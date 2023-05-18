@@ -58,6 +58,31 @@ class CliOptions(Subsystem):
         ),
     )
 
+    alias_flags = DictOption[str](
+        help=softwrap(
+            f"""
+            Register command line aliases.
+
+            Example:
+
+                [cli.alias_flags]
+                all-changed = "--changed-since=HEAD --changed-dependents=transitive"
+
+
+            This would allow you to run `{bin_name()} test --all-changed `, which is shorthand for
+            `{bin_name()} fmt lint check --changed-since=HEAD --changed-dependents=transitive`.
+
+            This is different from `[cli].alias` in that it requires each argument to start with `-`
+            or `--`, thus supporting only a subset of the `[cli].alias` functionality. The upside is
+            that it will look more like regular flags, and thus more symmetric with the expanded
+            semantics.
+
+            Notice: this option must be placed in a config file (e.g. `pants.toml` or `pantsrc`)
+            to have any effect.
+            """
+        ),
+    )
+
 
 @dataclass(frozen=True)
 class CliAlias:
@@ -116,6 +141,94 @@ class CliAlias:
                         """
                     )
                 )
+
+    def expand_args(self, args: tuple[str, ...]) -> tuple[str, ...]:
+        if not self.definitions:
+            return args
+        return tuple(self._do_expand_args(args))
+
+    def _do_expand_args(self, args: tuple[str, ...]) -> Generator[str, None, None]:
+        args_iter = iter(args)
+        for arg in args_iter:
+            if arg == "--":
+                # Do not expand pass through arguments.
+                yield arg
+                yield from args_iter
+                return
+
+            expanded = self.maybe_expand(arg)
+            if expanded:
+                logger.debug(f"Expanded [cli.alias].{arg} => {' '.join(expanded)}")
+                yield from expanded
+            else:
+                yield arg
+
+    def maybe_expand(self, arg: str) -> tuple[str, ...] | None:
+        return self.definitions.get(arg)
+
+
+@dataclass(frozen=True)
+class CliAliasFlag:
+    definitions: FrozenDict[str, tuple[str, ...]] = field(default_factory=FrozenDict)
+
+    def __post_init__(self):
+        valid_alias_re = re.compile(r"--\w(\w|-)*\w$", re.IGNORECASE)
+        for alias in self.definitions.keys():
+            if not re.match(valid_alias_re, alias):
+                raise CliAliasInvalidError(
+                    softwrap(
+                        f"""
+                        Invalid alias in `[cli].alias_flags` option: {alias!r}. May only contain alpha
+                        numerical letters and the separators `-` and `_`, and may not begin/end
+                        with a `-`. Leading dashes are inserted automatically when loading the
+                        configuration.
+                        """
+                    )
+                )
+
+    @classmethod
+    def from_dict(cls, aliases: dict[str, str]) -> CliAliasFlag:
+        definitions = {f"--{key}": tuple(shlex.split(value)) for key, value in aliases.items()}
+
+        def expand(
+            definition: tuple[str, ...], *trail: str
+        ) -> Generator[tuple[str, ...], None, None]:
+            for arg in definition:
+                if not arg.startswith("-"):
+                    raise CliAliasInvalidError(
+                        f"Invalid expansion in `[cli].alias_flags` option: {arg!r}. All expanded values must be flags."
+                    )
+                if arg not in definitions:
+                    yield (arg,)
+                else:
+                    if arg in trail:
+                        raise CliAliasCycleError(
+                            "CLI alias cycle detected in `[cli].alias_flags` option:\n"
+                            + " -> ".join([arg, *trail])
+                        )
+                    yield from expand(definitions[arg], arg, *trail)
+
+        return cls(
+            FrozenDict(
+                {
+                    f"{alias}": tuple(chain.from_iterable(expand(definition)))
+                    for alias, definition in definitions.items()
+                }
+            )
+        )
+
+    def check_name_conflicts(self, known_scopes: dict[str, list[str]]) -> None:
+        for scope, flags in known_scopes.items():
+            for alias, _ in self.definitions.items():
+                if alias in flags:
+                    raise CliAliasInvalidError(
+                        softwrap(
+                            f"""
+                            Invalid alias in `[cli].alias_flags` option: {alias!r}. This is already a
+                            registered flag in the {scope!r} scope.
+                            """
+                        )
+                    )
 
     def expand_args(self, args: tuple[str, ...]) -> tuple[str, ...]:
         if not self.definitions:
