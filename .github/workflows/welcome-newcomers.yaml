@@ -11,7 +11,6 @@ jobs:
   check_for_first_interaction:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
       - uses: actions/first-interaction@v1
         with:
           repo-token: ${{ secrets.WORKER_PANTS_SAY_HI_PAT }}
