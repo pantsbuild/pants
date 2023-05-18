@@ -785,6 +785,7 @@ def build_wheels_job(
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
             **({"container": container} if container else {}),
+            **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
             "env": {
                 **DISABLE_REMOTE_CACHE_ENV,
