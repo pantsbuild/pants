@@ -752,7 +752,7 @@ def build_wheels_job(
 
     if container:
         initial_steps = [
-            *checkout(containerized=True),
+            *checkout(containerized=True, ref=for_deploy_ref),
             install_rustup(),
             {
                 "name": "Expose Pythons",
