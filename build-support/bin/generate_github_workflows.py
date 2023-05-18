@@ -968,6 +968,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     wheels_job_names = tuple(wheels_jobs.keys())
     jobs = {
         "determine_ref": {
+            "name": "Determine the ref to build",
             "runs-on": "ubuntu-latest",
             "if": IS_PANTS_OWNER,
             "steps": [

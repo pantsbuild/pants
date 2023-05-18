@@ -267,6 +267,7 @@ jobs:
     timeout-minutes: 90
   determine_ref:
     if: github.repository_owner == 'pantsbuild'
+    name: Determine the ref to build
     outputs:
       build-ref: ${{ steps.determine_ref.outputs.build-ref }}
       is-release: ${{ steps.determine_ref.outputs.is-release }}
