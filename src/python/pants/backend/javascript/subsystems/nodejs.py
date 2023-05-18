@@ -269,26 +269,6 @@ class NodeJSToolProcess:
             project_digest=project_digest,
         )
 
-    @classmethod
-    def npx(
-        cls,
-        args: Iterable[str],
-        npm_package: str,
-        description: str,
-        level: LogLevel = LogLevel.INFO,
-        input_digest: Digest = EMPTY_DIGEST,
-        output_files: tuple[str, ...] = (),
-    ) -> NodeJSToolProcess:
-        return cls(
-            tool="npx",
-            tool_version=None,
-            args=("--yes", npm_package, *args),
-            description=description,
-            level=level,
-            input_digest=input_digest,
-            output_files=output_files,
-        )
-
 
 @dataclass(frozen=True)
 class NodeJSBinaries:
