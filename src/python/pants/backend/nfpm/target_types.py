@@ -33,12 +33,12 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentFileModeField,
     NfpmContentFileMtimeField,
     NfpmContentFileOwnerField,
-    NfpmContentFileSourceField,
     NfpmContentFilesField,
+    NfpmContentFileSourceField,
     NfpmContentSrcField,
     NfpmContentSymlinkDstField,
-    NfpmContentSymlinkSrcField,
     NfpmContentSymlinksField,
+    NfpmContentSymlinkSrcField,
     NfpmContentTypeField,
 )
 from pants.backend.nfpm.fields.deb import (
