@@ -111,29 +111,22 @@ def classify_changes() -> Jobs:
             "steps": [
                 *checkout(),
                 {
-                    "id": "comparison",
-                    "name": "Materialize comparison SHA",
-                    "run": dedent(
-                        """
-                        if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_REF ]]; then
-                          # push: we need to make sure the parent commit(s) exist
-                          git fetch --deepen=1
-                          comparison_sha=$(git rev-parse HEAD^)
-                        else
-                          # pull request: just fetch what github is telling us the base is
-                          git fetch origin --depth=1 "$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
-                          comparison_sha="$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
-                        fi
-                        echo "comparison_sha=$comparison_sha" | tee -a $GITHUB_OUTPUT
-                        """
-                    )
-                },
-                {
                     "id": "classify",
                     "name": "Classify changed files",
                     "run": dedent(
                         f"""\
-                        affected=$(git diff --name-only  "{gha_expr("steps.comparison.outputs.comparison_sha")}" HEAD | python build-support/bin/classify_changed_files.py)
+                        if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_REF ]]; then
+                          # push: compare to the immediate parent, which should already be fetched
+                          # (checkout's fetch_depth defaults to 10)
+                          comparison_sha=$(git rev-parse HEAD^)
+                        else
+                          # pull request: compare to the base branch, ensuring that commit exists
+                          git fetch --depth=1 "$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
+                          comparison_sha="$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
+                        fi
+                        echo "comparison_sha=$comparison_sha"
+
+                        affected=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
                         echo "Affected:"
                         if [[ "${{affected}}" == "docs" ]]; then
                           echo "docs_only=true" | tee -a $GITHUB_OUTPUT

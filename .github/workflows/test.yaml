@@ -618,17 +618,15 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - id: comparison
-      name: Materialize comparison SHA
-      run: "\nif [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_REF ]]; then\n  # push: we need to make sure the parent commit(s) exist\n\
-        \  git fetch --deepen=1\n  comparison_sha=$(git rev-parse HEAD^)\nelse\n  # pull request: just fetch what github is\
-        \ telling us the base is\n  git fetch origin --depth=1 \"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\n  comparison_sha=\"\
-        $GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\nfi\necho \"comparison_sha=$comparison_sha\" | tee -a $GITHUB_OUTPUT\n"
     - id: classify
       name: Classify changed files
-      run: "affected=$(git diff --name-only  \"${{ steps.comparison.outputs.comparison_sha }}\" HEAD | python build-support/bin/classify_changed_files.py)\n\
-        echo \"Affected:\"\nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" | tee -a $GITHUB_OUTPUT\n\
-        fi\nfor i in ${affected}; do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
+      run: "if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_REF ]]; then\n  # push: compare to the immediate parent, which should\
+        \ already be fetched\n  # (checkout's fetch_depth defaults to 10)\n  comparison_sha=$(git rev-parse HEAD^)\nelse\n\
+        \  # pull request: compare to the base branch, ensuring that commit exists\n  git fetch --depth=1 \"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\
+        \n  comparison_sha=\"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\nfi\necho \"comparison_sha=$comparison_sha\"\n\naffected=$(git\
+        \ diff --name-only \"$comparison_sha\" HEAD | python build-support/bin/classify_changed_files.py)\necho \"Affected:\"\
+        \nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" | tee -a $GITHUB_OUTPUT\nfi\nfor i in ${affected};\
+        \ do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Lint Python and Shell
