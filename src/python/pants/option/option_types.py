@@ -215,9 +215,9 @@ class _ListOptionBase(
     _OptionBase["tuple[_ListMemberT, ...]", "tuple[_ListMemberT, ...]"],
     Generic[_ListMemberT],
 ):
-    """Descriptor base for a  subsystem option of  ahomogenous list of some type.
+    """Descriptor base for a subsystem option of an homogenous list of some type.
 
-    Don't use this class directly, instead use one of the conrete classes below.
+    Don't use this class directly, instead use one of the concrete classes below.
 
     The default value will always be set as an empty list, and the Python property always returns
     a tuple (for immutability).

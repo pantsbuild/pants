@@ -25,6 +25,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import StrListOption
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import softwrap, stable_hash
 
@@ -259,6 +260,7 @@ async def get_python(
         ProcessResult,
         Process(
             pyenv_install.args + (specific_python,),
+            level=LogLevel.DEBUG,
             input_digest=pyenv_install.digest,
             description=f"Install Python {python_to_use}",
             append_only_caches=pyenv_install.append_only_caches,

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import itertools
 import json
+import logging
 import os.path
+import re
 from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
@@ -62,6 +64,8 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text, softwrap
+
+_logger = logging.getLogger(__name__)
 
 
 class NodePackageDependenciesField(Dependencies):
@@ -250,8 +254,8 @@ class NodePackageVersionField(StringField):
         This field should not be overridden; use the value from target generation.
         """
     )
-    required = True
-    value: str
+    required = False
+    value: str | None
 
 
 class NodeThirdPartyPackageVersionField(NodePackageVersionField):
@@ -313,6 +317,25 @@ class NodePackageTarget(Target):
         NodePackageVersionField,
         NodePackageDependenciesField,
         NodePackageTestScriptField,
+    )
+
+
+class NPMDistributionTarget(Target):
+    alias = "npm_distribution"
+
+    help = help_text(
+        """
+        A publishable npm registry distribution, typically a gzipped tarball
+        of the sources and any resources, but omitting the lockfile.
+
+        Generated using the projects package manager `pack` implementation.
+        """
+    )
+
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PackageJsonSourceField,
+        OutputPathField,
     )
 
 
@@ -444,6 +467,83 @@ class NodeBuildScriptTarget(Target):
 
 
 @dataclass(frozen=True)
+class PackageJsonImports:
+    """https://nodejs.org/api/packages.html#subpath-imports."""
+
+    imports: FrozenDict[re.Pattern[str], tuple[str, ...]]
+    root_dir: str
+
+    def replacements(self, import_string: str) -> tuple[str, ...]:
+        def replace_matching_pattern(
+            pattern: re.Pattern[str], subpath: str, string: str
+        ) -> str | None:
+            match = pattern.match(string)
+            if match:
+                replacement = subpath
+                for group in match.groups():
+                    replacement = replacement.replace("*", group, 1)
+                if "*" in replacement:
+                    _logger.warning(
+                        softwrap(
+                            f"""
+                            package.json#imports pattern '{pattern.pattern}' matched '{string}',
+                            but the resulting subpath '{subpath}' string replacements '*'
+                            did not match.
+
+                            Inference will not behave correctly for import '{string}'.
+                            """
+                        )
+                    )
+                    return None
+                return "".join((replacement, string[match.endpos :]))
+            return None
+
+        return tuple(
+            filter(
+                None,
+                (
+                    replace_matching_pattern(pattern, subpath, import_string)
+                    for pattern, subpaths in self.imports.items()
+                    for subpath in subpaths
+                ),
+            )
+        )
+
+    @classmethod
+    def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonImports:
+        return cls(
+            imports=cls._import_from_package_json(pkg_json),
+            root_dir=pkg_json.root_dir,
+        )
+
+    @staticmethod
+    def _to_import_pattern(string: str) -> re.Pattern[str]:
+        return re.compile(r"^" + re.escape(string).replace(r"\*", "(.*)"))
+
+    @staticmethod
+    def _import_from_package_json(
+        pkg_json: PackageJson,
+    ) -> FrozenDict[re.Pattern[str], tuple[str, ...]]:
+        imports: Mapping[str, Any] | None = pkg_json.content.get("imports")
+
+        def get_subpaths(value: str | Mapping[str, Any]) -> Iterable[str]:
+            if isinstance(value, str):
+                yield value
+            elif isinstance(value, Mapping):
+                for v in value.values():
+                    yield from get_subpaths(v)
+
+        if not imports:
+            return FrozenDict()
+        return FrozenDict(
+            {
+                PackageJsonImports._to_import_pattern(key): tuple(sorted(get_subpaths(subpath)))
+                for key, subpath in imports.items()
+            }
+        )
+
+
+@dataclass(frozen=True)
 class PackageJsonEntryPoints:
     """See https://nodejs.org/api/packages.html#package-entry-points and
     https://docs.npmjs.com/cli/v9/configuring-npm/package-json#browser."""
@@ -514,7 +614,7 @@ class PackageJsonScripts:
 class PackageJson:
     content: FrozenDict[str, Any]
     name: str
-    version: str
+    version: str | None
     snapshot: Snapshot
     workspaces: tuple[str, ...] = ()
     module: Literal["commonjs", "module"] | None = None
@@ -590,7 +690,11 @@ async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePa
         ),
     )
     package_json_tgts = sorted(
-        (tgt for tgt in candidate_targets if tgt.has_field(PackageJsonSourceField)),
+        (
+            tgt
+            for tgt in candidate_targets
+            if tgt.has_field(PackageJsonSourceField) and tgt.has_field(NodePackageNameField)
+        ),
         key=lambda tgt: tgt.address.spec_path,
         reverse=True,
     )
@@ -609,7 +713,7 @@ async def parse_package_json(content: FileContent) -> PackageJson:
     return PackageJson(
         content=parsed_package_json,
         name=parsed_package_json["name"],
-        version=parsed_package_json["version"],
+        version=parsed_package_json.get("version"),
         snapshot=await Get(Snapshot, PathGlobs([content.path])),
         module=parsed_package_json.get("type"),
         workspaces=tuple(parsed_package_json.get("workspaces", ())),
@@ -725,6 +829,15 @@ async def script_entrypoints_for_source(
     source_field: PackageJsonSourceField,
 ) -> PackageJsonEntryPoints:
     return PackageJsonEntryPoints.from_package_json(
+        await Get(PackageJson, PackageJsonSourceField, source_field)
+    )
+
+
+@rule
+async def subpath_imports_for_source(
+    source_field: PackageJsonSourceField,
+) -> PackageJsonImports:
+    return PackageJsonImports.from_package_json(
         await Get(PackageJson, PackageJsonSourceField, source_field)
     )
 

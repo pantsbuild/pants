@@ -62,34 +62,51 @@ class NodeJSProject:
     def lockfile_name(self) -> str:
         if self.package_manager == "pnpm":
             return "pnpm-lock.yaml"
+        elif self.package_manager == "yarn":
+            return "yarn.lock"
         return "package-lock.json"
 
     @property
     def generate_lockfile_args(self) -> tuple[str, ...]:
         if self.package_manager == "pnpm":
             return ("install", "--lockfile-only")
+        elif self.package_manager == "yarn":
+            return ("install",)  # yarn does not provide a lockfile only mode.
         return ("install", "--package-lock-only")
 
     @property
     def immutable_install_args(self) -> tuple[str, ...]:
-        if self.package_manager == "pnpm":
-            return ("install", "--frozen-lockfile")
-        return ("clean-install",)
+        if self.package_manager == "npm":
+            return ("clean-install",)
+        return ("install", "--frozen-lockfile")
 
     @property
     def workspace_specifier_arg(self) -> str:
         if self.package_manager == "pnpm":
             return "--filter"
+        elif self.package_manager == "yarn":
+            return "workspace"
         return "--workspace"
 
     def extra_env(self) -> dict[str, str]:
         if self.package_manager == "pnpm":
             return {"PNPM_HOME": "{chroot}/._pnpm_home"}
+        elif self.package_manager == "yarn":
+            return {"YARN_CACHE_FOLDER": "{chroot}/._yarn_cache"}
         return {}
+
+    @property
+    def pack_archive_format(self) -> str:
+        if self.package_manager == "yarn":
+            return "{}-v{}.tgz"
+        else:
+            return "{}-{}.tgz"
 
     def extra_caches(self) -> dict[str, str]:
         if self.package_manager == "pnpm":
             return {"pnpm_home": "._pnpm_home"}
+        elif self.package_manager == "yarn":
+            return {"yarn_cache": "._yarn_cache"}
         return {}
 
     def get_project_digest(self) -> MergeDigests:

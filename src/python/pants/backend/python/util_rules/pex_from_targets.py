@@ -333,16 +333,20 @@ class _PexRequirementsRequest:
 async def determine_requirement_strings_in_closure(
     request: _PexRequirementsRequest, global_requirement_constraints: GlobalRequirementConstraints
 ) -> PexRequirements:
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
-    return PexRequirements.create_from_requirement_fields(
-        (
-            tgt[PythonRequirementsField]
-            for tgt in transitive_targets.closure
-            if tgt.has_field(PythonRequirementsField)
-        ),
+    addrs = request.addresses
+    if len(addrs) == 0:
+        description_of_origin = ""
+    elif len(addrs) == 1:
+        description_of_origin = addrs[0].spec
+    else:
+        description_of_origin = f"{addrs[0].spec} and {len(addrs)-1} other targets"
+
+    return PexRequirements(
+        request.addresses,
         # This is only set if `[python].requirement_constraints` is configured, which is mutually
         # exclusive with resolves.
         constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
+        description_of_origin=description_of_origin,
     )
 
 
@@ -669,6 +673,7 @@ async def _setup_constraints_repository_pex(
         requirements=PexRequirements(
             all_constraints,
             constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
+            description_of_origin=constraints_path,
         ),
         # Monolithic PEXes like the repository PEX should always use the Packed layout.
         layout=PexLayout.PACKED,

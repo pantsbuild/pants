@@ -15,14 +15,14 @@ from pants.backend.visibility.rules import rules as visibility_rules
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import Snapshot
 from pants.engine.internals.dep_rules import DependencyRuleAction, DependencyRuleApplication
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
 
 def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
-    return Snapshot._unsafe_create(Digest(fingerprint.ljust(64, "0"), 1), files, ())
+    return Snapshot.create_for_testing(files, ())
 
 
 @pytest.mark.parametrize(
@@ -74,7 +74,7 @@ def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
                       "bar.txt",
                       "foo.txt"
                     ],
-                    "sources_fingerprint": "2000000000000000000000000000000000000000000000000000000000000000",
+                    "sources_fingerprint": "d3dd0a1f72aaa1fb2623e7024d3ea460b798f6324805cfad5c2b751e2dfb756b",
                     "sources_raw": [
                       "*.txt"
                     ]
@@ -111,7 +111,7 @@ def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
                     "sources": [
                       "foo.txt"
                     ],
-                    "sources_fingerprint": "1000000000000000000000000000000000000000000000000000000000000000",
+                    "sources_fingerprint": "b5e73bb1d7a3f8c2e7f8c43f38ab4d198e3512f082c670706df89f5abe319edf",
                     "sources_raw": [
                       "foo.txt"
                     ],
@@ -158,7 +158,7 @@ def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
                     "target_type": "files",
                     "dependencies": [],
                     "sources": [],
-                    "sources_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "sources_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                     "sources_raw": [
                       "*.txt"
                     ],
@@ -239,7 +239,7 @@ def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
                     "sources": [
                       "foo/a.txt"
                     ],
-                    "sources_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "sources_fingerprint": "72ceef751c940b5797530e298f4d9f66daf3c51f7d075bfb802295ffb01d5de3",
                     "sources_raw": [
                       "*.txt"
                     ]
