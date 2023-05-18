@@ -31,8 +31,8 @@ class NfpmContentFileOwnerField(StringField):
     alias: ClassVar[str] = "file_owner"
     default = "root"  # Make the nFPM default visible in help.
     help = help_text(
-        lambda: f"""
-        Username that owns this file or directory.
+        """
+        Username that should own this packaged file or directory.
 
         This is like the OWNER arg in chown: https://www.mankier.com/1/chown
         """
@@ -44,8 +44,8 @@ class NfpmContentFileGroupField(StringField):
     alias: ClassVar[str] = "file_group"
     default = "root"  # Make the nFPM default visible in help.
     help = help_text(
-        lambda: f"""
-        Name of the group that owns this file or directory.
+        """
+        Name of the group that should own this packaged file or directory.
 
         This is like the GROUP arg in chown: https://www.mankier.com/1/chown
         """
@@ -74,10 +74,10 @@ def _parse_filemode(filemode: str) -> int:
     This is the opposite of stat.filemode, except that it does not support the filetype bits.
     """
     if len(filemode) != 9:
-        raise ValueError(f"Symbolic filemode must be exactly 9 characters, not {len(filemode)}.")
+        raise ValueError(f"Symbolic file mode must be exactly 9 characters, not {len(filemode)}.")
     if not _filemode_chars.issuperset(filemode):
         raise ValueError(
-            "Cannot parse symbolic filemode with unknown symbols: "
+            "Cannot parse symbolic file mode with unknown symbols: "
             + "".join(set(filemode).difference(_filemode_chars))
         )
 
@@ -103,7 +103,7 @@ class NfpmContentFileModeField(IntField):
     # TODO: use the digest's execute bit to default to either 0o644 or 0o755
     #       and bypass any nFPM auto detection confusion.
     help = help_text(
-        lambda: f"""
+        """
         A file mode as a numeric octal, an string octal, or a symbolic representation.
 
         NB: In most cases, you should set this field and not rely on the default value.
@@ -161,7 +161,7 @@ class NfpmContentFileModeField(IntField):
                         f"The {repr(cls.alias)} field in target {address} must be "
                         "an octal (like 0o755 or 0o600), "
                         "an octal as a string (like '755' or '600'), "
-                        "or a symbolic filemode (like 'rwxr-xr-x' or 'rw-------'). "
+                        "or a symbolic file mode (like 'rwxr-xr-x' or 'rw-------'). "
                         f"It is set to {repr(raw_value)}."
                     ) from e
         else:
@@ -181,7 +181,7 @@ class NfpmContentFileMtimeField(StringField):
     # TODO: there are many things in nFPM that use time.Now(), so upstream nFPM work
     #       is required so pants can use SOURCE_DATE_EPOCH to overwrite that.
     help = help_text(
-        lambda: f"""
+        """
         The file modification time as an RFC 3339 formatted string.
 
         For example: 2008-01-02T15:04:05Z
