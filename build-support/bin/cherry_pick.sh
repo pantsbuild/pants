@@ -62,7 +62,7 @@ if [[ -z $CATEGORY_LABEL ]]; then
   read -r CATEGORY_LABEL
 fi
 
-REVIEWERS=" $(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)"
+REVIEWERS=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
 
 BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.XXXXXX")
 gh pr view "$PR_NUM" --json body --jq '.body' > "$BODY_FILE"
