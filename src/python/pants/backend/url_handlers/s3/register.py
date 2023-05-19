@@ -75,7 +75,7 @@ async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredenti
     headers = {}
     if aws_credentials.creds.token:
         # Workaround https://github.com/boto/botocore/pull/2948
-        headers['x-amz-security-token'] = None
+        headers['X-Amz-Security-Token'] = None
 
     http_request = SimpleNamespace(
         url=path_style_url,
