@@ -51,32 +51,6 @@ enum ByteStoreError {
   Other(String),
 }
 
-impl ByteStoreError {
-  fn retryable(&self) -> bool {
-    match self {
-      ByteStoreError::Grpc(status) => status_is_retryable(status),
-      ByteStoreError::Other(_) => false,
-    }
-  }
-}
-
-impl From<Status> for ByteStoreError {
-  fn from(status: Status) -> ByteStoreError {
-    ByteStoreError::Grpc(status)
-  }
-}
-
-impl From<String> for ByteStoreError {
-  fn from(string: String) -> ByteStoreError {
-    ByteStoreError::Other(string)
-  }
-}
-impl From<std::io::Error> for ByteStoreError {
-  fn from(err: std::io::Error) -> ByteStoreError {
-    ByteStoreError::Other(err.to_string())
-  }
-}
-
 impl fmt::Display for ByteStoreError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
@@ -203,11 +177,10 @@ impl Provider {
       digest.hash,
       digest.size_bytes,
     );
-    let store = self.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
-    let chunk_size_bytes = store.chunk_size_bytes;
+    let chunk_size_bytes = self.chunk_size_bytes;
 
     let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
       if offset >= len && has_sent_any {
@@ -252,8 +225,7 @@ impl Provider {
     digest: Digest,
     destination: &mut dyn LoadDestination,
   ) -> Result<bool, String> {
-    let store = self.clone();
-    let instance_name = store.instance_name.clone().unwrap_or_default();
+    let instance_name = self.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
       "{}{}blobs/{}/{}",
       &instance_name,
@@ -272,7 +244,7 @@ impl Provider {
 
     let destination = Arc::new(Mutex::new(destination));
 
-    let result_future = retry_call(
+    retry_call(
       (client, request, destination),
       move |(mut client, request, destination)| {
         async move {
@@ -307,24 +279,23 @@ impl Provider {
           let actual_digest = hasher.finish();
           if actual_digest != digest {
             // Return an `internal` status to attempt retry.
-            return Err(ByteStoreError::Grpc(Status::internal(format!(
+            return Err(Status::internal(format!(
               "Remote CAS gave wrong digest: expected {digest:?}, got {actual_digest:?}"
-            ))));
+            )));
           }
 
           Ok(())
         }
         .map(|read_result| match read_result {
           Ok(()) => Ok(true),
-          Err(ByteStoreError::Grpc(status)) if status.code() == Code::NotFound => Ok(false),
+          Err(status) if status.code() == Code::NotFound => Ok(false),
           Err(err) => Err(err),
         })
       },
-      ByteStoreError::retryable,
-    );
-
-    let result = result_future.await.map_err(|e| e.to_string());
-    result
+      status_is_retryable,
+    )
+    .await
+    .map_err(|e| e.to_string())
   }
 
   async fn list_missing_digests_(
@@ -336,9 +307,7 @@ impl Provider {
       blob_digests: digests.into_iter().map(|d| d.into()).collect::<Vec<_>>(),
     };
 
-    let store = self.clone();
-    let store2 = store.clone();
-    let client = store2.cas_client.as_ref().clone();
+    let client = self.cas_client.as_ref().clone();
     let response = retry_call(
       client,
       move |mut client| {
