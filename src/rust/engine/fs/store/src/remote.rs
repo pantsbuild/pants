@@ -498,10 +498,16 @@ impl ByteStore {
   /// Given a collection of Digests (digests),
   /// returns the set of digests from that collection not present in the CAS.
   ///
-  pub fn list_missing_digests(
-    &self,
-    request: remexec::FindMissingBlobsRequest,
-  ) -> impl Future<Output = Result<HashSet<Digest>, String>> {
+  pub async fn list_missing_digests<I>(&self, digests: I) -> Result<HashSet<Digest>, String>
+  where
+    I: IntoIterator<Item = Digest>,
+    I::IntoIter: Send,
+  {
+    let request = remexec::FindMissingBlobsRequest {
+      instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
+      blob_digests: digests.into_iter().map(|d| d.into()).collect::<Vec<_>>(),
+    };
+
     let store = self.clone();
     async {
       in_workunit!(
@@ -531,16 +537,7 @@ impl ByteStore {
       )
       .await
     }
-  }
-
-  pub fn find_missing_blobs_request(
-    &self,
-    digests: impl IntoIterator<Item = Digest>,
-  ) -> remexec::FindMissingBlobsRequest {
-    remexec::FindMissingBlobsRequest {
-      instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
-      blob_digests: digests.into_iter().map(|d| d.into()).collect::<Vec<_>>(),
-    }
+    .await
   }
 
   async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, ByteStoreError> {

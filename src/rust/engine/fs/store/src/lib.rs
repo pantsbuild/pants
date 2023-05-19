@@ -801,9 +801,7 @@ impl Store {
           ingested_digests.keys().cloned().collect()
         } else {
           remote
-            .list_missing_digests(
-              remote.find_missing_blobs_request(ingested_digests.keys().cloned()),
-            )
+            .list_missing_digests(ingested_digests.keys().cloned())
             .await?
         };
 
@@ -958,10 +956,7 @@ impl Store {
     } else {
       return Ok(false);
     };
-    let missing = remote
-      .store
-      .list_missing_digests(remote.store.find_missing_blobs_request(missing_locally))
-      .await?;
+    let missing = remote.store.list_missing_digests(missing_locally).await?;
 
     Ok(missing.is_empty())
   }
