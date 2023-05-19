@@ -262,6 +262,7 @@ async fn write_file_errors() {
 
 #[tokio::test]
 async fn write_connection_error() {
+  let _ = WorkunitStore::setup_for_tests();
   let store = ByteStore::new(
     "http://doesnotexist.example",
     None,
