@@ -1150,7 +1150,7 @@ def generate() -> dict[Path, str]:
                 "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}",
                 "cancel-in-progress": True,
             },
-            "on": {"pull_request": {}, "push": {"branches-ignore": ["dependabot/**"]}},
+            "on": {"pull_request": {}, "push": {"branches": ["main", "2.*.x"]}},
             "jobs": pr_jobs,
             "env": global_env(),
         },

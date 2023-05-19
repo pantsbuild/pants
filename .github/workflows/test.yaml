@@ -1039,5 +1039,6 @@ name: Pull Request CI
 'on':
   pull_request: {}
   push:
-    branches-ignore:
-    - dependabot/**
+    branches:
+    - main
+    - 2.*.x
