@@ -33,6 +33,26 @@ use workunit_store::{in_workunit, Metric, ObservationMetric};
 
 use crate::StoreError;
 
+pub type ByteSource = Arc<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
+
+#[async_trait]
+pub trait ByteStoreProvider: Sync + Send + 'static {
+  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String>;
+
+  async fn load(
+    &self,
+    digest: Digest,
+    destination: &mut dyn LoadDestination,
+  ) -> Result<bool, String>;
+
+  async fn list_missing_digests(
+    &self,
+    digests: &mut (dyn Iterator<Item = Digest> + Send),
+  ) -> Result<HashSet<Digest>, String>;
+
+  fn chunk_size_bytes(&self) -> usize;
+}
+
 #[derive(Clone)]
 pub struct ByteStore {
   instance_name: Option<String>,
@@ -100,7 +120,7 @@ impl std::error::Error for ByteStoreError {}
 
 /// Places that write the result of a remote `load`
 #[async_trait]
-trait LoadDestination: AsyncWrite + Send + Sync + Unpin + 'static {
+pub trait LoadDestination: AsyncWrite + Send + Sync + Unpin + 'static {
   /// Clear out the writer and start again, if there's been previous contents written
   async fn reset(&mut self) -> std::io::Result<()>;
 }
