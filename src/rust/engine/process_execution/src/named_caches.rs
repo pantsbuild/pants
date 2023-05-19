@@ -18,10 +18,9 @@ pub struct CacheName(String);
 
 impl CacheName {
   pub fn new(name: String) -> Result<CacheName, String> {
-    if name
-      .chars()
-      .all(|c| (c.is_ascii_alphabetic() && c.is_ascii_lowercase()) || c.is_ascii_digit() || c == '_')
-    {
+    if name.chars().all(|c| {
+      (c.is_ascii_alphabetic() && c.is_ascii_lowercase()) || c.is_ascii_digit() || c == '_'
+    }) {
       Ok(CacheName(name))
     } else {
       Err(format!(
