@@ -28,36 +28,7 @@ See <https://docs.github.com/en/github/authenticating-to-github/telling-git-abou
 
 Note: the last step is required on macOS.
 
-### 4. Create a PyPI account
-
-[pypi.org/account/register](https://pypi.org/account/register).
-
-Please enable two-factor authentication under "Account Settings".
-
-Generate an API token under "Account Settings" for all projects. Copy the token for the last step.
-
-### 5. Get added to pantsbuild.pants PyPI
-
-You can ask any of the current Owners to add you as a maintainer.
-
-### 6. Configure `~/.pypirc`
-
-Fill in with your PyPI token by running:
-
-```bash
-$ cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
-[pypi]
-username: __token__
-password: <fill me in>
-
-[server-login]
-username: __token__
-password: <fill me in>
-
-EOF
-```
-
-### 7. Authenticate with the Github API
+### 4. Authenticate with the Github API
 
 Ensure that you have a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) for your Github account in your `.netrc` file.
 
