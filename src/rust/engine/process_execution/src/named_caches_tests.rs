@@ -7,6 +7,7 @@ fn alphanumeric_lowercase_are_valid() {
   let name = "__mynamed_cache_1";
   let cache_name = CacheName::new(name.to_string());
   assert!(cache_name.is_ok());
+  assert_eq!(name, cache_name.unwrap().name());
 }
 
 #[test]
