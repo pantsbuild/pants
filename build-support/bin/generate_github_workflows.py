@@ -654,7 +654,7 @@ def test_jobs(
             ),
             *helper.setup_primary_python(),
             *helper.expose_all_pythons(),
-            helper.native_binaries_download(),
+            *helper.native_binaries_download(),
             {
                 "name": human_readable_step_name,
                 "run": pants_args_str,
@@ -831,7 +831,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 "steps": [
                     *checkout(),
                     *linux_x86_64_helper.setup_primary_python(),
-                    linux_x86_64_helper.native_binaries_download(),
+                    *linux_x86_64_helper.native_binaries_download(),
                     {
                         "name": "Lint",
                         "run": "./pants lint check ::\n",
