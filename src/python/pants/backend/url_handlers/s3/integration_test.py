@@ -45,7 +45,7 @@ def monkeypatch_botocore(monkeypatch):
         botocore = SimpleNamespace()
         botocore.exceptions = SimpleNamespace(NoCredentialsError=Exception)
         fake_session = object()
-        fake_creds = SimpleNamespace(access_key="ACCESS", secret_key="SECRET")
+        fake_creds = SimpleNamespace(access_key="ACCESS", secret_key="SECRET", token=None)
         botocore.session = SimpleNamespace(get_session=lambda: fake_session)
 
         def fake_resolver_creator(session):
