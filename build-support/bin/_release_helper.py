@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import sys
 import venv
-import xmlrpc.client
 from configparser import ConfigParser
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -21,7 +20,6 @@ from enum import Enum
 from functools import total_ordering
 from math import ceil
 from pathlib import Path
-from time import sleep
 from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
@@ -81,57 +79,6 @@ _expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi", "kaos"}
 DISABLED_BACKENDS_CONFIG = {
     "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants.explorer.server"]',
 }
-
-
-class PackageAccessValidator:
-    @classmethod
-    def validate_all(cls):
-        instance = cls()
-        for pkg_name in _known_packages:
-            instance.validate_package_access(pkg_name)
-
-    def __init__(self):
-        self._client = xmlrpc.client.ServerProxy("https://pypi.org/pypi")
-
-    @property
-    def client(self):
-        # The PyPI XML-RPC API requires at least 1 second between requests, or it rejects them
-        # with HTTPTooManyRequests.
-        sleep(1.0)
-        return self._client
-
-    @staticmethod
-    def validate_role_sets(role: str, actual: set[str], expected: set[str]) -> str:
-        err_msg = ""
-        if actual != expected:
-            expected_not_actual = sorted(expected - actual)
-            actual_not_expected = sorted(actual - expected)
-            if expected_not_actual:
-                err_msg += f"Missing expected {role}s: {','.join(expected_not_actual)}."
-            if actual_not_expected:
-                err_msg += f"Found unexpected {role}s: {','.join(actual_not_expected)}"
-        return err_msg
-
-    def validate_package_access(self, pkg_name: str) -> None:
-        actual_owners = set()
-        actual_maintainers = set()
-        for role_assignment in self.client.package_roles(pkg_name):
-            role, username = role_assignment
-            if role == "Owner":
-                actual_owners.add(username)
-            elif role == "Maintainer":
-                actual_maintainers.add(username)
-            else:
-                raise ValueError(f"Unrecognized role {role} for user {username}")
-
-        err_msg = ""
-        err_msg += self.validate_role_sets("owner", actual_owners, _expected_owners)
-        err_msg += self.validate_role_sets("maintainer", actual_maintainers, _expected_maintainers)
-
-        if err_msg:
-            die(f"Role discrepancies for {pkg_name}: {err_msg}")
-
-        print(f"Roles for package {pkg_name} as expected.")
 
 
 @total_ordering
@@ -871,31 +818,39 @@ def build_pex(fetch: bool) -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Publish
+# Fetch and stabilize the versions of wheels for publishing
 # -----------------------------------------------------------------------------------------------
 
 
-def publish() -> None:
-    banner("Releasing to PyPI and GitHub")
-    # Check prereqs.
-    check_clean_git_branch()
-    prompt_artifact_freshness()
-    check_pgp()
-    check_roles()
-
+def fetch_and_stabilize() -> None:
+    # TODO: Because wheels are now built specifically for a particular tag, we could likely remove
+    # "reversioning".
+    banner("Fetching and stabilizing wheels.")
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
     fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
     check_pants_wheels_present(CONSTANTS.deploy_dir)
     reversion_prebuilt_wheels()
+    banner("Successfully fetched and stabilized wheels")
 
-    # Release.
-    create_twine_venv()
-    upload_wheels_via_twine()
-    tag_release()
-    banner("Successfully released to PyPI and GitHub")
+
+# -----------------------------------------------------------------------------------------------
+# Begin a release by pushing a release tag
+# -----------------------------------------------------------------------------------------------
+
+
+def tag_release() -> None:
+    banner("Tagging release")
+
+    check_clean_git_branch()
+    check_pgp()
+
+    prompt_artifact_freshness()
     prompt_to_generate_docs()
+
+    run_tag_release()
+    banner("Successfully tagged release")
 
 
 def check_clean_git_branch() -> None:
@@ -946,24 +901,6 @@ def check_pgp() -> None:
         )
 
 
-def check_roles() -> None:
-    # Check that the packages we plan to publish are correctly owned.
-    banner("Checking current user.")
-    username = get_pypi_config("server-login", "username")
-    if (
-        username != "__token__"  # See: https://pypi.org/help/#apitoken
-        and username not in _expected_owners
-        and username not in _expected_maintainers
-    ):
-        die(f"User {username} not authorized to publish.")
-    banner("Checking package roles.")
-    validator = PackageAccessValidator()
-    for pkg in PACKAGES:
-        if pkg.name not in _known_packages:
-            die(f"Unknown package {pkg}")
-        validator.validate_package_access(pkg.name)
-
-
 def reversion_prebuilt_wheels() -> None:
     # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We use
     # manylinux2014 images.
@@ -985,7 +922,7 @@ def reversion_prebuilt_wheels() -> None:
         )
 
 
-def tag_release() -> None:
+def run_tag_release() -> None:
     tag_name = f"release_{CONSTANTS.pants_stable_version}"
     subprocess.run(
         [
@@ -1202,13 +1139,13 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("publish")
+    subparsers.add_parser("tag-release")
+    subparsers.add_parser("fetch-and-stabilize")
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
     subparsers.add_parser("build-local-pex")
     subparsers.add_parser("build-universal-pex")
-    subparsers.add_parser("validate-roles")
     subparsers.add_parser("validate-freshness")
     subparsers.add_parser("list-prebuilt-wheels")
     subparsers.add_parser("check-pants-wheels")
@@ -1217,8 +1154,10 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = create_parser().parse_args()
-    if args.command == "publish":
-        publish()
+    if args.command == "tag-release":
+        tag_release()
+    if args.command == "fetch-and-stabilize":
+        fetch_and_stabilize()
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":
@@ -1229,8 +1168,6 @@ def main() -> None:
         build_pex(fetch=False)
     if args.command == "build-universal-pex":
         build_pex(fetch=True)
-    if args.command == "validate-roles":
-        PackageAccessValidator.validate_all()
     if args.command == "validate-freshness":
         prompt_artifact_freshness()
     if args.command == "list-prebuilt-wheels":

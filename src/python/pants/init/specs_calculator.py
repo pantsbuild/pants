@@ -15,6 +15,7 @@ from pants.engine.internals.selectors import Params
 from pants.engine.rules import QueryRule
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.util.frozendict import FrozenDict
 from pants.vcs.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
 
@@ -85,7 +86,7 @@ def calculate_specs(
                 path_component=address_input.path_component,
                 target_component=address_input.target_component,
                 generated_component=address_input.generated_component,
-                parameters=address_input.parameters,
+                parameters=FrozenDict(address_input.parameters),
             )
         )
 

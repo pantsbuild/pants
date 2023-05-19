@@ -359,12 +359,6 @@ jobs:
       with:
         name: pants-log-wheels-Linux-ARM64
         path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -421,12 +415,6 @@ jobs:
       with:
         name: pants-log-wheels-Linux-x86_64
         path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -484,12 +472,6 @@ jobs:
       with:
         name: pants-log-wheels-macOS10-15-x86_64
         path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -543,12 +525,6 @@ jobs:
       with:
         name: pants-log-wheels-macOS11-ARM64
         path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   check_labels:
     if: github.repository_owner == 'pantsbuild'
@@ -616,10 +592,13 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+    - - name: Download native binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+          path: src/python/pants
+      - name: Make native-client runnable
+        run: chmod +x src/python/pants/bin/native_client
     - name: Lint
       run: './pants lint check ::
 
@@ -702,10 +681,13 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+    - - name: Download native binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+          path: src/python/pants
+      - name: Make native-client runnable
+        run: chmod +x src/python/pants/bin/native_client
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
@@ -768,10 +750,13 @@ jobs:
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+    - - name: Download native binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+          path: src/python/pants
+      - name: Make native-client runnable
+        run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 0/3
       run: './pants test --shard=0/3 ::
 
@@ -834,10 +819,13 @@ jobs:
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+    - - name: Download native binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+          path: src/python/pants
+      - name: Make native-client runnable
+        run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 1/3
       run: './pants test --shard=1/3 ::
 
@@ -900,10 +888,13 @@ jobs:
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+    - - name: Download native binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+          path: src/python/pants
+      - name: Make native-client runnable
+        run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 2/3
       run: './pants test --shard=2/3 ::
 
@@ -952,10 +943,13 @@ jobs:
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+    - - name: Download native binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+          path: src/python/pants
+      - name: Make native-client runnable
+        run: chmod +x src/python/pants/bin/native_client
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 

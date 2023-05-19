@@ -254,8 +254,8 @@ class NodePackageVersionField(StringField):
         This field should not be overridden; use the value from target generation.
         """
     )
-    required = True
-    value: str
+    required = False
+    value: str | None
 
 
 class NodeThirdPartyPackageVersionField(NodePackageVersionField):
@@ -317,6 +317,25 @@ class NodePackageTarget(Target):
         NodePackageVersionField,
         NodePackageDependenciesField,
         NodePackageTestScriptField,
+    )
+
+
+class NPMDistributionTarget(Target):
+    alias = "npm_distribution"
+
+    help = help_text(
+        """
+        A publishable npm registry distribution, typically a gzipped tarball
+        of the sources and any resources, but omitting the lockfile.
+
+        Generated using the projects package manager `pack` implementation.
+        """
+    )
+
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PackageJsonSourceField,
+        OutputPathField,
     )
 
 
@@ -595,7 +614,7 @@ class PackageJsonScripts:
 class PackageJson:
     content: FrozenDict[str, Any]
     name: str
-    version: str
+    version: str | None
     snapshot: Snapshot
     workspaces: tuple[str, ...] = ()
     module: Literal["commonjs", "module"] | None = None
@@ -671,7 +690,11 @@ async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePa
         ),
     )
     package_json_tgts = sorted(
-        (tgt for tgt in candidate_targets if tgt.has_field(PackageJsonSourceField)),
+        (
+            tgt
+            for tgt in candidate_targets
+            if tgt.has_field(PackageJsonSourceField) and tgt.has_field(NodePackageNameField)
+        ),
         key=lambda tgt: tgt.address.spec_path,
         reverse=True,
     )
@@ -690,7 +713,7 @@ async def parse_package_json(content: FileContent) -> PackageJson:
     return PackageJson(
         content=parsed_package_json,
         name=parsed_package_json["name"],
-        version=parsed_package_json["version"],
+        version=parsed_package_json.get("version"),
         snapshot=await Get(Snapshot, PathGlobs([content.path])),
         module=parsed_package_json.get("type"),
         workspaces=tuple(parsed_package_json.get("workspaces", ())),

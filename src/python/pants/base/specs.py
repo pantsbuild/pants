@@ -69,7 +69,7 @@ class AddressLiteralSpec(Spec):
             self.path_component,
             target_name=self.target_component,
             generated_name=self.generated_component,
-            parameters=self.parameters,
+            parameters=dict(self.parameters),
         )
 
 

@@ -138,7 +138,7 @@ fn find_pantsd(
   Ok(pantsd_settings)
 }
 
-fn execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> {
+fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> {
   let exe = PathBuf::from(pants_server.clone());
   let c_exe = CString::new(exe.into_os_string().into_vec())
     .expect("Failed to convert executable to a C string.");
@@ -156,6 +156,13 @@ fn execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> {
   })
 }
 
+fn execv_fallback_client(pants_server: OsString) -> Infallible {
+  if let Err(exit_code) = try_execv_fallback_client(pants_server) {
+    std::process::exit(exit_code);
+  }
+  unreachable!()
+}
+
 // The value is taken from this C precedent:
 // ```
 // $ grep 75 /usr/include/sysexits.h
@@ -170,18 +177,32 @@ const EX_TEMPFAIL: i32 = 75;
 // But in future, the native client may become the only client for `pantsd` (by directly handling
 // forking the `pantsd` process and then connecting to it).
 const PANTS_SERVER_EXE: &str = "_PANTS_SERVER_EXE";
+// An end-user-settable environment variable to skip attempting to use the native client, and
+// immediately delegate to the legacy client.
+const PANTS_NO_NATIVE_CLIENT: &str = "PANTS_NO_NATIVE_CLIENT";
 
 #[tokio::main]
 async fn main() {
   let start = SystemTime::now();
+  let no_native_client =
+    matches!(env::var_os(PANTS_NO_NATIVE_CLIENT), Some(value) if !value.is_empty());
   let pants_server = env::var_os(PANTS_SERVER_EXE);
+
+  match &pants_server {
+    Some(pants_server) if no_native_client => {
+      // The user requested that the native client not be used. Immediately fall back to the legacy
+      // client.
+      execv_fallback_client(pants_server.clone());
+      return;
+    }
+    _ => {}
+  }
+
   match (execute(start).await, pants_server) {
     (Err(_), Some(pants_server)) => {
       // We failed to connect to `pantsd`, but a server variable was provided. Fall back
       // to `execv`'ing the legacy Python client, which will handle spawning `pantsd`.
-      if let Err(exit_code) = execv_fallback_client(pants_server) {
-        std::process::exit(exit_code);
-      }
+      execv_fallback_client(pants_server);
     }
     (Err(err), None) => {
       eprintln!("{err}");
