@@ -23,6 +23,9 @@ jobs:
         with:
           # Always checkout the latest commit of main
           ref: "main"
+          # As an attempt to solve spurrious merge-conflicts, we'll fetch full history
+          fetch-depth: 0
+          
 
       - name: Cherry-Pick
         run: |
