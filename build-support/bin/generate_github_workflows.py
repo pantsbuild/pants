@@ -781,8 +781,8 @@ def build_wheels_job(
                 # than to not use debug mode.
                 **({} if for_deploy_ref else {"MODE": "debug"}),
             },
-            "steps": initial_steps
-            + [
+            "steps": [
+                *initial_steps,
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
