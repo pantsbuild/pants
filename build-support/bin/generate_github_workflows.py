@@ -773,7 +773,14 @@ def build_wheels_job(
             **({"container": container} if container else {}),
             **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
-            "env": DISABLE_REMOTE_CACHE_ENV,
+            "env": {
+                **DISABLE_REMOTE_CACHE_ENV,
+                # If we're not deploying these wheels, build in debug mode, which allows for
+                # incremental compilation across wheels. If this becomes too slow in CI, most likely
+                # the answer will be to adjust the `opt-level` for the relevant Cargo profile rather
+                # than to not use debug mode.
+                **({} if for_deploy_ref else {"MODE": "debug"}),
+            },
             "steps": initial_steps
             + [
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
