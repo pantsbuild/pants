@@ -962,6 +962,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
     inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
+    helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
         needs=["determine_ref"], for_deploy_ref=gha_expr("needs.determine_ref.outputs.build-ref")
     )
@@ -1007,6 +1008,9 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "uses": "actions/checkout@v3",
                     "with": {"ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}"},
                 },
+                setup_toolchain_auth(),
+                *helper.setup_primary_python(),
+                *helper.expose_all_pythons(),
                 {
                     "name": "Fetch and stabilize wheels",
                     "run": "./build-support/bin/release.sh fetch-and-stabilize",
