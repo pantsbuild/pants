@@ -963,6 +963,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
     inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
+    pypi_release_dir = "dest/pypi_release"
     helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
         needs=["determine_ref"], for_deploy_ref=gha_expr("needs.determine_ref.outputs.build-ref")
@@ -1014,7 +1015,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 *helper.expose_all_pythons(),
                 {
                     "name": "Fetch and stabilize wheels",
-                    "run": "./build-support/bin/release.sh fetch-and-stabilize",
+                    "run": f"./build-support/bin/release.sh fetch-and-stabilize --dest={pypi_release_dir}",
                     "env": {
                         # This step does not actually build anything: only download wheels from S3.
                         "MODE": "debug",
@@ -1045,6 +1046,8 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "uses": "pypa/gh-action-pypi-publish@release/v1",
                     "with": {
                         "password": gha_expr("secrets.PANTSBUILD_PYPI_API_TOKEN"),
+                        "packages-dir": pypi_release_dir,
+                        "skip-existing": True,
                     },
                 },
                 deploy_to_s3(
