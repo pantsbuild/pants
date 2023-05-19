@@ -765,7 +765,8 @@ def build_pex(fetch: bool) -> None:
         fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
         check_pants_wheels_present(CONSTANTS.deploy_dir)
         if stable:
-            reversion_prebuilt_wheels()
+            stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
+            reversion_prebuilt_wheels(str(stable_wheel_dir))
     else:
         build_pants_wheels()
         build_3rdparty_wheels()
@@ -822,16 +823,16 @@ def build_pex(fetch: bool) -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def fetch_and_stabilize() -> None:
+def fetch_and_stabilize(dest_dir: str) -> None:
     # TODO: Because wheels are now built specifically for a particular tag, we could likely remove
     # "reversioning".
-    banner("Fetching and stabilizing wheels.")
+    banner(f"Fetching and stabilizing wheels to {dest_dir}.")
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
     fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
     check_pants_wheels_present(CONSTANTS.deploy_dir)
-    reversion_prebuilt_wheels()
+    reversion_prebuilt_wheels(dest_dir)
     banner("Successfully fetched and stabilized wheels")
 
 
@@ -901,7 +902,7 @@ def check_pgp() -> None:
         )
 
 
-def reversion_prebuilt_wheels() -> None:
+def reversion_prebuilt_wheels(dest_dir: str) -> None:
     # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We use
     # manylinux2014 images.
     source_platform = "linux_"
@@ -911,12 +912,11 @@ def reversion_prebuilt_wheels() -> None:
         whl.rename(str(whl).replace(source_platform, dest_platform))
 
     # Now, reversion to use the STABLE_VERSION.
-    stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
-    stable_wheel_dir.mkdir(parents=True, exist_ok=True)
+    Path(dest_dir).mkdir(parents=True, exist_ok=True)
     for whl in unstable_wheel_dir.glob("*.whl"):
         reversion(
             whl_file=str(whl),
-            dest_dir=str(stable_wheel_dir),
+            dest_dir=dest_dir,
             target_version=CONSTANTS.pants_stable_version,
             extra_globs=["pants/_version/VERSION"],
         )
@@ -1140,7 +1140,13 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("tag-release")
-    subparsers.add_parser("fetch-and-stabilize")
+
+    fetch_and_stabilize = subparsers.add_parser("fetch-and-stabilize")
+    fetch_and_stabilize.add_argument(
+        "--dest",
+        help="A destination directory to put stabilized wheels in.",
+    )
+
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
@@ -1157,7 +1163,7 @@ def main() -> None:
     if args.command == "tag-release":
         tag_release()
     if args.command == "fetch-and-stabilize":
-        fetch_and_stabilize()
+        fetch_and_stabilize(args.dest)
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":
