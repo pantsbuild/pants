@@ -5,12 +5,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BoolField,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
@@ -22,6 +25,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
+    TargetGenerator,
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
@@ -31,6 +35,13 @@ from pants.jvm.target_types import (
     JunitTestExtraEnvVarsField,
     JunitTestSourceField,
     JunitTestTimeoutField,
+    JvmArtifactArtifactField,
+    JvmArtifactExcludeDependenciesField,
+    JvmArtifactExclusionRule,
+    JvmArtifactGroupField,
+    JvmArtifactPackagesField,
+    JvmArtifactResolveField,
+    JvmArtifactVersionField,
     JvmJdkField,
     JvmMainClassNameField,
     JvmProvidesTypesField,
@@ -359,6 +370,85 @@ class ScalacPluginTarget(Target):
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# `scala_artifact` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ScalaArtifactGroupField(JvmArtifactGroupField):
+    pass
+
+
+class ScalaArtifactArtifactField(JvmArtifactArtifactField):
+    pass
+
+
+class ScalaArtifactVersionField(JvmArtifactVersionField):
+    pass
+
+
+@dataclass(frozen=True)
+class ScalaArtifactExclusionRule(JvmArtifactExclusionRule):
+    alias = "scala_exclude"
+
+    full_crossversion: bool = False
+
+
+class ScalaArtifactExcludeDependenciesField(JvmArtifactExcludeDependenciesField):
+    pass
+
+
+class ScalaArtifactResolveField(JvmArtifactResolveField):
+    pass
+
+
+class ScalaArtifactPackagesField(JvmArtifactPackagesField):
+    pass
+
+
+class ScalaArtifactFullCrossversionField(BoolField):
+    alias = "full_crossversion"
+    default = False
+    help = help_text("If enabled, it will use the full Scala version in the artifact suffix.")
+
+
+@dataclass(frozen=True)
+class ScalaArtifactFieldSet(FieldSet):
+    group: ScalaArtifactGroupField
+    artifact: ScalaArtifactArtifactField
+    version: ScalaArtifactVersionField
+    packages: ScalaArtifactPackagesField
+    resolve: ScalaArtifactResolveField
+    excludes: ScalaArtifactExcludeDependenciesField
+    full_crossversion: ScalaArtifactFullCrossversionField
+
+    required_fields = (
+        ScalaArtifactGroupField,
+        ScalaArtifactArtifactField,
+        ScalaArtifactVersionField,
+        ScalaArtifactPackagesField,
+    )
+
+
+class ScalaArtifactTarget(TargetGenerator):
+    alias = "scala_artifact"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        *ScalaArtifactFieldSet.required_fields,
+        ScalaArtifactResolveField,
+        ScalaArtifactExcludeDependenciesField,
+        ScalaArtifactFullCrossversionField,
+        JvmJdkField,
+    )
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalaArtifactGroupField,
+        ScalaArtifactVersionField,
+        ScalaArtifactPackagesField,
+    )
+    moved_fields = (ScalaArtifactResolveField, JvmJdkField)
+
+
 def rules():
     return (
         *collect_rules(),
@@ -366,3 +456,7 @@ def rules():
         *ScalaFieldSet.jvm_rules(),
         UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
     )
+
+
+def build_file_aliases():
+    return BuildFileAliases(objects={ScalaArtifactExclusionRule.alias: ScalaArtifactExclusionRule})

@@ -266,8 +266,14 @@ class JvmProvidesTypesField(StringSequenceField):
         """
     )
 
+@dataclass(frozen=True)
+class JvmArtifactExclusionRule:
+    alias: ClassVar[str] = "jvm_exclude"
 
-class JvmArtifactExcludeDependenciesField(StringSequenceField):
+    group: str
+    artifact: Optional[str]
+
+class JvmArtifactExcludeDependenciesField(SequenceField[JvmArtifactExclusionRule]):
     alias = "excludes"
     help = help_text(
         """
@@ -282,6 +288,8 @@ class JvmArtifactExcludeDependenciesField(StringSequenceField):
         parse error from Coursier.
         """
     )
+    expected_element_type = JvmArtifactExclusionRule
+    expected_type_description = "an iterable of JvmArtifactExclusionRule"
 
 
 class JvmArtifactResolveField(JvmResolveField):
@@ -549,7 +557,7 @@ class JvmShadingRulesField(SequenceField[JvmShadingRule], metaclass=ABCMeta):
     alias = "shading_rules"
     required = False
     expected_element_type = JvmShadingRule
-    expected_type_description = "an iterable of ShadingRule"
+    expected_type_description = "an iterable of JvmShadingRule"
 
     @classmethod
     def compute_value(
@@ -786,6 +794,7 @@ def rules():
 def build_file_aliases():
     return BuildFileAliases(
         objects={
+            JvmArtifactExclusionRule.alias: JvmArtifactExclusionRule,
             DeployJarDuplicateRule.alias: DeployJarDuplicateRule,
             **{rule.alias: rule for rule in JVM_SHADING_RULE_TYPES},
         }
