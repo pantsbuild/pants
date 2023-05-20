@@ -115,7 +115,7 @@ def classify_changes() -> Jobs:
                     "name": "Classify changed files",
                     "run": dedent(
                         """\
-                        if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_REF ]]; then
+                        if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_SHA ]]; then
                           # push: compare to the immediate parent, which should already be fetched
                           # (checkout's fetch_depth defaults to 10)
                           comparison_sha=$(git rev-parse HEAD^)

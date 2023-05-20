@@ -620,7 +620,7 @@ jobs:
         fetch-depth: 10
     - id: classify
       name: Classify changed files
-      run: "if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_REF ]]; then\n  # push: compare to the immediate parent, which should\
+      run: "if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_SHA ]]; then\n  # push: compare to the immediate parent, which should\
         \ already be fetched\n  # (checkout's fetch_depth defaults to 10)\n  comparison_sha=$(git rev-parse HEAD^)\nelse\n\
         \  # pull request: compare to the base branch, ensuring that commit exists\n  git fetch --depth=1 \"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\
         \n  comparison_sha=\"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\nfi\necho \"comparison_sha=$comparison_sha\"\n\naffected=$(git\
