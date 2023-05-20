@@ -85,7 +85,7 @@ PYTHON39_VERSION = "3.9"
 ALL_PYTHON_VERSIONS = [PYTHON37_VERSION, PYTHON38_VERSION, PYTHON39_VERSION]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
-DONT_SKIP_WHEELS = "github.event_name == 'push' || needs.classify_changes.outputs.release == 'true'"
+DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
 IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # NB: This overrides `pants.ci.toml`.
@@ -113,28 +113,30 @@ def classify_changes() -> Jobs:
                 "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [
-                # fetch_depth must be 2.
-                *checkout(fetch_depth=2),
-                {
-                    "id": "files",
-                    "name": "Get changed files",
-                    "uses": "tj-actions/changed-files@v32",
-                    "with": {"separator": "|"},
-                },
+                *checkout(),
                 {
                     "id": "classify",
                     "name": "Classify changed files",
                     "run": dedent(
-                        f"""\
-                        affected=$(python build-support/bin/classify_changed_files.py "{gha_expr("steps.files.outputs.all_modified_files")}")
-                        echo "Affected:"
-                        if [[ "${{affected}}" == "docs" ]]; then
-                          echo "docs_only=true" >> $GITHUB_OUTPUT
-                          echo "docs_only"
+                        """\
+                        if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_SHA ]]; then
+                          # push: compare to the immediate parent, which should already be fetched
+                          # (checkout's fetch_depth defaults to 10)
+                          comparison_sha=$(git rev-parse HEAD^)
+                        else
+                          # pull request: compare to the base branch, ensuring that commit exists
+                          git fetch --depth=1 "$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
+                          comparison_sha="$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
                         fi
-                        for i in ${{affected}}; do
-                          echo "${{i}}=true" >> $GITHUB_OUTPUT
-                          echo "${{i}}"
+                        echo "comparison_sha=$comparison_sha"
+
+                        affected=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
+                        echo "Affected:"
+                        if [[ "${affected}" == "docs" ]]; then
+                          echo "docs_only=true" | tee -a $GITHUB_OUTPUT
+                        fi
+                        for i in ${affected}; do
+                          echo "${i}=true" | tee -a $GITHUB_OUTPUT
                         done
                         """
                     ),
@@ -423,25 +425,26 @@ class Helper:
             },
         ]
 
-    def setup_primary_python(self) -> Sequence[Step]:
+    def setup_primary_python(self, version: str | None = None) -> Sequence[Step]:
+        version = version or gha_expr("matrix.python-version")
         ret = []
         # We pre-install Pythons on our self-hosted platforms.
         # We must set them up on Github-hosted platforms.
         if self.platform in GITHUB_HOSTED:
             ret.append(
                 {
-                    "name": f"Set up Python {gha_expr('matrix.python-version')}",
+                    "name": f"Set up Python {version}",
                     "uses": "actions/setup-python@v4",
-                    "with": {"python-version": f"{gha_expr('matrix.python-version')}"},
+                    "with": {"python-version": version},
                 }
             )
         ret.append(
             {
-                "name": f"Tell Pants to use Python {gha_expr('matrix.python-version')}",
+                "name": f"Tell Pants to use Python {version}",
                 "run": dedent(
                     f"""\
-                    echo "PY=python{gha_expr('matrix.python-version')}" >> $GITHUB_ENV
-                    echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['=={gha_expr('matrix.python-version')}.*']" >> $GITHUB_ENV
+                    echo "PY=python{version}" >> $GITHUB_ENV
+                    echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['=={version}.*']" >> $GITHUB_ENV
                     """
                 ),
             }
@@ -962,6 +965,8 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
     inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
+    pypi_release_dir = "dest/pypi_release"
+    helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
         needs=["determine_ref"], for_deploy_ref=gha_expr("needs.determine_ref.outputs.build-ref")
     )
@@ -1007,12 +1012,17 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "uses": "actions/checkout@v3",
                     "with": {"ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}"},
                 },
+                setup_toolchain_auth(),
+                *helper.setup_primary_python(PYTHON39_VERSION),
+                *helper.expose_all_pythons(),
                 {
                     "name": "Fetch and stabilize wheels",
-                    "run": "./build-support/bin/release.sh fetch-and-stabilize",
+                    "run": f"./build-support/bin/release.sh fetch-and-stabilize --dest={pypi_release_dir}",
                     "env": {
                         # This step does not actually build anything: only download wheels from S3.
                         "MODE": "debug",
+                        # We're not building anything, but without specifying a version, we get 3.10.
+                        "USE_PY39": "true",
                     },
                 },
                 {
@@ -1038,6 +1048,8 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "uses": "pypa/gh-action-pypi-publish@release/v1",
                     "with": {
                         "password": gha_expr("secrets.PANTSBUILD_PYPI_API_TOKEN"),
+                        "packages-dir": pypi_release_dir,
+                        "skip-existing": True,
                     },
                 },
                 deploy_to_s3(
@@ -1150,7 +1162,7 @@ def generate() -> dict[Path, str]:
                 "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}",
                 "cancel-in-progress": True,
             },
-            "on": {"pull_request": {}, "push": {"branches-ignore": ["dependabot/**"]}},
+            "on": {"pull_request": {}, "push": {"branches": ["main", "2.*.x"]}},
             "jobs": pr_jobs,
             "env": global_env(),
         },
