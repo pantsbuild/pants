@@ -277,10 +277,28 @@ jobs:
       uses: actions/checkout@v3
       with:
         ref: ${{ needs.determine_ref.outputs.build-ref }}
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Tell Pants to use Python 3.9
+      run: 'echo "PY=python3.9" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==3.9.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - env:
         MODE: debug
+        USE_PY39: 'true'
       name: Fetch and stabilize wheels
-      run: ./build-support/bin/release.sh fetch-and-stabilize
+      run: ./build-support/bin/release.sh fetch-and-stabilize --dest=dest/pypi_release
     - name: Create Release -> Commit Mapping
       run: 'tag="${{ needs.determine_ref.outputs.build-ref }}"
 
@@ -297,7 +315,9 @@ jobs:
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
+        packages-dir: dest/pypi_release
         password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
+        skip-existing: true
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
