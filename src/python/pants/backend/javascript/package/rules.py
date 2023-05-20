@@ -98,6 +98,7 @@ async def pack_node_package_into_tgz_for_publication(
             args=("pack",),
             description=f"Packaging .tgz archive for {name}@{version}",
             input_digest=installation.digest,
+            immutable_digests=installation.immutable_input_digest(),
             output_files=(installation.join_relative_workspace_directory(archive_file),),
             level=LogLevel.INFO,
         ),
@@ -200,6 +201,7 @@ async def run_node_build_script(req: NodeBuildScriptRequest) -> NodeBuildScriptR
                 installation.join_relative_workspace_directory(directory)
                 for directory in output_dirs or ()
             ),
+            immutable_digests=installation.immutable_input_digest(),
             level=LogLevel.INFO,
             per_package_caches=FrozenDict(
                 {cache_name(extra_cache): extra_cache for extra_cache in extra_caches or ()}

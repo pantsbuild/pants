@@ -93,6 +93,7 @@ class NodeJsProjectEnvironmentProcess:
     per_package_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
     timeout_seconds: int | None = None
     extra_env: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    immutable_digests: FrozenDict[str, Digest] = field(default_factory=FrozenDict)
 
 
 @rule(desc="Assembling nodejs project environment")
@@ -148,6 +149,7 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             timeout_seconds=req.timeout_seconds,
             project_digest=project_digest,
             extra_env=FrozenDict(**req.extra_env, **req.env.project.extra_env()),
+            immutable_digests=req.immutable_digests,
         ),
     )
 

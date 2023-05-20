@@ -245,6 +245,7 @@ class NodeJSToolProcess:
     timeout_seconds: int | None = None
     extra_env: Mapping[str, str] = field(default_factory=FrozenDict)
     project_digest: Digest | None = None
+    immutable_digests: FrozenDict[str, Digest] = field(default_factory=FrozenDict)
 
     @classmethod
     def npm(
@@ -619,7 +620,7 @@ async def setup_node_tool_process(
         argv=list(filter(None, (request.tool, *request.args))),
         input_digest=input_digest,
         output_files=request.output_files,
-        immutable_input_digests=environment.immutable_digest(),
+        immutable_input_digests={**environment.immutable_digest(), **request.immutable_digests},
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,

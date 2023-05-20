@@ -223,6 +223,7 @@ async def run_javascript_tests(
                 installation.join_relative_workspace_directory(directory)
                 for directory in output_directories or ()
             ),
+            immutable_digests=FrozenDict(installation.immutable_input_digest()),
         ),
     )
     if test.force:

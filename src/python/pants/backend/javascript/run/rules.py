@@ -46,6 +46,7 @@ async def run_node_build_script(
             args=("--prefix", "{chroot}", "run", str(field_set.entry_point.value)),
             description=f"Running {str(field_set.entry_point.value)}.",
             input_digest=installation.digest,
+            immutable_digests=installation.immutable_input_digest(),
         ),
     )
 

@@ -24,7 +24,8 @@ from pants.backend.javascript.target_types import JSSourceField
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
+from pants.engine.fs import CreateDigest, DigestEntries, SymlinkEntry
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
@@ -36,6 +37,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.util.frozendict import FrozenDict
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,7 @@ class InstalledNodePackageRequest:
 class InstalledNodePackage:
     project_env: NodeJsProjectEnvironment
     digest: Digest
+    node_modules_digests: dict[str, Digest]
 
     @property
     def project_dir(self) -> str:
@@ -58,6 +61,14 @@ class InstalledNodePackage:
     @property
     def target(self) -> Target:
         return self.project_env.ensure_target()
+
+    def immutable_input_digest(self) -> FrozenDict[str, Digest]:
+        return FrozenDict(
+            {
+                os.path.join("._pants_node_modules", self.project_env.root_dir, prefix): digest
+                for prefix, digest in self.node_modules_digests.items()
+            }
+        )
 
 
 @dataclass(frozen=True)
@@ -109,7 +120,7 @@ async def install_node_packages_for_address(
             )
         ),
     )
-
+    prefixes = tuple(sorted(project_env.node_modules_directories, reverse=True))
     install_result = await Get(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
@@ -117,13 +128,35 @@ async def install_node_packages_for_address(
             project_env.project.immutable_install_args,
             description=f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
             input_digest=install_input_digest,
-            output_directories=tuple(project_env.node_modules_directories),
+            output_directories=prefixes,
         ),
     )
-    node_modules = await Get(Digest, AddPrefix(install_result.output_digest, project_env.root_dir))
+    entries = await Get(DigestEntries, Digest, install_result.output_digest)
+    node_modules = await MultiGet(
+        Get(Digest, CreateDigest(entry for entry in entries if entry.path.startswith(prefix)))
+        for prefix in prefixes
+    )
+    symlinks = await Get(
+        Digest,
+        CreateDigest(
+            SymlinkEntry(
+                os.path.join(project_env.root_dir, prefix),
+                os.path.join(
+                    *([".."] * len(project_env.root_dir.split(os.path.sep))),
+                    "._pants_node_modules",
+                    project_env.root_dir,
+                    prefix,
+                    "node_modules",
+                ),
+            )
+            for prefix in prefixes
+        ),
+    )
+
     return InstalledNodePackage(
         project_env,
-        digest=await Get(Digest, MergeDigests([install_input_digest, node_modules])),
+        digest=await Get(Digest, MergeDigests((install_input_digest, symlinks))),
+        node_modules_digests=dict(zip(prefixes, node_modules)),
     )
 
 
@@ -141,7 +174,11 @@ async def add_sources_to_installed_node_package(
         with_js=True,
     )
     digest = await Get(Digest, MergeDigests((installation.digest, source_files.snapshot.digest)))
-    return InstalledNodePackageWithSource(installation.project_env, digest=digest)
+    return InstalledNodePackageWithSource(
+        installation.project_env,
+        digest=digest,
+        node_modules_digests=installation.node_modules_digests,
+    )
 
 
 def rules() -> Iterable[Rule | UnionRule]:
