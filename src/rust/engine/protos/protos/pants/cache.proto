@@ -19,7 +19,9 @@ message CacheKey {
 
 message DependencyInferenceRequest {
   build.bazel.remote.execution.v2.Digest input_file_digest = 1;
-  optional JavascriptInferenceMetadata metadata = 2;
+  oneof metadata {
+    JavascriptInferenceMetadata js = 2;
+  }
 }
 
 
