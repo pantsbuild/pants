@@ -53,6 +53,7 @@ from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, Merg
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Target,
+    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
     targets_with_sources_types,
@@ -487,7 +488,7 @@ async def _determine_requirements_for_pex_from_targets(
     return dataclasses.replace(requirements, from_superset=repository_pex.maybe_pex), ()
 
 
-def _warn_about_any_files_targets(
+async def _warn_about_any_files_targets(
     addresses: Addresses, transitive_targets: TransitiveTargets, union_membership: UnionMembership
 ) -> None:
     # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
@@ -496,11 +497,18 @@ def _warn_about_any_files_targets(
         [FileSourceField], transitive_targets.dependencies, union_membership
     )
     if file_tgts:
+        # make it easier for the user to find which targets are problematic by including the alias
+        targets = await Get(Targets, Addresses, addresses)
+        formatted_addresses = ", ".join(
+            f"{a} (`{tgt.alias}`)" for a, tgt in zip(addresses, targets)
+        )
+
         files_addresses = sorted(tgt.address.spec for tgt in file_tgts)
-        formatted_addresses = ", ".join(str(a) for a in addresses)
-        targets, depend = ("target", "depends") if len(addresses) == 1 else ("targets", "depend")
+        targets_text, depend_text = (
+            ("target", "depends") if len(addresses) == 1 else ("targets", "depend")
+        )
         logger.warning(
-            f"The {targets} {formatted_addresses} transitively {depend} "
+            f"The {targets_text} {formatted_addresses} transitively {depend_text} "
             "on the below `files` targets, but Pants will not include them in the built package. "
             "Filesystem APIs like `open()` may be not able to load files within the binary "
             "itself; instead, they read from the current working directory."
@@ -535,7 +543,9 @@ async def create_pex_from_targets(
         sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
 
         if request.warn_for_transitive_files_targets:
-            _warn_about_any_files_targets(request.addresses, transitive_targets, union_membership)
+            await _warn_about_any_files_targets(
+                request.addresses, transitive_targets, union_membership
+            )
     else:
         sources = PythonSourceFiles.empty()
 

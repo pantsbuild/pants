@@ -925,7 +925,7 @@ def test_warn_about_files_targets(rule_runner: PythonRuleRunner, caplog) -> None
         ],
     )
 
-    assert "The target //:app transitively depends on" in caplog.text
+    assert "The target //:app (`python_source`) transitively depends on" in caplog.text
     # files are not fine:
     assert "//:file_target" in caplog.text
     # resources are fine:
