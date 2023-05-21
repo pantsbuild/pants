@@ -22,6 +22,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
     cast,
     get_type_hints,
@@ -44,6 +45,8 @@ from pants.option.parser import OptionValueHistory, Parser
 from pants.option.scope import ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
+
+T = TypeVar("T")
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -521,6 +524,9 @@ class HelpInfoExtracter:
 
             return load
 
+        def lazily(value: T) -> Callable[[], T]:
+            return lambda: value
+
         known_scope_infos = sorted(options.known_scope_to_info.values(), key=lambda x: x.scope)
         scope_to_help_info = LazyFrozenDict(
             {
@@ -532,7 +538,7 @@ class HelpInfoExtracter:
 
         env_var_to_help_info = LazyFrozenDict(
             {
-                ohi.env_var: lambda ohi=ohi: ohi
+                ohi.env_var: lazily(ohi)
                 for oshi in scope_to_help_info.values()
                 for ohi in chain(oshi.basic, oshi.advanced, oshi.deprecated)
             }
