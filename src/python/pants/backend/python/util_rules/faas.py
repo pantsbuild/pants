@@ -293,6 +293,7 @@ async def build_lambdex(
             f" {bin_name()} package. (See https://realpython.com/python-wheels/ for more about"
             " wheels.)\n\n(If the build does not raise an exception, it's safe to use macOS.)"
         )
+    lambdex.warn_for_layout(request.target_name)
 
     output_filename = request.output_path.value_or_default(
         # FaaS typically use the .zip suffix, so we use that instead of .pex.
