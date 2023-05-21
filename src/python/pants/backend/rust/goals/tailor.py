@@ -49,4 +49,4 @@ async def find_putative_rust_targets(
 
 
 def rules():
-    return *collect_rules(), UnionRule(PutativeTargetsRequest, PutativeRustTargetsRequest)
+    return [*collect_rules(), UnionRule(PutativeTargetsRequest, PutativeRustTargetsRequest)]
