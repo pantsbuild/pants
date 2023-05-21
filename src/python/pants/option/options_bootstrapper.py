@@ -170,8 +170,6 @@ class OptionsBootstrapper:
             val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
             alias = CliAlias.from_dict(val)
 
-            # We need to expand aliases before we expand alias flags, because aliases may expand
-            # into flags, but an alias flag cannot contain a non-flag.
             args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
 
