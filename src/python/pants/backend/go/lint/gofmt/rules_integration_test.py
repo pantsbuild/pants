@@ -235,6 +235,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     )
     assert fmt_result.did_change is True
 
+
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {"f.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')"}

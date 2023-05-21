@@ -98,9 +98,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     fmt_result = run_rustfmt(rule_runner, [tgt])
 
     assert fmt_result.stdout.strip() == ""
-    assert fmt_result.output == rule_runner.make_snapshot(
-        {"src/lib.rs": GOOD_FILE}
-    )
+    assert fmt_result.output == rule_runner.make_snapshot({"src/lib.rs": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -111,9 +109,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="package"))
     fmt_result = run_rustfmt(rule_runner, [tgt])
     assert fmt_result.stderr == ""
-    assert fmt_result.output == rule_runner.make_snapshot(
-        {"src/lib.rs": FIXED_BAD_FILE}
-    )
+    assert fmt_result.output == rule_runner.make_snapshot({"src/lib.rs": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -148,9 +144,6 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     tgts = [rule_runner.get_target(Address("good")), rule_runner.get_target(Address("bad"))]
     fmt_result = run_rustfmt(rule_runner, tgts)
     assert fmt_result.output == rule_runner.make_snapshot(
-        {
-            "good/src/f.rs": GOOD_FILE,
-            "bad/src/f.rs": FIXED_BAD_FILE
-        },
+        {"good/src/f.rs": GOOD_FILE, "bad/src/f.rs": FIXED_BAD_FILE},
     )
     assert fmt_result.did_change is True
