@@ -30,9 +30,7 @@ async def find_putative_rust_targets(
 ) -> PutativeTargets:
     putative_targets = []
 
-    all_cargo_toml_files = await Get(
-        Paths, PathGlobs, request.path_globs("Cargo.toml")
-    )
+    all_cargo_toml_files = await Get(Paths, PathGlobs, request.path_globs("Cargo.toml"))
     unowned_cargo_toml_files = set(all_cargo_toml_files.files) - set(all_owned_sources)
 
     for dirname, filenames in group_by_dir(unowned_cargo_toml_files).items():
