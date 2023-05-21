@@ -74,6 +74,7 @@ async def package_python_awslambda(
             handler=field_set.handler,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
+            reexported_handler_module=PythonAwsLambdaHandlerField.reexported_handler_module,
         ),
     )
 

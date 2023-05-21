@@ -42,7 +42,14 @@ from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
 from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    FileContent,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Paths,
+)
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -419,6 +426,9 @@ class BuildPythonFaaSRequest:
 
     include_requirements: bool
 
+    reexported_handler_module: str
+    log_only_reexported_handler_func: bool = False
+
 
 @rule
 async def build_python_faas(
@@ -435,11 +445,26 @@ async def build_python_faas(
         "--resolve-local-platforms",
     )
 
-    complete_platforms = await Get(
-        CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
+    complete_platforms, handler = await MultiGet(
+        Get(CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms),
+        Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
     )
 
     # TODO: improve diagnostics if there's more than one platform/complete_platform
+
+    # synthesise a source file that gives a fixed handler path, no matter what the entry point is:
+    # some platforms require a certain name (e.g. GCF), and even on others, giving a fixed name
+    # means users don't need to duplicate the entry_point config in both the pants BUILD file and
+    # infrastructure definitions (the latter can always use the same names, for every lambda).
+    reexported_handler_file = f"{request.reexported_handler_module}.py"
+    reexported_handler_func = "handler"
+    reexported_handler_content = (
+        f"from {handler.module} import {handler.func} as {reexported_handler_func}"
+    )
+    additional_sources = await Get(
+        Digest,
+        CreateDigest([FileContent(reexported_handler_file, reexported_handler_content.encode())]),
+    )
 
     repository_filename = "faas_repository.pex"
     pex_request = PexFromTargetsRequest(
@@ -452,12 +477,10 @@ async def build_python_faas(
         layout=PexLayout.PACKED,
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
+        additional_sources=additional_sources,
     )
 
-    pex_result, handler = await MultiGet(
-        Get(Pex, PexFromTargetsRequest, pex_request),
-        Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
-    )
+    pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)
 
     output_filename = request.output_path.value_or_default(file_ending="zip")
 
@@ -473,9 +496,14 @@ async def build_python_faas(
         ),
     )
 
+    if request.log_only_reexported_handler_func:
+        handler_text = reexported_handler_func
+    else:
+        handler_text = f"{request.reexported_handler_module}.{reexported_handler_func}"
+
     artifact = BuiltPackageArtifact(
         output_filename,
-        extra_log_lines=(f"    Handler: {handler.module}.{handler.func}",),
+        extra_log_lines=(f"    Handler: {handler_text}",),
     )
     return BuiltPackage(digest=result.digest, artifacts=(artifact,))
 
