@@ -418,6 +418,7 @@ class AllHelpInfo:
     name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
     name_to_backend_help_info: LazyFrozenDict[str, BackendHelpInfo]
     name_to_build_file_info: LazyFrozenDict[str, BuildFileSymbolHelpInfo]
+    env_var_to_help_info: LazyFrozenDict[str, OptionHelpInfo]
 
     def non_deprecated_option_scope_help_infos(self):
         for oshi in self.scope_to_help_info.values():
@@ -529,6 +530,14 @@ class HelpInfoExtracter:
             }
         )
 
+        env_var_to_help_info = LazyFrozenDict(
+            {
+                ohi.env_var: lambda ohi=ohi: ohi
+                for oshi in scope_to_help_info.values()
+                for ohi in chain(oshi.basic, oshi.advanced, oshi.deprecated)
+            }
+        )
+
         name_to_goal_info = LazyFrozenDict(
             {
                 scope_info.scope: goal_help_info_loader_for(scope_info)
@@ -559,6 +568,7 @@ class HelpInfoExtracter:
             name_to_api_type_info=cls.get_api_type_infos(build_configuration, union_membership),
             name_to_backend_help_info=cls.get_backend_help_info(options),
             name_to_build_file_info=cls.get_build_file_info(build_symbols),
+            env_var_to_help_info=env_var_to_help_info,
         )
 
     @staticmethod
