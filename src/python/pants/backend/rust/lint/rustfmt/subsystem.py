@@ -6,7 +6,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 
 # TODO we want to provide possibility for customising input for example using --config
-SUPPORTED_RUSTFMT_ARGS = FrozenOrderedSet(())
+SUPPORTED_RUSTFMT_ARGS : FrozenOrderedSet[str] = FrozenOrderedSet(())
 SUPPORTED_RUSTFMT_ARGS_AS_HELP = ", ".join([f"`{arg}`" for arg in SUPPORTED_RUSTFMT_ARGS])
 
 
