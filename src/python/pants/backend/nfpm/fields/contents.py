@@ -189,6 +189,28 @@ class NfpmContentTypeField(StringField):
     default = NfpmContentFileType.file.value
     help = help_text(
         lambda: f"""
+        The nFPM content type for the packaged file.
+
+        The content type can be either a standard file ({repr(NfpmContentFileType.file.value)}),
+        the default, or a config file ({repr(NfpmContentFileType.config.value)}).
+
+        For RPM packaged files, the content type can also be one of
+        {repr(NfpmContentFileType.config_noreplace.value)}, {repr(NfpmContentFileType.doc.value)},
+        {repr(NfpmContentFileType.license.value)}, and {repr(NfpmContentFileType.readme.value)}.
+        The {repr(NfpmContentFileType.config_noreplace.value)} type is used for RPM's
+        `%config(noreplace)` option. For packagers other than RPM, using
+        {repr(NfpmContentFileType.config_noreplace.value)} is the same as
+        {repr(NfpmContentFileType.config.value)}. The other RPM-specific types are equivalent to
+        {repr(NfpmContentFileType.file.value)} if used with other packagers.
+
+        This field only supports file-specific nFPM content types. Please use these targets for non-file content:
+
+        - For 'dir' content, use the `nfpm_content_dir` and `nfpm_content_dirs` targets.
+        - For 'symlink' content, use the `nfpm_content_symlink` and `nfpm_content_symlinks` targets.
+        - For 'ghost' content, which is only for RPM, use the 'ghost_contents' field on the `nfpm_rpm_package` target.
+
+        Pants expands globs before passing the list of contents to nFPM. So, pants does
+        not support nFPM's 'tree' content type.
         """
     )
 
