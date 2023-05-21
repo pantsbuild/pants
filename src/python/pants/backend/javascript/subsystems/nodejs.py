@@ -353,7 +353,7 @@ async def add_corepack_shims_to_digest(
     enable_corepack_result = await Get(
         ProcessResult,
         Process(
-            argv=("corepack", "enable", "npm", "pnpm", "--install-directory", "._corepack"),
+            argv=("corepack", "enable", "npm", "pnpm", "yarn", "--install-directory", "._corepack"),
             input_digest=input_digest,
             immutable_input_digests={**tool_shims.immutable_input_digests},
             output_directories=["._corepack"],
@@ -601,7 +601,7 @@ async def prepare_corepack_tool(
 async def setup_node_tool_process(
     request: NodeJSToolProcess, environment: NodeJSProcessEnvironment
 ) -> Process:
-    if request.tool in ("npm", "npx", "pnpm"):
+    if request.tool in ("npm", "npx", "pnpm", "yarn"):
         tool_name = request.tool.replace("npx", "npm")
         corepack_tool = await Get(
             CorepackToolDigest,

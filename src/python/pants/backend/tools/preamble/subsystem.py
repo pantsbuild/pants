@@ -34,8 +34,8 @@ class PreambleSubsystem(Subsystem):
             Example:
 
                 {
-                    '*.rs': '// Copyright (c) $year\n// Line 2\n'
-                    '*.py:!__init__.py': '# Copyright (c) $year\n# Line 2\n',
+                    '*.rs': '// Copyright (c) $year\\n// Line 2\\n'
+                    '*.py:!__init__.py': '# Copyright (c) $year\\n# Line 2\\n',
                 }
 
             It might be helpful to load this config from a JSON or YAML file. To do that, set

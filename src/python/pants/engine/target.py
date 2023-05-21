@@ -1044,21 +1044,6 @@ class AllUnexpandedTargets(Collection[Target]):
     """
 
 
-@dataclass(frozen=True)
-class AllTargetsRequest:
-    """Find all targets in the project.
-
-    Use with either `AllUnexpandedTargets` or `AllTargets`.
-    """
-
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(AllTargets, AllTargetsRequest)",
-            "Instead, simply use `Get(AllTargets)` or put `AllTargets` in the rule signature",
-        )
-
-
 # -----------------------------------------------------------------------------------------------
 # Target generation
 # -----------------------------------------------------------------------------------------------
@@ -1343,7 +1328,7 @@ def _generate_file_level_targets(
             fast_relpath(fp, template_address.spec_path) for fp in normalized_overrides
         )
         all_valid_relative_paths = sorted(
-            cast(str, tgt.address._relative_file_path or tgt.address.generated_name)
+            cast(str, tgt.address.relative_file_path or tgt.address.generated_name)
             for tgt in result
         )
         raise InvalidFieldException(

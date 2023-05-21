@@ -52,6 +52,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -217,7 +218,6 @@ async def _interactive_shell_command(
     bash: BashBinary,
 ) -> Process:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
-    shell_name = shell_command.address.spec
     working_directory = shell_command[RunShellCommandWorkdirField].value
 
     if working_directory is None:
@@ -245,7 +245,12 @@ async def _interactive_shell_command(
     boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "" else ""
 
     return Process(
-        argv=(bash.path, "-c", boot_script + command, shell_name),
+        argv=(
+            bash.path,
+            "-c",
+            boot_script + command,
+            f"{bin_name()} run {shell_command.address.spec} --",
+        ),
         description=f"Running {description}",
         env=command_env,
         input_digest=dependencies_digest,

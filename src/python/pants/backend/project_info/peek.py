@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import collections
 import json
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, Iterable, Mapping
 
 from typing_extensions import Protocol, runtime_checkable
@@ -134,7 +134,9 @@ class _PeekJsonEncoder(json.JSONEncoder):
         if o is None:
             return o
         if is_dataclass(o):
-            return asdict(o)
+            # NB: `dataclasses.asdict` creates a deep copy by default, which is unnecessary for
+            # this case.
+            return {field.name: getattr(o, field.name) for field in fields(o)}
         if isinstance(o, collections.abc.Mapping):
             return dict(o)
         if (

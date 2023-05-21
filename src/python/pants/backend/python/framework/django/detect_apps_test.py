@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.python.dependency_inference import parse_python_dependencies
-from pants.backend.python.framework.django import dependency_inference, detect_apps
+from pants.backend.python.framework.django import detect_apps
 from pants.backend.python.framework.django.detect_apps import DjangoApps
 from pants.backend.python.target_types import PythonSourceTarget
 from pants.backend.python.util_rules import pex
@@ -33,7 +33,6 @@ def rule_runner() -> RuleRunner:
             *parse_python_dependencies.rules(),
             *stripped_source_files.rules(),
             *pex.rules(),
-            *dependency_inference.rules(),
             *detect_apps.rules(),
             QueryRule(DjangoApps, [EnvironmentName]),
         ],

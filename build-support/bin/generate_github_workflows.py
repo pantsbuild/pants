@@ -67,10 +67,14 @@ def hashFiles(path: str) -> str:
 # ----------------------------------------------------------------------
 
 
+# NB: The `upload-artifact` action strips the longest common prefix of paths in the
+# created artifact, but the `download-artifact` action needs to know what that prefix
+# was.
+NATIVE_FILES_COMMON_PREFIX = "src/python/pants"
 NATIVE_FILES = [
-    "src/python/pants/bin/native_client",
-    "src/python/pants/engine/internals/native_engine.so",
-    "src/python/pants/engine/internals/native_engine.so.metadata",
+    f"{NATIVE_FILES_COMMON_PREFIX}/bin/native_client",
+    f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so",
+    f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
 
 # We don't specify patch versions so that we get the latest, which comes pre-installed:
@@ -81,7 +85,7 @@ PYTHON39_VERSION = "3.9"
 ALL_PYTHON_VERSIONS = [PYTHON37_VERSION, PYTHON38_VERSION, PYTHON39_VERSION]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
-DONT_SKIP_WHEELS = "github.event_name == 'push' || needs.classify_changes.outputs.release == 'true'"
+DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
 IS_PANTS_OWNER = "github.repository_owner == 'pantsbuild'"
 
 # NB: This overrides `pants.ci.toml`.
@@ -109,28 +113,30 @@ def classify_changes() -> Jobs:
                 "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [
-                # fetch_depth must be 2.
-                *checkout(fetch_depth=2),
-                {
-                    "id": "files",
-                    "name": "Get changed files",
-                    "uses": "tj-actions/changed-files@v32",
-                    "with": {"separator": "|"},
-                },
+                *checkout(),
                 {
                     "id": "classify",
                     "name": "Classify changed files",
                     "run": dedent(
-                        f"""\
-                        affected=$(python build-support/bin/classify_changed_files.py "{gha_expr("steps.files.outputs.all_modified_files")}")
-                        echo "Affected:"
-                        if [[ "${{affected}}" == "docs" ]]; then
-                          echo "docs_only=true" >> $GITHUB_OUTPUT
-                          echo "docs_only"
+                        """\
+                        if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_SHA ]]; then
+                          # push: compare to the immediate parent, which should already be fetched
+                          # (checkout's fetch_depth defaults to 10)
+                          comparison_sha=$(git rev-parse HEAD^)
+                        else
+                          # pull request: compare to the base branch, ensuring that commit exists
+                          git fetch --depth=1 "$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
+                          comparison_sha="$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
                         fi
-                        for i in ${{affected}}; do
-                          echo "${{i}}=true" >> $GITHUB_OUTPUT
-                          echo "${{i}}"
+                        echo "comparison_sha=$comparison_sha"
+
+                        affected=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
+                        echo "Affected:"
+                        if [[ "${affected}" == "docs" ]]; then
+                          echo "docs_only=true" | tee -a $GITHUB_OUTPUT
+                        fi
+                        for i in ${affected}; do
+                          echo "${i}=true" | tee -a $GITHUB_OUTPUT
                         done
                         """
                     ),
@@ -163,8 +169,11 @@ def ensure_category_label() -> Sequence[Step]:
     ]
 
 
-def checkout(*, fetch_depth: int = 10, containerized: bool = False) -> Sequence[Step]:
+def checkout(
+    *, fetch_depth: int = 10, containerized: bool = False, ref: str | None = None
+) -> Sequence[Step]:
     """Get prior commits and the commit message."""
+    fetch_depth_opt: dict[str, Any] = {"fetch-depth": fetch_depth}
     steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
         # for details on how we get the commit message here.
@@ -172,7 +181,10 @@ def checkout(*, fetch_depth: int = 10, containerized: bool = False) -> Sequence[
         {
             "name": "Check out code",
             "uses": "actions/checkout@v3",
-            "with": {"fetch-depth": fetch_depth},
+            "with": {
+                **fetch_depth_opt,
+                **({"ref": ref} if ref else {}),
+            },
         },
     ]
     if containerized:
@@ -245,14 +257,17 @@ def install_go() -> Step:
     }
 
 
-def deploy_to_s3(when: str = "github.event_name == 'push'", scope: str | None = None) -> Step:
+def deploy_to_s3(
+    name: str,
+    *,
+    scope: str | None = None,
+) -> Step:
     run = "./build-support/bin/deploy_to_s3.py"
     if scope:
         run = f"{run} --scope {scope}"
     return {
-        "name": "Deploy to S3",
+        "name": name,
         "run": run,
-        "if": when,
         "env": {
             "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
             "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
@@ -344,14 +359,21 @@ class Helper:
             },
         }
 
-    def native_binaries_download(self) -> Step:
-        return {
-            "name": "Download native binaries",
-            "uses": "actions/download-artifact@v3",
-            "with": {
-                "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
+    def native_binaries_download(self) -> Sequence[Step]:
+        return [
+            {
+                "name": "Download native binaries",
+                "uses": "actions/download-artifact@v3",
+                "with": {
+                    "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
+                    "path": NATIVE_FILES_COMMON_PREFIX,
+                },
             },
-        }
+            {
+                "name": "Make native-client runnable",
+                "run": f"chmod +x {NATIVE_FILES[0]}",
+            },
+        ]
 
     def rust_caches(self) -> Sequence[Step]:
         return [
@@ -403,25 +425,26 @@ class Helper:
             },
         ]
 
-    def setup_primary_python(self) -> Sequence[Step]:
+    def setup_primary_python(self, version: str | None = None) -> Sequence[Step]:
+        version = version or gha_expr("matrix.python-version")
         ret = []
         # We pre-install Pythons on our self-hosted platforms.
         # We must set them up on Github-hosted platforms.
         if self.platform in GITHUB_HOSTED:
             ret.append(
                 {
-                    "name": f"Set up Python {gha_expr('matrix.python-version')}",
+                    "name": f"Set up Python {version}",
                     "uses": "actions/setup-python@v4",
-                    "with": {"python-version": f"{gha_expr('matrix.python-version')}"},
+                    "with": {"python-version": version},
                 }
             )
         ret.append(
             {
-                "name": f"Tell Pants to use Python {gha_expr('matrix.python-version')}",
+                "name": f"Tell Pants to use Python {version}",
                 "run": dedent(
                     f"""\
-                    echo "PY=python{gha_expr('matrix.python-version')}" >> $GITHUB_ENV
-                    echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['=={gha_expr('matrix.python-version')}.*']" >> $GITHUB_ENV
+                    echo "PY=python{version}" >> $GITHUB_ENV
+                    echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['=={version}.*']" >> $GITHUB_ENV
                     """
                 ),
             }
@@ -647,7 +670,7 @@ def test_jobs(
             ),
             *helper.setup_primary_python(),
             *helper.expose_all_pythons(),
-            helper.native_binaries_download(),
+            *helper.native_binaries_download(),
             setup_toolchain_auth(),
             {
                 "name": human_readable_step_name,
@@ -708,7 +731,12 @@ def macos11_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
     return jobs
 
 
-def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
+def build_wheels_job(
+    platform: Platform,
+    python_versions: list[str],
+    for_deploy_ref: str | None,
+    needs: list[str] | None,
+) -> Jobs:
     helper = Helper(platform)
     # For manylinux compatibility, we build Linux wheels in a container rather than directly
     # on the Ubuntu runner. As a result, we have custom steps here to check out
@@ -727,7 +755,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
 
     if container:
         initial_steps = [
-            *checkout(containerized=True),
+            *checkout(containerized=True, ref=for_deploy_ref),
             install_rustup(),
             {
                 "name": "Expose Pythons",
@@ -742,7 +770,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
         ]
     else:
         initial_steps = [
-            *checkout(),
+            *checkout(ref=for_deploy_ref),
             *helper.expose_all_pythons(),
             # NB: We only cache Rust, but not `native_engine.so` and the Pants
             # virtualenv. This is because we must build both these things with
@@ -751,35 +779,46 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
             *helper.rust_caches(),
         ]
 
+    if_condition = (
+        IS_PANTS_OWNER if for_deploy_ref else f"({IS_PANTS_OWNER}) && ({DONT_SKIP_WHEELS})"
+    )
     return {
         helper.job_name("build_wheels"): {
-            "if": f"({IS_PANTS_OWNER}) && ({DONT_SKIP_WHEELS})",
+            "if": if_condition,
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
             **({"container": container} if container else {}),
+            **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
-            "env": DISABLE_REMOTE_CACHE_ENV,
-            "steps": initial_steps
-            + [
+            "env": {
+                **DISABLE_REMOTE_CACHE_ENV,
+                # If we're not deploying these wheels, build in debug mode, which allows for
+                # incremental compilation across wheels. If this becomes too slow in CI, most likely
+                # the answer will be to adjust the `opt-level` for the relevant Cargo profile rather
+                # than to not use debug mode.
+                **({} if for_deploy_ref else {"MODE": "debug"}),
+            },
+            "steps": [
+                *initial_steps,
                 setup_toolchain_auth(),
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
-                deploy_to_s3(),
+                *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
             ],
         },
     }
 
 
-def build_wheels_jobs() -> Jobs:
+def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | None = None) -> Jobs:
     # N.B.: When altering the number of total wheels built (currently 10), please edit the expected
     # total in the _release_helper script. Currently here:
     # https://github.com/pantsbuild/pants/blob/8c83e4db33d5fe577918ce073f6d89957cb6eef1/build-support/bin/_release_helper.py#L1182-L1192
     return {
-        **build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS),
-        **build_wheels_job(Platform.LINUX_ARM64, ALL_PYTHON_VERSIONS),
-        **build_wheels_job(Platform.MACOS10_15_X86_64, ALL_PYTHON_VERSIONS),
-        **build_wheels_job(Platform.MACOS11_ARM64, [PYTHON39_VERSION]),
+        **build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS, for_deploy_ref, needs),
+        **build_wheels_job(Platform.LINUX_ARM64, ALL_PYTHON_VERSIONS, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS10_15_X86_64, ALL_PYTHON_VERSIONS, for_deploy_ref, needs),
+        **build_wheels_job(Platform.MACOS11_ARM64, [PYTHON39_VERSION], for_deploy_ref, needs),
     }
 
 
@@ -810,7 +849,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 "steps": [
                     *checkout(),
                     *linux_x86_64_helper.setup_primary_python(),
-                    linux_x86_64_helper.native_binaries_download(),
+                    *linux_x86_64_helper.native_binaries_download(),
                     setup_toolchain_auth(),
                     {
                         "name": "Lint",
@@ -923,37 +962,68 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
 
 def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
-    inputs, env = workflow_dispatch_inputs([WorkflowInput("TAG", "string")])
+    """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
+    inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
+    pypi_release_dir = "dest/pypi_release"
+    helper = Helper(Platform.LINUX_X86_64)
+    wheels_jobs = build_wheels_jobs(
+        needs=["determine_ref"], for_deploy_ref=gha_expr("needs.determine_ref.outputs.build-ref")
+    )
+    wheels_job_names = tuple(wheels_jobs.keys())
     jobs = {
-        "publish-tag-to-commit-mapping": {
+        "determine_ref": {
+            "name": "Determine the ref to build",
             "runs-on": "ubuntu-latest",
             "if": IS_PANTS_OWNER,
             "steps": [
                 {
-                    "name": "Determine Release Tag",
-                    "id": "determine-tag",
+                    "name": "Determine ref to build",
                     "env": env,
+                    "id": "determine_ref",
                     "run": dedent(
                         """\
-                        if [[ -n "$TAG" ]]; then
-                            tag="$TAG"
+                        if [[ -n "$REF" ]]; then
+                            ref="$REF"
                         else
-                            tag="${GITHUB_REF#refs/tags/}"
+                            ref="${GITHUB_REF#refs/tags/}"
                         fi
-                        if [[ "${tag}" =~ ^release_.+$ ]]; then
-                            echo "release-tag=${tag}" >> $GITHUB_OUTPUT
-                        else
-                            echo "::error::Release tag '${tag}' must match 'release_.+'."
-                            exit 1
+                        echo "build-ref=${ref}" >> $GITHUB_OUTPUT
+                        if [[ "${ref}" =~ ^release_.+$ ]]; then
+                            echo "is-release=true" >> $GITHUB_OUTPUT
                         fi
                         """
                     ),
                 },
+            ],
+            "outputs": {
+                "build-ref": gha_expr("steps.determine_ref.outputs.build-ref"),
+                "is-release": gha_expr("steps.determine_ref.outputs.is-release"),
+            },
+        },
+        **wheels_jobs,
+        "publish": {
+            "runs-on": "ubuntu-latest",
+            "needs": [*wheels_job_names, "determine_ref"],
+            "if": f"{IS_PANTS_OWNER} && needs.determine_ref.outputs.is-release == 'true'",
+            "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
                     "uses": "actions/checkout@v3",
-                    "with": {"ref": f"{gha_expr('steps.determine-tag.outputs.release-tag')}"},
+                    "with": {"ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}"},
+                },
+                setup_toolchain_auth(),
+                *helper.setup_primary_python(PYTHON39_VERSION),
+                *helper.expose_all_pythons(),
+                {
+                    "name": "Fetch and stabilize wheels",
+                    "run": f"./build-support/bin/release.sh fetch-and-stabilize --dest={pypi_release_dir}",
+                    "env": {
+                        # This step does not actually build anything: only download wheels from S3.
+                        "MODE": "debug",
+                        # We're not building anything, but without specifying a version, we get 3.10.
+                        "USE_PY39": "true",
+                    },
                 },
                 {
                     "name": "Create Release -> Commit Mapping",
@@ -964,7 +1034,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
                     "run": dedent(
                         f"""\
-                        tag="{gha_expr("steps.determine-tag.outputs.release-tag")}"
+                        tag="{gha_expr("needs.determine_ref.outputs.build-ref")}"
                         commit="$(git rev-parse ${{tag}}^{{commit}})"
 
                         echo "Recording tag ${{tag}} is of commit ${{commit}}"
@@ -973,12 +1043,21 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         """
                     ),
                 },
+                {
+                    "name": "Publish to PyPI",
+                    "uses": "pypa/gh-action-pypi-publish@release/v1",
+                    "with": {
+                        "password": gha_expr("secrets.PANTSBUILD_PYPI_API_TOKEN"),
+                        "packages-dir": pypi_release_dir,
+                        "skip-existing": True,
+                    },
+                },
                 deploy_to_s3(
-                    when="github.event_name == 'push' || github.event_name == 'workflow_dispatch'",
+                    "Deploy commit mapping to S3",
                     scope="tags/pantsbuild.pants",
                 ),
             ],
-        }
+        },
     }
 
     return jobs, inputs
@@ -1083,7 +1162,7 @@ def generate() -> dict[Path, str]:
                 "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}",
                 "cancel-in-progress": True,
             },
-            "on": {"pull_request": {}, "push": {"branches-ignore": ["dependabot/**"]}},
+            "on": {"pull_request": {}, "push": {"branches": ["main", "2.*.x"]}},
             "jobs": pr_jobs,
             "env": global_env(),
         },
@@ -1143,7 +1222,7 @@ def generate() -> dict[Path, str]:
     release_jobs, release_inputs = release_jobs_and_inputs()
     release_yaml = yaml.dump(
         {
-            "name": "Record Release Commit",
+            "name": "Release",
             "on": {
                 "push": {"tags": ["release_*"]},
                 "workflow_dispatch": {"inputs": release_inputs},

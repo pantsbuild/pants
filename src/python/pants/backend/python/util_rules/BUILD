@@ -4,7 +4,7 @@
 python_sources(
     overrides={
         "local_dists_pep660.py": dict(dependencies=["./scripts/pep660_backend_wrapper.py"]),
-    }
+    },
 )
 
 python_tests(

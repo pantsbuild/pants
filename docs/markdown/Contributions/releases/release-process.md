@@ -28,36 +28,7 @@ See <https://docs.github.com/en/github/authenticating-to-github/telling-git-abou
 
 Note: the last step is required on macOS.
 
-### 4. Create a PyPI account
-
-[pypi.org/account/register](https://pypi.org/account/register).
-
-Please enable two-factor authentication under "Account Settings".
-
-Generate an API token under "Account Settings" for all projects. Copy the token for the last step.
-
-### 5. Get added to pantsbuild.pants PyPI
-
-You can ask any of the current Owners to add you as a maintainer.
-
-### 6. Configure `~/.pypirc`
-
-Fill in with your PyPI token by running:
-
-```bash
-$ cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
-[pypi]
-username: __token__
-password: <fill me in>
-
-[server-login]
-username: __token__
-password: <fill me in>
-
-EOF
-```
-
-### 7. Authenticate with the Github API
+### 4. Authenticate with the Github API
 
 Ensure that you have a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) for your Github account in your `.netrc` file.
 
@@ -213,15 +184,10 @@ Also, update the [Changelog](doc:changelog)'s "highlights" column with a link to
 > 
 > Ping someone in the `#maintainers-confidential` channel in Slack to be added. Alternatively, you can "Suggest edits" in the top right corner.
 
-Step 3: Wait for CI to build the wheels
+Step 3: Tag the release to build wheels
 ---------------------------------------
 
-Once you have merged the `VERSION` bump—which will be on `main` for `dev` and `a0` releases and the release branch for release candidates—CI will start building the wheels you need to finish the release.
-
-Head to <https://github.com/pantsbuild/pants/actions> and find your relevant build. You need the "Build wheels and fs_util" jobs to pass.
-
-Step 4: Run `release.sh`
-------------------------
+Once you have merged the `VERSION` bump — which will be on `main` for `dev` and `a0` releases and the release branch for release candidates — you should tag the release commit to trigger wheel building and PyPI publishing.
 
 First, ensure that you are on your release branch at your version bump commit.
 
@@ -232,12 +198,15 @@ First, ensure that you are on your release branch at your version bump commit.
 Then, run:
 
 ```bash
-./build-support/bin/release.sh publish
+./build-support/bin/release.sh tag-release
 ```
 
-This will first download the pre-built wheels built in CI and will publish them to PyPI. About 2-3 minutes in, the script will prompt you for your PGP password.
+This will tag the release with your PGP key, and push the tag to origin, which will kick off a [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) to build the wheels and publish them to PyPI.
 
-We also release a Pants Pex via GitHub releases. Run this:
+Step 4: Release a Pants PEX
+---------------------------
+
+After the [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) for your tag has completed, you should additionally build and publish the "universal" PEX to Github.
 
 ```bash
 PANTS_PEX_RELEASE=STABLE ./build-support/bin/release.sh build-universal-pex

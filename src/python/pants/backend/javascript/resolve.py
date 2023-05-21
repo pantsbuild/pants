@@ -9,6 +9,7 @@ from typing import Iterable
 from pants.backend.javascript import nodejs_project
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSProject
 from pants.backend.javascript.package_json import (
+    NodePackageNameField,
     OwningNodePackage,
     OwningNodePackageRequest,
     PackageJsonSourceField,
@@ -48,7 +49,9 @@ async def _get_node_package_json_directory(req: RequestNodeResolve) -> str:
         WrappedTargetRequest(req.address, description_of_origin="the `ChosenNodeResolve` rule"),
     )
     target: Target | None
-    if wrapped.target.has_field(PackageJsonSourceField):
+    if wrapped.target.has_field(PackageJsonSourceField) and wrapped.target.has_field(
+        NodePackageNameField
+    ):
         target = wrapped.target
     else:
         owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(wrapped.target.address))
