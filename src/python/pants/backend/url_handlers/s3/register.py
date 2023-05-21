@@ -39,7 +39,7 @@ async def access_aws_credentials() -> AWSCredentials:
                 To do that add an entry to `[GLOBAL].plugins` of a pip-resolvable package to download from PyPI.
                 (E.g. `botocore == 1.29.39`). Note that the `botocore` package from PyPI at the time
                 of writing is >70MB, so an alternate package providing the `botocore` modules may be
-                advisable.
+                advisable (such as [`botocore-a-la-carte`](https://pypi.org/project/botocore-a-la-carte/)).
                 """
             )
         )

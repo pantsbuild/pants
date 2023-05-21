@@ -26,4 +26,4 @@ def test_install_from_resolve_default() -> None:
     pex_reqs = tool.pex_requirements()
     assert isinstance(pex_reqs, PexRequirements)
     assert pex_reqs.from_superset == Resolve("dummy_resolve", False)
-    assert pex_reqs.req_strings == FrozenOrderedSet(["bar", "baz", "foo"])
+    assert pex_reqs.req_strings_or_addrs == FrozenOrderedSet(["bar", "baz", "foo"])

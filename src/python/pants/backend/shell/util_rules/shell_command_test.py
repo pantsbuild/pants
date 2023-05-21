@@ -529,7 +529,7 @@ def test_run_shell_command_request(
         }
     )
 
-    args = ("bash", "-c", expected_boot + "some cmd string", "src:test")
+    args = ("bash", "-c", expected_boot + "some cmd string", "pants run src:test --")
 
     tgt = rule_runner.get_target(Address("src", target_name="test"))
     run = RunShellCommand.create(tgt)

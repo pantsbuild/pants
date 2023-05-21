@@ -84,11 +84,12 @@ async def _determine_literal_addresses_from_raw_specs(
         Get(
             Address,
             AddressInput(
+                str(spec),
                 spec.path_component,
-                spec.target_component,
-                generated_component=spec.generated_component,
-                parameters=spec.parameters,
                 description_of_origin=description_of_origin,
+                target_component=spec.target_component,
+                generated_component=spec.generated_component,
+                parameters=dict(spec.parameters),
             ),
         )
         for spec in literal_specs

@@ -324,10 +324,11 @@ jobs:
     container:
       image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
     env:
+      MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
@@ -379,21 +380,16 @@ jobs:
       with:
         name: pants-log-wheels-Linux-ARM64
         path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
       image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
+      MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
@@ -446,19 +442,14 @@ jobs:
       with:
         name: pants-log-wheels-Linux-x86_64
         path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
+      MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS10-15-x86_64)
     needs:
     - classify_changes
@@ -514,19 +505,14 @@ jobs:
       with:
         name: pants-log-wheels-macOS10-15-x86_64
         path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
+      MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS11-ARM64)
     needs:
     - classify_changes
@@ -578,12 +564,6 @@ jobs:
       with:
         name: pants-log-wheels-macOS11-ARM64
         path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   check_labels:
     if: github.repository_owner == 'pantsbuild'
@@ -617,17 +597,16 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 2
-    - id: files
-      name: Get changed files
-      uses: tj-actions/changed-files@v32
-      with:
-        separator: '|'
+        fetch-depth: 10
     - id: classify
       name: Classify changed files
-      run: "affected=$(python build-support/bin/classify_changed_files.py \"${{ steps.files.outputs.all_modified_files }}\"\
-        )\necho \"Affected:\"\nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" >> $GITHUB_OUTPUT\n \
-        \ echo \"docs_only\"\nfi\nfor i in ${affected}; do\n  echo \"${i}=true\" >> $GITHUB_OUTPUT\n  echo \"${i}\"\ndone\n"
+      run: "if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_SHA ]]; then\n  # push: compare to the immediate parent, which should\
+        \ already be fetched\n  # (checkout's fetch_depth defaults to 10)\n  comparison_sha=$(git rev-parse HEAD^)\nelse\n\
+        \  # pull request: compare to the base branch, ensuring that commit exists\n  git fetch --depth=1 \"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\
+        \n  comparison_sha=\"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\nfi\necho \"comparison_sha=$comparison_sha\"\n\naffected=$(git\
+        \ diff --name-only \"$comparison_sha\" HEAD | python build-support/bin/classify_changed_files.py)\necho \"Affected:\"\
+        \nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" | tee -a $GITHUB_OUTPUT\nfi\nfor i in ${affected};\
+        \ do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Lint Python and Shell
@@ -655,6 +634,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -746,6 +728,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -817,6 +802,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -888,6 +876,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -959,6 +950,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1016,6 +1010,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1041,5 +1038,6 @@ name: Pull Request CI
 'on':
   pull_request: {}
   push:
-    branches-ignore:
-    - dependabot/**
+    branches:
+    - main
+    - 2.*.x

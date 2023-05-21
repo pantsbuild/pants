@@ -127,6 +127,22 @@ def test_pnpm_process(rule_runner: RuleRunner):
     assert result.stdout.strip() == b"7.5.0"
 
 
+def test_yarn_process(rule_runner: RuleRunner):
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            nodejs.NodeJSToolProcess(
+                tool="yarn",
+                tool_version="1.22.19",
+                args=("--version",),
+                description="Testing yarn process",
+            )
+        ],
+    )
+
+    assert result.stdout.strip() == b"1.22.19"
+
+
 def given_known_version(version: str) -> str:
     return f"{version}|linux_x86_64|1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333"
 

@@ -11,7 +11,7 @@ freezegun==1.2.1
 importlib_resources==5.0.*
 ijson==3.1.4
 packaging==21.3
-pex==2.1.135
+pex==2.1.137
 psutil==5.9.0
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
