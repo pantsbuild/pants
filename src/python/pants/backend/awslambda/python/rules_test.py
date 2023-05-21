@@ -122,7 +122,7 @@ def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     "major_minor_interpreter",
     all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
 )
-def test_create_hello_world_lambda(
+def test_create_hello_world_lambda_with_lambdex(
     rule_runner: PythonRuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
 ) -> None:
     rule_runner.write_files(
@@ -197,7 +197,7 @@ def test_create_hello_world_lambda(
     ), "Using include_requirements=False should exclude third-party deps"
 
 
-def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
+def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -257,3 +257,62 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text
+
+
+def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": dedent(
+                """
+                import mureq
+
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/BUILD": dedent(
+                """
+                python_requirement(name="mureq", requirements=["mureq==0.2"])
+                python_sources()
+
+                python_awslambda(
+                    name='lambda',
+                    handler='foo.bar.hello_world:handler',
+                    runtime="python3.7",
+                )
+                python_awslambda(
+                    name='slimlambda',
+                    include_requirements=False,
+                    handler='foo.bar.hello_world:handler',
+                    runtime="python3.7",
+                )
+                """
+            ),
+        }
+    )
+
+    zip_file_relpath, content = create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="lambda"),
+        expected_extra_log_lines=("    Handler: foo.bar.hello_world.handler",),
+        extra_args=["--lambdex-layout=zip"],
+    )
+    assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
+
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "mureq/__init__.py" in names
+    assert "foo/bar/hello_world.py" in names
+
+    zip_file_relpath, content = create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="slimlambda"),
+        expected_extra_log_lines=("    Handler: foo.bar.hello_world.handler",),
+        extra_args=["--lambdex-layout=zip"],
+    )
+    assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
+
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "mureq/__init__.py" not in names
+    assert "foo/bar/hello_world.py" in names
