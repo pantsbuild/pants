@@ -21,7 +21,6 @@ from pants.backend.python.util_rules.local_dists_pep660 import (
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
 from pants.core.goals.export import (
     Export,
@@ -38,7 +37,6 @@ from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
