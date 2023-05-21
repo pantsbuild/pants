@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 from pants.base.build_environment import get_buildroot, get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
 from pants.engine.unions import UnionMembership
-from pants.option.alias import CliAlias, CliAliasFlag
+from pants.option.alias import CliAlias
 from pants.option.config import Config
 from pants.option.custom_types import DictValueComponent, ListValueComponent
 from pants.option.global_options import BootstrapOptions, GlobalOptions
@@ -40,7 +40,6 @@ class OptionsBootstrapper:
     args: tuple[str, ...]
     config: Config
     alias: CliAlias
-    alias_flags: CliAliasFlag
 
     def __repr__(self) -> str:
         env = {pair[0]: pair[1] for pair in self.env_tuples}
@@ -171,16 +170,9 @@ class OptionsBootstrapper:
             val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
             alias = CliAlias.from_dict(val)
 
-            alias_flags_vals = post_bootstrap_config.get("cli", "alias_flags")
-            val = DictValueComponent.merge(
-                [DictValueComponent.create(v) for v in alias_flags_vals]
-            ).val
-            alias_flags = CliAliasFlag.from_dict(val)
-
             # We need to expand aliases before we expand alias flags, because aliases may expand
             # into flags, but an alias flag cannot contain a non-flag.
             args = alias.expand_args(tuple(args))
-            args = alias_flags.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
 
             # We need to set this env var to allow various static help strings to reference the
@@ -203,7 +195,6 @@ class OptionsBootstrapper:
                 args=args,
                 config=post_bootstrap_config,
                 alias=alias,
-                alias_flags=alias_flags,
             )
 
     @classmethod
@@ -316,8 +307,9 @@ class OptionsBootstrapper:
             allow_unknown_options=build_configuration.allow_unknown_options,
         )
         GlobalOptions.validate_instance(options.for_global_scope())
-        self.alias.check_name_conflicts(options.known_scope_to_info)
-        self.alias_flags.check_name_conflicts(options.scope_to_flags)
+        self.alias.check_name_conflicts(
+            options.known_scope_to_info, options.known_scope_to_scoped_args
+        )
         return options
 
 

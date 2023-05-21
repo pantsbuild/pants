@@ -227,6 +227,22 @@ class Options:
         return self._known_scope_to_info
 
     @property
+    def known_scope_to_args(self) -> dict[str, set[str]]:
+        mapping = {}
+        for scope, parser in self._parser_by_scope.items():
+            mapping[scope] = parser.known_args
+
+        return mapping
+
+    @property
+    def known_scope_to_scoped_args(self) -> dict[str, set[str]]:
+        mapping = {}
+        for scope, parser in self._parser_by_scope.items():
+            mapping[scope] = parser.known_scoped_args
+
+        return mapping
+
+    @property
     def scope_to_flags(self) -> dict[str, list[str]]:
         return self._scope_to_flags
 
