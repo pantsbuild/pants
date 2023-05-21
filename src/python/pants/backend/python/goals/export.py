@@ -52,15 +52,6 @@ class ExportVenvsRequest(ExportRequest):
 
 
 @dataclass(frozen=True)
-class _ExportVenvRequest(EngineAwareParameter):
-    resolve: str | None
-    root_python_targets: tuple[Target, ...]
-
-    def debug_hint(self) -> str | None:
-        return self.resolve
-
-
-@dataclass(frozen=True)
 class _ExportVenvForResolveRequest(EngineAwareParameter):
     resolve: str
 
@@ -439,50 +430,6 @@ async def export_virtualenv_for_resolve(
         ),
     )
     return MaybeExportResult(export_result)
-
-
-@rule
-async def export_virtualenv_for_targets(
-    request: _ExportVenvRequest,
-    python_setup: PythonSetup,
-) -> ExportResult:
-    if request.resolve:
-        interpreter_constraints = InterpreterConstraints(
-            python_setup.resolves_to_interpreter_constraints.get(
-                request.resolve, python_setup.interpreter_constraints
-            )
-        )
-    else:
-        interpreter_constraints = InterpreterConstraints.create_from_targets(
-            request.root_python_targets, python_setup
-        ) or InterpreterConstraints(python_setup.interpreter_constraints)
-
-    # Note that a pex created from a RequirementsPexRequest has packed layout,
-    # which should lead to the best performance in this use case.
-    requirements_pex_request = await Get(
-        PexRequest,
-        RequirementsPexRequest(
-            (tgt.address for tgt in request.root_python_targets),
-            hardcoded_interpreter_constraints=interpreter_constraints,
-        ),
-    )
-
-    dest_prefix = (
-        os.path.join("python", "virtualenvs")
-        if request.resolve
-        else os.path.join("python", "virtualenv")
-    )
-
-    export_result = await Get(
-        ExportResult,
-        VenvExportRequest(
-            requirements_pex_request,
-            dest_prefix,
-            request.resolve or "",
-            qualify_path_with_python_version=True,
-        ),
-    )
-    return export_result
 
 
 @rule
