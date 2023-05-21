@@ -23,7 +23,7 @@ class RustWorkspaceTarget(Target):
 
 
 class RustPackageSourcesField(MultipleSourcesField):
-    default = ("Cargo.toml", "src/**/*.rs", "tests/**/*.rs")
+    default = ("src/**/*.rs", "tests/**/*.rs")
     uses_source_roots = False
 
 
