@@ -312,8 +312,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
@@ -368,8 +368,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
@@ -423,8 +423,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS10-15-x86_64)
     needs:
     - classify_changes
@@ -481,8 +481,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS11-ARM64)
     needs:
     - classify_changes
