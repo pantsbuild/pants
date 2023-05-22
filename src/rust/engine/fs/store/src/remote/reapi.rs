@@ -1,4 +1,4 @@
-// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
@@ -29,7 +29,6 @@ use workunit_store::{Metric, ObservationMetric};
 
 use super::{ByteSource, ByteStoreProvider, LoadDestination};
 
-#[derive(Clone)]
 pub struct Provider {
   instance_name: Option<String>,
   chunk_size_bytes: usize,
