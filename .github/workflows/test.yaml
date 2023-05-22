@@ -368,11 +368,7 @@ jobs:
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        USE_PY39=true ./build-support/bin/release.sh build-wheels'
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -430,11 +426,7 @@ jobs:
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        USE_PY39=true ./build-support/bin/release.sh build-wheels'
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -493,11 +485,7 @@ jobs:
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        USE_PY39=true ./build-support/bin/release.sh build-wheels'
     - continue-on-error: true
       if: always()
       name: Upload pants.log
