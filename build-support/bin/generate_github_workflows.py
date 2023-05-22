@@ -198,6 +198,38 @@ def checkout(
     return steps
 
 
+def launch_bazel_remote() -> Sequence[Step]:
+    return [
+        {
+            "name": "Launch bazel-remote",
+            "if": "github.repository_owner == 'pantsbuild'",
+            "run": dedent(
+                """\
+                mkdir ~/cache
+                docker run -u 1001:1000 \
+                  -v ~/cache:/data \
+                  -p 9092:9092 \
+                  buchgr/bazel-remote-cache \
+                  --s3.auth_method=access_key \
+                  --s3.access_key_id=${AWS_SECRET_KEY_ID} \
+                  --s3.secret_access_key=${AWS_SECRET_ACCESS_KEY} \
+                  --s3.bucket=cache.pantsbuild.org \
+                  --s3.endpoint=s3.us-east-1.amazonaws.com \
+                  --max_size 30
+                echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
+                echo "PANTS_REMOTE_CACHE_WRITE=true" >> "$GITHUB_ENV"
+                echo "PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092" >> "$GITHUB_ENV"
+                """
+            ),
+            "env": {
+                "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
+                "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
+            },
+        }
+    ]
+
+
+
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
@@ -615,6 +647,7 @@ def test_jobs(helper: Helper, shard: str | None, platform_specific: bool) -> Job
         "if": IS_PANTS_OWNER,
         "steps": [
             *checkout(),
+            *launch_bazel_remote(),
             install_jdk(),
             *(
                 [install_go(), download_apache_thrift()]

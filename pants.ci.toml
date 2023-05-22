@@ -1,6 +1,11 @@
 [GLOBAL]
 colors = true
 
+remote_cache_read = true
+remote_cache_write = true
+remote_store_address = "grpc://localhost:9092"
+remote_instance_name = "cache"
+
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]
 
