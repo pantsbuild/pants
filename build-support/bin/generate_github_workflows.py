@@ -993,7 +993,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "uses": "actions/checkout@v3",
                     "with": {"ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}"},
                 },
-                setup_toolchain_auth(),
                 *helper.setup_primary_python(PYTHON39_VERSION),
                 *helper.expose_all_pythons(),
                 {
