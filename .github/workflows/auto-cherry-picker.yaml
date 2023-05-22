@@ -28,6 +28,6 @@ jobs:
         run: |
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
-          build-support/bin/cherry_pick.sh ${{ github.event.pull_request.number || inputs.PR_number }} origin
+          bash -x build-support/bin/cherry_pick.sh ${{ github.event.pull_request.number || inputs.PR_number }} origin
         env:
           GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
