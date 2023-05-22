@@ -265,11 +265,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         ref: ${{ needs.determine_ref.outputs.build-ref }}
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
