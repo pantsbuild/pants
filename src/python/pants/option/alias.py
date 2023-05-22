@@ -120,15 +120,15 @@ class CliAlias:
                     )
                 )
 
-        for scope, args in known_flags.items():
+        for scope_name, args in known_flags.items():
             for alias, _ in self.definitions.items():
                 if alias in args:
-                    scope = scope if scope != "" else "global"
+                    scope_name = scope_name if scope_name != "" else "global"
                     raise CliAliasInvalidError(
                         softwrap(
                             f"""
                             Invalid flag-like alias in `[cli].alias` option: {alias!r}. This is
-                            already a registered flag in the {scope!r} scope.
+                            already a registered flag in the {scope_name!r} scope.
                             """
                         )
                     )
