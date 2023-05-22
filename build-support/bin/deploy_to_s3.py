@@ -38,8 +38,8 @@ def _run(args, env=None) -> None:
         )
     except subprocess.CalledProcessError as ex:
         logger.error(f"Process `{' '.join(args)}` failed with exit code {ex.returncode}.")
-        logger.error(f"stdout: {ex.stdout}")
-        logger.error(f"stderr: {ex.stderr}")
+        logger.error(f"stdout:\n{ex.stdout.decode()}\n")
+        logger.error(f"stderr:\n{ex.stderr.decode()}\n")
         raise
 
 
