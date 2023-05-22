@@ -19,9 +19,9 @@ Sometimes you may want to try out your Pants changes on code in some other repo.
 
 This script expects to find a clone of the Pants repo, named `pants`, as a sibling directory of the one you're running in, and it will use the sources in that sibling to run Pants in the other repo, using that repo's config file and so on.
 
-You can find an example of this script [here](https://github.com/pantsbuild/example-python/blob/main/pants_from_sources). To copy it into your repo, use 
+You can find an example of this script [here](https://github.com/pantsbuild/example-python/blob/2.14/pants_from_sources). To copy it into your repo, use
 
 ```
-curl -L -O https://raw.githubusercontent.com/pantsbuild/example-python/main/pants_from_sources && \
+curl -L -O https://raw.githubusercontent.com/pantsbuild/example-python/2.14/pants_from_sources && \
   chmod +x pants_from_sources
 ```
