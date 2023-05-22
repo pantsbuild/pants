@@ -417,11 +417,11 @@ class NodeBuildScriptExtraEnvVarsField(StringSequenceField):
     required = False
     default = ()
     help = help_text(
-         """
-         Additional environment variables to include in environment when running a build script process.
+        """
+        Additional environment variables to include in environment when running a build script process.
 
-         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-         `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+        `ENV_VAR` to copy the value of a variable in Pants's own environment.
         """
     )
 
