@@ -125,21 +125,13 @@ python_sources(name="lib")
 
 You can install third-party type stubs (for example, `types-requests`) like [normal Python requirements](doc:python-third-party-dependencies). Pants will infer a dependency on both the type stub and the actual dependency, for example, both `types-requests` and `requests`, which you can confirm by running `pants dependencies path/to/f.py`.
 
-You can also install the type stub via the option `[mypy].extra_type_stubs`, which ensures
-the stubs are only used when running MyPy and are not included when, for example,
-[packaging a PEX](doc:python-package-goal). We recommend also setting
-`[mypy].extra_type_stubs_lockfile` for more reproducible builds and better supply-chain security.
-
-```toml pants.toml
-[mypy]
-extra_type_stubs = ["types-requests==2.25.12"]
-# Set this to a path, then run `pants generate-lockfiles --resolve=mypy-extra-type-stubs`.
-extra_type_stubs_lockfile = "3rdparty/python/mypy_extra_type_stubs.lock
-```
+If you install MyPy from a [custom lockfile](doc:python-lockfiles#lockfiles-for-tools) you can also add type stub requirements to that lockfile.
+This ensures that the stubs are only used when running MyPy and are not included when, for example,
+[packaging a PEX](doc:python-package-goal).
 
 ### Add a third-party plugin
 
-Add the plugin to the `requirements` option in the `[mypy]` scope, and create a `requirements.txt` file for the version. Then specify the resolve that the requirements should be installed from:
+Add any third-party MyPy plugins to a [custom lockfile](doc:python-lockfiles#lockfiles-for-tools):
 
 ```toml pants.toml
 [python.resolves]
@@ -148,8 +140,16 @@ mypy = "3rdparty/python/mypy-lock.txt"
 [mypy]
 install_from_resolve = "mypy"
 ```
-```Text mypy-requirements.txt
+```Text 3rdparty/python/mypy-requirements.txt
+mypy==1.3.0
 pydantic==1.6.1
+```
+```python 3rdparty/python/BUILD
+python_requirements(
+    name="mypy",
+    source="mypy-requirements.txt",
+    resolve="mypy",
+)
 ```
 
 Then update your `mypy.ini` to load the plugin:
@@ -160,11 +160,7 @@ plugins =
     pydantic.mypy
 ```
 
-For more information, see [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).
-
-For some plugins, like `django-stubs`, you may need to always load certain source files, such as a `settings.py` file. You can make sure that this source file is always used by hijacking the `source_plugins` option, which allows you to specify targets whose `sources` should always be used when running MyPy. See the below section for more information about source plugins.
-
-Some MyPy plugins also include type stubs, such as `django-stubs`. For type stubs to be used, the requirement must either be included in `[mypy].extra_type_stubs` or be loaded like a normal [third-party dependency](doc:python-third-party-dependencies), such as including in a `requirements.txt` file.
+For some plugins, such as `django-stubs`, you may need to always load certain source files, such as a `settings.py` file. You can make sure that this source file is always used by hijacking the `source_plugins` option, which allows you to specify targets whose `sources` should always be used when running MyPy. See the section below for more information about source plugins.
 
 For example, to fully use the `django-stubs` plugin, your setup might look like this:
 
@@ -173,9 +169,19 @@ For example, to fully use the `django-stubs` plugin, your setup might look like 
 root_patterns = ["src/python"]
 
 [mypy]
-extra_requirements = ["django-stubs==1.5.0"]
-extra_type_stubs = ["django-stubs==1.5.0"]
+install_from_resolve = "mypy"
 source_plugins = ["src/python/project:django_settings"]
+```
+```Text 3rdparty/python/mypy-requirements.txt
+mypy==1.3.0
+django-stubs==1.5.0
+```
+```python 3rdparty/python/BUILD
+python_requirements(
+    name="mypy",
+    source="mypy-requirements.txt",
+    resolve="mypy",
+)
 ```
 ```text mypy.ini
 [mypy]
@@ -197,16 +203,26 @@ MY_SETTING = URLPattern(pattern="foo", callback=lambda: None)
 python_source(name="django_settings", source="django_settings.py")
 ```
 
-> 🚧 Importing from `extra_type_stubs`
+> 🚧 Importing type stubs
 >
-> Requirements specified in `[mypy].extra_type_stubs` are not visible to the `python-infer` subsystem, and cannot be referenced as explicit `dependencies`. If you `import` from a stubs module in your code, and it does not have a corresponding implementation `python_requirement` target that provides the imported module, you may see a warning/error depending on the value you've configured for `[python-infer].unowned_dependency_behavior`. Goals other than `check` will also raise `ImportError`s if the `import` isn't conditional on the value of `typing.TYPE_CHECKING`:
+> Type stubs specified in the MyPy custom lockfile are not visible to the `python-infer` subsystem, and cannot be referenced as explicit `dependencies`. If you `import` from a stubs module in your code, and it does not have a corresponding implementation `python_requirement` target that provides the imported module, you may see a warning/error depending on the value you've configured for `[python-infer].unowned_dependency_behavior`. Goals other than `check` will also raise `ImportError`s if the `import` isn't conditional on the value of `typing.TYPE_CHECKING`:
 >
 > ```toml pants.toml
 > [python-infer]
 > unowned_dependency_behavior = "warning"
->
 > [mypy]
-> extra_type_stubs = ["mypy-boto3-ec2==1.20.49"]
+> install_from_resolve = "mypy"
+> ```
+> ```Text 3rdparty/python/mypy-requirements.txt
+> mypy==1.3.0
+> mypy_boto3_ec2==1.26.136
+> ```
+> ```python 3rdparty/python/BUILD
+> python_requirements(
+> name="mypy",
+> source="mypy-requirements.txt",
+> resolve="mypy",
+> )
 > ```
 > ```python src/example.py
 > from typing import TYPE_CHECKING
