@@ -44,10 +44,11 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -102,10 +103,11 @@ jobs:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -160,10 +162,11 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -218,10 +221,11 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -269,19 +273,12 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-    - name: Tell Pants to use Python 3.9
-      run: 'echo "PY=python3.9" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==3.9.*'']" >> $GITHUB_ENV
-
-        '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - env:
         MODE: debug
-        USE_PY39: 'true'
       name: Fetch and stabilize wheels
-      run: ./build-support/bin/release.sh fetch-and-stabilize --dest=dest/pypi_release
+      run: ./pants run build-support/bin/release.py -- fetch-and-stabilize --dest=dest/pypi_release
     - name: Create Release -> Commit Mapping
       run: 'tag="${{ needs.determine_ref.outputs.build-ref }}"
 
