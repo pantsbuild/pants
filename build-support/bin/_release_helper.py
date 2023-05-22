@@ -733,20 +733,16 @@ def build_fs_util() -> None:
 def build_pex(fetch: bool) -> None:
     stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
     if fetch:
-        # TODO: Support macOS on ARM64.
+        # TODO: Support macos and linux arm64.
         extra_pex_args = [
             "--python-shebang",
             "/usr/bin/env python",
-            *(
-                f"--platform={plat}-{abi}"
-                for plat in ("linux_x86_64", "macosx_11.0_x86_64")
-                for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
-            ),
+            *(f"--platform={plat}-cp-39-cp39" for plat in ("linux_x86_64", "macosx_11.0_x86_64")),
         ]
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
         banner(f"Building {pex_name} by fetching wheels.")
     else:
-        # TODO: Support macOS on ARM64. Will require qualifying the pex name with the arch.
+        # TODO: Support macos and linux arm64. Will require qualifying the pex name with the arch.
         major, minor = sys.version_info[:2]
         extra_pex_args = [
             f"--interpreter-constraint=CPython=={major}.{minor}.*",
@@ -765,7 +761,8 @@ def build_pex(fetch: bool) -> None:
         fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
         check_pants_wheels_present(CONSTANTS.deploy_dir)
         if stable:
-            reversion_prebuilt_wheels()
+            stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
+            reversion_prebuilt_wheels(str(stable_wheel_dir))
     else:
         build_pants_wheels()
         build_3rdparty_wheels()
@@ -822,16 +819,16 @@ def build_pex(fetch: bool) -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-def fetch_and_stabilize() -> None:
+def fetch_and_stabilize(dest_dir: str) -> None:
     # TODO: Because wheels are now built specifically for a particular tag, we could likely remove
     # "reversioning".
-    banner("Fetching and stabilizing wheels.")
+    banner(f"Fetching and stabilizing wheels to {dest_dir}.")
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
     fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
     check_pants_wheels_present(CONSTANTS.deploy_dir)
-    reversion_prebuilt_wheels()
+    reversion_prebuilt_wheels(dest_dir)
     banner("Successfully fetched and stabilized wheels")
 
 
@@ -901,7 +898,7 @@ def check_pgp() -> None:
         )
 
 
-def reversion_prebuilt_wheels() -> None:
+def reversion_prebuilt_wheels(dest_dir: str) -> None:
     # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We use
     # manylinux2014 images.
     source_platform = "linux_"
@@ -911,12 +908,11 @@ def reversion_prebuilt_wheels() -> None:
         whl.rename(str(whl).replace(source_platform, dest_platform))
 
     # Now, reversion to use the STABLE_VERSION.
-    stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
-    stable_wheel_dir.mkdir(parents=True, exist_ok=True)
+    Path(dest_dir).mkdir(parents=True, exist_ok=True)
     for whl in unstable_wheel_dir.glob("*.whl"):
         reversion(
             whl_file=str(whl),
-            dest_dir=str(stable_wheel_dir),
+            dest_dir=dest_dir,
             target_version=CONSTANTS.pants_stable_version,
             extra_globs=["pants/_version/VERSION"],
         )
@@ -1114,13 +1110,12 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 10:
+        if is_cross_platform(local_files) and len(local_files) != 4:
             formatted_local_files = "\n    ".join(sorted(f.name for f in local_files))
             missing_packages.append(
                 softwrap(
                     f"""
-                    {package.name}. Expected 10 wheels ({{cp37m, cp38, cp39}} x
-                    {{macosx10.15-x86_64, macosx11-x86_64, linux-x86_64}} + cp39-macosx-arm64),
+                    {package.name}. Expected 4 wheels (linux/mac X x86_64/arm64),
                     but found {len(local_files)}:\n    {formatted_local_files}
                     """
                 )
@@ -1140,7 +1135,13 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("tag-release")
-    subparsers.add_parser("fetch-and-stabilize")
+
+    fetch_and_stabilize = subparsers.add_parser("fetch-and-stabilize")
+    fetch_and_stabilize.add_argument(
+        "--dest",
+        help="A destination directory to put stabilized wheels in.",
+    )
+
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
@@ -1157,7 +1158,7 @@ def main() -> None:
     if args.command == "tag-release":
         tag_release()
     if args.command == "fetch-and-stabilize":
-        fetch_and_stabilize()
+        fetch_and_stabilize(args.dest)
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":
