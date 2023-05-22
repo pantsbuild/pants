@@ -127,7 +127,9 @@ class HelpPrinter(MaybeColor):
                 self._all_help_info.name_to_api_type_info.keys(), self._print_api_type_help
             ),
             **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_rule_help),
-            **_help_table(self._all_help_info.env_var_to_help_info.keys(), self._print_env_var_help),
+            **_help_table(
+                self._all_help_info.env_var_to_help_info.keys(), self._print_env_var_help
+            ),
         }
 
     @staticmethod
