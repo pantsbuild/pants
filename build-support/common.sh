@@ -48,31 +48,17 @@ function git_merge_base() {
 }
 
 function determine_python() {
-  if [[ -n "${PY:-}" ]]; then
-    which "${PY}" && return 0
+  version = '3.9'
+  interpreter_path="$(command -v "python${version}")"
+  if [[ -z "${interpreter_path}" ]]; then
+    echo "pants: Failed to find a Python ${version} interpreter" && return 1
   fi
-
-  local candidate_versions
-  if is_macos_arm; then
-    candidate_versions=('3.9')
-  else
-    candidate_versions=('3.7' '3.8' '3.9')
+  # Check if the Python version is installed via Pyenv but not activated.
+  if [[ "$("${interpreter_path}" --version 2>&1 > /dev/null)" == "pyenv: python${version}"* ]]; then
+    echo "pants: The Python ${version} interpreter at ${interpreter_path} is an inactive pyenv interpreter" && return 1
   fi
-
-  for version in "${candidate_versions[@]}"; do
-    local interpreter_path
-    interpreter_path="$(command -v "python${version}")"
-    if [[ -z "${interpreter_path}" ]]; then
-      continue
-    fi
-    # Check if the Python version is installed via Pyenv but not activated.
-    if [[ "$("${interpreter_path}" --version 2>&1 > /dev/null)" == "pyenv: python${version}"* ]]; then
-      continue
-    fi
-    echo "${interpreter_path}" && return 0
-  done
-  echo "pants: failed to find suitable Python interpreter, looking for: ${candidate_versions[*]}" >&2
-  return 1
+  echo "${interpreter_path}"
+  return 0
 }
 
 function is_macos_arm() {
