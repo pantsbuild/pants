@@ -27,12 +27,6 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
@@ -98,10 +92,6 @@ jobs:
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
       run: ./cargo test --tests -- --nocapture --test-threads=8
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
@@ -118,16 +108,10 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
@@ -205,10 +189,6 @@ jobs:
         ./cargo check --benches
 
         ./cargo doc'
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 60
   bootstrap_pants_macos11_x86_64:
     env:
@@ -225,16 +205,10 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
@@ -300,10 +274,6 @@ jobs:
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
       run: ./cargo test --tests -- --nocapture
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
@@ -345,10 +315,11 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -398,10 +369,11 @@ jobs:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -452,10 +424,11 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -506,10 +479,11 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -573,16 +547,10 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
@@ -601,10 +569,6 @@ jobs:
       with:
         name: pants-log-lint-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 30
   merge_ok:
     if: always()
@@ -673,12 +637,6 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
@@ -697,10 +655,6 @@ jobs:
       with:
         name: pants-log-python-test-Linux-ARM64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_0:
     env: {}
@@ -736,16 +690,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -766,10 +714,6 @@ jobs:
       with:
         name: pants-log-python-test-0_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_1:
     env: {}
@@ -805,16 +749,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -835,10 +773,6 @@ jobs:
       with:
         name: pants-log-python-test-1_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_2:
     env: {}
@@ -874,16 +808,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -904,10 +832,6 @@ jobs:
       with:
         name: pants-log-python-test-2_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_3:
     env: {}
@@ -943,16 +867,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -973,10 +891,6 @@ jobs:
       with:
         name: pants-log-python-test-3_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_4:
     env: {}
@@ -1012,16 +926,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1042,10 +950,6 @@ jobs:
       with:
         name: pants-log-python-test-4_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_5:
     env: {}
@@ -1081,16 +985,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1111,10 +1009,6 @@ jobs:
       with:
         name: pants-log-python-test-5_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_6:
     env: {}
@@ -1150,16 +1044,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1180,10 +1068,6 @@ jobs:
       with:
         name: pants-log-python-test-6_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_7:
     env: {}
@@ -1219,16 +1103,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1249,10 +1127,6 @@ jobs:
       with:
         name: pants-log-python-test-7_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_8:
     env: {}
@@ -1288,16 +1162,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1318,10 +1186,6 @@ jobs:
       with:
         name: pants-log-python-test-8_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_9:
     env: {}
@@ -1357,16 +1221,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1387,10 +1245,6 @@ jobs:
       with:
         name: pants-log-python-test-9_10-Linux-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
   test_python_macos11_x86_64:
     env:
@@ -1412,16 +1266,10 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1442,10 +1290,6 @@ jobs:
       with:
         name: pants-log-python-test-macOS11-x86_64
         path: .pants.d/pants.log
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
 name: Pull Request CI
 'on':

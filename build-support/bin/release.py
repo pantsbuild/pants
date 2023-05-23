@@ -258,6 +258,7 @@ def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[st
                 env={
                     **os.environ,
                     **DISABLED_BACKENDS_CONFIG,
+                    "NO_SCIE_WARNING": "1",
                 },
             )
             .stdout.decode()
