@@ -31,7 +31,7 @@ class Lambdex(PythonToolBase):
     lockfile_rules_type = LockfileRules.SIMPLE
 
     layout = EnumOption(
-        default=LambdexLayout.LAMBDEX,
+        default=LambdexLayout.ZIP,
         help=softwrap(
             """
             Explicitly control the layout used for `python_awslambda` and
