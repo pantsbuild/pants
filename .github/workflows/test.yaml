@@ -63,11 +63,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
@@ -163,11 +158,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
@@ -275,11 +265,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
@@ -327,8 +312,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
@@ -357,22 +342,13 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        USE_PY39=true ./build-support/bin/release.sh build-wheels'
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -388,8 +364,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
@@ -416,11 +392,6 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -430,11 +401,7 @@ jobs:
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        USE_PY39=true ./build-support/bin/release.sh build-wheels'
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -448,8 +415,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS10-15-x86_64)
     needs:
     - classify_changes
@@ -478,11 +445,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -493,11 +455,7 @@ jobs:
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        USE_PY39=true ./build-support/bin/release.sh build-wheels'
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -511,8 +469,8 @@ jobs:
       MODE: debug
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
-      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
     name: Build wheels (macOS11-ARM64)
     needs:
     - classify_changes
@@ -541,11 +499,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -597,17 +550,16 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 2
-    - id: files
-      name: Get changed files
-      uses: tj-actions/changed-files@v32
-      with:
-        separator: '|'
+        fetch-depth: 10
     - id: classify
       name: Classify changed files
-      run: "affected=$(python build-support/bin/classify_changed_files.py \"${{ steps.files.outputs.all_modified_files }}\"\
-        )\necho \"Affected:\"\nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" >> $GITHUB_OUTPUT\n \
-        \ echo \"docs_only\"\nfi\nfor i in ${affected}; do\n  echo \"${i}=true\" >> $GITHUB_OUTPUT\n  echo \"${i}\"\ndone\n"
+      run: "if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_SHA ]]; then\n  # push: compare to the immediate parent, which should\
+        \ already be fetched\n  # (checkout's fetch_depth defaults to 10)\n  comparison_sha=$(git rev-parse HEAD^)\nelse\n\
+        \  # pull request: compare to the base branch, ensuring that commit exists\n  git fetch --depth=1 \"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\
+        \n  comparison_sha=\"$GITHUB_EVENT_PULL_REQUEST_BASE_SHA\"\nfi\necho \"comparison_sha=$comparison_sha\"\n\naffected=$(git\
+        \ diff --name-only \"$comparison_sha\" HEAD | python build-support/bin/classify_changed_files.py)\necho \"Affected:\"\
+        \nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" | tee -a $GITHUB_OUTPUT\nfi\nfor i in ${affected};\
+        \ do\n  echo \"${i}=true\" | tee -a $GITHUB_OUTPUT\ndone\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Lint Python and Shell
@@ -638,11 +590,6 @@ jobs:
         path: src/python/pants
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Lint
       run: './pants lint check ::
 
@@ -689,6 +636,13 @@ jobs:
     - test_python_linux_x86_64_0
     - test_python_linux_x86_64_1
     - test_python_linux_x86_64_2
+    - test_python_linux_x86_64_3
+    - test_python_linux_x86_64_4
+    - test_python_linux_x86_64_5
+    - test_python_linux_x86_64_6
+    - test_python_linux_x86_64_7
+    - test_python_linux_x86_64_8
+    - test_python_linux_x86_64_9
     - test_python_macos11_x86_64
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
@@ -732,11 +686,6 @@ jobs:
         path: src/python/pants
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
@@ -756,7 +705,7 @@ jobs:
   test_python_linux_x86_64_0:
     env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Test Python (Linux-x86_64) Shard 0/3
+    name: Test Python (Linux-x86_64) Shard 0/10
     needs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
@@ -806,13 +755,8 @@ jobs:
         path: src/python/pants
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Run Python test shard 0/3
-      run: './pants test --shard=0/3 ::
+    - name: Run Python test shard 0/10
+      run: './pants test --shard=0/10 ::
 
         '
     - continue-on-error: true
@@ -820,7 +764,7 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-0_3-Linux-x86_64
+        name: pants-log-python-test-0_10-Linux-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:
@@ -830,7 +774,7 @@ jobs:
   test_python_linux_x86_64_1:
     env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Test Python (Linux-x86_64) Shard 1/3
+    name: Test Python (Linux-x86_64) Shard 1/10
     needs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
@@ -880,13 +824,8 @@ jobs:
         path: src/python/pants
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Run Python test shard 1/3
-      run: './pants test --shard=1/3 ::
+    - name: Run Python test shard 1/10
+      run: './pants test --shard=1/10 ::
 
         '
     - continue-on-error: true
@@ -894,7 +833,7 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-1_3-Linux-x86_64
+        name: pants-log-python-test-1_10-Linux-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:
@@ -904,7 +843,7 @@ jobs:
   test_python_linux_x86_64_2:
     env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
-    name: Test Python (Linux-x86_64) Shard 2/3
+    name: Test Python (Linux-x86_64) Shard 2/10
     needs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
@@ -954,13 +893,8 @@ jobs:
         path: src/python/pants
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Run Python test shard 2/3
-      run: './pants test --shard=2/3 ::
+    - name: Run Python test shard 2/10
+      run: './pants test --shard=2/10 ::
 
         '
     - continue-on-error: true
@@ -968,7 +902,490 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-2_3-Linux-x86_64
+        name: pants-log-python-test-2_10-Linux-x86_64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_linux_x86_64_3:
+    env: {}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 3/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 3/10
+      run: './pants test --shard=3/10 ::
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-3_10-Linux-x86_64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_linux_x86_64_4:
+    env: {}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 4/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 4/10
+      run: './pants test --shard=4/10 ::
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-4_10-Linux-x86_64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_linux_x86_64_5:
+    env: {}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 5/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 5/10
+      run: './pants test --shard=5/10 ::
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-5_10-Linux-x86_64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_linux_x86_64_6:
+    env: {}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 6/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 6/10
+      run: './pants test --shard=6/10 ::
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-6_10-Linux-x86_64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_linux_x86_64_7:
+    env: {}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 7/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 7/10
+      run: './pants test --shard=7/10 ::
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-7_10-Linux-x86_64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_linux_x86_64_8:
+    env: {}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 8/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 8/10
+      run: './pants test --shard=8/10 ::
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-8_10-Linux-x86_64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_linux_x86_64_9:
+    env: {}
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
+    name: Test Python (Linux-x86_64) Shard 9/10
+    needs:
+    - bootstrap_pants_linux_x86_64
+    - classify_changes
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
+    - name: Run Python test shard 9/10
+      run: './pants test --shard=9/10 ::
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-9_10-Linux-x86_64
         path: .pants.d/pants.log
     strategy:
       matrix:
@@ -1014,11 +1431,6 @@ jobs:
         path: src/python/pants
     - name: Make native-client runnable
       run: chmod +x src/python/pants/bin/native_client
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
@@ -1039,5 +1451,6 @@ name: Pull Request CI
 'on':
   pull_request: {}
   push:
-    branches-ignore:
-    - dependabot/**
+    branches:
+    - main
+    - 2.*.x

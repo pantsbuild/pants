@@ -41,7 +41,6 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.27.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -152,11 +151,6 @@ flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
 
-[python.resolves_to_interpreter_constraints]
-# Without setting this explicitly, the 'python-default' resolve uses the Pants default
-# ">=3.7,<4" IC, which is incorrect and can lead to a failed lock for systems with >=3.10.
-python-default = [">=3.7,<3.10"]
-
 [python-infer]
 assets = true
 unowned_dependency_behavior = "error"
@@ -236,13 +230,6 @@ version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
 [scala-infer]
 force_add_siblings_as_dependencies = false
-
-[toolchain-setup]
-repo = "pants"
-org = "pantsbuild"
-
-[buildsense]
-enable = false
 
 [pants-releases.release_notes]
 master = "src/python/pants/notes/master.rst"

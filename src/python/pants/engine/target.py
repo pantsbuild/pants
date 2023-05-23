@@ -1044,21 +1044,6 @@ class AllUnexpandedTargets(Collection[Target]):
     """
 
 
-@dataclass(frozen=True)
-class AllTargetsRequest:
-    """Find all targets in the project.
-
-    Use with either `AllUnexpandedTargets` or `AllTargets`.
-    """
-
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(AllTargets, AllTargetsRequest)",
-            "Instead, simply use `Get(AllTargets)` or put `AllTargets` in the rule signature",
-        )
-
-
 # -----------------------------------------------------------------------------------------------
 # Target generation
 # -----------------------------------------------------------------------------------------------
