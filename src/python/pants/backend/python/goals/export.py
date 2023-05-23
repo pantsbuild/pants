@@ -21,7 +21,6 @@ from pants.backend.python.util_rules.local_dists_pep660 import (
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
 from pants.core.goals.export import (
     Export,
@@ -38,7 +37,6 @@ from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
@@ -49,15 +47,6 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ExportVenvsRequest(ExportRequest):
     pass
-
-
-@dataclass(frozen=True)
-class _ExportVenvRequest(EngineAwareParameter):
-    resolve: str | None
-    root_python_targets: tuple[Target, ...]
-
-    def debug_hint(self) -> str | None:
-        return self.resolve
 
 
 @dataclass(frozen=True)
@@ -439,50 +428,6 @@ async def export_virtualenv_for_resolve(
         ),
     )
     return MaybeExportResult(export_result)
-
-
-@rule
-async def export_virtualenv_for_targets(
-    request: _ExportVenvRequest,
-    python_setup: PythonSetup,
-) -> ExportResult:
-    if request.resolve:
-        interpreter_constraints = InterpreterConstraints(
-            python_setup.resolves_to_interpreter_constraints.get(
-                request.resolve, python_setup.interpreter_constraints
-            )
-        )
-    else:
-        interpreter_constraints = InterpreterConstraints.create_from_targets(
-            request.root_python_targets, python_setup
-        ) or InterpreterConstraints(python_setup.interpreter_constraints)
-
-    # Note that a pex created from a RequirementsPexRequest has packed layout,
-    # which should lead to the best performance in this use case.
-    requirements_pex_request = await Get(
-        PexRequest,
-        RequirementsPexRequest(
-            (tgt.address for tgt in request.root_python_targets),
-            hardcoded_interpreter_constraints=interpreter_constraints,
-        ),
-    )
-
-    dest_prefix = (
-        os.path.join("python", "virtualenvs")
-        if request.resolve
-        else os.path.join("python", "virtualenv")
-    )
-
-    export_result = await Get(
-        ExportResult,
-        VenvExportRequest(
-            requirements_pex_request,
-            dest_prefix,
-            request.resolve or "",
-            qualify_path_with_python_version=True,
-        ),
-    )
-    return export_result
 
 
 @rule
