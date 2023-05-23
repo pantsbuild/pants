@@ -20,7 +20,7 @@ use parking_lot::Mutex;
 use sharded_lmdb::ShardedLmdb;
 use std::os::unix::fs::PermissionsExt;
 use task_executor::Executor;
-use tempfile::NamedTempFile;
+use tempfile::Builder;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use workunit_store::ObservationMetric;
 
@@ -230,7 +230,9 @@ impl ShardedFSDB {
           .executor
           .spawn_blocking(
             move || {
-              NamedTempFile::new_in(dest_path2.parent().unwrap())
+              Builder::new()
+                .suffix(".tmp")
+                .tempfile_in(dest_path2.parent().unwrap())
                 .map_err(|e| format!("Failed to create temp file: {e}"))
             },
             |e| Err(format!("temp file creation task failed: {e}")),
@@ -425,6 +427,10 @@ impl UnderlyingByteStore for ShardedFSDB {
                   format!("Error iterating dir {:?}: {e}", shard.path().file_name())
                 })?;
                 let path = large_file.path();
+                if path.extension().is_some() {
+                  continue; // NB: This is a tempfile
+                }
+
                 let hash = path.file_name().unwrap().to_str().unwrap();
                 let (length, mtime) = large_file
                   .metadata()
