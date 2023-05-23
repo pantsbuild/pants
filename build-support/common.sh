@@ -48,7 +48,11 @@ function git_merge_base() {
 }
 
 function determine_python() {
-  version = '3.9'
+  if [[ -n "${PY:-}" ]]; then
+    which "${PY}" && return 0
+  fi
+
+  version='3.9'
   interpreter_path="$(command -v "python${version}")"
   if [[ -z "${interpreter_path}" ]]; then
     echo "pants: Failed to find a Python ${version} interpreter" && return 1
