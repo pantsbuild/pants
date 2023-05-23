@@ -30,7 +30,7 @@ use process_execution::{
   ProcessExecutionEnvironment, ProcessResultSource,
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
-use tonic::{Code, Request, Status};
+use tonic::{Code, Request};
 
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
@@ -589,70 +589,77 @@ async fn check_action_cache(
       workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 
       let start = Instant::now();
-      let client = action_cache_client.as_ref().clone();
-      let response = retry_call(
-        client,
-        move |mut client| {
-          let request = remexec::GetActionResultRequest {
-            action_digest: Some(action_digest.into()),
-            instance_name: instance_name.clone().unwrap_or_default(),
-            ..remexec::GetActionResultRequest::default()
-          };
-          let request = apply_headers(Request::new(request), &context.build_id);
-          async move { client.get_action_result(request).await }
-        },
-        status_is_retryable,
-      )
-      .and_then(|action_result| async move {
-        let action_result = action_result.into_inner();
-        let response = populate_fallible_execution_result(
-          store.clone(),
-          context.run_id,
-          &action_result,
-          false,
-          ProcessResultSource::HitRemotely,
-          environment,
-        )
-        .await
-        .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
+      let response = get_action_result(action_digest, instance_name, context, action_cache_client)
+        .and_then(|action_result| async move {
+          let Some(action_result) = action_result else { return Ok(None) };
 
-        let cache_content_valid = check_cache_content(&response, &store, cache_content_behavior)
+          let response = populate_fallible_execution_result(
+            store.clone(),
+            context.run_id,
+            &action_result,
+            false,
+            ProcessResultSource::HitRemotely,
+            environment,
+          )
           .await
-          .map_err(|e| {
-            Status::unavailable(format!("Output content could not be validated: {e}"))
-          })?;
+          .map_err(|e| format!("Output roots could not be loaded: {e}"))?;
 
-        if cache_content_valid {
-          Ok(response)
-        } else {
-          Err(Status::not_found(""))
-        }
-      })
-      .await;
+          let cache_content_valid = check_cache_content(&response, &store, cache_content_behavior)
+            .await
+            .map_err(|e| format!("Output content could not be validated: {e}"))?;
+
+          if cache_content_valid {
+            Ok(Some(response))
+          } else {
+            Ok(None)
+          }
+        })
+        .await;
 
       workunit.record_observation(
         ObservationMetric::RemoteCacheGetActionResultTimeMicros,
         start.elapsed().as_micros() as u64,
       );
 
-      match response {
-        Ok(response) => {
-          workunit.increment_counter(Metric::RemoteCacheRequestsCached, 1);
-          Ok(Some(response))
-        }
-        Err(status) => match status.code() {
-          Code::NotFound => {
-            workunit.increment_counter(Metric::RemoteCacheRequestsUncached, 1);
-            Ok(None)
-          }
-          _ => {
-            workunit.increment_counter(Metric::RemoteCacheReadErrors, 1);
-            // TODO: Ensure that we're catching missing digests.
-            Err(status_to_str(status).into())
-          }
-        },
-      }
+      let counter = match response {
+        Ok(Some(_)) => Metric::RemoteCacheRequestsCached,
+        Ok(None) => Metric::RemoteCacheRequestsUncached,
+        // TODO: Ensure that we're catching missing digests.
+        Err(_) => Metric::RemoteCacheReadErrors,
+      };
+      workunit.increment_counter(counter, 1);
+
+      response.map_err(ProcessError::from)
     }
   )
   .await
+}
+
+async fn get_action_result(
+  action_digest: Digest,
+  instance_name: Option<String>,
+  context: &Context,
+  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
+) -> Result<Option<ActionResult>, String> {
+  let client = action_cache_client.as_ref().clone();
+  let response = retry_call(
+    client,
+    move |mut client| {
+      let request = remexec::GetActionResultRequest {
+        action_digest: Some(action_digest.into()),
+        instance_name: instance_name.clone().unwrap_or_default(),
+        ..remexec::GetActionResultRequest::default()
+      };
+      let request = apply_headers(Request::new(request), &context.build_id);
+      async move { client.get_action_result(request).await }
+    },
+    status_is_retryable,
+  )
+  .await;
+
+  match response {
+    Ok(response) => Ok(Some(response.into_inner())),
+    Err(status) if status.code() == Code::NotFound => Ok(None),
+    Err(status) => Err(status_to_str(status)),
+  }
 }
