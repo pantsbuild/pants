@@ -235,6 +235,7 @@ def test_packages_files_as_resource_in_workspace(
     with open(os.path.join(rule_runner.build_root, "src/js/a/dist/index.cjs")) as f:
         assert f.read() == "blarb\n"
 
+
 def test_extra_envs(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

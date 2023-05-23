@@ -16,6 +16,7 @@ from pants.backend.javascript.package_json import (
     NodeBuildScript,
     NodeBuildScriptEntryPointField,
     NodeBuildScriptExtraCaches,
+    NodeBuildScriptExtraEnvVarsField,
     NodeBuildScriptOutputDirectoriesField,
     NodeBuildScriptOutputFilesField,
     NodeBuildScriptSourcesField,
@@ -32,6 +33,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import ResourceSourceField
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
@@ -41,8 +43,6 @@ from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
-from pants.backend.javascript.package_json import NodeBuildScriptExtraEnvVarsField
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 
 
 @dataclass(frozen=True)
@@ -158,7 +158,7 @@ class NodeBuildScriptRequest:
             or (),
             script_name=req.protocol_target[NodeBuildScriptEntryPointField].value,
             extra_caches=req.protocol_target[NodeBuildScriptExtraCaches].value or (),
-            extra_env_vars=req.protocol_target[NodeBuildScriptExtraEnvVarsField].value or ()
+            extra_env_vars=req.protocol_target[NodeBuildScriptExtraEnvVarsField].value or (),
         )
 
     @classmethod
@@ -169,7 +169,7 @@ class NodeBuildScriptRequest:
             output_directories=req.output_directories.value or (),
             script_name=req.script_name.value,
             extra_caches=req.extra_caches.value or (),
-            extra_env_vars=req.extra_env_vars.value or ()
+            extra_env_vars=req.extra_env_vars.value or (),
         )
 
     def get_paths(self) -> Iterable[str]:

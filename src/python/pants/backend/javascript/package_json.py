@@ -412,6 +412,7 @@ class NodeBuildScriptOutputDirectoriesField(StringSequenceField):
         """
     )
 
+
 class NodeBuildScriptExtraEnvVarsField(StringSequenceField):
     alias = "extra_env_vars"
     required = False

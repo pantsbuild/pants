@@ -76,6 +76,7 @@ def test_creates_run_requests_package_json_scripts(rule_runner: RuleRunner) -> N
 
         assert result.args == ("npm", "--prefix", "{chroot}", "run", script)
 
+
 def test_extra_envs(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
