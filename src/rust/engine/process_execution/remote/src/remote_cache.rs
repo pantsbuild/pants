@@ -282,7 +282,6 @@ impl CommandRunner {
       let response = check_action_cache(
         action_digest,
         &request.description,
-        self.instance_name.clone(),
         request.execution_environment.clone(),
         &context,
         self.provider.clone(),
@@ -386,7 +385,6 @@ impl CommandRunner {
   async fn update_action_cache(
     &self,
     result: &FallibleProcessResultWithPlatform,
-    _instance_name: Option<String>,
     command: &Command,
     action_digest: Digest,
     command_digest: Digest,
@@ -516,13 +514,7 @@ impl process_execution::CommandRunner for CommandRunner {
       let write_fut = in_workunit!("remote_cache_write", Level::Trace, |workunit| async move {
         workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
         let write_result = command_runner
-          .update_action_cache(
-            &result,
-            command_runner.instance_name.clone(),
-            &command,
-            action_digest,
-            command_digest,
-          )
+          .update_action_cache(&result, &command, action_digest, command_digest)
           .await;
         match write_result {
           Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
@@ -558,7 +550,6 @@ impl process_execution::CommandRunner for CommandRunner {
 async fn check_action_cache(
   action_digest: Digest,
   command_description: &str,
-  _instance_name: Option<String>,
   environment: ProcessExecutionEnvironment,
   context: &Context,
   provider: Arc<dyn ActionCacheProvider>,
