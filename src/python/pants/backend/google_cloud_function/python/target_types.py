@@ -29,11 +29,19 @@ from pants.util.strutil import help_text
 
 
 class PythonGoogleCloudFunctionHandlerField(PythonFaaSHandlerField):
+    # GCP requires "Your main file must be named main.py"
+    # https://cloud.google.com/functions/docs/writing#directory-structure-python
+    reexported_handler_module = "main"
+
     help = help_text(
         f"""
         Entry point to the Google Cloud Function handler.
 
         {PythonFaaSHandlerField.help}
+
+        This is re-exported at `{reexported_handler_module}.handler` in the resulting package to
+        used as the configured handler of the Google Cloud Function in GCP.  It can also be accessed
+        under its source-root-relative module path, for example: `path.to.module.handler_func`.
         """
     )
 
