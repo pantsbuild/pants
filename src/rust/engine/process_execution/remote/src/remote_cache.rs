@@ -40,6 +40,23 @@ pub enum RemoteCacheWarningsBehavior {
   Backoff,
 }
 
+/// This `ActionCacheProvider` trait captures the operations required to be able to cache command
+/// executions remotely.
+#[async_trait]
+trait ActionCacheProvider: Sync + Send + 'static {
+  async fn update_action_result(
+    &self,
+    action_digest: Digest,
+    action_result: ActionResult,
+  ) -> Result<(), String>;
+
+  async fn get_action_result(
+    &self,
+    action_digest: Digest,
+    context: &Context,
+  ) -> Result<Option<ActionResult>, String>;
+}
+
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
 ///
