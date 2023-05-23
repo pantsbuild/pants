@@ -75,3 +75,37 @@ def test_creates_run_requests_package_json_scripts(rule_runner: RuleRunner) -> N
         result = rule_runner.request(RunRequest, [RunNodeBuildScriptFieldSet.create(tgt)])
 
         assert result.args == ("npm", "--prefix", "{chroot}", "run", script)
+
+def test_extra_envs(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_build_script(entry_point="build", extra_env_vars=["FOO=BAR"], output_files=["dist/index.cjs"])
+                    ]
+                )
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "browser": "lib/index.mjs",
+                    "scripts": {"build": "mkdir dist && echo $FOO >> dist/index.cjs"},
+                }
+            ),
+            "src/js/package-lock.json": json.dumps({}),
+            "src/js/lib/BUILD": dedent(
+                """\
+                javascript_sources()
+                """
+            ),
+            "src/js/lib/index.mjs": "",
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/js", generated_name="build"))
+
+    result = rule_runner.request(RunRequest, [RunNodeBuildScriptFieldSet.create(tgt)])
+    assert result.extra_env.get("FOO") == "BAR"
