@@ -280,14 +280,12 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
                     name='lambda',
                     handler='foo.bar.hello_world:handler',
                     runtime="python3.7",
-                    layout='zip',
                 )
                 python_awslambda(
                     name='slimlambda',
                     include_requirements=False,
                     handler='foo.bar.hello_world:handler',
                     runtime="python3.7",
-                    layout='zip',
                 )
                 """
             ),
@@ -298,6 +296,7 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
         expected_extra_log_lines=("    Handler: lambda_function.handler",),
+        extra_args=["--lambdex-layout=zip"],
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
 
@@ -313,6 +312,7 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
         expected_extra_log_lines=("    Handler: lambda_function.handler",),
+        extra_args=["--lambdex-layout=zip"],
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
 

@@ -265,7 +265,6 @@ def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
                     name='gcf',
                     handler='foo.bar.hello_world:handler',
                     runtime="python37",
-                    layout='zip',
                     type='event',
                 )
                 """
@@ -277,6 +276,7 @@ def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),
         expected_extra_log_lines=("    Handler: handler",),
+        extra_args=["--lambdex-layout=zip"],
     )
     assert "src.python.foo.bar/gcf.zip" == zip_file_relpath
 

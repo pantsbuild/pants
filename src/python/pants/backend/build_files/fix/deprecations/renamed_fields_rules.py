@@ -41,12 +41,7 @@ class RenamedFieldTypes:
         return cls(
             FrozenDict(
                 {
-                    target_name: FrozenDict(
-                        {
-                            deprecated_field_name: new_field_name
-                            for deprecated_field_name, new_field_name in field_renames.items()
-                        }
-                    )
+                    target_name: FrozenDict(field_renames.items())
                     for target_name, field_renames in data.items()
                 }
             )

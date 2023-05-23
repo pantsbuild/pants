@@ -12,12 +12,11 @@ from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaIncludeRequirements,
     PythonAwsLambdaRuntime,
 )
+from pants.backend.python.subsystems.lambdex import Lambdex, LambdexLayout
 from pants.backend.python.util_rules.faas import (
     BuildLambdexRequest,
     BuildPythonFaaSRequest,
     PythonFaaSCompletePlatforms,
-    PythonFaaSLayout,
-    PythonFaaSLayoutField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
@@ -39,16 +38,14 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
     complete_platforms: PythonFaaSCompletePlatforms
     output_path: OutputPathField
     environment: EnvironmentField
-    layout: PythonFaaSLayoutField
 
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def package_python_awslambda(
     field_set: PythonAwsLambdaFieldSet,
+    lambdex: Lambdex,
 ) -> BuiltPackage:
-    layout = PythonFaaSLayout(field_set.layout.value)
-
-    if layout is PythonFaaSLayout.LAMBDEX:
+    if lambdex.layout is LambdexLayout.LAMBDEX:
         return await Get(
             BuiltPackage,
             BuildLambdexRequest(
@@ -75,13 +72,9 @@ async def package_python_awslambda(
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
             handler=field_set.handler,
-            layout=layout,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
-            # This doesn't matter (just needs to be fixed), but is the default name used by the AWS
-            # console when creating a Python lambda, so is as good as any
-            # https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html
-            reexported_handler_module="lambda_function",
+            reexported_handler_module=PythonAwsLambdaHandlerField.reexported_handler_module,
         ),
     )
 

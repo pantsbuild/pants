@@ -8,11 +8,8 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 from typing import Optional, cast
-
-from typing_extensions import Literal
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
@@ -281,35 +278,6 @@ class PythonFaaSRuntimeField(StringField, ABC):
         return platform_str
 
 
-class PythonFaaSLayout(Enum):
-    # TODO: deprecate lambdex layout, since PEX can be used directly now
-    LAMBDEX = "lambdex"
-    ZIP = "zip"
-
-
-class PythonFaaSLayoutField(StringField):
-    alias = "layout"
-    valid_choices = PythonFaaSLayout
-    default = PythonFaaSLayout.LAMBDEX.value
-
-    help = help_text(
-        """
-        The layout used for the function artifact.
-
-        With the `lambdex` layout (default), the artifact is created as a Lambdex, which is a normal
-        PEX that's been adjusted to include a shim file for the handler. This requires dynamically
-        choosing dependencies on start-up.
-
-        With the `zip` layout (recommended), the artifact contains first and third party code at the
-        top level, similar to building with `pip install --target=...`. This layout chooses the
-        appropriate versions of dependencies at build time, and so at most one platform can be
-        specified via `runtime` or `complete_platforms`. This matches the layout recommended by
-        cloud providers.
-
-        """
-    )
-
-
 @rule
 async def digest_complete_platforms(
     complete_platforms: PythonFaaSCompletePlatforms,
@@ -352,6 +320,7 @@ async def build_lambdex(
             f" {bin_name()} package. (See https://realpython.com/python-wheels/ for more about"
             " wheels.)\n\n(If the build does not raise an exception, it's safe to use macOS.)"
         )
+    lambdex.warn_for_layout(request.target_name)
 
     output_filename = request.output_path.value_or_default(
         # FaaS typically use the .zip suffix, so we use that instead of .pex.
@@ -436,7 +405,6 @@ class BuildPythonFaaSRequest:
     handler: PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
-    layout: Literal[PythonFaaSLayout.ZIP]
 
     include_requirements: bool
 

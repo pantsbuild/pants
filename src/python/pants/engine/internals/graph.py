@@ -40,7 +40,6 @@ from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRe
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     AllUnexpandedTargets,
     CoarsenedTarget,
     CoarsenedTargets,
@@ -569,18 +568,6 @@ async def resolve_targets(
         for tgt in parametrizations.generated_or_generator(generator.address)
     )
     return Targets(expanded_targets)
-
-
-@rule(_masked_types=[EnvironmentName])
-def find_all_targets_deprecated(_: AllTargetsRequest, all_targets: AllTargets) -> AllTargets:
-    return all_targets
-
-
-@rule(_masked_types=[EnvironmentName])
-def find_all_unexpanded_targets_deprecated(
-    _: AllTargetsRequest, all_targets: AllUnexpandedTargets
-) -> AllUnexpandedTargets:
-    return all_targets
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
