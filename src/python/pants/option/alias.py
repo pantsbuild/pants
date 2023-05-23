@@ -72,7 +72,7 @@ class CliAlias:
                         f"""
                         Invalid alias in `[cli].alias` option: {alias!r}. May only contain alpha
                         numerical letters and the separators `-` and `_`. Flags can be defined using
-                        `--`, but a single dash is not allowed.
+                        `--`. A single dash is not allowed.
                         """
                     )
                 )
