@@ -124,12 +124,9 @@ async def package_pex_binary(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
 ) -> PexFromTargetsRequestForBuiltPackage:
-    resolved_pex_entry_point_get = Get(
+    resolved_entry_point = await Get(
         ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
     )
-
-    # If sources are included, then we need to check dependencies for `files` targets.
-    resolved_entry_point = await resolved_pex_entry_point_get
 
     output_filename = field_set.output_path.value_or_default(file_ending="pex")
 
