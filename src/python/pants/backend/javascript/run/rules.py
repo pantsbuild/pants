@@ -23,7 +23,6 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import Process
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 
 
 @dataclass(frozen=True)
