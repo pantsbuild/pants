@@ -33,7 +33,6 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     AllUnexpandedTargets,
     AsyncFieldMixin,
     CoarsenedTargets,
@@ -145,8 +144,8 @@ class MockTargetGenerator(TargetFilesGenerator):
 def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(AllTargets, [AllTargetsRequest]),
-            QueryRule(AllUnexpandedTargets, [AllTargetsRequest]),
+            QueryRule(AllTargets, []),
+            QueryRule(AllUnexpandedTargets, []),
             QueryRule(CoarsenedTargets, [Addresses]),
             QueryRule(Targets, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
@@ -670,7 +669,7 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
             "dir/BUILD": "target()",
         }
     )
-    all_tgts = transitive_targets_rule_runner.request(AllTargets, [AllTargetsRequest()])
+    all_tgts = transitive_targets_rule_runner.request(AllTargets, [])
     expected = {
         Address("", target_name="generator", relative_file_path="f1.txt"),
         Address("", target_name="generator", relative_file_path="f2.txt"),
@@ -679,9 +678,7 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     }
     assert {t.address for t in all_tgts} == expected
 
-    all_unexpanded = transitive_targets_rule_runner.request(
-        AllUnexpandedTargets, [AllTargetsRequest()]
-    )
+    all_unexpanded = transitive_targets_rule_runner.request(AllUnexpandedTargets, [])
     assert {t.address for t in all_unexpanded} == {*expected, Address("", target_name="generator")}
 
 

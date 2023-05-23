@@ -82,7 +82,7 @@ NATIVE_FILES = [
 PYTHON37_VERSION = "3.7"
 PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
-ALL_PYTHON_VERSIONS = [PYTHON37_VERSION, PYTHON38_VERSION, PYTHON39_VERSION]
+ALL_PYTHON_VERSIONS = [PYTHON39_VERSION]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
@@ -113,28 +113,30 @@ def classify_changes() -> Jobs:
                 "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [
-                # fetch_depth must be 2.
-                *checkout(fetch_depth=2),
-                {
-                    "id": "files",
-                    "name": "Get changed files",
-                    "uses": "tj-actions/changed-files@v32",
-                    "with": {"separator": "|"},
-                },
+                *checkout(),
                 {
                     "id": "classify",
                     "name": "Classify changed files",
                     "run": dedent(
-                        f"""\
-                        affected=$(python build-support/bin/classify_changed_files.py "{gha_expr("steps.files.outputs.all_modified_files")}")
-                        echo "Affected:"
-                        if [[ "${{affected}}" == "docs" ]]; then
-                          echo "docs_only=true" >> $GITHUB_OUTPUT
-                          echo "docs_only"
+                        """\
+                        if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_SHA ]]; then
+                          # push: compare to the immediate parent, which should already be fetched
+                          # (checkout's fetch_depth defaults to 10)
+                          comparison_sha=$(git rev-parse HEAD^)
+                        else
+                          # pull request: compare to the base branch, ensuring that commit exists
+                          git fetch --depth=1 "$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
+                          comparison_sha="$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
                         fi
-                        for i in ${{affected}}; do
-                          echo "${{i}}=true" >> $GITHUB_OUTPUT
-                          echo "${{i}}"
+                        echo "comparison_sha=$comparison_sha"
+
+                        affected=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
+                        echo "Affected:"
+                        if [[ "${affected}" == "docs" ]]; then
+                          echo "docs_only=true" | tee -a $GITHUB_OUTPUT
+                        fi
+                        for i in ${affected}; do
+                          echo "${i}=true" | tee -a $GITHUB_OUTPUT
                         done
                         """
                     ),
@@ -676,9 +678,16 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper, python_versions, validate_ci_config=True, rust_testing=RustTesting.ALL
         ),
-        f"{shard_name_prefix}_0": test_python_linux("0/3"),
-        f"{shard_name_prefix}_1": test_python_linux("1/3"),
-        f"{shard_name_prefix}_2": test_python_linux("2/3"),
+        f"{shard_name_prefix}_0": test_python_linux("0/10"),
+        f"{shard_name_prefix}_1": test_python_linux("1/10"),
+        f"{shard_name_prefix}_2": test_python_linux("2/10"),
+        f"{shard_name_prefix}_3": test_python_linux("3/10"),
+        f"{shard_name_prefix}_4": test_python_linux("4/10"),
+        f"{shard_name_prefix}_5": test_python_linux("5/10"),
+        f"{shard_name_prefix}_6": test_python_linux("6/10"),
+        f"{shard_name_prefix}_7": test_python_linux("7/10"),
+        f"{shard_name_prefix}_8": test_python_linux("8/10"),
+        f"{shard_name_prefix}_9": test_python_linux("9/10"),
     }
     return jobs
 
@@ -1142,7 +1151,7 @@ def generate() -> dict[Path, str]:
                 "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}",
                 "cancel-in-progress": True,
             },
-            "on": {"pull_request": {}, "push": {"branches-ignore": ["dependabot/**"]}},
+            "on": {"pull_request": {}, "push": {"branches": ["main", "2.*.x"]}},
             "jobs": pr_jobs,
             "env": global_env(),
         },

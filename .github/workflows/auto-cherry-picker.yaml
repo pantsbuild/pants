@@ -1,11 +1,11 @@
 name: Auto Cherry-Picker
 
 on:
-  pull_request:
-    types:
-      - closed
-    branches:
-      - main
+  # NB: This is safe since we already have merged the PR.
+  # See https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+  pull_request_target:
+    types: [closed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       PR_number:

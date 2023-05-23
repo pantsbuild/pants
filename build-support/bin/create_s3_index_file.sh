@@ -7,7 +7,7 @@ if [[ -z "$1" ]]; then
   exit 1
 fi
 
-set -euo pipefail
+set -euox pipefail
 
 SHA=$1
 WHEEL_DIR=binaries.pantsbuild.org/wheels/pantsbuild.pants

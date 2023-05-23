@@ -8,7 +8,6 @@ import warnings
 from dataclasses import dataclass
 from typing import List, Mapping
 
-from pants.base.deprecated import warn_or_error
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -16,7 +15,7 @@ from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.util.docutil import bin_name, doc_url
+from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -81,20 +80,18 @@ class PantsRunner:
             stdout_fileno=stdout_fileno,
             stderr_fileno=stderr_fileno,
         ):
-            # N.B. We inline imports to speed up the python thin client run, and avoids importing
-            # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
             if "SCIE" not in os.environ and "NO_SCIE_WARNING" not in os.environ:
-                warn_or_error(
-                    "2.18.0.dev0",
-                    f"Running Pants in an external Python interpreter via a `{bin_name()}` script",
+                raise RuntimeError(
                     softwrap(
                         f"""
-                        The `pants` launcher binary is now the approved way of running Pants.
+                        The `pants` launcher binary is now the only supported way of running Pants.
                         See {doc_url("installation")} for details.
                         """
                     ),
                 )
 
+            # N.B. We inline imports to speed up the python thin client run, and avoids importing
+            # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
             if self._should_run_with_pantsd(global_bootstrap_options):
                 from pants.bin.remote_pants_runner import RemotePantsRunner
 
