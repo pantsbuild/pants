@@ -1,5 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -72,9 +74,14 @@ async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredenti
     if request.query:
         path_style_url += f"?{request.query}"
 
+    headers: dict[str, str] = {}
+    if aws_credentials.creds.token:
+        # Workaround https://github.com/boto/botocore/pull/2948
+        headers["X-Amz-Security-Token"] = ""
+
     http_request = SimpleNamespace(
         url=path_style_url,
-        headers={},
+        headers=headers,
         method="GET",
         auth_path=None,
     )
