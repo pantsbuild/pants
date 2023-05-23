@@ -29,11 +29,20 @@ from pants.util.strutil import help_text, softwrap
 
 
 class PythonAwsLambdaHandlerField(PythonFaaSHandlerField):
+    # This doesn't matter (just needs to be fixed), but is the default name used by the AWS
+    # console when creating a Python lambda, so is as good as any
+    # https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html
+    reexported_handler_module = "lambda_function"
+
     help = help_text(
         f"""
         Entry point to the AWS Lambda handler.
 
         {PythonFaaSHandlerField.help}
+
+        This is re-exported at `{reexported_handler_module}.handler` in the resulting package to be
+        used as the configured handler of the Lambda in AWS. It can also be accessed under its
+        source-root-relative module path, for example: `path.to.module.handler_func`.
         """
     )
 
