@@ -678,9 +678,16 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper, python_versions, validate_ci_config=True, rust_testing=RustTesting.ALL
         ),
-        f"{shard_name_prefix}_0": test_python_linux("0/3"),
-        f"{shard_name_prefix}_1": test_python_linux("1/3"),
-        f"{shard_name_prefix}_2": test_python_linux("2/3"),
+        f"{shard_name_prefix}_0": test_python_linux("0/10"),
+        f"{shard_name_prefix}_1": test_python_linux("1/10"),
+        f"{shard_name_prefix}_2": test_python_linux("2/10"),
+        f"{shard_name_prefix}_3": test_python_linux("3/10"),
+        f"{shard_name_prefix}_4": test_python_linux("4/10"),
+        f"{shard_name_prefix}_5": test_python_linux("5/10"),
+        f"{shard_name_prefix}_6": test_python_linux("6/10"),
+        f"{shard_name_prefix}_7": test_python_linux("7/10"),
+        f"{shard_name_prefix}_8": test_python_linux("8/10"),
+        f"{shard_name_prefix}_9": test_python_linux("9/10"),
     }
     return jobs
 
