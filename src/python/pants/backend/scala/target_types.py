@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
@@ -13,7 +14,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
-    BoolField,
     Dependencies,
     FieldSet,
     GeneratedTargets,
@@ -391,17 +391,6 @@ class ScalaArtifactVersionField(JvmArtifactVersionField):
     pass
 
 
-@dataclass(frozen=True)
-class ScalaArtifactExclusionRule(JvmArtifactExclusionRule):
-    alias = "scala_exclude"
-
-    full_crossversion: bool = False
-
-
-class ScalaArtifactExcludeDependenciesField(JvmArtifactExcludeDependenciesField):
-    pass
-
-
 class ScalaArtifactResolveField(JvmArtifactResolveField):
     pass
 
@@ -410,10 +399,33 @@ class ScalaArtifactPackagesField(JvmArtifactPackagesField):
     pass
 
 
-class ScalaArtifactFullCrossversionField(BoolField):
-    alias = "full_crossversion"
-    default = False
-    help = help_text("If enabled, it will use the full Scala version in the artifact suffix.")
+class ScalaCrossVersion(Enum):
+    PARTIAL = "partial"
+    FULL = "full"
+
+
+class ScalaArtifactCrossversionField(StringField):
+    alias = "crossversion"
+    default = ScalaCrossVersion.PARTIAL.value
+    help = help_text(
+        """
+        Whether to use the full Scala version or the partial one to determine the artifact name suffix.
+
+        Default is `partial`.
+        """
+    )
+    valid_choices = ScalaCrossVersion
+
+
+@dataclass(frozen=True)
+class ScalaArtifactExclusionRule(JvmArtifactExclusionRule):
+    alias = "scala_exclude"
+
+    crossversion: ScalaCrossVersion = ScalaCrossVersion.PARTIAL
+
+
+class ScalaArtifactExcludeDependenciesField(JvmArtifactExcludeDependenciesField):
+    pass
 
 
 @dataclass(frozen=True)
@@ -424,7 +436,7 @@ class ScalaArtifactFieldSet(FieldSet):
     packages: ScalaArtifactPackagesField
     resolve: ScalaArtifactResolveField
     excludes: ScalaArtifactExcludeDependenciesField
-    full_crossversion: ScalaArtifactFullCrossversionField
+    crossversion: ScalaArtifactCrossversionField
 
     required_fields = (
         ScalaArtifactGroupField,
@@ -441,7 +453,7 @@ class ScalaArtifactTarget(TargetGenerator):
         *ScalaArtifactFieldSet.required_fields,
         ScalaArtifactResolveField,
         ScalaArtifactExcludeDependenciesField,
-        ScalaArtifactFullCrossversionField,
+        ScalaArtifactCrossversionField,
         JvmJdkField,
     )
     copied_fields = (
@@ -468,8 +480,8 @@ async def generate_jvm_artifact_targets(
     scala_version = scala.version_for_resolve(field_set.resolve.normalized_value(jvm))
     scala_version_parts = scala_version.split(".")
 
-    def scala_suffix(full_crossversion: bool) -> str:
-        if full_crossversion:
+    def scala_suffix(crossversion: ScalaCrossVersion) -> str:
+        if crossversion == ScalaCrossVersion.FULL:
             return scala_version
         elif int(scala_version_parts[0]) >= 3:
             return scala_version_parts[0]
@@ -485,7 +497,9 @@ async def generate_jvm_artifact_targets(
             else:
                 excluded_artifact_name = None
                 if exclusion_rule.artifact:
-                    excluded_artifact_name = f"{exclusion_rule.artifact}_{scala_suffix(exclusion_rule.full_crossversion)}"
+                    excluded_artifact_name = (
+                        f"{exclusion_rule.artifact}_{scala_suffix(exclusion_rule.crossversion)}"
+                    )
                 exclusion_rules.append(
                     JvmArtifactExclusionRule(
                         group=exclusion_rule.group, artifact=excluded_artifact_name
@@ -493,7 +507,8 @@ async def generate_jvm_artifact_targets(
                 )
         exclude_dependencies_field[JvmArtifactExcludeDependenciesField.alias] = exclusion_rules
 
-    artifact_name = f"{field_set.artifact.value}_{scala_suffix(field_set.full_crossversion.value)}"
+    crossversion = ScalaCrossVersion(field_set.crossversion.value)
+    artifact_name = f"{field_set.artifact.value}_{scala_suffix(crossversion)}"
     jvm_artifact_target = JvmArtifactTarget(
         {
             **request.template,
