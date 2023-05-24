@@ -38,9 +38,8 @@ class RustfmtRequest(FmtTargetsRequest):
 
 
 @rule(desc="Format with rustfmt")
-async def rustfmt_fmt(request: RustfmtRequest.Batch, rustfmt: RustfmtSubsystem) -> FmtResult:
+async def rustfmt_fmt(request: RustfmtRequest.Batch) -> FmtResult:
     args = (
-        *rustfmt.args,
         # Filter out non-.rs files, e.g. cargo.toml, from the file list.
         *(f for f in request.snapshot.files if f.endswith(".rs")),
     )
