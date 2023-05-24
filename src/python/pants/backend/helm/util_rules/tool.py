@@ -440,7 +440,10 @@ async def setup_helm(
 
 @rule
 async def helm_process(
-    request: HelmProcess, helm_binary: HelmBinary, helm_subsystem: HelmSubsystem
+    request: HelmProcess,
+    helm_binary: HelmBinary,
+    helm_subsystem: HelmSubsystem,
+    log_level: LogLevel,
 ) -> Process:
     global_extra_env = await Get(
         EnvironmentVars, EnvironmentVarsRequest(helm_subsystem.extra_env_vars)
@@ -457,9 +460,15 @@ async def helm_process(
 
     argv = [helm_binary.path, *request.argv]
 
-    # A special case for "--debug". We probably want it applied to all operations in the chain, not just the final one
-    # For example, we probably want this applied to the call to `template`, not just the call to `install`
-    if "--debug" in helm_subsystem.valid_args() and "--debug" not in request.argv:
+    # A special case for "--debug".
+    # This ensures that it is applied to all operations in the chain,
+    # not just the final one.
+    # For example, we want this applied to the call to `template`, not just the call to `install`
+    # Also, we can be helpful and automatically forward a request to debug Pants to also debug Helm
+    debug_requested = (
+        "--debug" in helm_subsystem.valid_args() or max(request.level, log_level) >= LogLevel.DEBUG  # type: ignore[operator]
+    )
+    if debug_requested and "--debug" not in request.argv:
         argv.append("--debug")
 
     return Process(
