@@ -283,7 +283,8 @@ class NfpmContentFile(Target):
         *CONTENT_FILE_FIELDS,
     )
     help = help_text(
-        f"""
+        """
+        A file that should be copied into an nFPM package.
         """
     )
 
@@ -299,7 +300,8 @@ class NfpmContentFiles(TargetGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = CONTENT_FILE_FIELDS
     help = help_text(
-        f"""
+        """
+        Multiple files that should be copied into an nFPM package.
         """
     )
 
@@ -322,7 +324,8 @@ class NfpmContentSymlink(Target):
         *CONTENT_SYMLINK_FIELDS,
     )
     help = help_text(
-        f"""
+        """
+        A symlink in an nFPM package (created on package install).
         """
     )
 
@@ -338,7 +341,8 @@ class NfpmContentSymlinks(TargetGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = CONTENT_SYMLINK_FIELDS
     help = help_text(
-        f"""
+        """
+        Multiple symlinks in an nFPM package (created on package install).
         """
     )
 
@@ -364,7 +368,8 @@ class NfpmContentDir(Target):
         *CONTENT_DIR_FIELDS,
     )
     help = help_text(
-        f"""
+        """
+        A directory in an nFPM package (created on package install).
         """
     )
 
@@ -380,6 +385,7 @@ class NfpmContentDirs(TargetGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = CONTENT_DIR_FIELDS
     help = help_text(
-        f"""
+        """
+        Multiple directories in an nFPM package (created on package install).
         """
     )

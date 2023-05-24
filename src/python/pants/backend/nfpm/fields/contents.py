@@ -116,32 +116,32 @@ class NfpmContentFileModeField(IntField):
         the `Oo` prefix is optional (like `644`). If you specify a symbolic file mode string,
         you must provide 9 characters with "-" in place of any absent permissions
         (like `'rw-r--r--'`).
-        
+
         For example to specify world readable/executable and user writable, these
         are equivalent:
-        
+
         - `0o755`
         - `'755'`
         - `'rwxr-xr-x'`
-        
+
         Another example for a file with read/write permissions for only the user:
-        
+
         - `0o600`
         - `'600'`
         - `'rw-------'`
-        
+
         Another example for a file with the group sticky bit set:
-        
+
         - `0o2660`
         - `'2660'`
         - `'rw-rwS---'`
-        
+
         WARNING: If you forget to include the `0o` prefix on a numeric octal, then
         it will be interpreted as an integer which is probably not what you want.
         For example, `755` (no quotes) will be processed as `0o1363` (symbolically
         that would be '-wxrw--wt') which is probably not what you intended. Pants
         cannot detect errors like this, so be careful to either use a string or
-        include the `0o` octal prefix. 
+        include the `0o` octal prefix.
         """
     )
 
@@ -213,7 +213,7 @@ class NfpmContentFileSourceField(OptionalSingleSourceField):
     # default_glob_match_error_behavior =
     help = help_text(
         lambda: f"""
-        A file that should be copied into an nfpm package (optional).
+        A file that should be copied into an nFPM package (optional).
 
         Either specify a file with '{NfpmContentFileSourceField.alias}', or use
         '{NfpmDependencies.alias}' to add a dependency on the target that owns
@@ -307,7 +307,7 @@ class NfpmContentTypeField(StringField):
           - {repr(NfpmContentFileType.doc.value)},
           - {repr(NfpmContentFileType.license.value)}, and
           - {repr(NfpmContentFileType.readme.value)}.
-          
+
         The {repr(NfpmContentFileType.config_noreplace.value)} type is used for RPM's
         `%config(noreplace)` option. For packagers other than RPM, using
         {repr(NfpmContentFileType.config_noreplace.value)} is the same as
