@@ -39,7 +39,6 @@ class RustfmtRequest(FmtTargetsRequest):
 
 @rule(desc="Format with rustfmt")
 async def rustfmt_fmt(request: RustfmtRequest.Batch, rustfmt: RustfmtSubsystem) -> FmtResult:
-    print("rustfmt_fmt")
     args = (
         *rustfmt.args,
         # Filter out non-.rs files, e.g. cargo.toml, from the file list.
