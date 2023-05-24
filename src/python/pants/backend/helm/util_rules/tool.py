@@ -443,7 +443,6 @@ async def helm_process(
     request: HelmProcess,
     helm_binary: HelmBinary,
     helm_subsystem: HelmSubsystem,
-    log_level: LogLevel,
 ) -> Process:
     global_extra_env = await Get(
         EnvironmentVars, EnvironmentVarsRequest(helm_subsystem.extra_env_vars)
@@ -465,8 +464,8 @@ async def helm_process(
     # not just the final one.
     # For example, we want this applied to the call to `template`, not just the call to `install`
     # Also, we can be helpful and automatically forward a request to debug Pants to also debug Helm
-    debug_requested = (
-        "--debug" in helm_subsystem.valid_args() or max(request.level, log_level) >= LogLevel.DEBUG  # type: ignore[operator]
+    debug_requested = "--debug" in helm_subsystem.valid_args() or (
+        0 < logger.getEffectiveLevel() <= LogLevel.DEBUG.level
     )
     if debug_requested and "--debug" not in request.argv:
         argv.append("--debug")
