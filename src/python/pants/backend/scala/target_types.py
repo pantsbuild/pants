@@ -503,7 +503,7 @@ async def generate_jvm_artifact_targets(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     field_set = ScalaArtifactFieldSet.create(request.generator)
-    resolve_name = request.template[ScalaArtifactResolveField.alias] or jvm.default_resolve
+    resolve_name = request.template.get(ScalaArtifactResolveField.alias) or jvm.default_resolve
     scala_version = scala.version_for_resolve(resolve_name)
     scala_version_parts = scala_version.split(".")
 

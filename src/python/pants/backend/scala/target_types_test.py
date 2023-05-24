@@ -51,7 +51,7 @@ _JVM_RESOLVES = {
     "current": "3rdparty/jvm/current.lock",
 }
 _SCALA_VERSION_FOR_RESOLVE = {
-    "jvm-default": "2.13.6",
+    "jvm-default": "2.12.11",
     "latest": "3.3.0",
     "previous": "2.13.10",
     "current": "2.13.9",
@@ -69,6 +69,7 @@ def assert_generated(
     rule_runner.set_options(
         [
             f"--jvm-resolves={repr(_JVM_RESOLVES)}",
+            "--jvm-default-resolve=jvm-default",
             f"--scala-version-for-resolve={repr(_SCALA_VERSION_FOR_RESOLVE)}",
         ]
     )
@@ -85,6 +86,37 @@ def assert_generated(
     assert expected_targets == {
         t for parametrization in parametrizations for t in parametrization.parametrization.values()
     }
+
+
+def test_generate_jvm_artifact_using_default_resolve(rule_runner: RuleRunner) -> None:
+    assert_generated(
+        rule_runner,
+        Address("", target_name="test"),
+        build_content=dedent(
+            """\
+            scala_artifact(
+                name="test",
+                group="com.example",
+                artifact="example-gen",
+                version="1.0.0",
+            )
+            """
+        ),
+        expected_targets={
+            JvmArtifactTarget(
+                {
+                    JvmArtifactGroupField.alias: "com.example",
+                    JvmArtifactArtifactField.alias: "example-gen_2.12",
+                    JvmArtifactVersionField.alias: "1.0.0",
+                },
+                Address(
+                    "",
+                    target_name="test",
+                    generated_name="example-gen_2.12",
+                ),
+            ),
+        },
+    )
 
 
 def test_generate_jvm_artifact_based_on_resolve(rule_runner: RuleRunner) -> None:
