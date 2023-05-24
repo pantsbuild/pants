@@ -275,7 +275,7 @@ class JvmArtifactExclusionRule:
     artifact: str | None = None
 
     def validate(self) -> set[str]:
-        return {}
+        return set()
 
     def to_coord_str(self) -> str:
         result = self.group
@@ -314,13 +314,14 @@ class JvmArtifactExcludeDependenciesField(SequenceField[JvmArtifactExclusionRule
     expected_element_type = JvmArtifactExclusionRule
     expected_type_description = "an iterable of JvmArtifactExclusionRule"
 
+    @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[JvmArtifactExclusionRule]], address: Address
     ) -> Optional[Tuple[JvmArtifactExclusionRule, ...]]:
         computed_value = super().compute_value(raw_value, address)
 
         if computed_value:
-            errors = []
+            errors: list[str] = []
             for exclusion_rule in computed_value:
                 err = exclusion_rule.validate()
                 if err:

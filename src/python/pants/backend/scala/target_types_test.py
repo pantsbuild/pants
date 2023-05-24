@@ -68,7 +68,7 @@ def assert_generated(
     rule_runner.write_files({"BUILD": build_content})
     rule_runner.set_options(
         [
-            f"--jvm-resolves={_JVM_RESOLVES}",
+            f"--jvm-resolves={repr(_JVM_RESOLVES)}",
             f"--scala-version-for-resolve={repr(_SCALA_VERSION_FOR_RESOLVE)}",
         ]
     )

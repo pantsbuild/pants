@@ -429,7 +429,7 @@ class ScalaArtifactExclusionRule(JvmArtifactExclusionRule):
         valid_crossversions = [x.value for x in ScalaCrossVersion]
         if self.crossversion not in valid_crossversions:
             return {f"Invalid `crossversion` value: {self.crossversion}"}
-        return {}
+        return set()
 
 
 class ScalaArtifactExcludeDependenciesField(JvmArtifactExcludeDependenciesField):
@@ -448,7 +448,6 @@ class ScalaArtifactFieldSet(FieldSet):
     artifact: ScalaArtifactArtifactField
     version: ScalaArtifactVersionField
     packages: ScalaArtifactPackagesField
-    resolve: ScalaArtifactResolveField
     excludes: ScalaArtifactExcludeDependenciesField
     crossversion: ScalaArtifactCrossversionField
 
@@ -489,7 +488,7 @@ class ScalaArtifactTarget(TargetGenerator):
         ScalaArtifactVersionField,
         ScalaArtifactPackagesField,
     )
-    moved_fields = (JvmJdkField,)
+    moved_fields = (ScalaArtifactResolveField, JvmJdkField)
 
 
 class GenerateJvmArtifactForScalaTargets(GenerateTargetsRequest):
@@ -504,7 +503,7 @@ async def generate_jvm_artifact_targets(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     field_set = ScalaArtifactFieldSet.create(request.generator)
-    resolve_name = field_set.resolve.normalized_value(jvm)
+    resolve_name = request.template[ScalaArtifactResolveField.alias] or jvm.default_resolve
     scala_version = scala.version_for_resolve(resolve_name)
     scala_version_parts = scala_version.split(".")
 
@@ -539,7 +538,6 @@ async def generate_jvm_artifact_targets(
         {
             **request.template,
             JvmArtifactArtifactField.alias: artifact_name,
-            JvmArtifactResolveField.alias: resolve_name,
             **exclude_dependencies_field,
         },
         request.generator.address.create_generated(artifact_name),
