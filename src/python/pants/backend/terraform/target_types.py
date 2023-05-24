@@ -5,13 +5,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.rules import collect_rules
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     Dependencies,
+    DescriptionField,
     FieldSet,
     MultipleSourcesField,
     Target,
+    Targets,
     generate_multiple_sources_field_help_message,
 )
 from pants.util.strutil import help_text
@@ -48,6 +51,33 @@ class TerraformModuleTarget(Target):
 
         Use `terraform_modules` to generate `terraform_module` targets for less boilerplate.
         """
+    )
+
+
+class TerraformDeploymentTarget(Target):
+    alias = "terraform_deployment"
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformDependenciesField, TerraformModuleSourcesField)
+    help = "A deployment of Terraform"
+
+
+@dataclass(frozen=True)
+class TerraformDeploymentFieldSet(FieldSet):
+    required_fields = (
+        TerraformDependenciesField,
+        TerraformModuleSourcesField,
+    )
+    description: DescriptionField
+    sources: TerraformModuleSourcesField
+
+
+class AllTerraformDeploymentTargets(Targets):
+    pass
+
+
+@rule
+def all_terraform_deployment_targets(targets: AllTargets) -> AllTerraformDeploymentTargets:
+    return AllTerraformDeploymentTargets(
+        tgt for tgt in targets if TerraformDeploymentFieldSet.is_applicable(tgt)
     )
 
 
