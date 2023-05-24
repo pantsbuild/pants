@@ -913,7 +913,7 @@ dependencies = [
  "smallvec",
  "stdio",
  "store",
- "syn 1.0.109",
+ "syn 2.0.15",
  "task_executor",
  "tempfile",
  "testutil",

@@ -158,7 +158,7 @@ process_execution = { path = "process_execution" }
 pyo3 =  { git = "https://github.com/PyO3/pyo3.git", rev = "c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32" }
 rand = "0.8"
 # See https://github.com/PyO3/pyo3/issues/3151
-syn = "1.0.85"
+syn = "2.0.15"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
