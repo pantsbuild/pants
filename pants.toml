@@ -41,7 +41,6 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.27.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -135,13 +134,13 @@ fmt = false
 venv_use_symlinks = true
 
 [python]
-# N.B.: When adjusting this to support new Python versions, you must update the Pants
+# N.B.: When upgrading to a new Python version, you must update the Pants
 # `python_distribution` targets, currently:
 # + src/python/pants:pants-packaged
 # + src/python/pants/testutil:testutil_wheel
 # And update the PythonBuildStandalone version/URL:
 # + src/python/pants/core/subsystems/python_bootstrap.py
-interpreter_constraints = [">=3.7,<3.10"]
+interpreter_constraints = ["==3.9.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
@@ -193,13 +192,12 @@ extra_env_vars = [
 timeout_default = 60
 
 [mypy]
-interpreter_constraints = [">=3.7,<3.10"]
 install_from_resolve = "mypy"
 requirements = ["//3rdparty/python:mypy"]
 
 
 [coverage-py]
-interpreter_constraints = [">=3.7,<3.10"]
+interpreter_constraints = ["==3.9.*"]
 
 [preamble]
 template_by_globs = "@build-support/preambles/config.yaml"
@@ -231,13 +229,6 @@ version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
 [scala-infer]
 force_add_siblings_as_dependencies = false
-
-[toolchain-setup]
-repo = "pants"
-org = "pantsbuild"
-
-[buildsense]
-enable = false
 
 [pants-releases.release_notes]
 master = "src/python/pants/notes/master.rst"
