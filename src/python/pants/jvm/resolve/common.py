@@ -161,6 +161,7 @@ class ArtifactRequirement:
                 "`JvmArtifactFieldSet` fields present."
             )
 
+        exclusion_rules = target[JvmArtifactExcludeDependenciesField].value or ()
         return ArtifactRequirement(
             coordinate=Coordinate(
                 group=target[JvmArtifactGroupField].value,
@@ -173,7 +174,7 @@ class ArtifactRequirement:
                 if target[JvmArtifactJarSourceField].value
                 else None
             ),
-            excludes=frozenset(target[JvmArtifactExcludeDependenciesField].value or []) or None,
+            excludes=frozenset(rule.to_exclude_str() for rule in exclusion_rules) or None,
         )
 
     def with_extra_excludes(self, *excludes: str) -> ArtifactRequirement:

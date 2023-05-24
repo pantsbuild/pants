@@ -14,6 +14,7 @@ from pants.backend.scala.target_types import (
     ScalaSourceTarget,
     ScalatestTestsGeneratorTarget,
     ScalatestTestTarget,
+    ScalaArtifactTarget
 )
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.backend.scala.test import scalatest
@@ -32,6 +33,7 @@ def target_types():
         ScalacPluginTarget,
         ScalatestTestTarget,
         ScalatestTestsGeneratorTarget,
+        ScalaArtifactTarget,
         *jvm_common.target_types(),
         *wrap_scala.target_types,
     ]

@@ -266,12 +266,20 @@ class JvmProvidesTypesField(StringSequenceField):
         """
     )
 
+
 @dataclass(frozen=True)
 class JvmArtifactExclusionRule:
     alias: ClassVar[str] = "jvm_exclude"
 
     group: str
     artifact: Optional[str]
+
+    def to_exclude_str(self) -> str:
+        result = self.group
+        if self.artifact:
+            result += f":{self.artifact}"
+        return result
+
 
 class JvmArtifactExcludeDependenciesField(SequenceField[JvmArtifactExclusionRule]):
     alias = "excludes"
