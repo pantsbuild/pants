@@ -7,6 +7,7 @@ import os
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import help_text
 
 
 class RustSubsystem(Subsystem):
@@ -16,20 +17,24 @@ class RustSubsystem(Subsystem):
     toolchain = StrOption(
         "--toolchain",
         default="stable",
-        help=(
-            "Name of a Rust toolchain to use for all builds. The toolchain name will be provided to "
-            "Rustup to find the Toolchain."
+        help=help_text(
+            """
+            Name of a Rust toolchain to use for all builds. The toolchain name will be provided to
+            Rustup to find the Toolchain.
+            """
         ),
     )
 
     _rustup_search_paths = StrListOption(
         "--rustup-search-paths",
         default=["<PATH>"],
-        help=(
-            "A list of paths to search for Rustup.\n\n"
-            "Specify absolute paths to directories with the `rustup` binary, e.g. `/usr/bin`. "
-            "Earlier entries will be searched first.\n\n"
-            "The special string '<PATH>' will expand to the contents of the PATH env var."
+        help=help_text(
+            """
+            A list of paths to search for Rustup.
+            Specify absolute paths to directories with the `rustup` binary, e.g. `/usr/bin`.
+            Earlier entries will be searched first.
+            The special string '<PATH>' will expand to the contents of the PATH env var.
+            """
         ),
     )
 
