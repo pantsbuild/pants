@@ -174,7 +174,7 @@ class ArtifactRequirement:
                 if target[JvmArtifactJarSourceField].value
                 else None
             ),
-            excludes=frozenset(rule.to_exclude_str() for rule in exclusion_rules) or None,
+            excludes=frozenset(rule.to_coord_str() for rule in exclusion_rules) or None,
         )
 
     def with_extra_excludes(self, *excludes: str) -> ArtifactRequirement:

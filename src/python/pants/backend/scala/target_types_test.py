@@ -16,6 +16,7 @@ from pants.engine.target import Target
 from pants.jvm import jvm_common
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
+    JvmArtifactExcludeDependenciesField,
     JvmArtifactExclusionRule,
     JvmArtifactGroupField,
     JvmArtifactResolveField,
@@ -43,16 +44,34 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+_JVM_RESOLVES = {
+    "jvm-default": "3rdparty/jvm/default.lock",
+    "latest": "3rdparty/jvm/latest.lock",
+    "previous": "3rdparty/jvm/previous.lock",
+    "current": "3rdparty/jvm/current.lock",
+}
+_SCALA_VERSION_FOR_RESOLVE = {
+    "jvm-default": "2.13.6",
+    "latest": "3.3.0",
+    "previous": "2.13.10",
+    "current": "2.13.9",
+}
+
+
 def assert_generated(
     rule_runner: RuleRunner,
     address: Address,
     *,
     build_content: str,
-    scala_versions_per_resolve: dict[str, str],
     expected_targets: set[Target],
 ) -> None:
     rule_runner.write_files({"BUILD": build_content})
-    rule_runner.set_options([f"--scala-version-for-resolve={repr(scala_versions_per_resolve)}"])
+    rule_runner.set_options(
+        [
+            f"--jvm-resolves={_JVM_RESOLVES}",
+            f"--scala-version-for-resolve={repr(_SCALA_VERSION_FOR_RESOLVE)}",
+        ]
+    )
 
     parametrizations = rule_runner.request(
         _TargetParametrizations,
@@ -83,7 +102,6 @@ def test_generate_jvm_artifact_based_on_resolve(rule_runner: RuleRunner) -> None
             )
             """
         ),
-        scala_versions_per_resolve={"current": "2.13.10"},
         expected_targets={
             JvmArtifactTarget(
                 {
@@ -91,6 +109,87 @@ def test_generate_jvm_artifact_based_on_resolve(rule_runner: RuleRunner) -> None
                     JvmArtifactArtifactField.alias: "example-gen_2.13",
                     JvmArtifactVersionField.alias: "3.4.0",
                     JvmArtifactResolveField.alias: "current",
+                },
+                Address(
+                    "",
+                    target_name="test",
+                    generated_name="example-gen_2.13",
+                ),
+            ),
+        },
+    )
+
+
+def test_generate_jvm_artifact_using_full_crossversion(rule_runner: RuleRunner) -> None:
+    assert_generated(
+        rule_runner,
+        Address("", target_name="test"),
+        build_content=dedent(
+            """\
+            scala_artifact(
+                name="test",
+                group="com.example",
+                artifact="example-gen",
+                version="3.4.0",
+                resolve="current",
+                crossversion="full",
+            )
+            """
+        ),
+        expected_targets={
+            JvmArtifactTarget(
+                {
+                    JvmArtifactGroupField.alias: "com.example",
+                    JvmArtifactArtifactField.alias: "example-gen_2.13.9",
+                    JvmArtifactVersionField.alias: "3.4.0",
+                    JvmArtifactResolveField.alias: "current",
+                },
+                Address(
+                    "",
+                    target_name="test",
+                    generated_name="example-gen_2.13.9",
+                ),
+            ),
+        },
+    )
+
+
+def test_generate_jvm_artifact_with_exclusions(rule_runner: RuleRunner) -> None:
+    assert_generated(
+        rule_runner,
+        Address("", target_name="test"),
+        build_content=dedent(
+            """\
+            scala_artifact(
+                name="test",
+                group="com.example",
+                artifact="example-gen",
+                version="3.4.0",
+                resolve="current",
+                excludes=[
+                  jvm_exclude(group="com.example"),
+                  scala_exclude(group="com.example", artifact="excluded-partial"),
+                  scala_exclude(group="com.example", artifact="excluded-full", crossversion="full"),
+                ],
+            )
+            """
+        ),
+        expected_targets={
+            JvmArtifactTarget(
+                {
+                    JvmArtifactGroupField.alias: "com.example",
+                    JvmArtifactArtifactField.alias: "example-gen_2.13",
+                    JvmArtifactVersionField.alias: "3.4.0",
+                    JvmArtifactResolveField.alias: "current",
+                    JvmArtifactExcludeDependenciesField.alias: [
+                        JvmArtifactExclusionRule(group="com.example"),
+                        JvmArtifactExclusionRule(
+                            group="com.example", artifact="excluded-partial_2.13"
+                        ),
+                        JvmArtifactExclusionRule(
+                            group="com.example", artifact="excluded-full_2.13.9"
+                        ),
+                    ],
                 },
                 Address(
                     "",
@@ -117,7 +216,6 @@ def test_generate_jvm_artifacts_for_parametrized_resolve(rule_runner: RuleRunner
             )
             """
         ),
-        scala_versions_per_resolve={"latest": "3.3.0", "previous": "2.13.10"},
         expected_targets={
             JvmArtifactTarget(
                 {

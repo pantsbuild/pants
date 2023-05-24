@@ -272,9 +272,12 @@ class JvmArtifactExclusionRule:
     alias: ClassVar[str] = "jvm_exclude"
 
     group: str
-    artifact: Optional[str]
+    artifact: str | None = None
 
-    def to_exclude_str(self) -> str:
+    def validate(self) -> set[str]:
+        return {}
+
+    def to_coord_str(self) -> str:
         result = self.group
         if self.artifact:
             result += f":{self.artifact}"
@@ -310,6 +313,31 @@ class JvmArtifactExcludeDependenciesField(SequenceField[JvmArtifactExclusionRule
     )
     expected_element_type = JvmArtifactExclusionRule
     expected_type_description = "an iterable of JvmArtifactExclusionRule"
+
+    def compute_value(
+        cls, raw_value: Optional[Iterable[JvmArtifactExclusionRule]], address: Address
+    ) -> Optional[Tuple[JvmArtifactExclusionRule, ...]]:
+        computed_value = super().compute_value(raw_value, address)
+
+        if computed_value:
+            errors = []
+            for exclusion_rule in computed_value:
+                err = exclusion_rule.validate()
+                if err:
+                    errors.extend(err)
+
+            if errors:
+                raise InvalidFieldException(
+                    softwrap(
+                        f"""
+                        Invalid value for `{JvmArtifactExcludeDependenciesField.alias}` field.
+                        Found following errors:
+
+                        {bullet_list(errors)}
+                        """
+                    )
+                )
+        return computed_value
 
 
 class JvmArtifactResolveField(JvmResolveField):

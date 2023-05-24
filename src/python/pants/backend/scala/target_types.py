@@ -423,7 +423,13 @@ class ScalaArtifactCrossversionField(StringField):
 class ScalaArtifactExclusionRule(JvmArtifactExclusionRule):
     alias = "scala_exclude"
 
-    crossversion: ScalaCrossVersion = ScalaCrossVersion.PARTIAL
+    crossversion: str = ScalaCrossVersion.PARTIAL.value
+
+    def validate(self) -> set[str]:
+        valid_crossversions = [x.value for x in ScalaCrossVersion]
+        if self.crossversion not in valid_crossversions:
+            return {f"Invalid `crossversion` value: {self.crossversion}"}
+        return {}
 
 
 class ScalaArtifactExcludeDependenciesField(JvmArtifactExcludeDependenciesField):
@@ -473,6 +479,7 @@ class ScalaArtifactTarget(TargetGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         *ScalaArtifactFieldSet.required_fields,
+        ScalaArtifactResolveField,
         ScalaArtifactExcludeDependenciesField,
         ScalaArtifactCrossversionField,
     )
@@ -482,7 +489,7 @@ class ScalaArtifactTarget(TargetGenerator):
         ScalaArtifactVersionField,
         ScalaArtifactPackagesField,
     )
-    moved_fields = (ScalaArtifactResolveField, JvmJdkField)
+    moved_fields = (JvmJdkField,)
 
 
 class GenerateJvmArtifactForScalaTargets(GenerateTargetsRequest):
@@ -497,7 +504,8 @@ async def generate_jvm_artifact_targets(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     field_set = ScalaArtifactFieldSet.create(request.generator)
-    scala_version = scala.version_for_resolve(field_set.resolve.normalized_value(jvm))
+    resolve_name = field_set.resolve.normalized_value(jvm)
+    scala_version = scala.version_for_resolve(resolve_name)
     scala_version_parts = scala_version.split(".")
 
     def scala_suffix(crossversion: ScalaCrossVersion) -> str:
@@ -517,9 +525,7 @@ async def generate_jvm_artifact_targets(
             else:
                 excluded_artifact_name = None
                 if exclusion_rule.artifact:
-                    excluded_artifact_name = (
-                        f"{exclusion_rule.artifact}_{scala_suffix(exclusion_rule.crossversion)}"
-                    )
+                    excluded_artifact_name = f"{exclusion_rule.artifact}_{scala_suffix(ScalaCrossVersion(exclusion_rule.crossversion))}"
                 exclusion_rules.append(
                     JvmArtifactExclusionRule(
                         group=exclusion_rule.group, artifact=excluded_artifact_name
@@ -533,6 +539,7 @@ async def generate_jvm_artifact_targets(
         {
             **request.template,
             JvmArtifactArtifactField.alias: artifact_name,
+            JvmArtifactResolveField.alias: resolve_name,
             **exclude_dependencies_field,
         },
         request.generator.address.create_generated(artifact_name),
