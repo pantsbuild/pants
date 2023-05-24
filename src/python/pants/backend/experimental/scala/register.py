@@ -6,6 +6,7 @@ from pants.backend.scala.dependency_inference import rules as dep_inf_rules
 from pants.backend.scala.goals import check, repl, tailor
 from pants.backend.scala.resolve.lockfile import rules as scala_lockfile_rules
 from pants.backend.scala.target_types import (
+    ScalaArtifactTarget,
     ScalacPluginTarget,
     ScalaJunitTestsGeneratorTarget,
     ScalaJunitTestTarget,
@@ -14,8 +15,8 @@ from pants.backend.scala.target_types import (
     ScalaSourceTarget,
     ScalatestTestsGeneratorTarget,
     ScalatestTestTarget,
-    ScalaArtifactTarget
 )
+from pants.backend.scala.target_types import build_file_aliases as scala_build_file_aliases
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.backend.scala.test import scalatest
 from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
@@ -56,4 +57,4 @@ def rules():
 
 
 def build_file_aliases():
-    return jvm_common.build_file_aliases()
+    return jvm_common.build_file_aliases().merge(scala_build_file_aliases())
