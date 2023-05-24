@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import stat
 from enum import Enum
-from typing import ClassVar, Optional, Sequence
+from typing import ClassVar, Optional
 
 from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.core.target_types import FileTarget, RelocatedFiles
@@ -164,9 +164,9 @@ class NfpmContentFileModeField(IntField):
                         "or a symbolic file mode (like 'rwxr-xr-x' or 'rw-------'). "
                         f"It is set to {repr(raw_value)}."
                     ) from e
+            value = super().compute_value(octal_value, address)
         else:
-            octal_value = raw_value
-        value = super().compute_value(octal_value, address)
+            value = super().compute_value(raw_value, address)
         # TODO: maybe warn if the octal value is higher than expected (value > 0o7777).
         return value
 
@@ -327,7 +327,7 @@ class NfpmContentTypeField(StringField):
     )
 
 
-class NfpmContentFilesField(SequenceField[Sequence[str, str]]):
+class NfpmContentFilesField(SequenceField[tuple[str, str]]):
     nfpm_alias = ""
     alias: ClassVar[str] = "files"
     help = help_text(
@@ -374,7 +374,7 @@ class NfpmContentSymlinkDstField(NfpmContentDstField):
     )
 
 
-class NfpmContentSymlinksField(SequenceField[Sequence[str, str]]):
+class NfpmContentSymlinksField(SequenceField[tuple[str, str]]):
     nfpm_alias = ""
     alias: ClassVar[str] = "symlinks"
     help = help_text(

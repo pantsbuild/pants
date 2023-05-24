@@ -341,5 +341,5 @@ class NfpmRpmGhostContents(StringSequenceField):
 
     @property
     def nfpm_contents(self) -> list[dict[str, str]]:
-        contents = [{"type": "ghost", "dst": ghost} for ghost in self.value]
+        contents = [{"type": "ghost", "dst": ghost} for ghost in self.value or ()]
         return contents
