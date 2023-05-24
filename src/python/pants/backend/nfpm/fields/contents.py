@@ -332,6 +332,7 @@ class NfpmContentFilesField(SequenceField[Sequence[str, str]]):
     alias: ClassVar[str] = "files"
     help = help_text(
         lambda: f"""
+        A list of 2-tuples ('{NfpmContentSrcField.alias}', '{NfpmContentDstField.alias}').
         """
     )
 
@@ -378,6 +379,7 @@ class NfpmContentSymlinksField(SequenceField[Sequence[str, str]]):
     alias: ClassVar[str] = "symlinks"
     help = help_text(
         lambda: f"""
+        A list of 2-tuples ('{NfpmContentSymlinkSrcField.alias}', '{NfpmContentSymlinkDstField.alias}').
         """
     )
 
@@ -406,5 +408,6 @@ class NfpmContentDirsField(StringSequenceField):
     alias: ClassVar[str] = "dirs"
     help = help_text(
         lambda: f"""
+        A list of directories '{NfpmContentDirDstField.alias}'.
         """
     )
