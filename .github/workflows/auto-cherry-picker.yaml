@@ -23,7 +23,8 @@ jobs:
         with:
           # Always checkout the latest commit of main, for latest changes to the script
           ref: "main"
-          # NB: `fetch-depth: 1` causes merge-conflicts if `main` points to merge-commit of the PR.
+          # NB: we're usually cherrypicking the HEAD of main, and we need its parent commit to diff
+          # for the cherry-pick, so we can save an extra round-trip by just getting that parent now
           fetch-depth: 2
 
       - name: Cherry-Pick
