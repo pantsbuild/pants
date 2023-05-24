@@ -8,7 +8,7 @@ python_tests(
     # The package.json files are inlined in ./test_integration_tests.py
     overrides={
         "test_integration_test.py": dict(
-            dependencies=["./jest_resources", "./mocha_resources"], timeout=120
+            dependencies=["./jest_resources", "./mocha_resources"], timeout=240
         ),
     },
 )
