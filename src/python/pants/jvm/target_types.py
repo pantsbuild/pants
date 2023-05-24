@@ -281,20 +281,32 @@ class JvmArtifactExclusionRule:
         return result
 
 
-class JvmArtifactExcludeDependenciesField(SequenceField[JvmArtifactExclusionRule]):
-    alias = "excludes"
-    help = help_text(
-        """
-        A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded
+def _jvm_artifact_exclude_dependencies_help(
+    supported_rule_types: Callable[[], Iterable[type[JvmArtifactExclusionRule]]]
+) -> str | Callable[[], str]:
+    return help_text(
+        lambda: f"""
+        A list of exclusion rules for unversioned coordinates that should be excluded
         as dependencies when this artifact is resolved.
 
         This does not prevent this artifact from being included in the resolve as a dependency
         of other artifacts that depend on it, and is currently intended as a way to resolve
         version conflicts in complex resolves.
 
-        These values are passed directly to Coursier, and if specified incorrectly will show a
-        parse error from Coursier.
+        Supported rule types are:
+        {bullet_list(rule.alias for rule in supported_rule_types())}
         """
+    )
+
+
+class JvmArtifactExcludeDependenciesField(SequenceField[JvmArtifactExclusionRule]):
+    alias = "excludes"
+    help = _jvm_artifact_exclude_dependencies_help(
+        lambda: JvmArtifactExcludeDependenciesField.supported_rule_types
+    )
+
+    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusionRule], ...]] = (
+        JvmArtifactExclusionRule,
     )
     expected_element_type = JvmArtifactExclusionRule
     expected_type_description = "an iterable of JvmArtifactExclusionRule"

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import ClassVar
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
@@ -51,6 +52,7 @@ from pants.jvm.target_types import (
     JvmProvidesTypesField,
     JvmResolveField,
     JvmRunnableSourceFieldSet,
+    _jvm_artifact_exclude_dependencies_help,
 )
 from pants.util.strutil import help_text
 
@@ -425,7 +427,13 @@ class ScalaArtifactExclusionRule(JvmArtifactExclusionRule):
 
 
 class ScalaArtifactExcludeDependenciesField(JvmArtifactExcludeDependenciesField):
-    pass
+    help = _jvm_artifact_exclude_dependencies_help(
+        lambda: ScalaArtifactExcludeDependenciesField.supported_rule_types
+    )
+    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusionRule], ...]] = (
+        JvmArtifactExclusionRule,
+        ScalaArtifactExclusionRule,
+    )
 
 
 @dataclass(frozen=True)
@@ -448,13 +456,25 @@ class ScalaArtifactFieldSet(FieldSet):
 
 class ScalaArtifactTarget(TargetGenerator):
     alias = "scala_artifact"
+    help = help_text(
+        """
+        A third-party Scala artifact, as identified by its Maven-compatible coordinate.
+
+        That is, an artifact identified by its `group`, `artifact`, and `version` components.
+
+        Each artifact is associated with one or more resolves (a logical name you give to a
+        lockfile). For this artifact to be used by your first-party code, it must be
+        associated with the resolve(s) used by that code. See the `resolve` field.
+
+        Being a Scala artifact, the final artifact name will be inferred using the Scala version
+        configured for the given resolve.
+        """
+    )
     core_fields = (
         *COMMON_TARGET_FIELDS,
         *ScalaArtifactFieldSet.required_fields,
-        ScalaArtifactResolveField,
         ScalaArtifactExcludeDependenciesField,
         ScalaArtifactCrossversionField,
-        JvmJdkField,
     )
     copied_fields = (
         *COMMON_TARGET_FIELDS,
