@@ -9,6 +9,7 @@ from pants.backend.codegen import export_codegen_goal
 from pants.bsp.rules import rules as bsp_rules
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (
+    bench,
     check,
     deploy,
     export,
@@ -68,6 +69,7 @@ wrap_as_resources = wrap_source_rule_and_target(ResourceSourceField, "resources"
 def rules():
     return [
         # goals
+        *bench.rules(),
         *check.rules(),
         *deploy.rules(),
         *export.rules(),

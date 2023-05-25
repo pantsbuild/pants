@@ -11,6 +11,8 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import (
     ScalaJunitTestsGeneratorSourcesField,
     ScalaJunitTestsGeneratorTarget,
+    ScalameterBenchmarksGeneratorSourcesField,
+    ScalameterBenchmarksGeneratorTarget,
     ScalaSourcesGeneratorTarget,
     ScalatestTestsGeneratorSourcesField,
     ScalatestTestsGeneratorTarget,
@@ -40,6 +42,9 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
     scalatest_filespec_matcher = FilespecMatcher(ScalatestTestsGeneratorSourcesField.default, ())
     junit_filespec_matcher = FilespecMatcher(ScalaJunitTestsGeneratorSourcesField.default, ())
+    scalameter_filespec_matcher = FilespecMatcher(
+        ScalameterBenchmarksGeneratorSourcesField.default, ()
+    )
     scalatest_files = {
         path
         for path in paths
@@ -52,11 +57,18 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
         if os.path.basename(path)
         in set(junit_filespec_matcher.matches([os.path.basename(path) for path in paths]))
     }
-    sources_files = set(paths) - scalatest_files - junit_files
+    scalameter_files = {
+        path
+        for path in paths
+        if os.path.basename(path)
+        in set(scalameter_filespec_matcher.matches([os.path.basename(path) for path in paths]))
+    }
+    sources_files = set(paths) - scalatest_files - junit_files - scalameter_files
     return {
         ScalaJunitTestsGeneratorTarget: junit_files,
         ScalaSourcesGeneratorTarget: sources_files,
         ScalatestTestsGeneratorTarget: scalatest_files,
+        ScalameterBenchmarksGeneratorTarget: scalameter_files,
     }
 
 
