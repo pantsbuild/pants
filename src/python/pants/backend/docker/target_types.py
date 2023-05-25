@@ -282,8 +282,9 @@ class DockerImageBuildSecretsOptionField(
         Secret files to expose to the build (only if BuildKit enabled).
 
         Secrets may use absolute paths, or paths relative to your build root, or the BUILD file
-        if prefixed with `./`. The id should be valid as used by the Docker build `--secret`
-        option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
+        if prefixed with `./`. Paths to your home directory will be automatically expanded.
+        The id should be valid as used by the Docker build `--secret` option.
+        See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
         information.
 
         Example:
@@ -292,6 +293,7 @@ class DockerImageBuildSecretsOptionField(
                 secrets={
                     "mysecret": "/var/secrets/some-secret",
                     "repo-secret": "src/proj/secrets/some-secret",
+                    "home-dir-secret": "~/.config/some-secret",
                     "target-secret": "./secrets/some-secret",
                 }
             )
@@ -305,16 +307,11 @@ class DockerImageBuildSecretsOptionField(
         # `path` is an absolute path, the `buildroot` and `spec_path` will not be considered.  Also,
         # an empty path part is ignored.
         for secret, path in (self.value or {}).items():
-            if os.path.isabs(path):
-                full_path = path
-            elif path != os.path.expanduser(path):
-                full_path = os.path.expanduser(path)
-            else:
-                full_path = os.path.join(
-                    get_buildroot(),
-                    self.address.spec_path if re.match(r"\.{1,2}/", path) else "",
-                    path,
-                )
+            full_path = os.path.join(
+                get_buildroot(),
+                self.address.spec_path if re.match(r"\.{1,2}/", path) else "",
+                os.path.expanduser(path),
+            )
 
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
