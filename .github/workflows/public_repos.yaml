@@ -29,6 +29,20 @@ jobs:
 
     runs-on: ubuntu-22.04
     steps:
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v4
+        with:
+          python-version: |
+            3.7
+            3.8
+            3.9
+            3.10
+
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19.5
+
       - name: "Pants on"
         run: |
           # FIXME: save the script somewhere
