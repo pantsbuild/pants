@@ -18,7 +18,7 @@ Directories to cache
 
 In your CI's config file, we recommend caching these directories:
 
-- `$HOME/.nce` (Linux) or `$HOME/Library/Caches/nce` (macOS)<br>
+- `$HOME/.cache/nce` (Linux) or `$HOME/Library/Caches/nce` (macOS)<br>
   This is the cache directory used by the [Pants launcher binary](doc:installation) to cache its embedded interpreter. Cache this against some static key that you can modify if you want to purge that cache.
 - `$HOME/.cache/pants/setup`<br>
   This is the Pants bootstrap directory. Cache this against the version, as specified in `pants.toml`.  See the [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml) repo for an example of how to generate an effective cache key for this directory in GitHub Actions.

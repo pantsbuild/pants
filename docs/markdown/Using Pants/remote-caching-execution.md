@@ -40,6 +40,7 @@ In order to use remote caching or remote execution, Pants will need access to a 
 - [BuildBarn](https://github.com/buildbarn/bb-remote-execution)
 - [Buildfarm](https://github.com/bazelbuild/bazel-buildfarm/) 
 - [BuildGrid](https://buildgrid.build/)
+- [bazel-remote](https://github.com/buchgr/bazel-remote]
 
 **Note**: Setup of a self-hosted REAPI server is beyond the scope of this documentation. All these server projects have support channels on the BuildTeamWorld Slack. [Go here to obtain an invite to that Slack.](https://bit.ly/2SG1amT)
 
