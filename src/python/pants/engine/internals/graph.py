@@ -11,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -674,6 +674,20 @@ class _DependencyMappingRequest:
     expanded_targets: bool
 
 
+def _partition(
+    predicate: Callable[[Target], bool], targets: FrozenOrderedSet[Target]
+) -> tuple[FrozenOrderedSet[Target], FrozenOrderedSet[Target]]:
+    # https://stackoverflow.com/a/46217079
+    predicate_is_true = []
+    predicate_is_false = []
+    for tgt in targets:
+        if predicate(tgt):
+            predicate_is_true.append(tgt)
+        else:
+            predicate_is_false.append(tgt)
+    return FrozenOrderedSet(predicate_is_true), FrozenOrderedSet(predicate_is_false)
+
+
 @dataclass(frozen=True)
 class _DependencyMapping:
     mapping: FrozenDict[Address, tuple[Address, ...]]
@@ -690,9 +704,17 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     """
     roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
     visited: OrderedSet[Target] = OrderedSet()
-    queued = FrozenOrderedSet(roots_as_targets)
+    queued = roots_set = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: dict[Address, tuple[Address, ...]] = {}
     while queued:
+        applicable: FrozenOrderedSet[Target]
+        filtered: FrozenOrderedSet[Target]
+        if request.tt_request.do_traverse_deps_predicate is None or queued is roots_set:
+            # "queued is roots_set" ensures we always include at least the roots
+            applicable, filtered = queued, FrozenOrderedSet()
+        else:
+            applicable, filtered = _partition(request.tt_request.do_traverse_deps_predicate, queued)
+
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
             direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
@@ -703,7 +725,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                         include_special_cased_deps=request.tt_request.include_special_cased_deps,
                     ),
                 )
-                for tgt in queued
+                for tgt in applicable
             )
         else:
             direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
@@ -714,15 +736,16 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                         include_special_cased_deps=request.tt_request.include_special_cased_deps,
                     ),
                 )
-                for tgt in queued
+                for tgt in applicable
             )
 
         dependency_mapping.update(
             zip(
-                (t.address for t in queued),
+                (t.address for t in applicable),
                 (tuple(t.address for t in deps) for deps in direct_dependencies),
             )
         )
+        dependency_mapping.update((t.address, ()) for t in filtered)
 
         queued = FrozenOrderedSet(itertools.chain.from_iterable(direct_dependencies)).difference(
             visited
