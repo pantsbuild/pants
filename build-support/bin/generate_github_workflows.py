@@ -206,7 +206,7 @@ def launch_bazel_remote() -> Sequence[Step]:
             "run": dedent(
                 """\
                 mkdir -p ~/bazel-remote
-                docker run -u 1001:1000 \
+                docker run --detach -u 1001:1000 \
                   -v ~/bazel-remote:/data \
                   -p 9092:9092 \
                   buchgr/bazel-remote-cache \
@@ -215,8 +215,7 @@ def launch_bazel_remote() -> Sequence[Step]:
                   --s3.access_key_id="${AWS_ACCESS_KEY_ID}" \
                   --s3.bucket=cache.pantsbuild.org \
                   --s3.endpoint=s3.us-east-1.amazonaws.com \
-                  --max_size 30 \
-                  &
+                  --max_size 30
                 echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
                 echo "PANTS_REMOTE_CACHE_WRITE=true" >> "$GITHUB_ENV"
                 echo "PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092" >> "$GITHUB_ENV"
