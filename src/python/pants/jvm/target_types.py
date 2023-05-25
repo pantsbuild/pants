@@ -13,6 +13,7 @@ from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.core.goals.bench import BenchmarkExtraEnvVarsField, BenchmarkTimeoutField
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
@@ -831,6 +832,21 @@ class JvmWarTarget(Target):
         """
     )
 
+# -----------------------------------------------------------------------------------------------
+# JMH benchmark support field(s)
+# -----------------------------------------------------------------------------------------------
+
+
+class JmhBenchmarkSourceField(SingleSourceField, metaclass=ABCMeta):
+    """A marker that indicates that a source field represents a JMH benchmark."""
+
+
+class JmhBenchmarkTimeoutField(BenchmarkTimeoutField):
+    pass
+
+
+class JmhBenchmarkExtraEnvVarsField(BenchmarkExtraEnvVarsField):
+    pass
 
 # -----------------------------------------------------------------------------------------------
 # Dynamic Field defaults

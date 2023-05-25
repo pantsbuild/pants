@@ -17,6 +17,9 @@ from pants.engine.target import (
 )
 from pants.jvm import target_types as jvm_target_types
 from pants.jvm.target_types import (
+    JmhBenchmarkExtraEnvVarsField,
+    JmhBenchmarkSourceField,
+    JmhBenchmarkTimeoutField,
     JunitTestExtraEnvVarsField,
     JunitTestSourceField,
     JunitTestTimeoutField,
@@ -144,6 +147,53 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
 
+# -----------------------------------------------------------------------------------------------
+# `jmh_test` and `jmh_tests` targets
+# -----------------------------------------------------------------------------------------------
+
+class JavaJmhBenchmarkSourceField(JavaSourceField, JmhBenchmarkSourceField):
+    """A JMH benchmark file written in Java."""
+
+
+class JmhBenchmarkTarget(Target):
+    alias = "jmh_benchmark"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JavaJmhBenchmarkSourceField,
+        JmhBenchmarkTimeoutField,
+        JmhBenchmarkExtraEnvVarsField,
+        JvmDependenciesField,
+        JvmResolveField,
+        JvmProvidesTypesField,
+        JvmJdkField,
+    )
+    help = "A single Java benchmark, run with JMH."
+
+
+class JavaJmhBenckmarksGeneratorSourcesField(JavaGeneratorSourcesField):
+    default = ("*Benchmark.java",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Benchmark.java', '!BenchmarkIgnore.java']`"
+    )
+
+
+class JmhBenckmarksGeneratorTarget(TargetFilesGenerator):
+    alias = "jmh_benchmarks"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JavaJmhBenckmarksGeneratorSourcesField,
+    )
+    generated_target_cls = JunitTestTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        JmhBenchmarkTimeoutField,
+        JmhBenchmarkExtraEnvVarsField,
+        JvmDependenciesField,
+        JvmJdkField,
+        JvmProvidesTypesField,
+        JvmResolveField,
+    )
+    help = "Generate a `junit_test` target for each file in the `sources` field."
 
 def rules():
     return [
