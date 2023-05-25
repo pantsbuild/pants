@@ -997,12 +997,19 @@ class TransitiveTargetsRequest:
 
     roots: Tuple[Address, ...]
     include_special_cased_deps: bool
+    # If this predicate returns false, then the target's dependencies will be ignored.
+    predicate: Callable[[Target], bool] | None
 
     def __init__(
-        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
+        self,
+        roots: Iterable[Address],
+        *,
+        include_special_cased_deps: bool = False,
+        predicate: Callable[[Target], bool] | None = None,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
+        object.__setattr__(self, "predicate", predicate)
 
 
 @dataclass(frozen=True)
