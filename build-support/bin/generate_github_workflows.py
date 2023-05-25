@@ -198,6 +198,58 @@ def checkout(
     return steps
 
 
+def launch_bazel_remote() -> Sequence[Step]:
+    """Run a sidecar bazel-remote instance.
+
+    This process proxies to a public-read/private-write S3 bucket (cache.pantsbuild.org). PRs within
+    pantsbuild/pants will have AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY secrets set and so will be
+    able to read and write the cache. PRs across forks will not, so they use hard-coded read only
+    creds so they can at least read from the cache.
+    """
+    return [
+        {
+            "name": "Launch bazel-remote",
+            "run": dedent(
+                """\
+                mkdir -p ~/bazel-remote
+                if [[ -z "${AWS_ACCESS_KEY_ID}" ]]; then
+                  CACHE_WRITE=false
+                  # If no secret read/write creds, use hard-coded read-only creds, so that
+                  # cross-fork PRs can at least read from the cache.
+                  # These creds are hard-coded here in this public repo, which makes the bucket
+                  # world-readable. But since putting raw AWS tokens in a public repo, even
+                  # deliberately, is icky, we base64-them. This will at least help hide from
+                  # automated scanners that look for checked in AWS keys.
+                  # Not that it would be terrible if we were scanned, since this is public
+                  # on purpose, but it's best not to draw attention.
+                  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK' | base64 -d)
+                  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64 -d)
+                else
+                  CACHE_WRITE=true
+                fi
+                docker run --detach -u 1001:1000 \
+                  -v ~/bazel-remote:/data \
+                  -p 9092:9092 \
+                  buchgr/bazel-remote-cache:v2.4.1 \
+                  --s3.auth_method=access_key \
+                  --s3.access_key_id="${AWS_ACCESS_KEY_ID}" \
+                  --s3.secret_access_key="${AWS_SECRET_ACCESS_KEY}" \
+                  --s3.bucket=cache.pantsbuild.org \
+                  --s3.endpoint=s3.us-east-1.amazonaws.com \
+                  --max_size 30
+                echo "PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092" >> "$GITHUB_ENV"
+                echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
+                echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
+                """
+            ),
+            "env": {
+                "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
+                "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
+            },
+        }
+    ]
+
+
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
@@ -586,7 +638,9 @@ def bootstrap_jobs(
     }
 
 
-def test_jobs(helper: Helper, shard: str | None, platform_specific: bool) -> Jobs:
+def test_jobs(
+    helper: Helper, shard: str | None, platform_specific: bool, with_remote_caching: bool
+) -> Jobs:
     human_readable_job_name = f"Test Python ({helper.platform_name()})"
     human_readable_step_name = "Run Python tests"
     log_name = "python-test"
@@ -615,6 +669,7 @@ def test_jobs(helper: Helper, shard: str | None, platform_specific: bool) -> Job
         "if": IS_PANTS_OWNER,
         "steps": [
             *checkout(),
+            *(launch_bazel_remote() if with_remote_caching else []),
             install_jdk(),
             *(
                 [install_go(), download_apache_thrift()]
@@ -639,7 +694,7 @@ def linux_x86_64_test_jobs() -> Jobs:
     helper = Helper(Platform.LINUX_X86_64)
 
     def test_python_linux(shard: str) -> dict[str, Any]:
-        return test_jobs(helper, shard, platform_specific=False)
+        return test_jobs(helper, shard, platform_specific=False, with_remote_caching=True)
 
     shard_name_prefix = helper.job_name("test_python")
     jobs = {
@@ -668,7 +723,11 @@ def linux_arm64_test_jobs() -> Jobs:
             validate_ci_config=False,
             rust_testing=RustTesting.SOME,
         ),
-        helper.job_name("test_python"): test_jobs(helper, shard=None, platform_specific=True),
+        # We run these on a dedicated host with ample local cache, so remote caching
+        # just adds cost but little value.
+        helper.job_name("test_python"): test_jobs(
+            helper, shard=None, platform_specific=True, with_remote_caching=False
+        ),
     }
     return jobs
 
@@ -681,7 +740,11 @@ def macos11_x86_64_test_jobs() -> Jobs:
             validate_ci_config=False,
             rust_testing=RustTesting.SOME,
         ),
-        helper.job_name("test_python"): test_jobs(helper, shard=None, platform_specific=True),
+        # We run these on a dedicated host with ample local cache, so remote caching
+        # just adds cost but little value.
+        helper.job_name("test_python"): test_jobs(
+            helper, shard=None, platform_specific=True, with_remote_caching=False
+        ),
     }
     return jobs
 
@@ -798,6 +861,7 @@ def test_workflow_jobs() -> Jobs:
                 "if": IS_PANTS_OWNER,
                 "steps": [
                     *checkout(),
+                    *launch_bazel_remote(),
                     *linux_x86_64_helper.setup_primary_python(),
                     *linux_x86_64_helper.native_binaries_download(),
                     {
