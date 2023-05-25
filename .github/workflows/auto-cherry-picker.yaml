@@ -21,8 +21,10 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
         with:
-          # Always checkout the latest commit of main
+          # Always checkout the latest commit of main, for latest changes to the script
           ref: "main"
+          # NB: `fetch-depth: 1` causes merge-conflicts if `main` points to merge-commit of the PR.
+          fetch-depth: 2
 
       - name: Cherry-Pick
         run: |

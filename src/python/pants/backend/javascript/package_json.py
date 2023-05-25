@@ -88,6 +88,7 @@ class NodeBuildScript(NodeScript):
     output_directories: tuple[str, ...] = ()
     output_files: tuple[str, ...] = ()
     extra_caches: tuple[str, ...] = ()
+    extra_env_vars: tuple[str, ...] = ()
 
     alias: ClassVar[str] = "node_build_script"
 
@@ -98,6 +99,7 @@ class NodeBuildScript(NodeScript):
         output_directories: Iterable[str] = (),
         output_files: Iterable[str] = (),
         extra_caches: Iterable[str] = (),
+        extra_env_vars: Iterable[str] = (),
     ) -> NodeBuildScript:
         """A build script, mapped from the `scripts` section of a package.json file.
 
@@ -110,6 +112,7 @@ class NodeBuildScript(NodeScript):
             output_directories=tuple(output_directories),
             output_files=tuple(output_files),
             extra_caches=tuple(extra_caches),
+            extra_env_vars=tuple(extra_env_vars),
         )
 
 
@@ -410,6 +413,20 @@ class NodeBuildScriptOutputDirectoriesField(StringSequenceField):
     )
 
 
+class NodeBuildScriptExtraEnvVarsField(StringSequenceField):
+    alias = "extra_env_vars"
+    required = False
+    default = ()
+    help = help_text(
+        """
+        Additional environment variables to include in environment when running a build script process.
+
+        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+        `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        """
+    )
+
+
 class NodeBuildScriptExtraCaches(StringSequenceField):
     alias = "extra_caches"
     required = False
@@ -452,6 +469,7 @@ class NodeBuildScriptTarget(Target):
         NodeBuildScriptOutputFilesField,
         NodeBuildScriptSourcesField,
         NodeBuildScriptExtraCaches,
+        NodeBuildScriptExtraEnvVarsField,
         NodePackageDependenciesField,
         OutputPathField,
     )
@@ -923,6 +941,7 @@ async def generate_node_package_targets(
                         NodeBuildScriptEntryPointField.alias: build_script.entry_point,
                         NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
                         NodeBuildScriptOutputFilesField.alias: build_script.output_files,
+                        NodeBuildScriptExtraEnvVarsField.alias: build_script.extra_env_vars,
                         NodeBuildScriptExtraCaches.alias: build_script.extra_caches,
                         NodePackageDependenciesField.alias: [
                             file_tgt.address.spec,

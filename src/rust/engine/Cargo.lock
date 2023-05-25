@@ -913,7 +913,6 @@ dependencies = [
  "smallvec",
  "stdio",
  "store",
- "syn 1.0.109",
  "task_executor",
  "tempfile",
  "testutil",
@@ -2555,14 +2554,14 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.18.3"
-source = "git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32#c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32"
+source = "git+https://github.com/PyO3/pyo3.git?rev=edb952233159dd6d16089f9c1d855404090a9f4c#edb952233159dd6d16089f9c1d855404090a9f4c"
 dependencies = [
  "cfg-if 1.0.0",
  "indoc",
  "libc",
  "memoffset 0.8.0",
- "parking_lot 0.12.1",
- "pyo3-build-config 0.18.3 (git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32)",
+ "parking_lot 0.11.2",
+ "pyo3-build-config 0.18.3 (git+https://github.com/PyO3/pyo3.git?rev=edb952233159dd6d16089f9c1d855404090a9f4c)",
  "pyo3-ffi",
  "pyo3-macros",
  "unindent",
@@ -2581,7 +2580,7 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.18.3"
-source = "git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32#c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32"
+source = "git+https://github.com/PyO3/pyo3.git?rev=edb952233159dd6d16089f9c1d855404090a9f4c#edb952233159dd6d16089f9c1d855404090a9f4c"
 dependencies = [
  "once_cell",
  "target-lexicon",
@@ -2590,16 +2589,16 @@ dependencies = [
 [[package]]
 name = "pyo3-ffi"
 version = "0.18.3"
-source = "git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32#c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32"
+source = "git+https://github.com/PyO3/pyo3.git?rev=edb952233159dd6d16089f9c1d855404090a9f4c#edb952233159dd6d16089f9c1d855404090a9f4c"
 dependencies = [
  "libc",
- "pyo3-build-config 0.18.3 (git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32)",
+ "pyo3-build-config 0.18.3 (git+https://github.com/PyO3/pyo3.git?rev=edb952233159dd6d16089f9c1d855404090a9f4c)",
 ]
 
 [[package]]
 name = "pyo3-macros"
 version = "0.18.3"
-source = "git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32#c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32"
+source = "git+https://github.com/PyO3/pyo3.git?rev=edb952233159dd6d16089f9c1d855404090a9f4c#edb952233159dd6d16089f9c1d855404090a9f4c"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -2610,7 +2609,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.18.3"
-source = "git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32#c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32"
+source = "git+https://github.com/PyO3/pyo3.git?rev=edb952233159dd6d16089f9c1d855404090a9f4c#edb952233159dd6d16089f9c1d855404090a9f4c"
 dependencies = [
  "proc-macro2",
  "quote",
