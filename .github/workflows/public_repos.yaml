@@ -1,0 +1,53 @@
+name: Public repos
+"on":
+  push:
+
+jobs:
+  test:
+    matrix:
+      repository:
+        - https://github.com/pantsbuild/example-python
+        - https://github.com/pantsbuild/example-visibility
+        - https://github.com/pantsbuild/example-django
+        - https://github.com/pantsbuild/example-adhoc
+        - https://github.com/pantsbuild/example-jvm
+        - https://github.com/pantsbuild/example-golang
+        - https://github.com/pantsbuild/example-kotlin
+        - https://github.com/pantsbuild/example-docker
+        - https://github.com/pantsbuild/example-codegen
+        - https://github.com/pantsbuild/example-plugin
+
+        # - https://github.com/StackStorm/st2
+        # - https://github.com/lablup/backend.ai
+        # - https://github.com/Ars-Linguistica/mlconjug3
+        # - https://github.com/mitodl/ol-infrastructure
+        # - https://github.com/naccdata/flywheel-gear-extensions
+        # - https://github.com/OpenSaMD/OpenSaMD
+
+    runs-on: ubuntu-22.04
+    steps:
+      - name: "Pants on"
+        run: |
+          # FIXME: save the script somewhere
+          curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
+          echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+      - name: "Check out"
+        run: |
+          git clone --depth=1 ${{ matrix.repository }} repo
+
+      - run: |
+          pants version
+        workdir: repo
+      - run: |
+          pants tailor --check update-build-files --check ::
+        workdir: repo
+      - run: |
+          pants lint check ::
+        workdir: repo
+      - run: |
+          pants test ::
+        workdir: repo
+      - run: |
+          pants package ::
+        workdir: repo
