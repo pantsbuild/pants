@@ -4,25 +4,26 @@ name: Public repos
 
 jobs:
   test:
-    matrix:
-      repository:
-        - https://github.com/pantsbuild/example-python
-        - https://github.com/pantsbuild/example-visibility
-        - https://github.com/pantsbuild/example-django
-        - https://github.com/pantsbuild/example-adhoc
-        - https://github.com/pantsbuild/example-jvm
-        - https://github.com/pantsbuild/example-golang
-        - https://github.com/pantsbuild/example-kotlin
-        - https://github.com/pantsbuild/example-docker
-        - https://github.com/pantsbuild/example-codegen
-        - https://github.com/pantsbuild/example-plugin
+    strategy:
+      matrix:
+        repository:
+          - https://github.com/pantsbuild/example-python
+          - https://github.com/pantsbuild/example-visibility
+          - https://github.com/pantsbuild/example-django
+          - https://github.com/pantsbuild/example-adhoc
+          - https://github.com/pantsbuild/example-jvm
+          - https://github.com/pantsbuild/example-golang
+          - https://github.com/pantsbuild/example-kotlin
+          - https://github.com/pantsbuild/example-docker
+          - https://github.com/pantsbuild/example-codegen
+          - https://github.com/pantsbuild/example-plugin
 
-        # - https://github.com/StackStorm/st2
-        # - https://github.com/lablup/backend.ai
-        # - https://github.com/Ars-Linguistica/mlconjug3
-        # - https://github.com/mitodl/ol-infrastructure
-        # - https://github.com/naccdata/flywheel-gear-extensions
-        # - https://github.com/OpenSaMD/OpenSaMD
+          # - https://github.com/StackStorm/st2
+          # - https://github.com/lablup/backend.ai
+          # - https://github.com/Ars-Linguistica/mlconjug3
+          # - https://github.com/mitodl/ol-infrastructure
+          # - https://github.com/naccdata/flywheel-gear-extensions
+          # - https://github.com/OpenSaMD/OpenSaMD
 
     runs-on: ubuntu-22.04
     steps:
