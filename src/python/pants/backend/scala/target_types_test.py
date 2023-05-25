@@ -16,8 +16,8 @@ from pants.engine.target import Target
 from pants.jvm import jvm_common
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
-    JvmArtifactExclusionsField,
     JvmArtifactExclusion,
+    JvmArtifactExclusionsField,
     JvmArtifactGroupField,
     JvmArtifactResolveField,
     JvmArtifactTarget,
