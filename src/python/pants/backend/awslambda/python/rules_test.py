@@ -168,7 +168,10 @@ def test_create_hello_world_lambda_with_lambdex(
             "    Complete platform: src/python/foo/bar/platform.json",
             "              Handler: lambdex_handler.handler",
         ),
-        extra_args=[f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[
+            f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']",
+            "--lambdex-layout=lambdex",
+        ],
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
     zipfile = ZipFile(BytesIO(content))
@@ -187,7 +190,10 @@ def test_create_hello_world_lambda_with_lambdex(
             "    Runtime: python3.7",
             "    Handler: lambdex_handler.handler",
         ),
-        extra_args=[f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[
+            f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']",
+            "--lambdex-layout=lambdex",
+        ],
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
     zipfile = ZipFile(BytesIO(content))
@@ -248,6 +254,7 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
             "    Runtime: python3.7",
             "    Handler: lambdex_handler.handler",
         ),
+        extra_args=["--lambdex-layout=lambdex"],
     )
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
@@ -296,7 +303,6 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
         expected_extra_log_lines=("    Handler: lambda_function.handler",),
-        extra_args=["--lambdex-layout=zip"],
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
 
@@ -312,7 +318,6 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
         expected_extra_log_lines=("    Handler: lambda_function.handler",),
-        extra_args=["--lambdex-layout=zip"],
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
 
