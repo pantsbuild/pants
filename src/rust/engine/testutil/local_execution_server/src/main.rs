@@ -32,7 +32,7 @@ use protos::{
 };
 use std::io::Read;
 
-use structopt::StructOpt;
+use clap::StructOpt;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -40,7 +40,7 @@ use structopt::StructOpt;
   about = "A mock execution server, to test remote execution capabilities.\nThe server will handle exactly one request as specified by the optional arguments: request_size and request_digest. In response to this request, it will perform a default operation. It will reject any subsequent request."
 )]
 struct Options {
-  #[structopt(short = "p", long = "port")]
+  #[structopt(short = 'p', long = "port")]
   port: Option<u16>,
   #[structopt(
     long = "request_hash",

@@ -4,7 +4,6 @@ slug: "using-pants-in-ci"
 excerpt: "Suggestions for how to use Pants to speed up your CI (continuous integration)."
 hidden: false
 createdAt: "2021-05-24T23:02:54.908Z"
-updatedAt: "2022-07-25T23:50:56.628Z"
 ---
 > 📘 Examples
 > 
@@ -19,10 +18,12 @@ Directories to cache
 
 In your CI's config file, we recommend caching these directories:
 
+- `$HOME/.cache/nce` (Linux) or `$HOME/Library/Caches/nce` (macOS)<br>
+  This is the cache directory used by the [Pants launcher binary](doc:installation) to cache its embedded interpreter. Cache this against some static key that you can modify if you want to purge that cache.
 - `$HOME/.cache/pants/setup`<br>
   This is the Pants bootstrap directory. Cache this against the version, as specified in `pants.toml`.  See the [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml) repo for an example of how to generate an effective cache key for this directory in GitHub Actions.
 - `$HOME/.cache/pants/named_caches`<br>
-  Caches used by some underlying tools.  Cache this against the inputs to those tools. For the `pants.backend.python` backend, named caches are used by PEX, and therefore its inputs are your lockfiles. Again, see [pantsbuild/example-python]([pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml)) for an example.
+  Caches used by some underlying tools.  Cache this against the inputs to those tools. For the `pants.backend.python` backend, named caches are used by PEX, and therefore its inputs are your lockfiles. Again, see [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml) for an example.
 
 If you're not using a fine-grained [remote caching](doc:remote-caching-execution) service, then you may also want to preserve the local Pants cache at `$HOME/.cache/pants/lmdb_store`. This has to be invalidated on any file that can affect any process, e.g., `hashFiles('**/*')` on GitHub Actions.
 
@@ -39,17 +40,17 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 > You can use this script to nuke the cache when it gets too big:
 > 
 > ```bash
-> function nuke_if_too_big() {
->   path=$1
->   limit_mb=$2
->   size_mb=$(du -m -d0 ${path} | cut -f 1)
->   if (( ${size_mb} > ${limit_mb} )); then
->     echo "${path} is too large (${size_mb}mb), nuking it."
->     rm -rf ${path}
->   fi
-> }
+>  function nuke_if_too_big() {
+>    path=$1
+>    limit_mb=$2
+>    size_mb=$(du -m -d0 "${path}" | cut -f 1)
+>    if (( size_mb > limit_mb )); then
+>      echo "${path} is too large (${size_mb}mb), nuking it."
+>      rm -rf "${path}"
+>    fi
+>  }
 >
-> nuke_if_too_big ~/.cache/pants/setup 256
+> nuke_if_too_big ~/.cache/pants/setup 512
 > nuke_if_too_big ~/.cache/pants/named_caches 1024
 > ```
 
@@ -91,21 +92,21 @@ Because Pants understands the dependencies of your code, you can use Pants to sp
 We recommend running these commands in CI:
 
 ```shell
-❯ ./pants --version  # Bootstrap Pants.
-❯ ./pants \
+❯ pants --version  # Bootstrap Pants.
+❯ pants \
   --changed-since=origin/main \
   tailor --check \
   update-build-files --check \
   lint
-❯ ./pants \
+❯ pants \
   --changed-since=origin/main \
-  --changed-dependees=transitive \
+  --changed-dependents=transitive \
   check test
 ```
 
-Because most linters do not care about a target's dependencies, we lint all changed files and targets, but not any dependees of those changes.
+Because most linters do not care about a target's dependencies, we lint all changed files and targets, but not any dependents of those changes.
 
-Meanwhile, tests should be rerun when any changes are made to the tests _or_ to dependencies of those tests, so we use the option `--changed-dependees=transitive`. `check` should also run on any transitive changes.
+Meanwhile, tests should be rerun when any changes are made to the tests _or_ to dependencies of those tests, so we use the option `--changed-dependents=transitive`. `check` should also run on any transitive changes.
 
 See [Advanced target selection](doc:advanced-target-selection) for more information on `--changed-since` and alternative techniques to select targets to run in CI.
 
@@ -142,8 +143,8 @@ See [Advanced target selection](doc:advanced-target-selection) for more informat
 Alternatively, you can simply run over all your code. Pants's caching means that you will not need to rerun on changed files.
 
 ```bash
-❯ ./pants --version  # Bootstrap Pants.
-❯ ./pants \
+❯ pants --version  # Bootstrap Pants.
+❯ pants \
    tailor --check \
    update-build-files --check \
    lint check test ::
@@ -207,7 +208,7 @@ The default test runners for these CI providers have the following resources. If
 Tip: store Pants logs as artifacts
 ----------------------------------
 
-We recommend that you configure your CI system to store the pants log (`.pantd.d/pants.log`) as a build artifact, so that it is available in case you need to troubleshoot CI issues.
+We recommend that you configure your CI system to store the pants log (`.pantsd.d/pants.log`) as a build artifact, so that it is available in case you need to troubleshoot CI issues.
 
 Different CI providers and systems have different ways to configure build artifacts:
 

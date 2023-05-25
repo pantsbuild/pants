@@ -3,7 +3,6 @@ title: "Welcome to Pants!"
 slug: "welcome-to-pants"
 hidden: false
 createdAt: "2020-02-21T17:44:28.054Z"
-updatedAt: "2022-03-09T22:12:20.097Z"
 ---
 What is Pants?
 ==============

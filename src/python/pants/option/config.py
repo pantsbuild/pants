@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import getpass
 import logging
 import os
 import re
@@ -17,6 +16,8 @@ from typing_extensions import Protocol
 from pants.base.build_environment import get_buildroot
 from pants.option.errors import ConfigError, ConfigValidationError, InterpolationMissingOptionError
 from pants.option.ranked_value import Value
+from pants.util.osutil import getuser
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,8 @@ class Config:
     ) -> Config:
         """Loads config from the given string payloads, with later payloads overriding earlier ones.
 
-        A handful of seed values will be set to act as if specified in the loaded config file's
-        DEFAULT section, and be available for use in substitutions.  The caller may override some of
-        these seed values.
+        A handful of seed values, plus the values in the DEFAULT section, will be available for use in
+        substitutions.  The caller may override some of these seed values.
 
         If an `env` is supplied, it is exposed as `env` object available for interpolation via dot
         access of the environment variable names (e.g.: `env.HOME`).
@@ -89,11 +89,11 @@ class Config:
     ) -> _ConfigValues:
         """Attempt to parse as TOML, raising an exception on failure."""
         toml_values = toml.loads(config_source.content.decode())
-        toml_values[DEFAULT_SECTION] = {
+        seed_values = {
             **normalized_seed_values,
             **toml_values.get(DEFAULT_SECTION, {}),
         }
-        return _ConfigValues(config_source.path, toml_values)
+        return _ConfigValues(config_source.path, toml_values, seed_values)
 
     def verify(self, section_to_valid_options: dict[str, set[str]]):
         error_log = []
@@ -103,8 +103,14 @@ class Config:
             for error in error_log:
                 logger.error(error)
             raise ConfigValidationError(
-                "Invalid config entries detected. See log for details on which entries to update "
-                "or remove.\n(Specify --no-verify-config to disable this check.)"
+                softwrap(
+                    """
+                    Invalid config entries detected. See log for details on which entries to update
+                    or remove.
+
+                    (Specify --no-verify-config to disable this check.)
+                    """
+                )
             )
 
     @staticmethod
@@ -123,8 +129,10 @@ class Config:
 
         all_seed_values: dict[str, Any] = {
             "buildroot": buildroot,
+            # Note that expanduser will return the root dir when running with a uid
+            # not associated with a user.
             "homedir": os.path.expanduser("~"),
-            "user": getpass.getuser(),
+            "user": getuser(),
         }
         if env:
             all_seed_values["env"] = SimpleNamespace(**env)
@@ -171,6 +179,7 @@ class _ConfigValues:
 
     path: str
     section_to_values: dict[str, dict[str, Any]]
+    seed_values: dict[str, Any]
 
     def _possibly_interpolate_value(
         self,
@@ -182,7 +191,6 @@ class _ConfigValues:
     ) -> str:
         """For any values with %(foo)s, substitute it with the corresponding value from DEFAULT or
         the same section."""
-        # TODO(benjy): I wonder if we can abuse ConfigParser to do this for us?
 
         def format_str(value: str) -> str:
             # Escape embedded { and } characters, so that .format() does not act on them.
@@ -193,7 +201,7 @@ class _ConfigValues:
                 string=escaped_str,
             )
             try:
-                possible_interpolations = {**self.defaults, **section_values}
+                possible_interpolations = {**self.seed_values, **section_values}
                 return new_style_format_str.format(**possible_interpolations)
             except KeyError as e:
                 bad_reference = e.args[0]
@@ -253,10 +261,6 @@ class _ConfigValues:
             return remove_val
 
         return stringify(option_value)
-
-    @property
-    def defaults(self) -> dict[str, Any]:
-        return self.section_to_values[DEFAULT_SECTION].copy()
 
     def get_verification_errors(self, section_to_valid_options: dict[str, set[str]]) -> list[str]:
         error_log = []

@@ -23,7 +23,7 @@ from pants.backend.helm.util_rules import chart, sources
 from pants.build_graph.address import Address
 from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, source_files
-from pants.engine.rules import QueryRule, SubsystemRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.rule_runner import RuleRunner
@@ -41,7 +41,7 @@ def rule_runner() -> RuleRunner:
             *source_root_rules(),
             *sources.rules(),
             *target_types_rules(),
-            SubsystemRule(HelmSubsystem),
+            *HelmSubsystem.rules(),
             QueryRule(Partitions, [HelmLintRequest.PartitionRequest]),
             QueryRule(LintResult, [HelmLintRequest.Batch]),
         ],

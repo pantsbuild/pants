@@ -4,7 +4,6 @@ slug: "versions"
 excerpt: "Summaries of each release, including links to their changelogs."
 hidden: true
 createdAt: "2020-07-23T21:01:05.036Z"
-updatedAt: "2021-04-02T23:15:51.364Z"
 ---
 * [2.5.x](doc:release-notes-2-5)
 * [2.4.x](doc:release-notes-2-4)

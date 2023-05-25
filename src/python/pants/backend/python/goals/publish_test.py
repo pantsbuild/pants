@@ -47,7 +47,11 @@ def set_options(rule_runner: RuleRunner, options: list | None = None) -> RuleRun
     rule_runner.set_options(
         options or [],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-        env={"TWINE_PASSWORD_PYPI": "secret"},
+        env={
+            "TWINE_USERNAME": "whoami",
+            "TWINE_USERNAME_PYPI": "whoareyou",
+            "TWINE_PASSWORD_PYPI": "secret",
+        },
     )
     return rule_runner
 
@@ -131,7 +135,7 @@ def test_twine_upload(rule_runner, packages) -> None:
                 "my-package-0.1.0.tar.gz",
                 "my_package-0.1.0-py3-none-any.whl",
             ),
-            env=FrozenDict({"TWINE_PASSWORD": "secret"}),
+            env=FrozenDict({"TWINE_USERNAME": "whoareyou", "TWINE_PASSWORD": "secret"}),
         ),
     )
     assert_package(
@@ -151,7 +155,7 @@ def test_twine_upload(rule_runner, packages) -> None:
                 "my-package-0.1.0.tar.gz",
                 "my_package-0.1.0-py3-none-any.whl",
             ),
-            env=FrozenDict(),
+            env=FrozenDict({"TWINE_USERNAME": "whoami"}),
         ),
     )
 

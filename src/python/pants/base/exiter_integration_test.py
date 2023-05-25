@@ -20,7 +20,6 @@ dir_layout = {
 
 @ensure_daemon
 def test_unicode_containing_exception(use_pantsd: bool) -> None:
-
     with setup_tmpdir(dir_layout) as tmpdir:
         pants_run = run_pants(
             [

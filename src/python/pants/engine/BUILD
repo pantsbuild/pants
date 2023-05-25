@@ -17,5 +17,5 @@ python_tests(
         # Loaded reflectively as a backend in `streaming_workunit_handler_integration_test.py`.
         "testprojects/pants-plugins/src/python/workunit_logger"
     ],
-    timeout=120,
+    timeout=240,
 )

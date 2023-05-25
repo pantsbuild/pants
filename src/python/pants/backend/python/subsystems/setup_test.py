@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.testutil.option_util import create_subsystem
@@ -43,7 +42,7 @@ def test_resolves_to_constraints_file() -> None:
 
 
 def test_resolves_to_no_binary_and_only_binary() -> None:
-    def create(resolves_to_projects: dict[str, list[str]]) -> dict[str, list[PipRequirement]]:
+    def create(resolves_to_projects: dict[str, list[str]]) -> dict[str, list[str]]:
         subsystem = create_subsystem(
             PythonSetup,
             resolves={"a": "a.lock"},
@@ -59,15 +58,24 @@ def test_resolves_to_no_binary_and_only_binary() -> None:
         assert only_binary == no_binary
         return only_binary
 
-    p1_req = PipRequirement.parse("p1")
     assert create({"a": ["p1"], "tool1": ["p2"]}) == {
-        "a": [p1_req],
-        "tool1": [PipRequirement.parse("p2")],
+        "a": ["p1"],
+        "tool1": ["p2"],
     }
     assert create({"__default__": ["p1"], "tool2": ["override"]}) == {
-        "a": [p1_req],
-        "tool1": [p1_req],
-        "tool2": [PipRequirement.parse("override")],
+        "a": ["p1"],
+        "tool1": ["p1"],
+        "tool2": ["override"],
+    }
+    # Test that we don't fail on :all:.
+    assert create({"a": [":all:"], "tool1": [":all:"]}) == {
+        "a": [":all:"],
+        "tool1": [":all:"],
+    }
+    # Test name canonicalization.
+    assert create({"a": ["foo.BAR"], "tool1": ["Baz_Qux"]}) == {
+        "a": ["foo-bar"],
+        "tool1": ["baz-qux"],
     }
     with pytest.raises(UnrecognizedResolveNamesError):
         create({"fake": []})

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -39,7 +39,10 @@ from pants.core.goals.test import (
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import ChosenLocalEnvironmentName
+from pants.core.util_rules.environments import (
+    ChosenLocalEnvironmentName,
+    SingleEnvironmentNameRequest,
+)
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -54,9 +57,16 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.internals.session import RunId
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
+from pants.engine.platform import Platform
+from pants.engine.process import (
+    InteractiveProcess,
+    InteractiveProcessResult,
+    ProcessExecutionEnvironment,
+    ProcessResultMetadata,
+)
 from pants.engine.target import (
     BoolField,
+    Field,
     MultipleSourcesField,
     Target,
     TargetRootsToFieldSets,
@@ -77,6 +87,30 @@ from pants.testutil.rule_runner import (
 from pants.util.logging import LogLevel
 
 
+def make_process_result_metadata(
+    source: str,
+    *,
+    environment_name: str | None = None,
+    docker_image: str | None = None,
+    remote_execution: bool = False,
+    total_elapsed_ms: int = 999,
+    source_run_id: int = 0,
+) -> ProcessResultMetadata:
+    return ProcessResultMetadata(
+        total_elapsed_ms,
+        ProcessExecutionEnvironment(
+            environment_name=environment_name,
+            # TODO: None of the following are currently consumed in these tests.
+            platform=Platform.create_for_localhost().value,
+            docker_image=docker_image,
+            remote_execution=remote_execution,
+            remote_execution_extra_platform_properties=[],
+        ),
+        source,
+        source_run_id,
+    )
+
+
 class MockMultipleSourcesField(MultipleSourcesField):
     pass
 
@@ -90,9 +124,14 @@ class MockSkipTestsField(BoolField):
     default = False
 
 
+class MockRequiredField(Field):
+    alias = "required"
+    required = True
+
+
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (MockMultipleSourcesField, MockSkipTestsField)
+    core_fields = (MockMultipleSourcesField, MockSkipTestsField, MockRequiredField)
 
 
 @dataclass(frozen=True)
@@ -104,8 +143,11 @@ class MockCoverageDataCollection(CoverageDataCollection):
     element_type = MockCoverageData
 
 
-class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
-    required_fields = (MultipleSourcesField,)
+@dataclass(frozen=True)
+class MockTestFieldSet(TestFieldSet):
+    required_fields = (MultipleSourcesField, MockRequiredField)
+    sources: MultipleSourcesField
+    required: MockRequiredField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -145,9 +187,7 @@ class MockTestRequest(TestRequest):
             addresses=tuple(addresses),
             coverage_data=MockCoverageData(addresses),
             output_setting=ShowOutput.ALL,
-            result_metadata=None
-            if cls.skipped(addresses)
-            else ProcessResultMetadata(999, "ran_locally", 0),
+            result_metadata=None if cls.skipped(addresses) else make_process_result_metadata("ran"),
         )
 
 
@@ -193,7 +233,7 @@ def rule_runner() -> RuleRunner:
 def make_target(address: Address | None = None, *, skip: bool = False) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({MockSkipTestsField.alias: skip}, address)
+    return MockTarget({MockSkipTestsField.alias: skip, MockRequiredField.alias: "present"}, address)
 
 
 def run_test_rule(
@@ -220,6 +260,7 @@ def run_test_rule(
         output=output,
         extra_env_vars=[],
         shard="",
+        batch_size=1,
     )
     debug_adapter_subsystem = create_subsystem(
         DebugAdapterSubsystem,
@@ -300,8 +341,8 @@ def run_test_rule(
                 ),
                 MockGet(
                     output_type=EnvironmentName,
-                    input_types=(TestRequest.Batch, EnvironmentName),
-                    mock=lambda _b, _e: EnvironmentName(None),
+                    input_types=(SingleEnvironmentNameRequest,),
+                    mock=lambda _a: EnvironmentName(None),
                 ),
                 MockGet(
                     output_type=TestResult,
@@ -412,10 +453,12 @@ def _assert_test_summary(
 
 def test_format_summary_remote(rule_runner: RuleRunner) -> None:
     _assert_test_summary(
-        "✓ //:dummy_address succeeded in 0.05s (ran remotely).",
+        "✓ //:dummy_address succeeded in 0.05s (ran in remote environment `ubuntu`).",
         exit_code=0,
         run_id=0,
-        result_metadata=ProcessResultMetadata(50, "ran_remotely", 0),
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
     )
 
 
@@ -424,7 +467,9 @@ def test_format_summary_local(rule_runner: RuleRunner) -> None:
         "✓ //:dummy_address succeeded in 0.05s.",
         exit_code=0,
         run_id=0,
-        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name=None, total_elapsed_ms=50
+        ),
     )
 
 
@@ -433,7 +478,18 @@ def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
         "✓ //:dummy_address succeeded in 0.05s (memoized).",
         exit_code=0,
         run_id=1234,
-        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+        result_metadata=make_process_result_metadata("ran", total_elapsed_ms=50),
+    )
+
+
+def test_format_summary_memoized_remote(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized for remote environment `ubuntu`).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
     )
 
 
@@ -539,7 +595,7 @@ def assert_streaming_output(
     output_setting: ShowOutput = ShowOutput.ALL,
     expected_level: LogLevel,
     expected_message: str,
-    result_metadata: ProcessResultMetadata = ProcessResultMetadata(999, "dummy", 0),
+    result_metadata: ProcessResultMetadata = make_process_result_metadata("dummy"),
 ) -> None:
     result = TestResult(
         exit_code=exit_code,
@@ -555,13 +611,13 @@ def assert_streaming_output(
     assert result.message() == expected_message
 
 
-def test_streaming_output_skip() -> None:
+def test_streaming_output_no_tests() -> None:
     assert_streaming_output(
         exit_code=None,
         stdout="",
         stderr="",
         expected_level=LogLevel.DEBUG,
-        expected_message="skipped.",
+        expected_message="no tests found.",
     )
 
 

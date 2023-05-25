@@ -32,7 +32,6 @@ class InvalidPythonLockfileReason(Enum):
 
 @dataclass(frozen=True)
 class PythonLockfileMetadata(LockfileMetadata):
-
     scope = LockfileScope.PYTHON
 
     valid_for_interpreter_constraints: InterpreterConstraints
@@ -44,8 +43,8 @@ class PythonLockfileMetadata(LockfileMetadata):
         requirements: set[PipRequirement],
         manylinux: str | None,
         requirement_constraints: set[PipRequirement],
-        only_binary: set[PipRequirement],
-        no_binary: set[PipRequirement],
+        only_binary: set[str],
+        no_binary: set[str],
     ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -76,15 +75,14 @@ class PythonLockfileMetadata(LockfileMetadata):
     def is_valid_for(
         self,
         *,
-        is_tool: bool,
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
         manylinux: str | None,
         requirement_constraints: Iterable[PipRequirement],
-        only_binary: Iterable[PipRequirement],
-        no_binary: Iterable[PipRequirement],
+        only_binary: Iterable[str],
+        no_binary: Iterable[str],
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `PythonLockfileMetadata` can be used in the current execution
         context."""
@@ -95,7 +93,6 @@ class PythonLockfileMetadata(LockfileMetadata):
 @_python_lockfile_metadata(1)
 @dataclass(frozen=True)
 class PythonLockfileMetadataV1(PythonLockfileMetadata):
-
     requirements_invalidation_digest: str
 
     @classmethod
@@ -122,7 +119,6 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
     def is_valid_for(
         self,
         *,
-        is_tool: bool,
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
@@ -130,8 +126,8 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         user_requirements: Iterable[PipRequirement],
         manylinux: str | None,
         requirement_constraints: Iterable[PipRequirement],
-        only_binary: Iterable[PipRequirement],
-        no_binary: Iterable[PipRequirement],
+        only_binary: Iterable[str],
+        no_binary: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidPythonLockfileReason] = set()
 
@@ -192,7 +188,6 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
     def is_valid_for(
         self,
         *,
-        is_tool: bool,
         expected_invalidation_digest: str | None,  # Not used by V2.
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
@@ -200,17 +195,11 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         # Everything below is not used by V2.
         manylinux: str | None,
         requirement_constraints: Iterable[PipRequirement],
-        only_binary: Iterable[PipRequirement],
-        no_binary: Iterable[PipRequirement],
+        only_binary: Iterable[str],
+        no_binary: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons = set()
-
-        invalid_reqs = (
-            self.requirements != set(user_requirements)
-            if is_tool
-            else not set(user_requirements).issubset(self.requirements)
-        )
-        if invalid_reqs:
+        if not set(user_requirements).issubset(self.requirements):
             failure_reasons.add(InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH)
 
         if not self.valid_for_interpreter_constraints.contains(
@@ -228,8 +217,8 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
 
     manylinux: str | None
     requirement_constraints: set[PipRequirement]
-    only_binary: set[PipRequirement]
-    no_binary: set[PipRequirement]
+    only_binary: set[str]
+    no_binary: set[str]
 
     @classmethod
     def _from_json_dict(
@@ -248,20 +237,8 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
                 PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
             },
         )
-        only_binary = metadata(
-            "only_binary",
-            Set[PipRequirement],
-            lambda l: {
-                PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
-            },
-        )
-        no_binary = metadata(
-            "no_binary",
-            Set[PipRequirement],
-            lambda l: {
-                PipRequirement.parse(i, description_of_origin=lockfile_description) for i in l
-            },
-        )
+        only_binary = metadata("only_binary", Set[str], lambda l: set(l))
+        no_binary = metadata("no_binary", Set[str], lambda l: set(l))
 
         return PythonLockfileMetadataV3(
             valid_for_interpreter_constraints=v2_metadata.valid_for_interpreter_constraints,
@@ -278,27 +255,25 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         return {
             "manylinux": instance.manylinux,
             "requirement_constraints": sorted(str(i) for i in instance.requirement_constraints),
-            "only_binary": sorted(str(i) for i in instance.only_binary),
-            "no_binary": sorted(str(i) for i in instance.no_binary),
+            "only_binary": sorted(instance.only_binary),
+            "no_binary": sorted(instance.no_binary),
         }
 
     def is_valid_for(
         self,
         *,
-        is_tool: bool,
         expected_invalidation_digest: str | None,  # Validation digests are not used by V2.
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
         user_requirements: Iterable[PipRequirement],
         manylinux: str | None,
         requirement_constraints: Iterable[PipRequirement],
-        only_binary: Iterable[PipRequirement],
-        no_binary: Iterable[PipRequirement],
+        only_binary: Iterable[str],
+        no_binary: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
             .is_valid_for(
-                is_tool=is_tool,
                 expected_invalidation_digest=expected_invalidation_digest,
                 user_interpreter_constraints=user_interpreter_constraints,
                 interpreter_universe=interpreter_universe,

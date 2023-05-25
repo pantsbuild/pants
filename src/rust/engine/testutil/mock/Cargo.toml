@@ -18,5 +18,5 @@ prost = "0.9"
 prost-types = "0.9"
 protos = { path = "../../protos" }
 testutil = { path = ".." }
-tokio = { version = "1.21", features = ["time"] }
+tokio = { version = "1.28", features = ["time"] }
 tonic = { version = "0.6" }

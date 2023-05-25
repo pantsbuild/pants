@@ -21,10 +21,10 @@ pub fn status_is_retryable(status: &Status) -> bool {
 
 /// Retry a gRPC client operation using exponential back-off to delay between attempts.
 #[inline]
-pub async fn retry_call<T, E, C, F, G, Fut>(client: C, f: F, is_retryable: G) -> Result<T, E>
+pub async fn retry_call<T, E, C, F, G, Fut>(client: C, mut f: F, is_retryable: G) -> Result<T, E>
 where
   C: Clone,
-  F: Fn(C) -> Fut,
+  F: FnMut(C) -> Fut,
   G: Fn(&E) -> bool,
   Fut: Future<Output = Result<T, E>>,
 {
@@ -100,8 +100,8 @@ mod tests {
     let client = MockClient::new(vec![
       Err(MockError(true, "first")),
       Err(MockError(true, "second")),
-      Ok(3isize),
-      Ok(4isize),
+      Ok(3_isize),
+      Ok(4_isize),
     ]);
     let result = retry_call(
       client.clone(),
@@ -109,14 +109,14 @@ mod tests {
       |err| err.0,
     )
     .await;
-    assert_eq!(result, Ok(3isize));
+    assert_eq!(result, Ok(3_isize));
     assert_eq!(client.values.lock().len(), 1);
 
     let client = MockClient::new(vec![
       Err(MockError(true, "first")),
       Err(MockError(false, "second")),
-      Ok(3isize),
-      Ok(4isize),
+      Ok(3_isize),
+      Ok(4_isize),
     ]);
     let result = retry_call(
       client.clone(),
@@ -131,7 +131,7 @@ mod tests {
       Err(MockError(true, "first")),
       Err(MockError(true, "second")),
       Err(MockError(true, "third")),
-      Ok(1isize),
+      Ok(1_isize),
     ]);
     let result = retry_call(
       client.clone(),

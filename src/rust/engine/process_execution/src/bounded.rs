@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::borrow::Cow;
 use std::cmp::{max, min, Ordering, Reverse};
 use std::collections::VecDeque;
@@ -202,7 +204,7 @@ impl AsyncSemaphore {
     // Spawn a task which will periodically balance Tasks.
     let _balancer_task = {
       let state = Arc::downgrade(&state);
-      executor.spawn(async move {
+      executor.native_spawn(async move {
         loop {
           sleep(preemptible_duration / 4).await;
           if let Some(state) = state.upgrade() {

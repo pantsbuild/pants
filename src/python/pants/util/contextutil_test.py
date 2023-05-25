@@ -74,6 +74,9 @@ class TestContextutilTest:
         with self.ensure_user_defined_in_environment():
             with hermetic_environment_as():
                 assert "USER" not in os.environ
+        with self.ensure_user_defined_in_environment():
+            with hermetic_environment_as("USER"):
+                assert "USER" in os.environ
 
     def test_hermetic_environment_subprocesses(self) -> None:
         with self.ensure_user_defined_in_environment():

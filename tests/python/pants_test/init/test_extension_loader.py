@@ -110,7 +110,6 @@ class LoaderTest(unittest.TestCase):
         target_types=None,
         module_name="register",
     ):
-
         package_name = f"__test_package_{uuid.uuid4().hex}"
         self.assertFalse(package_name in sys.modules)
 

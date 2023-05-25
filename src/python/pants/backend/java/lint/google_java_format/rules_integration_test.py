@@ -17,8 +17,6 @@ from pants.build_graph.address import Address
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath, jdk_rules
@@ -105,17 +103,11 @@ def run_google_java_format(rule_runner: RuleRunner, targets: list[Target]) -> Fm
     return fmt_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"Foo.java": GOOD_FILE, "BUILD": "java_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.java"))
     fmt_result = run_google_java_format(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"Foo.java": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"Foo.java": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -123,7 +115,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"Bar.java": BAD_FILE, "BUILD": "java_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.java"))
     fmt_result = run_google_java_format(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"Bar.java": FIXED_BAD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"Bar.java": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -136,7 +128,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.java")),
     ]
     fmt_result = run_google_java_format(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"Foo.java": GOOD_FILE, "Bar.java": FIXED_BAD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"Foo.java": GOOD_FILE, "Bar.java": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True

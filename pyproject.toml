@@ -54,6 +54,7 @@ show_traceback = true
 
 [[tool.mypy.overrides]]
 module = [
+    "botocore",
     "bs4",
     "chevron",
     "colors",
@@ -63,9 +64,9 @@ module = [
     "gnupg",
     "hdrh",
     "hdrh.histogram",
-    "ijson",
+    "ijson.*",
+    "nodesemver",
     "pex.*",
     "psutil",
-    "setproctitle",
 ]
 ignore_missing_imports = true

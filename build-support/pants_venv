@@ -11,14 +11,19 @@ REQUIREMENTS=(
   "${REPO_ROOT}/3rdparty/python/requirements.txt"
 )
 
-# NB: We house these outside the working copy to avoid needing to gitignore them, but also to
-# dodge https://github.com/hashicorp/vagrant/issues/12057.
-platform=$(uname -mps | sed 's/ /./g')
-venv_dir_prefix="${HOME}/.cache/pants/pants_dev_deps/${platform}"
+platform=$(uname -mps)
 
 function venv_dir() {
-  py_venv_version=$(${PY} -c 'import sys; print("".join(map(str, sys.version_info[0:2])))')
-  echo "${venv_dir_prefix}.py${py_venv_version}.venv"
+  # Include the entire version string in order to differentiate e.g. PyPy from CPython.
+  # Fingerprinting uname and python output avoids shebang length limits and any odd chars.
+  venv_fingerprint=$( (
+    echo "${platform}"
+    ${PY} --version
+  ) | fingerprint_data)
+
+  # NB: We house these outside the working copy to avoid needing to gitignore them, but also to
+  # dodge https://github.com/hashicorp/vagrant/issues/12057.
+  echo "${HOME}/.cache/pants/pants_dev_deps/${venv_fingerprint}.venv"
 }
 
 function activate_venv() {

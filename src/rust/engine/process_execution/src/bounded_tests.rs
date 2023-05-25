@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -312,7 +314,6 @@ async fn dropped_future_is_removed_from_queue() {
         tx_thread2.send(()).unwrap();
         rx_thread2.await.unwrap();
         drop(waiter_future);
-        ()
       }
       future::Either::Right(_) => {
         panic!("The sleep result should always be ready first!");

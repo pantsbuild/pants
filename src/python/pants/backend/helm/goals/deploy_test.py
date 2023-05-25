@@ -18,6 +18,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.testutil import HELM_CHART_FILE
 from pants.backend.helm.util_rules.tool import HelmBinary
+from pants.core.goals import package
 from pants.core.goals.deploy import DeployProcess
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
@@ -32,6 +33,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *helm_deploy_rules(),
             *source_files.rules(),
+            *package.rules(),
             QueryRule(HelmBinary, ()),
             QueryRule(DeployProcess, (DeployHelmDeploymentFieldSet,)),
         ],

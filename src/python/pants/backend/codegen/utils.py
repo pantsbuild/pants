@@ -32,11 +32,11 @@ def find_python_runtime_library_or_raise_error(
     disable_inference_option: str,
 ) -> Address:
     addresses = [
-        module_provider.addr
-        for module_provider in module_mapping.providers_for_module(
+        possible_module_provider.provider.addr
+        for possible_module_provider in module_mapping.providers_for_module(
             runtime_library_module, resolve=resolve
         )
-        if module_provider.typ == ModuleProviderType.IMPL
+        if possible_module_provider.provider.typ == ModuleProviderType.IMPL
     ]
     if len(addresses) == 1:
         return addresses[0]

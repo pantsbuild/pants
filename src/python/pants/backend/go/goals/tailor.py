@@ -24,12 +24,12 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
-    group_by_dir,
 )
 from pants.engine.fs import DigestContents, PathGlobs, Paths
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
 from pants.engine.unions import UnionRule
+from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 
@@ -50,7 +50,6 @@ def has_go_mod_ancestor(dirname: str, all_go_mod_dirs: frozenset[str]) -> bool:
     return any(dirname.startswith(go_mod_dir) for go_mod_dir in all_go_mod_dirs)
 
 
-@rule_helper
 async def _find_go_mod_targets(
     all_go_mod_files: set[str], all_owned_sources: AllOwnedSources
 ) -> list[PutativeTarget]:
@@ -66,7 +65,6 @@ async def _find_go_mod_targets(
     ]
 
 
-@rule_helper
 async def _find_cgo_sources(
     path: str, all_owned_sources: AllOwnedSources
 ) -> tuple[list[str], list[str]]:
@@ -142,7 +140,6 @@ async def find_putative_go_package_target(
     )
 
 
-@rule_helper
 async def _find_go_package_targets(
     request: PutativeGoTargetsRequest,
     all_go_mod_dirs: frozenset[str],
@@ -168,7 +165,6 @@ async def _find_go_package_targets(
     ]
 
 
-@rule_helper
 async def _find_go_binary_targets(
     request: PutativeGoTargetsRequest, all_go_mod_dirs: frozenset[str]
 ) -> list[PutativeTarget]:

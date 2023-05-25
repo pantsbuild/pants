@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from pants.option.option_types import BoolOption, DictOption, IntOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class JvmSubsystem(Subsystem):
     options_scope = "jvm"
-    help = softwrap(
+    help = help_text(
         """
         Options for general JVM functionality.
 

@@ -26,20 +26,16 @@
 #![allow(clippy::mutex_atomic)]
 
 ///
-/// Macro to allow debug logging to a file which bypasses the standard logging systems.
-/// This is useful for one-off debugging, and is code that several developers have found they're
-/// writing a lot as one-offs when working in the rust code (particularly when working on logging),
-/// so this is a useful macro to exist for one-off use.
-///
-/// This should not be used for actual production logging; use the log crate's macros
-/// (info!, debug!, trace!) for that.
+/// Macro to allow fatal logging to a file which bypasses the standard logging systems.
+/// This is useful for code paths which must not interact with stdio or the logging system, and
+/// can also be useful for one-off debugging of stdio, logging, or pantsd issues.
 ///
 #[macro_export]
-macro_rules! debug_log {
-    ($path:expr, $($arg:tt)+) => {
+macro_rules! fatal_log {
+    ($($arg:tt)+) => {
       {
         use ::std::io::Write;
-        let mut f = ::std::fs::OpenOptions::new().create(true).append(true).open($path).unwrap();
+        let mut f = ::std::fs::OpenOptions::new().create(true).append(true).open("fatal.log").unwrap();
         writeln!(f, $($arg)+).unwrap()
       }
     };

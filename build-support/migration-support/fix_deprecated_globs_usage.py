@@ -230,7 +230,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
             ]
             for bundle_func in bundle_funcs:
                 # Every `bundle` is guaranteed to have a `fileset` defined.
-                fileset_arg: [ast.keyword] = next(  # type: ignore[misc]
+                fileset_arg: ast.keyword = next(
                     kwarg for kwarg in bundle_func.keywords if kwarg.arg == "fileset"
                 )
                 if not isinstance(fileset_arg.value, ast.Call):

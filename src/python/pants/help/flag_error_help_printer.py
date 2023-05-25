@@ -3,6 +3,7 @@
 
 import difflib
 
+from pants.engine.internals.parser import BuildFileSymbolsInfo
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter
@@ -25,6 +26,7 @@ class FlagErrorHelpPrinter(MaybeColor):
             UnionMembership({}),
             lambda x: tuple(),
             RegisteredTargetTypes({}),
+            BuildFileSymbolsInfo.from_info(),
         )
 
     def handle_unknown_flags(self, err: UnknownFlagsError):

@@ -69,59 +69,38 @@ class PexData:
 
 
 def get_all_data(rule_runner: RuleRunner, pex: Pex | VenvPex) -> PexData:
+    # We fish PEX-INFO out of the pex manually rather than running PEX_TOOLS, as
+    # we don't know if the pex can run on the current system.
     if isinstance(pex, VenvPex):
         digest = pex.digest
         sandbox_path = pex.pex_filename
-        process = rule_runner.request(
-            Process,
-            [
-                VenvPexProcess(
-                    pex,
-                    argv=["info"],
-                    extra_env=dict(PEX_TOOLS="1"),
-                    description="Extract PEX-INFO.",
-                ),
-            ],
-        )
     else:
         digest = pex.digest
         sandbox_path = pex.name
-        pex_pex = rule_runner.request(PexPEX, [])
-        process = rule_runner.request(
-            Process,
-            [
-                PexProcess(
-                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
-                    argv=["-m", "pex.tools", pex.name, "info"],
-                    input_digest=pex.digest,
-                    extra_env=dict(PEX_INTERPRETER="1"),
-                    description="Extract PEX-INFO.",
-                )
-            ],
-        )
 
     rule_runner.scheduler.write_digest(digest)
-    local_path = PurePath(rule_runner.build_root) / "test.pex"
-    result = rule_runner.request(ProcessResult, [process])
-    pex_info_content = result.stdout.decode()
+    local_path = PurePath(rule_runner.build_root) / sandbox_path
 
     is_zipapp = zipfile.is_zipfile(local_path)
     if is_zipapp:
         with zipfile.ZipFile(local_path, "r") as zipfp:
             files = tuple(zipfp.namelist())
+            pex_info_content = zipfp.read("PEX-INFO")
     else:
         files = tuple(
             os.path.normpath(os.path.relpath(os.path.join(root, path), local_path))
             for root, dirs, files in os.walk(local_path)
             for path in dirs + files
         )
+        with open(os.path.join(local_path, "PEX-INFO"), "rb") as fp:
+            pex_info_content = fp.read()
 
     return PexData(
         pex=pex,
         is_zipapp=is_zipapp,
         sandbox_path=PurePath(sandbox_path),
         local_path=local_path,
-        info=json.loads(pex_info_content),
+        info=json.loads(pex_info_content.decode()),
         files=files,
     )
 

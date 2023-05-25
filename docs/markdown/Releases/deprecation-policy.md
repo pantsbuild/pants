@@ -4,7 +4,6 @@ slug: "deprecation-policy"
 excerpt: "How we try to provide you a stable experience."
 hidden: false
 createdAt: "2020-05-16T22:36:48.260Z"
-updatedAt: "2022-02-08T21:05:17.456Z"
 ---
 Deprecations must live at least one minor release, meaning that if something is deprecated in 2.1.x, for example, it cannot be removed until 2.2.x.
 

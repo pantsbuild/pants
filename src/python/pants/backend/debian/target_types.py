@@ -14,12 +14,12 @@ from pants.engine.target import (
     Target,
 )
 from pants.util.docutil import bin_name, doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class DebianSources(MultipleSourcesField):
     required = True
-    help = softwrap(
+    help = help_text(
         """
         Paths that will be included in the package to be produced such as Debian metadata files.
         You must include a DEBIAN/control file.
@@ -70,7 +70,7 @@ class DebianSources(MultipleSourcesField):
 
 class DebianSymlinks(DictStringToStringField):
     alias = "symlinks"
-    help = softwrap(
+    help = help_text(
         """
         Symlinks to create for each target being packaged.
 
@@ -88,7 +88,7 @@ class DebianInstallPrefix(StringField):
 class DebianPackageDependencies(SpecialCasedDependencies):
     alias = "packages"
     required = True
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to any targets that can be built with `{bin_name()} package`, e.g.
         `["project:app"]`.
@@ -113,7 +113,7 @@ class DebianPackage(Target):
         DebianInstallPrefix,
         DebianPackageDependencies,
     )
-    help = softwrap(
+    help = help_text(
         f""""
         A Debian package containing an artifact.
 

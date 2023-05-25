@@ -27,7 +27,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -46,7 +46,7 @@ use tempfile::TempDir;
 use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
 fn executor() -> Executor {
-  Executor::global(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
+  Executor::new_owned(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
 }
 
 pub fn criterion_benchmark_materialize(c: &mut Criterion) {
@@ -62,6 +62,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
       let (store, _tempdir, digest) = snapshot(&executor, count, size);
       let parent_dest = TempDir::new().unwrap();
       let parent_dest_path = parent_dest.path();
+
       cgroup
         .sample_size(10)
         .measurement_time(Duration::from_secs(30))
@@ -74,7 +75,13 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
               let dest = new_temp.path().to_path_buf();
               std::mem::forget(new_temp);
               let _ = executor
-                .block_on(store.materialize_directory(dest, digest.clone(), perms))
+                .block_on(store.materialize_directory(
+                  dest,
+                  digest.clone(),
+                  false,
+                  &BTreeSet::new(),
+                  perms,
+                ))
                 .unwrap();
             })
           },
@@ -314,7 +321,7 @@ fn tempdir_containing(max_files: usize, file_target_size: usize) -> (TempDir, Ve
     // We use the (repeated) path as the content as well.
     let abs_path = tempdir.path().join(path.path());
     if let Some(parent) = abs_path.parent() {
-      fs::safe_create_dir_all(parent).unwrap();
+      std::fs::create_dir_all(parent).unwrap();
     }
     let mut f = BufWriter::new(std::fs::File::create(abs_path).unwrap());
     let bytes = path.path().as_os_str().as_bytes();

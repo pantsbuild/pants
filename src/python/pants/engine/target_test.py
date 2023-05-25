@@ -3,18 +3,20 @@
 
 import string
 from collections import namedtuple
-from dataclasses import dataclass
+from dataclasses import FrozenInstanceError, dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
 import pytest
 
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.target import (
+    NO_VALUE,
     AsyncFieldMixin,
     BoolField,
     CoarsenedTarget,
+    CoarsenedTargets,
     DictStringToStringField,
     DictStringToStringSequenceField,
     ExplicitlyProvidedDependencies,
@@ -33,7 +35,6 @@ from pants.engine.target import (
     NestedDictStringToStringField,
     OptionalSingleSourceField,
     OverridesField,
-    RequiredFieldMissingException,
     ScalarField,
     SequenceField,
     SingleSourceField,
@@ -50,7 +51,6 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import FrozenInstanceError
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -116,7 +116,7 @@ def test_field_and_target_eq() -> None:
 
     # Ensure the field is frozen.
     with pytest.raises(FrozenInstanceError):
-        field.y = "foo"  # type: ignore[attr-defined]
+        field.value = "foo"
 
     tgt = FortranTarget({"version": "dev0"}, addr)
     assert tgt.address == addr
@@ -135,7 +135,7 @@ def test_field_and_target_eq() -> None:
 
     # Ensure the target is frozen.
     with pytest.raises(FrozenInstanceError):
-        tgt.y = "foo"  # type: ignore[attr-defined]
+        tgt.address = addr  # type: ignore[misc]
 
     # Ensure that subclasses are not equal.
     class SubclassField(FortranVersion):
@@ -154,7 +154,7 @@ def test_field_and_target_eq() -> None:
 
 
 def test_invalid_fields_rejected() -> None:
-    with pytest.raises(InvalidFieldException) as exc:
+    with pytest.raises(InvalidTargetException) as exc:
         FortranTarget({"invalid_field": True}, Address("", target_name="lib"))
     assert "Unrecognized field `invalid_field=True`" in str(exc)
     assert "//:lib" in str(exc)
@@ -202,7 +202,7 @@ def test_get_field() -> None:
 
 
 def test_field_hydration_is_eager() -> None:
-    with pytest.raises(InvalidFieldException) as exc:
+    with pytest.raises(InvalidTargetException) as exc:
         FortranTarget(
             {FortranExtensions.alias: ["FortranExt1", "DoesNotStartWithFortran"]},
             Address("", target_name="bad_extension"),
@@ -215,11 +215,11 @@ def test_has_fields() -> None:
     empty_union_membership = UnionMembership({})
     tgt = FortranTarget({}, Address("", target_name="lib"))
 
-    assert tgt.field_types == (FortranExtensions, FortranVersion)
-    assert FortranTarget.class_field_types(union_membership=empty_union_membership) == (
+    assert tgt.field_types == {FortranExtensions, FortranVersion}
+    assert set(FortranTarget.class_field_types(union_membership=empty_union_membership)) == {
         FortranExtensions,
         FortranVersion,
-    )
+    }
 
     assert tgt.has_fields([]) is True
     assert FortranTarget.class_has_fields([], union_membership=empty_union_membership) is True
@@ -268,16 +268,15 @@ def test_add_custom_fields() -> None:
         tgt_values, Address("", target_name="lib"), union_membership=union_membership
     )
 
-    assert tgt.field_types == (FortranExtensions, FortranVersion, CustomField)
+    assert tgt.field_types == {FortranExtensions, FortranVersion, CustomField}
     assert tgt.core_fields == (FortranExtensions, FortranVersion)
-    assert tgt.plugin_fields == (CustomField,)
     assert tgt.has_field(CustomField) is True
 
-    assert FortranTarget.class_field_types(union_membership=union_membership) == (
+    assert set(FortranTarget.class_field_types(union_membership=union_membership)) == {
         FortranExtensions,
         FortranVersion,
         CustomField,
-    )
+    }
     assert FortranTarget.class_has_field(CustomField, union_membership=union_membership) is True
     assert (
         FortranTarget.class_get_field(CustomField, union_membership=union_membership) is CustomField
@@ -296,7 +295,7 @@ def test_add_custom_fields() -> None:
         core_fields = ()
 
     other_tgt = OtherTarget({}, Address("", target_name="other"))
-    assert other_tgt.plugin_fields == ()
+    assert tuple(other_tgt.field_types) == ()
     assert other_tgt.has_field(CustomField) is False
 
 
@@ -389,7 +388,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     )
 
     # Custom validation
-    with pytest.raises(InvalidFieldException) as exc:
+    with pytest.raises(InvalidTargetException) as exc:
         CustomFortranTarget(
             {FortranExtensions.alias: CustomFortranExtensions.banned_extensions},
             Address("", target_name="invalid"),
@@ -399,7 +398,7 @@ def test_override_preexisting_field_via_new_target() -> None:
 
 
 def test_required_field() -> None:
-    class RequiredField(StringField):
+    class RequiredField(Field):
         alias = "field"
         required = True
 
@@ -408,11 +407,13 @@ def test_required_field() -> None:
         core_fields = (RequiredField,)
 
     address = Address("", target_name="lib")
+    # No errors getting the repr
+    assert repr(RequiredField("present", address))
 
     # No errors when defined
     RequiredTarget({"field": "present"}, address)
 
-    with pytest.raises(RequiredFieldMissingException) as exc:
+    with pytest.raises(InvalidTargetException) as exc:
         RequiredTarget({}, address)
     assert str(address) in str(exc.value)
     assert "field" in str(exc.value)
@@ -445,7 +446,7 @@ def test_async_field_mixin() -> None:
 
     # Ensure it's still frozen.
     with pytest.raises(FrozenInstanceError):
-        field.y = "foo"  # type: ignore[attr-defined]
+        field.value = 11
 
     # Ensure that subclasses are not equal.
     class Subclass(ExampleField):
@@ -496,6 +497,27 @@ def test_coarsened_target_equality() -> None:
 
     assert id(nested()) != id(nested())
     assert nested() == nested()
+
+
+def test_coarsened_target_closure() -> None:
+    all_targets = [FortranTarget({}, Address(name)) for name in string.ascii_lowercase[:5]]
+    a, b, c, d, e = all_targets
+
+    def ct(members: List[Target], dependencies: List[CoarsenedTarget] = []) -> CoarsenedTarget:
+        return CoarsenedTarget(members, dependencies)
+
+    def assert_closure(cts: Sequence[CoarsenedTarget], expected: Sequence[Target]) -> None:
+        assert sorted(t.address for t in CoarsenedTargets(cts).closure()) == sorted(
+            t.address for t in expected
+        )
+
+    ct1 = ct([a], [])
+    ct2 = ct([b, c], [ct1])
+    ct3 = ct([d, e], [ct1, ct2])
+
+    assert_closure([ct1], [a])
+    assert_closure([ct1, ct2], [a, b, c])
+    assert_closure([ct1, ct2, ct3], all_targets)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -713,15 +735,15 @@ def test_string_field_valid_choices() -> None:
 
 @pytest.mark.parametrize("field_cls", [IntField, FloatField])
 def test_int_float_fields_valid_numbers(field_cls: type) -> None:
-    class AllNums(field_cls):  # type: ignore[valid-type,misc]
+    class AllNums(field_cls):
         alias = "all_nums"
         valid_numbers = ValidNumbers.all
 
-    class PositiveAndZero(field_cls):  # type: ignore[valid-type,misc]
+    class PositiveAndZero(field_cls):
         alias = "positive_and_zero"
         valid_numbers = ValidNumbers.positive_and_zero
 
-    class PositiveOnly(field_cls):  # type: ignore[valid-type,misc]
+    class PositiveOnly(field_cls):
         alias = "positive_only"
         valid_numbers = ValidNumbers.positive_only
 
@@ -1025,7 +1047,7 @@ def test_multiple_sources_path_globs(
         default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
     sources = TestMultipleSourcesField(field_value, Address("test"))
-    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn)
+    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn())
     for attr, expect in zip(expected._fields, expected):
         if expect is not SKIP:
             assert getattr(actual, attr) == expect
@@ -1085,7 +1107,7 @@ def test_single_source_path_globs(
 
     sources = TestSingleSourceField(field_value, Address("test"))
 
-    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn)
+    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn())
     for attr, expect in zip(expected._fields, expected):
         if expect is not SKIP:
             assert getattr(actual, attr) == expect
@@ -1096,7 +1118,18 @@ def test_single_source_file_path() -> None:
         pass
 
     assert TestSingleSourceField(None, Address("project")).file_path is None
+    assert TestSingleSourceField(NO_VALUE, Address("project")).file_path is None
     assert TestSingleSourceField("f.ext", Address("project")).file_path == "project/f.ext"
+
+
+def test_optional_source_value() -> None:
+    class TestSingleSourceField(OptionalSingleSourceField):
+        none_is_valid_value: ClassVar[bool] = True
+        default: ClassVar[str] = "default"
+
+    assert TestSingleSourceField(None, Address("project")).value is None
+    assert TestSingleSourceField(NO_VALUE, Address("project")).value == "default"
+    assert TestSingleSourceField("f.ext", Address("project")).value == "f.ext"
 
 
 def test_sources_fields_ban_parent_dir_pattern() -> None:
@@ -1379,15 +1412,16 @@ def test_overrides_field_normalization() -> None:
     addr = Address("", target_name="example")
 
     assert OverridesField(None, addr).value is None
-    assert OverridesField({}, addr).value == {}
+    assert OverridesField({}, addr).value == FrozenDict({})
 
-    # Note that `list_field` is not hashable. We have to override `__hash__` for this to work.
     tgt1_override = {"str_field": "value", "list_field": [0, 1, 3]}
     tgt2_override = {"int_field": 0, "dict_field": {"a": 0}}
 
     # Convert a `str` key to `tuple[str, ...]`.
     field = OverridesField({"tgt1": tgt1_override, ("tgt1", "tgt2"): tgt2_override}, addr)
-    assert field.value == {("tgt1",): tgt1_override, ("tgt1", "tgt2"): tgt2_override}
+    assert field.value == FrozenDict.deep_freeze(
+        {("tgt1",): tgt1_override, ("tgt1", "tgt2"): tgt2_override}
+    )
     with no_exception():
         hash(field)
 
@@ -1395,7 +1429,7 @@ def test_overrides_field_normalization() -> None:
         {"foo.ext": tgt1_override, ("foo.ext", "bar*.ext"): tgt2_override}, Address("dir")
     )
     globs = OverridesField.to_path_globs(
-        Address("dir"), path_field.flatten(), UnmatchedBuildFileGlobs.error
+        Address("dir"), path_field.flatten(), UnmatchedBuildFileGlobs.error()
     )
     assert [path_globs.globs for path_globs in globs] == [
         ("dir/foo.ext",),
@@ -1419,8 +1453,8 @@ def test_overrides_field_normalization() -> None:
         "dir/bar2.ext": tgt2_override,
     }
     assert path_field.flatten() == {
-        "foo.ext": {**tgt2_override, **tgt1_override},
-        "bar*.ext": tgt2_override,
+        "foo.ext": dict(FrozenDict.deep_freeze({**tgt2_override, **tgt1_override})),
+        "bar*.ext": dict(FrozenDict.deep_freeze(tgt2_override)),
     }
     with pytest.raises(InvalidFieldException):
         # Same field is overridden for the same file multiple times, which is an error.

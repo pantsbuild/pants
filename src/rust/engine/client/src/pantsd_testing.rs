@@ -27,13 +27,7 @@ pub(crate) fn launch_pantsd() -> (BuildRoot, TempDir) {
     .stderr(Stdio::inherit());
   let result = cmd
     .output()
-    .map_err(|e| {
-      format!(
-        "Problem running command {command:?}: {err}",
-        command = cmd,
-        err = e
-      )
-    })
+    .map_err(|e| format!("Problem running command {cmd:?}: {e}"))
     .unwrap();
   assert_eq!(Some(0), result.status.code());
   assert_eq!(

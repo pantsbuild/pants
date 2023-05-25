@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 
+from pants.core.util_rules.asdf import AsdfPathString
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -23,13 +24,12 @@ class GolangSubsystem(Subsystem):
     help = "Options for Golang support."
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
-
         env_vars_used_by_options = ("PATH",)
 
         _go_search_paths = StrListOption(
             default=["<PATH>"],
             help=softwrap(
-                """
+                f"""
                 A list of paths to search for Go.
 
                 Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`.
@@ -38,9 +38,8 @@ class GolangSubsystem(Subsystem):
                 The following special strings are supported:
 
                 * `<PATH>`, the contents of the PATH environment variable
-                * `<ASDF>`, all Go versions currently configured by ASDF \
-                    `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
-                * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
+                * `{AsdfPathString.STANDARD}`, {AsdfPathString.STANDARD.description("Go")}
+                * `{AsdfPathString.LOCAL}`, {AsdfPathString.LOCAL.description("binary")}
                 """
             ),
         )
@@ -75,19 +74,49 @@ class GolangSubsystem(Subsystem):
         cgo_gcc_binary_name = StrOption(
             default="gcc",
             advanced=True,
-            help="Name of the tool to use to compile C code included via CGo in a Go package.",
+            help=softwrap(
+                """
+                Name of the tool to use to compile C code included via CGo in a Go package.
+                Pants will search for the tool using the paths specified by the
+                `[golang].cgo_tool_search_paths` option.
+                """
+            ),
         )
 
         cgo_gxx_binary_name = StrOption(
             default="g++",
             advanced=True,
-            help="Name of the tool to use to compile C++ code included via CGo in a Go package.",
+            help=softwrap(
+                """
+                Name of the tool to use to compile C++ code included via CGo in a Go package.
+                Pants will search for the tool using the paths specified by the
+                `[golang].cgo_tool_search_paths` option.
+                """
+            ),
         )
 
         cgo_fortran_binary_name = StrOption(
             default="gfortran",
             advanced=True,
-            help="Name of the tool to use to compile fortran code included via CGo in a Go package.",
+            help=softwrap(
+                """
+                Name of the tool to use to compile fortran code included via CGo in a Go package.
+                Pants will search for the tool using the paths specified by the
+                `[golang].cgo_tool_search_paths` option.
+                """
+            ),
+        )
+
+        external_linker_binary_name = StrOption(
+            default="gcc",
+            advanced=True,
+            help=softwrap(
+                """
+                Name of the tool to use as the "external linker" when invoking `go tool link`.
+                Pants will search for the tool using the paths specified by the
+                `[golang].cgo_tool_search_paths` option.
+                """
+            ),
         )
 
         cgo_c_flags = StrListOption(
@@ -208,9 +237,6 @@ class GolangSubsystem(Subsystem):
             """\
             Enable Cgo support, which allows Go and C code to interact. This option must be enabled for any
             packages making use of Cgo to actually be compiled with Cgo support.
-
-            TODO: Future Pants changes may also require enabling Cgo via fields on relevant Go targets.
-            See https://github.com/pantsbuild/pants/issues/16833.
 
             See https://go.dev/blog/cgo and https://pkg.go.dev/cmd/cgo for additional information about Cgo.
             """

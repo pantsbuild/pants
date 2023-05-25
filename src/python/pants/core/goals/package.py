@@ -30,7 +30,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class BuiltPackage:
 
 class OutputPathField(StringField, AsyncFieldMixin):
     alias = "output_path"
-    help = softwrap(
+    help = help_text(
         f"""
         Where the built asset should be located.
 
@@ -160,7 +160,13 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     )
 
     merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
-    workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
+    all_relpaths = [
+        artifact.relpath for pkg in packages for artifact in pkg.artifacts if artifact.relpath
+    ]
+
+    workspace.write_digest(
+        merged_digest, path_prefix=str(dist_dir.relpath), clear_paths=all_relpaths
+    )
     for pkg in packages:
         for artifact in pkg.artifacts:
             msg = []

@@ -11,6 +11,7 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionTimeoutError
 from pants.init.engine_initializer import GraphScheduler
 from pants.pantsd.service.pants_service import PantsService
+from pants.util.strutil import softwrap
 
 
 class SchedulerService(PantsService):
@@ -126,9 +127,13 @@ class SchedulerService(PantsService):
         if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
             bytes_per_mib = 1_048_576
             raise Exception(
-                f"pantsd process {self._pid} was using {memory_usage_in_bytes / bytes_per_mib:.2f} "
-                f"MiB of memory (above the `--pantsd-max-memory-usage` limit of "
-                f"{self._max_memory_usage_in_bytes / bytes_per_mib:.2f} MiB)."
+                softwrap(
+                    f"""
+                    pantsd process {self._pid} was using {memory_usage_in_bytes / bytes_per_mib:.2f}
+                    MiB of memory (above the `--pantsd-max-memory-usage` limit of
+                    {self._max_memory_usage_in_bytes / bytes_per_mib:.2f} MiB).
+                    """
+                )
             )
 
     def _check_invalidation_watcher_liveness(self):

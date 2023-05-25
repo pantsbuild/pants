@@ -99,12 +99,17 @@ async def generate_python_from_protobuf(
     protoc_gen_mypy_script = "protoc-gen-mypy"
     protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
     mypy_pex = None
+    complete_pex_env = pex_environment.in_sandbox(working_directory=None)
 
     if python_protobuf_subsystem.mypy_plugin:
         mypy_request = python_protobuf_mypy_plugin.to_pex_request()
         mypy_pex = await Get(
             VenvPex,
-            VenvPexRequest(bin_names=[protoc_gen_mypy_script], pex_request=mypy_request),
+            VenvPexRequest(
+                pex_request=mypy_request,
+                complete_pex_env=complete_pex_env,
+                bin_names=[protoc_gen_mypy_script],
+            ),
         )
 
         if request.protocol_target.get(ProtobufGrpcToggleField).value:
@@ -117,8 +122,9 @@ async def generate_python_from_protobuf(
                 mypy_pex = await Get(
                     VenvPex,
                     VenvPexRequest(
-                        bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
                         pex_request=mypy_request,
+                        complete_pex_env=complete_pex_env,
+                        bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
                     ),
                 )
 
@@ -178,9 +184,7 @@ async def generate_python_from_protobuf(
             description=f"Generating Python sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
-            append_only_caches=pex_environment.in_sandbox(
-                working_directory=None
-            ).append_only_caches,
+            append_only_caches=complete_pex_env.append_only_caches,
         ),
     )
 

@@ -14,7 +14,6 @@ from pants.backend.scala.target_types import (
 )
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
-    TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
@@ -65,6 +64,7 @@ class ScalatestTestFieldSet(TestFieldSet):
 class ScalatestTestRequest(TestRequest):
     tool_subsystem = Scalatest
     field_set_type = ScalatestTestFieldSet
+    supports_debug = True
 
 
 class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -91,7 +91,6 @@ async def setup_scalatest_for_target(
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
 ) -> TestSetup:
-
     jdk, transitive_tgts = await MultiGet(
         Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
@@ -205,13 +204,6 @@ async def setup_scalatest_debug_request(
 
 
 @rule
-async def setup_scalatest_debug_adapter_request(
-    _: ScalatestTestRequest.Batch,
-) -> TestDebugAdapterRequest:
-    raise NotImplementedError("Debugging Scala using a debug adapter has not yet been implemented.")
-
-
-@rule
 def generate_scalatest_lockfile_request(
     _: ScalatestToolLockfileSentinel, scalatest: Scalatest
 ) -> GenerateJvmLockfileFromTool:
@@ -222,7 +214,6 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(TestFieldSet, ScalatestTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, ScalatestToolLockfileSentinel),
         *ScalatestTestRequest.rules(),
     ]

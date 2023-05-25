@@ -22,7 +22,7 @@ from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
-from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class SourceRootPatternMatcher:
         for root_pattern in self.root_patterns:
             if ".." in root_pattern.split(os.path.sep):
                 raise InvalidSourceRootPatternError(
-                    f"`..` disallowed in source root pattern: {root_pattern}. "
+                    f"`..` disallowed in source root pattern: {root_pattern}."
                 )
 
     def get_patterns(self) -> tuple[str, ...]:
@@ -108,22 +108,37 @@ class SourceRootConfig(Subsystem):
 
     root_patterns = StrListOption(
         default=DEFAULT_ROOT_PATTERNS,
-        help="A list of source root suffixes. A directory with this suffix will be considered "
-        "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
-        "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
-        "buildroot. E.g., `/src/python` will match `<buildroot>/src/python` but not "
-        "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
-        "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
-        "Use `/` to signify that the buildroot itself is a source root. "
-        f"See {doc_url('source-roots')}.",
+        help=softwrap(
+            f"""
+            A list of source root suffixes.
+
+            A directory with this suffix will be considered a potential source root.
+            E.g., `src/python` will match `<buildroot>/src/python`, `<buildroot>/project1/src/python`
+            etc.
+
+            Prepend a `/` to anchor the match at the buildroot.
+            E.g., `/src/python` will match `<buildroot>/src/python` but not `<buildroot>/project1/src/python`.
+
+            A `*` wildcard will match a single path segment,
+            E.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`.
+
+            Use `/` to signify that the buildroot itself is a source root.
+
+            See {doc_url('source-roots')}.
+            """
+        ),
         advanced=True,
         metavar='["pattern1", "pattern2", ...]',
     )
     marker_filenames = StrListOption(
-        help="The presence of a file of this name in a directory indicates that the directory "
-        "is a source root. The content of the file doesn't matter, and may be empty. "
-        "Useful when you can't or don't wish to centrally enumerate source roots via "
-        "`root_patterns`.",
+        help=softwrap(
+            """
+            The presence of a file of this name in a directory indicates that the directory
+            is a source root. The content of the file doesn't matter, and may be empty.
+            Useful when you can't or don't wish to centrally enumerate source roots via
+            `root_patterns`.
+            """
+        ),
         advanced=True,
         metavar="filename",
     )
@@ -133,8 +148,7 @@ class SourceRootConfig(Subsystem):
         return SourceRootPatternMatcher(self.root_patterns)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class SourceRootsRequest:
     """Find the source roots for the given files and/or dirs."""
 
@@ -142,8 +156,9 @@ class SourceRootsRequest:
     dirs: tuple[PurePath, ...]
 
     def __init__(self, files: Iterable[PurePath], dirs: Iterable[PurePath]) -> None:
-        self.files = tuple(sorted(files))
-        self.dirs = tuple(sorted(dirs))
+        object.__setattr__(self, "files", tuple(sorted(files)))
+        object.__setattr__(self, "dirs", tuple(sorted(dirs)))
+
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -219,10 +234,8 @@ async def get_optional_source_roots(
     }
     dirs.update(file_to_dir.values())
 
-    dir_to_root: dict[PurePath, OptionalSourceRoot] = {}
-    for d in dirs:
-        root = await Get(OptionalSourceRoot, SourceRootRequest(d))
-        dir_to_root[d] = root
+    roots = await MultiGet(Get(OptionalSourceRoot, SourceRootRequest(d)) for d in dirs)
+    dir_to_root = dict(zip(dirs, roots))
 
     path_to_optional_root: dict[PurePath, OptionalSourceRoot] = {}
     for d in source_roots_request.dirs:

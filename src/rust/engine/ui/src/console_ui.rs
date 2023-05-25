@@ -42,6 +42,8 @@ use terminal_size::terminal_size_using_fd;
 use prodash::progress::Step;
 use prodash::render::line;
 use prodash::{Root, TreeOptions};
+
+use logging::fatal_log;
 use task_executor::Executor;
 use workunit_store::{format_workunit_duration_ms, SpanId, WorkunitStore};
 
@@ -226,7 +228,7 @@ impl Instance {
       // TODO: There is a shutdown race here, where if the UI is torn down before exclusive access is
       // dropped, we might drop stderr on the floor. That likely causes:
       //   https://github.com/pantsbuild/pants/issues/13276
-      let _stderr_task = executor.spawn_blocking({
+      let _stderr_task = executor.native_spawn_blocking({
         let mut tree = tree.clone();
         move || {
           while let Ok(stderr) = stderr_receiver.recv() {
@@ -340,7 +342,7 @@ impl Instance {
               None => "(Waiting)".to_string(),
               Some(duration) => format_workunit_duration_ms!((duration).as_millis()).to_string(),
             };
-            format!("{} {}", duration_label, label)
+            format!("{duration_label} {label}")
           });
 
           match maybe_label {
@@ -406,7 +408,10 @@ impl Instance {
         prodash
           .executor
           .clone()
-          .spawn_blocking(move || prodash.handle.shutdown_and_wait())
+          .spawn_blocking(
+            move || prodash.handle.shutdown_and_wait(),
+            |e| fatal_log!("Failed to teardown UI: {e}"),
+          )
           .boxed()
       }
     }

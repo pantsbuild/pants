@@ -13,14 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class PipRequirement:
-    """A Pip-style requirement.
-
-    Currently just a drop-in replacement for pkg_resources.Requirement.
-
-    TODO:  Once this class has fully replaced relevant uses of pkg_resources.Requirement,
-      we will enhance this class to support Pip requirements that are not parseable by
-      pkg_resources.Requirement, such as old-style VCS requirements, --hash option suffixes etc.
-    """
+    """A Pip-style requirement."""
 
     @classmethod
     def parse(cls, line: str, description_of_origin: str = "") -> PipRequirement:

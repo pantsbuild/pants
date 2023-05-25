@@ -10,7 +10,7 @@ python_tests(
     sources=["*_test.py", "!scheduler_integration_test.py"],
     timeout=90,
     overrides={
-        "platform_rules_test.py": {"tags": ["platform_specific_behavior"]},
+        "platform_rules_test.py": {"tags": ["platform_specific_behavior"], "timeout": 120},
     },
 )
 

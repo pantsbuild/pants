@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.cc.dependency_inference.rules import rules as dep_inf_rules
 from pants.backend.cc.goals import tailor
+from pants.backend.cc.subsystems import compiler
 from pants.backend.cc.target_types import CCSourcesGeneratorTarget, CCSourceTarget
 from pants.backend.cc.target_types import rules as target_type_rules
 
@@ -13,6 +14,7 @@ def target_types():
 def rules():
     return [
         *dep_inf_rules(),
+        *compiler.rules(),
         *tailor.rules(),
         *target_type_rules(),
     ]

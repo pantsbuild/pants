@@ -23,14 +23,14 @@ from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, StringSequenceField
 from pants.option.global_options import GlobalOptions
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
 
 class PythonRepositoriesField(StringSequenceField):
     alias = "repositories"
-    help = softwrap(
+    help = help_text(
         """
         List of URL addresses or Twine repository aliases where to publish the Python package.
 
@@ -114,25 +114,20 @@ def twine_env_suffix(repo: str) -> str:
 
 def twine_env_request(repo: str) -> EnvironmentVarsRequest:
     suffix = twine_env_suffix(repo)
-    req = EnvironmentVarsRequest(
-        [
-            f"{var}{suffix}"
-            for var in [
-                "TWINE_USERNAME",
-                "TWINE_PASSWORD",
-                "TWINE_REPOSITORY_URL",
-            ]
-        ]
-    )
+    env_vars = [
+        "TWINE_USERNAME",
+        "TWINE_PASSWORD",
+        "TWINE_REPOSITORY_URL",
+    ]
+    req = EnvironmentVarsRequest(env_vars + [f"{var}{suffix}" for var in env_vars])
     return req
 
 
 def twine_env(env: EnvironmentVars, repo: str) -> EnvironmentVars:
     suffix = twine_env_suffix(repo)
-    if not suffix:
-        return env
-
-    return EnvironmentVars({key.rsplit(suffix, maxsplit=1)[0]: value for key, value in env.items()})
+    return EnvironmentVars(
+        {key.rsplit(suffix, maxsplit=1)[0] if suffix else key: value for key, value in env.items()}
+    )
 
 
 @rule

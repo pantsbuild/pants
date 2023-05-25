@@ -182,7 +182,10 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
                         "pants.backend.python",
                         "pants.backend.python.lint.flake8",
                     ],
-                }
+                },
+                "python": {
+                    "interpreter_constraints": "['>=3.7,<3.10']",
+                },
             }
 
             if extra_config:

@@ -4,7 +4,6 @@ slug: "protobuf-go"
 excerpt: "How to generate Go from Protocol Buffers."
 hidden: false
 createdAt: "2022-04-20T22:34:22.819Z"
-updatedAt: "2022-04-25T23:26:26.127Z"
 ---
 When your Go code imports Protobuf generated files, Pants will detect the imports and run the Protoc compiler to generate then compile those files.
 
@@ -22,7 +21,7 @@ When your Go code imports Protobuf generated files, Pants will detect the import
 > 
 > Because Pants does not save generated code to disk, `go mod tidy` will error that it cannot find the generated packages.
 > 
-> One workaround is to run `./pants export-codegen ::` to save the generated files.
+> One workaround is to run `pants export-codegen ::` to save the generated files.
 
 Step 1: Activate the Protobuf Go backend
 ----------------------------------------
@@ -37,7 +36,7 @@ backend_packages = [
 ]
 ```
 
-This adds the new [`protobuf_source`](doc:reference-protobuf_source) target, which you can confirm by running `./pants help protobuf_source`. 
+This adds the new [`protobuf_source`](doc:reference-protobuf_source) target, which you can confirm by running `pants help protobuf_source`. 
 
 To reduce boilerplate, you can also use the [`protobuf_sources`](doc:reference-protobuf_sources) target, which generates one `protobuf_source` target per file in the `sources` field.
 
@@ -79,15 +78,15 @@ Multiple Protobuf files can set the same `go_package` if their code should show 
 Step 4: Generate `protobuf_sources` targets
 -------------------------------------------
 
-Run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) for Pants to create a `protobuf_sources` target wherever you have `.proto` files:
+Run [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) for Pants to create a `protobuf_sources` target wherever you have `.proto` files:
 
 ```
-❯ ./pants tailor ::
+❯ pants tailor ::
 Created src/protos/BUILD:
   - Add protobuf_sources target protos
 ```
 
-Pants will use [dependency inference](doc:targets) for any `import` statements in your `.proto` files, which you can confirm by running `./pants dependencies path/to/file.proto`.
+Pants will use [dependency inference](doc:targets) for any `import` statements in your `.proto` files, which you can confirm by running `pants dependencies path/to/file.proto`.
 
 If you want gRPC code generated for all files in the folder, set `grpc=True`.
 
@@ -134,11 +133,11 @@ func TestGenerateUuid(t *testing.T) {
 }
 ```
 
-Pants's dependency inference will detect Go imports of Protobuf packages, which you can confirm by running `./pants dependencies path/to/file.go`. You can also run `./pants check path/to/file.go` to confirm that everything compiles.
+Pants's dependency inference will detect Go imports of Protobuf packages, which you can confirm by running `pants dependencies path/to/file.go`. You can also run `pants check path/to/file.go` to confirm that everything compiles.
 
-> 📘 Run `./pants export-codegen ::` to inspect the files
+> 📘 Run `pants export-codegen ::` to inspect the files
 > 
-> `./pants export-codegen ::` will run all relevant code generators and write the files to `dist/codegen` using the same paths used normally by Pants.
+> `pants export-codegen ::` will run all relevant code generators and write the files to `dist/codegen` using the same paths used normally by Pants.
 > 
 > You do not need to run this goal for codegen to work when using Pants; `export-codegen` is only for external consumption outside of Pants, e.g. to get `go mod tidy` working.
 
@@ -156,22 +155,22 @@ backend_packages = [
 ]
 ```
 
-Now you can run `./pants fmt` and `./pants lint`:
+Now you can run `pants fmt` and `pants lint`:
 
 ```
-❯ ./pants lint src/protos/user.proto
+❯ pants lint src/protos/user.proto
 ```
 
-Use `./pants fmt lint dir:` to run on all files in the directory, and `./pants fmt lint dir::` to run on all files in the directory and subdirectories.
+Use `pants fmt lint dir:` to run on all files in the directory, and `pants fmt lint dir::` to run on all files in the directory and subdirectories.
 
 Temporarily disable Buf with `--buf-fmt-skip` and `--buf-lint-skip`:
 
 ```bash
-❯ ./pants --buf-fmt-skip fmt ::
+❯ pants --buf-fmt-skip fmt ::
 ```
 
 Only run Buf with `--lint-only=buf-fmt` or `--lint-only=buf-lint`, and `--fmt-only=buf-fmt`:
 
 ```bash
-❯ ./pants fmt --only=buf-fmt ::
+❯ pants fmt --only=buf-fmt ::
 ```

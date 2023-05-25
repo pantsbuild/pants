@@ -3,7 +3,6 @@ title: "Anonymous telemetry"
 slug: "anonymous-telemetry"
 hidden: false
 createdAt: "2021-03-14T04:37:07.980Z"
-updatedAt: "2022-02-08T23:53:12.600Z"
 ---
 Pants can optionally send anonymized telemetry to the Pants project. This data helps us develop and improve Pants by detecting bugs, analyzing usage patterns, and so on.
 

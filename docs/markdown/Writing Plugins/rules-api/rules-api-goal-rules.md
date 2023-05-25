@@ -4,11 +4,10 @@ slug: "rules-api-goal-rules"
 excerpt: "How to create new goals."
 hidden: false
 createdAt: "2020-05-07T22:38:43.975Z"
-updatedAt: "2022-07-25T14:45:07.539Z"
 ---
 For many [plugin tasks](doc:common-plugin-tasks), you will be extending existing goals, such as adding a new linter to the `lint` goal. However, you may instead want to create a new goal, such as a `publish` goal. This page explains how to create a new goal.
 
-As explained in [Concepts](doc:rules-api-concepts), `@goal_rule`s are the entry-point into the rule graph. When a user runs `./pants my-goal`, the Pants engine will look for the respective `@goal_rule`. That `@goal_rule` will usually request other types, either as parameters in the `@goal_rule` signature or through `await Get`. But unlike a `@rule`, a `@goal_rule` may also trigger side-effects (such as running interactive processes, writing to the filesystem, etc) via `await Effect`.
+As explained in [Concepts](doc:rules-api-concepts), `@goal_rule`s are the entry-point into the rule graph. When a user runs `pants my-goal`, the Pants engine will look for the respective `@goal_rule`. That `@goal_rule` will usually request other types, either as parameters in the `@goal_rule` signature or through `await Get`. But unlike a `@rule`, a `@goal_rule` may also trigger side effects (such as running interactive processes, writing to the filesystem, etc) via `await Effect`.
 
 Often, you can keep all of your logic inline in the `@goal_rule`. As your `@goal_rule` gets more complex, you may end up factoring out helper `@rule`s, but you do not need to start with writing helper `@rule`s.
 
@@ -19,9 +18,9 @@ There are four steps to creating a new [goal](doc:goals) with Pants:
 
 1. Define a subclass of `GoalSubsystem`. This is the API to your goal.
    1. Set the class property `name` to the name of your goal.
-   2. Set the class property `help`, which is used by `./pants help`.
+   2. Set the class property `help`, which is used by `pants help`.
    3. You may register options through attributes of `pants.option.option_types` types. See [Options and subsystems](doc:subsystems).
-2. Define a subclass of `Goal`. When a user runs `./pants my-goal`, the engine will request your subclass, which is what causes the `@goal_rule` to run.
+2. Define a subclass of `Goal`. When a user runs `pants my-goal`, the engine will request your subclass, which is what causes the `@goal_rule` to run.
    1. Set the class property `subsystem_cls` to the `GoalSubsystem` from the previous step.
    2. A `Goal` takes a single argument in its constructor, `exit_code: int`. Pants will use this to determine what its own exit code should be.
 3. Define an `@goal_rule`, which must return the `Goal` from the previous step and set its `exit_code`.
@@ -57,7 +56,7 @@ def rules():
     return [*hello_world.rules()]
 ```
 
-You may now run `./pants hello-world`, which should cause Pants to return with an error code of 1 (run `echo $?` to verify). Precisely, this causes the engine to request the type `HelloWorld`, which results in running the `@goal_rule` `hello_world`.
+You may now run `pants hello-world`, which should cause Pants to return with an error code of 1 (run `echo $?` to verify). Precisely, this causes the engine to request the type `HelloWorld`, which results in running the `@goal_rule` `hello_world`.
 
 `Console`: output to stdout/stderr
 ----------------------------------
@@ -91,7 +90,7 @@ If your goal's purpose is to emit output, it may be helpful to use the mixin `Ou
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import goal_rule
 
-class HelloWorldSubsystem(Outputting, GoalSubystem):
+class HelloWorldSubsystem(Outputting, GoalSubsystem):
     name = "hello-world"
     help = "An example goal."
 
@@ -108,13 +107,13 @@ async def hello_world(
 
 ### `LineOriented` mixin (optional)
 
-If your goal's purpose is to emit output—and that output is naturally split by new lines—it may be helpful to use the mixin `LineOriented`. This subclasses `Outputting`, so will register both the options `--output-file` and `--sep`, which allows the user to change the separator to not be `\n`.
+If your goal's purpose is to emit output -- and that output is naturally split by new lines -- it may be helpful to use the mixin `LineOriented`. This subclasses `Outputting`, so will register both the options `--output-file` and `--sep`, which allows the user to change the separator to not be `\n`.
 
 ```python
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 
-class HelloWorldSubsystem(LineOriented, GoalSubystem):
+class HelloWorldSubsystem(LineOriented, GoalSubsystem):
     name = "hello-world"
     help = "An example goal."""
 
@@ -149,7 +148,7 @@ async def hello_world(console: Console, targets: Targets) -> HelloWorld:
 This example will print the address of any targets specified by the user, just as the `list` goal behaves.
 
 ```bash
-$ ./pants hello-world helloworld/util::
+$ pants hello-world helloworld/util::
 helloworld/util
 helloworld/util:tests
 ```
@@ -168,9 +167,9 @@ See [Rules and the Target API](doc:rules-api-and-target-api)  for detailed infor
 > 
 > This will not work because the engine has no path in the rule graph to resolve a `PythonDistribution` type given the initial input types to the rule graph (the "roots").
 > 
-> Instead, request `Targets`, which will give you all of the targets that the user specified on the command line. The engine knows how to resolve this type because it can go from `Specs` -> `Addresses` -> `Targets`.
+> Instead, request `Targets`, which will give you all the targets that the user specified on the command line. The engine knows how to resolve this type because it can go from `Specs` -> `Addresses` -> `Targets`.
 > 
-> From here, filter out the relevant targets you want using the Target API (see [Rules and the Target API](doc:rules-api-and-target-api).
+> From here, filter out the relevant targets you want using the Target API (see [Rules and the Target API](doc:rules-api-and-target-api)).
 > 
 > ```python
 > from pants.engine.target import Targets
@@ -201,3 +200,7 @@ async def hello_world(console: Console, specs_paths: SpecsPaths) -> HelloWorld:
 `SpecsPaths.files` will list all files matched by the specs, e.g. `::` will match every file in the project (regardless of if targets own the files).
 
 To convert `SpecsPaths` into a [`Digest`](doc:rules-api-file-system), use `await Get(Digest, PathGlobs(globs=specs_paths.files))`.
+
+> 📘 Name clashing
+>
+> It is very unlikely, but is still possible that adding a custom goal with an unfortunate name may cause issues when certain existing Pants options are passed in the command line. For instance, executing a goal named `local` with a particular option (in this case, the global `local_cache` option), e.g. `pants --no-local-cache local ...` would fail since there's no `--no-cache` flag defined for the `local` goal. 

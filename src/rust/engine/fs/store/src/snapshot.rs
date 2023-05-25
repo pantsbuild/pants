@@ -13,8 +13,8 @@ use futures::future;
 use futures::FutureExt;
 
 use fs::{
-  DigestTrie, Dir, DirectoryDigest, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS,
-  PreparedPathGlobs, SymlinkBehavior, EMPTY_DIGEST_TREE,
+  DigestTrie, Dir, DirectoryDigest, Entry, File, GitignoreStyleExcludes, GlobMatching, PathStat,
+  PosixFS, PreparedPathGlobs, SymlinkBehavior, EMPTY_DIGEST_TREE,
 };
 use hashing::{Digest, EMPTY_DIGEST};
 
@@ -50,6 +50,34 @@ impl Snapshot {
       digest: EMPTY_DIGEST,
       tree: EMPTY_DIGEST_TREE.clone(),
     }
+  }
+
+  pub fn files(&self) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    self
+      .tree
+      .walk(SymlinkBehavior::Oblivious, &mut |path, entry| {
+        if let Entry::File(_) = entry {
+          files.push(path.to_owned())
+        }
+      });
+    files
+  }
+
+  pub fn directories(&self) -> Vec<PathBuf> {
+    let mut directories = Vec::new();
+    self
+      .tree
+      .walk(SymlinkBehavior::Oblivious, &mut |path, entry| {
+        match entry {
+          Entry::Directory(d) if d.name().is_empty() => {
+            // Is the root directory, which is not emitted here.
+          }
+          Entry::Directory(_) => directories.push(path.to_owned()),
+          _ => (),
+        }
+      });
+    directories
   }
 
   pub async fn from_path_stats<
@@ -138,9 +166,9 @@ impl Snapshot {
       )?);
 
       let path_stats = posix_fs
-        .expand_globs(path_globs, None)
+        .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
         .await
-        .map_err(|err| format!("Error expanding globs: {}", err))?;
+        .map_err(|err| format!("Error expanding globs: {err}"))?;
       Snapshot::from_path_stats(
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
@@ -149,14 +177,8 @@ impl Snapshot {
     }
   }
 
-  /// # Safety
-  ///
-  /// This should only be used for testing, as this will always create an invalid Snapshot.
-  pub unsafe fn create_for_testing_ffi(
-    digest: Digest,
-    files: Vec<String>,
-    dirs: Vec<String>,
-  ) -> Result<Self, String> {
+  /// Creates a snapshot containing empty Files for testing purposes.
+  pub fn create_for_testing(files: Vec<String>, dirs: Vec<String>) -> Result<Self, String> {
     // NB: All files receive the EMPTY_DIGEST.
     let file_digests = files
       .iter()
@@ -188,8 +210,7 @@ impl Snapshot {
       &file_digests,
     )?;
     Ok(Self {
-      // NB: The DigestTrie's computed digest is ignored in favor of the given Digest.
-      digest,
+      digest: tree.compute_root_digest(),
       tree,
     })
   }
@@ -248,9 +269,7 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
     let immutable = self.immutable;
     let res = async move {
       let path = posix_fs.file_path(&file);
-      store
-        .store_file(true, immutable, move || std::fs::File::open(&path))
-        .await
+      store.store_file(true, immutable, path).await
     };
     res.boxed()
   }

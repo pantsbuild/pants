@@ -10,6 +10,8 @@ from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
+from pants.engine.internals.parser import BuildFileSymbolsInfo
+from pants.engine.internals.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
@@ -52,14 +54,18 @@ class ExplorerBuiltinGoal(BuiltinGoal):
             )
             return 127
 
+        env_name = determine_bootstrap_environment(graph_session.scheduler_session)
+        build_symbols = graph_session.scheduler_session.product_request(
+            BuildFileSymbolsInfo, [Params(env_name)]
+        )[0]
         all_help_info = HelpInfoExtracter.get_all_help_info(
             options,
             union_membership,
             graph_session.goal_consumed_subsystem_scopes,
             RegisteredTargetTypes.create(build_config.target_types),
+            build_symbols,
             build_config,
         )
-        env_name = determine_bootstrap_environment(graph_session.scheduler_session)
         request_state = RequestState(
             all_help_info=all_help_info,
             build_configuration=build_config,

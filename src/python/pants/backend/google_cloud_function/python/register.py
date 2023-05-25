@@ -3,7 +3,7 @@
 
 """Create Google Cloud Functions from Python code.
 
-FIXME See https://www.pantsbuild.org/docs/awslambda-python.
+See https://www.pantsbuild.org/docs/google-cloud-function-python.
 """
 
 from pants.backend.google_cloud_function.python import rules as python_rules

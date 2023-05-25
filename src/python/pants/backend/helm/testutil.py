@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.helm.util_rules.chart_metadata import DEFAULT_API_VERSION, ChartType
 

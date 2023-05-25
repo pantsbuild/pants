@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.docker.goals.package_image import DockerFieldSet
+from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DeployHelmDeploymentFieldSet(HelmDeploymentFieldSet, DeployFieldSet):
-
     timeout: HelmDeploymentTimeoutField
 
 
@@ -56,7 +55,9 @@ async def run_helm_deploy(
         Get(HelmPostRenderer, HelmDeploymentPostRendererRequest(field_set)),
     )
 
-    publish_targets = [tgt for tgt in target_dependencies if DockerFieldSet.is_applicable(tgt)]
+    publish_targets = [
+        tgt for tgt in target_dependencies if DockerPackageFieldSet.is_applicable(tgt)
+    ]
 
     interactive_process = await Get(
         InteractiveProcess,
@@ -69,7 +70,7 @@ async def run_helm_deploy(
                 *passthrough_args,
             ],
             post_renderer=post_renderer,
-            description=f"Deploying {field_set.address}",
+            description=f"Running Helm deployment: {field_set.address}",
         ),
     )
 

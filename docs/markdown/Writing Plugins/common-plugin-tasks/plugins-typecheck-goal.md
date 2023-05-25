@@ -4,7 +4,6 @@ slug: "plugins-typecheck-goal"
 excerpt: "How to add a new typechecker to the `check` goal."
 hidden: false
 createdAt: "2020-08-19T21:55:10.667Z"
-updatedAt: "2022-02-14T23:39:46.585Z"
 ---
 Adding a typechecker is almost identical to [adding a linter](doc:plugins-lint-goal), except for these differences:
 

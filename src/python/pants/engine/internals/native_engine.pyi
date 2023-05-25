@@ -4,9 +4,20 @@
 from __future__ import annotations
 
 from io import RawIOBase
-from typing import Any, Generic, Iterable, Sequence, TextIO, Tuple, TypeVar, overload
+from typing import (
+    Any,
+    FrozenSet,
+    Generic,
+    Iterable,
+    Mapping,
+    Sequence,
+    TextIO,
+    Tuple,
+    TypeVar,
+    overload,
+)
 
-from typing_extensions import Protocol
+from typing_extensions import Protocol, Self
 
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
@@ -20,18 +31,213 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 # (core)
 # ------------------------------------------------------------------------------
 
-class PyFailure: ...
+class PyFailure:
+    def get_error(self) -> Exception | None: ...
 
 # ------------------------------------------------------------------------------
 # Address (parsing)
 # ------------------------------------------------------------------------------
 
-class AddressParseException(Exception):
-    pass
+BANNED_CHARS_IN_TARGET_NAME: FrozenSet
+BANNED_CHARS_IN_GENERATED_NAME: FrozenSet
+BANNED_CHARS_IN_PARAMETERS: FrozenSet
 
 def address_spec_parse(
     spec: str,
 ) -> tuple[tuple[str, str | None, str | None, tuple[tuple[str, str], ...]], str | None]: ...
+
+class AddressParseException(Exception):
+    pass
+
+class InvalidAddressError(Exception):
+    pass
+
+class InvalidSpecPathError(Exception):
+    pass
+
+class InvalidTargetNameError(Exception):
+    pass
+
+class InvalidParametersError(Exception):
+    pass
+
+class UnsupportedWildcardError(Exception):
+    pass
+
+class AddressInput:
+    """A string that has been parsed and normalized using the Address syntax.
+
+    An AddressInput must be resolved into an Address using the engine (which involves inspecting
+    disk to determine the types of its path component).
+    """
+
+    def __init__(
+        self,
+        original_spec: str,
+        path_component: str,
+        description_of_origin: str,
+        target_component: str | None = None,
+        generated_component: str | None = None,
+        parameters: Mapping[str, str] | None = None,
+    ) -> None: ...
+    @classmethod
+    def parse(
+        cls,
+        spec: str,
+        *,
+        description_of_origin: str,
+        relative_to: str | None = None,
+        subproject_roots: Sequence[str] | None = None,
+    ) -> Self:
+        """Parse a string into an AddressInput.
+
+        :param spec: Target address spec.
+        :param relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
+          interprets the missing spec_path part as `relative_to`.
+        :param subproject_roots: Paths that correspond with embedded build roots under
+          the current build root.
+        :param description_of_origin: where the AddressInput comes from, e.g. "CLI arguments" or
+          "the option `--paths-from`". This is used for better error messages.
+
+        For example:
+
+            some_target(
+                name='mytarget',
+                dependencies=['path/to/buildfile:targetname'],
+            )
+
+        Where `path/to/buildfile:targetname` is the dependent target address spec.
+
+        In there is no target name component, it defaults the default target in the resulting
+        Address's spec_path.
+
+        Optionally, specs can be prefixed with '//' to denote an absolute spec path. This is
+        normally not significant except when a spec referring to a root level target is needed
+        from deeper in the tree. For example, in `path/to/buildfile/BUILD`:
+
+            some_target(
+                name='mytarget',
+                dependencies=[':targetname'],
+            )
+
+        The `targetname` spec refers to a target defined in `path/to/buildfile/BUILD*`. If instead
+        you want to reference `targetname` in a root level BUILD file, use the absolute form.
+        For example:
+
+            some_target(
+                name='mytarget',
+                dependencies=['//:targetname'],
+            )
+
+        The spec may be for a generated target: `dir:generator#generated`.
+
+        The spec may be a file, such as `a/b/c.txt`. It may include a relative address spec at the
+        end, such as `a/b/c.txt:original` or `a/b/c.txt:../original`, to disambiguate which target
+        the file comes from; otherwise, it will be assumed to come from the default target in the
+        directory, i.e. a target which leaves off `name`.
+        """
+        ...
+    @property
+    def spec(self) -> str: ...
+    @property
+    def path_component(self) -> str: ...
+    @property
+    def target_component(self) -> str | None: ...
+    @property
+    def generated_component(self) -> str | None: ...
+    @property
+    def parameters(self) -> dict[str, str]: ...
+    @property
+    def description_of_origin(self) -> str: ...
+    def file_to_address(self) -> Address:
+        """Converts to an Address by assuming that the path_component is a file on disk."""
+        ...
+    def dir_to_address(self) -> Address:
+        """Converts to an Address by assuming that the path_component is a directory on disk."""
+        ...
+
+class Address:
+    """The unique address for a `Target`.
+
+    Targets explicitly declared in BUILD files use the format `path/to:tgt`, whereas targets
+    generated from other targets use the format `path/to:generator#generated`.
+    """
+
+    def __init__(
+        self,
+        spec_path: str,
+        *,
+        target_name: str | None = None,
+        parameters: Mapping[str, str] | None = None,
+        generated_name: str | None = None,
+        relative_file_path: str | None = None,
+    ) -> None:
+        """
+        :param spec_path: The path from the build root to the directory containing the BUILD file
+          for the target. If the target is generated, this is the path to the generator target.
+        :param target_name: The name of the target. For generated targets, this is the name of
+            its target generator. If the `name` is left off (i.e. the default), set to `None`.
+        :param parameters: A series of key-value pairs which are incorporated into the identity of
+            the Address.
+        :param generated_name: The name of what is generated. You can use a file path if the
+            generated target represents an entity from the file system, such as `a/b/c` or
+            `subdir/f.ext`.
+        :param relative_file_path: The relative path from the spec_path to an addressed file,
+          if any. Because files must always be located below targets that apply metadata to
+          them, this will always be relative.
+        """
+        ...
+    @property
+    def spec_path(self) -> str: ...
+    @property
+    def generated_name(self) -> str | None: ...
+    @property
+    def relative_file_path(self) -> str | None: ...
+    @property
+    def parameters(self) -> dict[str, str]: ...
+    @property
+    def is_generated_target(self) -> bool: ...
+    @property
+    def is_file_target(self) -> bool: ...
+    @property
+    def is_parametrized(self) -> bool: ...
+    def is_parametrized_subset_of(self, other: Address) -> bool:
+        """True if this Address is == to the given Address, but with a subset of its parameters."""
+        ...
+    @property
+    def filename(self) -> str: ...
+    @property
+    def target_name(self) -> str: ...
+    @property
+    def parameters_repr(self) -> str: ...
+    @property
+    def spec(self) -> str:
+        """The canonical string representation of the Address.
+
+        Prepends '//' if the target is at the root, to disambiguate build root level targets from
+        "relative" spec notation.
+        """
+        ...
+    @property
+    def path_safe_spec(self) -> str: ...
+    def parametrize(self, parameters: Mapping[str, str]) -> Address:
+        """Creates a new Address with the given `parameters` merged over self.parameters."""
+        ...
+    def maybe_convert_to_target_generator(self) -> Address:
+        """If this address is generated or parametrized, convert it to its generator target.
+
+        Otherwise, return self unmodified.
+        """
+        ...
+    def create_generated(self, generated_name: str) -> Address: ...
+    def create_file(self, relative_file_path: str) -> Address: ...
+    def debug_hint(self) -> str: ...
+    def metadata(self) -> dict[str, Any]: ...
+
+    # NB: These methods are provided by our `__richcmp__` implementation, but must be declared in
+    # the stub in order for mypy to accept them as comparable.
+    def __lt__(self, other: Any) -> bool: ...
+    def __gt__(self, other: Any) -> bool: ...
 
 # ------------------------------------------------------------------------------
 # Scheduler
@@ -39,6 +245,8 @@ def address_spec_parse(
 
 class PyExecutor:
     def __init__(self, core_threads: int, max_threads: int) -> None: ...
+    def to_borrowed(self) -> PyExecutor: ...
+    def shutdown(self, duration_secs: float) -> None: ...
 
 # ------------------------------------------------------------------------------
 # FS
@@ -77,12 +285,14 @@ class Snapshot:
     names/content.
 
     You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
+
+    The `files` and `dirs` properties are symlink oblivious. If you require knowing about symlinks,
+    you can use the `digest` property to request the `DigestEntries`:
+    `await Get(DigestEntries, Digest, snapshot.digest)`.
     """
 
     @classmethod
-    def _unsafe_create(
-        cls, digest: Digest, files: Sequence[str], dirs: Sequence[str]
-    ) -> Snapshot: ...
+    def create_for_testing(cls, files: Sequence[str], dirs: Sequence[str]) -> Snapshot: ...
     @property
     def digest(self) -> Digest: ...
     @property
@@ -165,7 +375,7 @@ def default_cache_path() -> str: ...
 # Process
 # ------------------------------------------------------------------------------
 
-class ProcessConfigFromEnvironment:
+class ProcessExecutionEnvironment:
     """Settings from the current Environment for how a `Process` should be run.
 
     Note that most values from the Environment are instead set via changing the arguments `argv` and
@@ -175,14 +385,19 @@ class ProcessConfigFromEnvironment:
     def __init__(
         self,
         *,
+        environment_name: str | None,
         platform: str,
         docker_image: str | None,
         remote_execution: bool,
         remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
     ) -> None: ...
-    def __eq__(self, other: ProcessConfigFromEnvironment | Any) -> bool: ...
+    def __eq__(self, other: ProcessExecutionEnvironment | Any) -> bool: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
+    @property
+    def name(self) -> str | None: ...
+    @property
+    def environment_type(self) -> str: ...
     @property
     def remote_execution(self) -> bool: ...
     @property
@@ -239,6 +454,7 @@ class RawFdRunner(Protocol):
         command: str,
         args: tuple[str, ...],
         env: dict[str, str],
+        working_dir: str,
         cancellation_latch: PySessionCancellationLatch,
         stdin_fileno: int,
         stdout_fileno: int,
@@ -258,7 +474,11 @@ def single_file_digests_to_bytes(
     scheduler: PyScheduler, digests: list[FileDigest]
 ) -> list[bytes]: ...
 def write_digest(
-    scheduler: PyScheduler, session: PySession, digest: Digest, path_prefix: str
+    scheduler: PyScheduler,
+    session: PySession,
+    digest: Digest,
+    path_prefix: str,
+    clear_paths: Sequence[str],
 ) -> None: ...
 def write_log(msg: str, level: int, target: str) -> None: ...
 def flush_log() -> None: ...
@@ -319,13 +539,13 @@ def scheduler_create(
     build_root: str,
     local_execution_root_dir: str,
     named_caches_dir: str,
-    ca_certs_path: str | None,
     ignore_patterns: Sequence[str],
     use_gitignore: bool,
     watch_filesystem: bool,
     remoting_options: PyRemotingOptions,
     local_store_options: PyLocalStoreOptions,
     exec_strategy_opts: PyExecutionStrategyOptions,
+    ca_certs_path: str | None,
 ) -> PyScheduler: ...
 def scheduler_execute(
     scheduler: PyScheduler, session: PySession, execution_request: PyExecutionRequest
@@ -340,7 +560,7 @@ def session_poll_workunits(
     scheduler: PyScheduler, session: PySession, max_log_verbosity_level: int
 ) -> tuple[tuple[Workunit, ...], tuple[Workunit, ...]]: ...
 def session_run_interactive_process(
-    session: PySession, process: InteractiveProcess, process_config: ProcessConfigFromEnvironment
+    session: PySession, process: InteractiveProcess, process_config: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult: ...
 def session_get_metrics(session: PySession) -> dict[str, int]: ...
 def session_get_observation_histograms(
@@ -389,6 +609,8 @@ class PyGeneratorResponseGet(Generic[_Output]):
     input_types: Sequence[type]
     inputs: Sequence[Any]
 
+    @overload
+    def __init__(self, output_type: type[_Output]) -> None: ...
     @overload
     def __init__(
         self,
@@ -475,3 +697,14 @@ class PyThreadLocals:
 
 class PollTimeout(Exception):
     pass
+
+# Prefer to import these exception types from `pants.base.exceptions`
+
+class EngineError(Exception):
+    """Base exception used for errors originating from the native engine."""
+
+class IntrinsicError(EngineError):
+    """Exceptions raised for failures within intrinsic methods implemented in Rust."""
+
+class IncorrectProductError(EngineError):
+    """Exceptions raised when a rule's return value doesn't match its declared type."""

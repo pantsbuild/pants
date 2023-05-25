@@ -16,9 +16,11 @@ from pants.core.goals.export import (
     ExportRequest,
     ExportResult,
     ExportResults,
+    ExportSubsystem,
     PostProcessingCommand,
     export,
 )
+from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
     EnvironmentField,
@@ -34,7 +36,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.rule_runner import (
     MockEffect,
     MockGet,
@@ -99,6 +101,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                 union_membership,
                 BuildRoot(),
                 DistDir(relpath=Path("dist")),
+                create_subsystem(ExportSubsystem, resolve=[]),
             ],
             mock_gets=[
                 MockGet(
@@ -124,11 +127,12 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                 MockGet(
                     output_type=EnvironmentTarget,
                     input_types=(EnvironmentNameRequest,),
-                    mock=lambda req: EnvironmentTarget(None),
+                    mock=lambda req: EnvironmentTarget(req.raw_value, None),
                 ),
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
+                rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
                 MockEffect(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),
@@ -162,7 +166,8 @@ def test_run_export_rule() -> None:
             assert fp.read() == b"BAR"
 
 
-_e = lambda path, env: make_target(path, path, env)
+def _e(path, env):
+    return make_target(path, path, env)
 
 
 @pytest.mark.parametrize(
@@ -205,7 +210,6 @@ _e = lambda path, env: make_target(path, path, env)
 def test_warnings_for_non_local_target_environments(
     targets: Iterable[Target], err_present: Iterable[str], err_absent: Iterable[str]
 ) -> None:
-
     rule_runner = RuleRunner(
         rules=[
             UnionRule(ExportRequest, MockExportRequest),
@@ -230,6 +234,7 @@ def test_warnings_for_non_local_target_environments(
                 union_membership,
                 BuildRoot(),
                 DistDir(relpath=Path("dist")),
+                create_subsystem(ExportSubsystem, resolve=[]),
             ],
             mock_gets=[
                 MockGet(
@@ -253,6 +258,7 @@ def test_warnings_for_non_local_target_environments(
                 ),
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
+                rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
                 MockEffect(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),
@@ -272,10 +278,12 @@ def test_warnings_for_non_local_target_environments(
 
 def _give_an_environment(enr: EnvironmentNameRequest) -> EnvironmentTarget:
     if enr.raw_value.startswith("l"):
-        return EnvironmentTarget(LocalEnvironmentTarget({}, Address("local", target_name="local")))
+        return EnvironmentTarget(
+            enr.raw_value, LocalEnvironmentTarget({}, Address("local", target_name="local"))
+        )
     elif enr.raw_value.startswith("r"):
         return EnvironmentTarget(
-            RemoteEnvironmentTarget({}, Address("remote", target_name="remote"))
+            enr.raw_value, RemoteEnvironmentTarget({}, Address("remote", target_name="remote"))
         )
     else:
         raise Exception()

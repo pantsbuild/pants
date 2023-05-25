@@ -74,10 +74,10 @@ class ArgSplitter:
 
     Recognizes, e.g.:
 
-    ./pants check --foo lint target1: dir f.ext
-    ./pants --global-opt check target1: dir f.ext --check-flag
-    ./pants --check-flag check target1: dir f.ext
-    ./pants goal -- passthru foo
+    pants check --foo lint target1: dir f.ext
+    pants --global-opt check target1: dir f.ext --check-flag
+    pants --check-flag check target1: dir f.ext
+    pants goal -- passthru foo
     """
 
     def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
@@ -251,7 +251,7 @@ class ArgSplitter:
 
         For example, in:
 
-            ./pants --check-some-opt=100 check <target>
+            pants --check-some-opt=100 check <target>
 
         --check-some-opt should be treated as if it were --check-some-opt=100 in the check scope.
         """

@@ -173,19 +173,16 @@ def test_binary_shims_request(rule_runner: RuleRunner) -> None:
             BinaryShimsRequest.for_binaries(
                 "ls",
                 rationale="test the binary shims feature",
-                output_directory=".bin",
                 search_path=("/usr/bin", "/bin"),
             )
         ],
     )
 
-    assert result.bin_directory == ".bin"
-
     contents = rule_runner.request(DigestContents, [result.digest])
     assert len(contents) == 1
 
     binary_shim = contents[0]
-    assert binary_shim.path == ".bin/ls"
+    assert binary_shim.path == "ls"
     assert binary_shim.is_executable
     assert re.match(
         dedent(
@@ -206,18 +203,15 @@ def test_binary_shims_paths(rule_runner: RuleRunner, tmp_path: Path) -> None:
             BinaryShimsRequest.for_paths(
                 BinaryPath(binary_path_abs),
                 rationale="test the binary shims feature",
-                output_directory=".bin",
             )
         ],
     )
-
-    assert result.bin_directory == ".bin"
 
     contents = rule_runner.request(DigestContents, [result.digest])
     assert len(contents) == 1
 
     binary_shim = contents[0]
-    assert binary_shim.path == ".bin/mybin"
+    assert binary_shim.path == "mybin"
     assert binary_shim.is_executable
     assert re.match(
         dedent(

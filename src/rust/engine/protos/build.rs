@@ -5,7 +5,13 @@ use prost_build::Config;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut config = Config::new();
-  config.bytes(&["."]);
+  config.bytes(["."]);
+  config.disable_comments([
+    // the comments on these fields contain invalid HTML/Markdown (e.g. "clientip:<ip address of
+    // client>" outside of a code segment)
+    "google.rpc.ResourceInfo.owner",
+    "google.rpc.QuotaFailure.Violation.subject",
+  ]);
 
   tonic_build::configure()
     .build_client(true)

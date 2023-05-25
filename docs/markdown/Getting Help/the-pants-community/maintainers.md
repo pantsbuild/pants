@@ -4,7 +4,6 @@ slug: "maintainers"
 excerpt: "What Pants maintainers do and how to become one."
 hidden: false
 createdAt: "2020-05-16T22:36:48.659Z"
-updatedAt: "2022-09-28T00:00:00.000Z"
 ---
 Pants community Maintainers are contributors who have been recognized by the project as stewards of Pants. They have a proven record of contributions, are committed to ensuring the continued success of our project, and through their actions help to grow our Community.
 

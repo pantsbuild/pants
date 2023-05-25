@@ -40,9 +40,8 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
@@ -56,8 +55,7 @@ class HelmDeploymentCmd(Enum):
     RENDER = "template"
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
+@dataclass(frozen=True)
 class HelmDeploymentRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 
@@ -75,11 +73,11 @@ class HelmDeploymentRequest(EngineAwareParameter):
         extra_argv: Iterable[str] | None = None,
         post_renderer: HelmPostRenderer | None = None,
     ) -> None:
-        self.field_set = field_set
-        self.cmd = cmd
-        self.description = description
-        self.extra_argv = tuple(extra_argv or ())
-        self.post_renderer = post_renderer
+        object.__setattr__(self, "field_set", field_set)
+        object.__setattr__(self, "cmd", cmd)
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "extra_argv", tuple(extra_argv or ()))
+        object.__setattr__(self, "post_renderer", post_renderer)
 
     def debug_hint(self) -> str | None:
         return self.field_set.address.spec
@@ -140,12 +138,16 @@ class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType)
         return msg
 
     def metadata(self) -> dict[str, Any] | None:
-        return {
-            "address": self.address,
+        meta = {
+            "address": self.address.spec,
             "chart": self.chart,
             "process": self.process,
-            "output_directory": self.output_directory,
         }
+
+        if self.output_directory:
+            meta["output_directory"] = self.output_directory
+
+        return meta
 
 
 @dataclass(frozen=True)
@@ -170,7 +172,11 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return {"content": self.snapshot}
 
     def metadata(self) -> dict[str, Any] | None:
-        return {"address": self.address, "chart": self.chart, "post_processed": self.post_processed}
+        return {
+            "address": self.address.spec,
+            "chart": self.chart,
+            "post_processed": self.post_processed,
+        }
 
     def cacheable(self) -> bool:
         # When using post-renderers it may not be safe to cache the generated files as the final result
@@ -178,7 +184,6 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return not self.post_processed
 
 
-@rule_helper
 async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> InterpolationContext:
     interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
 
@@ -188,7 +193,6 @@ async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> Interpo
     return InterpolationContext.from_dict(interpolation_context)
 
 
-@rule_helper
 async def _sort_value_file_names_for_evaluation(
     address: Address,
     *,
@@ -343,6 +347,7 @@ async def setup_render_helm_deployment_process(
             *(("--skip-crds",) if request.field_set.skip_crds.value else ()),
             *(("--no-hooks",) if request.field_set.no_hooks.value else ()),
             *(("--output-dir", output_dir) if output_dir else ()),
+            *(("--enable-dns",) if request.field_set.enable_dns.value else ()),
             *(
                 ("--post-renderer", os.path.join(".", request.post_renderer.exe))
                 if request.post_renderer
@@ -363,6 +368,7 @@ async def setup_render_helm_deployment_process(
         extra_immutable_input_digests=immutable_input_digests,
         extra_append_only_caches=append_only_caches,
         description=request.description,
+        level=LogLevel.DEBUG if request.cmd == HelmDeploymentCmd.RENDER else LogLevel.INFO,
         input_digest=merged_digests,
         output_directories=output_directories,
         cache_scope=process_cache,

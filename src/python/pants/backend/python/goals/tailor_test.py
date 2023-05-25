@@ -21,6 +21,7 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
+from pants.core.target_types import ResourceTarget
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -298,6 +299,32 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                     "__main__",
                     [],
                     kwargs={"entry_point": "__main__.py"},
+                ),
+            ]
+        )
+        == pts
+    )
+
+
+def test_find_putative_targets_for_py_typed_marker_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"src/python/foo/py.typed": ""})
+    rule_runner.set_options(["--python-tailor-py-typed-targets"])
+    pts = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativePythonTargetsRequest(("src/python/foo",)),
+            AllOwnedSources([]),
+        ],
+    )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    ResourceTarget,
+                    path="src/python/foo",
+                    name="py_typed",
+                    triggering_sources=("py.typed",),
+                    kwargs={"source": "py.typed"},
                 ),
             ]
         )

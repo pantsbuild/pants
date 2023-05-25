@@ -16,7 +16,9 @@ from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DynamicRemoteOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.testutil import rule_runner
 from pants.testutil.option_util import create_options_bootstrapper
+from pants.util.dirutil import safe_mkdir_for
 
 
 def create_dynamic_remote_options(
@@ -39,10 +41,10 @@ def create_dynamic_remote_options(
     if token_path:
         args.append(f"--remote-oauth-bearer-token-path={token_path}")
     if plugin:
-        args.append(f"--remote-auth-plugin={plugin}")
+        args.append(f"--backend-packages={plugin}")
     ob = create_options_bootstrapper(args)
     env = CompleteEnvironmentVars({})
-    oi = OptionsInitializer(ob)
+    oi = OptionsInitializer(ob, rule_runner.EXECUTOR)
     _build_config = oi.build_config(ob, env)
     options = oi.options(ob, env, _build_config, union_membership=UnionMembership({}), raise_=False)
     return DynamicRemoteOptions.from_options(
@@ -63,17 +65,18 @@ def test_dynamic_remote_options_oauth_bearer_token_path(tmp_path: Path) -> None:
 
 
 def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
-    def compute_options(state: str, tempdir: Path) -> DynamicRemoteOptions:
-        # NB: For an unknown reason, if we use the same file name for multiple runs, the plugin
-        # result gets memoized. So, we use a distinct file name.
-        plugin_path = tempdir / f"auth_plugin_{state}.py"
+    def compute_options(plugin_name: str, state: str) -> DynamicRemoteOptions:
+        # NB: If we use the same file name for multiple runs, import loading might be memoized. So
+        # we use a distinct file name.
+        plugin_path = tmp_path / plugin_name / "register.py"
+        safe_mkdir_for(plugin_path)
         plugin_path.touch()
         plugin_path.write_text(
             dedent(
                 f"""\
                 from pants.option.global_options import AuthPluginState, AuthPluginResult
 
-                def auth_func(initial_execution_headers, initial_store_headers, options, **kwargs):
+                def remote_auth(initial_execution_headers, initial_store_headers, options, **kwargs):
                     return AuthPluginResult(
                         state=AuthPluginState.{state},
                         execution_headers={{
@@ -92,14 +95,15 @@ def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
                 """
             )
         )
-        sys.path.append(tempdir.as_posix())
+        sys.path.append(tmp_path.as_posix())
         result = create_dynamic_remote_options(
-            initial_headers={"foo": "bar"}, plugin=f"auth_plugin_{state}:auth_func"
+            initial_headers={"foo": "bar"},
+            plugin=plugin_name,
         )
         sys.path.pop()
         return result
 
-    opts = compute_options("OK", tmp_path)
+    opts = compute_options("ok_plugin", "OK")
     assert opts.store_headers == {
         "store": "abc",
         "foo": "baz",
@@ -114,7 +118,7 @@ def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
     assert opts.store_address == "http://custom_store"
     assert opts.execution_address == "http://custom_exec"
 
-    opts = compute_options("UNAVAILABLE", tmp_path)
+    opts = compute_options("unavailable_plugin", "UNAVAILABLE")
     assert opts.cache_read is False
     assert opts.cache_write is False
     assert opts.execution is False

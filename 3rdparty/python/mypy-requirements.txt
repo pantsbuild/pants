@@ -1,0 +1,3 @@
+mypy==1.1.1
+mypy-typing-asserts
+strawberry-graphql==0.159.1

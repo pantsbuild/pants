@@ -88,7 +88,7 @@ fn test_float() {
   let assert_float =
     |expected: f64, id: OptionId| assert_eq!(expected, args.get_float(&id).unwrap().unwrap());
 
-  assert_float(4 as f64, option_id!(-'j', "jobs"));
+  assert_float(4_f64, option_id!(-'j', "jobs"));
   assert_float(3.14, option_id!("foo"));
   assert_float(1.137, option_id!("baz", "spam"));
 

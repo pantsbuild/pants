@@ -7,6 +7,7 @@ Active Maintainers
 * Benjy Weinberger
 * Carina C. Zona
 * Christopher Neugebauer
+* Dan Moran
 * Daniel McClanahan
 * Daniel Wagner-Hall
 * Eric Arellano
@@ -16,6 +17,7 @@ Active Maintainers
 * Kris Wilson
 * Patrick Lawson
 * Stu Hood
+* Suresh Joshi (SJ)
 * Tom Dyas
 * Yi Cheng
 

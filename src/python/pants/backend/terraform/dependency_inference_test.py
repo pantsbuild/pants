@@ -4,7 +4,6 @@ import textwrap
 
 import pytest
 
-from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform import dependency_inference
 from pants.backend.terraform.dependency_inference import (
     InferTerraformModuleDependenciesRequest,
@@ -36,7 +35,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
-            *pex_rules(),
             *dependency_inference.rules(),
             QueryRule(InferredDependencies, [InferTerraformModuleDependenciesRequest]),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),

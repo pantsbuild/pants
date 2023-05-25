@@ -29,6 +29,7 @@ from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
@@ -428,5 +429,6 @@ def generate_scala_parser_lockfile_request(
 def rules():
     return (
         *collect_rules(),
+        *jdk_rules(),
         UnionRule(GenerateToolLockfileSentinel, ScalaParserToolLockfileSentinel),
     )

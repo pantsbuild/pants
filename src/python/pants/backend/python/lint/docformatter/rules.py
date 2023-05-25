@@ -10,9 +10,10 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
+from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -36,11 +37,12 @@ class DocformatterRequest(FmtTargetsRequest):
 
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
 async def docformatter_fmt(
-    request: DocformatterRequest.Batch, docformatter: Docformatter
+    request: DocformatterRequest.Batch, docformatter: Docformatter, keep_sandboxes: KeepSandboxes
 ) -> FmtResult:
     docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
+    description = f"Run Docformatter on {pluralize(len(request.files), 'file')}."
     result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         VenvPexProcess(
             docformatter_pex,
             argv=(
@@ -50,10 +52,25 @@ async def docformatter_fmt(
             ),
             input_digest=request.snapshot.digest,
             output_files=request.files,
-            description=(f"Run Docformatter on {pluralize(len(request.files), 'file')}."),
+            description=description,
             level=LogLevel.DEBUG,
         ),
     )
+    # Docformatter 1.6.0+ very annoyingly returns an exit code of 3 if run with `--in-place`
+    # and any files changed. Earlier versions do not return this code in fmt mode.
+    # (All versions return 3 in check mode if any files would have changed, but that is
+    # not an issue here).
+    if result.exit_code not in [0, 3]:
+        # TODO(#12725):It would be more straightforward to force the exception with:
+        # result = await Get(ProcessResult, FallibleProcessResult, result)
+        raise ProcessExecutionFailure(
+            result.exit_code,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
+
     return await FmtResult.create(request, result)
 
 

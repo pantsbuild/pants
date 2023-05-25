@@ -26,13 +26,14 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address
 from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *subsystem_rules(),
             *skip_field.rules(),
@@ -46,7 +47,7 @@ def rule_runner() -> RuleRunner:
 
 
 @skip_unless_all_pythons_present("3.8", "3.9")
-def test_first_party_plugins(rule_runner: RuleRunner) -> None:
+def test_first_party_plugins(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -105,7 +106,7 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_setup_lockfile(rule_runner: RuleRunner) -> None:
+def test_setup_lockfile(rule_runner: PythonRuleRunner) -> None:
     global_constraint = "==3.9.*"
 
     def assert_lockfile_request(

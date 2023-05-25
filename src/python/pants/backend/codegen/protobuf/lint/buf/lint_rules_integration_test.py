@@ -207,3 +207,55 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
     assert_success(
         rule_runner, tgt, source_roots=["src/python", "/src/protobuf", "/tests/protobuf"]
     )
+
+
+def test_config_discovery(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/v1/f.proto": BAD_FILE,
+            "foo/v1/BUILD": "protobuf_sources(name='t')",
+            "buf.yaml": dedent(
+                """\
+             version: v1
+             lint:
+               ignore_only:
+                 FIELD_LOWER_SNAKE_CASE:
+                   - foo/v1/f.proto
+             """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("foo/v1", target_name="t", relative_file_path="f.proto"))
+
+    assert_success(
+        rule_runner,
+        tgt,
+    )
+
+
+def test_config_file_submitted(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/v1/f.proto": BAD_FILE,
+            "foo/v1/BUILD": "protobuf_sources(name='t')",
+            # Intentionally placed somewhere config_discovery can't see.
+            "foo/buf.yaml": dedent(
+                """\
+             version: v1
+             lint:
+               ignore_only:
+                 FIELD_LOWER_SNAKE_CASE:
+                   - foo/v1/f.proto
+             """,
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("foo/v1", target_name="t", relative_file_path="f.proto"))
+
+    assert_success(
+        rule_runner,
+        tgt,
+        extra_args=["--buf-config=foo/buf.yaml"],
+    )

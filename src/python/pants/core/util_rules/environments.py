@@ -17,12 +17,12 @@ from pants.engine.environment import ChosenLocalEnvironmentName as ChosenLocalEn
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.graph import WrappedTargetForBootstrap
-from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
+from pants.engine.internals.native_engine import ProcessExecutionEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -43,14 +43,14 @@ from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
 
 class EnvironmentsSubsystem(Subsystem):
     options_scope = "environments-preview"
-    help = softwrap(
+    help = help_text(
         """
         A highly experimental subsystem to allow setting environment variables and executable
         search paths for different environments, e.g. macOS vs. Linux.
@@ -93,7 +93,7 @@ class EnvironmentField(StringField):
     alias = "environment"
     default = LOCAL_ENVIRONMENT_MATCHER
     value: str
-    help = softwrap(
+    help = help_text(
         f"""
         Specify which environment target to consume environment-sensitive options from.
 
@@ -118,7 +118,7 @@ class CompatiblePlatformsField(StringSequenceField):
     default = tuple(plat.value for plat in Platform)
     valid_choices = Platform
     value: tuple[str, ...]
-    help = softwrap(
+    help = help_text(
         f"""
         Which platforms this environment can be used with.
 
@@ -133,7 +133,7 @@ class CompatiblePlatformsField(StringSequenceField):
 
 
 class LocalFallbackEnvironmentField(FallbackEnvironmentField):
-    help = softwrap(
+    help = help_text(
         f"""
         The environment to fallback to when this local environment cannot be used because the
         field `{CompatiblePlatformsField.alias}` is not compatible with the local host.
@@ -154,7 +154,7 @@ class LocalFallbackEnvironmentField(FallbackEnvironmentField):
 class LocalEnvironmentTarget(Target):
     alias = "local_environment"
     core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
-    help = softwrap(
+    help = help_text(
         f"""
         Configuration of a local execution environment for specific platforms.
 
@@ -179,7 +179,7 @@ class DockerImageField(StringField):
     alias = "image"
     required = True
     value: str
-    help = softwrap(
+    help = help_text(
         """
         The docker image ID to use when this environment is loaded.
 
@@ -198,7 +198,7 @@ class DockerPlatformField(StringField):
     alias = "platform"
     default = None
     valid_choices = Platform
-    help = softwrap(
+    help = help_text(
         """
         If set, Docker will always use the specified platform when pulling and running the image.
 
@@ -236,7 +236,7 @@ def docker_platform_field_default_factory(
 
 
 class DockerFallbackEnvironmentField(FallbackEnvironmentField):
-    help = softwrap(
+    help = help_text(
         f"""
         The environment to fallback to when this Docker environment cannot be used because either
         the global option `--docker-execution` is false, or the
@@ -258,7 +258,7 @@ class DockerEnvironmentTarget(Target):
         DockerPlatformField,
         DockerFallbackEnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Configuration of a Docker environment used for building your code.
 
@@ -269,6 +269,11 @@ class DockerEnvironmentTarget(Target):
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
         the `environment` field defined on other targets.
+
+        Before running Pants using this environment, if you are using Docker Desktop, make sure the option
+        **Enable default Docker socket** is enabled, you can find it in **Docker Desktop Settings > Advanced**
+        panel. That option tells Docker to create a socket at `/var/run/docker.sock` which Pants can use to
+        communicate with Docker.
         """
         # TODO(#17096) Add a link to the environments docs once they land.
     )
@@ -285,7 +290,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
     alias = "extra_platform_properties"
     default = ()
     value: tuple[str, ...]
-    help = softwrap(
+    help = help_text(
         """
         Platform properties to set on remote execution requests.
 
@@ -298,7 +303,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
 
 
 class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
-    help = softwrap(
+    help = help_text(
         f"""
         The environment to fallback to when remote execution is disabled via the global option
         `--remote-execution`.
@@ -318,7 +323,7 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
 class RemoteEnvironmentCacheBinaryDiscovery(BoolField):
     alias = "cache_binary_discovery"
     default = False
-    help = softwrap(
+    help = help_text(
         f"""
         If true, will cache system binary discovery, e.g. finding Python interpreters.
 
@@ -346,7 +351,7 @@ class RemoteEnvironmentTarget(Target):
         RemoteFallbackEnvironmentField,
         RemoteEnvironmentCacheBinaryDiscovery,
     )
-    help = softwrap(
+    help = help_text(
         """
         Configuration of a remote execution environment used for building your code.
 
@@ -375,7 +380,6 @@ class RemoteEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 
 
-@rule_helper
 async def _warn_on_non_local_environments(specified_targets: Iterable[Target], source: str) -> None:
     """Raise a warning when the user runs a local-only operation against a target that expects a
     non-local environment.
@@ -415,7 +419,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
         if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget)
     ]
 
-    for (env_name, tgts, env_tgt) in error_cases:
+    for env_name, tgts, env_tgt in error_cases:
         # "Blah was called with target `//foo` which specifies…"
         # "Blah was called with targets `//foo`, `//bar` which specify…"
         # "Blah was called with targets including `//foo`, `//bar`, `//baz` (and others) which specify…"
@@ -464,6 +468,7 @@ class AllEnvironmentTargets(FrozenDict[str, Target]):
 
 @dataclass(frozen=True)
 class EnvironmentTarget:
+    name: str | None
     val: Target | None
 
     def executable_search_path_cache_scope(
@@ -502,6 +507,18 @@ class EnvironmentTarget:
         )
 
 
+def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
+    for attr in dir(field_set):
+        # Skip what look like dunder methods, which are unlikely to be an
+        # EnvironmentField value on FieldSet class declarations.
+        if attr.startswith("__"):
+            continue
+        val = getattr(field_set, attr)
+        if isinstance(val, EnvironmentField):
+            return val
+    return EnvironmentField(None, address=field_set.address)
+
+
 @dataclass(frozen=True)
 class EnvironmentNameRequest(EngineAwareParameter):
     f"""Normalize the value into a name from `[environments-preview].names`, such as by
@@ -509,6 +526,16 @@ class EnvironmentNameRequest(EngineAwareParameter):
 
     raw_value: str
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    @classmethod
+    def from_target(cls, target: Target) -> EnvironmentNameRequest:
+        f"""Return a `EnvironmentNameRequest` with the environment this target should use when built.
+
+        If the Target includes `EnvironmentField` in its class definition, then this method will
+        use the value of that field. Otherwise, it will fall back to `{LOCAL_ENVIRONMENT_MATCHER}`.
+        """
+        env_field = target.get(EnvironmentField)
+        return cls._from_field(env_field, target.address)
 
     @classmethod
     def from_field_set(cls, field_set: FieldSet) -> EnvironmentNameRequest:
@@ -522,31 +549,44 @@ class EnvironmentNameRequest(EngineAwareParameter):
         then pass `{{resulting_environment_name: EnvironmentName}}` into a `Get` to change which
         environment is used for the subgraph.
         """
-        for attr in dir(field_set):
-            # Skip what look like dunder methods, which are unlikely to be an
-            # EnvironmentField value on FieldSet class declarations.
-            if attr.startswith("__"):
-                continue
-            val = getattr(field_set, attr)
-            if isinstance(val, EnvironmentField):
-                env_field = val
-                break
-        else:
-            env_field = EnvironmentField(None, address=field_set.address)
+        env_field = _compute_env_field(field_set)
+        return cls._from_field(env_field, field_set.address)
 
+    @classmethod
+    def _from_field(cls, env_field: EnvironmentField, address: Address) -> EnvironmentNameRequest:
         return EnvironmentNameRequest(
             env_field.value,
             # Note that if the field was not registered, we will have fallen back to the default
             # LOCAL_ENVIRONMENT_MATCHER, which we expect to be infallible when normalized. That
             # implies that the error message using description_of_origin should not trigger, so
             # it's okay that the field is not actually registered on the target.
-            description_of_origin=(
-                f"the `{env_field.alias}` field from the target {field_set.address}"
-            ),
+            description_of_origin=(f"the `{env_field.alias}` field from the target {address}"),
         )
 
     def debug_hint(self) -> str:
         return self.raw_value
+
+
+@dataclass(frozen=True)
+class SingleEnvironmentNameRequest(EngineAwareParameter):
+    """Asserts that all of the given environment strings resolve to the same EnvironmentName."""
+
+    raw_values: tuple[str, ...]
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    @classmethod
+    def from_field_sets(
+        cls, field_sets: Sequence[FieldSet], description_of_origin: str
+    ) -> SingleEnvironmentNameRequest:
+        """See `EnvironmentNameRequest.from_field_set`."""
+
+        return SingleEnvironmentNameRequest(
+            tuple(sorted({_compute_env_field(field_set).value for field_set in field_sets})),
+            description_of_origin=description_of_origin,
+        )
+
+    def debug_hint(self) -> str:
+        return ", ".join(self.raw_values)
 
 
 @rule
@@ -617,7 +657,25 @@ async def determine_local_environment(
     )
 
 
-@rule_helper
+@rule
+async def resolve_single_environment_name(
+    request: SingleEnvironmentNameRequest,
+) -> EnvironmentName:
+    environment_names = await MultiGet(
+        Get(EnvironmentName, EnvironmentNameRequest(name, request.description_of_origin))
+        for name in request.raw_values
+    )
+
+    unique_environments = sorted({name.val or "<None>" for name in environment_names})
+    if len(unique_environments) != 1:
+        raise AssertionError(
+            f"Needed 1 unique environment, but {request.description_of_origin} contained "
+            f"{len(unique_environments)}:\n\n"
+            f"{bullet_list(unique_environments)}"
+        )
+    return environment_names[0]
+
+
 async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> EnvironmentName:
     fallback_field = env_tgt[FallbackEnvironmentField]
     if fallback_field.value is None:
@@ -640,7 +698,7 @@ async def resolve_environment_name(
     global_options: GlobalOptions,
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
-        local_env_name = await Get(ChosenLocalEnvironmentName, {})
+        local_env_name = await Get(ChosenLocalEnvironmentName)
         return local_env_name.val
     if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
@@ -747,7 +805,7 @@ async def get_target_for_environment_name(
     env_name: EnvironmentName, environments_subsystem: EnvironmentsSubsystem
 ) -> EnvironmentTarget:
     if env_name.val is None:
-        return EnvironmentTarget(None)
+        return EnvironmentTarget(None, None)
     if env_name.val not in environments_subsystem.names:
         raise AssertionError(
             softwrap(
@@ -788,10 +846,9 @@ async def get_target_for_environment_name(
                 """
             )
         )
-    return EnvironmentTarget(tgt)
+    return EnvironmentTarget(env_name.val, tgt)
 
 
-@rule_helper
 async def _maybe_add_docker_image_id(image_name: str, platform: Platform, address: Address) -> str:
     # If the image name appears to be just an image ID, just return it as-is.
     if image_name.startswith("sha256:"):
@@ -829,7 +886,7 @@ async def extract_process_config_from_environment(
     platform: Platform,
     global_options: GlobalOptions,
     environments_subsystem: EnvironmentsSubsystem,
-) -> ProcessConfigFromEnvironment:
+) -> ProcessExecutionEnvironment:
     docker_image = None
     remote_execution = False
     raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
@@ -868,7 +925,8 @@ async def extract_process_config_from_environment(
                     )
                 )
 
-    return ProcessConfigFromEnvironment(
+    return ProcessExecutionEnvironment(
+        environment_name=tgt.name,
         platform=platform.value,
         docker_image=docker_image,
         remote_execution=remote_execution,

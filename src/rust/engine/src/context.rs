@@ -3,16 +3,15 @@
 
 use std::cmp::max;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::convert::{Into, TryInto};
-use std::future::Future;
+use std::convert::Into;
 use std::io::Read;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::intrinsics::Intrinsics;
-use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, WrappedNode};
+use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult};
 use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
@@ -20,25 +19,27 @@ use crate::types::Types;
 
 use async_oncecell::OnceCell;
 use cache::PersistentCache;
-use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
-use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
+use graph::{Graph, InvalidationResult};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
-use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
+// use docker::docker::{self, DOCKER, IMAGE_PULL_CACHE};
+use docker::docker;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-  self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  ImmutableInputs, NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
+  self, bounded, local, CacheContentBehavior, CommandRunner, NamedCaches, ProcessExecutionStrategy,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
+use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, Store};
+use store::{self, ImmutableInputs, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidationWatcher};
-use workunit_store::{Metric, RunId, RunningWorkunit};
+use workunit_store::{Metric, RunningWorkunit};
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -91,17 +92,18 @@ pub struct RemotingOptions {
   pub root_ca_certs_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
   pub store_chunk_bytes: usize,
-  pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_rpc_concurrency: usize,
+  pub store_rpc_timeout: Duration,
   pub store_batch_api_size_limit: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_content_behavior: CacheContentBehavior,
   pub cache_rpc_concurrency: usize,
-  pub cache_read_timeout: Duration,
+  pub cache_rpc_timeout: Duration,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
   pub execution_rpc_concurrency: usize,
+  pub append_only_caches_base_path: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -143,6 +145,7 @@ impl Core {
   fn make_store(
     executor: &Executor,
     local_store_options: &LocalStoreOptions,
+    local_execution_root_dir: &Path,
     enable_remote: bool,
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
@@ -152,6 +155,7 @@ impl Core {
     let local_only = Store::local_only_with_options(
       executor.clone(),
       local_store_options.store_dir.clone(),
+      local_execution_root_dir,
       local_store_options.into(),
     )?;
     if enable_remote {
@@ -164,7 +168,7 @@ impl Core {
         grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
         remoting_opts.store_headers.clone(),
         remoting_opts.store_chunk_bytes,
-        remoting_opts.store_chunk_upload_timeout,
+        remoting_opts.store_rpc_timeout,
         remoting_opts.store_rpc_retries,
         remoting_opts.store_rpc_concurrency,
         capabilities_cell_opt,
@@ -216,7 +220,7 @@ impl Core {
         exec_strategy_opts.local_parallelism * 2
       };
 
-      let nailgun_runner = nailgun::CommandRunner::new(
+      let nailgun_runner = pe_nailgun::CommandRunner::new(
         local_execution_root_dir.to_path_buf(),
         local_runner_store.clone(),
         executor.clone(),
@@ -239,15 +243,17 @@ impl Core {
     let docker_runner = Box::new(docker::CommandRunner::new(
       local_runner_store.clone(),
       executor.clone(),
-      &DOCKER,
-      &IMAGE_PULL_CACHE,
+      &docker::DOCKER,
+      &docker::IMAGE_PULL_CACHE,
       local_execution_root_dir.to_path_buf(),
-      named_caches.clone(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
-      matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
+      matches!(
+        req.execution_environment.strategy,
+        ProcessExecutionStrategy::Docker(_)
+      )
     }));
 
     let mut runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
@@ -260,11 +266,12 @@ impl Core {
       // We always create the remote execution runner if it is globally enabled, but it may not
       // actually be used thanks to the `SwitchedCommandRunner` below. Only one of local execution
       // or remote execution will be used for any particular process.
-      let remote_execution_runner = Box::new(remote::CommandRunner::new(
+      let remote_execution_runner = Box::new(remote::remote::CommandRunner::new(
         // We unwrap because global_options.py will have already validated this is defined.
         remoting_opts.execution_address.as_ref().unwrap(),
         instance_name,
         process_cache_namespace,
+        remoting_opts.append_only_caches_base_path.clone(),
         root_ca_certs.clone(),
         remoting_opts.execution_headers.clone(),
         full_store.clone(),
@@ -284,7 +291,7 @@ impl Core {
         runner,
         |req| {
           matches!(
-            req.execution_strategy,
+            req.execution_environment.strategy,
             ProcessExecutionStrategy::RemoteExecution(_)
           )
         },
@@ -329,7 +336,8 @@ impl Core {
         remoting_opts.cache_warnings_behavior,
         remoting_opts.cache_content_behavior,
         remoting_opts.cache_rpc_concurrency,
-        remoting_opts.cache_read_timeout,
+        remoting_opts.cache_rpc_timeout,
+        remoting_opts.append_only_caches_base_path.clone(),
       )?);
     }
 
@@ -465,7 +473,7 @@ impl Core {
     let root_ca_certs = if let Some(ref path) = remoting_opts.root_ca_certs_path {
       Some(
         std::fs::read(path)
-          .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?,
+          .map_err(|err| format!("Error reading root CA certs file {path:?}: {err}"))?,
       )
     } else {
       None
@@ -486,7 +494,7 @@ impl Core {
       None
     };
 
-    safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
+    std::fs::create_dir_all(&local_store_options.store_dir).map_err(|e| {
       format!(
         "Error making directory {:?}: {:?}",
         local_store_options.store_dir, e
@@ -495,13 +503,14 @@ impl Core {
     let full_store = Self::make_store(
       &executor,
       &local_store_options,
+      &local_execution_root_dir,
       need_remote_store,
       &remoting_opts,
       &remoting_opts.store_address,
       &root_ca_certs,
       capabilities_cell_opt.clone(),
     )
-    .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
+    .map_err(|e| format!("Could not initialize Store: {e:?}"))?;
 
     let local_cache = PersistentCache::new(
       &local_store_options.store_dir,
@@ -529,7 +538,7 @@ impl Core {
     };
 
     let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
-    let named_caches = NamedCaches::new(named_caches_dir);
+    let named_caches = NamedCaches::new_local(named_caches_dir);
     let command_runners = Self::make_command_runners(
       &full_store,
       &store,
@@ -559,26 +568,22 @@ impl Core {
       });
     let http_client = http_client_builder
       .build()
-      .map_err(|err| format!("Error building HTTP client: {}", err))?;
+      .map_err(|err| format!("Error building HTTP client: {err}"))?;
     let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
-    let gitignore_file = if use_gitignore {
-      let gitignore_path = build_root.join(".gitignore");
-      if Path::is_file(&gitignore_path) {
-        Some(gitignore_path)
-      } else {
-        None
-      }
+    let gitignore_files = if use_gitignore {
+      GitignoreStyleExcludes::gitignore_file_paths(&build_root)
     } else {
-      None
+      vec![]
     };
+
     let ignorer =
-      GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
-        .map_err(|e| format!("Could not parse build ignore patterns: {:?}", e))?;
+      GitignoreStyleExcludes::create_with_gitignore_files(ignore_patterns, gitignore_files)
+        .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
     let watcher = if watch_filesystem {
       let w = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
-      w.start(&graph);
+      w.start(&graph)?;
       Some(w)
     } else {
       None
@@ -598,7 +603,7 @@ impl Core {
       http_client,
       local_cache,
       vfs: PosixFS::new(&build_root, ignorer, executor)
-        .map_err(|e| format!("Could not initialize Vfs: {:?}", e))?,
+        .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
@@ -633,8 +638,8 @@ impl Core {
       .iter()
       .map(|runner| runner.shutdown().boxed());
     let shutdown_results = futures::future::join_all(shutdown_futures).await;
-    for shutfdown_result in shutdown_results {
-      if let Err(err) = shutfdown_result {
+    for shutdown_result in shutdown_results {
+      if let Err(err) = shutdown_result {
         log::warn!("Command runner failed to shutdown cleanly: {err}");
       }
     }
@@ -678,12 +683,12 @@ impl Deref for InvalidatableGraph {
   }
 }
 
-#[derive(Clone)]
-pub struct Context {
-  entry_id: Option<EntryId>,
+pub type Context = graph::Context<NodeKey>;
+
+pub struct SessionCore {
+  // TODO: This field is also accessible via the Session: move to an accessor.
   pub core: Arc<Core>,
   pub session: Session,
-  run_id: RunId,
   /// The number of attempts which have been made to backtrack to a particular ExecuteProcess node.
   ///
   /// Presence in this map at process runtime indicates that the process is being retried, and that
@@ -692,37 +697,16 @@ pub struct Context {
   backtrack_levels: Arc<Mutex<HashMap<ExecuteProcess, usize>>>,
   /// The Digests that we have successfully invalidated a Node for.
   backtrack_digests: Arc<Mutex<HashSet<Digest>>>,
-  stats: Arc<Mutex<graph::Stats>>,
 }
 
-impl Context {
-  pub fn new(core: Arc<Core>, session: Session) -> Context {
-    let run_id = session.run_id();
-    Context {
-      entry_id: None,
-      core,
+impl SessionCore {
+  pub fn new(session: Session) -> Self {
+    Self {
+      core: session.core().clone(),
       session,
-      run_id,
       backtrack_levels: Arc::default(),
       backtrack_digests: Arc::default(),
-      stats: Arc::default(),
     }
-  }
-
-  ///
-  /// Get the future value for the given Node implementation.
-  ///
-  pub async fn get<N: WrappedNode>(&self, node: N) -> NodeResult<N::Item> {
-    let node_result = self
-      .core
-      .graph
-      .get(self.entry_id, self, node.into())
-      .await?;
-    Ok(
-      node_result
-        .try_into()
-        .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
-    )
   }
 
   ///
@@ -732,8 +716,12 @@ impl Context {
   /// If we successfully locate and restart the source of the Digest, converts the Result into a
   /// `Failure::Invalidated`, which will cause retry at some level above us.
   ///
+  /// TODO: This takes both `self` and `context: Context`, but could take `self: Context` after
+  /// the `arbitrary_self_types` feature has stabilized.
+  ///
   pub fn maybe_backtrack(
     &self,
+    context: &Context,
     result: NodeResult<NodeOutput>,
     workunit: &mut RunningWorkunit,
   ) -> NodeResult<NodeOutput> {
@@ -748,7 +736,7 @@ impl Context {
     // `invalidate_from_roots` cannot view `Node` results. Would be more efficient as a merged
     // method.
     let mut candidate_roots = Vec::new();
-    self.core.graph.visit_live(self, |k, v| match k {
+    self.core.graph.visit_live(context, |k, v| match k {
       NodeKey::ExecuteProcess(p) if v.digests().contains(&digest) => {
         if let NodeOutput::ProcessResult(pr) = v {
           candidate_roots.push((p.clone(), pr.backtrack_level));
@@ -837,45 +825,5 @@ impl Context {
   ///
   pub fn maybe_start_backtracking(&self, node: &ExecuteProcess) -> usize {
     self.backtrack_levels.lock().get(node).cloned().unwrap_or(0)
-  }
-}
-
-impl NodeContext for Context {
-  type Node = NodeKey;
-  type RunId = RunId;
-
-  fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = graph::Stats> + 'a> {
-    Box::new(self.stats.lock())
-  }
-
-  ///
-  /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
-  /// is a shallow clone.
-  ///
-  fn clone_for(&self, entry_id: EntryId) -> Context {
-    Context {
-      entry_id: Some(entry_id),
-      core: self.core.clone(),
-      session: self.session.clone(),
-      run_id: self.run_id,
-      backtrack_levels: self.backtrack_levels.clone(),
-      backtrack_digests: self.backtrack_digests.clone(),
-      stats: self.stats.clone(),
-    }
-  }
-
-  fn run_id(&self) -> &Self::RunId {
-    &self.run_id
-  }
-
-  fn graph(&self) -> &Graph<NodeKey> {
-    &self.core.graph
-  }
-
-  fn spawn<F>(&self, future: F)
-  where
-    F: Future<Output = ()> + Send + 'static,
-  {
-    let _join = self.core.executor.spawn(future);
   }
 }

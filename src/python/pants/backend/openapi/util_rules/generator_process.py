@@ -24,7 +24,6 @@ from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.util_rules import rules as jvm_util_rules
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 
 
 @unique
@@ -32,8 +31,7 @@ class OpenAPIGeneratorType(Enum):
     JAVA = "java"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class OpenAPIGeneratorProcess:
     argv: tuple[str, ...]
     generator_type: OpenAPIGeneratorType
@@ -64,18 +62,20 @@ class OpenAPIGeneratorProcess:
         extra_jvm_options: Iterable[str] | None = None,
         cache_scope: ProcessCacheScope | None = None,
     ):
-        self.generator_type = generator_type
-        self.argv = tuple(argv)
-        self.input_digest = input_digest
-        self.description = description
-        self.level = level
-        self.output_directories = tuple(output_directories or ())
-        self.output_files = tuple(output_files or ())
-        self.extra_env = FrozenDict(extra_env or {})
-        self.extra_classpath_entries = tuple(extra_classpath_entries or ())
-        self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
-        self.extra_jvm_options = tuple(extra_jvm_options or ())
-        self.cache_scope = cache_scope
+        object.__setattr__(self, "generator_type", generator_type)
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "output_directories", tuple(output_directories or ()))
+        object.__setattr__(self, "output_files", tuple(output_files or ()))
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(self, "extra_classpath_entries", tuple(extra_classpath_entries or ()))
+        object.__setattr__(
+            self, "extra_immutable_input_digests", FrozenDict(extra_immutable_input_digests or {})
+        )
+        object.__setattr__(self, "extra_jvm_options", tuple(extra_jvm_options or ()))
+        object.__setattr__(self, "cache_scope", cache_scope)
 
 
 _GENERATOR_CLASS_NAME = "org.openapitools.codegen.OpenAPIGenerator"

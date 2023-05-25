@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -29,9 +30,16 @@ class GoCheckRequest(CheckRequest):
 
 @rule(desc="Check Go compilation", level=LogLevel.DEBUG)
 async def check_go(request: GoCheckRequest) -> CheckResults:
-    build_requests = await MultiGet(
-        Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(field_set.address))
+    build_opts_for_field_sets = await MultiGet(
+        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address))
         for field_set in request.field_sets
+    )
+    build_requests = await MultiGet(
+        Get(
+            FallibleBuildGoPackageRequest,
+            BuildGoPackageTargetRequest(field_set.address, build_opts=build_opts),
+        )
+        for field_set, build_opts in zip(request.field_sets, build_opts_for_field_sets)
     )
     invalid_requests = []
     valid_requests = []

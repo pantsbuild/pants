@@ -12,6 +12,7 @@ from typing import Mapping
 
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import first_party_pkg, goroot, sdk
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FallibleFirstPartyPkgDigest,
@@ -21,7 +22,6 @@ from pants.backend.go.util_rules.first_party_pkg import (
 )
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
-from pants.core.goals.tailor import group_by_dir
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     CreateDigest,
@@ -41,11 +41,12 @@ from pants.engine.internals.native_engine import (
 )
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
+from pants.util.dirutil import group_by_dir
+from pants.util.strutil import help_text, softwrap
 
 # Adapted from Go toolchain.
 # See https://github.com/golang/go/blob/master/src/cmd/go/internal/generate/generate.go and
@@ -62,7 +63,7 @@ _GENERATE_DIRECTIVE_RE = re.compile(rb"^//go:generate[ \t](.*)$")
 
 class GoGenerateGoalSubsystem(GoalSubsystem):
     name = "go-generate"
-    help = softwrap(
+    help = help_text(
         """
         Run each command in a package described by a `//go:generate` directive. This is equivalent to running
         `go generate` on a Go package.
@@ -157,7 +158,6 @@ def _expand_env(s: str, m: Mapping[str, str]) -> str:
     return buf + s[i:]
 
 
-@rule_helper
 async def _run_generators(
     analysis: FirstPartyPkgAnalysis,
     digest: Digest,
@@ -220,7 +220,7 @@ async def _run_generators(
             args[i] = _expand_env(arg, env)
 
         # Invoke the subprocess and store its output for use as input root of next command (if any).
-        result = await Get(
+        result = await Get(  # noqa: PNT30: this is inherently sequential
             ProcessResult,
             Process(
                 argv=args,
@@ -231,7 +231,9 @@ async def _run_generators(
                 description=f"Process `go generate` directives in file: {os.path.join(dir_path, go_file)}",
             ),
         )
-        digest = await Get(Digest, AddPrefix(result.output_digest, dir_path))
+        digest = await Get(  # noqa: PNT30: this is inherently sequential
+            Digest, AddPrefix(result.output_digest, dir_path)
+        )
 
     return digest
 
@@ -286,10 +288,13 @@ async def run_go_package_generators(
     goroot: GoRoot,
     subsystem: GoGenerateGoalSubsystem.EnvironmentAware,
 ) -> RunPackageGeneratorsResult:
+    build_opts = await Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(request.address))
     fallible_analysis, env = await MultiGet(
         Get(
             FallibleFirstPartyPkgAnalysis,
-            FirstPartyPkgAnalysisRequest(request.address, extra_build_tags=("generate",)),
+            FirstPartyPkgAnalysisRequest(
+                request.address, build_opts=build_opts, extra_build_tags=("generate",)
+            ),
         ),
         Get(EnvironmentVars, EnvironmentVarsRequest(subsystem.env_vars)),
     )
@@ -299,7 +304,8 @@ async def run_go_package_generators(
     dir_path = analysis.dir_path if analysis.dir_path else "."
 
     fallible_pkg_digest = await Get(
-        FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(request.address)
+        FallibleFirstPartyPkgDigest,
+        FirstPartyPkgDigestRequest(request.address, build_opts=build_opts),
     )
     if fallible_pkg_digest.pkg_digest is None:
         raise ValueError(
@@ -314,7 +320,7 @@ async def run_go_package_generators(
         output_digest_for_go_file = await _run_generators(
             analysis, pkg_digest.digest, dir_path, go_file, goroot, env
         )
-        output_digest = await Get(
+        output_digest = await Get(  # noqa: PNT30: requires triage
             Digest, OverwriteMergeDigests(output_digest, output_digest_for_go_file)
         )
 

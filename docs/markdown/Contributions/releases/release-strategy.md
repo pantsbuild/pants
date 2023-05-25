@@ -4,13 +4,12 @@ slug: "release-strategy"
 excerpt: "Our approach to semantic versioning + time-based releases."
 hidden: false
 createdAt: "2020-05-17T03:02:12.315Z"
-updatedAt: "2022-04-29T21:43:57.204Z"
 ---
 Pants release cycles flow through:
 
 1. `dev` releases from the `main` branch,
 2. an `a` (alpha) release, which is the first on a stable branch,
-3. `rc` releases, which have begun to stabilize, and might viably become a stable release
+3. `rc` releases, which have begun to stabilize on a stable branch, and will become a stable release
 4. stable releases, which are our most trusted.
 
 Pants follows semantic versioning, along with using regular time-based dev releases. We follow a strict [Deprecation policy](doc:deprecation-policy).
@@ -24,7 +23,7 @@ Pants follows semantic versioning, along with using regular time-based dev relea
 Stable releases
 ---------------
 
-Stable releases occur roughly every month. They have been vetted through at least one alpha and one release candidate.
+Stable releases occur roughly every six weeks. They have been vetted through at least one alpha and one release candidate.
 
 Stable releases are named with the major, minor, and patch version (with no suffix). For example, `2.1.0` or `2.2.1`.
 

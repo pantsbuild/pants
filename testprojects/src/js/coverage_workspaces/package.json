@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "name": "@pants/test-projects",
+  "version": "0.0.1",
+  "workspaces": ["jest_coverage", "mocha_coverage"]
+}

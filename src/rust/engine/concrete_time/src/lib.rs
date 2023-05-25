@@ -133,8 +133,7 @@ impl TimeSpan {
         duration: duration.into(),
       }),
       None => Err(format!(
-        "Got negative {} time: {:?} - {:?}",
-        time_span_description, end, start
+        "Got negative {time_span_description} time: {end:?} - {start:?}"
       )),
     }
   }

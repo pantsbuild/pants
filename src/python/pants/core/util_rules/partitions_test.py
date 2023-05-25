@@ -8,11 +8,7 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.core.goals.fix import Partitions
-from pants.core.util_rules.partitions import (
-    Partition,
-    PartitionerType,
-    _PartitionFieldSetsRequestBase,
-)
+from pants.core.util_rules.partitions import PartitionerType, _PartitionFieldSetsRequestBase
 from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, MultipleSourcesField, SingleSourceField
 from pants.option.option_types import SkipOption
@@ -85,17 +81,9 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
     rule_runner = RuleRunner(rules=rules)
     rule_runner.write_files({"BUILD": "", "knife.utensil": "", "bowl.utensil": ""})
     partitions = rule_runner.request(Partitions, [CookRequest.PartitionRequest(field_sets)])
-    assert partitions == Partitions(
-        [
-            Partition(
-                (
-                    "bowl.utensil",
-                    "knife.utensil",
-                ),
-                None,
-            )
-        ]
-    )
+    assert len(partitions) == 1
+    assert partitions[0].elements == ("bowl.utensil", "knife.utensil")
+    assert partitions[0].metadata.description is None
 
     rule_runner.set_options(["--kitchen-skip"])
     partitions = rule_runner.request(Partitions, [CookRequest.PartitionRequest(field_sets)])
@@ -142,12 +130,10 @@ def test_default_one_partition_per_input_partitioner(kitchen_field_set_type, fie
     rule_runner = RuleRunner(rules=rules)
     rule_runner.write_files({"BUILD": "", "knife.utensil": "", "bowl.utensil": ""})
     partitions = rule_runner.request(Partitions, [CookRequest.PartitionRequest(field_sets)])
-    assert partitions == Partitions(
-        [
-            Partition(("bowl.utensil",), None),
-            Partition(("knife.utensil",), None),
-        ]
-    )
+    assert len(partitions) == 2
+    assert [len(partition.elements) for partition in partitions] == [1, 1]
+    assert [partition.elements[0] for partition in partitions] == ["bowl.utensil", "knife.utensil"]
+    assert [partition.metadata.description for partition in partitions] == [None, None]
 
     rule_runner.set_options(["--kitchen-skip"])
     partitions = rule_runner.request(Partitions, [CookRequest.PartitionRequest(field_sets)])

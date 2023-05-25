@@ -3,10 +3,19 @@
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
+import json
 import re
 import shlex
 import textwrap
-from typing import Iterable
+from collections import abc
+from typing import Any, Callable, Iterable, TypeVar
+
+from typing_extensions import ParamSpec
+
+from pants.engine.internals.native_engine import Digest
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 def ensure_binary(text_or_binary: bytes | str) -> bytes:
@@ -113,6 +122,18 @@ def pluralize(count: int, item_type: str, include_count: bool = True) -> str:
     else:
         text = f"{count} {pluralized_item}"
         return text
+
+
+def comma_separated_list(items: Iterable[str]) -> str:
+    items = list(items)
+    if len(items) == 0:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    # For 3+ items, employ the oxford comma.
+    return f"{', '.join(items[0:-1])}, and {items[-1]}"
 
 
 def strip_prefix(string: str, prefix: str) -> str:
@@ -290,3 +311,70 @@ def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
         unit_idx += 1
 
     return f"{int(amount)}{units[unit_idx]}"
+
+
+def strval(val: str | Callable[[], str]) -> str:
+    return val if isinstance(val, str) else val()
+
+
+def help_text(val: str | Callable[[], str]) -> str | Callable[[], str]:
+    """Convenience method for defining an optionally lazy-evaluated softwrapped help string.
+
+    This exists because `mypy` does not respect the type hints defined on base `Field` and `Target`
+    classes.
+    """
+    # This can go away when https://github.com/python/mypy/issues/14702 is fixed
+    if isinstance(val, str):
+        return softwrap(val)
+    else:
+        return lambda: softwrap(val())  # type: ignore[operator]
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def docstring(doc: str | Callable[[], str]) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Use this decorator to provide a dynamic doc-string to a function."""
+
+    def wrapper(func: Callable[P, R]) -> Callable[P, R]:
+        func.__doc__ = strval(doc)
+        return func
+
+    return wrapper
+
+
+class _JsonEncoder(json.JSONEncoder):
+    """Allow us to serialize everything, with a fallback on `str()` in case of any esoteric
+    types."""
+
+    def default(self, o):
+        """Return a serializable object for o."""
+        if isinstance(o, abc.Mapping):
+            return dict(o)
+        if isinstance(o, (abc.Sequence, OrderedSet, FrozenOrderedSet)):
+            return list(o)
+
+        # NB: A quick way to embed the type in the hash so that two objects with the same data but
+        # different types produce different hashes.
+        classname = o.__class__.__name__
+        if dataclasses.is_dataclass(o):
+            return {"__class__.__name__": classname, **dataclasses.asdict(o)}
+        if isinstance(o, (Digest,)):
+            return {"__class__.__name__": classname, "fingerprint": o.fingerprint}
+        return super().default(o)
+
+
+def stable_hash(value: Any, *, name: str = "sha256") -> str:
+    """Attempts to return a stable hash of the value stable across processes.
+
+    "Stable" here means that if `value` is equivalent in multiple invocations (across multiple
+    processes), it should produce the same hash. To that end, what values are accepted are limited
+    in scope.
+    """
+    return hashlib.new(
+        name,
+        json.dumps(
+            value, indent=None, separators=(",", ":"), sort_keys=True, cls=_JsonEncoder
+        ).encode("utf-8"),
+    ).hexdigest()

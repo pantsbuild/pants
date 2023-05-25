@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.util.docutil import git_url
 
 
 class ScroogeSubsystem(JvmToolBase):
@@ -16,7 +15,3 @@ class ScroogeSubsystem(JvmToolBase):
         "pants.backend.codegen.thrift.scrooge",
         "scrooge.default.lockfile.txt",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/codegen/thrift/scrooge/scrooge.default.lockfile.txt"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)

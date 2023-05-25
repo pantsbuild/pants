@@ -1,0 +1,12 @@
+{
+  "main": "index.cjs",
+  "private": true,
+  "name": "@pants/test-jest-coverage-project",
+  "version": "0.0.1",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0"
+  }
+}

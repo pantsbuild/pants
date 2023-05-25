@@ -4,7 +4,6 @@ slug: "release-process"
 excerpt: "How to release a new version of `pantsbuild.pants` and its plugins."
 hidden: false
 createdAt: "2020-05-16T22:36:48.334Z"
-updatedAt: "2022-06-08T18:06:57.112Z"
 ---
 This page covers the nitty-gritty of executing a release, and is probably only interesting for maintainers. If you're interested in when and why Pants is released, please see the [Release strategy](doc:release-strategy) page.
 
@@ -29,36 +28,7 @@ See <https://docs.github.com/en/github/authenticating-to-github/telling-git-abou
 
 Note: the last step is required on macOS.
 
-### 4. Create a PyPI account
-
-[pypi.org/account/register](https://pypi.org/account/register).
-
-Please enable two-factor authentication under "Account Settings".
-
-Generate an API token under "Account Settings" for all projects. Copy the token for the last step.
-
-### 5. Get added to pantsbuild.pants PyPI
-
-You can ask any of the current Owners to add you as a maintainer.
-
-### 6. Configure `~/.pypirc`
-
-Fill in with your PyPI token by running:
-
-```bash
-$ cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
-[pypi]
-username: __token__
-password: <fill me in>
-
-[server-login]
-username: __token__
-password: <fill me in>
-
-EOF
-```
-
-### 7. Authenticate with the Github API
+### 4. Authenticate with the Github API
 
 Ensure that you have a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) for your Github account in your `.netrc` file.
 
@@ -124,7 +94,7 @@ Update the release page in `src/python/pants/notes` for this release series, e.g
 
 Run `git fetch --all --tags` to be sure you have the latest release tags available locally.
 
-From the `main` branch, run `./pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
+From the `main` branch, run `pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
 
 This will generate the sections to copy into the release notes. Delete any empty sections. Do not paste the `Internal` section into the notes file. Instead, paste into a comment on the prep PR.
 
@@ -142,7 +112,7 @@ You are encouraged to fix typos and tweak change descriptions for clarity to use
 
 ### 2. Update `CONTRIBUTORS.md`
 
-Run `./pants run build-support/bin/contributors.py`
+Run `pants run build-support/bin/contributors.py`
 
 Take note of any new contributors since the last release so that you can give a shoutout in the announcement email.
 
@@ -188,15 +158,21 @@ $ git push upstream 2.9.x
 Step 2: Update this docs site
 -----------------------------
 
+Note that this step can currently only be performed by a subset of maintainers due to a paid maximum number of seats. If you do not have a readme.com account, contact someone in the `#maintainers-confidential` channel in Slack to help out.
+
 ### `dev0` - set up the new version
 
 Go to the [documentation dashboard](https://dash.readme.com/). In the top left dropdown, where it says the current version, click "Manage versions". Click "Add new version" and use a "v" with the minor release number, e.g. "v2.9". Fork from the prior release. Mark this new version as public by clicking on "Is public?"
 
-Also, update the [Changelog](doc:changelog) page with the new release series at the top of the table. It's okay if there are no "highlights" yet.
+### Sync the `docs/` content
+
+See the `docs/NOTES.md` for instructions setting up the the necessary Node tooling your first time.
+You'll need to 1st login as outlined there via some variant of `npx rdme login --2fa --project pants ...`.
+On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>`; e.g: `npx rdme docs docs/markdown --version v2.8`.
 
 ### Regenerate the references
 
-On the relevant release branch, run `./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
+Still on the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 
 ### `stable` releases - Update the default docsite
 
@@ -208,15 +184,10 @@ Also, update the [Changelog](doc:changelog)'s "highlights" column with a link to
 > 
 > Ping someone in the `#maintainers-confidential` channel in Slack to be added. Alternatively, you can "Suggest edits" in the top right corner.
 
-Step 3: Wait for CI to build the wheels
+Step 3: Tag the release to build wheels
 ---------------------------------------
 
-Once you have merged the `VERSION` bump—which will be on `main` for `dev` and `a0` releases and the release branch for release candidates—CI will start building the wheels you need to finish the release.
-
-Head to <https://github.com/pantsbuild/pants/actions> and find your relevant build. You need the "Build wheels and fs_util" jobs to pass.
-
-Step 4: Run `release.sh`
-------------------------
+Once you have merged the `VERSION` bump — which will be on `main` for `dev` and `a0` releases and the release branch for release candidates — you should tag the release commit to trigger wheel building and PyPI publishing.
 
 First, ensure that you are on your release branch at your version bump commit.
 
@@ -227,15 +198,18 @@ First, ensure that you are on your release branch at your version bump commit.
 Then, run:
 
 ```bash
-./build-support/bin/release.sh publish
+./pants run build-support/bin/release.py -- tag-release
 ```
 
-This will first download the pre-built wheels built in CI and will publish them to PyPI. About 2-3 minutes in, the script will prompt you for your PGP password.
+This will tag the release with your PGP key, and push the tag to origin, which will kick off a [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) to build the wheels and publish them to PyPI.
 
-We also release a Pants Pex via GitHub releases. Run this:
+Step 4: Release a Pants PEX
+---------------------------
+
+After the [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) for your tag has completed, you should additionally build and publish the "universal" PEX to Github.
 
 ```bash
-PANTS_PEX_RELEASE=STABLE ./build-support/bin/release.sh build-universal-pex
+PANTS_PEX_RELEASE=STABLE ./pants run build-support/bin/release.py -- build-universal-pex
 ```
 
 Then go to <https://github.com/pantsbuild/pants/tags>, find your release's tag, click `Edit tag`, and upload the PEX located at `dist/pex.pants.<version>.pex`.
@@ -246,7 +220,7 @@ Step 5: Test the release
 Run this script as a basic smoke test:
 
 ```bash
-./build-support/bin/release.sh test-release
+./pants run build-support/bin/release.py -- test-release
 ```
 
 You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm the changelog is correct on the "Project description" page and that the `macOS` and `manylinux` wheels show up in the "Download files" page. 
@@ -264,7 +238,7 @@ Announce the release to:
 You can get a contributor list by running the following, where `<tag>` is the tag for the prior release (eg: `release_2.9.0.dev0`):
 
 ```bash
-./pants run ./build-support/bin/contributors.py -- -s <tag>
+pants run ./build-support/bin/contributors.py -- -s <tag>
 ```
 
 > ❗️ Update the links in these templates!
@@ -341,3 +315,36 @@ For the first stable release in the series, first, write a blog post to summariz
 > Mario Rozell
 >
 > _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_
+
+When Things Go Wrong
+--------------------
+
+From time to time, a release will fail. It's a complex process. The first thing to do after you've
+exhausted your knowledge and debugging skills or patience is to contact others. You might reach out
+to the development or maintainers channels on Pantbuild Slack in the absence of other ideas about
+whom to ask for help.
+
+Some issues are well known or well understood, and they are documented here.
+
+#### https://binaries.pantsbuild.com outage / missing wheels
+
+The https://binaries.pantsbuild.com site is an S3 bucket that houses Pantsbuild wheels generated in
+CI and used as part of the release process. If there are missing wheels or the wheels can't be
+fetched due to connectivity issues or an S3 outage, you'll learn about this through the release
+script erroring out. The script is idempotent; so you can just run it again, potentially waiting
+longer for wheels to be built in CI or outages to clear.
+
+When the release script finishes, it creates and pushes a release tag. This will trigger a [release
+GitHub workflow](https://github.com/pantsbuild/pants/blob/main/.github/workflows/release.yaml) that
+could ~silently error later if there were to be an S3 outage. This job currently is responsible for
+pushing a file mapping the release tag to the commit it tags out to
+`https://binaries.pantsbuild.com/tags/pantsbuild.pants/<tag>`. If the tag is missing, it should be
+fixed by running the following in an environment where you have both `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` of an account that has permissions to push to the Pantsbuild S3 bucket:
+```
+pants run build-support/bin/backfill_s3_release_tag_mappings.py -- \
+   --aws-cli-symlink-path $HOME/bin
+```
+If this sounds mysterious or new to you, you probably don't have such an account and should ask for
+help from other maintainers. You may want to adjust the `--aws-cli-symlink-path` to your liking as
+well, consult `--help` for more information.

@@ -3,7 +3,6 @@ title: "2.0.x"
 slug: "release-notes-2-0"
 hidden: true
 createdAt: "2020-06-26T03:30:39.353Z"
-updatedAt: "2020-10-12T17:00:35.317Z"
 ---
 Some highlights:
 

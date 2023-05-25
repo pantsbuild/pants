@@ -102,7 +102,7 @@ class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
             signal.SIGQUIT: "SIGQUIT",
             signal.SIGTERM: "SIGTERM",
         }
-        for (signum, signame) in signal_names.items():
+        for signum, signame in signal_names.items():
             with self.pantsd_successful_run_context() as ctx:
                 ctx.runner(["help"])
                 pid = ctx.checker.assert_started()

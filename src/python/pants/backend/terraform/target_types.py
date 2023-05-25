@@ -14,7 +14,7 @@ from pants.engine.target import (
     Target,
     generate_multiple_sources_field_help_message,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class TerraformDependenciesField(Dependencies):
@@ -40,7 +40,7 @@ class TerraformFieldSet(FieldSet):
 class TerraformModuleTarget(Target):
     alias = "terraform_module"
     core_fields = (*COMMON_TARGET_FIELDS, TerraformDependenciesField, TerraformModuleSourcesField)
-    help = softwrap(
+    help = help_text(
         """
         A single Terraform module corresponding to a directory.
 

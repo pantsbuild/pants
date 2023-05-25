@@ -4,7 +4,6 @@ slug: "project-introspection"
 excerpt: "Finding insights in your project."
 hidden: false
 createdAt: "2020-05-11T09:10:16.427Z"
-updatedAt: "2022-04-05T03:00:53.427Z"
 ---
 Pants provides several goals to provide insights into your project's structure.
 
@@ -23,7 +22,7 @@ Pants provides several goals to provide insights into your project's structure.
 > For example:
 > 
 > ```bash
-> $ ./pants dependees project/util.py | xargs ./pants test
+> $ pants dependents project/util.py | xargs pants test
 > ```
 > 
 > See [Advanced target selection](doc:advanced-target-selection) for more info and other techniques to use the results.
@@ -36,7 +35,7 @@ Pants provides several goals to provide insights into your project's structure.
 For example, to show all targets in your project:
 
 ```bash
-❯ ./pants list ::
+❯ pants list ::
 //:ansicolors
 //:setuptools
 helloworld:lib
@@ -49,13 +48,13 @@ helloworld/main.py:lib
 You can specify a file, which will find the target(s) owning that file:
 
 ```bash
-❯ ./pants list helloworld/greet/greeting_test.py
+❯ pants list helloworld/greet/greeting_test.py
 helloworld/greet/greeting_test.py:tests
 ```
 
 `list` often works well when paired with the `--filter` options from
 [Advanced Target Selection](doc:advanced-target-selection), e.g.
-`./pants --filter-target-type=python_test list ::` to find all your `python_test` targets.
+`pants --filter-target-type=python_test list ::` to find all your `python_test` targets.
 
 `dependencies` - find a target's dependencies
 ---------------------------------------------
@@ -63,14 +62,14 @@ helloworld/greet/greeting_test.py:tests
 Use `dependencies` to list all targets used directly by a target.
 
 ```bash
-❯ ./pants dependencies helloworld:pex_binary
+❯ pants dependencies helloworld:pex_binary
 helloworld/main.py:lib
 ```
 
 You can specify a file, which will run on the target(s) owning that file:
 
 ```bash
-❯ ./pants dependencies helloworld/main.py:lib
+❯ pants dependencies helloworld/main.py:lib
 //:ansicolors
 helloworld/greet/greeting.py:lib
 helloworld/main.py:lib
@@ -79,7 +78,7 @@ helloworld/main.py:lib
 To include transitive dependencies—meaning the dependencies of the direct dependencies—use `--transitive`:
 
 ```bash
-❯ ./pants dependencies --transitive helloworld/main.py:lib
+❯ pants dependencies --transitive helloworld/main.py:lib
 //:ansicolors
 //:setuptools
 //:types-setuptools
@@ -89,29 +88,29 @@ helloworld/main.py:lib
 helloworld/translator/translator.py:lib
 ```
 
-`dependees` - find which targets depend on a target
----------------------------------------------------
+`dependents` - find which targets depend on a target
+----------------------------------------------------
 
-The `dependees` goal finds all targets that directly depend on the target you specify.
+The `dependents` goal finds all targets that directly depend on the target you specify.
 
 ```bash
-❯ ./pants dependees //:ansicolors
+❯ pants dependents //:ansicolors
 helloworld/main.py:lib
 ```
 
 You can specify a file, which will run on the target(s) owning that file:
 
 ```
-❯ ./pants dependees helloworld/translator/translator.py
+❯ pants dependents helloworld/translator/translator.py
 helloworld/greet/greeting.py:lib
 helloworld/translator:lib
 helloworld/translator/translator_test.py:tests
 ```
 
-To include transitive dependees—meaning targets that don't directly depend on your target, but which depend on a target that does directly use your target—use `--transitive`:
+To include transitive dependents — meaning targets that don't directly depend on your target, but which depend on a target that does directly use your target — use `--transitive`:
 
 ```bash
-❯ ./pants dependees --transitive helloworld/translator/translator.py
+❯ pants dependents --transitive helloworld/translator/translator.py
 helloworld:lib
 helloworld:pex_binary
 helloworld/main.py:lib
@@ -122,7 +121,7 @@ helloworld/greet:lib
 To include the original target itself, use `--closed`:
 
 ```bash
-❯ ./pants dependees --closed //:ansicolors
+❯ pants dependents --closed //:ansicolors
 //:ansicolors
 helloworld/main.py:lib
 ```
@@ -133,7 +132,7 @@ helloworld/main.py:lib
 `filedeps` outputs all of the files belonging to a target, based on its `sources` field.
 
 ```bash
-❯ ./pants filedeps helloworld/greet:lib
+❯ pants filedeps helloworld/greet:lib
 helloworld/greet/BUILD
 helloworld/greet/__init__.py
 helloworld/greet/greeting.py
@@ -142,7 +141,7 @@ helloworld/greet/greeting.py
 To output absolute paths, use the option `--absolute`:
 
 ```bash
-$ ./pants filedeps --absolute helloworld/util:util
+$ pants filedeps --absolute helloworld/util:util
 /Users/pantsbuild/example-python/helloworld/greet/BUILD
 /Users/pantsbuild/example-python/helloworld/greet/__init__.py
 /Users/pantsbuild/example-python/helloworld/greet/greeting.py
@@ -151,7 +150,7 @@ $ ./pants filedeps --absolute helloworld/util:util
 To include the files used by dependencies (including transitive dependencies), use `--transitive`:
 
 ```bash
-$ ./pants filedeps --transitive helloworld/util:util
+$ pants filedeps --transitive helloworld/util:util
 BUILD
 helloworld/greet/BUILD
 helloworld/greet/__init__.py
@@ -166,7 +165,7 @@ helloworld/greet/translations.json
 `peek` outputs JSON for each target specified.
 
 ```bash
-$ ./pants peek helloworld/util:tests
+$ pants peek helloworld/util:tests
 [
   {
     "address": "helloworld/util:tests",
@@ -198,7 +197,7 @@ $ ./pants peek helloworld/util:tests
 You can use `--exclude-defaults` for less verbose output:
 
 ```bash
-$ ./pants peek --exclude-defaults helloworld/util:tests
+$ pants peek --exclude-defaults helloworld/util:tests
 [
   {
     "address": "helloworld/util:tests",
@@ -210,21 +209,21 @@ $ ./pants peek --exclude-defaults helloworld/util:tests
 
 > 📘 Piping peek output into jq
 > 
-> `peek` can be particularly useful when paired with [JQ](https://stedolan.github.io/jq/) to query the JSON. For example, you can combine `./pants peek` with JQ to find all targets where you set the field `skip_flake8=True`:
+> `peek` can be particularly useful when paired with [JQ](https://stedolan.github.io/jq/) to query the JSON. For example, you can combine `pants peek` with JQ to find all targets where you set the field `skip_flake8=True`:
 > 
 > ```bash
-> $ ./pants peek :: | jq -r '.[] | select(.skip_flake8 == true) | .["address"]'
+> $ pants peek :: | jq -r '.[] | select(.skip_flake8 == true) | .["address"]'
 > helloworld/greet:lib
 > helloworld/greet:tests
 > helloworld/util:lib
 > ```
 
-> 📘 Piping other introspection commands into `./pants peek`
+> 📘 Piping other introspection commands into `pants peek`
 > 
-> Some introspection goals, such as `filter`, `dependencies` and `dependees` emit a flat list of target addresses. It's often useful to expand each of those into a full JSON structure with detailed properties of each target, by piping to `./pants peek`:
+> Some introspection goals, such as `filter`, `dependencies` and `dependents` emit a flat list of target addresses. It's often useful to expand each of those into a full JSON structure with detailed properties of each target, by piping to `pants peek`:
 > 
 > ```bash
-> ./pants dependees  helloworld/main.py:lib | xargs ./pants peek --exclude-defaults
+> pants dependents  helloworld/main.py:lib | xargs pants peek --exclude-defaults
 > [
 >   {
 >     "address": "helloworld:lib",
@@ -258,7 +257,7 @@ $ ./pants peek --exclude-defaults helloworld/util:tests
 `paths` emits a list of all dependency paths between two targets:
 
 ```bash
-$ ./pants paths --from=helloworld/main.py --to=helloworld/translator/translator.py
+$ pants paths --from=helloworld/main.py --to=helloworld/translator/translator.py
 [
   [
     "helloworld/main.py:lib",
@@ -274,7 +273,7 @@ $ ./pants paths --from=helloworld/main.py --to=helloworld/translator/translator.
 `count-loc` counts the lines of code of the specified files by running the [Succinct Code Counter](https://github.com/boyter/scc) tool.
 
 ```shell
-❯ ./pants count-loc ::
+❯ pants count-loc ::
 ───────────────────────────────────────────────────────────────────────────────
 Language                 Files     Lines   Blanks  Comments     Code Complexity
 ───────────────────────────────────────────────────────────────────────────────
@@ -300,7 +299,7 @@ Estimated People Required 53.813884
 SCC has [dozens of options](https://github.com/boyter/scc#usage). You can pass through options by either setting `--scc-args` or using `--` at the end of your command, like this:
 
 ```bash
-./pants count-loc :: -- --no-cocomo
+pants count-loc :: -- --no-cocomo
 ```
 
 > 🚧 See unexpected results? Set `pants_ignore`.

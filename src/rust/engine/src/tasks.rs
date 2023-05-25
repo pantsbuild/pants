@@ -55,10 +55,7 @@ impl DisplayForGraph for Rule {
           "goal_rule".to_string()
         };
 
-        format!(
-          "@{}({}({}) -> {}{})",
-          rule_type, task_name, clause_portion, product, get_portion,
-        )
+        format!("@{rule_type}({task_name}({clause_portion}) -> {product}{get_portion})",)
       }
       Rule::Intrinsic(ref intrinsic) => format!(
         "@rule(<intrinsic>({}) -> {})",

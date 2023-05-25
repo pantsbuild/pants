@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -33,7 +34,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
     )
 
-    def assert_ics(build_file: str, expected: list[str]) -> None:
+    def assert_ics(build_file: str, expected: Iterable[str]) -> None:
         rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
         lockfile_request = rule_runner.request(GeneratePythonLockfile, [BlackLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)

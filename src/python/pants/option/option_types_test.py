@@ -268,7 +268,7 @@ def test_advanced_params():
             fromfile=True,
             metavar="META",
             mutually_exclusive_group="group",
-            removal_hint="it's purple",
+            removal_hint=lambda cls: f"{cls.__name__} is purple",
             removal_version="99.9.9",
         )
 
@@ -279,7 +279,7 @@ def test_advanced_params():
     assert flag_options["mutually_exclusive_group"] == "group"
     assert flag_options["default_help_repr"] == "Help!"
     assert flag_options["removal_version"] == "99.9.9"
-    assert flag_options["removal_hint"] == "it's purple"
+    assert flag_options["removal_hint"] == "MySubsystem is purple"
     assert flag_options["daemon"]
     assert not flag_options["fingerprint"]
 

@@ -7,6 +7,7 @@ from json import dumps
 
 import pytest
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.macros import pipenv_requirements
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTargetGenerator
 from pants.backend.python.target_types import PythonRequirementTarget
@@ -21,6 +22,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
+            *lockfile.rules(),
             *pipenv_requirements.rules(),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ),
@@ -97,7 +99,7 @@ def test_pipfile_lockfile_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--python-enable-resolves"])
     file_addr = Address("", target_name="reqs", relative_file_path="Pipfile.lock")
     lock_addr = Address(
-        "3rdparty/python", target_name="python-default", relative_file_path="default.lock"
+        "3rdparty/python", target_name="_python-default_lockfile", relative_file_path="default.lock"
     )
     assert_pipenv_requirements(
         rule_runner,

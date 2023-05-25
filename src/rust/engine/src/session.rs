@@ -7,18 +7,19 @@ use std::sync::atomic::{self, AtomicU32};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
-use crate::context::Core;
+use crate::context::{Core, SessionCore};
 use crate::nodes::{NodeKey, Select};
 use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
-use futures::future::{self, AbortHandle, Abortable, FutureExt};
-use graph::LastObserved;
+use futures::future::{self, FutureExt};
+use graph::{Context, LastObserved};
 use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
 use task_executor::{Executor, TailTasks};
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::task::JoinHandle;
 use ui::ConsoleUI;
 use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 
@@ -30,7 +31,7 @@ const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
 // Root requests are limited to Select nodes, which produce (python) Values.
 pub type Root = Select;
 
-pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
+pub type ObservedValueResult = (Result<Value, Failure>, Option<LastObserved>);
 
 ///
 /// An enum for the two cases of `--[no-]dynamic-ui`.
@@ -174,7 +175,7 @@ impl Session {
       display,
     });
     core.sessions.add(&handle)?;
-    let run_id = core.sessions.generate_run_id();
+    let run_id = core.graph.generate_run_id();
     let preceding_graph_size = core.graph.len();
     Ok(Session {
       handle,
@@ -188,6 +189,16 @@ impl Session {
         tail_tasks: TailTasks::new(),
       }),
     })
+  }
+
+  ///
+  /// Return a `graph::Context` for this Session.
+  ///
+  pub fn graph_context(&self) -> Context<NodeKey> {
+    self
+      .core()
+      .graph
+      .context_with_run_id(SessionCore::new(self.clone()), self.run_id())
   }
 
   ///
@@ -285,7 +296,7 @@ impl Session {
 
   pub fn new_run_id(&self) {
     self.state.run_id.store(
-      self.state.core.sessions.generate_run_id().0,
+      self.state.core.graph.generate_run_id().0,
       atomic::Ordering::SeqCst,
     );
   }
@@ -392,10 +403,7 @@ pub struct Sessions {
   /// Core/Scheduler are being shut down.
   sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>>,
   /// Handle to kill the signal monitoring task when this object is killed.
-  signal_task_abort_handle: AbortHandle,
-  /// A generator for RunId values. Although this is monotonic, there is no meaning assigned to
-  /// ordering: only equality is relevant.
-  run_id_generator: AtomicU32,
+  signal_task_handle: JoinHandle<()>,
 }
 
 impl Sessions {
@@ -404,41 +412,34 @@ impl Sessions {
       Arc::new(Mutex::new(Some(Vec::new())));
     // A task that watches for keyboard interrupts arriving at this process, and cancels all
     // non-isolated Sessions.
-    let signal_task_abort_handle = {
+    let signal_task_handle = {
       let mut signal_stream = signal(SignalKind::interrupt())
-        .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
-      let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        .map_err(|err| format!("Failed to install interrupt handler: {err}"))?;
       let sessions = sessions.clone();
-      #[allow(clippy::let_underscore_lock)]
-      let _ = executor.spawn(Abortable::new(
-        async move {
-          loop {
-            let _ = signal_stream.recv().await;
-            let cancellable_sessions = {
-              let sessions = sessions.lock();
-              if let Some(ref sessions) = *sessions {
-                sessions
-                  .iter()
-                  .flat_map(|session| session.upgrade())
-                  .filter(|session| !session.isolated)
-                  .collect::<Vec<_>>()
-              } else {
-                vec![]
-              }
-            };
-            for session in cancellable_sessions {
-              session.cancel();
+      executor.native_spawn(async move {
+        loop {
+          let _ = signal_stream.recv().await;
+          let cancellable_sessions = {
+            let sessions = sessions.lock();
+            if let Some(ref sessions) = *sessions {
+              sessions
+                .iter()
+                .flat_map(|session| session.upgrade())
+                .filter(|session| !session.isolated)
+                .collect::<Vec<_>>()
+            } else {
+              vec![]
             }
+          };
+          for session in cancellable_sessions {
+            session.cancel();
           }
-        },
-        abort_registration,
-      ));
-      abort_handle
+        }
+      })
     };
     Ok(Sessions {
       sessions,
-      signal_task_abort_handle,
-      run_id_generator: AtomicU32::new(0),
+      signal_task_handle,
     })
   }
 
@@ -451,10 +452,6 @@ impl Sessions {
     } else {
       Err("The scheduler is shutting down: no new sessions may be created.".to_string())
     }
-  }
-
-  fn generate_run_id(&self) -> RunId {
-    RunId(self.run_id_generator.fetch_add(1, atomic::Ordering::SeqCst))
   }
 
   ///
@@ -485,7 +482,7 @@ impl Sessions {
         log::info!("Waiting for shutdown of: {:?}", build_ids);
         tokio::time::timeout(timeout, future::join_all(cancellation_latches))
           .await
-          .map_err(|_| format!("Some Sessions did not shutdown within {:?}.", timeout))?;
+          .map_err(|_| format!("Some Sessions did not shutdown within {timeout:?}."))?;
       }
     }
     Ok(())
@@ -494,6 +491,6 @@ impl Sessions {
 
 impl Drop for Sessions {
   fn drop(&mut self) {
-    self.signal_task_abort_handle.abort();
+    self.signal_task_handle.abort();
   }
 }

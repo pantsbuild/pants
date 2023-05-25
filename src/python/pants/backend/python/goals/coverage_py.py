@@ -12,19 +12,13 @@ from typing import Any, MutableMapping, cast
 
 import toml
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -61,7 +55,6 @@ from pants.option.option_types import (
     StrOption,
 )
 from pants.source.source_root import AllSourceRoots
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -115,22 +108,20 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=6.5,<6.6"
+    default_version = "coverage[toml]>=6.5,<8"
     default_main = ConsoleScript("coverage")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/coverage_py.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     filter = StrListOption(
         help=softwrap(
             """
             A list of Python modules or filesystem paths to use in the coverage report, e.g.
-            `['helloworld_test', 'helloworld/util/dirutil'].
+            `['helloworld_test', 'helloworld/util/dirutil']`.
 
             Both modules and directory paths are recursive: any submodules or child paths,
             respectively, will be included.
@@ -229,24 +220,13 @@ class CoverageSubsystem(PythonToolBase):
         )
 
 
-class CoveragePyLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = CoverageSubsystem.options_scope
-
-
-@rule
-def setup_coverage_lockfile(
-    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(coverage)
-
-
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
-    address: Address
+    addresses: tuple[Address, ...]
     digest: Digest
 
 
-class PytestCoverageDataCollection(CoverageDataCollection):
+class PytestCoverageDataCollection(CoverageDataCollection[PytestCoverageData]):
     element_type = PytestCoverageData
 
 
@@ -381,18 +361,20 @@ async def merge_coverage_data(
 ) -> MergedCoverageData:
     if len(data_collection) == 1 and not coverage.global_report:
         coverage_data = data_collection[0]
-        return MergedCoverageData(coverage_data.digest, (coverage_data.address,))
+        return MergedCoverageData(coverage_data.digest, coverage_data.addresses)
 
     coverage_digest_gets = []
     coverage_data_file_paths = []
-    addresses = []
+    addresses: list[Address] = []
     for data in data_collection:
+        path_prefix = data.addresses[0].path_safe_spec
+        if len(data.addresses) > 1:
+            path_prefix = f"{path_prefix}+{len(data.addresses)-1}-others"
+
         # We prefix each .coverage file with its corresponding address to avoid collisions.
-        coverage_digest_gets.append(
-            Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
-        )
-        coverage_data_file_paths.append(f"{data.address.path_safe_spec}/.coverage")
-        addresses.append(data.address)
+        coverage_digest_gets.append(Get(Digest, AddPrefix(data.digest, prefix=path_prefix)))
+        coverage_data_file_paths.append(f"{path_prefix}/.coverage")
+        addresses.extend(data.addresses)
 
     if coverage.global_report:
         # It's important to set the `branch` value in the empty base report to the value it will
@@ -618,7 +600,5 @@ def _get_coverage_report(
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
-        UnionRule(GenerateToolLockfileSentinel, CoveragePyLockfileSentinel),
     ]

@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 from textwrap import fill, indent
 
-from pants.backend.project_info.dependees import Dependees, DependeesRequest
+from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -16,7 +16,6 @@ from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     RegisteredTargetTypes,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -39,12 +38,12 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
             """
             Output a CSV summary of interpreter constraints for your whole repository. The
             headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`,
-            and `# Dependees`.
+            and `# Dependents`.
 
             This information can be useful when prioritizing a migration from one Python version to
-            another (e.g. to Python 3). Use `# Dependencies` and `# Dependees` to help prioritize
+            another (e.g. to Python 3). Use `# Dependencies` and `# Dependents` to help prioritize
             which targets are easiest to port (low # dependencies) and highest impact to port
-            (high # dependees).
+            (high # dependents).
 
             Use a tool like Pandas or Excel to process the CSV. Use the option
             `--py-constraints-output-file=summary.csv` to write directly to a file.
@@ -68,6 +67,7 @@ async def py_constraints(
     union_membership: UnionMembership,
 ) -> PyConstraintsGoal:
     if py_constraints_subsystem.summary:
+        dependents_header = "# Dependents"
         if addresses:
             console.print_stderr(
                 softwrap(
@@ -79,7 +79,7 @@ async def py_constraints(
             )
             return PyConstraintsGoal(exit_code=1)
 
-        all_targets = await Get(AllTargets, AllTargetsRequest())
+        all_targets = await Get(AllTargets)
         all_python_targets = tuple(
             t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )
@@ -98,8 +98,8 @@ async def py_constraints(
             for transitive_targets in transitive_targets_per_tgt
         ]
 
-        dependees_per_root = await MultiGet(
-            Get(Dependees, DependeesRequest([tgt.address], transitive=True, include_roots=False))
+        dependents_per_root = await MultiGet(
+            Get(Dependents, DependentsRequest([tgt.address], transitive=True, include_roots=False))
             for tgt in all_python_targets
         )
 
@@ -109,14 +109,14 @@ async def py_constraints(
                 "Constraints": str(constraints),
                 "Transitive Constraints": str(transitive_constraints),
                 "# Dependencies": len(transitive_targets.dependencies),
-                "# Dependees": len(dependees),
+                dependents_header: len(dependents),
             }
-            for tgt, constraints, transitive_constraints, transitive_targets, dependees in zip(
+            for tgt, constraints, transitive_constraints, transitive_targets, dependents in zip(
                 all_python_targets,
                 constraints_per_tgt,
                 transitive_constraints_per_tgt,
                 transitive_targets_per_tgt,
-                dependees_per_root,
+                dependents_per_root,
             )
         ]
 
@@ -128,7 +128,7 @@ async def py_constraints(
                     "Constraints",
                     "Transitive Constraints",
                     "# Dependencies",
-                    "# Dependees",
+                    dependents_header,
                 ],
             )
             writer.writeheader()

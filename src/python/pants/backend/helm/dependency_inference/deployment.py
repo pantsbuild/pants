@@ -87,7 +87,7 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
     # Build YAML index of Docker image refs for future processing during depedendecy inference or post-rendering.
     image_refs_index: MutableYamlIndex[str] = MutableYamlIndex()
     for manifest in parsed_manifests:
-        for (idx, path, image_ref) in manifest.found_image_refs:
+        for idx, path, image_ref in manifest.found_image_refs:
             image_refs_index.insert(
                 file_path=PurePath(manifest.filename),
                 document_index=idx,

@@ -11,6 +11,7 @@ from typing import List, Optional, Tuple
 import pytest
 
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
+from pants.base.exceptions import IntrinsicError
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -21,6 +22,7 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     FileContent,
+    MergeDigests,
     Snapshot,
 )
 from pants.engine.internals.engine_testutil import (
@@ -40,8 +42,9 @@ from pants.engine.streaming_workunit_handler import (
 from pants.engine.unions import UnionRule, union
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class A:
@@ -1006,3 +1009,44 @@ def test_union_member_construction(run_tracker: RunTracker) -> None:
     )
 
     assert "yep" == rule_runner.request(str, [])
+
+
+@dataclass(frozen=True)
+class FileInput:
+    filename: str
+
+
+@dataclass(frozen=True)
+class MergedOutput:
+    digest: Digest
+
+
+class MergeErr(Exception):
+    pass
+
+
+@rule
+async def catch_merge_digests_error(file_input: FileInput) -> MergedOutput:
+    # Create two separate digests writing different contents to the same file path.
+    input_1 = CreateDigest((FileContent(path=file_input.filename, content=b"yes"),))
+    input_2 = CreateDigest((FileContent(path=file_input.filename, content=b"no"),))
+    digests = await MultiGet(Get(Digest, CreateDigest, input_1), Get(Digest, CreateDigest, input_2))
+    try:
+        merged = await Get(Digest, MergeDigests(digests))
+    except IntrinsicError as e:
+        raise MergeErr(f"error merging digests for input {file_input}: {e}")
+    return MergedOutput(merged)
+
+
+def test_catch_intrinsic_error() -> None:
+    rule_runner = RuleRunner(
+        rules=[catch_merge_digests_error, QueryRule(MergedOutput, (FileInput,))]
+    )
+    msg = softwrap(
+        """\
+        error merging digests for input FileInput(filename='some-file.txt'): Can only merge
+        Directories with no duplicates, but found 2 duplicate entries in :
+        """
+    )
+    with engine_error(MergeErr, contains=msg):
+        rule_runner.request(MergedOutput, (FileInput("some-file.txt"),))

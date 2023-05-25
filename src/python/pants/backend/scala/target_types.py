@@ -32,10 +32,12 @@ from pants.jvm.target_types import (
     JunitTestSourceField,
     JunitTestTimeoutField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
@@ -65,7 +67,7 @@ class ScalaDependenciesField(Dependencies):
 
 
 class ScalaConsumedPluginNamesField(StringSequenceField):
-    help = softwrap(
+    help = help_text(
         """
         The names of Scala plugins that this source file requires.
 
@@ -82,7 +84,7 @@ class ScalaConsumedPluginNamesField(StringSequenceField):
 
 
 @dataclass(frozen=True)
-class ScalaFieldSet(FieldSet):
+class ScalaFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (ScalaSourceField,)
 
     sources: ScalaSourceField
@@ -167,7 +169,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         JvmResolveField,
     )
     settings_request_cls = ScalaSettingsRequest
-    help = softwrap(
+    help = help_text(
         f"""
         Generate a `scalatest_test` target for each file in the `sources` field (defaults to
         all files in the directory matching {ScalatestTestsGeneratorSourcesField.default}).
@@ -258,6 +260,7 @@ class ScalaSourceTarget(Target):
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
+        JvmMainClassNameField,
     )
     help = "A single Scala source file containing application or library code."
 
@@ -305,6 +308,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
         ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmJdkField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
     )
     settings_request_cls = ScalaSettingsRequest
@@ -325,7 +329,7 @@ class ScalacPluginArtifactField(StringField, AsyncFieldMixin):
 
 class ScalacPluginNameField(StringField):
     alias = "plugin_name"
-    help = softwrap(
+    help = help_text(
         """
         The name that `scalac` should use to load the plugin.
 
@@ -341,7 +345,7 @@ class ScalacPluginTarget(Target):
         ScalacPluginArtifactField,
         ScalacPluginNameField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A plugin for `scalac`.
 
@@ -359,5 +363,6 @@ def rules():
     return (
         *collect_rules(),
         *jvm_target_types.rules(),
+        *ScalaFieldSet.jvm_rules(),
         UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
     )

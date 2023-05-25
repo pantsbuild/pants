@@ -109,15 +109,14 @@ async def create_python_repl_request(
     )
 
     complete_pex_env = pex_env.in_workspace()
-    args = complete_pex_env.create_argv(
-        request.in_chroot(requirements_pex.name), python=requirements_pex.python
-    )
+    args = complete_pex_env.create_argv(request.in_chroot(requirements_pex.name))
 
     chrooted_source_roots = [request.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **complete_pex_env.environment_dict(python_configured=requirements_pex.python is not None),
+        **complete_pex_env.environment_dict(python=requirements_pex.python),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
         "PEX_PATH": request.in_chroot(local_dists.pex.name),
+        "PEX_INTERPRETER_HISTORY": "1" if python_setup.repl_history else "0",
     }
 
     return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env)
@@ -174,15 +173,13 @@ async def create_ipython_repl_request(
     )
 
     complete_pex_env = pex_env.in_workspace()
-    args = list(
-        complete_pex_env.create_argv(request.in_chroot(ipython_pex.name), python=ipython_pex.python)
-    )
+    args = list(complete_pex_env.create_argv(request.in_chroot(ipython_pex.name)))
     if ipython.ignore_cwd:
         args.append("--ignore-cwd")
 
     chrooted_source_roots = [request.in_chroot(sr) for sr in sources.source_roots]
     extra_env = {
-        **complete_pex_env.environment_dict(python_configured=ipython_pex.python is not None),
+        **complete_pex_env.environment_dict(python=ipython_pex.python),
         "PEX_PATH": os.pathsep.join(
             [
                 request.in_chroot(requirements_pex.name),

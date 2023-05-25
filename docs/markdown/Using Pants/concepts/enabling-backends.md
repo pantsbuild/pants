@@ -4,7 +4,6 @@ slug: "enabling-backends"
 excerpt: "How to enable specific functionality."
 hidden: false
 createdAt: "2020-02-21T17:44:27.363Z"
-updatedAt: "2022-04-20T22:31:51.974Z"
 ---
 Most Pants functionality is opt-in by adding the relevant _backend_ to the `[GLOBAL].backend_packages` option in `pants.toml`. For example:
 
@@ -21,7 +20,7 @@ Available backends
 ------------------
 
 | Backend                                                   | What it does                                                                                       | Docs                                                              |
-| :-------------------------------------------------------- | :------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------- |
+|:----------------------------------------------------------|:---------------------------------------------------------------------------------------------------|:------------------------------------------------------------------|
 | `pants.backend.build_files.fmt.black`                     | Enables autoformatting `BUILD` files using `black`.                                                |                                                                   |
 | `pants.backend.build_files.fmt.buildifier`                | Enables autoformatting `BUILD` files using `buildifier`.                                           |                                                                   |
 | `pants.backend.build_files.fmt.yapf`                      | Enables autoformatting `BUILD` files using `yapf`.                                                 |                                                                   |
@@ -40,6 +39,7 @@ Available backends
 | `pants.backend.experimental.python.lint.autoflake`        | Enables Autoflake, which removes unused Python imports: <https://pypi.org/project/autoflake/>      | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.experimental.python.lint.pyupgrade`        | Enables Pyupgrade, which upgrades to new Python syntax: <https://pypi.org/project/pyupgrade/>      | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.experimental.python.packaging.pyoxidizer`  | Enables `pyoxidizer_binary` target.                                                                | [PyOxidizer](doc:pyoxidizer)                                      |
+| `pants.backend.experimental.visibility`                   | Enables `__dependencies_rules__` and `__dependents_rules__`                                        | [Visibility](doc:targets#visibility)                              |
 | `pants.backend.google_cloud_function.python`              | Enables generating a Google Cloud Function from Python code.                                       | [Google Cloud Function](doc:google-cloud-function-python)         |
 | `pants.backend.plugin_development`                        | Enables `pants_requirements` target.                                                               | [Plugins overview](doc:plugins-overview)                          |
 | `pants.backend.python`                                    | Core Python support.                                                                               | [Enabling Python support](doc:python-backend)                     |

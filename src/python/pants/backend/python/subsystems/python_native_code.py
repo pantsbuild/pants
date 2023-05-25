@@ -11,7 +11,6 @@ from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
 class PythonNativeCodeSubsystem(Subsystem):
-
     options_scope = "python-native-code"
     help = "Options for building native code using Python, e.g. when resolving distributions."
 

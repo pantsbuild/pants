@@ -7,6 +7,7 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.testutil import rule_runner
 
 
 class OptionsInitializerTest(unittest.TestCase):
@@ -18,7 +19,7 @@ class OptionsInitializerTest(unittest.TestCase):
         )
 
         env = CompleteEnvironmentVars({})
-        initializer = OptionsInitializer(options_bootstrapper)
+        initializer = OptionsInitializer(options_bootstrapper, rule_runner.EXECUTOR)
         with self.assertRaises(ExecutionError):
             initializer.build_config(options_bootstrapper, env)
 
@@ -30,7 +31,7 @@ class OptionsInitializerTest(unittest.TestCase):
             allow_pantsrc=False,
         )
         env = CompleteEnvironmentVars({})
-        initializer = OptionsInitializer(ob)
+        initializer = OptionsInitializer(ob, rule_runner.EXECUTOR)
         with self.assertRaises(ExecutionError) as exc:
             initializer.build_config(ob, env)
         self.assertIn(

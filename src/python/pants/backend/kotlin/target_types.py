@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -24,10 +23,12 @@ from pants.jvm.target_types import (
     JunitTestSourceField,
     JunitTestTimeoutField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class KotlinSourceField(SingleSourceField):
@@ -39,7 +40,7 @@ class KotlinGeneratorSourcesField(MultipleSourcesField):
 
 
 class KotlincConsumedPluginIdsField(StringSequenceField):
-    help = softwrap(
+    help = help_text(
         """
         The IDs of Kotlin compiler plugins that this source file requires.
 
@@ -56,7 +57,7 @@ class KotlincConsumedPluginIdsField(StringSequenceField):
 
 
 @dataclass(frozen=True)
-class KotlinFieldSet(FieldSet):
+class KotlinFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (KotlinSourceField,)
 
     sources: KotlinSourceField
@@ -88,6 +89,7 @@ class KotlinSourceTarget(Target):
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
+        JvmMainClassNameField,
     )
     help = "A single Kotlin source file containing application or library code."
 
@@ -113,6 +115,7 @@ class KotlinSourcesGeneratorTarget(TargetFilesGenerator):
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
+        JvmMainClassNameField,
     )
     help = "Generate a `kotlin_source` target for each file in the `sources` field."
 
@@ -187,7 +190,7 @@ class KotlincPluginArtifactField(StringField, AsyncFieldMixin):
 
 class KotlincPluginIdField(StringField):
     alias = "plugin_id"
-    help = softwrap(
+    help = help_text(
         """
         The ID for `kotlinc` to use when setting options for the plugin.
 
@@ -198,7 +201,7 @@ class KotlincPluginIdField(StringField):
 
 class KotlincPluginArgsField(StringSequenceField):
     alias = "plugin_args"
-    help = softwrap(
+    help = help_text(
         """
         Optional list of argument to pass to the plugin.
         """
@@ -213,7 +216,7 @@ class KotlincPluginTarget(Target):
         KotlincPluginIdField,
         KotlincPluginArgsField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A plugin for `kotlinc`.
 
@@ -232,4 +235,6 @@ class KotlincPluginTarget(Target):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *KotlinFieldSet.jvm_rules(),
+    ]

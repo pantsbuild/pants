@@ -802,3 +802,73 @@ def test_compile_with_multiple_scala_versions(
         ".Example.scala.main_2.13.scalac.jar",
         "org.scala-lang_scala-library_2.13.8.jar",
     ]
+
+
+@pytest.fixture
+def scala3_stdlib_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scala-library-3.test.lock",
+        ["org.scala-lang:scala3-library_3:3.2.0"],
+    )
+
+
+@pytest.fixture
+def scala3_stdlib_jvm_lockfile(
+    scala3_stdlib_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala3_stdlib_jvm_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_compile_no_deps_scala3(
+    rule_runner: RuleRunner, scala3_stdlib_jvm_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                scala_sources(
+                    name = 'lib',
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": scala3_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala3_stdlib_jvm_lockfile.serialized_lockfile,
+            "ExampleLib.scala": SCALA_LIB_SOURCE,
+        }
+    )
+    rule_runner.set_options(
+        args=[
+            "--scala-version-for-resolve={'jvm-default': '3.2.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="lib")
+    )
+
+    classpath = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
+    )
+    assert classpath.content == {
+        ".ExampleLib.scala.lib.scalac.jar": {
+            "META-INF/MANIFEST.MF",
+            "org/pantsbuild/example/lib/C.class",
+            "org/pantsbuild/example/lib/C.tasty",
+        }
+    }
+
+    # Additionally validate that `check` works.
+    check_results = rule_runner.request(
+        CheckResults,
+        [
+            ScalacCheckRequest(
+                [ScalacCheckRequest.field_set_type.create(coarsened_target.representative)]
+            )
+        ],
+    )
+    assert len(check_results.results) == 1
+    check_result = check_results.results[0]
+    assert check_result.exit_code == 0

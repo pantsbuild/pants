@@ -86,16 +86,14 @@ impl Config {
           items.push(value.to_owned())
         } else {
           return Err(format!(
-            "Expected {} to be an array of strings but given {} containing non string item {}",
-            option_name, value, item
+            "Expected {option_name} to be an array of strings but given {value} containing non string item {item}"
           ));
         }
       }
       Ok(items)
     } else {
       Err(format!(
-        "Expected {} to be an array but given {}.",
-        option_name, value
+        "Expected {option_name} to be an array but given {value}."
       ))
     }
   }
@@ -103,7 +101,7 @@ impl Config {
   fn get_value(&self, id: &OptionId) -> Option<&Value> {
     self
       .config
-      .get(&id.scope())
+      .get(id.scope())
       .and_then(|table| table.get(Self::option_name(id)))
   }
 
@@ -129,7 +127,7 @@ impl Config {
 
 impl OptionsSource for Config {
   fn display(&self, id: &OptionId) -> String {
-    format!("{}", id)
+    format!("{id}")
   }
 
   fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
@@ -137,10 +135,7 @@ impl OptionsSource for Config {
       if let Some(string) = value.as_str() {
         Ok(Some(string.to_owned()))
       } else {
-        Err(format!(
-          "Expected {} to be a string but given {}.",
-          id, value
-        ))
+        Err(format!("Expected {id} to be a string but given {value}."))
       }
     } else {
       Ok(None)
@@ -152,7 +147,7 @@ impl OptionsSource for Config {
       if let Some(bool) = value.as_bool() {
         Ok(Some(bool))
       } else {
-        Err(format!("Expected {} to be a bool but given {}.", id, value))
+        Err(format!("Expected {id} to be a bool but given {value}."))
       }
     } else {
       Ok(None)
@@ -164,10 +159,7 @@ impl OptionsSource for Config {
       if let Some(float) = value.as_float() {
         Ok(Some(float))
       } else {
-        Err(format!(
-          "Expected {} to be a float but given {}.",
-          id, value
-        ))
+        Err(format!("Expected {id} to be a float but given {value}."))
       }
     } else {
       Ok(None)
@@ -175,7 +167,7 @@ impl OptionsSource for Config {
   }
 
   fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-    if let Some(table) = self.config.get(&id.scope()) {
+    if let Some(table) = self.config.get(id.scope()) {
       let option_name = Self::option_name(id);
       let mut list_edits = vec![];
       if let Some(value) = table.get(&option_name) {
@@ -188,26 +180,25 @@ impl OptionsSource for Config {
             )
           {
             return Err(format!(
-              "Expected {} to contain an 'add' element, a 'remove' element or both but found: {:?}",
-              option_name, sub_table
+              "Expected {option_name} to contain an 'add' element, a 'remove' element or both but found: {sub_table:?}"
             ));
           }
           if let Some(add) = sub_table.get("add") {
             list_edits.push(ListEdit {
               action: ListEditAction::Add,
-              items: Self::extract_string_list(&*format!("{}.add", option_name), add)?,
+              items: Self::extract_string_list(&format!("{option_name}.add"), add)?,
             })
           }
           if let Some(remove) = sub_table.get("remove") {
             list_edits.push(ListEdit {
               action: ListEditAction::Remove,
-              items: Self::extract_string_list(&*format!("{}.remove", option_name), remove)?,
+              items: Self::extract_string_list(&format!("{option_name}.remove"), remove)?,
             })
           }
         } else {
           list_edits.push(ListEdit {
             action: ListEditAction::Replace,
-            items: Self::extract_string_list(&*option_name, value)?,
+            items: Self::extract_string_list(&option_name, value)?,
           });
         }
       }

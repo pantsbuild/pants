@@ -34,6 +34,7 @@ class TestOptionHelpFormatter:
             choices=None,
             comma_separated_choices=None,
             value_history=OptionValueHistory((RankedValue(Rank.HARDCODED, None),)),
+            fromfile=False,
         )
         ohi = replace(ohi, **kwargs)
         lines = HelpFormatter(

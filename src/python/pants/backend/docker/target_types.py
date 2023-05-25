@@ -13,6 +13,7 @@ from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.base.build_environment import get_buildroot
+from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
@@ -36,7 +37,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 # Common help text to be applied to each field that supports value interpolation.
 _interpolation_help = (
@@ -48,7 +49,7 @@ _interpolation_help = (
 class DockerImageBuildArgsField(StringSequenceField):
     alias = "extra_build_args"
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         Build arguments (`--build-arg`) to use when building this image.
         Entries are either strings in the form `ARG_NAME=value` to set an explicit value;
@@ -61,7 +62,7 @@ class DockerImageBuildArgsField(StringSequenceField):
 
 class DockerImageContextRootField(StringField):
     alias = "context_root"
-    help = softwrap(
+    help = help_text(
         """
         Specify which directory to use as the Docker build context root. This affects the file
         paths to use for the `COPY` and `ADD` instructions. For example, whether
@@ -95,6 +96,7 @@ class DockerImageContextRootField(StringField):
 
 
 class DockerImageSourceField(OptionalSingleSourceField):
+    none_is_valid_value = True
     default = "Dockerfile"
 
     # When the default glob value is in effect, we don't want the normal glob match error behavior
@@ -104,7 +106,7 @@ class DockerImageSourceField(OptionalSingleSourceField):
     # to the user.
     default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
-    help = softwrap(
+    help = help_text(
         """
         The Dockerfile to use when building the Docker image.
 
@@ -117,7 +119,7 @@ class DockerImageSourceField(OptionalSingleSourceField):
 class DockerImageInstructionsField(StringSequenceField):
     alias = "instructions"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         The `Dockerfile` content, typically one instruction per list item.
 
@@ -139,7 +141,7 @@ class DockerImageInstructionsField(StringSequenceField):
 class DockerImageTagsField(StringSequenceField):
     alias = "image_tags"
     default = ("latest",)
-    help = softwrap(
+    help = help_text(
         f"""
 
         Any tags to apply to the Docker image name (the version is usually applied as a tag).
@@ -153,7 +155,7 @@ class DockerImageTagsField(StringSequenceField):
 
 class DockerImageTargetStageField(StringField):
     alias = "target_stage"
-    help = softwrap(
+    help = help_text(
         """
         Specify target build stage, rather than building the entire `Dockerfile`.
 
@@ -173,7 +175,7 @@ class DockerImageDependenciesField(Dependencies):
 class DockerImageRegistriesField(StringSequenceField):
     alias = "registries"
     default = (ALL_DEFAULT_REGISTRIES,)
-    help = softwrap(
+    help = help_text(
         """
         List of addresses or configured aliases to any Docker registries to use for the
         built image.
@@ -207,7 +209,7 @@ class DockerImageRegistriesField(StringSequenceField):
 
 class DockerImageRepositoryField(StringField):
     alias = "repository"
-    help = softwrap(
+    help = help_text(
         f"""
         The repository name for the Docker image. e.g. "<repository>/<name>".
 
@@ -254,7 +256,7 @@ class DockerBuildOptionFieldMixin(ABC):
 
 class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
     alias = "image_labels"
-    help = softwrap(
+    help = help_text(
         f"""
         Provide image metadata.
 
@@ -275,7 +277,7 @@ class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
     alias = "secrets"
-    help = softwrap(
+    help = help_text(
         """
         Secret files to expose to the build (only if BuildKit enabled).
 
@@ -314,7 +316,7 @@ class DockerImageBuildSecretsOptionField(
 class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
     alias = "ssh"
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         SSH agent socket or keys to expose to the build (only if BuildKit enabled)
         (format: default|<id>[=<socket>|<key>[,<key>]])
@@ -348,12 +350,13 @@ class DockerBuildOptionFieldValueMixin(Field):
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
     alias = "pull"
-    default = True
-    help = softwrap(
+    default = False
+    help = help_text(
         """
         If true, then docker will always attempt to pull a newer version of the image.
 
-        Useful to disable it when building images from other intermediate goals.
+        NOTE: This option cannot be used on images that build off of "transitive" base images
+        referenced by address (i.e. `FROM path/to/your/base/Dockerfile`).
         """
     )
     docker_build_option = "--pull"
@@ -374,7 +377,7 @@ class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
 class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
     alias = "squash"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If true, then docker will squash newly built layers into a single new layer.
 
@@ -403,16 +406,17 @@ class DockerImageTarget(Target):
         DockerImageTargetStageField,
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
+        OutputPathField,
         RestartableField,
     )
-    help = softwrap(
+    help = help_text(
         """
         The `docker_image` target describes how to build and tag a Docker image.
 
         Any dependencies, as inferred or explicitly specified, will be included in the Docker
         build context, after being packaged if applicable.
 
-        By default, will use a Dockerfile from the same directory as the BUILD file this target
+        By default, it will use a Dockerfile from the same directory as the BUILD file this target
         is defined in. Point at another file with the `source` field, or use the `instructions`
         field to have the Dockerfile contents verbatim directly in the BUILD file.
 

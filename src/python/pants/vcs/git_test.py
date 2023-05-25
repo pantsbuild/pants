@@ -273,8 +273,8 @@ def test_bad_ref_stderr_issues_13396(git: MutatingGitWorktree) -> None:
     with pytest.raises(
         GitBinaryException,
         match=re.escape(
-            "fatal: ambiguous argument 'HEAD~1000': unknown revision or path not in the working "
-            "tree.\n"
+            "fatal: ambiguous argument 'HEAD~1000': unknown revision or path not in the working"
+            + " tree.\n"
         ),
     ):
         git.changes_in(diffspec="HEAD~1000")

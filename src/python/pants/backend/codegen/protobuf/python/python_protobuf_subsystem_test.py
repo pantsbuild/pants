@@ -38,7 +38,12 @@ def test_find_protobuf_python_requirement() -> None:
         {"codegen/dir/f.proto": "", "codegen/dir/BUILD": "protobuf_sources(grpc=True)"}
     )
     rule_runner.set_options(
-        ["--python-resolves={'python-default': '', 'another': ''}", "--python-enable-resolves"]
+        [
+            "--python-resolves={'python-default': '', 'another': ''}",
+            "--python-enable-resolves",
+            # Turn off python synthetic lockfile targets to make the test simpler.
+            "--no-python-enable-lockfile-targets",
+        ]
     )
     proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
     request = InferPythonProtobufDependencies(

@@ -166,3 +166,13 @@ def test_lazy_frozen_dict() -> None:
 
     # Hash value should be stable regardless if we've loaded the values or not.
     assert hash(ld1) == hashvalue
+
+
+def test_frozendict_dot_frozen() -> None:
+    a = {1: 2}
+    b = FrozenDict(a)
+    frozen_a = FrozenDict.frozen(a)
+    frozen_b = FrozenDict.frozen(b)
+
+    assert frozen_a == FrozenDict(a)
+    assert frozen_b is b

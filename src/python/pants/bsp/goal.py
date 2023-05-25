@@ -173,14 +173,14 @@ class BSPGoal(BuiltinGoal):
 
         run_script_path = bsp_scripts_dir / "run-bsp.sh"
         run_script_path.write_text(
-            textwrap.dedent(
+            textwrap.dedent(  # noqa: PNT20
                 f"""\
-            #!/bin/sh
-            {run_script_env_lines_str}
-            exec 2>>{shlex.quote(str(bsp_logs_dir / 'stderr.log'))}
-            env 1>&2
-            exec {shlex.quote(bin_name())} --no-pantsd {self.name} --server
-            """
+                #!/bin/sh
+                {run_script_env_lines_str}
+                exec 2>>{shlex.quote(str(bsp_logs_dir / 'stderr.log'))}
+                env 1>&2
+                exec {shlex.quote(bin_name())} --no-pantsd {self.name} --server
+                """
             )
         )
         run_script_path.chmod(0o755)

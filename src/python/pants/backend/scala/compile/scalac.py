@@ -18,6 +18,11 @@ from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_r
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
+from pants.backend.scala.util_rules import versions
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+)
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
@@ -35,10 +40,11 @@ from pants.jvm.compile import (
 )
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import NO_MAIN_CLASS
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -66,7 +72,6 @@ async def compile_scala_source(
     scalac: Scalac,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
-
     # Request classpath entries for our direct dependencies.
     dependency_cpers = await Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request))
     direct_dependency_classpath_entries = dependency_cpers.if_all_succeeded()
@@ -80,6 +85,9 @@ async def compile_scala_source(
         )
 
     scala_version = scala.version_for_resolve(request.resolve.name)
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
 
     component_members_with_sources = tuple(
         t for t in request.component.members if t.has_field(SourcesField)
@@ -140,16 +148,8 @@ async def compile_scala_source(
             ToolClasspathRequest(
                 artifact_requirements=ArtifactRequirements.from_coordinates(
                     [
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-compiler",
-                            version=scala_version,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-library",
-                            version=scala_version,
-                        ),
+                        scala_artifacts.compiler_coordinate,
+                        scala_artifacts.library_coordinate,
                     ]
                 ),
             ),
@@ -179,7 +179,7 @@ async def compile_scala_source(
             jdk=jdk,
             classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
             argv=[
-                "scala.tools.nsc.Main",
+                scala_artifacts.compiler_main,
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
                 *local_plugins.args(local_scalac_plugins_relpath),
@@ -188,7 +188,7 @@ async def compile_scala_source(
                 # NB: We set a non-existent main-class so that using `-d` produces a `jar` manifest
                 # with stable content.
                 "-Xmain-class",
-                "no.main.class",
+                NO_MAIN_CLASS,
                 "-d",
                 output_file,
                 *sorted(
@@ -225,16 +225,15 @@ async def compile_scala_source(
 
 @rule
 async def fetch_scala_library(request: ScalaLibraryRequest) -> ClasspathEntry:
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(request.version)
+    )
     tcp = await Get(
         ToolClasspath,
         ToolClasspathRequest(
             artifact_requirements=ArtifactRequirements.from_coordinates(
                 [
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-library",
-                        version=request.version,
-                    ),
+                    scala_artifacts.library_coordinate,
                 ]
             ),
         ),
@@ -248,5 +247,6 @@ def rules():
         *collect_rules(),
         *jvm_compile_rules(),
         *scalac_plugins_rules(),
+        *versions.rules(),
         UnionRule(ClasspathEntryRequest, CompileScalaSourceRequest),
     ]

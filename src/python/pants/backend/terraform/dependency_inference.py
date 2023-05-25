@@ -4,23 +4,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Tuple
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
+from pants.backend.python.subsystems.python_tool_base import (
+    LockfileRules,
+    PythonToolRequirementsBase,
 )
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
+from pants.backend.terraform.tool import TerraformProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.tailor import group_by_dir
+from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, ProcessResult
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     FieldSet,
@@ -31,7 +31,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.util.docutil import git_url
+from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.resources import read_resource
@@ -41,26 +41,13 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"
     help = "Used to parse Terraform modules to infer their dependencies."
 
-    default_version = "python-hcl2==3.0.5"
+    default_version = "python-hcl2==4.3.0"
+    default_requirements = ["python-hcl2>=3.0.5,<5"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
-    default_lockfile_path = "src/python/pants/backend/terraform/hcl2.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-
-
-class TerraformHcl2ParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = TerraformHcl2Parser.options_scope
-
-
-@rule
-def setup_lockfile_request(
-    _: TerraformHcl2ParserLockfileSentinel, hcl2_parser: TerraformHcl2Parser
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(hcl2_parser)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)
@@ -160,10 +147,44 @@ async def infer_terraform_module_dependencies(
     return InferredDependencies(terraform_module_addresses)
 
 
+@dataclass(frozen=True)
+class GetTerraformDependenciesRequest:
+    source_files: SourceFiles
+    directories: Tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TerraformDependencies:
+    fetched_deps: Tuple[Tuple[str, Digest], ...]
+
+
+@rule
+async def get_terraform_providers(
+    req: GetTerraformDependenciesRequest,
+) -> TerraformDependencies:
+    fetched_deps = await MultiGet(
+        Get(
+            FallibleProcessResult,
+            TerraformProcess(
+                args=("init",),
+                input_digest=req.source_files.snapshot.digest,
+                output_files=(".terraform.lock.hcl",),
+                output_directories=(".terraform",),
+                description="Run `terraform init` to fetch dependencies",
+                chdir=directory,
+            ),
+        )
+        for directory in req.directories
+    )
+
+    return TerraformDependencies(
+        tuple(zip(req.directories, (x.output_digest for x in fetched_deps)))
+    )
+
+
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
+        *pex_rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
-        UnionRule(GenerateToolLockfileSentinel, TerraformHcl2ParserLockfileSentinel),
     ]

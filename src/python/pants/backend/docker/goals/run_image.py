@@ -3,27 +3,51 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, replace
 from typing import cast
 
-from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerFieldSet
+from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerPackageFieldSet
 from pants.backend.docker.subsystems.docker_options import DockerOptions
+from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSourceField
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import WrappedTarget, WrappedTargetRequest
+
+
+@dataclass(frozen=True)
+class DockerRunFieldSet(RunFieldSet):
+    required_fields = (DockerImageSourceField,)
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
 
 @rule
 async def docker_image_run_request(
-    field_set: DockerFieldSet,
+    field_set: DockerRunFieldSet,
     docker: DockerBinary,
     options: DockerOptions,
     options_env_aware: DockerOptions.EnvironmentAware,
 ) -> RunRequest:
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+    )
+    build_request = DockerPackageFieldSet.create(wrapped_target.target)
+    registries = options.registries()
+    for registry in registries.get(*(build_request.registries.value or [])):
+        if registry.use_local_alias:
+            # We only need to tag a single image name for run requests if there is a registry with
+            # `use_local_alias` as true.
+            build_request = replace(
+                build_request,
+                registries=DockerImageRegistriesField((registry.alias,), field_set.address),
+            )
+            break
     env, image = await MultiGet(
         Get(EnvironmentVars, EnvironmentVarsRequest(options_env_aware.env_vars)),
-        Get(BuiltPackage, PackageFieldSet, field_set),
+        Get(BuiltPackage, PackageFieldSet, build_request),
     )
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]
     run = docker.run_image(tag, docker_run_args=options.run_args, env=env)
@@ -36,14 +60,8 @@ async def docker_image_run_request(
     )
 
 
-@rule
-async def docker_image_run_debug_adapter_request(
-    field_set: DockerFieldSet,
-) -> RunDebugAdapterRequest:
-    raise NotImplementedError(
-        "Debugging a Docker image using a debug adapter has not yet been implemented."
-    )
-
-
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *DockerRunFieldSet.rules(),
+    ]

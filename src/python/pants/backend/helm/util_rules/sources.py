@@ -17,7 +17,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.native_engine import RemovePrefix
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     HydratedSources,
@@ -121,7 +121,6 @@ class HelmChartSourceFiles:
     unrooted_files: tuple[str, ...]
 
 
-@rule_helper
 async def _strip_chart_source_root(
     source_files: SourceFiles, chart_root: HelmChartRoot
 ) -> Snapshot:

@@ -18,7 +18,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class ValidationConfig:
 class RegexLintSubsystem(Subsystem):
     options_scope = "regex-lint"
     name = "regex-lint"
-    help = softwrap(
+    help = help_text(
         """
         Lint your code using regex patterns, e.g. to check for copyright headers.
 

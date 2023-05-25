@@ -9,12 +9,12 @@ from pants.base.deprecated import resolve_conflicting_options
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class PythonRepos(Subsystem):
     options_scope = "python-repos"
-    help = softwrap(
+    help = help_text(
         """
         External Python code repositories, such as PyPI.
 

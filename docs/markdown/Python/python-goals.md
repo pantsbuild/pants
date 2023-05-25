@@ -4,7 +4,6 @@ slug: "python-goals"
 excerpt: "Details on the Python-related goals implemented in the Python backend."
 hidden: false
 createdAt: "2020-03-16T16:19:59.347Z"
-updatedAt: "2021-11-06T02:19:59.221Z"
 ---
 - [fmt](doc:python-fmt-goal): autoformat source code.
 - [lint](doc:python-lint-goal): lint source code in check-only mode.

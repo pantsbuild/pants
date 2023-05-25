@@ -4,7 +4,6 @@ slug: "python-fmt-goal"
 excerpt: "Autoformat source code."
 hidden: false
 createdAt: "2020-03-16T18:36:31.694Z"
-updatedAt: "2021-11-06T02:25:54.989Z"
 ---
 See [here](doc:python-linters-and-formatters) for how to opt in to specific formatters, along with how to configure them:
 

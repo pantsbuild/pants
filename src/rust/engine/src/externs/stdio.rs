@@ -27,7 +27,7 @@ impl PyStdioRead {
 
   fn readinto(&self, obj: &PyAny, py: Python) -> PyResult<usize> {
     let py_buffer = PyBuffer::get(obj)?;
-    let mut buffer = vec![0; py_buffer.len_bytes() as usize];
+    let mut buffer = vec![0; py_buffer.len_bytes()];
     let read = py
       .allow_threads(|| stdio::get_destination().read_stdin(&mut buffer))
       .map_err(|e| PyException::new_err(e.to_string()))?;

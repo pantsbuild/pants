@@ -27,6 +27,7 @@ def workunit_logger_config(log_dest: str, *, pantsd: bool = True) -> Mapping:
             "backend_packages.add": ["workunit_logger", "pants.backend.python"],
         },
         "workunit-logger": {"dest": log_dest},
+        "python": {"interpreter_constraints": "['>=3.7,<3.10']"},
     }
 
 

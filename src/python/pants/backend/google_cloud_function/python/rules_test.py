@@ -30,6 +30,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     FilesGeneratorTarget,
@@ -41,12 +42,13 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *package_pex_binary.rules(),
             *python_google_cloud_function_rules(),
@@ -54,6 +56,7 @@ def rule_runner() -> RuleRunner:
             *target_rules(),
             *python_target_types_rules(),
             *core_target_types_rules(),
+            *package.rules(),
             QueryRule(BuiltPackage, (PythonGoogleCloudFunctionFieldSet,)),
         ],
         target_types=[
@@ -72,7 +75,7 @@ def rule_runner() -> RuleRunner:
 
 
 def create_python_google_cloud_function(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     addr: Address,
     *,
     expected_extra_log_lines: tuple[str, ...],
@@ -98,7 +101,7 @@ def create_python_google_cloud_function(
 
 
 @pytest.fixture
-def complete_platform(rule_runner: RuleRunner) -> bytes:
+def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     rule_runner.write_files(
         {
             "pex_exe/BUILD": dedent(
@@ -127,8 +130,8 @@ def complete_platform(rule_runner: RuleRunner) -> bytes:
     "major_minor_interpreter",
     all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
 )
-def test_create_hello_world_lambda(
-    rule_runner: RuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
+def test_create_hello_world_lambda_with_lambdex(
+    rule_runner: PythonRuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
 ) -> None:
     rule_runner.write_files(
         {
@@ -172,10 +175,13 @@ def test_create_hello_world_lambda(
     assert "main.py" in names
     assert "foo/bar/hello_world.py" in names
     if sys.platform == "darwin":
-        assert "Google Cloud Functions built on macOS may fail to build." in caplog.text
+        assert (
+            "`python_google_cloud_function` targets built on macOS may fail to build."
+            in caplog.text
+        )
 
 
-def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
+def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -231,9 +237,51 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
     assert (
-        "The `python_google_cloud_function` target src/py/project:lambda transitively depends on"
+        "The target src/py/project:lambda (`python_google_cloud_function`) transitively depends on"
         in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text
+
+
+def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": dedent(
+                """
+                import mureq
+
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/BUILD": dedent(
+                """
+                python_requirement(name="mureq", requirements=["mureq==0.2"])
+                python_sources()
+
+                python_google_cloud_function(
+                    name='gcf',
+                    handler='foo.bar.hello_world:handler',
+                    runtime="python37",
+                    type='event',
+                )
+                """
+            ),
+        }
+    )
+
+    zip_file_relpath, content = create_python_google_cloud_function(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="gcf"),
+        expected_extra_log_lines=("    Handler: handler",),
+        extra_args=["--lambdex-layout=zip"],
+    )
+    assert "src.python.foo.bar/gcf.zip" == zip_file_relpath
+
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "mureq/__init__.py" in names
+    assert "foo/bar/hello_world.py" in names
+    assert zipfile.read("main.py") == b"from foo.bar.hello_world import handler as handler"

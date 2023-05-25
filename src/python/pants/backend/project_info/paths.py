@@ -70,7 +70,7 @@ def find_paths_breadth_first(
         current_edge = (prev_target, target)
 
         if current_edge not in visited_edges:
-            for dep in adjacency_lists[target]:
+            for dep in adjacency_lists.get(target, []):
                 dep_path = cur_path + [dep.address]
                 if dep.address == to_target:
                     yield dep_path
@@ -81,7 +81,6 @@ def find_paths_breadth_first(
 
 @goal_rule
 async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
-
     path_from = paths_subsystem.from_
     path_to = paths_subsystem.to
 

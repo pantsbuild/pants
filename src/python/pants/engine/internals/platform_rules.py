@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+
 from pants.core.util_rules.environments import (
     DockerImageField,
     DockerPlatformField,
@@ -10,7 +12,12 @@ from pants.core.util_rules.environments import (
     EnvironmentTarget,
     RemotePlatformField,
 )
-from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import (
+    CompleteEnvironmentVars,
+    EnvironmentVars,
+    EnvironmentVarsRequest,
+    PathEnvironmentVariable,
+)
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
@@ -70,6 +77,7 @@ async def complete_environment_vars(
             ["env", "-0"],
             description=f"Extract environment variables from {description_of_env_source}",
             level=LogLevel.DEBUG,
+            cache_scope=env_tgt.executable_search_path_cache_scope(),
         ),
     )
     result = {}
@@ -91,6 +99,13 @@ def environment_vars_subset(
             allowed=(None if request.allowed is None else tuple(request.allowed)),
         ).items()
     )
+
+
+@rule
+async def environment_path_variable() -> PathEnvironmentVariable:
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
+    path = env.get("PATH", None)
+    return PathEnvironmentVariable(path.split(os.pathsep) if path else ())
 
 
 def rules():

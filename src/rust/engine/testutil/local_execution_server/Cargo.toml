@@ -8,6 +8,5 @@ publish = false
 [dependencies]
 protos = { path = "../../protos" }
 mock = { path = "../mock" }
-clap = "3"
-structopt = "0.3.26"
+clap = { version = "3", features = ["derive"] }
 

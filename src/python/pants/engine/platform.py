@@ -5,9 +5,14 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pants.base.deprecated import deprecated
-from pants.util.memo import memoized_classproperty
 from pants.util.osutil import get_normalized_arch_name, get_normalized_os_name
+
+
+class PlatformError(Exception):
+    """Raise when an attempt is made to execute a process on a platform where it cannot succeed.
+
+    E.g., because it requires a tool that is not supported on the platform.
+    """
 
 
 class Platform(Enum):
@@ -19,17 +24,6 @@ class Platform(Enum):
     @property
     def is_macos(self) -> bool:
         return self in [Platform.macos_arm64, Platform.macos_x86_64]
-
-    @memoized_classproperty
-    @deprecated(
-        "2.16.0.dev1",
-        (
-            "The `Platform` to use is dependent on a `@rule`'s position in the `@rule` graph. "
-            "Request the `Platform` to use as a `@rule` argument to get the appropriate `Platform`."
-        ),
-    )
-    def current(cls) -> Platform:
-        return cls.create_for_localhost()
 
     @classmethod
     def create_for_localhost(cls) -> Platform:

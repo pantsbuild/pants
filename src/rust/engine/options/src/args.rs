@@ -45,9 +45,9 @@ impl Args {
   fn arg_names(id: &OptionId, negate: Negate) -> HashMap<String, bool> {
     let mut arg_names = HashMap::new();
     if let Some(switch) = id.2 {
-      arg_names.insert(format!("-{}", switch), false);
+      arg_names.insert(format!("-{switch}"), false);
       if negate == Negate::True {
-        arg_names.insert(format!("--no-{}", switch), true);
+        arg_names.insert(format!("--no-{switch}"), true);
       }
     }
     arg_names.insert(Self::arg_name(id, Negate::False), false);
@@ -106,12 +106,9 @@ impl OptionsSource for Args {
       let mut components = arg.as_str().splitn(2, '=');
       if let Some(name) = components.next() {
         if arg_names.contains_key(name) {
-          let value = components.next().ok_or_else(|| {
-            format!(
-              "Expected string list option {name} to have a value.",
-              name = name
-            )
-          })?;
+          let value = components
+            .next()
+            .ok_or_else(|| format!("Expected string list option {name} to have a value."))?;
           edits.extend(parse_string_list(value).map_err(|e| e.render(name))?)
         }
       }

@@ -15,8 +15,6 @@ from pants.core.goals.fix import FixResult
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -84,12 +82,6 @@ def run_pyupgrade(
     return fix_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
@@ -103,15 +95,27 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
         [tgt],
         extra_args=[f"--pyupgrade-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
-    assert fix_result.output == get_snapshot(rule_runner, {"f.py": PY_36_GOOD_FILE})
+    assert fix_result.output == rule_runner.make_snapshot({"f.py": PY_36_GOOD_FILE})
     assert fix_result.did_change is False
+
+
+def test_convergance(rule_runner: RuleRunner) -> None:
+    # NB: Testing the fact that we re-run pyupgrade until it converges
+    percent_s_string_formatting = '"%s %s" % (foo, bar)\n'
+    rule_runner.write_files(
+        {"f.py": percent_s_string_formatting, "BUILD": "python_sources(name='t')"}
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
+    fix_result = run_pyupgrade(rule_runner, [tgt], extra_args=["--pyupgrade-args=--py36-plus"])
+    assert fix_result.output == rule_runner.make_snapshot({"f.py": 'f"{foo} {bar}"\n'})
+    assert fix_result.did_change is True
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": PY_36_BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fix_result = run_pyupgrade(rule_runner, [tgt])
-    assert fix_result.output == get_snapshot(rule_runner, {"f.py": PY_36_FIXED_BAD_FILE})
+    assert fix_result.output == rule_runner.make_snapshot({"f.py": PY_36_FIXED_BAD_FILE})
     assert fix_result.did_change is True
 
 
@@ -124,8 +128,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
     fix_result = run_pyupgrade(rule_runner, tgts)
-    assert fix_result.output == get_snapshot(
-        rule_runner, {"good.py": PY_36_GOOD_FILE, "bad.py": PY_36_FIXED_BAD_FILE}
+    assert fix_result.output == rule_runner.make_snapshot(
+        {"good.py": PY_36_GOOD_FILE, "bad.py": PY_36_FIXED_BAD_FILE}
     )
     assert fix_result.did_change is True
 
@@ -142,7 +146,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
         [tgt],
         pyupgrade_arg="--py38-plus",
     )
-    assert fix_result.output == get_snapshot(
-        rule_runner, {"some_file_name.py": PY_38_FIXED_BAD_FILE}
+    assert fix_result.output == rule_runner.make_snapshot(
+        {"some_file_name.py": PY_38_FIXED_BAD_FILE}
     )
     assert fix_result.did_change is True

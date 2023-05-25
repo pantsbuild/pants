@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.python.goals.setup_py import DistBuildEnvironment, DistBuildEnvironmentRequest
 from pants.backend.python.target_types import PythonDistribution
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
@@ -13,18 +12,22 @@ from pants.backend.python.typecheck.mypy.subsystem import (
     MyPyFirstPartyPlugins,
 )
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.package_dists import (
+    DistBuildEnvironment,
+    DistBuildEnvironmentRequest,
+)
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class UsesMyPycField(BoolField):
     alias = "uses_mypyc"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If true, this distribution is built using mypyc.
 

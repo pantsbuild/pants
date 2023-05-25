@@ -26,6 +26,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     FilesGeneratorTarget,
@@ -37,12 +38,13 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *awslambda_python_rules(),
             *awslambda_python_subsystem_rules(),
@@ -50,6 +52,7 @@ def rule_runner() -> RuleRunner:
             *package_pex_binary.rules(),
             *python_target_types_rules(),
             *target_rules(),
+            *package.rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
         ],
         target_types=[
@@ -69,7 +72,7 @@ def rule_runner() -> RuleRunner:
 
 
 def create_python_awslambda(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     addr: Address,
     *,
     expected_extra_log_lines: tuple[str, ...],
@@ -90,12 +93,12 @@ def create_python_awslambda(
 
 
 @pytest.fixture
-def complete_platform(rule_runner: RuleRunner) -> bytes:
+def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     rule_runner.write_files(
         {
             "pex_exe/BUILD": dedent(
                 """\
-                python_requirement(name="req", requirements=["pex==2.1.66"])
+                python_requirement(name="req", requirements=["pex==2.1.112"])
                 pex_binary(dependencies=[":req"], script="pex")
                 """
             ),
@@ -119,8 +122,8 @@ def complete_platform(rule_runner: RuleRunner) -> bytes:
     "major_minor_interpreter",
     all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
 )
-def test_create_hello_world_lambda(
-    rule_runner: RuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
+def test_create_hello_world_lambda_with_lambdex(
+    rule_runner: PythonRuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
 ) -> None:
     rule_runner.write_files(
         {
@@ -175,7 +178,7 @@ def test_create_hello_world_lambda(
         ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" in names
     ), "third-party dep `mureq` must be included"
     if sys.platform == "darwin":
-        assert "AWS Lambdas built on macOS may fail to build." in caplog.text
+        assert "`python_awslambda` targets built on macOS may fail to build." in caplog.text
 
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
@@ -194,7 +197,7 @@ def test_create_hello_world_lambda(
     ), "Using include_requirements=False should exclude third-party deps"
 
 
-def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
+def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -249,8 +252,74 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
     assert (
-        "The `python_awslambda` target src/py/project:lambda transitively depends on" in caplog.text
+        "The target src/py/project:lambda (`python_awslambda`) transitively depends on"
+        in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text
+
+
+def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": dedent(
+                """
+                import mureq
+
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/BUILD": dedent(
+                """
+                python_requirement(name="mureq", requirements=["mureq==0.2"])
+                python_sources()
+
+                python_awslambda(
+                    name='lambda',
+                    handler='foo.bar.hello_world:handler',
+                    runtime="python3.7",
+                )
+                python_awslambda(
+                    name='slimlambda',
+                    include_requirements=False,
+                    handler='foo.bar.hello_world:handler',
+                    runtime="python3.7",
+                )
+                """
+            ),
+        }
+    )
+
+    zip_file_relpath, content = create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="lambda"),
+        expected_extra_log_lines=("    Handler: lambda_function.handler",),
+        extra_args=["--lambdex-layout=zip"],
+    )
+    assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
+
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "mureq/__init__.py" in names
+    assert "foo/bar/hello_world.py" in names
+    assert (
+        zipfile.read("lambda_function.py") == b"from foo.bar.hello_world import handler as handler"
+    )
+
+    zip_file_relpath, content = create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="slimlambda"),
+        expected_extra_log_lines=("    Handler: lambda_function.handler",),
+        extra_args=["--lambdex-layout=zip"],
+    )
+    assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
+
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "mureq/__init__.py" not in names
+    assert "foo/bar/hello_world.py" in names
+    assert (
+        zipfile.read("lambda_function.py") == b"from foo.bar.hello_world import handler as handler"
+    )

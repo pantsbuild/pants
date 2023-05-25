@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import StrListOption
-from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
@@ -37,10 +36,6 @@ class ScalaPBSubsystem(JvmToolBase):
         "pants.backend.codegen.protobuf.scala",
         "scalapbc.default.lockfile.txt",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)
 
     _jvm_plugins = StrListOption(
         help=softwrap(

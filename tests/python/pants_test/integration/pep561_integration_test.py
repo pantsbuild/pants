@@ -12,12 +12,11 @@ def typecheck_file(path: str, filename: str) -> PantsResult:
         [
             "--backend-packages=pants.backend.python",
             "--backend-packages=pants.backend.python.typecheck.mypy",
+            "--python-interpreter-constraints=['==3.9.*']",
             "check",
             f"{path}/{filename}",
         ],
-        # Match the wheel_config_settings --python-tag of src/python/pants/testutil:testutil_wheel.
         config={
-            "python": {"interpreter_constraints": ["CPython>=3.7<=3.9"]},
             "mypy": {"config": f"{path}/mypy.ini"},
         },
     )

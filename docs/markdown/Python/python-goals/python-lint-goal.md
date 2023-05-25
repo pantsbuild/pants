@@ -4,7 +4,6 @@ slug: "python-lint-goal"
 excerpt: "Lint source code."
 hidden: false
 createdAt: "2020-03-16T16:19:55.704Z"
-updatedAt: "2022-03-05T01:09:54.477Z"
 ---
 The `lint` goal runs both dedicated linters and any formatters in check-only mode:
 
@@ -14,6 +13,7 @@ The `lint` goal runs both dedicated linters and any formatters in check-only mod
 - Docformatter
 - Flake8
 - isort
+- Pydocstyle
 - Pylint
 - Pyupgrade
 - yapf
@@ -28,4 +28,4 @@ See [here](doc:python-linters-and-formatters) for how to opt in to specific form
 > 
 > Bandit, Flake8, and Pylint depend on which Python interpreter the tool is run with. Normally, if your project has some Python 2-only files and some Python 3-only files, you would not be able to run the linter in a single command because it would fail to parse your code.
 > 
-> Instead, Pants will do the right thing when you run `./pants lint ::`. Pants will group your targets based on their [interpreter constraints](doc:python-interpreter-compatibility), and run all the Python 2 targets together and all the Python 3 targets together.
+> Instead, Pants will do the right thing when you run `pants lint ::`. Pants will group your targets based on their [interpreter constraints](doc:python-interpreter-compatibility), and run all the Python 2 targets together and all the Python 3 targets together.

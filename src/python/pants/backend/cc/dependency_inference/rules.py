@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict
+from typing import DefaultDict, Iterable
 
 from pants.backend.cc.subsystems.cc_infer import CCInferSubsystem
 from pants.backend.cc.target_types import CCDependenciesField, CCSourceField
@@ -16,7 +16,7 @@ from pants.core.util_rules.stripped_source_files import StrippedFileName, Stripp
 from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     DependenciesRequest,
@@ -158,6 +158,7 @@ async def infer_cc_source_dependencies(
         if cc_infer.include_from_source_roots:
             unambiguous = cc_files_mapping.mapping.get(include.path)
             ambiguous = cc_files_mapping.ambiguous_files.get(include.path)
+
             if unambiguous:
                 result.add(unambiguous)
             elif ambiguous:
@@ -175,11 +176,10 @@ async def infer_cc_source_dependencies(
                 maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
                 if maybe_disambiguated:
                     result.add(maybe_disambiguated)
-
     return InferredDependencies(sorted(result))
 
 
-def rules():
+def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *stripped_source_files.rules(),

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from packaging.version import Version
 
-from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
+from pants.backend.python.util_rules.package_dists import SetupKwargs, SetupKwargsRequest
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalTool,

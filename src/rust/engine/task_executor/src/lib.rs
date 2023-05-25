@@ -29,20 +29,13 @@ use std::collections::HashMap;
 use std::env;
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use arc_swap::ArcSwapOption;
 use futures::future::FutureExt;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle, Runtime};
-use tokio::task::{Id, JoinSet};
-
-lazy_static! {
-    // Lazily initialized in Executor::global.
-    static ref GLOBAL_EXECUTOR: ArcSwapOption<Runtime> = ArcSwapOption::from_pointee(None);
-}
+use tokio::task::{Id, JoinError, JoinHandle, JoinSet};
 
 /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
 /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
@@ -61,9 +54,23 @@ fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::
   })
 }
 
+///
+/// Executors come in two flavors:
+/// * "borrowed"
+///     * Created with `Self::new()`, or `self::to_borrowed()`.
+///     * A borrowed Executor will not be shut down when all handles are dropped, and shutdown
+///       methods will have no impact.
+///     * Used when multiple runs of Pants will borrow a single Executor owned by `pantsd`, and in
+///       unit tests where the Runtime is created by macros.
+/// * "owned"
+///     * Created with `Self::new_owned()`.
+///     * When all handles of a owned Executor are dropped, its Runtime will be shut down.
+///       Additionally, the explicit shutdown methods can be used to shut down the Executor for all
+///       clones.
+///
 #[derive(Debug, Clone)]
 pub struct Executor {
-  _runtime: Option<Arc<Runtime>>,
+  runtime: Arc<Mutex<Option<Runtime>>>,
   handle: Handle,
 }
 
@@ -78,8 +85,8 @@ impl Executor {
   /// the scope of the tokio::{test, main} macros.
   ///
   pub fn new() -> Executor {
-    Executor {
-      _runtime: None,
+    Self {
+      runtime: Arc::new(Mutex::new(None)),
       handle: Handle::current(),
     }
   }
@@ -92,22 +99,14 @@ impl Executor {
   /// need thread configurability, but also want to know reliably when the Runtime will shutdown
   /// (which, because it is static, will only be at the entire process' exit).
   ///
-  pub fn global<F>(
+  pub fn new_owned<F>(
     num_worker_threads: usize,
     max_threads: usize,
     on_thread_start: F,
   ) -> Result<Executor, String>
   where
-    F: Fn() + Send + Sync + Clone + 'static,
+    F: Fn() + Send + Sync + 'static,
   {
-    let global = GLOBAL_EXECUTOR.load();
-    if let Some(ref runtime) = *global {
-      return Ok(Executor {
-        _runtime: Some(runtime.clone()),
-        handle: runtime.handle().clone(),
-      });
-    }
-
     let mut runtime_builder = Builder::new_multi_thread();
 
     runtime_builder
@@ -116,16 +115,29 @@ impl Executor {
       .enable_all();
 
     if env::var("PANTS_DEBUG").is_ok() {
-      runtime_builder.on_thread_start(on_thread_start.clone());
+      runtime_builder.on_thread_start(on_thread_start);
     };
 
     let runtime = runtime_builder
       .build()
-      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+      .map_err(|e| format!("Failed to start the runtime: {e}"))?;
 
-    // Attempt to swap, then recurse to retry.
-    GLOBAL_EXECUTOR.compare_and_swap(global, Some(Arc::new(runtime)));
-    Self::global(num_worker_threads, max_threads, on_thread_start)
+    let handle = runtime.handle().clone();
+    Ok(Executor {
+      runtime: Arc::new(Mutex::new(Some(runtime))),
+      handle,
+    })
+  }
+
+  ///
+  /// Creates a clone of this Executor which is disconnected from shutdown events. See the `Executor`
+  /// rustdoc.
+  ///
+  pub fn to_borrowed(&self) -> Executor {
+    Self {
+      runtime: Arc::new(Mutex::new(None)),
+      handle: self.handle.clone(),
+    }
   }
 
   ///
@@ -143,19 +155,31 @@ impl Executor {
   ///
   /// Run a Future on a tokio Runtime as a new Task, and return a Future handle to it.
   ///
-  /// Unlike tokio::spawn, if the background Task panics, the returned Future will too.
+  /// If the background Task exits abnormally, the given closure will be called to recover: usually
+  /// it should convert the resulting Error to a relevant error type.
   ///
   /// If the returned Future is dropped, the computation will still continue to completion: see
-  /// https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html
+  /// <https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html>
   ///
   pub fn spawn<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
     &self,
     future: F,
+    rescue_join_error: impl FnOnce(JoinError) -> O,
   ) -> impl Future<Output = O> {
-    self
-      .handle
-      .spawn(future_with_correct_context(future))
-      .map(|r| r.expect("Background task exited unsafely."))
+    self.native_spawn(future).map(|res| match res {
+      Ok(o) => o,
+      Err(e) => rescue_join_error(e),
+    })
+  }
+
+  ///
+  /// Run a Future on a tokio Runtime as a new Task, and return a JoinHandle.
+  ///
+  pub fn native_spawn<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
+    &self,
+    future: F,
+  ) -> JoinHandle<O> {
+    self.handle.spawn(future_with_correct_context(future))
   }
 
   ///
@@ -178,33 +202,68 @@ impl Executor {
   /// Spawn a Future on a threadpool specifically reserved for I/O tasks which are allowed to be
   /// long-running.
   ///
-  /// Unlike tokio::task::spawn_blocking, If the background Task panics, the returned Future will
-  /// too.
+  /// If the background Task exits abnormally, the given closure will be called to recover: usually
+  /// it should convert the resulting Error to a relevant error type.
   ///
   /// If the returned Future is dropped, the computation will still continue to completion: see
-  /// https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html
+  /// <https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html>
   ///
   pub fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
     &self,
     f: F,
+    rescue_join_error: impl FnOnce(JoinError) -> R,
   ) -> impl Future<Output = R> {
+    self.native_spawn_blocking(f).map(|res| match res {
+      Ok(o) => o,
+      Err(e) => rescue_join_error(e),
+    })
+  }
+
+  ///
+  /// Spawn a Future on threads specifically reserved for I/O tasks which are allowed to be
+  /// long-running and return a JoinHandle
+  ///
+  pub fn native_spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+    &self,
+    f: F,
+  ) -> JoinHandle<R> {
     let stdio_destination = stdio::get_destination();
     let workunit_store_handle = workunit_store::get_workunit_store_handle();
     // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
     // panic, in which case we want to propagate that.
-    self
-      .handle
-      .spawn_blocking(move || {
-        stdio::set_thread_destination(stdio_destination);
-        workunit_store::set_thread_workunit_store_handle(workunit_store_handle);
-        f()
-      })
-      .map(|r| r.expect("Background task exited unsafely."))
+    self.handle.spawn_blocking(move || {
+      stdio::set_thread_destination(stdio_destination);
+      workunit_store::set_thread_workunit_store_handle(workunit_store_handle);
+      f()
+    })
   }
 
   /// Return a reference to this executor's runtime handle.
   pub fn handle(&self) -> &Handle {
     &self.handle
+  }
+
+  ///
+  /// A blocking call to shut down the Runtime associated with this "owned" Executor. If tasks do
+  /// not shut down within the given timeout, they are leaked.
+  ///
+  /// This method has no effect for "borrowed" Executors: see the `Executor` rustdoc.
+  ///
+  pub fn shutdown(&self, timeout: Duration) {
+    let Some(runtime) = self.runtime.lock().take() else { return };
+
+    let start = Instant::now();
+    runtime.shutdown_timeout(timeout + Duration::from_millis(250));
+    if start.elapsed() > timeout {
+      // Leaked tasks could lead to panics in some cases (see #16105), so warn for them.
+      log::warn!("Executor shutdown took unexpectedly long: tasks were likely leaked!");
+    }
+  }
+
+  /// Returns true if `shutdown` has been called for this Executor. Always returns true for
+  /// borrowed Executors.
+  pub fn is_shutdown(&self) -> bool {
+    self.runtime.lock().is_none()
   }
 }
 

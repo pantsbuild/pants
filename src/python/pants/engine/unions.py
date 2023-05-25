@@ -9,7 +9,6 @@ from typing import Any, Callable, DefaultDict, Generic, Iterable, Mapping, TypeV
 
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 _T = TypeVar("_T", bound=type)
@@ -100,8 +99,7 @@ class UnionRule:
             raise ValueError(msg)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class UnionMembership:
     union_rules: FrozenDict[type, FrozenOrderedSet[type]]
 
@@ -114,8 +112,10 @@ class UnionMembership:
         return cls(mapping)
 
     def __init__(self, union_rules: Mapping[type, Iterable[type]]) -> None:
-        self.union_rules = FrozenDict(
-            {base: FrozenOrderedSet(members) for base, members in union_rules.items()}
+        object.__setattr__(
+            self,
+            "union_rules",
+            FrozenDict({base: FrozenOrderedSet(members) for base, members in union_rules.items()}),
         )
 
     def __contains__(self, union_type: _T) -> bool:

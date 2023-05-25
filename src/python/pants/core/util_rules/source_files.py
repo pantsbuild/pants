@@ -7,7 +7,6 @@ from typing import Iterable, Set, Tuple, Type
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField
-from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
@@ -25,8 +24,7 @@ class SourceFiles:
         return self.snapshot.files
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class SourceFilesRequest:
     sources_fields: Tuple[SourcesField, ...]
     for_sources_types: Tuple[Type[SourcesField], ...]
@@ -39,9 +37,9 @@ class SourceFilesRequest:
         for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
         enable_codegen: bool = False,
     ) -> None:
-        self.sources_fields = tuple(sources_fields)
-        self.for_sources_types = tuple(for_sources_types)
-        self.enable_codegen = enable_codegen
+        object.__setattr__(self, "sources_fields", tuple(sources_fields))
+        object.__setattr__(self, "for_sources_types", tuple(for_sources_types))
+        object.__setattr__(self, "enable_codegen", enable_codegen)
 
 
 @rule(desc="Get all relevant source files")

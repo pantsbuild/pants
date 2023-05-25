@@ -44,7 +44,7 @@ from pants.backend.scala.dependency_inference.rules import rules as scala_dep_in
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
-from pants.core.target_types import FilesGeneratorTarget
+from pants.core.target_types import FilesGeneratorTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
@@ -135,6 +135,7 @@ def rule_runner() -> RuleRunner:
             ProtobufSourcesGeneratorTarget,
             ScalaSourcesGeneratorTarget,
             FilesGeneratorTarget,
+            RelocatedFiles,
         ],
     )
     rule_runner.set_options(
@@ -220,7 +221,6 @@ def test_request_classification(
         members: Sequence[type[ClasspathEntryRequest]],
         generators: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]],
     ) -> tuple[type[ClasspathEntryRequest], type[ClasspathEntryRequest] | None]:
-
         factory = ClasspathEntryRequestFactory(tuple(members), generators)
 
         req = factory.for_targets(
@@ -354,8 +354,14 @@ def test_allow_files_dependency(
         {
             "BUILD": dedent(
                 """\
-                scala_sources(name='main', dependencies=[":files"])
+                scala_sources(name='main', dependencies=[":files", ":relocated"])
                 files(name="files", sources=["File.txt"])
+                relocated_files(
+                    name="relocated",
+                    files_targets=[":files"],
+                    src="",
+                    dest="files",
+                )
                 """
             ),
             "3rdparty/jvm/BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),

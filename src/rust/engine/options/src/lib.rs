@@ -274,7 +274,7 @@ pub fn render_choice(items: &[&str]) -> Option<String> {
   match items {
     [] => None,
     [this] => Some(this.to_string()),
-    [this, that] => Some(format!("{} or {}", this, that)),
+    [this, that] => Some(format!("{this} or {that}")),
     [these @ .., that] => Some(format!("{} or {}", these.join(", "), that)),
   }
 }
