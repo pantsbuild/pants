@@ -666,7 +666,11 @@ def bootstrap_jobs(
 
 
 def test_jobs(
-    helper: Helper, python_versions: list[str], shard: str | None, platform_specific: bool, with_remote_caching: bool
+    helper: Helper,
+    python_versions: list[str],
+    shard: str | None,
+    platform_specific: bool,
+    with_remote_caching: bool,
 ) -> Jobs:
     human_readable_job_name = f"Test Python ({helper.platform_name()})"
     human_readable_step_name = "Run Python tests"
@@ -722,7 +726,10 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
     helper = Helper(Platform.LINUX_X86_64)
 
     def test_python_linux(shard: str) -> dict[str, Any]:
-        return test_jobs(helper, python_versions, shard, platform_specific=False, with_remote_caching=True)
+        return test_jobs(
+            helper, python_versions, shard, platform_specific=False, with_remote_caching=True
+        )
+
     shard_name_prefix = helper.job_name("test_python")
     jobs = {
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
