@@ -167,7 +167,10 @@ def test_create_hello_world_lambda_with_lambdex(
             "    Complete platform: src/python/foo/bar/platform.json",
             "              Handler: handler",
         ),
-        extra_args=[f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[
+            f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']",
+            "--lambdex-layout=lambdex",
+        ],
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
     zipfile = ZipFile(BytesIO(content))
@@ -233,6 +236,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
             "    Runtime: python37",
             "    Handler: handler",
         ),
+        extra_args=["--lambdex-layout=lambdex"],
     )
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
@@ -276,7 +280,6 @@ def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),
         expected_extra_log_lines=("    Handler: handler",),
-        extra_args=["--lambdex-layout=zip"],
     )
     assert "src.python.foo.bar/gcf.zip" == zip_file_relpath
 
