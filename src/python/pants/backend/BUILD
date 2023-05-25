@@ -96,6 +96,11 @@ __dependents_rules__(
         DEFAULT_DEPENDENTS_RULES,
     ),
     (
+        "[/java/subsystems/jmh.py]",
+        "src/python/pants/jvm/bench/jmh.py",
+        DEFAULT_DEPENDENTS_RULES,
+    ),
+    (
         "[/docker/target_types.py]",
         "pants-plugins/pants_explorer/server/graphql/query/conftest.py",
         DEFAULT_DEPENDENTS_RULES,
