@@ -31,7 +31,8 @@ class RustSubsystem(Subsystem):
         help=help_text(
             """
             A list of paths to search for Rustup.
-            Specify absolute paths to directories with the `rustup` binary, e.g. `/usr/bin`.
+            
+            Specify absolute paths to directories with the `rustup` binary, e.g. `/usr/bin`. 
             Earlier entries will be searched first.
             The special string '<PATH>' will expand to the contents of the PATH env var.
             """
