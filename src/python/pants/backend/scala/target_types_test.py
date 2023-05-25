@@ -6,7 +6,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.scala.target_types import ScalaArtifactExclusionRule, ScalaArtifactTarget
+from pants.backend.scala.target_types import ScalaArtifactExclusion, ScalaArtifactTarget
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
@@ -16,8 +16,8 @@ from pants.engine.target import Target
 from pants.jvm import jvm_common
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
-    JvmArtifactExcludeDependenciesField,
-    JvmArtifactExclusionRule,
+    JvmArtifactExclusionsField,
+    JvmArtifactExclusion,
     JvmArtifactGroupField,
     JvmArtifactResolveField,
     JvmArtifactTarget,
@@ -37,8 +37,8 @@ def rule_runner() -> RuleRunner:
         ],
         objects={
             "parametrize": Parametrize,
-            JvmArtifactExclusionRule.alias: JvmArtifactExclusionRule,
-            ScalaArtifactExclusionRule.alias: ScalaArtifactExclusionRule,
+            JvmArtifactExclusion.alias: JvmArtifactExclusion,
+            ScalaArtifactExclusion.alias: ScalaArtifactExclusion,
         },
     )
     return rule_runner
@@ -198,7 +198,7 @@ def test_generate_jvm_artifact_with_exclusions(rule_runner: RuleRunner) -> None:
                 artifact="example-gen",
                 version="3.4.0",
                 resolve="current",
-                excludes=[
+                exclusions=[
                   jvm_exclude(group="com.example"),
                   scala_exclude(group="com.example", artifact="excluded-partial"),
                   scala_exclude(group="com.example", artifact="excluded-full", crossversion="full"),
@@ -213,14 +213,10 @@ def test_generate_jvm_artifact_with_exclusions(rule_runner: RuleRunner) -> None:
                     JvmArtifactArtifactField.alias: "example-gen_2.13",
                     JvmArtifactVersionField.alias: "3.4.0",
                     JvmArtifactResolveField.alias: "current",
-                    JvmArtifactExcludeDependenciesField.alias: [
-                        JvmArtifactExclusionRule(group="com.example"),
-                        JvmArtifactExclusionRule(
-                            group="com.example", artifact="excluded-partial_2.13"
-                        ),
-                        JvmArtifactExclusionRule(
-                            group="com.example", artifact="excluded-full_2.13.9"
-                        ),
+                    JvmArtifactExclusionsField.alias: [
+                        JvmArtifactExclusion(group="com.example"),
+                        JvmArtifactExclusion(group="com.example", artifact="excluded-partial_2.13"),
+                        JvmArtifactExclusion(group="com.example", artifact="excluded-full_2.13.9"),
                     ],
                 },
                 Address(

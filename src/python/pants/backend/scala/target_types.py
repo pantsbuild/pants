@@ -40,19 +40,21 @@ from pants.jvm.target_types import (
     JunitTestSourceField,
     JunitTestTimeoutField,
     JvmArtifactArtifactField,
-    JvmArtifactExcludeDependenciesField,
-    JvmArtifactExclusionRule,
+    JvmArtifactExclusionsField,
+    JvmArtifactExclusion,
     JvmArtifactGroupField,
+    JvmArtifactJarSourceField,
     JvmArtifactPackagesField,
     JvmArtifactResolveField,
     JvmArtifactTarget,
+    JvmArtifactUrlField,
     JvmArtifactVersionField,
     JvmJdkField,
     JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
     JvmRunnableSourceFieldSet,
-    _jvm_artifact_exclude_dependencies_help,
+    _jvm_artifact_exclusions_field_help,
 )
 from pants.util.strutil import help_text
 
@@ -381,26 +383,6 @@ class ScalacPluginTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalaArtifactGroupField(JvmArtifactGroupField):
-    pass
-
-
-class ScalaArtifactArtifactField(JvmArtifactArtifactField):
-    pass
-
-
-class ScalaArtifactVersionField(JvmArtifactVersionField):
-    pass
-
-
-class ScalaArtifactResolveField(JvmArtifactResolveField):
-    pass
-
-
-class ScalaArtifactPackagesField(JvmArtifactPackagesField):
-    pass
-
-
 class ScalaCrossVersion(Enum):
     PARTIAL = "partial"
     FULL = "full"
@@ -420,7 +402,7 @@ class ScalaArtifactCrossversionField(StringField):
 
 
 @dataclass(frozen=True)
-class ScalaArtifactExclusionRule(JvmArtifactExclusionRule):
+class ScalaArtifactExclusion(JvmArtifactExclusion):
     alias = "scala_exclude"
 
     crossversion: str = ScalaCrossVersion.PARTIAL.value
@@ -432,30 +414,30 @@ class ScalaArtifactExclusionRule(JvmArtifactExclusionRule):
         return set()
 
 
-class ScalaArtifactExcludeDependenciesField(JvmArtifactExcludeDependenciesField):
-    help = _jvm_artifact_exclude_dependencies_help(
-        lambda: ScalaArtifactExcludeDependenciesField.supported_rule_types
+class ScalaArtifactExclusionsField(JvmArtifactExclusionsField):
+    help = _jvm_artifact_exclusions_field_help(
+        lambda: ScalaArtifactExclusionsField.supported_rule_types
     )
-    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusionRule], ...]] = (
-        JvmArtifactExclusionRule,
-        ScalaArtifactExclusionRule,
+    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (
+        JvmArtifactExclusion,
+        ScalaArtifactExclusion,
     )
 
 
 @dataclass(frozen=True)
 class ScalaArtifactFieldSet(FieldSet):
-    group: ScalaArtifactGroupField
-    artifact: ScalaArtifactArtifactField
-    version: ScalaArtifactVersionField
-    packages: ScalaArtifactPackagesField
-    excludes: ScalaArtifactExcludeDependenciesField
+    group: JvmArtifactGroupField
+    artifact: JvmArtifactArtifactField
+    version: JvmArtifactVersionField
+    packages: JvmArtifactPackagesField
+    excludes: ScalaArtifactExclusionsField
     crossversion: ScalaArtifactCrossversionField
 
     required_fields = (
-        ScalaArtifactGroupField,
-        ScalaArtifactArtifactField,
-        ScalaArtifactVersionField,
-        ScalaArtifactPackagesField,
+        JvmArtifactGroupField,
+        JvmArtifactArtifactField,
+        JvmArtifactVersionField,
+        JvmArtifactPackagesField,
     )
 
 
@@ -478,17 +460,24 @@ class ScalaArtifactTarget(TargetGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         *ScalaArtifactFieldSet.required_fields,
-        ScalaArtifactResolveField,
-        ScalaArtifactExcludeDependenciesField,
+        JvmArtifactResolveField,
+        JvmArtifactUrlField,
+        JvmArtifactJarSourceField,
+        ScalaArtifactExclusionsField,
         ScalaArtifactCrossversionField,
     )
     copied_fields = (
         *COMMON_TARGET_FIELDS,
-        ScalaArtifactGroupField,
-        ScalaArtifactVersionField,
-        ScalaArtifactPackagesField,
+        JvmArtifactGroupField,
+        JvmArtifactVersionField,
+        JvmArtifactPackagesField,
+        JvmArtifactUrlField,
+        JvmArtifactJarSourceField,
     )
-    moved_fields = (ScalaArtifactResolveField, JvmJdkField)
+    moved_fields = (
+        JvmArtifactResolveField,
+        JvmJdkField,
+    )
 
 
 class GenerateJvmArtifactForScalaTargets(GenerateTargetsRequest):
@@ -503,7 +492,7 @@ async def generate_jvm_artifact_targets(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     field_set = ScalaArtifactFieldSet.create(request.generator)
-    resolve_name = request.template.get(ScalaArtifactResolveField.alias) or jvm.default_resolve
+    resolve_name = request.template.get(JvmArtifactResolveField.alias) or jvm.default_resolve
     scala_version = scala.version_for_resolve(resolve_name)
     scala_version_parts = scala_version.split(".")
 
@@ -519,18 +508,18 @@ async def generate_jvm_artifact_targets(
     if field_set.excludes.value:
         exclusion_rules = []
         for exclusion_rule in field_set.excludes.value:
-            if not isinstance(exclusion_rule, ScalaArtifactExclusionRule):
+            if not isinstance(exclusion_rule, ScalaArtifactExclusion):
                 exclusion_rules.append(exclusion_rule)
             else:
                 excluded_artifact_name = None
                 if exclusion_rule.artifact:
                     excluded_artifact_name = f"{exclusion_rule.artifact}_{scala_suffix(ScalaCrossVersion(exclusion_rule.crossversion))}"
                 exclusion_rules.append(
-                    JvmArtifactExclusionRule(
+                    JvmArtifactExclusion(
                         group=exclusion_rule.group, artifact=excluded_artifact_name
                     )
                 )
-        exclude_dependencies_field[JvmArtifactExcludeDependenciesField.alias] = exclusion_rules
+        exclude_dependencies_field[JvmArtifactExclusionsField.alias] = exclusion_rules
 
     crossversion = ScalaCrossVersion(field_set.crossversion.value)
     artifact_name = f"{field_set.artifact.value}_{scala_suffix(crossversion)}"
@@ -559,4 +548,4 @@ def rules():
 
 
 def build_file_aliases():
-    return BuildFileAliases(objects={ScalaArtifactExclusionRule.alias: ScalaArtifactExclusionRule})
+    return BuildFileAliases(objects={ScalaArtifactExclusion.alias: ScalaArtifactExclusion})

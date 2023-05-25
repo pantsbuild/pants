@@ -267,8 +267,28 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
+class JvmArtifactExcludeDependenciesField(StringSequenceField):
+    alias = "excludes"
+    help = help_text(
+        """
+        A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded
+        as dependencies when this artifact is resolved.
+
+        This does not prevent this artifact from being included in the resolve as a dependency
+        of other artifacts that depend on it, and is currently intended as a way to resolve
+        version conflicts in complex resolves.
+
+        These values are passed directly to Coursier, and if specified incorrectly will show a
+        parse error from Coursier.
+        """
+    )
+
+    removal_hint = "Use `exclusions` field instead"
+    removal_version = "2.18"
+
+
 @dataclass(frozen=True)
-class JvmArtifactExclusionRule:
+class JvmArtifactExclusion:
     alias: ClassVar[str] = "jvm_exclude"
 
     group: str
@@ -284,8 +304,8 @@ class JvmArtifactExclusionRule:
         return result
 
 
-def _jvm_artifact_exclude_dependencies_help(
-    supported_rule_types: Callable[[], Iterable[type[JvmArtifactExclusionRule]]]
+def _jvm_artifact_exclusions_field_help(
+    supported_rule_types: Callable[[], Iterable[type[JvmArtifactExclusion]]]
 ) -> str | Callable[[], str]:
     return help_text(
         lambda: f"""
@@ -302,22 +322,20 @@ def _jvm_artifact_exclude_dependencies_help(
     )
 
 
-class JvmArtifactExcludeDependenciesField(SequenceField[JvmArtifactExclusionRule]):
-    alias = "excludes"
-    help = _jvm_artifact_exclude_dependencies_help(
-        lambda: JvmArtifactExcludeDependenciesField.supported_rule_types
+class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
+    alias = "exclusions"
+    help = _jvm_artifact_exclusions_field_help(
+        lambda: JvmArtifactExclusionsField.supported_rule_types
     )
 
-    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusionRule], ...]] = (
-        JvmArtifactExclusionRule,
-    )
-    expected_element_type = JvmArtifactExclusionRule
+    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (JvmArtifactExclusion,)
+    expected_element_type = JvmArtifactExclusion
     expected_type_description = "an iterable of JvmArtifactExclusionRule"
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[JvmArtifactExclusionRule]], address: Address
-    ) -> Optional[Tuple[JvmArtifactExclusionRule, ...]]:
+        cls, raw_value: Optional[Iterable[JvmArtifactExclusion]], address: Address
+    ) -> Optional[Tuple[JvmArtifactExclusion, ...]]:
         computed_value = super().compute_value(raw_value, address)
 
         if computed_value:
@@ -331,7 +349,7 @@ class JvmArtifactExcludeDependenciesField(SequenceField[JvmArtifactExclusionRule
                 raise InvalidFieldException(
                     softwrap(
                         f"""
-                        Invalid value for `{JvmArtifactExcludeDependenciesField.alias}` field.
+                        Invalid value for `{JvmArtifactExclusionsField.alias}` field.
                         Found following errors:
 
                         {bullet_list(errors)}
@@ -383,6 +401,7 @@ class JvmArtifactTarget(Target):
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
         JvmArtifactExcludeDependenciesField,
+        JvmArtifactExclusionsField,
         JvmJdkField,
         JvmMainClassNameField,
     )
@@ -843,7 +862,7 @@ def rules():
 def build_file_aliases():
     return BuildFileAliases(
         objects={
-            JvmArtifactExclusionRule.alias: JvmArtifactExclusionRule,
+            JvmArtifactExclusion.alias: JvmArtifactExclusion,
             DeployJarDuplicateRule.alias: DeployJarDuplicateRule,
             **{rule.alias: rule for rule in JVM_SHADING_RULE_TYPES},
         }
