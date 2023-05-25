@@ -9,22 +9,22 @@ jobs:
       fail-fast: false
       matrix:
         repository:
-          - https://github.com/pantsbuild/example-python
-          - https://github.com/pantsbuild/example-visibility
-          - https://github.com/pantsbuild/example-django
-          - https://github.com/pantsbuild/example-adhoc
-          - https://github.com/pantsbuild/example-jvm
-          - https://github.com/pantsbuild/example-golang
-          - https://github.com/pantsbuild/example-kotlin
-          - https://github.com/pantsbuild/example-docker
-          - https://github.com/pantsbuild/example-codegen
+          - pantsbuild/example-python
+          - pantsbuild/example-visibility
+          - pantsbuild/example-django
+          - pantsbuild/example-adhoc
+          - pantsbuild/example-jvm
+          - pantsbuild/example-golang
+          - pantsbuild/example-kotlin
+          - pantsbuild/example-docker
+          - pantsbuild/example-codegen
 
-          # - https://github.com/StackStorm/st2
-          # - https://github.com/lablup/backend.ai
-          # - https://github.com/Ars-Linguistica/mlconjug3
-          # - https://github.com/mitodl/ol-infrastructure
-          # - https://github.com/naccdata/flywheel-gear-extensions
-          # - https://github.com/OpenSaMD/OpenSaMD
+          # - StackStorm/st2
+          # - lablup/backend.ai
+          # - Ars-Linguistica/mlconjug3
+          # - mitodl/ol-infrastructure
+          # - naccdata/flywheel-gear-extensions
+          # - OpenSaMD/OpenSaMD
         pants_version:
           # repo's default version
           # FIXME: https://github.com/pantsbuild/scie-pants/pull/190
@@ -74,11 +74,9 @@ jobs:
           echo "$HOME/bin" | tee -a $GITHUB_PATH
 
       - name: "Check out"
-        run: |
-          git clone --depth=1 ${{ matrix.repository }} repo
-          cd repo
-          pwd
-          git rev-parse HEAD
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ matrix.repository }}
 
       - run: |
           pants version
