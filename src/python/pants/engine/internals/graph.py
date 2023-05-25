@@ -672,8 +672,6 @@ def _detect_cycles(
 class _DependencyMappingRequest:
     tt_request: TransitiveTargetsRequest
     expanded_targets: bool
-    # If this predicate returns false, then the target's dependencies will be ignored.
-    predicate: Callable[[Target], bool] | None = None
 
 
 def _partition(
@@ -711,10 +709,10 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     while queued:
         applicable: FrozenOrderedSet[Target]
         filtered: FrozenOrderedSet[Target]
-        if request.predicate is None:
+        if request.tt_request.predicate is None:
             applicable, filtered = queued, FrozenOrderedSet()
         else:
-            applicable, filtered = _partition(request.predicate, queued)
+            applicable, filtered = _partition(request.tt_request.predicate, queued)
 
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
