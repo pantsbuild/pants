@@ -367,6 +367,67 @@ def test_transitive_targets_tolerates_generated_target_cycles(
     ]
 
 
+def test_transitive_targets_with_do_traverse_deps_predicate(
+    transitive_targets_rule_runner: RuleRunner,
+) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='t1')
+                target(name='t2', dependencies=[':t1'])
+                target(name='t3')
+                target(name='d1', dependencies=[':t1'])
+                target(name='d2', dependencies=[':t2'])
+                target(name='d3')
+                target(name='skipped', dependencies=[':t3'])
+                target(name='d4', tags=['skip_deps'], dependencies=[':skipped'])
+                target(name='root', dependencies=[':d1', ':d2', ':d3', ':d4'])
+                """
+            ),
+        }
+    )
+
+    def get_target(name: str) -> Target:
+        return transitive_targets_rule_runner.get_target(Address("", target_name=name))
+
+    t1 = get_target("t1")
+    t2 = get_target("t2")
+    t3 = get_target("t3")
+    d1 = get_target("d1")
+    d2 = get_target("d2")
+    d3 = get_target("d3")
+    skipped = get_target("skipped")
+    d4 = get_target("d4")
+    root = get_target("root")
+
+    direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequest(root[Dependencies])]
+    )
+    assert direct_deps == Targets([d1, d2, d3, d4])
+
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [
+            TransitiveTargetsRequest(
+                [root.address, d2.address],
+                do_traverse_deps_predicate=lambda tgt: "skip_deps" not in (tgt[Tags].value or []),
+            )
+        ],
+    )
+    assert transitive_targets.roots == (root, d2)
+    # NB: `//:d2` is both a target root and a dependency of `//:root`.
+    assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, d4, t2, t1])
+    assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, d4, t2, t1])
+    # `//:d4` depends on `//:skipped` which depends on `//:t3`.
+    # Nothing else depends on `//:skipped` or `//:t3`, so they should not
+    # be present in the list of transitive deps thanks to `do_traverse_deps_predicate`.
+    assert skipped not in transitive_targets.dependencies
+    assert t3 not in transitive_targets.dependencies
+    assert skipped not in transitive_targets.closure
+    assert t3 not in transitive_targets.closure
+
+
 def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     """CoarsenedTargets should "coarsen" a cycle into a single CoarsenedTarget instance."""
     transitive_targets_rule_runner.write_files(
