@@ -25,9 +25,17 @@ jobs:
           # - https://github.com/mitodl/ol-infrastructure
           # - https://github.com/naccdata/flywheel-gear-extensions
           # - https://github.com/OpenSaMD/OpenSaMD
+        pants_version:
+          # repo's default version
+          - ""
+          # try future latest versions
+          - 2.15.0
+          - 2.16.0rc3
+          - 2.17.0a2
 
     runs-on: ubuntu-22.04
     env:
+      PANTS_VERSION: ${{ matrix.pants_version }}
       # for example-docker:
       DYNAMIC_TAG: dynamic-tag-here
     steps:
