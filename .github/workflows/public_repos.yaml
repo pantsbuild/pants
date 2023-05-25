@@ -80,16 +80,11 @@ jobs:
 
       - run: |
           pants version
-        working-directory: repo
       - run: |
           pants tailor --check update-build-files --check ::
-        working-directory: repo
       - run: |
           pants lint check ::
-        working-directory: repo
       - run: |
           pants test ::
-        working-directory: repo
       - run: |
           pants package ::
-        working-directory: repo
