@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
-from pants.backend.terraform.target_types import TerraformFieldSet
+from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.internals.selectors import Get, MultiGet
@@ -22,7 +22,7 @@ class TerraformValidateSubsystem(Subsystem):
 
 
 class TerraformCheckRequest(CheckRequest):
-    field_set_type = TerraformFieldSet
+    field_set_type = TerraformDeploymentFieldSet
     tool_name = TerraformValidateSubsystem.options_scope
 
 
@@ -34,7 +34,10 @@ async def terraform_check(
         return CheckResults([], checker_name=request.tool_name)
 
     initialised_terraforms = await MultiGet(
-        Get(InitialisedTerraform, TerraformInitRequest((deployment.sources,)))
+        Get(
+            InitialisedTerraform,
+            TerraformInitRequest((deployment.sources,), deployment.backend_config),
+        )
         for deployment in request.field_sets
     )
 

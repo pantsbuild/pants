@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Tuple
@@ -16,6 +17,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -146,6 +148,10 @@ async def infer_terraform_module_dependencies(
 class GetTerraformDependenciesRequest:
     source_files: SourceFiles
     directories: Tuple[str, ...]
+    backend_config: SourceFiles
+
+    # Not initialising the backend means we won't access remote state. Useful for `validate`
+    initialise_backend: bool = False
 
 
 @dataclass(frozen=True)
@@ -157,12 +163,27 @@ class TerraformDependencies:
 async def get_terraform_providers(
     req: GetTerraformDependenciesRequest,
 ) -> TerraformDependencies:
+    args = ["init"]
+    if req.backend_config.files:
+        relative_to_chdir = PurePath(req.backend_config.files[0]).relative_to(req.directories[0])
+        args.append(f"-backend-config={shlex.quote(relative_to_chdir.as_posix())}")
+        backend_digest = req.backend_config.snapshot.digest
+    else:
+        backend_digest = EMPTY_DIGEST
+
+    args.append(f"-backend={req.initialise_backend}")
+
+    with_backend_config = await Get(
+        Digest, MergeDigests([req.source_files.snapshot.digest, backend_digest])
+    )
+
+    # TODO: Does this need to be a MultiGet? I think we will now always get one directory
     fetched_deps = await MultiGet(
         Get(
             FallibleProcessResult,
             TerraformProcess(
-                args=("init",),
-                input_digest=req.source_files.snapshot.digest,
+                args=tuple(args),
+                input_digest=with_backend_config,
                 output_files=(".terraform.lock.hcl",),
                 output_directories=(".terraform",),
                 description="Run `terraform init` to fetch dependencies",

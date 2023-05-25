@@ -13,6 +13,7 @@ from pants.engine.target import (
     DescriptionField,
     FieldSet,
     MultipleSourcesField,
+    OptionalSingleSourceField,
     Target,
     Targets,
     generate_multiple_sources_field_help_message,
@@ -54,9 +55,23 @@ class TerraformModuleTarget(Target):
     )
 
 
+class TerraformBackendConfigField(OptionalSingleSourceField):
+    alias = "backend_config"
+    help = "Configuration to be merged with what is in the configuration file's 'backend' block"
+
+    def empty(self) -> TerraformBackendConfigField:
+        """Clear the backend config to ensure that."""
+        return TerraformBackendConfigField(None, self.address)
+
+
 class TerraformDeploymentTarget(Target):
     alias = "terraform_deployment"
-    core_fields = (*COMMON_TARGET_FIELDS, TerraformDependenciesField, TerraformModuleSourcesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        TerraformDependenciesField,
+        TerraformModuleSourcesField,
+        TerraformBackendConfigField,
+    )
     help = "A deployment of Terraform"
 
 
@@ -68,6 +83,8 @@ class TerraformDeploymentFieldSet(FieldSet):
     )
     description: DescriptionField
     sources: TerraformModuleSourcesField
+
+    backend_config: TerraformBackendConfigField
 
 
 class AllTerraformDeploymentTargets(Targets):

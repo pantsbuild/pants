@@ -10,9 +10,10 @@ from pants.backend.terraform.dependency_inference import (
     TerraformDependencies,
 )
 from pants.backend.terraform.partition import partition_files_by_directory
+from pants.backend.terraform.target_types import TerraformBackendConfigField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import SourcesField
 
@@ -20,7 +21,10 @@ from pants.engine.target import SourcesField
 @dataclass(frozen=True)
 class TerraformInitRequest:
     sources: Iterable[SourcesField]
-    # backend_config: Any
+    backend_config: TerraformBackendConfigField
+
+    # Not initialising the backend means we won't access remote state. Useful for `validate`
+    initialise_backend: bool = False
 
 
 @dataclass(frozen=True)
@@ -32,12 +36,20 @@ class InitialisedTerraform:
 
 @rule
 async def init_terraform(request: TerraformInitRequest) -> InitialisedTerraform:
-    source_files = await Get(SourceFiles, SourceFilesRequest(request.sources))
+    source_files, backend_config = await MultiGet(
+        Get(SourceFiles, SourceFilesRequest(request.sources)),
+        Get(SourceFiles, SourceFilesRequest([request.backend_config])),
+    )
     files_by_directory = partition_files_by_directory(source_files.files)
 
     fetched_deps = await Get(
         TerraformDependencies,
-        GetTerraformDependenciesRequest(source_files, tuple(files_by_directory.keys())),
+        GetTerraformDependenciesRequest(
+            source_files,
+            tuple(files_by_directory.keys()),
+            backend_config,
+            initialise_backend=request.initialise_backend,
+        ),
     )
 
     merged_fetched_deps = await Get(Digest, MergeDigests([x[1] for x in fetched_deps.fetched_deps]))

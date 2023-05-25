@@ -36,7 +36,12 @@ async def prepare_terraform_deployment(
     request: TerraformDeploymentRequest,
 ) -> InteractiveProcess:
     initialised_terraform = await Get(
-        InitialisedTerraform, TerraformInitRequest((request.field_set.sources,))
+        InitialisedTerraform,
+        TerraformInitRequest(
+            (request.field_set.sources,),
+            request.field_set.backend_config,
+            initialise_backend=True,
+        ),
     )
 
     process = await Get(
