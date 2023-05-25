@@ -27,6 +27,9 @@ jobs:
           # - https://github.com/OpenSaMD/OpenSaMD
 
     runs-on: ubuntu-22.04
+    env:
+      # for example-docker:
+      DYNAMIC_TAG: dynamic-tag-here
     steps:
       - name: Set up Python 3.8
         uses: actions/setup-python@v4
@@ -41,6 +44,19 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.19.5
+
+      # for example-adhoc
+      - if: runner.os == 'Linux'
+        name: Download Apache `thrift` binary (Linux)
+        run: 'mkdir -p "${HOME}/.thrift"
+
+          curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+
+          chmod +x "${HOME}/.thrift/thrift"
+
+          echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+          '
 
       - name: "Pants on"
         run: |
