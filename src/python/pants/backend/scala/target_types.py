@@ -430,7 +430,7 @@ class ScalaArtifactFieldSet(FieldSet):
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
-    excludes: ScalaArtifactExclusionsField
+    exclusions: ScalaArtifactExclusionsField
     crossversion: ScalaArtifactCrossversionField
 
     required_fields = (
@@ -504,22 +504,21 @@ async def generate_jvm_artifact_targets(
 
         return f"{scala_version_parts[0]}.{scala_version_parts[1]}"
 
-    exclude_dependencies_field = {}
-    if field_set.excludes.value:
-        exclusion_rules = []
-        for exclusion_rule in field_set.excludes.value:
-            if not isinstance(exclusion_rule, ScalaArtifactExclusion):
-                exclusion_rules.append(exclusion_rule)
+    exclusions_field = {}
+    if field_set.exclusions.value:
+        exclusions = []
+        for exclusion in field_set.exclusions.value:
+            if not isinstance(exclusion, ScalaArtifactExclusion):
+                exclusions.append(exclusion)
             else:
                 excluded_artifact_name = None
-                if exclusion_rule.artifact:
-                    excluded_artifact_name = f"{exclusion_rule.artifact}_{scala_suffix(ScalaCrossVersion(exclusion_rule.crossversion))}"
-                exclusion_rules.append(
-                    JvmArtifactExclusion(
-                        group=exclusion_rule.group, artifact=excluded_artifact_name
-                    )
+                if exclusion.artifact:
+                    crossversion = ScalaCrossVersion(exclusion.crossversion)
+                    excluded_artifact_name = f"{exclusion.artifact}_{scala_suffix(crossversion)}"
+                exclusions.append(
+                    JvmArtifactExclusion(group=exclusion.group, artifact=excluded_artifact_name)
                 )
-        exclude_dependencies_field[JvmArtifactExclusionsField.alias] = exclusion_rules
+        exclusions_field[JvmArtifactExclusionsField.alias] = exclusions
 
     crossversion = ScalaCrossVersion(field_set.crossversion.value)
     artifact_name = f"{field_set.artifact.value}_{scala_suffix(crossversion)}"
@@ -527,7 +526,7 @@ async def generate_jvm_artifact_targets(
         {
             **request.template,
             JvmArtifactArtifactField.alias: artifact_name,
-            **exclude_dependencies_field,
+            **exclusions_field,
         },
         request.generator.address.create_generated(artifact_name),
         union_membership,
