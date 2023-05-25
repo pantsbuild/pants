@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.goals import lockfile as python_lockfile
-from pants.backend.terraform import dependency_inference, tool
+from pants.backend.terraform import dependencies, dependency_inference, tool
 from pants.backend.terraform.goals import check, deploy, tailor
 from pants.backend.terraform.lint.tffmt.tffmt import rules as tffmt_rules
 from pants.backend.terraform.target_types import TerraformDeploymentTarget, TerraformModuleTarget
@@ -17,6 +17,7 @@ def target_types():
 def rules():
     return [
         *collect_rules(),
+        *dependencies.rules(),
         *check.rules(),
         *dependency_inference.rules(),
         *tailor.rules(),
