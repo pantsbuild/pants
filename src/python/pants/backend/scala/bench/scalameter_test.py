@@ -23,7 +23,7 @@ from pants.backend.scala.target_types import (
     ScalaSourcesGeneratorTarget,
 )
 from pants.backend.scala.target_types import rules as scala_target_types_rules
-from pants.core.goals.bench import BenchmarkResult
+from pants.core.goals.bench import BenchmarkResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
@@ -59,6 +59,7 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *system_binaries.rules(),
             *util_rules(),
+            get_filtered_environment,
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(BenchmarkResult, (ScalameterBenchmarkRequest.Batch,)),
             QueryRule(Scalameter, ()),

@@ -17,9 +17,8 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JmhBenck
 from pants.backend.java.target_types import rules as java_target_types_rules
 from pants.core.goals.bench import BenchmarkResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
-from pants.core.util_rules import config_files, source_files, system_binaries
+from pants.core.util_rules import config_files, source_files, system_binaries, stripped_source_files
 from pants.engine.addresses import Address, Addresses
-from pants.engine.rules import QueryRule
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.bench.jmh import JmhBenchmarkFieldSet, JmhBenchmarkRequest
@@ -32,7 +31,7 @@ from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
 @pytest.fixture
@@ -51,6 +50,7 @@ def rule_runner() -> RuleRunner:
             *javac_rules(),
             *jmh_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *system_binaries.rules(),
             *util_rules(),
             get_filtered_environment,
@@ -98,8 +98,11 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
                 """\
                 jmh_benchmarks(
                     name='example-bench',
-                    dependencies= [
+                    dependencies=[
                         '3rdparty/jvm:org.openjdk.jmh_jmh-core',
+                        '3rdparty/jvm:org.openjdk.jmh_jmh-generator-bytecode',
+                        '3rdparty/jvm:org.openjdk.jmh_jmh-generator-reflection',
+                        '3rdparty/jvm:org.openjdk.jmh_jmh-generator-asm',
                     ],
                 )
                 """

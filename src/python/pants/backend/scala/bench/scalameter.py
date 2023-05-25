@@ -36,7 +36,7 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.target_types import JvmJdkField
 from pants.util.logging import LogLevel
 
@@ -59,7 +59,7 @@ class ScalameterBenchmarkRequest(BenchmarkRequest):
     field_set_type = ScalameterBenchmarkFieldSet
 
 
-class ScalameterToolLockfileSentinel(GenerateToolLockfileSentinel):
+class ScalameterToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = Scalameter.options_scope
 
 
@@ -140,21 +140,23 @@ async def setup_scalameter_for_target(
         EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
     )
 
-    args = ["org.scalameter.Main", "-CresultDir", reports_dir]
-    if benchmark_classnames:
-        args.extend(["-b", ":".join(benchmark_classnames)])
-    if scalameter.min_warmups:
-        args.extend(["-Cminwarmpus", str(scalameter.min_warmups)])
-    if scalameter.max_warmups:
-        args.extend(["-Cmaxwarmups", str(scalameter.max_warmups)])
-    if scalameter.runs:
-        args.extend(["-Cruns", str(scalameter.runs)])
-    if scalameter.colors is not None:
-        args.extend(["-Ccolors", "true" if scalameter.colors else "false"])
-
     process = JvmProcess(
         jdk=jdk,
-        argv=args,
+        argv=[
+            "org.scalameter.Main",
+            "-b",
+            ":".join(benchmark_classnames),
+            "-CresultDir",
+            reports_dir,
+            *(("-Cminwarmpus", str(scalameter.min_warmups)) if scalameter.min_warmups else ()),
+            *(("-Cmaxwarmups", str(scalameter.max_warmups)) if scalameter.max_warmups else ()),
+            *(("-Cruns", str(scalameter.runs)) if scalameter.runs else ()),
+            *(
+                ("-Ccolors", "true" if scalameter.colors else "false")
+                if scalameter.colors is not None
+                else ()
+            ),
+        ],
         classpath_entries=[
             *classpath.args(),
             *scalameter_classpath.classpath_entries(toolcp_relpath),
@@ -186,7 +188,7 @@ async def run_scalameter_benchmark(
 
     reports_digest = await Get(
         Digest,
-        DigestSubset(process_result.output_digest, PathGlobs([f"{results_dir_prefix}/**"])),
+        DigestSubset(process_result.output_digest, PathGlobs([os.path.join(results_dir_prefix, "**")])),
     )
     reports_snapshot = await Get(Snapshot, RemovePrefix(reports_digest, results_dir_prefix))
 

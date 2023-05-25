@@ -195,7 +195,7 @@ class JmhBenckmarksGeneratorTarget(TargetFilesGenerator):
         JvmProvidesTypesField,
         JvmResolveField,
     )
-    help = "Generate a `junit_test` target for each file in the `sources` field."
+    help = "Generate a `jmh_benchmark` target for each file in the `sources` field."
 
 
 def rules():

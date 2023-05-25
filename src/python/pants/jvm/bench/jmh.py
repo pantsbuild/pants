@@ -20,17 +20,8 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestSubset,
-    Directory,
-    MergeDigests,
-    PathGlobs,
-    RemovePrefix,
-    Snapshot,
-)
-from pants.engine.process import FallibleProcessResult, ProcessCacheScope, ProcessResult
+from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
+from pants.engine.process import FallibleProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
@@ -39,7 +30,6 @@ from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
-from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JmhBenchmarkExtraEnvVarsField,
     JmhBenchmarkSourceField,
@@ -98,7 +88,6 @@ class GenerateJmhSourcesRequest:
 @rule(level=LogLevel.DEBUG)
 async def setup_jmh_for_target(
     request: JmhSetupRequest,
-    jvm: JvmSubsystem,
     jmh: Jmh,
     bench_subsystem: BenchmarkSubsystem,
     bench_extra_env: BenchmarkExtraEnv,
@@ -122,15 +111,13 @@ async def setup_jmh_for_target(
         ),
     )
 
-    jmh_generated = await Get(
-        GeneratedJmhSources,
-        GenerateJmhSourcesRequest(
-            request.field_set.address, jdk, jmh_classpath, classpath, files.snapshot.digest
-        ),
-    )
-    input_digest = await Get(
-        Digest, MergeDigests((*classpath.digests(), files.snapshot.digest, jmh_generated.digest))
-    )
+    # jmh_generated = await Get(
+    #     GeneratedJmhSources,
+    #     GenerateJmhSourcesRequest(
+    #         request.field_set.address, jdk, jmh_classpath, classpath, files.snapshot.digest
+    #     ),
+    # )
+    input_digest = await Get(Digest, MergeDigests([*classpath.digests(), files.snapshot.digest]))
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
@@ -191,68 +178,68 @@ async def run_jmh_benchmark(
     reports_dir_prefix = jmh_setup.reports_dir_prefix
 
     reports_subset = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir_prefix}/**"]))
+        Digest, DigestSubset(process_result.output_digest, PathGlobs([os.path.join(reports_dir_prefix, "**")]))
     )
-    reports = await Get(Snapshot, RemovePrefix(reports_subset, reports_dir_prefix))
+    reports_snapshot = await Get(Snapshot, RemovePrefix(reports_subset, reports_dir_prefix))
 
     return BenchmarkResult.from_fallible_process_result(
         process_result,
         address=field_set.address,
         output_setting=bench_subsystem.output,
-        reports=reports,
+        reports=reports_snapshot,
     )
 
 
-@rule(level=LogLevel.DEBUG)
-async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> GeneratedJmhSources:
-    input_prefix = "__input"
-    input_digest = await Get(
-        Digest, MergeDigests([*request.classpath.digests(), request.extra_files])
-    )
+# @rule(level=LogLevel.DEBUG)
+# async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> GeneratedJmhSources:
+#     input_prefix = "__input"
+#     input_digest = await Get(
+#         Digest, MergeDigests([*request.classpath.digests(), request.extra_files])
+#     )
 
-    toolcp_relpath = "__toolcp"
-    extra_immutable_input_digests = {
-        toolcp_relpath: request.jmh_classpath.digest,
-        input_prefix: input_digest,
-    }
+#     toolcp_relpath = "__toolcp"
+#     extra_immutable_input_digests = {
+#         toolcp_relpath: request.jmh_classpath.digest,
+#         input_prefix: input_digest,
+#     }
 
-    sources_output_dir = os.path.join("__gen", "sources")
-    files_output_dir = os.path.join("__gen", "files")
-    empty_dirs_digest = await Get(
-        Digest, CreateDigest([Directory(sources_output_dir), Directory(files_output_dir)])
-    )
+#     sources_output_dir = os.path.join("__gen", "sources")
+#     files_output_dir = os.path.join("__gen", "files")
+#     empty_dirs_digest = await Get(
+#         Digest, CreateDigest([Directory(sources_output_dir), Directory(files_output_dir)])
+#     )
 
-    process_result = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=request.jdk,
-            classpath_entries=[
-                *request.classpath.args(),
-                *request.jmh_classpath.classpath_entries(toolcp_relpath),
-            ],
-            argv=[
-                "org.openjdk.jmh.generators.bytecode.JmhBytecodeGenerator",
-                input_prefix,
-                sources_output_dir,
-                files_output_dir,
-                jmh.generator_type.value,
-            ],
-            input_digest=empty_dirs_digest,
-            extra_jvm_options=jmh.jvm_options,
-            extra_immutable_input_digests=extra_immutable_input_digests,
-            output_directories=(sources_output_dir, files_output_dir),
-            description=f"Generate JMH sources for {request.address}",
-            level=LogLevel.DEBUG,
-            use_nailgun=False,
-        ),
-    )
+#     process_result = await Get(
+#         ProcessResult,
+#         JvmProcess(
+#             jdk=request.jdk,
+#             classpath_entries=[
+#                 *request.classpath.args(),
+#                 *request.jmh_classpath.classpath_entries(toolcp_relpath),
+#             ],
+#             argv=[
+#                 "org.openjdk.jmh.generators.bytecode.JmhBytecodeGenerator",
+#                 input_prefix,
+#                 sources_output_dir,
+#                 files_output_dir,
+#                 jmh.generator_type.value,
+#             ],
+#             input_digest=empty_dirs_digest,
+#             extra_jvm_options=jmh.jvm_options,
+#             extra_immutable_input_digests=extra_immutable_input_digests,
+#             output_directories=(sources_output_dir, files_output_dir),
+#             description=f"Generate JMH sources for {request.address}",
+#             level=LogLevel.DEBUG,
+#             use_nailgun=False,
+#         ),
+#     )
 
-    generated_digest = await Get(Digest, RemovePrefix(process_result.output_digest, "__gen"))
-    return GeneratedJmhSources(generated_digest)
+#     generated_digest = await Get(Digest, RemovePrefix(process_result.output_digest, "__gen"))
+#     return GeneratedJmhSources(generated_digest)
 
 
 @rule
-def generate_junit_lockfile_request(
+def generate_jmh_lockfile_request(
     _: JmhToolLockfileSentinel, jmh: Jmh
 ) -> GenerateJvmLockfileFromTool:
     return GenerateJvmLockfileFromTool.create(jmh)
@@ -262,6 +249,6 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, JmhToolLockfileSentinel),
         *JmhBenchmarkRequest.rules(),
+        UnionRule(GenerateToolLockfileSentinel, JmhToolLockfileSentinel),
     ]
