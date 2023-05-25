@@ -8,8 +8,11 @@ from dataclasses import dataclass
 from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess, TerraformTool
+from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import collect_rules, rule
@@ -44,11 +47,23 @@ async def prepare_terraform_deployment(
         ),
     )
 
+    args = ["apply"]
+
+    var_files = await Get(SourceFiles, SourceFilesRequest([request.field_set.var_files]))
+    for var_file in var_files.files:
+        args.append(
+            terraform_arg("-var-file", terraform_relpath(initialised_terraform.chdir, var_file))
+        )
+
+    with_vars = await Get(
+        Digest, MergeDigests([var_files.snapshot.digest, initialised_terraform.sources_and_deps])
+    )
+
     process = await Get(
         Process,
         TerraformProcess(
-            args=("apply",),
-            input_digest=initialised_terraform.sources_and_deps,
+            args=tuple(args),
+            input_digest=with_vars,
             description="Terraform apply",
             chdir=initialised_terraform.chdir,
         ),

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Tuple
@@ -13,6 +12,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.core.util_rules.source_files import SourceFiles
@@ -165,13 +165,17 @@ async def get_terraform_providers(
 ) -> TerraformDependencies:
     args = ["init"]
     if req.backend_config.files:
-        relative_to_chdir = PurePath(req.backend_config.files[0]).relative_to(req.directories[0])
-        args.append(f"-backend-config={shlex.quote(relative_to_chdir.as_posix())}")
+        args.append(
+            terraform_arg(
+                "-backend-config",
+                terraform_relpath(req.directories[0], req.backend_config.files[0]),
+            )
+        )
         backend_digest = req.backend_config.snapshot.digest
     else:
         backend_digest = EMPTY_DIGEST
 
-    args.append(f"-backend={req.initialise_backend}")
+    args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
     with_backend_config = await Get(
         Digest, MergeDigests([req.source_files.snapshot.digest, backend_digest])

@@ -64,6 +64,15 @@ class TerraformBackendConfigField(OptionalSingleSourceField):
         return TerraformBackendConfigField(None, self.address)
 
 
+class TerraformVarFilesField(MultipleSourcesField):
+    alias = "var_files"
+    default = ("*.tfvars",)
+    expected_file_extensions = (".tfvars",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `var_files=['common.tfvars', 'prod.tfvars']`"
+    )
+
+
 class TerraformDeploymentTarget(Target):
     alias = "terraform_deployment"
     core_fields = (
@@ -71,6 +80,7 @@ class TerraformDeploymentTarget(Target):
         TerraformDependenciesField,
         TerraformModuleSourcesField,
         TerraformBackendConfigField,
+        TerraformVarFilesField,
     )
     help = "A deployment of Terraform"
 
@@ -85,6 +95,7 @@ class TerraformDeploymentFieldSet(FieldSet):
     sources: TerraformModuleSourcesField
 
     backend_config: TerraformBackendConfigField
+    var_files: TerraformVarFilesField
 
 
 class AllTerraformDeploymentTargets(Targets):
