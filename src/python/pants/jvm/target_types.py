@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from typing import Callable, ClassVar, Iterable, Optional, Tuple, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.bench import BenchmarkExtraEnvVarsField, BenchmarkTimeoutField
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
-from pants.core.goals.bench import BenchmarkExtraEnvVarsField, BenchmarkTimeoutField
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
@@ -832,6 +832,7 @@ class JvmWarTarget(Target):
         """
     )
 
+
 # -----------------------------------------------------------------------------------------------
 # JMH benchmark support field(s)
 # -----------------------------------------------------------------------------------------------
@@ -847,6 +848,7 @@ class JmhBenchmarkTimeoutField(BenchmarkTimeoutField):
 
 class JmhBenchmarkExtraEnvVarsField(BenchmarkExtraEnvVarsField):
     pass
+
 
 # -----------------------------------------------------------------------------------------------
 # Dynamic Field defaults

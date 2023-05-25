@@ -1,9 +1,13 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption, EnumOption, SkipOption
 
+class GeneratorType(Enum):
+    REFLECTION = "reflection"
+    ASM = "asm"
 
 class Jmh(JvmToolBase):
     options_scope = "jmh"
@@ -19,4 +23,8 @@ class Jmh(JvmToolBase):
     )
     default_lockfile_resource = ("pants.jvm.bench", "jmh.default.lockfile.txt")
 
+    generator_type = EnumOption(
+        default=GeneratorType.REFLECTION
+    )
+    args = ArgsListOption(example="--disable-ansi-colors", passthrough=True)
     skip = SkipOption("bench")
