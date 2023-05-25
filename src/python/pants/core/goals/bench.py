@@ -614,10 +614,10 @@ class BenchmarkExtraEnv:
 
 @rule
 async def get_filtered_environment(
-    test_env_aware: BenchmarkSubsystem.EnvironmentAware,
+    bench_env_aware: BenchmarkSubsystem.EnvironmentAware,
 ) -> BenchmarkExtraEnv:
     return BenchmarkExtraEnv(
-        await Get(EnvironmentVars, EnvironmentVarsRequest(test_env_aware.extra_env_vars))
+        await Get(EnvironmentVars, EnvironmentVarsRequest(bench_env_aware.extra_env_vars))
     )
 
 
