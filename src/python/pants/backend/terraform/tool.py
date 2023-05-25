@@ -12,14 +12,16 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
-from pants.option.option_types import BoolOption
+from pants.option.option_types import BoolOption, StrListOption
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
+from pants.util.strutil import softwrap
 
 
 class TerraformTool(TemplatedExternalTool):
@@ -217,6 +219,19 @@ class TerraformTool(TemplatedExternalTool):
             "1.0.6|linux_arm64|2047f8afc7d0d7b645a0422181ba3fe47b3547c4fe658f95eebeb872752ec129|30514636",
         ]
 
+    extra_env_vars = StrListOption(
+        help=softwrap(
+            """
+            Additional environment variables that would be made available to all Terraform processes.
+            """
+        ),
+        advanced=True,
+    )
+
+    @property
+    def env_vars(self) -> tuple[str, ...]:
+        return tuple(sorted(set(self.extra_env_vars)))
+
     tailor = BoolOption(
         default=True,
         help="If true, add `terraform_module` targets with the `tailor` goal.",
@@ -245,6 +260,7 @@ async def setup_terraform_process(
         ExternalToolRequest,
         terraform.get_request(platform),
     )
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.env_vars))
 
     immutable_input_digests = {"__terraform": downloaded_terraform.digest}
 
@@ -257,6 +273,7 @@ async def setup_terraform_process(
         immutable_input_digests=immutable_input_digests,
         output_files=prepend_paths(request.output_files),
         output_directories=prepend_paths(request.output_directories),
+        env=env,
         description=request.description,
         level=LogLevel.DEBUG,
     )
