@@ -709,10 +709,10 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     while queued:
         applicable: FrozenOrderedSet[Target]
         filtered: FrozenOrderedSet[Target]
-        if request.tt_request.predicate is None:
+        if request.tt_request.do_traverse_deps_predicate is None:
             applicable, filtered = queued, FrozenOrderedSet()
         else:
-            applicable, filtered = _partition(request.tt_request.predicate, queued)
+            applicable, filtered = _partition(request.tt_request.do_traverse_deps_predicate, queued)
 
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:

@@ -7,10 +7,12 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -23,9 +25,11 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
     StringField,
+    Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import bin_name
@@ -176,6 +180,39 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
             if msg:
                 logger.info("\n".join(msg))
     return Package(exit_code=0)
+
+
+@dataclass(frozen=True)
+class TransitiveTargetsWithoutTraversingPackagesRequest:
+    roots: tuple[Address, ...]
+    include_special_cased_deps: bool
+
+    def __init__(
+        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
+    ) -> None:
+        object.__setattr__(self, "roots", tuple(roots))
+        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
+
+
+@rule
+async def transitive_targets_without_traversing_packages_request(
+    request: TransitiveTargetsWithoutTraversingPackagesRequest,
+    union_membership: UnionMembership,
+) -> TransitiveTargetsRequest:
+    package_field_set_types = union_membership.get(PackageFieldSet)
+
+    def do_traverse_deps(tgt: Target) -> bool:
+        for field_set_type in package_field_set_types:
+            if field_set_type.is_applicable(tgt):
+                # False means do not traverse dependencies of this target
+                return False
+        return True
+
+    return TransitiveTargetsRequest(
+        request.roots,
+        include_special_cased_deps=request.include_special_cased_deps,
+        do_traverse_deps_predicate=do_traverse_deps,
+    )
 
 
 def rules():
