@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
-from pants.backend.terraform.tool import TerraformProcess, TerraformTool
+from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -30,8 +30,6 @@ class DeployTerraformFieldSet(TerraformDeploymentFieldSet, DeployFieldSet):
 @dataclass(frozen=True)
 class TerraformDeploymentRequest(EngineAwareParameter):
     field_set: TerraformDeploymentFieldSet
-
-    extra_argv: tuple[str, ...]
 
 
 @rule
@@ -59,6 +57,9 @@ async def prepare_terraform_deployment(
         Digest, MergeDigests([var_files.snapshot.digest, initialised_terraform.sources_and_deps])
     )
 
+    if request.field_set.extra_args.value:
+        args.extend(request.field_set.extra_args.value)
+
     process = await Get(
         Process,
         TerraformProcess(
@@ -72,11 +73,9 @@ async def prepare_terraform_deployment(
 
 
 @rule(desc="Run Terraform deploy process", level=LogLevel.DEBUG)
-async def run_terraform_deploy(
-    field_set: DeployTerraformFieldSet, terraform_subsystem: TerraformTool
-) -> DeployProcess:
+async def run_terraform_deploy(field_set: DeployTerraformFieldSet) -> DeployProcess:
     interactive_process = await Get(
-        InteractiveProcess, TerraformDeploymentRequest(field_set=field_set, extra_argv=tuple())
+        InteractiveProcess, TerraformDeploymentRequest(field_set=field_set)
     )
 
     return DeployProcess(
