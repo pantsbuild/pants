@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.jvm import classpath, jdk_rules, resources, run, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
+from pants.jvm.bench import jmh
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.goals import lockfile
 from pants.jvm.jar_tool import jar_tool
@@ -31,6 +32,7 @@ def rules():
         *shading_rules(),
         *deploy_jar.rules(),
         *jar_tool.rules(),
+        *jmh.rules(),
         *lockfile.rules(),
         *coursier_fetch.rules(),
         *resources.rules(),

@@ -147,9 +147,11 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
 
+
 # -----------------------------------------------------------------------------------------------
 # `jmh_test` and `jmh_tests` targets
 # -----------------------------------------------------------------------------------------------
+
 
 class JavaJmhBenchmarkSourceField(JavaSourceField, JmhBenchmarkSourceField):
     """A JMH benchmark file written in Java."""
@@ -194,6 +196,7 @@ class JmhBenckmarksGeneratorTarget(TargetFilesGenerator):
         JvmResolveField,
     )
     help = "Generate a `junit_test` target for each file in the `sources` field."
+
 
 def rules():
     return [

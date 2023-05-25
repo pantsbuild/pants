@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from tracemalloc import Snapshot
 from typing import Any
 
 from pants.backend.java.subsystems.jmh import Jmh
@@ -29,6 +28,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     RemovePrefix,
+    Snapshot,
 )
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -81,9 +81,23 @@ class JmhSetup:
     reports_dir_prefix: str
 
 
+@dataclass(frozen=True)
+class GeneratedJmhSources:
+    digest: Digest
+
+
+@dataclass(frozen=True)
+class GenerateJmhSourcesRequest:
+    address: Address
+    jdk: JdkEnvironment
+    jmh_classpath: ToolClasspath
+    classpath: Classpath
+    extra_files: Digest
+
+
 @rule(level=LogLevel.DEBUG)
 async def setup_jmh_for_target(
-    request: JmhBenchmarkRequest,
+    request: JmhSetupRequest,
     jvm: JvmSubsystem,
     jmh: Jmh,
     bench_subsystem: BenchmarkSubsystem,
@@ -109,8 +123,8 @@ async def setup_jmh_for_target(
     )
 
     jmh_generated = await Get(
-        _GeneratedJmhSources,
-        _GenerateJmhSourcesRequest(
+        GeneratedJmhSources,
+        GenerateJmhSourcesRequest(
             request.field_set.address, jdk, jmh_classpath, classpath, files.snapshot.digest
         ),
     )
@@ -172,9 +186,9 @@ async def run_jmh_benchmark(
 ) -> BenchmarkResult:
     field_set = batch.single_element
 
-    test_setup = await Get(JmhSetup, JmhSetupRequest(field_set))
-    process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
-    reports_dir_prefix = test_setup.reports_dir_prefix
+    jmh_setup = await Get(JmhSetup, JmhSetupRequest(field_set))
+    process_result = await Get(FallibleProcessResult, JvmProcess, jmh_setup.process)
+    reports_dir_prefix = jmh_setup.reports_dir_prefix
 
     reports_subset = await Get(
         Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir_prefix}/**"]))
@@ -189,26 +203,12 @@ async def run_jmh_benchmark(
     )
 
 
-@dataclass(frozen=True)
-class _GeneratedJmhSources:
-    digest: Digest
-
-
-@dataclass(frozen=True)
-class _GenerateJmhSourcesRequest:
-    address: Address
-    jdk: JdkEnvironment
-    jmh_classpath: ToolClasspath
-    classpath: Classpath
-    extra_files: Digest
-
-
 @rule(level=LogLevel.DEBUG)
-async def generate_jmh_sources(
-    request: _GenerateJmhSourcesRequest, jmh: Jmh
-) -> _GeneratedJmhSources:
+async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> GeneratedJmhSources:
     input_prefix = "__input"
-    input_digest = await Get(Digest, MergeDigests([*request.classpath.args(), request.extra_files]))
+    input_digest = await Get(
+        Digest, MergeDigests([*request.classpath.digests(), request.extra_files])
+    )
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
@@ -235,7 +235,7 @@ async def generate_jmh_sources(
                 input_prefix,
                 sources_output_dir,
                 files_output_dir,
-                jmh.generator_type,
+                jmh.generator_type.value,
             ],
             input_digest=empty_dirs_digest,
             extra_jvm_options=jmh.jvm_options,
@@ -248,7 +248,7 @@ async def generate_jmh_sources(
     )
 
     generated_digest = await Get(Digest, RemovePrefix(process_result.output_digest, "__gen"))
-    return _GeneratedJmhSources(generated_digest)
+    return GeneratedJmhSources(generated_digest)
 
 
 @rule
