@@ -252,7 +252,8 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
     assert (
-        "The `python_awslambda` target src/py/project:lambda transitively depends on" in caplog.text
+        "The target src/py/project:lambda (`python_awslambda`) transitively depends on"
+        in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
