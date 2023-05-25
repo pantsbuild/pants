@@ -8,6 +8,7 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
@@ -21,7 +22,11 @@ from pants.backend.python.dependency_inference.subsystem import (
 )
 from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
+from pants.backend.python.target_types import (
+    PexCompletePlatformsField,
+    PexLayout,
+    PythonResolveField,
+)
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     Pex,
@@ -31,10 +36,19 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
+from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
+from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
-from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    FileContent,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Paths,
+)
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -51,12 +65,11 @@ from pants.engine.target import (
     StringField,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    targets_with_sources_types,
 )
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.docutil import bin_name, doc_url
+from pants.util.docutil import bin_name
 from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
@@ -97,7 +110,8 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
 
 @dataclass(frozen=True)
 class ResolvedPythonFaaSHandler:
-    val: str
+    module: str
+    func: str
     file_name_used: bool
 
 
@@ -118,7 +132,7 @@ async def resolve_python_faas_handler(
     # If it's already a module, simply use that. Otherwise, convert the file name into a module
     # path.
     if not path.endswith(".py"):
-        return ResolvedPythonFaaSHandler(handler_val, file_name_used=False)
+        return ResolvedPythonFaaSHandler(module=path, func=func, file_name_used=False)
 
     # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, path)
@@ -147,7 +161,7 @@ async def resolve_python_faas_handler(
     stripped_source_path = os.path.relpath(handler_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPythonFaaSHandler(f"{normalized_path}:{func}", file_name_used=True)
+    return ResolvedPythonFaaSHandler(module=normalized_path, func=func, file_name_used=True)
 
 
 class PythonFaaSDependencies(Dependencies):
@@ -187,7 +201,6 @@ async def infer_faas_handler_dependency(
             ResolvePythonFaaSHandlerRequest(request.field_set.handler),
         ),
     )
-    module, _, _func = handler.val.partition(":")
 
     # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
     # When set, use the source root, which is useful in practice, but incurs fewer memoization
@@ -202,7 +215,7 @@ async def infer_faas_handler_dependency(
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            module,
+            handler.module,
             resolve=request.field_set.resolve.normalized_value(python_setup),
             locality=locality,
         ),
@@ -218,7 +231,7 @@ async def infer_faas_handler_dependency(
         context=(
             f"The target {address} has the field "
             f"`handler={repr(request.field_set.handler.value)}`, which maps "
-            f"to the Python module `{module}`"
+            f"to the Python module `{handler.module}`"
         ),
     )
     maybe_disambiguated = explicitly_provided_deps.disambiguated(
@@ -248,6 +261,21 @@ class PythonFaaSRuntimeField(StringField, ABC):
     @abstractmethod
     def to_interpreter_version(self) -> None | tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
+
+    def to_platform_string(self) -> None | str:
+        # We hardcode the platform value to the appropriate one for each FaaS runtime.
+        # (Running the "hello world" cloud function in the example code will report the platform, and can be
+        # used to verify correctness of these platform strings.)
+        interpreter_version = self.to_interpreter_version()
+        if interpreter_version is None:
+            return None
+
+        py_major, py_minor = interpreter_version
+        platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
+        # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
+        if py_major <= 3 and py_minor < 8:
+            platform_str += "m"
+        return platform_str
 
 
 @rule
@@ -282,7 +310,6 @@ async def build_lambdex(
     request: BuildLambdexRequest,
     lambdex: Lambdex,
     platform: Platform,
-    union_membership: UnionMembership,
 ) -> BuiltPackage:
     if platform.is_macos:
         logger.warning(
@@ -293,24 +320,15 @@ async def build_lambdex(
             f" {bin_name()} package. (See https://realpython.com/python-wheels/ for more about"
             " wheels.)\n\n(If the build does not raise an exception, it's safe to use macOS.)"
         )
+    lambdex.warn_for_layout(request.target_name)
 
     output_filename = request.output_path.value_or_default(
         # FaaS typically use the .zip suffix, so we use that instead of .pex.
         file_ending="zip",
     )
 
-    # We hardcode the platform value to the appropriate one for each FaaS runtime.
-    # (Running the "hello world" cloud function in the example code will report the platform, and can be
-    # used to verify correctness of these platform strings.)
-    pex_platforms = []
-    interpreter_version = request.runtime.to_interpreter_version()
-    if interpreter_version:
-        py_major, py_minor = interpreter_version
-        platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
-        # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
-        if py_major <= 3 and py_minor < 8:
-            platform_str += "m"
-        pex_platforms.append(platform_str)
+    platform_str = request.runtime.to_platform_string()
+    pex_platforms = [platform_str] if platform_str else []
 
     additional_pex_args = (
         # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
@@ -333,6 +351,7 @@ async def build_lambdex(
         complete_platforms=complete_platforms,
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
+        warn_for_transitive_files_targets=True,
     )
     lambdex_request = lambdex.to_pex_request()
 
@@ -343,23 +362,7 @@ async def build_lambdex(
         Get(TransitiveTargets, TransitiveTargetsRequest([request.address])),
     )
 
-    # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
-    # gotcha.
-    file_tgts = targets_with_sources_types(
-        [FileSourceField], transitive_targets.dependencies, union_membership
-    )
-    if file_tgts:
-        files_addresses = sorted(tgt.address.spec for tgt in file_tgts)
-        logger.warning(
-            f"The `{request.target_name}` target {request.address} transitively depends "
-            "on the below `files` targets, but Pants will not include them in the built package. "
-            "Filesystem APIs like `open()` are not able to load files within the binary "
-            "itself; instead, they read from the current working directory."
-            f"\n\nInstead, use `resources` targets. See {doc_url('resources')}."
-            f"\n\nFiles targets dependencies: {files_addresses}"
-        )
-
-    lambdex_args = ["build", "-e", handler.val, output_filename]
+    lambdex_args = ["build", "-e", f"{handler.module}:{handler.func}", output_filename]
     if request.script_handler:
         lambdex_args.extend(("-H", request.script_handler))
     if request.script_module:
@@ -393,9 +396,106 @@ async def build_lambdex(
     return BuiltPackage(digest=result.output_digest, artifacts=(artifact,))
 
 
+@dataclass(frozen=True)
+class BuildPythonFaaSRequest:
+    address: Address
+    target_name: str
+
+    complete_platforms: PythonFaaSCompletePlatforms
+    handler: PythonFaaSHandlerField
+    output_path: OutputPathField
+    runtime: PythonFaaSRuntimeField
+
+    include_requirements: bool
+
+    reexported_handler_module: str
+    log_only_reexported_handler_func: bool = False
+
+
+@rule
+async def build_python_faas(
+    request: BuildPythonFaaSRequest,
+) -> BuiltPackage:
+    platform_str = request.runtime.to_platform_string()
+    pex_platforms = PexPlatforms([platform_str] if platform_str else [])
+
+    additional_pex_args = (
+        # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
+        "--manylinux=manylinux2014",
+        # When we're executing Pex on Linux, allow a local interpreter to be resolved if
+        # available and matching the AMI platform.
+        "--resolve-local-platforms",
+    )
+
+    complete_platforms, handler = await MultiGet(
+        Get(CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms),
+        Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
+    )
+
+    # TODO: improve diagnostics if there's more than one platform/complete_platform
+
+    # synthesise a source file that gives a fixed handler path, no matter what the entry point is:
+    # some platforms require a certain name (e.g. GCF), and even on others, giving a fixed name
+    # means users don't need to duplicate the entry_point config in both the pants BUILD file and
+    # infrastructure definitions (the latter can always use the same names, for every lambda).
+    reexported_handler_file = f"{request.reexported_handler_module}.py"
+    reexported_handler_func = "handler"
+    reexported_handler_content = (
+        f"from {handler.module} import {handler.func} as {reexported_handler_func}"
+    )
+    additional_sources = await Get(
+        Digest,
+        CreateDigest([FileContent(reexported_handler_file, reexported_handler_content.encode())]),
+    )
+
+    repository_filename = "faas_repository.pex"
+    pex_request = PexFromTargetsRequest(
+        addresses=[request.address],
+        internal_only=False,
+        include_requirements=request.include_requirements,
+        output_filename=repository_filename,
+        platforms=pex_platforms,
+        complete_platforms=complete_platforms,
+        layout=PexLayout.PACKED,
+        additional_args=additional_pex_args,
+        additional_lockfile_args=additional_pex_args,
+        additional_sources=additional_sources,
+        warn_for_transitive_files_targets=True,
+    )
+
+    pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)
+
+    output_filename = request.output_path.value_or_default(file_ending="zip")
+
+    result = await Get(
+        PexVenv,
+        PexVenvRequest(
+            pex=pex_result,
+            layout=PexVenvLayout.FLAT_ZIPPED,
+            platforms=pex_platforms,
+            complete_platforms=complete_platforms,
+            output_path=Path(output_filename),
+            description=f"Build {request.target_name} artifact for {request.address}",
+        ),
+    )
+
+    if request.log_only_reexported_handler_func:
+        handler_text = reexported_handler_func
+    else:
+        handler_text = f"{request.reexported_handler_module}.{reexported_handler_func}"
+
+    artifact = BuiltPackageArtifact(
+        output_filename,
+        extra_log_lines=(f"    Handler: {handler_text}",),
+    )
+    return BuiltPackage(digest=result.digest, artifacts=(artifact,))
+
+
 def rules():
     return (
         *collect_rules(),
         *import_rules(),
+        *pex_venv_rules(),
+        *pex_from_targets_rules(),
         UnionRule(InferDependenciesRequest, InferPythonFaaSHandlerDependency),
     )
