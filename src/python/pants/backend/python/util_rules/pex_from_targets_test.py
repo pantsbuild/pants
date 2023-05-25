@@ -56,6 +56,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.backend.python.util_rules.pex_test_utils import get_all_data
 from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Snapshot
 from pants.testutil.option_util import create_subsystem
@@ -85,6 +86,8 @@ def rule_runner() -> PythonRuleRunner:
             PythonRequirementTarget,
             PythonSourceTarget,
             PythonTestTarget,
+            FileTarget,
+            ResourceTarget,
         ],
     )
 
@@ -892,3 +895,39 @@ def test_lockfile_requirements_selection(
             assert mode == ResolveMode.pex
             assert isinstance(result.requirements.from_superset, Resolve)
             assert result.requirements.from_superset.name == "myresolve"
+
+
+def test_warn_about_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
+    rule_runner.write_files(
+        {
+            "app.py": "",
+            "file.txt": "",
+            "resource.txt": "",
+            "BUILD": dedent(
+                """
+                file(name="file_target", source="file.txt")
+                resource(name="resource_target", source="resource.txt")
+                python_sources(name="app", dependencies=[":file_target", ":resource_target"])
+                """
+            ),
+        }
+    )
+
+    rule_runner.request(
+        PexRequest,
+        [
+            PexFromTargetsRequest(
+                [Address("", target_name="app")],
+                output_filename="app.pex",
+                internal_only=True,
+                warn_for_transitive_files_targets=True,
+            )
+        ],
+    )
+
+    assert "The target //:app (`python_source`) transitively depends on" in caplog.text
+    # files are not fine:
+    assert "//:file_target" in caplog.text
+    # resources are fine:
+    assert "resource_target" not in caplog.text
+    assert "resource.txt" not in caplog.text
