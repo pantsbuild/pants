@@ -44,12 +44,15 @@ jobs:
       - name: Set up Python 3.8
         uses: actions/setup-python@v4
         with:
-          # 3.9.15 is specifically required by OpenSaMD/OpenSaMD
+          # Specific constraints:
+          # OpenSaMD/OpenSaMD: 3.9.15
+          # lablub/backend.ai: 3.11.3
           python-version: |
             3.7
             3.8
             3.9.15
             3.10
+            3.11.3
 
       - name: Install Go
         uses: actions/setup-go@v3
@@ -89,12 +92,17 @@ jobs:
 
       - run: |
           pants version
-      # several repos don't pass this
-      # - run: |
-      #     pants tailor --check update-build-files --check ::
+      # several repos don't some of these checks, but `if: always()`
+      # to walk through all of them
+      - run: |
+          pants tailor --check update-build-files --check ::
+        if: always()
       - run: |
           pants lint check ::
+        if: always()
       - run: |
           pants test ::
+        if: always()
       - run: |
           pants package ::
+        if: always()
