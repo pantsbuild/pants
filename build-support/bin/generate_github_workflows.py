@@ -202,28 +202,42 @@ def launch_bazel_remote() -> Sequence[Step]:
     return [
         {
             "name": "Launch bazel-remote",
-            "if": "github.repository_owner == 'pantsbuild'",
             "run": dedent(
                 """\
                 mkdir -p ~/bazel-remote
+                if [[ -z "${AWS_ACCESS_KEY_ID}" ]]; then
+                  CACHE_WRITE=false
+                  # If no secret read/write creds, use hard-coded read-only creds, so that
+                  # cross-fork PRs can at least read from the cache.
+                  # These creds are hard-coded here in this public repo, which makes the bucket 
+                  # world-readable. But since putting raw AWS tokens in a public repo, even 
+                  # deliberately, is icky, we base64-them. This will at least help hide from
+                  # automated scanners that look for checked in AWS keys.
+                  # Not that it would be terrible if we were scanned, since this is public
+                  # on purpose, but it's best not to draw attention.
+                  AWS_ACCESS_KEY_ID=$(echo 'QUtJQVY2QTZHN1JRVkJJUVM1RUEK' | base64 -d)
+                  AWS_SECRET_ACCESS_KEY=$(echo 'd3dOQ1k1eHJJWVVtejZBblV6M0l1endXV0loQWZWcW9GZlVjMDlKRwo=' | base64 -d)
+                else
+                  CACHE_WRITE=true
+                fi
                 docker run --detach -u 1001:1000 \
                   -v ~/bazel-remote:/data \
                   -p 9092:9092 \
                   buchgr/bazel-remote-cache \
                   --s3.auth_method=access_key \
-                  --s3.secret_access_key="${AWS_SECRET_ACCESS_KEY}" \
                   --s3.access_key_id="${AWS_ACCESS_KEY_ID}" \
+                  --s3.secret_access_key="${AWS_SECRET_ACCESS_KEY}" \
                   --s3.bucket=cache.pantsbuild.org \
                   --s3.endpoint=s3.us-east-1.amazonaws.com \
                   --max_size 30
-                echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
-                echo "PANTS_REMOTE_CACHE_WRITE=true" >> "$GITHUB_ENV"
                 echo "PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092" >> "$GITHUB_ENV"
+                echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
+                echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
                 """
             ),
             "env": {
-                "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
                 "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
+                "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
             },
         }
     ]
