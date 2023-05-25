@@ -178,7 +178,10 @@ async def run_jmh_benchmark(
     reports_dir_prefix = jmh_setup.reports_dir_prefix
 
     reports_subset = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([os.path.join(reports_dir_prefix, "**")]))
+        Digest,
+        DigestSubset(
+            process_result.output_digest, PathGlobs([os.path.join(reports_dir_prefix, "**")])
+        ),
     )
     reports_snapshot = await Get(Snapshot, RemovePrefix(reports_subset, reports_dir_prefix))
 

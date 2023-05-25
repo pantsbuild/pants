@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(dependencies=[":lockfile"])
-resources(name="lockfile", sources=["jmh.default.lockfile.txt"])
+resource(name="lockfile", source="jmh.default.lockfile.txt")
 
-python_tests(name="tests", dependencies=[":test_lockfile"])
-resources(name="test_lockfile", sources=["jmh.test.lock"])
+python_tests(name="tests", dependencies=[":test_resources"])
+resources(name="test_resources", sources=["jmh.test.lock"])

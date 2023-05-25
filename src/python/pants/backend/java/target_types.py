@@ -185,7 +185,7 @@ class JmhBenckmarksGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         JavaJmhBenckmarksGeneratorSourcesField,
     )
-    generated_target_cls = JunitTestTarget
+    generated_target_cls = JmhBenchmarkTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         JmhBenchmarkTimeoutField,

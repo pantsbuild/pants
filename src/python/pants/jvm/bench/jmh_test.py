@@ -15,9 +15,11 @@ from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.subsystems.jmh import Jmh
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JmhBenckmarksGeneratorTarget
 from pants.backend.java.target_types import rules as java_target_types_rules
+from pants.backend.scala.compile.scalac import rules as scalac_rules
+from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.core.goals.bench import BenchmarkResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
-from pants.core.util_rules import config_files, source_files, system_binaries, stripped_source_files
+from pants.core.util_rules import config_files, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
@@ -48,8 +50,10 @@ def rule_runner() -> RuleRunner:
             *strip_jar.rules(),
             *java_target_types_rules(),
             *javac_rules(),
+            *scalac_rules(),
             *jmh_rules(),
             *source_files.rules(),
+            *scala_target_types_rules(),
             *stripped_source_files.rules(),
             *system_binaries.rules(),
             *util_rules(),
