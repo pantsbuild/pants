@@ -18,7 +18,6 @@ jobs:
           - https://github.com/pantsbuild/example-kotlin
           - https://github.com/pantsbuild/example-docker
           - https://github.com/pantsbuild/example-codegen
-          - https://github.com/pantsbuild/example-plugin
 
           # - https://github.com/StackStorm/st2
           # - https://github.com/lablup/backend.ai
