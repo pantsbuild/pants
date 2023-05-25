@@ -39,16 +39,16 @@ jobs:
 
       - run: |
           pants version
-        workdir: repo
+        working-directory: repo
       - run: |
           pants tailor --check update-build-files --check ::
-        workdir: repo
+        working-directory: repo
       - run: |
           pants lint check ::
-        workdir: repo
+        working-directory: repo
       - run: |
           pants test ::
-        workdir: repo
+        working-directory: repo
       - run: |
           pants package ::
-        workdir: repo
+        working-directory: repo
