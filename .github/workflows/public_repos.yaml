@@ -5,6 +5,8 @@ name: Public repos
 jobs:
   test:
     strategy:
+      # run each one to completion
+      fail-fast: false
       matrix:
         repository:
           - https://github.com/pantsbuild/example-python
@@ -36,6 +38,9 @@ jobs:
       - name: "Check out"
         run: |
           git clone --depth=1 ${{ matrix.repository }} repo
+          cd repo
+          pwd
+          git rev-parse HEAD
 
       - run: |
           pants version
