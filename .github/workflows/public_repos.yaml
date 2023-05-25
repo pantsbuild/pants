@@ -9,6 +9,7 @@ jobs:
       fail-fast: false
       matrix:
         repository:
+          # pants' examples
           - pantsbuild/example-python
           - pantsbuild/example-visibility
           - pantsbuild/example-django
@@ -18,13 +19,13 @@ jobs:
           - pantsbuild/example-kotlin
           - pantsbuild/example-docker
           - pantsbuild/example-codegen
-
-          # - StackStorm/st2
-          # - lablup/backend.ai
-          # - Ars-Linguistica/mlconjug3
-          # - mitodl/ol-infrastructure
-          # - naccdata/flywheel-gear-extensions
-          # - OpenSaMD/OpenSaMD
+          # public repos (just from a basic search for path:pants.toml on github)
+          - StackStorm/st2
+          - lablup/backend.ai
+          - Ars-Linguistica/mlconjug3
+          - mitodl/ol-infrastructure
+          - naccdata/flywheel-gear-extensions
+          - OpenSaMD/OpenSaMD
         pants_version:
           # repo's default version
           # FIXME: https://github.com/pantsbuild/scie-pants/pull/190
