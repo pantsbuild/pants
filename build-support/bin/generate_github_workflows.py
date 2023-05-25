@@ -199,6 +199,13 @@ def checkout(
 
 
 def launch_bazel_remote() -> Sequence[Step]:
+    """Run a sidecar bazel-remote instance.
+
+    This process proxies to a public-read/private-write S3 bucket (cache.pantsbuild.org).
+    PRs within pantsbuild/pants will have AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+    secrets set and so will be able to read and write the cache. PRs across forks
+    will not, so they use hard-coded read only creds so they can at least read from the cache.
+    """
     return [
         {
             "name": "Launch bazel-remote",
