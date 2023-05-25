@@ -149,7 +149,7 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
 
                     public static void main(String[] args) throws RunnerException {
                         Options opt = new OptionsBuilder()
-                                .include(JMHSample_01_HelloWorld.class.getSimpleName())
+                                .include(HelloWorldBenchmark.class.getSimpleName())
                                 .forks(1)
                                 .build();
 
@@ -163,6 +163,8 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
     )
 
     bench_result = run_jmh_benchmark(rule_runner, "example-bench", "HelloWorldBenchmark.java")
+    print(bench_result.stdout)
+    print(bench_result.stderr)
 
     assert bench_result.exit_code == 0
 

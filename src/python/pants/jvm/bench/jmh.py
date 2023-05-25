@@ -25,6 +25,7 @@ from pants.engine.fs import (
     Digest,
     DigestSubset,
     Directory,
+    FileContent,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
@@ -126,17 +127,23 @@ async def setup_jmh_for_target(
             request.field_set.address, jdk, jmh_classpath, classpath, files.snapshot.digest
         ),
     )
-    input_digest = await Get(
-        Digest, MergeDigests([*classpath.digests(), files.snapshot.digest, jmh_generated.digest])
-    )
 
     toolcp_relpath = "__toolcp"
+    gen_relpath = "__gen"
     extra_immutable_input_digests = {
         toolcp_relpath: jmh_classpath.digest,
+        gen_relpath: jmh_generated.digest,
     }
 
     reports_dir_prefix = "__reports"
-    reports_dir = os.path.join(reports_dir_prefix, request.field_set.address.path_safe_spec)
+    report_file = os.path.join(reports_dir_prefix, request.field_set.address.path_safe_spec)
+    report_file_digest = await Get(
+        Digest, CreateDigest([FileContent(path=report_file, content=b"")])
+    )
+
+    input_digest = await Get(
+        Digest, MergeDigests([*classpath.digests(), files.snapshot.digest, report_file_digest])
+    )
 
     # Classfiles produced by the root `jmh_test` targets are the only ones which should run.
     user_benchmarks = " ".join(classpath.root_args())
@@ -155,11 +162,12 @@ async def setup_jmh_for_target(
         classpath_entries=[
             *classpath.args(),
             *jmh_classpath.classpath_entries(toolcp_relpath),
+            gen_relpath,
         ],
         argv=[
             "org.openjdk.jmh.Main",
             "-rff",
-            reports_dir,
+            report_file,
             *jmh.args,
             user_benchmarks,
         ],
@@ -167,7 +175,7 @@ async def setup_jmh_for_target(
         extra_env={**bench_extra_env.env, **field_set_extra_env},
         extra_jvm_options=jmh.jvm_options,
         extra_immutable_input_digests=extra_immutable_input_digests,
-        output_directories=(reports_dir_prefix,),
+        output_files=(report_file,),
         description=f"Run JMH benchmarks for {request.field_set.address}",
         timeout_seconds=request.field_set.timeout.calculate_from_global_options(bench_subsystem),
         level=LogLevel.DEBUG,
@@ -248,7 +256,27 @@ async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> 
         ),
     )
 
-    generated_digest = await Get(Digest, RemovePrefix(process_result.output_digest, "__gen"))
+    sources_digest_subset, files_digest_subset = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                process_result.output_digest, PathGlobs([os.path.join(sources_output_dir, "**")])
+            ),
+        ),
+        Get(
+            Digest,
+            DigestSubset(
+                process_result.output_digest, PathGlobs([os.path.join(files_output_dir, "**")])
+            ),
+        ),
+    )
+
+    sources_digest, files_digest = await MultiGet(
+        Get(Digest, RemovePrefix(sources_digest_subset, sources_output_dir)),
+        Get(Digest, RemovePrefix(files_digest_subset, files_output_dir)),
+    )
+
+    generated_digest = await Get(Digest, MergeDigests([sources_digest, files_digest]))
     return GeneratedJmhSources(generated_digest)
 
 
