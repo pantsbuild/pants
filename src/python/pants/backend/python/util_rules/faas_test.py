@@ -66,7 +66,9 @@ def test_handler_filespec(handler: str, expected: List[str]) -> None:
 
 
 def test_resolve_handler(rule_runner: RuleRunner) -> None:
-    def assert_resolved(handler: str, *, expected: str, is_file: bool) -> None:
+    def assert_resolved(
+        handler: str, *, expected_module: str, expected_func: str, is_file: bool
+    ) -> None:
         addr = Address("src/python/project")
         rule_runner.write_files(
             {"src/python/project/lambda.py": "", "src/python/project/f2.py": ""}
@@ -75,17 +77,26 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
         result = rule_runner.request(
             ResolvedPythonFaaSHandler, [ResolvePythonFaaSHandlerRequest(field)]
         )
-        assert result.val == expected
+        assert result.module == expected_module
+        assert result.func == expected_func
         assert result.file_name_used == is_file
 
-    assert_resolved("path.to.lambda:func", expected="path.to.lambda:func", is_file=False)
-    assert_resolved("lambda.py:func", expected="project.lambda:func", is_file=True)
+    assert_resolved(
+        "path.to.lambda:func", expected_module="path.to.lambda", expected_func="func", is_file=False
+    )
+    assert_resolved(
+        "lambda.py:func", expected_module="project.lambda", expected_func="func", is_file=True
+    )
 
     with engine_error(contains="Unmatched glob"):
-        assert_resolved("doesnt_exist.py:func", expected="doesnt matter", is_file=True)
+        assert_resolved(
+            "doesnt_exist.py:func", expected_module="doesnt matter", expected_func="", is_file=True
+        )
     # Resolving >1 file is an error.
     with engine_error(InvalidFieldException):
-        assert_resolved("*.py:func", expected="doesnt matter", is_file=True)
+        assert_resolved(
+            "*.py:func", expected_module="doesnt matter", expected_func="", is_file=True
+        )
 
 
 def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:

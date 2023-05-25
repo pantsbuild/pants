@@ -13,6 +13,22 @@ function fail {
   exit "${2-1}"
 }
 
+function git_fetch_with_depth {
+  DEPTH="$1"
+  REF="$2"
+
+  # setting --depth will forcibly truncate history, which is fine in the temporary checkout on CI,
+  # but would be annoying locally: people will usually already have the full history, so doing a
+  # full fetch is fine
+  if [[ $CI = 1 ]]; then
+    DEPTH_ARGS=("--depth=$DEPTH")
+  else
+    DEPTH_ARGS=()
+  fi
+
+  git fetch "${DEPTH_ARGS[@]}" https://github.com/pantsbuild/pants "$REF"
+}
+
 if [[ -z $(which gh 2> /dev/null) ]]; then
   fail "Requires the GitHub CLI: https://cli.github.com/"
 fi
@@ -51,7 +67,8 @@ COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 if [[ -z $COMMIT ]]; then
   fail "Wasn't able to retrieve merge commit for $PR_NUM."
 fi
-git fetch https://github.com/pantsbuild/pants "$COMMIT"
+# Both the commit and its parent are required, to compute the diff to apply when cherry picking
+git_fetch_with_depth 2 "$COMMIT"
 
 TITLE=$(gh pr view "$PR_NUM" --json title --jq '.title')
 CATEGORY_LABEL=$(gh pr view "$PR_NUM" --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
@@ -68,7 +85,9 @@ BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.XXXXXX")
 gh pr view "$PR_NUM" --json body --jq '.body' > "$BODY_FILE"
 
 for MILESTONE in $MILESTONES; do
-  git fetch https://github.com/pantsbuild/pants "$MILESTONE" || continue
+  # Only the HEAD is required to be able to create the cherry-pick branch, so there's no need to
+  # spend time cloning the whole history
+  git_fetch_with_depth 1 "$MILESTONE" || continue
 
   PR_CREATE_CMD=(gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE")
   while IFS= read -r REVIEWER; do PR_CREATE_CMD+=(--reviewer "$REVIEWER"); done <<< "$REVIEWERS"
