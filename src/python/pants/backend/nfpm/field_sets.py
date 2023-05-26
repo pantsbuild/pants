@@ -52,7 +52,11 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
 
             cfg = config
             for key in keys[:-1]:
-                # TODO: if key == "[]" then it is an array (.contents)
+                # NB: if key == "[]" then it is an array (.contents).
+                # We can safely ignore .contents because contents fields are on
+                # the nfpm content targets, not on nfpm package targets, so
+                # they will not be in NfpmPackageFieldSet.required_fields.
+                # "contents" gets added to the config based on the dependencies field.
                 cfg.setdefault(key, {})
                 cfg = cfg[key]
             cfg[keys[-1]] = value
