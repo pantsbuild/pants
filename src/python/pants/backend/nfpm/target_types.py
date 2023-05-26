@@ -263,8 +263,7 @@ class NfpmRpmPackage(Target):
     )
 
 
-CONTENT_FILE_FIELDS = (
-    NfpmContentTypeField,
+CONTENT_FILE_INFO_FIELDS = (
     NfpmContentFileOwnerField,
     NfpmContentFileGroupField,
     NfpmContentFileModeField,
@@ -280,7 +279,8 @@ class NfpmContentFile(Target):
         NfpmDependencies,  # this would depend on the file target
         NfpmContentSrcField,
         NfpmContentDstField,
-        *CONTENT_FILE_FIELDS,
+        NfpmContentTypeField,
+        *CONTENT_FILE_INFO_FIELDS,
     )
     help = help_text(
         """
@@ -298,20 +298,15 @@ class NfpmContentFiles(TargetGenerator):
         NfpmContentFilesField,  # TODO: if given a "sources" field, what does this look like?
     )
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = CONTENT_FILE_FIELDS
+    moved_fields = (
+        NfpmContentTypeField,
+        *CONTENT_FILE_INFO_FIELDS,
+    )
     help = help_text(
         """
         Multiple files that should be copied into an nFPM package.
         """
     )
-
-
-CONTENT_SYMLINK_FIELDS = (
-    NfpmContentFileOwnerField,
-    NfpmContentFileGroupField,
-    # NfpmContentFileModeField,  # mode does not make sense for symlink
-    NfpmContentFileMtimeField,
-)
 
 
 class NfpmContentSymlink(Target):
@@ -321,7 +316,7 @@ class NfpmContentSymlink(Target):
         # Modeled w/o dependencies for now (feel free to add later).
         NfpmContentSymlinkSrcField,  # path on package install target
         NfpmContentSymlinkDstField,  # path on package install target
-        *CONTENT_SYMLINK_FIELDS,
+        *CONTENT_FILE_INFO_FIELDS,
     )
     help = help_text(
         """
@@ -339,20 +334,12 @@ class NfpmContentSymlinks(TargetGenerator):
         NfpmContentSymlinksField,
     )
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = CONTENT_SYMLINK_FIELDS
+    moved_fields = CONTENT_FILE_INFO_FIELDS
     help = help_text(
         """
         Multiple symlinks in an nFPM package (created on package install).
         """
     )
-
-
-CONTENT_DIR_FIELDS = (
-    NfpmContentFileOwnerField,
-    NfpmContentFileGroupField,
-    NfpmContentFileModeField,
-    NfpmContentFileMtimeField,
-)
 
 
 class NfpmContentDir(Target):
@@ -365,7 +352,7 @@ class NfpmContentDir(Target):
         # pulls the mode and mtime. But, pants creates the sandbox for nFPM,
         # so pants would have to explicitly set mode/mtime on sandboxed dirs.
         # So, the pants UX simplifies and only supports BUILD-defined values.
-        *CONTENT_DIR_FIELDS,
+        *CONTENT_FILE_INFO_FIELDS,
     )
     help = help_text(
         """
@@ -383,7 +370,7 @@ class NfpmContentDirs(TargetGenerator):
         NfpmContentDirsField,
     )
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = CONTENT_DIR_FIELDS
+    moved_fields = CONTENT_FILE_INFO_FIELDS
     help = help_text(
         """
         Multiple directories in an nFPM package (created on package install).
