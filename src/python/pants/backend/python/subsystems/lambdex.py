@@ -5,7 +5,6 @@ from enum import Enum
 
 from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.base.deprecated import warn_or_error
 from pants.engine.rules import collect_rules
 from pants.option.option_types import EnumOption
 from pants.util.strutil import softwrap
@@ -31,7 +30,7 @@ class Lambdex(PythonToolBase):
     lockfile_rules_type = LockfileRules.SIMPLE
 
     layout = EnumOption(
-        default=LambdexLayout.LAMBDEX,
+        default=LambdexLayout.ZIP,
         help=softwrap(
             """
             Explicitly control the layout used for `python_awslambda` and
@@ -39,34 +38,21 @@ class Lambdex(PythonToolBase):
             Lambdex-based layout to the plain zip layout, as recommended by cloud vendors.
             """
         ),
+        removal_version="2.19.0.dev0",
+        removal_hint=softwrap(
+            """
+            Remove the whole [lambdex] section, as Lambdex is deprecated and its functionality be
+            removed. If you have `layout = "zip"`, no further action is required, as you are already using
+            the recommended layout.
+
+            If you have `layout = "lambdex"`, removing the section will switch any
+            `python_awslambda` and `python_google_cloud_function` targets to using the `zip` layout,
+            as recommended by cloud vendors.  (If you are using `python_awslambda`, you will need to
+            also update the handlers configured in the cloud from `lambdex_handler.handler` to
+            `lambda_function.handler`.)
+            """
+        ),
     )
-
-    def warn_for_layout(self, target_alias: str) -> None:
-        if self.options.is_default("layout"):
-            lambda_message = (
-                " (you will need to also update the handlers configured in the cloud from `lambdex_handler.handler` to `lambda_function.handler`)"
-                if target_alias == "python_awslambda"
-                else ""
-            )
-
-            warn_or_error(
-                "2.19.0.dev0",
-                f"using the Lambdex layout for `{target_alias}` targets",
-                softwrap(
-                    f"""
-                    Set the `[lambdex].layout` option explicitly to `zip` (recommended) or `lambdex`
-                    (compatibility), in `pants.toml`. Recommended: set to `zip` to opt-in to the new
-                    layout recommended by cloud vendors{lambda_message}:
-
-                        [lambdex]
-                        layout = "zip"
-
-                    You can also explicitly set `layout = "lambdex"` to silence this warning and
-                    continue using the Lambdex-based layout in this release of Pants. This layout
-                    will disappear in future.
-                    """
-                ),
-            )
 
 
 def rules():
