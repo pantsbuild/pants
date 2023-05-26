@@ -7,7 +7,7 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.nfpm.fields.all import NfpmDependencies, NfpmPackageNameField
+from pants.backend.nfpm.fields.all import NfpmPackageNameField
 from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import OutputPathField, PackageFieldSet
@@ -21,7 +21,6 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     output_path: OutputPathField
     package_name: NfpmPackageNameField
     description: DescriptionField
-    dependencies: NfpmDependencies
 
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
         config: dict[str, Any] = {
