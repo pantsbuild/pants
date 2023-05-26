@@ -9,11 +9,12 @@ from typing import TypedDict
 import yaml
 
 from pants.backend.nfpm.field_sets import NfpmPackageFieldSet
-from pants.engine.addresses import Addresses
+from pants.core.goals.package import TraverseIfNotPackageTarget
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, Targets
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
 
 
@@ -45,17 +46,23 @@ class NfpmContent(TypedDict, total=False):
 
 
 @rule(level=LogLevel.DEBUG)
-async def generate_nfpm_yaml(request: RequestNfpmPackageConfig) -> NfpmPackageConfig:
-    nfpm_targets, hydrated_deps = await MultiGet(
-        Get(Targets, Addresses((request.field_set.address,))),
-        Get(Targets, DependenciesRequest(request.field_set.dependencies)),
+async def generate_nfpm_yaml(
+    request: RequestNfpmPackageConfig, union_membership: UnionMembership
+) -> NfpmPackageConfig:
+    transitive_targets = await Get(
+        TransitiveTargets,
+        TransitiveTargetsRequest(
+            [request.field_set.address],
+            should_traverse_deps_predicate=TraverseIfNotPackageTarget(
+                roots=[request.field_set.address],
+                union_membership=union_membership,
+            ),
+        ),
     )
-    # TODO: how do I get dependencies of a given type but stop descending
-    #       into transitive deps when I hit another nfpm package target
 
     # Fist get the config that can be constructed from the target itself.
-    tgt = nfpm_targets.expect_single()
-    config = request.field_set.nfpm_config(tgt)
+    nfpm_package_target = transitive_targets.roots[0]
+    config = request.field_set.nfpm_config(nfpm_package_target)
 
     # Second, gather package contents from hydrated deps.
     contents: list[NfpmContent] = config["contents"]
