@@ -9,6 +9,8 @@ from typing import Iterable
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import (
+    ScalaJmhBenchmarksGeneratorSourcesField,
+    ScalaJmhBenchmarksGeneratorTarget,
     ScalaJunitTestsGeneratorSourcesField,
     ScalaJunitTestsGeneratorTarget,
     ScalameterBenchmarksGeneratorSourcesField,
@@ -42,32 +44,30 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
     scalatest_filespec_matcher = FilespecMatcher(ScalatestTestsGeneratorSourcesField.default, ())
     junit_filespec_matcher = FilespecMatcher(ScalaJunitTestsGeneratorSourcesField.default, ())
+    jmh_filespec_matcher = FilespecMatcher(ScalaJmhBenchmarksGeneratorSourcesField.default, ())
     scalameter_filespec_matcher = FilespecMatcher(
         ScalameterBenchmarksGeneratorSourcesField.default, ()
     )
-    scalatest_files = {
-        path
-        for path in paths
-        if os.path.basename(path)
-        in set(scalatest_filespec_matcher.matches([os.path.basename(path) for path in paths]))
-    }
-    junit_files = {
-        path
-        for path in paths
-        if os.path.basename(path)
-        in set(junit_filespec_matcher.matches([os.path.basename(path) for path in paths]))
-    }
-    scalameter_files = {
-        path
-        for path in paths
-        if os.path.basename(path)
-        in set(scalameter_filespec_matcher.matches([os.path.basename(path) for path in paths]))
-    }
-    sources_files = set(paths) - scalatest_files - junit_files - scalameter_files
+
+    def filter_paths_using_matcher(matcher: FilespecMatcher) -> set[str]:
+        return {
+            path
+            for path in paths
+            if os.path.basename(path)
+            in set(matcher.matches([os.path.basename(path) for path in paths]))
+        }
+
+    scalatest_files = filter_paths_using_matcher(scalatest_filespec_matcher)
+    junit_files = filter_paths_using_matcher(junit_filespec_matcher)
+    jmh_files = filter_paths_using_matcher(jmh_filespec_matcher)
+    scalameter_files = filter_paths_using_matcher(scalameter_filespec_matcher)
+
+    sources_files = set(paths) - scalatest_files - junit_files - jmh_files - scalameter_files
     return {
         ScalaJunitTestsGeneratorTarget: junit_files,
         ScalaSourcesGeneratorTarget: sources_files,
         ScalatestTestsGeneratorTarget: scalatest_files,
+        ScalaJmhBenchmarksGeneratorTarget: jmh_files,
         ScalameterBenchmarksGeneratorTarget: scalameter_files,
     }
 

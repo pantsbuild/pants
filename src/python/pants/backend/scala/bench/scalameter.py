@@ -188,7 +188,9 @@ async def run_scalameter_benchmark(
 
     reports_digest = await Get(
         Digest,
-        DigestSubset(process_result.output_digest, PathGlobs([os.path.join(results_dir_prefix, "**")])),
+        DigestSubset(
+            process_result.output_digest, PathGlobs([os.path.join(results_dir_prefix, "**")])
+        ),
     )
     reports_snapshot = await Get(Snapshot, RemovePrefix(reports_digest, results_dir_prefix))
 

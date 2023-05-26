@@ -106,11 +106,11 @@ def test_simple_benchmark(rule_runner: RuleRunner, scalameter_lockfile: JVMLockf
               )
               """
             ),
-            "SimpleBenchmark.scala": dedent(
+            "SimpleBench.scala": dedent(
                 """\
                 import org.scalameter.api._
 
-                class SimpleBenchmark extends Bench.LocalTime {
+                class SimpleBench extends Bench.LocalTime {
                   val ranges = for {
                     size <- Gen.range("size")(3000, 15000, 30000)
                   } yield 0 until size
@@ -126,9 +126,7 @@ def test_simple_benchmark(rule_runner: RuleRunner, scalameter_lockfile: JVMLockf
         }
     )
 
-    bench_result = run_scalameter_benchmark(
-        rule_runner, "example-benchmark", "SimpleBenchmark.scala"
-    )
+    bench_result = run_scalameter_benchmark(rule_runner, "example-benchmark", "SimpleBench.scala")
 
     assert bench_result.exit_code == 0
     assert bench_result.reports

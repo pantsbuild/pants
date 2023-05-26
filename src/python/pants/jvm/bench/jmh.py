@@ -103,7 +103,7 @@ class GenerateJmhSourcesRequest(EngineAwareParameter):
         return self.address.spec
 
 
-async def _compile_generated_sources(
+async def _compile_jmh_generated_sources(
     address: Address,
     jdk: JdkEnvironment,
     jmh_classpath: ToolClasspath,
@@ -185,11 +185,11 @@ async def setup_jmh_for_target(
             GenerateJmhSourcesRequest(request.field_set.address, jdk, jmh_classpath, classpath),
         ),
     )
-    jmh_generated_classes = await _compile_generated_sources(
+    jmh_generated_classfiles = await _compile_jmh_generated_sources(
         request.field_set.address, jdk, jmh_classpath, classpath, jmh_generated.sources
     )
     jmh_generated_digest = await Get(
-        Digest, MergeDigests([jmh_generated_classes, jmh_generated.resources.digest])
+        Digest, MergeDigests([jmh_generated_classfiles, jmh_generated.resources.digest])
     )
 
     toolcp_relpath = "__toolcp"
@@ -281,21 +281,27 @@ async def run_jmh_benchmark(
     )
 
 
-async def _extract_classes_from_digest(
-    address: Address, path: str, digest: Digest, unzip: UnzipBinary
-) -> Digest:
+@dataclass(frozen=True)
+class _ExtractClassfiles:
+    address: Address
+    path: str
+    digest: Digest
+
+
+@rule(level=LogLevel.DEBUG)
+async def _extract_classes_from_digest(request: _ExtractClassfiles, unzip: UnzipBinary) -> Digest:
     dest_dir = "__extracted"
     dest_digest = await Get(Digest, CreateDigest([Directory(dest_dir)]))
 
-    input_digest = await Get(Digest, MergeDigests([digest, dest_digest]))
+    input_digest = await Get(Digest, MergeDigests([request.digest, dest_digest]))
 
     process_result = await Get(
         ProcessResult,
         Process(
-            unzip.extract_archive_argv(path, dest_dir),
+            unzip.extract_archive_argv(request.path, dest_dir),
             input_digest=input_digest,
             level=LogLevel.DEBUG,
-            description=f"Extracting classes for {address} from {path}.",
+            description=f"Collecting classfiles for {request.address} from {request.path}.",
             output_directories=(dest_dir,),
         ),
     )
@@ -304,15 +310,13 @@ async def _extract_classes_from_digest(
 
 
 @rule(level=LogLevel.DEBUG)
-async def generate_jmh_sources(
-    request: GenerateJmhSourcesRequest, jmh: Jmh, unzip: UnzipBinary
-) -> GeneratedJmhSources:
+async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> GeneratedJmhSources:
     classfiles_filenames = ClasspathEntry.args(request.classpath.entries)
     classfiles_digests = [entry.digest for entry in request.classpath.entries]
-    extracted_classes = [
-        await _extract_classes_from_digest(request.address, path, digest, unzip)
+    extracted_classes = await MultiGet(
+        Get(Digest, _ExtractClassfiles(request.address, path, digest))
         for path, digest in zip(classfiles_filenames, classfiles_digests)
-    ]
+    )
 
     input_prefix = "__input"
     input_digest = await Get(Digest, MergeDigests(extracted_classes))

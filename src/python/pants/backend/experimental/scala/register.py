@@ -9,6 +9,8 @@ from pants.backend.scala.resolve.lockfile import rules as scala_lockfile_rules
 from pants.backend.scala.target_types import (
     ScalaArtifactTarget,
     ScalacPluginTarget,
+    ScalaJmhBenchmarksGeneratorTarget,
+    ScalaJmhBenchmarkTarget,
     ScalaJunitTestsGeneratorTarget,
     ScalaJunitTestTarget,
     ScalameterBenchmarksGeneratorTarget,
@@ -38,6 +40,8 @@ def target_types():
         ScalatestTestTarget,
         ScalatestTestsGeneratorTarget,
         ScalaArtifactTarget,
+        ScalaJmhBenchmarkTarget,
+        ScalaJmhBenchmarksGeneratorTarget,
         ScalameterBenchmarkTarget,
         ScalameterBenchmarksGeneratorTarget,
         *jvm_common.target_types(),
