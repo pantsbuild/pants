@@ -550,6 +550,40 @@ async fn retries() {
 }
 
 #[tokio::test]
+async fn mutable() {
+  let graph = empty_graph();
+  let context = graph.context(
+    TContext::new().with_mutable(vec![TNode::new(0)].into_iter().collect())
+  );
+
+  // Create three nodes, with the bottommost as mutable.
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+
+  // Clear the middle Node, which dirties the upper node, _and_ the mutable node.
+  assert_eq!(
+    graph.invalidate_from_roots(true, |n| n.id == 1),
+    InvalidationResult {
+      cleared: 1,
+      dirtied: 2
+    }
+  );
+
+  // Request with a different salt, which will cause all three nodes to re-run.
+  let context = context.new_run(1).with_salt(1);
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 1), T(1, 1), T(2, 1)])
+  );
+  assert_eq!(
+    context.runs(),
+    vec![TNode::new(1), TNode::new(0), TNode::new(2)]
+  );
+}
+
+#[tokio::test]
 async fn eager_cleaning_success() {
   // Test that invalidation does not cause a Running node to restart if the dependencies that it
   // has already requested can successfully be cleaned.
@@ -778,6 +812,7 @@ struct TNode {
   pub id: usize,
   restartable: bool,
   cacheable: bool,
+  mutable: bool,
 }
 impl TNode {
   fn new(id: usize) -> Self {
@@ -785,6 +820,7 @@ impl TNode {
       id,
       restartable: true,
       cacheable: true,
+      mutable: false,
     }
   }
 }
@@ -841,6 +877,10 @@ impl Node for TNode {
 
   fn cacheable(&self) -> bool {
     self.cacheable
+  }
+
+  fn mutable(&self) -> bool {
+    self.mutable
   }
 
   fn cyclic_error(path: &[&Self]) -> Self::Error {
@@ -919,6 +959,7 @@ struct TContext {
   errors: Arc<HashSet<TNode>>,
   non_restartable: Arc<HashSet<TNode>>,
   uncacheable: Arc<HashSet<TNode>>,
+  mutable: Arc<HashSet<TNode>>,
   aborts: Arc<Mutex<Vec<TNode>>>,
   runs: Arc<Mutex<Vec<TNode>>>,
 }
@@ -933,6 +974,7 @@ impl TContext {
       errors: Arc::default(),
       non_restartable: Arc::default(),
       uncacheable: Arc::default(),
+      mutable: Arc::default(),
       aborts: Arc::default(),
       runs: Arc::default(),
     }
@@ -967,6 +1009,11 @@ impl TContext {
 
   fn with_uncacheable(mut self, uncacheable: HashSet<TNode>) -> TContext {
     self.uncacheable = Arc::new(uncacheable);
+    self
+  }
+
+  fn with_mutable(mut self, mutable: HashSet<TNode>) -> TContext {
+    self.mutable = Arc::new(mutable);
     self
   }
 
@@ -1024,6 +1071,7 @@ impl TContext {
           id: new_node_id,
           restartable: !self.non_restartable.contains(&TNode::new(new_node_id)),
           cacheable: !self.uncacheable.contains(&TNode::new(new_node_id)),
+          mutable: self.mutable.contains(&TNode::new(new_node_id)),
         }]
       }
       None => vec![],

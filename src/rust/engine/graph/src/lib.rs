@@ -146,6 +146,13 @@ impl<N: Node> InnerGraph<N> {
       {
         // Nodes are being cleaned: clear the highest id entry.
         (dirty_candidate, false)
+      } else if running_scc
+        .iter()
+        .any(|&id| self.pg[running_graph[id]].node().mutable())
+      {
+        // Mutable nodes are always placed in cycles with their dependees, and will briefly be
+        // running at the same time as their dependee(s) when they are first requested.
+        continue;
       } else {
         // There are no nodes being cleaned: terminate the Running node with the highest id.
         (
@@ -468,6 +475,7 @@ impl<N: Node> Graph<N> {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
 
+      let dst_is_mutable = dst_node.mutable();
       let dst_id = inner.ensure_entry(dst_node);
       if let Some(src_id) = src_id {
         test_trace_log!(
@@ -476,6 +484,11 @@ impl<N: Node> Graph<N> {
           inner.entry_for_id(dst_id).unwrap().node()
         );
         inner.pg.add_edge(src_id, dst_id, ());
+
+        if dst_is_mutable {
+          // If the destination node is mutable, place it in a cycle with the source.
+          inner.pg.add_edge(dst_id, src_id, ());
+        }
       } else {
         // Otherwise, this is an external request: always retry.
         test_trace_log!(
