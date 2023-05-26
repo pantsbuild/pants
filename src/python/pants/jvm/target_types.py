@@ -267,26 +267,6 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
-class JvmArtifactExcludeDependenciesField(StringSequenceField):
-    alias = "excludes"
-    help = help_text(
-        """
-        A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded
-        as dependencies when this artifact is resolved.
-
-        This does not prevent this artifact from being included in the resolve as a dependency
-        of other artifacts that depend on it, and is currently intended as a way to resolve
-        version conflicts in complex resolves.
-
-        These values are passed directly to Coursier, and if specified incorrectly will show a
-        parse error from Coursier.
-        """
-    )
-
-    removal_hint = "Use `exclusions` field instead"
-    removal_version = "2.18.0.dev0"
-
-
 @dataclass(frozen=True)
 class JvmArtifactExclusion:
     alias: ClassVar[str] = "jvm_exclude"
@@ -405,7 +385,6 @@ class JvmArtifactTarget(Target):
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
-        JvmArtifactExcludeDependenciesField,
         JvmArtifactExclusionsField,
         JvmJdkField,
         JvmMainClassNameField,

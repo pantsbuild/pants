@@ -154,7 +154,6 @@ pytest = "3rdparty/python/pytest.lock"
 [python-infer]
 assets = true
 unowned_dependency_behavior = "error"
-use_rust_parser = true
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
