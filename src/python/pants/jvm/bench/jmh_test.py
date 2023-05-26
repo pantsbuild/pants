@@ -17,6 +17,9 @@ from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.subsystems.jmh import Jmh
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JmhBenckmarksGeneratorTarget
 from pants.backend.java.target_types import rules as java_target_types_rules
+from pants.backend.kotlin.compile import kotlinc, kotlinc_plugins
+from pants.backend.kotlin.target_types import KotlinJmhBenckmarksGeneratorTarget
+from pants.backend.kotlin.target_types import rules as kotlin_target_types_rules
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.core.goals.bench import BenchmarkResult, get_filtered_environment
@@ -51,12 +54,15 @@ def rule_runner() -> RuleRunner:
             *jdk_util_rules(),
             *non_jvm_dependencies_rules(),
             *strip_jar.rules(),
-            *java_target_types_rules(),
-            *javac_rules(),
-            *scalac_rules(),
             *jmh_rules(),
-            *source_files.rules(),
+            *javac_rules(),
+            *java_target_types_rules(),
+            *kotlinc.rules(),
+            *kotlinc_plugins.rules(),
+            *kotlin_target_types_rules(),
+            *scalac_rules(),
             *scala_target_types_rules(),
+            *source_files.rules(),
             *stripped_source_files.rules(),
             *system_binaries.rules(),
             *util_rules(),
@@ -72,6 +78,7 @@ def rule_runner() -> RuleRunner:
             RelocatedFiles,
             JavaSourcesGeneratorTarget,
             JmhBenckmarksGeneratorTarget,
+            KotlinJmhBenckmarksGeneratorTarget,
         ],
     )
     return rule_runner
@@ -99,7 +106,7 @@ def jmh_lockfile(jmh_lockfile_def: JVMLockfileFixtureDefinition, request) -> JVM
 
 
 @maybe_skip_jdk_test
-def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) -> None:
+def test_hello_world_java(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
             "3rdparty/jvm/default.lock": jmh_lockfile.serialized_lockfile,
@@ -107,7 +114,7 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
             "example/BUILD": dedent(
                 """\
                 jmh_benchmarks(
-                    name='example-bench',
+                    name='example-java',
                     timeout=60,
                     dependencies=[
                         '3rdparty/jvm:org.openjdk.jmh_jmh-core',
@@ -123,10 +130,6 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
                 package example;
 
                 import org.openjdk.jmh.annotations.Benchmark;
-                import org.openjdk.jmh.runner.Runner;
-                import org.openjdk.jmh.runner.RunnerException;
-                import org.openjdk.jmh.runner.options.Options;
-                import org.openjdk.jmh.runner.options.OptionsBuilder;
 
                 public class HelloWorldBenchmark {
 
@@ -144,7 +147,7 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
     bench_result = run_jmh_benchmark(
         rule_runner,
         "example",
-        "example-bench",
+        "example-java",
         "HelloWorldBenchmark.java",
         jmh_args=["-f", "1", "-w", "1"],
     )
@@ -157,6 +160,62 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
     assert len(report) == 1
     assert report[0]["jmhVersion"] == _JMH_VERSION
     assert report[0]["benchmark"] == "example.HelloWorldBenchmark.wellHelloThere"
+
+
+def test_hello_world_kotlin(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": jmh_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": jmh_lockfile.requirements_as_jvm_artifact_targets(),
+            "example/BUILD": dedent(
+                """\
+                kotlin_jmh_benchmarks(
+                    name='example-kotlin',
+                    timeout=60,
+                    dependencies=[
+                        '3rdparty/jvm:org.openjdk.jmh_jmh-core',
+                        '3rdparty/jvm:org.openjdk.jmh_jmh-generator-bytecode',
+                        '3rdparty/jvm:org.openjdk.jmh_jmh-generator-reflection',
+                        '3rdparty/jvm:org.openjdk.jmh_jmh-generator-asm',
+                    ],
+                )
+                """
+            ),
+            "example/HelloWorldBenchmark.kt": dedent(
+                """\
+                package example
+
+                import org.openjdk.jmh.annotations.Benchmark
+
+                open class HelloWorldBenchmark {
+
+                    @Benchmark
+                    fun kotlinHelloThere() {
+                        // this method was intentionally left blank.
+                    }
+
+                }
+                """
+            ),
+        }
+    )
+
+    bench_result = run_jmh_benchmark(
+        rule_runner,
+        "example",
+        "example-kotlin",
+        "HelloWorldBenchmark.kt",
+        jmh_args=["-f", "1", "-w", "1"],
+    )
+
+    assert bench_result.exit_code == 0
+    assert bench_result.reports
+    assert len(bench_result.reports.files) == 1
+
+    report = _read_json_report(rule_runner, bench_result)
+    assert len(report) == 1
+    assert report[0]["jmhVersion"] == _JMH_VERSION
+    assert report[0]["benchmark"] == "example.HelloWorldBenchmark.kotlinHelloThere"
 
 
 def run_jmh_benchmark(

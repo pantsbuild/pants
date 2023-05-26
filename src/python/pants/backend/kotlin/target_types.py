@@ -20,6 +20,9 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.jvm.target_types import (
+    JmhBenchmarkExtraEnvVarsField,
+    JmhBenchmarkSourceField,
+    JmhBenchmarkTimeoutField,
     JunitTestExtraEnvVarsField,
     JunitTestSourceField,
     JunitTestTimeoutField,
@@ -243,6 +246,59 @@ class KotlincPluginTarget(Target):
         * Serialization: `org.jetbrains.kotlin:kotlin-serialization:VERSION` (ID: `serialization`)
         """
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# `kotlin_jmh_benchmark` and `kotlin_jmh_benchmarks` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class KotlinJmhBenchmarkSourceField(KotlinSourceField, JmhBenchmarkSourceField):
+    pass
+
+
+class KotlinJmhBenchmarkDependenciesField(KotlinDependenciesField):
+    pass
+
+
+class KotlinJmhBenchmarkTarget(Target):
+    alias = "kotlin_jmh_benchmark"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        KotlinJmhBenchmarkSourceField,
+        JmhBenchmarkTimeoutField,
+        JmhBenchmarkExtraEnvVarsField,
+        KotlinJmhBenchmarkDependenciesField,
+        JvmResolveField,
+        JvmProvidesTypesField,
+        JvmJdkField,
+    )
+    help = "A single Kotlin benchmark, run with JMH."
+
+
+class KotlinJmhBenckmarksGeneratorSourcesField(KotlinGeneratorSourcesField):
+    default = ("*Benchmark.kt",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Benchmark.kt', '!BenchmarkIgnore.kt']`"
+    )
+
+
+class KotlinJmhBenckmarksGeneratorTarget(TargetFilesGenerator):
+    alias = "kotlin_jmh_benchmarks"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        KotlinJmhBenckmarksGeneratorSourcesField,
+    )
+    generated_target_cls = KotlinJmhBenchmarkTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        JmhBenchmarkTimeoutField,
+        JmhBenchmarkExtraEnvVarsField,
+        KotlinJmhBenchmarkDependenciesField,
+        JvmJdkField,
+        JvmResolveField,
+    )
+    help = "Generate a `kotlin_jmh_benchmark` target for each file in the `sources` field."
 
 
 def rules():

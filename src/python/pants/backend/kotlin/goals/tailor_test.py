@@ -6,6 +6,7 @@ import pytest
 from pants.backend.kotlin.goals import tailor
 from pants.backend.kotlin.goals.tailor import PutativeKotlinTargetsRequest, classify_source_files
 from pants.backend.kotlin.target_types import (
+    KotlinJmhBenckmarksGeneratorTarget,
     KotlinJunitTestsGeneratorTarget,
     KotlinSourcesGeneratorTarget,
 )
@@ -34,6 +35,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
             "tests/kotlin/owned/BUILD": "kotlin_junit_tests()\n",
             "tests/kotlin/owned/OwnedTest.kt": "package owned",
             "tests/kotlin/unowned/UnownedTest.kt": "package unowned\n",
+            "benches/kotlin/owned/BUILD": "kotlin_jmh_benchmarks()\n",
+            "benches/kotlin/owned/OwnedBenchmark.kt": "package owned",
+            "benches/kotlin/unowned/UnownedBenchmark.kt": "package unowned\n",
         }
     )
     putative_targets = rule_runner.request(
@@ -45,9 +49,17 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     "src/kotlin/unowned",
                     "tests/kotlin/owned",
                     "tests/kotlin/unowned",
+                    "benches/kotlin/owned",
+                    "benches/kotlin/unowned",
                 )
             ),
-            AllOwnedSources(["src/kotlin/owned/OwnedFile.kt", "tests/kotlin/owned/OwnedTest.kt"]),
+            AllOwnedSources(
+                [
+                    "src/kotlin/owned/OwnedFile.kt",
+                    "tests/kotlin/owned/OwnedTest.kt",
+                    "benches/kotlin/owned/OwnedBenchmark.kt",
+                ]
+            ),
         ],
     )
     assert (
@@ -58,6 +70,12 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     "src/kotlin/unowned",
                     "unowned",
                     ["UnownedFile.kt"],
+                ),
+                PutativeTarget.for_target_type(
+                    KotlinJmhBenckmarksGeneratorTarget,
+                    "benches/kotlin/unowned",
+                    "unowned",
+                    ["UnownedBenchmark.kt"],
                 ),
                 PutativeTarget.for_target_type(
                     KotlinJunitTestsGeneratorTarget,
@@ -75,9 +93,13 @@ def test_classify_source_files() -> None:
     junit_files = {
         "foo/bar/BazTest.kt",
     }
-    lib_files = {"foo/bar/Baz.scala"}
+    jmh_files = {
+        "foo/bar/BazBenchmark.kt",
+    }
+    lib_files = {"foo/bar/Baz.kt"}
 
     assert {
         KotlinJunitTestsGeneratorTarget: junit_files,
+        KotlinJmhBenckmarksGeneratorTarget: jmh_files,
         KotlinSourcesGeneratorTarget: lib_files,
-    } == classify_source_files(junit_files | lib_files)
+    } == classify_source_files(junit_files | jmh_files | lib_files)

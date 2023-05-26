@@ -149,7 +149,7 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
 
 
 # -----------------------------------------------------------------------------------------------
-# `jmh_test` and `jmh_tests` targets
+# `jmh_benchmark` and `jmh_benchmarks` targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -192,7 +192,6 @@ class JmhBenckmarksGeneratorTarget(TargetFilesGenerator):
         JmhBenchmarkExtraEnvVarsField,
         JvmDependenciesField,
         JvmJdkField,
-        JvmProvidesTypesField,
         JvmResolveField,
     )
     help = "Generate a `jmh_benchmark` target for each file in the `sources` field."
