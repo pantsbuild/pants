@@ -621,14 +621,14 @@ async def run_bench(
         console.print_stderr(_format_bench_summary(result, run_id, console))
 
         if result.extra_output and result.extra_output.files:
-            path_prefix = str(distdir.relpath / "test" / result.path_safe_description)
+            path_prefix = str(distdir.relpath / "bench" / result.path_safe_description)
             workspace.write_digest(
                 result.extra_output.digest,
                 path_prefix=path_prefix,
             )
             if result.log_extra_output:
                 logger.info(
-                    f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`."
+                    f"Wrote extra output from benchmark `{result.addresses[0]}` to `{path_prefix}`."
                 )
 
     if bench_subsystem.report:

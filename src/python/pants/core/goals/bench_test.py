@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Iterable
@@ -19,12 +20,14 @@ from pants.core.goals.bench import (
     BenchmarkSubsystem,
     BenchmarkTimeoutField,
     ShowOutput,
+    _format_bench_summary,
     run_bench,
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import SingleEnvironmentNameRequest
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
+from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.internals.session import RunId
@@ -43,6 +46,7 @@ from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
+from pants.util.logging import LogLevel
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -322,6 +326,71 @@ def test_summary(rule_runner: RuleRunner) -> None:
     )
 
 
+def _assert_bench_summary(
+    expected: str,
+    *,
+    exit_code: int | None,
+    run_id: int,
+    result_metadata: ProcessResultMetadata | None,
+) -> None:
+    assert expected == _format_bench_summary(
+        BenchmarkResult(
+            exit_code=exit_code,
+            stdout="",
+            stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            addresses=(Address(spec_path="", target_name="dummy_address"),),
+            output_setting=ShowOutput.FAILED,
+            result_metadata=result_metadata,
+        ),
+        RunId(run_id),
+        Console(use_colors=False),
+    )
+
+
+def test_format_summary_remote(rule_runner: RuleRunner) -> None:
+    _assert_bench_summary(
+        "✓ //:dummy_address succeeded in 0.05s (ran in remote environment `ubuntu`).",
+        exit_code=0,
+        run_id=0,
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
+    )
+
+
+def test_format_summary_local(rule_runner: RuleRunner) -> None:
+    _assert_bench_summary(
+        "✓ //:dummy_address succeeded in 0.05s.",
+        exit_code=0,
+        run_id=0,
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name=None, total_elapsed_ms=50
+        ),
+    )
+
+
+def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
+    _assert_bench_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=make_process_result_metadata("ran", total_elapsed_ms=50),
+    )
+
+
+def test_format_summary_memoized_remote(rule_runner: RuleRunner) -> None:
+    _assert_bench_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized for remote environment `ubuntu`).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
+    )
+
+
 def test_report(rule_runner: RuleRunner) -> None:
     addr1 = Address("", target_name="t1")
     addr2 = Address("", target_name="t2")
@@ -348,6 +417,121 @@ def test_report_dir(rule_runner: RuleRunner) -> None:
     )
     assert exit_code == 0
     assert f"Wrote benchmark reports to {report_dir}" in stderr
+
+
+def test_sort_results() -> None:
+    create_bench_result = partial(
+        BenchmarkResult,
+        stdout="",
+        stdout_digest=EMPTY_FILE_DIGEST,
+        stderr="",
+        stderr_digest=EMPTY_FILE_DIGEST,
+        output_setting=ShowOutput.ALL,
+        result_metadata=None,
+    )
+    skip1 = create_bench_result(
+        exit_code=None,
+        addresses=(Address("t1"),),
+    )
+    skip2 = create_bench_result(
+        exit_code=None,
+        addresses=(Address("t2"),),
+    )
+    success1 = create_bench_result(
+        exit_code=0,
+        addresses=(Address("t1"),),
+    )
+    success2 = create_bench_result(
+        exit_code=0,
+        addresses=(Address("t2"),),
+    )
+    fail1 = create_bench_result(
+        exit_code=1,
+        addresses=(Address("t1"),),
+    )
+    fail2 = create_bench_result(
+        exit_code=1,
+        addresses=(Address("t2"),),
+    )
+    assert sorted([fail2, success2, skip2, fail1, success1, skip1]) == [
+        skip1,
+        skip2,
+        success1,
+        success2,
+        fail1,
+        fail2,
+    ]
+
+
+def assert_streaming_output(
+    *,
+    exit_code: int | None,
+    stdout: str = "stdout",
+    stderr: str = "stderr",
+    output_setting: ShowOutput = ShowOutput.ALL,
+    expected_level: LogLevel,
+    expected_message: str,
+    result_metadata: ProcessResultMetadata = make_process_result_metadata("dummy"),
+) -> None:
+    result = BenchmarkResult(
+        exit_code=exit_code,
+        stdout=stdout,
+        stdout_digest=EMPTY_FILE_DIGEST,
+        stderr=stderr,
+        stderr_digest=EMPTY_FILE_DIGEST,
+        output_setting=output_setting,
+        addresses=(Address("demo_test"),),
+        result_metadata=result_metadata,
+    )
+    assert result.level() == expected_level
+    assert result.message() == expected_message
+
+
+def test_streaming_output_no_tests() -> None:
+    assert_streaming_output(
+        exit_code=None,
+        stdout="",
+        stderr="",
+        expected_level=LogLevel.DEBUG,
+        expected_message="no benchmarks found.",
+    )
+
+
+def test_streaming_output_success() -> None:
+    assert_success_streamed = partial(
+        assert_streaming_output, exit_code=0, expected_level=LogLevel.INFO
+    )
+    assert_success_streamed(
+        expected_message=dedent(
+            """\
+            succeeded.
+            stdout
+            stderr
+
+            """
+        ),
+    )
+    assert_success_streamed(output_setting=ShowOutput.FAILED, expected_message="succeeded.")
+    assert_success_streamed(output_setting=ShowOutput.NONE, expected_message="succeeded.")
+
+
+def test_streaming_output_failure() -> None:
+    assert_failure_streamed = partial(
+        assert_streaming_output, exit_code=1, expected_level=LogLevel.ERROR
+    )
+    message = dedent(
+        """\
+        failed (exit code 1).
+        stdout
+        stderr
+
+        """
+    )
+    assert_failure_streamed(expected_message=message)
+    assert_failure_streamed(output_setting=ShowOutput.FAILED, expected_message=message)
+    assert_failure_streamed(
+        output_setting=ShowOutput.NONE, expected_message="failed (exit code 1)."
+    )
 
 
 def test_timeout_calculation() -> None:
