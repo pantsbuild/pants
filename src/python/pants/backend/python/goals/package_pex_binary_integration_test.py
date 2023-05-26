@@ -63,9 +63,7 @@ def rule_runner() -> PythonRuleRunner:
         ],
         objects={"python_artifact": PythonArtifact},
     )
-    rule_runner.set_options(
-        ["--python-infer-use-rust-parser"], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
-    )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
 
 
