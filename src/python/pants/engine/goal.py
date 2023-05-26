@@ -54,7 +54,7 @@ class GoalSubsystem(Subsystem):
 
     @classproperty
     @abstractmethod
-    def name(cls):
+    def name(cls) -> str:
         """The name used to select the corresponding Goal on the commandline and the options_scope
         for its options."""
 
