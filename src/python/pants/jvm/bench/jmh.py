@@ -229,7 +229,7 @@ async def run_jmh_benchmark(
     )
 
 
-async def _extract_classes_from_digest(path: str, digest: Digest, unzip: UnzipBinary) -> Digest:
+async def _extract_classes_from_digest(address: Address, path: str, digest: Digest, unzip: UnzipBinary) -> Digest:
     dest_dir = "__extracted"
     dest_digest = await Get(Digest, CreateDigest([Directory(dest_dir)]))
 
@@ -241,7 +241,7 @@ async def _extract_classes_from_digest(path: str, digest: Digest, unzip: UnzipBi
             unzip.extract_archive_argv(path, dest_dir),
             input_digest=input_digest,
             level=LogLevel.DEBUG,
-            description=f"Extracting classes from {path}.",
+            description=f"Extracting classes for {address} from {path}.",
             output_directories=(dest_dir,),
         ),
     )
@@ -256,7 +256,7 @@ async def generate_jmh_sources(
     classfiles_filenames = ClasspathEntry.args(request.classpath.entries)
     classfiles_digests = [entry.digest for entry in request.classpath.entries]
     extracted_classes = [
-        await _extract_classes_from_digest(path, digest, unzip)
+        await _extract_classes_from_digest(request.address, path, digest, unzip)
         for path, digest in zip(classfiles_filenames, classfiles_digests)
     ]
 
