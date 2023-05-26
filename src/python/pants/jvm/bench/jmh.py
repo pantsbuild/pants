@@ -18,7 +18,9 @@ from pants.core.goals.bench import (
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.engine.addresses import Address, Addresses
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     CreateDigest,
@@ -31,11 +33,12 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import FallibleProcessResult, ProcessCacheScope, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
+from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
@@ -87,12 +90,15 @@ class GeneratedJmhSources:
 
 
 @dataclass(frozen=True)
-class GenerateJmhSourcesRequest:
+class GenerateJmhSourcesRequest(EngineAwareParameter):
     address: Address
     jdk: JdkEnvironment
     jmh_classpath: ToolClasspath
     classpath: Classpath
     extra_files: Digest
+
+    def debug_hint(self) -> str | None:
+        return self.address.spec
 
 
 @rule(level=LogLevel.DEBUG)
@@ -121,17 +127,22 @@ async def setup_jmh_for_target(
         ),
     )
 
-    jmh_generated = await Get(
-        GeneratedJmhSources,
-        GenerateJmhSourcesRequest(
-            request.field_set.address, jdk, jmh_classpath, classpath, files.snapshot.digest
+    classpath_digest, jmh_generated = await MultiGet(
+        Get(Digest, MergeDigests(classpath.digests())),
+        Get(
+            GeneratedJmhSources,
+            GenerateJmhSourcesRequest(
+                request.field_set.address, jdk, jmh_classpath, classpath, files.snapshot.digest
+            ),
         ),
     )
 
     toolcp_relpath = "__toolcp"
+    classes_relpath = "__classes"
     gen_relpath = "__gen"
     extra_immutable_input_digests = {
         toolcp_relpath: jmh_classpath.digest,
+        classes_relpath: classpath_digest,
         gen_relpath: jmh_generated.digest,
     }
 
@@ -141,9 +152,7 @@ async def setup_jmh_for_target(
         Digest, CreateDigest([FileContent(path=report_file, content=b"")])
     )
 
-    input_digest = await Get(
-        Digest, MergeDigests([*classpath.digests(), files.snapshot.digest, report_file_digest])
-    )
+    input_digest = await Get(Digest, MergeDigests([files.snapshot.digest, report_file_digest]))
 
     # Classfiles produced by the root `jmh_test` targets are the only ones which should run.
     user_benchmarks = " ".join(classpath.root_args())
@@ -160,16 +169,24 @@ async def setup_jmh_for_target(
     process = JvmProcess(
         jdk=jdk,
         classpath_entries=[
-            *classpath.args(),
+            *classpath.args(prefix=classes_relpath),
             *jmh_classpath.classpath_entries(toolcp_relpath),
             gen_relpath,
         ],
         argv=[
             "org.openjdk.jmh.Main",
+            *(
+                ("-foe", ("true" if jmh.fail_on_error else "false"))
+                if jmh.fail_on_error is not None
+                else ()
+            ),
+            "-v",
+            jmh.verbosity.value,
+            "-rf",
+            jmh.result_format.value,
             "-rff",
             report_file,
             *jmh.args,
-            user_benchmarks,
         ],
         input_digest=input_digest,
         extra_env={**bench_extra_env.env, **field_set_extra_env},
@@ -212,12 +229,39 @@ async def run_jmh_benchmark(
     )
 
 
-@rule(level=LogLevel.DEBUG)
-async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> GeneratedJmhSources:
-    input_prefix = "__input"
-    input_digest = await Get(
-        Digest, MergeDigests([*request.classpath.digests(), request.extra_files])
+async def _extract_classes_from_digest(path: str, digest: Digest, unzip: UnzipBinary) -> Digest:
+    dest_dir = "__extracted"
+    dest_digest = await Get(Digest, CreateDigest([Directory(dest_dir)]))
+
+    input_digest = await Get(Digest, MergeDigests([digest, dest_digest]))
+
+    process_result = await Get(
+        ProcessResult,
+        Process(
+            unzip.extract_archive_argv(path, dest_dir),
+            input_digest=input_digest,
+            level=LogLevel.DEBUG,
+            description=f"Extracting classes from {path}.",
+            output_directories=(dest_dir,),
+        ),
     )
+
+    return await Get(Digest, RemovePrefix(process_result.output_digest, dest_dir))
+
+
+@rule(level=LogLevel.DEBUG)
+async def generate_jmh_sources(
+    request: GenerateJmhSourcesRequest, jmh: Jmh, unzip: UnzipBinary
+) -> GeneratedJmhSources:
+    classfiles_filenames = ClasspathEntry.args(request.classpath.entries)
+    classfiles_digests = [entry.digest for entry in request.classpath.entries]
+    extracted_classes = [
+        await _extract_classes_from_digest(path, digest, unzip)
+        for path, digest in zip(classfiles_filenames, classfiles_digests)
+    ]
+
+    input_prefix = "__input"
+    input_digest = await Get(Digest, MergeDigests([*extracted_classes, request.extra_files]))
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
@@ -235,10 +279,7 @@ async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> 
         ProcessResult,
         JvmProcess(
             jdk=request.jdk,
-            classpath_entries=[
-                *request.classpath.args(),
-                *request.jmh_classpath.classpath_entries(toolcp_relpath),
-            ],
+            classpath_entries=request.jmh_classpath.classpath_entries(toolcp_relpath),
             argv=[
                 "org.openjdk.jmh.generators.bytecode.JmhBytecodeGenerator",
                 input_prefix,

@@ -5,7 +5,11 @@ import pytest
 
 from pants.backend.java.goals import tailor
 from pants.backend.java.goals.tailor import PutativeJavaTargetsRequest, classify_source_files
-from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JmhBenckmarksGeneratorTarget, JunitTestsGeneratorTarget
+from pants.backend.java.target_types import (
+    JavaSourcesGeneratorTarget,
+    JmhBenckmarksGeneratorTarget,
+    JunitTestsGeneratorTarget,
+)
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -68,8 +72,11 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     ["UnownedFileTest.java"],
                 ),
                 PutativeTarget.for_target_type(
-                    JmhBenckmarksGeneratorTarget, "src/java/unowned", "unowned", ["UnownedFileBenchmark.java"]
-                )
+                    JmhBenckmarksGeneratorTarget,
+                    "src/java/unowned",
+                    "unowned",
+                    ["UnownedFileBenchmark.java"],
+                ),
             ]
         )
         == putative_targets

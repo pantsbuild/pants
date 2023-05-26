@@ -4,12 +4,26 @@
 from enum import Enum
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.option_types import ArgsListOption, EnumOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, EnumOption, SkipOption
 
 
 class GeneratorType(Enum):
     REFLECTION = "reflection"
     ASM = "asm"
+
+
+class VerbosityMode(Enum):
+    SILENT = "silent"
+    NORMAL = "normal"
+    EXTRA = "extra"
+
+
+class ResultFormat(Enum):
+    TEXT = "text"
+    CSV = "csv"
+    SCSV = "scsv"
+    JSON = "json"
+    LATEX = "latex"
 
 
 class Jmh(JvmToolBase):
@@ -30,6 +44,12 @@ class Jmh(JvmToolBase):
         "--generator_type",
         default=GeneratorType.REFLECTION,
         help="Type of bytecode generation to use.",
+    )
+    verbosity = EnumOption(default=VerbosityMode.NORMAL, help="Level of verbosity.")
+    result_format = EnumOption(default=ResultFormat.CSV, help="File format of the results report.")
+    fail_on_error = BoolOption(
+        default=None,
+        help="Whether should JMH fail in case any benchmark suffers from an unrecoverable error.",
     )
     args = ArgsListOption(example="--disable-ansi-colors", passthrough=True)
     skip = SkipOption("bench")

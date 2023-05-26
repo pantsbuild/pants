@@ -98,7 +98,7 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
         {
             "3rdparty/jvm/default.lock": jmh_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": jmh_lockfile.requirements_as_jvm_artifact_targets(),
-            "BUILD": dedent(
+            "example/BUILD": dedent(
                 """\
                 jmh_benchmarks(
                     name='example-bench',
@@ -111,8 +111,10 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
                 )
                 """
             ),
-            "HelloWorldBenchmark.java": dedent(
+            "example/HelloWorldBenchmark.java": dedent(
                 """\
+                package example;
+
                 import org.openjdk.jmh.annotations.Benchmark;
                 import org.openjdk.jmh.runner.Runner;
                 import org.openjdk.jmh.runner.RunnerException;
@@ -162,19 +164,25 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
         }
     )
 
-    bench_result = run_jmh_benchmark(rule_runner, "example-bench", "HelloWorldBenchmark.java")
+    bench_result = run_jmh_benchmark(
+        rule_runner, "example", "example-bench", "HelloWorldBenchmark.java"
+    )
     print(bench_result.stdout)
     print(bench_result.stderr)
 
     assert bench_result.exit_code == 0
+    assert False
 
 
 def run_jmh_benchmark(
-    rule_runner: RuleRunner, target_name: str, relative_file_path: str
+    rule_runner: RuleRunner, spec_path: str, target_name: str, relative_file_path: str
 ) -> BenchmarkResult:
-    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        ["--jmh-verbosity=extra", "--jmh-result-format=json", "--jmh-fail-on-error"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     tgt = rule_runner.get_target(
-        Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
+        Address(spec_path=spec_path, target_name=target_name, relative_file_path=relative_file_path)
     )
     return rule_runner.request(
         BenchmarkResult, [JmhBenchmarkRequest.Batch("", (JmhBenchmarkFieldSet.create(tgt),), None)]
