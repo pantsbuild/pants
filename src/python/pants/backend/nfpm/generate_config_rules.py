@@ -49,7 +49,7 @@ async def generate_nfpm_yaml(request: RequestNfpmPackageConfig) -> NfpmPackageCo
     # Second, gather package contents from hydrated deps.
     contents: list[NfpmContent] = config["contents"]
 
-    # assumption: TransitiveTargets is AFTER target generation (so there are no target generators)
+    # NB: TransitiveTargets is AFTER target generation/expansion (so there are no target generators)
     for tgt in transitive_targets.dependencies:
         if tgt.has_field(NfpmContentDirDstField):  # an NfpmContentDir
             dst = tgt[NfpmContentDirDstField].value
