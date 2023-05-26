@@ -96,7 +96,7 @@ __dependents_rules__(
         DEFAULT_DEPENDENTS_RULES,
     ),
     (
-        "[/java/subsystems/jmh.py]",
+        ("[/java/subsystems/jmh.py]", "[/java/target_types.py]"),
         "src/python/pants/jvm/bench/jmh.py",
         DEFAULT_DEPENDENTS_RULES,
     ),

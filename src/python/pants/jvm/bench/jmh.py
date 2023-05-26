@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.java.subsystems.jmh import Jmh
+from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.bench import (
     BenchmarkExtraEnv,
     BenchmarkFieldSet,
@@ -35,7 +36,13 @@ from pants.engine.fs import (
 )
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import (
+    GeneratedSources,
+    GenerateSourcesRequest,
+    SourcesField,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import ClasspathEntry
@@ -85,12 +92,12 @@ class JmhSetup:
 
 
 @dataclass(frozen=True)
-class GeneratedJmhSources:
+class GeneratedJmhBytecode:
     digest: Digest
 
 
 @dataclass(frozen=True)
-class GenerateJmhSourcesRequest(EngineAwareParameter):
+class GenerateJmhBytecodeRequest(EngineAwareParameter):
     address: Address
     jdk: JdkEnvironment
     jmh_classpath: ToolClasspath
@@ -130,12 +137,15 @@ async def setup_jmh_for_target(
     classpath_digest, jmh_generated = await MultiGet(
         Get(Digest, MergeDigests(classpath.digests())),
         Get(
-            GeneratedJmhSources,
-            GenerateJmhSourcesRequest(
+            GeneratedJmhBytecode,
+            GenerateJmhBytecodeRequest(
                 request.field_set.address, jdk, jmh_classpath, classpath, files.snapshot.digest
             ),
         ),
     )
+
+    snap = await Get(Snapshot, Digest, jmh_generated.digest)
+    print(snap.files)
 
     toolcp_relpath = "__toolcp"
     classes_relpath = "__classes"
@@ -153,9 +163,6 @@ async def setup_jmh_for_target(
     )
 
     input_digest = await Get(Digest, MergeDigests([files.snapshot.digest, report_file_digest]))
-
-    # Classfiles produced by the root `jmh_test` targets are the only ones which should run.
-    user_benchmarks = " ".join(classpath.root_args())
 
     # Cache bench runs only if they are successful, or not at all if `--bench-force`.
     cache_scope = (
@@ -229,7 +236,14 @@ async def run_jmh_benchmark(
     )
 
 
-async def _extract_classes_from_digest(address: Address, path: str, digest: Digest, unzip: UnzipBinary) -> Digest:
+class GenerateJavaJmhSourcesRequest(GenerateSourcesRequest):
+    input = JmhBenchmarkSourceField
+    output = JavaSourceField
+
+
+async def _extract_classes_from_digest(
+    address: Address, path: str, digest: Digest, unzip: UnzipBinary
+) -> Digest:
     dest_dir = "__extracted"
     dest_digest = await Get(Digest, CreateDigest([Directory(dest_dir)]))
 
@@ -251,21 +265,33 @@ async def _extract_classes_from_digest(address: Address, path: str, digest: Dige
 
 @rule(level=LogLevel.DEBUG)
 async def generate_jmh_sources(
-    request: GenerateJmhSourcesRequest, jmh: Jmh, unzip: UnzipBinary
-) -> GeneratedJmhSources:
-    classfiles_filenames = ClasspathEntry.args(request.classpath.entries)
-    classfiles_digests = [entry.digest for entry in request.classpath.entries]
+    request: GenerateJavaJmhSourcesRequest, jmh: Jmh, unzip: UnzipBinary
+) -> GeneratedSources:
+    field_set = JmhBenchmarkFieldSet.create(request.protocol_target)
+
+    jdk, lockfile_request = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version)),
+        Get(GenerateJvmLockfileFromTool, JmhToolLockfileSentinel()),
+    )
+
+    classpath, jmh_classpath = await MultiGet(
+        Get(Classpath, Addresses([field_set.address])),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
+    )
+
+    classfiles_filenames = ClasspathEntry.args(classpath.entries)
+    classfiles_digests = [entry.digest for entry in classpath.entries]
     extracted_classes = [
-        await _extract_classes_from_digest(request.address, path, digest, unzip)
+        await _extract_classes_from_digest(field_set.address, path, digest, unzip)
         for path, digest in zip(classfiles_filenames, classfiles_digests)
     ]
 
     input_prefix = "__input"
-    input_digest = await Get(Digest, MergeDigests([*extracted_classes, request.extra_files]))
+    input_digest = await Get(Digest, MergeDigests(extracted_classes))
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
-        toolcp_relpath: request.jmh_classpath.digest,
+        toolcp_relpath: jmh_classpath.digest,
         input_prefix: input_digest,
     }
 
@@ -278,8 +304,8 @@ async def generate_jmh_sources(
     process_result = await Get(
         ProcessResult,
         JvmProcess(
-            jdk=request.jdk,
-            classpath_entries=request.jmh_classpath.classpath_entries(toolcp_relpath),
+            jdk=jdk,
+            classpath_entries=jmh_classpath.classpath_entries(toolcp_relpath),
             argv=[
                 "org.openjdk.jmh.generators.bytecode.JmhBytecodeGenerator",
                 input_prefix,
@@ -291,7 +317,7 @@ async def generate_jmh_sources(
             extra_jvm_options=jmh.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
             output_directories=(sources_output_dir, files_output_dir),
-            description=f"Generate JMH sources for {request.address}",
+            description=f"Generate JMH sources for {field_set.address}",
             level=LogLevel.DEBUG,
             use_nailgun=False,
         ),
@@ -317,8 +343,8 @@ async def generate_jmh_sources(
         Get(Digest, RemovePrefix(files_digest_subset, files_output_dir)),
     )
 
-    generated_digest = await Get(Digest, MergeDigests([sources_digest, files_digest]))
-    return GeneratedJmhSources(generated_digest)
+    generated = await Get(Snapshot, MergeDigests([sources_digest, files_digest]))
+    return GeneratedSources(generated)
 
 
 @rule
