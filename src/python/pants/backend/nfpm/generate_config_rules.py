@@ -27,27 +27,22 @@ class NfpmPackageConfig:
     digest: Digest  # digest contains nfpm.yaml
 
 
-NfpmFileInfo = TypedDict(
-    "NfpmFileInfo",
-    {
-        "owner": str,
-        "group": str,
-        "mode": int,
-        "mtime": str,
-    },
-    total=False,
-)
-NfpmContent = TypedDict(
-    "NfpmContent",
-    {
-        "src": str,
-        "dst": str,
-        "type": str,
-        "packager": str,
-        "file_info": NfpmFileInfo,
-    },
-    total=False,
-)
+class NfpmFileInfo(TypedDict, total=False):
+    # nFPM allows these to be None or missing.
+    # Each of the fields have a default, so in practice, these won't be None.
+    owner: str | None
+    group: str | None
+    mode: int | None
+    mtime: str | None
+
+
+class NfpmContent(TypedDict, total=False):
+    src: str
+    dst: str
+    type: str
+    packager: str
+    file_info: NfpmFileInfo
+
 
 @rule(level=LogLevel.DEBUG)
 async def generate_nfpm_yaml(request: RequestNfpmPackageConfig) -> NfpmPackageConfig:
