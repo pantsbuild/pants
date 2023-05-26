@@ -6,6 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import ClassVar, Optional
 
+from pants.backend.nfpm.config import NfpmContent
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException, StringField, StringSequenceField
@@ -340,6 +341,6 @@ class NfpmRpmGhostContents(StringSequenceField):
     # TODO: does this need any validation like requiring absolute paths?
 
     @property
-    def nfpm_contents(self) -> list[dict[str, str]]:
-        contents = [{"type": "ghost", "dst": ghost} for ghost in self.value or ()]
+    def nfpm_contents(self) -> list[NfpmContent]:
+        contents = [NfpmContent(type="ghost", dst=ghost) for ghost in self.value or ()]
         return contents
