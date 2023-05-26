@@ -9,8 +9,10 @@ from typing import Iterable
 
 from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.backend.java.target_types import (
+    JavaJmhBenckmarksGeneratorSourcesField,
     JavaSourcesGeneratorTarget,
     JavaTestsGeneratorSourcesField,
+    JmhBenckmarksGeneratorTarget,
     JunitTestsGeneratorTarget,
 )
 from pants.core.goals.tailor import (
@@ -36,11 +38,17 @@ class PutativeJavaTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
+
     tests_filespec_matcher = FilespecMatcher(JavaTestsGeneratorSourcesField.default, ())
     test_filenames = set(tests_filespec_matcher.matches([os.path.basename(path) for path in paths]))
     test_files = {path for path in paths if os.path.basename(path) in test_filenames}
-    sources_files = set(paths) - test_files
-    return {JunitTestsGeneratorTarget: test_files, JavaSourcesGeneratorTarget: sources_files}
+
+    benchmarks_filespec_matcher = FilespecMatcher(JavaJmhBenckmarksGeneratorSourcesField.default, ())
+    benchmark_filenames = set(benchmarks_filespec_matcher.matches([os.path.basename(path) for path in paths]))
+    benchmark_files = {path for path in paths if os.path.basename(path) in benchmark_filenames}
+
+    sources_files = set(paths) - test_files - benchmark_files
+    return {JunitTestsGeneratorTarget: test_files, JmhBenckmarksGeneratorTarget: benchmark_files, JavaSourcesGeneratorTarget: sources_files}
 
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Java targets to create")
