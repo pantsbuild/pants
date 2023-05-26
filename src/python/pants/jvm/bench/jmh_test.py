@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import json
 from textwrap import dedent
+from typing import Any, Iterable, cast
 
 import pytest
 
@@ -21,6 +23,7 @@ from pants.core.goals.bench import BenchmarkResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
+from pants.engine.fs import DigestContents
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.bench.jmh import JmhBenchmarkFieldSet, JmhBenchmarkRequest
@@ -74,15 +77,18 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+_JMH_VERSION = "1.36"
+
+
 @pytest.fixture
 def jmh_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
         "jmh.test.lock",
         [
-            "org.openjdk.jmh:jmh-core:1.36",
-            "org.openjdk.jmh:jmh-generator-bytecode:1.36",
-            "org.openjdk.jmh:jmh-generator-reflection:1.36",
-            "org.openjdk.jmh:jmh-generator-asm:1.36",
+            f"org.openjdk.jmh:jmh-core:{_JMH_VERSION}",
+            f"org.openjdk.jmh:jmh-generator-bytecode:{_JMH_VERSION}",
+            f"org.openjdk.jmh:jmh-generator-reflection:{_JMH_VERSION}",
+            f"org.openjdk.jmh:jmh-generator-asm:{_JMH_VERSION}",
         ],
     )
 
@@ -102,6 +108,7 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
                 """\
                 jmh_benchmarks(
                     name='example-bench',
+                    timeout=60,
                     dependencies=[
                         '3rdparty/jvm:org.openjdk.jmh_jmh-core',
                         '3rdparty/jvm:org.openjdk.jmh_jmh-generator-bytecode',
@@ -128,36 +135,6 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
                         // this method was intentionally left blank.
                     }
 
-                    /*
-                    * ============================== HOW TO RUN THIS TEST: ====================================
-                    *
-                    * You are expected to see the run with large number of iterations, and
-                    * very large throughput numbers. You can see that as the estimate of the
-                    * harness overheads per method call. In most of our measurements, it is
-                    * down to several cycles per call.
-                    *
-                    * a) Via command-line:
-                    *    $ mvn clean install
-                    *    $ java -jar target/benchmarks.jar JMHSample_01
-                    *
-                    * JMH generates self-contained JARs, bundling JMH together with it.
-                    * The runtime options for the JMH are available with "-h":
-                    *    $ java -jar target/benchmarks.jar -h
-                    *
-                    * b) Via the Java API:
-                    *    (see the JMH homepage for possible caveats when running from IDE:
-                    *      http://openjdk.java.net/projects/code-tools/jmh/)
-                    */
-
-                    public static void main(String[] args) throws RunnerException {
-                        Options opt = new OptionsBuilder()
-                                .include(HelloWorldBenchmark.class.getSimpleName())
-                                .forks(1)
-                                .build();
-
-                        new Runner(opt).run();
-                    }
-
                 }
                 """
             ),
@@ -165,25 +142,52 @@ def test_hello_world(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixture) 
     )
 
     bench_result = run_jmh_benchmark(
-        rule_runner, "example", "example-bench", "HelloWorldBenchmark.java"
+        rule_runner,
+        "example",
+        "example-bench",
+        "HelloWorldBenchmark.java",
+        jmh_args=["-f", "1", "-w", "1"],
     )
-    print(bench_result.stdout)
-    print(bench_result.stderr)
 
     assert bench_result.exit_code == 0
-    assert False
+    assert bench_result.reports
+    assert len(bench_result.reports.files) == 1
+
+    report = _read_json_report(rule_runner, bench_result)
+    assert len(report) == 1
+    assert report[0]["jmhVersion"] == _JMH_VERSION
+    assert report[0]["benchmark"] == "example.HelloWorldBenchmark.wellHelloThere"
 
 
 def run_jmh_benchmark(
-    rule_runner: RuleRunner, spec_path: str, target_name: str, relative_file_path: str
+    rule_runner: RuleRunner,
+    spec_path: str,
+    target_name: str,
+    relative_file_path: str,
+    *,
+    jmh_args: Iterable[str] = (),
 ) -> BenchmarkResult:
-    rule_runner.set_options(
-        ["--jmh-verbosity=extra", "--jmh-result-format=json", "--jmh-fail-on-error"],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
+    jvm_options = ["-Djmh.ignoreLock=true"]
+    args = [
+        "--bench-timeouts",
+        "--jmh-verbosity=extra",
+        "--jmh-result-format=json",
+        "--jmh-fail-on-error",
+        f"--jmh-jvm-options={repr(jvm_options)}",
+        f"--jmh-args={repr(jmh_args)}",
+    ]
+    rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
     tgt = rule_runner.get_target(
         Address(spec_path=spec_path, target_name=target_name, relative_file_path=relative_file_path)
     )
     return rule_runner.request(
         BenchmarkResult, [JmhBenchmarkRequest.Batch("", (JmhBenchmarkFieldSet.create(tgt),), None)]
     )
+
+
+def _read_json_report(rule_runner: RuleRunner, result: BenchmarkResult) -> list[dict[str, Any]]:
+    assert result.reports
+    contents = rule_runner.request(DigestContents, [result.reports.digest])
+    assert len(contents) == 1
+
+    return cast(list[dict[str, Any]], json.loads(contents[0].content))
