@@ -79,7 +79,7 @@ class ExternalToolOptionsMixin:
     """Common options for implementing subsystem providing an `ExternalToolRequest`."""
 
     @classproperty
-    def name(cls):
+    def name(cls) -> str:
         """The name of the tool, for use in user-facing messages.
 
         Derived from the classname, but subclasses can override, e.g., with a classproperty.
