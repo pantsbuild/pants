@@ -552,8 +552,9 @@ async fn retries() {
 #[tokio::test]
 async fn mutable() {
   let graph = empty_graph();
-  let context =
-    TContext::new(graph.clone()).with_mutable(vec![TNode::new(0)].into_iter().collect());
+  let context = graph.context(
+    TContext::new().with_mutable(vec![TNode::new(0)].into_iter().collect())
+  );
 
   // Create three nodes, with the bottommost as mutable.
   assert_eq!(
