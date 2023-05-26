@@ -101,7 +101,8 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: 1.19.5
-    - env: {}
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build wheels
       run: './pants run build-support/bin/release.py -- build-local-pex
 

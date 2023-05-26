@@ -367,7 +367,8 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: 1.19.5
-    - env: {}
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build wheels
       run: './pants run build-support/bin/release.py -- build-local-pex
 
@@ -675,7 +676,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_0:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 0/10
     needs:
@@ -752,7 +754,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_1:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 1/10
     needs:
@@ -829,7 +832,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_2:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 2/10
     needs:
@@ -906,7 +910,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_3:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 3/10
     needs:
@@ -983,7 +988,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_4:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 4/10
     needs:
@@ -1060,7 +1066,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_5:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 5/10
     needs:
@@ -1137,7 +1144,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_6:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 6/10
     needs:
@@ -1214,7 +1222,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_7:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 7/10
     needs:
@@ -1291,7 +1300,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_8:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 8/10
     needs:
@@ -1368,7 +1378,8 @@ jobs:
         path: .pants.d/pants.log
     timeout-minutes: 90
   test_python_linux_x86_64_9:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 9/10
     needs:
