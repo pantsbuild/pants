@@ -11,7 +11,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentFileGroupField,
     NfpmContentFileModeField,
     NfpmContentFileMtimeField,
-    NfpmContentFileOwnerField
+    NfpmContentFileOwnerField,
 )
 from pants.engine.target import Target
 
@@ -30,7 +30,6 @@ class OctalInt(int):
 
 # This is an unfortunate import-time side effect: PyYAML does registration globally.
 yaml.add_representer(OctalInt, OctalInt.represent_octal)
-
 
 
 class NfpmFileInfo(TypedDict, total=False):
