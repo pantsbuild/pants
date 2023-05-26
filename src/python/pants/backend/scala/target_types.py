@@ -56,7 +56,7 @@ from pants.jvm.target_types import (
     JvmRunnableSourceFieldSet,
     _jvm_artifact_exclusions_field_help,
 )
-from pants.util.strutil import help_text
+from pants.util.strutil import help_text, softwrap
 
 
 class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
@@ -343,7 +343,7 @@ class ScalacPluginArtifactField(StringField, AsyncFieldMixin):
     alias = "artifact"
     required = True
     value: str
-    help = "The address of a `jvm_artifact` that defines a plugin for `scalac`."
+    help = "The address of either a `jvm_artifact` or a `scala_artifact` that defines a plugin for `scalac`."
 
 
 class ScalacPluginNameField(StringField):
@@ -404,14 +404,28 @@ class ScalaArtifactCrossversionField(StringField):
 @dataclass(frozen=True)
 class ScalaArtifactExclusion(JvmArtifactExclusion):
     alias = "scala_exclude"
+    help = help_text(
+        """
+        Exclude the given `artifact` and `group`, or all artifacts from the given `group`.
+        You can also use the `crossversion` field to help resolve the final artifact name.
+        """
+    )
 
     crossversion: str = ScalaCrossVersion.PARTIAL.value
 
     def validate(self) -> set[str]:
+        errors = super().validate()
         valid_crossversions = [x.value for x in ScalaCrossVersion]
         if self.crossversion not in valid_crossversions:
-            return {f"Invalid `crossversion` value: {self.crossversion}"}
-        return set()
+            errors.add(
+                softwrap(
+                    f"""
+                    Invalid `crossversion` value: {self.crossversion}. Valid values are:
+                    {', '.join(valid_crossversions)}
+                    """
+                )
+            )
+        return errors
 
 
 class ScalaArtifactExclusionsField(JvmArtifactExclusionsField):
@@ -438,6 +452,7 @@ class ScalaArtifactFieldSet(FieldSet):
         JvmArtifactArtifactField,
         JvmArtifactVersionField,
         JvmArtifactPackagesField,
+        ScalaArtifactCrossversionField,
     )
 
 
@@ -460,11 +475,10 @@ class ScalaArtifactTarget(TargetGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         *ScalaArtifactFieldSet.required_fields,
-        JvmArtifactResolveField,
+        ScalaArtifactExclusionsField,
         JvmArtifactUrlField,
         JvmArtifactJarSourceField,
-        ScalaArtifactExclusionsField,
-        ScalaArtifactCrossversionField,
+        JvmMainClassNameField,
     )
     copied_fields = (
         *COMMON_TARGET_FIELDS,
@@ -473,6 +487,7 @@ class ScalaArtifactTarget(TargetGenerator):
         JvmArtifactPackagesField,
         JvmArtifactUrlField,
         JvmArtifactJarSourceField,
+        JvmMainClassNameField,
     )
     moved_fields = (
         JvmArtifactResolveField,

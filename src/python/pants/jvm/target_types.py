@@ -284,12 +284,17 @@ class JvmArtifactExcludeDependenciesField(StringSequenceField):
     )
 
     removal_hint = "Use `exclusions` field instead"
-    removal_version = "2.18"
+    removal_version = "2.18.0.dev0"
 
 
 @dataclass(frozen=True)
 class JvmArtifactExclusion:
     alias: ClassVar[str] = "jvm_exclude"
+    help: ClassVar[str | Callable[[], str]] = help_text(
+        """
+        Exclude the given `artifact` and `group`, or all artifacts from the given `group`.
+        """
+    )
 
     group: str
     artifact: str | None = None
@@ -305,19 +310,19 @@ class JvmArtifactExclusion:
 
 
 def _jvm_artifact_exclusions_field_help(
-    supported_rule_types: Callable[[], Iterable[type[JvmArtifactExclusion]]]
+    supported_exclusions: Callable[[], Iterable[type[JvmArtifactExclusion]]]
 ) -> str | Callable[[], str]:
     return help_text(
         lambda: f"""
-        A list of exclusion rules for unversioned coordinates that should be excluded
+        A list of exclusions for unversioned coordinates that should be excluded
         as dependencies when this artifact is resolved.
 
         This does not prevent this artifact from being included in the resolve as a dependency
         of other artifacts that depend on it, and is currently intended as a way to resolve
         version conflicts in complex resolves.
 
-        Supported rule types are:
-        {bullet_list(rule.alias for rule in supported_rule_types())}
+        Supported exclusions are:
+        {bullet_list(f'`{exclusion.alias}`: {exclusion.help}' for exclusion in supported_exclusions())}
         """
     )
 
