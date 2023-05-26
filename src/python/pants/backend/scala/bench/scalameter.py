@@ -119,11 +119,13 @@ async def setup_scalameter_for_target(
         ),
     )
 
-    input_digest = await Get(Digest, MergeDigests([*classpath.digests(), files.snapshot.digest]))
+    classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
 
     toolcp_relpath = "__toolcp"
+    inputcp_relpath = "__inputcp"
     immutable_input_digests = {
         toolcp_relpath: scalameter_classpath.digest,
+        inputcp_relpath: classpath_digest,
     }
 
     reports_dir_prefix = "__reports"
@@ -158,10 +160,10 @@ async def setup_scalameter_for_target(
             ),
         ],
         classpath_entries=[
-            *classpath.args(),
+            *classpath.args(prefix=inputcp_relpath),
             *scalameter_classpath.classpath_entries(toolcp_relpath),
         ],
-        input_digest=input_digest,
+        input_digest=files.snapshot.digest,
         extra_env={**bench_extra_env.env, **field_set_extra_env},
         extra_jvm_options=scalameter.jvm_options,
         extra_immutable_input_digests=immutable_input_digests,

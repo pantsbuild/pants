@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from textwrap import dedent
-from typing import Any, Iterable, cast
+from typing import Any, cast
 
 import pytest
 
@@ -151,7 +151,6 @@ def test_hello_world_java(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixt
         "example",
         "example-java",
         "HelloWorldBenchmark.java",
-        jmh_args=["-f", "1", "-w", "1"],
     )
 
     assert bench_result.exit_code == 0
@@ -208,7 +207,6 @@ def test_hello_world_kotlin(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFi
         "example",
         "example-kotlin",
         "HelloWorldBenchmark.kt",
-        jmh_args=["-f", "1", "-w", "1"],
     )
 
     assert bench_result.exit_code == 0
@@ -265,7 +263,6 @@ def test_hello_world_scala(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFix
         "example",
         "example-scala",
         "HelloWorldBenchmark.scala",
-        jmh_args=["-f", "1", "-w", "1"],
     )
 
     assert bench_result.exit_code == 0
@@ -283,13 +280,11 @@ def run_jmh_benchmark(
     spec_path: str,
     target_name: str,
     relative_file_path: str,
-    *,
-    jmh_args: Iterable[str] = (),
 ) -> BenchmarkResult:
     jvm_options = ["-Djmh.ignoreLock=true"]
+    jmh_args = ["-i", "1", "-f", "0", "-wi", "1", "-wf", "0", "-v", "extra"]
     args = [
         "--bench-timeouts",
-        "--jmh-verbosity=extra",
         "--jmh-result-format=json",
         "--jmh-fail-on-error",
         f"--jmh-jvm-options={repr(jvm_options)}",

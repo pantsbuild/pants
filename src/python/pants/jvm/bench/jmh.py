@@ -218,6 +218,8 @@ async def setup_jmh_for_target(
         EnvironmentVars, EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ())
     )
 
+    requested_timeout = request.field_set.timeout.calculate_from_global_options(bench_subsystem)
+
     process = JvmProcess(
         jdk=jdk,
         classpath_entries=[
@@ -227,18 +229,16 @@ async def setup_jmh_for_target(
         ],
         argv=[
             "org.openjdk.jmh.Main",
+            *jmh.args,
+            *(("-to", f"{requested_timeout}s") if requested_timeout is not None else ()),
             *(
                 ("-foe", ("true" if jmh.fail_on_error else "false"))
                 if jmh.fail_on_error is not None
                 else ()
             ),
-            "-v",
-            jmh.verbosity.value,
-            "-rf",
-            jmh.result_format.value,
+            *(("-rf", jmh.result_format.value) if jmh.result_format else ()),
             "-rff",
             report_file,
-            *jmh.args,
         ],
         input_digest=input_digest,
         extra_env={**bench_extra_env.env, **field_set_extra_env},
@@ -246,7 +246,7 @@ async def setup_jmh_for_target(
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_files=(report_file,),
         description=f"Run JMH benchmarks for {request.field_set.address}",
-        timeout_seconds=request.field_set.timeout.calculate_from_global_options(bench_subsystem),
+        timeout_seconds=requested_timeout,
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
         use_nailgun=False,

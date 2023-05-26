@@ -12,12 +12,6 @@ class GeneratorType(Enum):
     ASM = "asm"
 
 
-class VerbosityMode(Enum):
-    SILENT = "silent"
-    NORMAL = "normal"
-    EXTRA = "extra"
-
-
 class ResultFormat(Enum):
     TEXT = "text"
     CSV = "csv"
@@ -41,15 +35,15 @@ class Jmh(JvmToolBase):
     default_lockfile_resource = ("pants.jvm.bench", "jmh.default.lockfile.txt")
 
     generator_type = EnumOption(
-        "--generator_type",
         default=GeneratorType.REFLECTION,
         help="Type of bytecode generation to use.",
     )
-    verbosity = EnumOption(default=VerbosityMode.NORMAL, help="Level of verbosity.")
-    result_format = EnumOption(default=ResultFormat.CSV, help="File format of the results report.")
+    result_format = EnumOption(
+        default=None, enum_type=ResultFormat, help="File format of the results report."
+    )
     fail_on_error = BoolOption(
         default=None,
         help="Whether should JMH fail in case any benchmark suffers from an unrecoverable error.",
     )
-    args = ArgsListOption(example="--disable-ansi-colors", passthrough=True)
+    args = ArgsListOption(example="--wi 1", passthrough=True)
     skip = SkipOption("bench")
