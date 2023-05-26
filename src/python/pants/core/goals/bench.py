@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from enum import Enum
@@ -48,6 +49,8 @@ from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import help_text, softwrap
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class BenchmarkResult(EngineAwareReturnType):
@@ -56,49 +59,91 @@ class BenchmarkResult(EngineAwareReturnType):
     stdout_digest: FileDigest
     stderr: str
     stderr_digest: FileDigest
-    address: Address
+    addresses: tuple[Address, ...]
     output_setting: ShowOutput
     result_metadata: ProcessResultMetadata | None
+    partition_description: str | None = None
 
+    # Benchmark reports
     reports: Snapshot | None = None
+    # Any extra output (such as from plugins) that the benchmark runner was configured to output.
+    extra_output: Snapshot | None = None
+    # True if the core benchmark rules should log that extra output was written.
+    log_extra_output: bool = False
 
-    @classmethod
-    def skip(cls, address: Address, output_setting: ShowOutput) -> BenchmarkResult:
-        return cls(
+    @staticmethod
+    def no_benchmarks_found(address: Address, output_setting: ShowOutput) -> BenchmarkResult:
+        return BenchmarkResult(
             exit_code=None,
             stdout="",
             stderr="",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=address,
+            addresses=(address,),
             output_setting=output_setting,
             result_metadata=None,
         )
 
-    @classmethod
+    @staticmethod
     def from_fallible_process_result(
-        cls,
         process_result: FallibleProcessResult,
         address: Address,
         output_setting: ShowOutput,
         *,
         reports: Snapshot | None = None,
+        extra_output: Snapshot | None = None,
+        log_extra_output: bool = False,
     ) -> BenchmarkResult:
-        return cls(
+        return BenchmarkResult(
             exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode(),
             stdout_digest=process_result.stdout_digest,
             stderr=process_result.stderr.decode(),
             stderr_digest=process_result.stderr_digest,
-            address=address,
+            addresses=(address,),
             output_setting=output_setting,
             reports=reports,
             result_metadata=process_result.metadata,
+            extra_output=extra_output,
+            log_extra_output=log_extra_output,
+        )
+
+    @staticmethod
+    def from_batched_fallibe_process_result(
+        process_result: FallibleProcessResult,
+        batch: BenchmarkRequest.Batch[_BenchmarkFieldSetT, Any],
+        output_setting: ShowOutput,
+        *,
+        reports: Snapshot | None = None,
+        extra_output: Snapshot | None = None,
+        log_extra_output: bool = False,
+    ) -> BenchmarkResult:
+        return BenchmarkResult(
+            exit_code=process_result.exit_code,
+            stdout=process_result.stdout.decode(),
+            stdout_digest=process_result.stdout_digest,
+            stderr=process_result.stderr.decode(),
+            stderr_digest=process_result.stderr_digest,
+            addresses=tuple(field_set.address for field_set in batch.elements),
+            output_setting=output_setting,
+            result_metadata=process_result.metadata,
+            reports=reports,
+            extra_output=extra_output,
+            log_extra_output=log_extra_output,
         )
 
     @property
-    def skipped(self) -> bool:
-        return self.exit_code is None and not self.stdout and not self.stderr
+    def description(self) -> str:
+        if len(self.addresses) == 1:
+            return self.addresses[0].spec
+        return f"{self.addresses[0].spec} and {len(self.addresses)-1} other files"
+
+    @property
+    def path_safe_description(self) -> str:
+        if len(self.addresses) == 1:
+            return self.addresses[0].path_safe_spec
+
+        return f"{self.addresses[0].path_safe_spec}+{len(self.addresses)-1}"
 
     def __lt__(self, other: Any) -> bool:
         """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
@@ -107,7 +152,7 @@ class BenchmarkResult(EngineAwareReturnType):
         if not isinstance(other, BenchmarkResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
-            return self.address.spec < other.address.spec
+            return self.description < other.description
         if self.exit_code is None:
             return True
         if other.exit_code is None:
@@ -119,19 +164,23 @@ class BenchmarkResult(EngineAwareReturnType):
             "stdout": self.stdout_digest,
             "stderr": self.stderr_digest,
         }
+        if self.reports:
+            output["reports"] = self.reports
         return output
 
     def level(self) -> LogLevel:
-        if self.skipped:
+        if self.exit_code is None:
             return LogLevel.DEBUG
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
-        if self.skipped:
-            return f"{self.address} skipped"
+        if self.exit_code is None:
+            return "no benchmarks found."
 
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
-        message = f"{self.address} {status}"
+        message = f"{status}."
+        if self.partition_description:
+            message += f"\nPartition: {self.partition_description}"
         if self.output_setting == ShowOutput.NONE or (
             self.output_setting == ShowOutput.FAILED and self.exit_code == 0
         ):
@@ -147,7 +196,7 @@ class BenchmarkResult(EngineAwareReturnType):
         return f"{message}{output}"
 
     def metadata(self) -> dict[str, Any]:
-        return {"address": self.address.spec}
+        return {"addresses": [address.spec for address in self.addresses]}
 
     def cacheable(self) -> bool:
         """Is marked uncacheable to ensure that it always renders."""
@@ -520,12 +569,12 @@ async def _get_benchmark_batches(
 @goal_rule
 async def run_bench(
     console: Console,
+    workspace: Workspace,
+    distdir: DistDir,
     bench_subsystem: BenchmarkSubsystem,
+    local_environment_name: ChosenLocalEnvironmentName,
     union_membership: UnionMembership,
     run_id: RunId,
-    distdir: DistDir,
-    workspace: Workspace,
-    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Benchmark:
     shard, num_shards = parse_shard_spec(bench_subsystem.shard, "the [bench].shard option")
     targets_to_valid_field_sets = await Get(
@@ -562,10 +611,25 @@ async def run_bench(
     if results:
         console.print_stderr("")
     for result in sorted(results):
+        if result.exit_code is None:
+            continue
         if result.exit_code != 0:
-            exit_code = cast(int, result.exit_code)
+            exit_code = result.exit_code
+        if result.result_metadata is None:
+            continue
 
         console.print_stderr(_format_bench_summary(result, run_id, console))
+
+        if result.extra_output and result.extra_output.files:
+            path_prefix = str(distdir.relpath / "test" / result.path_safe_description)
+            workspace.write_digest(
+                result.extra_output.digest,
+                path_prefix=path_prefix,
+            )
+            if result.log_extra_output:
+                logger.info(
+                    f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`."
+                )
 
     if bench_subsystem.report:
         report_dir = bench_subsystem.report_dir(distdir)
@@ -580,31 +644,40 @@ async def run_bench(
 
 def _format_bench_summary(result: BenchmarkResult, run_id: RunId, console: Console) -> str:
     """Format the benchmark summary printed to the console."""
+    assert (
+        result.result_metadata is not None
+    ), "Skipped benchmark results should not be outputted in the test summary"
 
-    if result.result_metadata:
-        if result.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
-
-        source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-        source_print = f"({source})" if source else ""
-
-        elapsed_print = ""
-        total_elapsed_ms = result.result_metadata.total_elapsed_ms
-        if total_elapsed_ms is not None:
-            elapsed_secs = total_elapsed_ms / 1000
-            elapsed_print = f"in {elapsed_secs:.2f}s"
-
-        suffix = f"{elapsed_print} {source_print}"
+    if result.exit_code == 0:
+        sigil = console.sigil_succeeded()
+        status = "succeeded"
     else:
-        sigil = console.sigil_skipped()
-        status = "skipped"
-        suffix = ""
+        sigil = console.sigil_failed()
+        status = "failed"
 
-    return f"{sigil} {result.address} {status} {suffix}"
+    environment = result.result_metadata.execution_environment.name
+    environment_type = result.result_metadata.execution_environment.environment_type
+    source = result.result_metadata.source(run_id)
+    source_str = _SOURCE_MAP[source]
+
+    if environment:
+        preposition = "in" if source == ProcessResultMetadata.Source.RAN else "for"
+        source_desc = (
+            f" ({source_str} {preposition} {environment_type} environment `{environment}`)"
+        )
+    elif source == ProcessResultMetadata.Source.RAN:
+        source_desc = ""
+    else:
+        source_desc = f" ({source_str})"
+
+    elapsed_print = ""
+    total_elapsed_ms = result.result_metadata.total_elapsed_ms
+    if total_elapsed_ms is not None:
+        elapsed_secs = total_elapsed_ms / 1000
+        elapsed_print = f"in {elapsed_secs:.2f}s"
+
+    suffix = f" {elapsed_print}{source_desc}"
+    return f"{sigil} {result.description} {status}{suffix}."
 
 
 @dataclass(frozen=True)
