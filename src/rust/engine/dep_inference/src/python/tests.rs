@@ -78,8 +78,10 @@ from a.b import (
 
   assert_imports("from . import b", &[".b"]);
   assert_imports("from .a import b", &[".a.b"]);
+  assert_imports("from .. import b", &["..b"]);
   assert_imports("from ..a import b", &["..a.b"]);
   assert_imports("from ..a import b.c", &["..a.b.c"]);
+  assert_imports("from ... import b.c", &["...b.c"]);
   assert_imports("from ...a import b.c", &["...a.b.c"]);
   assert_imports("from ....a import b.c", &["....a.b.c"]);
   assert_imports("from ....a import b, c", &["....a.b", "....a.c"]);
@@ -488,7 +490,9 @@ fn relative_imports_resolution() {
   let filename = "foo/bar/baz.py";
   assert_relative_imports(filename, "from . import b", &["foo.bar.b"]);
   assert_relative_imports(filename, "from .a import b", &["foo.bar.a.b"]);
+  assert_relative_imports(filename, "from .. import b", &["foo.b"]);
   assert_relative_imports(filename, "from ..a import b", &["foo.a.b"]);
+  assert_relative_imports(filename, "from .. import b.c", &["foo.b.c"]);
   assert_relative_imports(filename, "from ..a import b.c", &["foo.a.b.c"]);
 
   let filename = "bingo/bango/bongo/himom.py";
@@ -496,9 +500,11 @@ fn relative_imports_resolution() {
   assert_relative_imports(filename, "from .a import b", &["bingo.bango.bongo.a.b"]);
   assert_relative_imports(filename, "from ..a import b", &["bingo.bango.a.b"]);
   assert_relative_imports(filename, "from ..a import b.c", &["bingo.bango.a.b.c"]);
+  assert_relative_imports(filename, "from ... import b.c", &["bingo.b.c"]);
   assert_relative_imports(filename, "from ...a import b.c", &["bingo.a.b.c"]);
 
   // Left unchanged, since we blew through the top, let Pants error using this string as a message
+  assert_relative_imports(filename, "from .... import b.c", &["....b.c"]);
   assert_relative_imports(filename, "from ....a import b.c", &["....a.b.c"]);
   assert_relative_imports(filename, "from ....a import b, c", &["....a.b", "....a.c"]);
   assert_relative_imports(
