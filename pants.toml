@@ -154,7 +154,6 @@ pytest = "3rdparty/python/pytest.lock"
 [python-infer]
 assets = true
 unowned_dependency_behavior = "error"
-use_rust_parser = true
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
@@ -173,7 +172,7 @@ args = ["--external-sources"]
 args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
-args = ["--no-header"]
+args = ["--no-header", "-vv"]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
 requirements = ["//3rdparty/python:pytest"]

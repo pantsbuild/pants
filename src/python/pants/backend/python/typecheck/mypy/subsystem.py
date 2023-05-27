@@ -151,7 +151,7 @@ class MyPy(PythonToolBase):
     )
     extra_type_stubs = StrListOption(
         advanced=True,
-        removal_version="2.18.0dev0",
+        removal_version="2.18.0.dev1",
         removal_hint=softwrap(
             f"""
             Extra type stubs are now installed from a named resolve, as described
@@ -183,7 +183,7 @@ class MyPy(PythonToolBase):
         advanced=True,
         # Note that there is no default lockfile, as by default, extra_type_stubs is empty.
         default=NO_TOOL_LOCKFILE,
-        removal_version="2.18.0dev0",
+        removal_version="2.18.0.dev1",
         removal_hint=softwrap(
             f"""
             Extra type stubs are now installed from a named resolve, as described

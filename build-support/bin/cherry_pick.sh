@@ -20,7 +20,7 @@ function git_fetch_with_depth {
   # setting --depth will forcibly truncate history, which is fine in the temporary checkout on CI,
   # but would be annoying locally: people will usually already have the full history, so doing a
   # full fetch is fine
-  if [[ $CI = 1 ]]; then
+  if [[ $CI = true ]]; then
     DEPTH_ARGS=("--depth=$DEPTH")
   else
     DEPTH_ARGS=()
