@@ -75,7 +75,10 @@ class ScalameterSetup:
 
 
 async def _benchmark_classnames(field_set: ScalameterBenchmarkFieldSet) -> list[str]:
-    """Determine fully classified names of the benchmark classes in the given field set."""
+    """Determine fully classified names of the benchmark classes in the given field set.
+
+    This is a best effort at guessing the actual class name from the file name.
+    """
 
     stripped_sources = await Get(
         StrippedSourceFiles,
@@ -131,6 +134,8 @@ async def setup_scalameter_for_target(
     reports_dir_prefix = "__reports"
     reports_dir = os.path.join(reports_dir_prefix, request.field_set.address.path_safe_spec)
 
+    # Scalameter doesn't scan the classpath for benchmark classes, so we need to
+    # explictly list which classes to run.
     benchmark_classnames = await _benchmark_classnames(request.field_set)
 
     # Cache test runs only if they are successful, or not at all if `--bench-force`.

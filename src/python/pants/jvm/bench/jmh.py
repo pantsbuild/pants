@@ -311,6 +311,8 @@ async def _extract_classes_from_digest(request: _ExtractClassfiles, unzip: Unzip
 
 @rule(level=LogLevel.DEBUG)
 async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> GeneratedJmhSources:
+    # JMH requires access to the `.class` files to generate the benchmarking code.
+    # So we extract them from the root classpath entries.
     classfiles_filenames = ClasspathEntry.args(request.classpath.entries)
     classfiles_digests = [entry.digest for entry in request.classpath.entries]
     extracted_classes = await MultiGet(
@@ -328,9 +330,9 @@ async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> 
     }
 
     sources_output_dir = os.path.join("__gen", "sources")
-    files_output_dir = os.path.join("__gen", "files")
+    resources_output_dir = os.path.join("__gen", "resources")
     empty_dirs_digest = await Get(
-        Digest, CreateDigest([Directory(sources_output_dir), Directory(files_output_dir)])
+        Digest, CreateDigest([Directory(sources_output_dir), Directory(resources_output_dir)])
     )
 
     process_result = await Get(
@@ -342,20 +344,20 @@ async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> 
                 "org.openjdk.jmh.generators.bytecode.JmhBytecodeGenerator",
                 input_prefix,
                 sources_output_dir,
-                files_output_dir,
+                resources_output_dir,
                 jmh.generator_type.value,
             ],
             input_digest=empty_dirs_digest,
             extra_jvm_options=jmh.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
-            output_directories=(sources_output_dir, files_output_dir),
+            output_directories=(sources_output_dir, resources_output_dir),
             description=f"Generate JMH sources for {request.address}",
             level=LogLevel.DEBUG,
             use_nailgun=False,
         ),
     )
 
-    sources_digest_subset, files_digest_subset = await MultiGet(
+    sources_digest_subset, resources_digest_subset = await MultiGet(
         Get(
             Digest,
             DigestSubset(
@@ -365,14 +367,14 @@ async def generate_jmh_sources(request: GenerateJmhSourcesRequest, jmh: Jmh) -> 
         Get(
             Digest,
             DigestSubset(
-                process_result.output_digest, PathGlobs([os.path.join(files_output_dir, "**")])
+                process_result.output_digest, PathGlobs([os.path.join(resources_output_dir, "**")])
             ),
         ),
     )
 
     sources_snapshot, resources_snapshot = await MultiGet(
         Get(Snapshot, RemovePrefix(sources_digest_subset, sources_output_dir)),
-        Get(Snapshot, RemovePrefix(files_digest_subset, files_output_dir)),
+        Get(Snapshot, RemovePrefix(resources_digest_subset, resources_output_dir)),
     )
 
     return GeneratedJmhSources(sources_snapshot, resources_snapshot)

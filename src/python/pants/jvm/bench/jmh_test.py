@@ -282,6 +282,7 @@ def run_jmh_benchmark(
     relative_file_path: str,
 ) -> BenchmarkResult:
     jvm_options = ["-Djmh.ignoreLock=true"]
+    # Run with no forks, one warmup iteration and one measure iteration
     jmh_args = ["-i", "1", "-f", "0", "-wi", "1", "-wf", "0", "-v", "extra"]
     args = [
         "--bench-timeouts",
