@@ -1,0 +1,11 @@
+# Define a function for our custom completion.
+function _pants_completions {
+    # Use reply=() to specify the completions. We will use pants completion-helper
+    # to get the completions. The "${words[@]}" will pass the current command-line
+    # to the completion-helper command.
+    reply=($(pants completion-helper -- "${words[@]}"))
+}
+
+# Use compctl to specify that our _pants_completions function should be used for
+# completion with the pants command.
+compctl -K _pants_completions pants

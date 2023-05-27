@@ -1,4 +1,4 @@
-function pants_completions()
+function _pants_completions()
 {
     local current_word
     current_word=${COMP_WORDS[COMP_CWORD]}
@@ -14,4 +14,4 @@ autoload -U +X bashcompinit && bashcompinit
 autoload -Uz compinit && compinit
 ###
 
-complete -F pants_completions pants
+complete -F _pants_completions pants
