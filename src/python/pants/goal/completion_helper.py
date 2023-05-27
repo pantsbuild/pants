@@ -97,6 +97,7 @@ class CompletionHelperBuiltinGoal(BuiltinGoal):
 
         # If there is a previous goal and current_word starts with a hyphen, then show scoped options
         if current_word.startswith("-"):
+            # TODO: What if previous goal isn't a real goal part of for_scope? Crashes right now
             scoped_options = sorted(options.for_scope(previous_goal).as_dict().keys())
             scoped_options = [f"--{o}" for o in scoped_options]
             candidate_options = [o for o in scoped_options if o.startswith(current_word)]
