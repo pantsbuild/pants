@@ -144,9 +144,7 @@ async def get_pyenv_install_info(
                         #!/usr/bin/env bash
                         set -e
                         export PYENV_ROOT=$(readlink {PYENV_NAMED_CACHE})/{installation_fingerprint}
-                        DEST="$PYENV_ROOT"/versions/$1
-                        if [ ! -f "$DEST"/DONE ]; then
-                            mkdir -p "$DEST" 2>/dev/null || true
+                        if [ ! -f "$PYENV_ROOT"/done/$1/DONE ]; then
                             {python_binary.path} install_python_shim.py $1
                         fi
                         echo "$DEST"/bin/python
@@ -159,25 +157,30 @@ async def get_pyenv_install_info(
                     dedent(
                         f"""\
                         import fcntl
+                        import os
                         import pathlib
+                        import shutil
                         import subprocess
                         import sys
 
                         PYENV_ROOT = pathlib.Path("{PYENV_NAMED_CACHE}", "{installation_fingerprint}").resolve()
                         SPECIFIC_VERSION = sys.argv[1]
                         SPECIFIC_VERSION_PATH = PYENV_ROOT / "versions" / SPECIFIC_VERSION
-                        DONEFILE_PATH = SPECIFIC_VERSION_PATH / "DONE"
-                        DONEFILE_LOCK_PATH = SPECIFIC_VERSION_PATH / "DONE.lock"
-                        DONEFILE_LOCK_FD = DONEFILE_LOCK_PATH.open(mode="w")
+                        DONEFILE_DIR = PYENV_ROOT / "done" / SPECIFIC_VERSION
+                        DONEFILE_PATH = DONEFILE_DIR / "DONE"
+                        DONEFILE_LOCK_PATH = DONEFILE_DIR / "DONE.lock"
 
                         def main():
+                            os.makedirs(DONEFILE_DIR, exist_ok=True)
                             if DONEFILE_PATH.exists():
                                 return
-                            fcntl.lockf(DONEFILE_LOCK_FD, fcntl.LOCK_EX)
+                            fcntl.lockf(DONEFILE_LOCK_PATH.open(mode="w"), fcntl.LOCK_EX)
                             # Use double-checked locking to ensure that we really need to do the work
                             if DONEFILE_PATH.exists():
                                 return
-
+                            # If a previous install failed this directory may exist in an intermediate
+                            # state, and pyenv may choke trying to install into it, so we remove it.
+                            shutil.rmtree(SPECIFIC_VERSION_PATH)
                             subprocess.run(["{pyenv.exe}", "install", SPECIFIC_VERSION], check=True)
                             # Removing write perms helps ensure users aren't accidentally modifying
                             # Python or the site-packages
