@@ -18,6 +18,8 @@ from pants.core.goals.deploy import Deploy, DeployProcess
 from pants.core.register import rules as core_rules
 from pants.core.util_rules import source_files
 from pants.engine import process
+from pants.engine.fs import DigestContents
+from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, mock_console
 
@@ -90,3 +92,29 @@ def test_run_terraform_deploy(rule_runner: RuleRunner, standard_deployment, tmpd
     assert raw_state, "Terraform state file not found where expected."
     state = json.loads(raw_state)
     assert len(state["resources"]) == 1, "Resource not found in terraform state"
+
+
+def test_deploy_terraform_forwards_args(rule_runner: RuleRunner, standard_deployment) -> None:
+    rule_runner.write_files(standard_deployment.files)
+
+    target = rule_runner.get_target(Address("src/tf", target_name="stg"))
+    field_set = DeployTerraformFieldSet.create(target)
+    deploy_process = rule_runner.request(DeployProcess, [field_set])
+    assert deploy_process.process
+
+    argv = deploy_process.process.process.argv
+
+    assert "-chdir=src/tf" in argv, "Did not find expected -chdir"
+    assert "-var-file=stg.tfvars" in argv, "Did not find expected -var-file"
+    assert "--auto-approve" in argv, "Did not find expected extra_args"
+    # assert standard_deployment.state_file.check()
+
+    # TODO: this really tests initialising Terraform, move to there
+    input_files = rule_runner.request(
+        DigestContents, [(deploy_process.process.process.input_digest)]
+    )
+    stub_tfstate_raw = next(
+        file for file in input_files if file.path == "src/tf/.terraform/terraform.tfstate"
+    )
+    stub_tfstate = json.loads(stub_tfstate_raw.content)
+    assert stub_tfstate["backend"]["config"]["path"] == str(standard_deployment.state_file)
