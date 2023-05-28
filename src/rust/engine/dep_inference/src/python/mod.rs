@@ -177,11 +177,11 @@ impl ImportCollector<'_> {
     };
     let full_name = match module_name {
       Some(module_name) => {
-        let mut mod_text = self.code_at(module_name.range());
-        if mod_text == "." {
-          mod_text = "";
-        }
-        [mod_text, name_ref].join(".")
+        let mod_text = self.code_at(module_name.range());
+        // `from ... import a` => `...a` mod_text alone, but `from x import a` => `x.a` needs to
+        // insert a .
+        let joiner = if mod_text.ends_with('.') { "" } else { "." };
+        [mod_text, name_ref].join(joiner)
       }
       None => name_ref.to_string(),
     };
