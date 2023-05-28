@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from pants.backend.terraform import dependencies, dependency_inference, tool
+from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.goals.deploy import rules as terraform_deploy_rules
 from pants.backend.terraform.target_types import TerraformDeploymentTarget, TerraformModuleTarget
@@ -18,7 +19,6 @@ from pants.core.goals.deploy import Deploy, DeployProcess
 from pants.core.register import rules as core_rules
 from pants.core.util_rules import source_files
 from pants.engine import process
-from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, mock_console
@@ -35,10 +35,10 @@ def rule_runner() -> RuleRunner:
             *terraform_deploy_rules(),
             *source_files.rules(),
             *deploy.rules(),
-            # *publish.rules(),
             *core_rules(),
             *process.rules(),
             QueryRule(DeployProcess, (DeployTerraformFieldSet,)),
+            QueryRule(InitialisedTerraform, (TerraformInitRequest,)),
         ],
         preserve_tmpdirs=True,
     )
@@ -108,13 +108,3 @@ def test_deploy_terraform_forwards_args(rule_runner: RuleRunner, standard_deploy
     assert "-var-file=stg.tfvars" in argv, "Did not find expected -var-file"
     assert "--auto-approve" in argv, "Did not find expected extra_args"
     # assert standard_deployment.state_file.check()
-
-    # TODO: this really tests initialising Terraform, move to there
-    input_files = rule_runner.request(
-        DigestContents, [(deploy_process.process.process.input_digest)]
-    )
-    stub_tfstate_raw = next(
-        file for file in input_files if file.path == "src/tf/.terraform/terraform.tfstate"
-    )
-    stub_tfstate = json.loads(stub_tfstate_raw.content)
-    assert stub_tfstate["backend"]["config"]["path"] == str(standard_deployment.state_file)
