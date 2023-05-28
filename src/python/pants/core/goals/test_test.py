@@ -180,9 +180,9 @@ class MockTestRequest(TestRequest):
         addresses = [field_set.address for field_set in field_sets]
         return TestResult(
             exit_code=cls.exit_code(addresses),
-            stdout="",
+            stdout_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
-            stderr="",
+            stderr_bytes=b"",
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=tuple(addresses),
             coverage_data=MockCoverageData(addresses),
@@ -438,8 +438,8 @@ def _assert_test_summary(
     assert expected == _format_test_summary(
         TestResult(
             exit_code=exit_code,
-            stdout="",
-            stderr="",
+            stdout_bytes=b"",
+            stderr_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=(Address(spec_path="", target_name="dummy_address"),),
@@ -599,9 +599,9 @@ def assert_streaming_output(
 ) -> None:
     result = TestResult(
         exit_code=exit_code,
-        stdout=stdout,
+        stdout_bytes=stdout.encode(),
         stdout_digest=EMPTY_FILE_DIGEST,
-        stderr=stderr,
+        stderr_bytes=stderr.encode(),
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         addresses=(Address("demo_test"),),
