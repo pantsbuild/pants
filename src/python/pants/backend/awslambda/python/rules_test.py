@@ -12,9 +12,12 @@ from zipfile import ZipFile
 
 import pytest
 
-from pants.backend.awslambda.python.rules import PythonAwsLambdaFieldSet
+from pants.backend.awslambda.python.rules import (
+    PythonAwsLambdaFieldSet,
+    PythonAwsLambdaLayerFieldSet,
+)
 from pants.backend.awslambda.python.rules import rules as awslambda_python_rules
-from pants.backend.awslambda.python.target_types import PythonAWSLambda
+from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonAWSLambdaLayer
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -37,6 +40,8 @@ from pants.core.target_types import (
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
+from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.target import FieldSet
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
@@ -54,12 +59,14 @@ def rule_runner() -> PythonRuleRunner:
             *target_rules(),
             *package.rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
+            QueryRule(BuiltPackage, (PythonAwsLambdaLayerFieldSet,)),
         ],
         target_types=[
             FileTarget,
             FilesGeneratorTarget,
             PexBinary,
             PythonAWSLambda,
+            PythonAWSLambdaLayer,
             PythonRequirementTarget,
             PythonRequirementTarget,
             PythonSourcesGeneratorTarget,
@@ -77,13 +84,18 @@ def create_python_awslambda(
     *,
     expected_extra_log_lines: tuple[str, ...],
     extra_args: list[str] | None = None,
+    layer: bool = False,
 ) -> tuple[str, bytes]:
     rule_runner.set_options(
         ["--source-root-patterns=src/python", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     target = rule_runner.get_target(addr)
-    built_asset = rule_runner.request(BuiltPackage, [PythonAwsLambdaFieldSet.create(target)])
+    if layer:
+        field_set: type[FieldSet] = PythonAwsLambdaLayerFieldSet
+    else:
+        field_set = PythonAwsLambdaFieldSet
+    built_asset = rule_runner.request(BuiltPackage, [field_set.create(target)])
     assert expected_extra_log_lines == built_asset.artifacts[0].extra_log_lines
     digest_contents = rule_runner.request(DigestContents, [built_asset.digest])
     assert len(digest_contents) == 1
@@ -328,3 +340,82 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
     assert (
         zipfile.read("lambda_function.py") == b"from foo.bar.hello_world import handler as handler"
     )
+
+
+def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": dedent(
+                """
+                import mureq
+
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/BUILD": dedent(
+                """
+                python_requirement(name="mureq", requirements=["mureq==0.2"])
+                python_sources()
+
+                python_aws_lambda_layer(
+                    name='lambda',
+                    dependencies=["./hello_world.py"],
+                    runtime="python3.7",
+                )
+                python_aws_lambda_layer(
+                    name='slimlambda',
+                    include_sources=False,
+                    dependencies=["./hello_world.py"],
+                    runtime="python3.7",
+                )
+                """
+            ),
+        }
+    )
+
+    zip_file_relpath, content = create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="lambda"),
+        expected_extra_log_lines=(),
+        layer=True,
+    )
+    assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
+
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "python/mureq/__init__.py" in names
+    assert "python/foo/bar/hello_world.py" in names
+    # nothing that looks like a synthesized handler in any of the names
+    assert "lambda_function.py" not in " ".join(names)
+
+    zip_file_relpath, content = create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="slimlambda"),
+        expected_extra_log_lines=(),
+        layer=True,
+    )
+    assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
+
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "python/mureq/__init__.py" in names
+    assert "python/foo/bar/hello_world.py" not in names
+    # nothing that looks like a synthesized handler in any of the names
+    assert "lambda_function.py" not in " ".join(names)
+
+
+def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
+    """A layer _must_ use 'dependencies', unlike most other targets."""
+    rule_runner.write_files(
+        {"BUILD": "python_aws_lambda_layer(name='lambda', runtime='python3.7')"}
+    )
+    with pytest.raises(
+        ExecutionError, match="The 'dependencies' field in target //:lambda must be defined"
+    ):
+        create_python_awslambda(
+            rule_runner,
+            Address("", target_name="lambda"),
+            expected_extra_log_lines=(),
+            layer=True,
+        )
