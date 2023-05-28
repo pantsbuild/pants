@@ -3,19 +3,76 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Tuple
 
-from pants.backend.terraform.dependency_inference import (
-    GetTerraformDependenciesRequest,
-    TerraformDependencies,
-)
 from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import TerraformBackendConfigField
+from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import SourcesField
+
+
+@dataclass(frozen=True)
+class GetTerraformDependenciesRequest:
+    source_files: SourceFiles
+    directories: Tuple[str, ...]
+    backend_config: SourceFiles
+
+    # Not initialising the backend means we won't access remote state. Useful for `validate`
+    initialise_backend: bool = False
+
+
+@dataclass(frozen=True)
+class TerraformDependencies:
+    fetched_deps: Tuple[Tuple[str, Digest], ...]
+
+
+@rule
+async def get_terraform_providers(
+    req: GetTerraformDependenciesRequest,
+) -> TerraformDependencies:
+    args = ["init"]
+    if req.backend_config.files:
+        args.append(
+            terraform_arg(
+                "-backend-config",
+                terraform_relpath(req.directories[0], req.backend_config.files[0]),
+            )
+        )
+        backend_digest = req.backend_config.snapshot.digest
+    else:
+        backend_digest = EMPTY_DIGEST
+
+    args.append(terraform_arg("-backend", str(req.initialise_backend)))
+
+    with_backend_config = await Get(
+        Digest, MergeDigests([req.source_files.snapshot.digest, backend_digest])
+    )
+
+    # TODO: Does this need to be a MultiGet? I think we will now always get one directory
+    fetched_deps = await MultiGet(
+        Get(
+            FallibleProcessResult,
+            TerraformProcess(
+                args=tuple(args),
+                input_digest=with_backend_config,
+                output_files=(".terraform.lock.hcl",),
+                output_directories=(".terraform",),
+                description="Run `terraform init` to fetch dependencies",
+                chdir=directory,
+            ),
+        )
+        for directory in req.directories
+    )
+
+    return TerraformDependencies(
+        tuple(zip(req.directories, (x.output_digest for x in fetched_deps)))
+    )
 
 
 @dataclass(frozen=True)
