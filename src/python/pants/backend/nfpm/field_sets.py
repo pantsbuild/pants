@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from pants.backend.nfpm.fields.all import NfpmPackageNameField
 from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
@@ -14,10 +14,12 @@ from pants.core.goals.package import OutputPathField, PackageFieldSet
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, Target
 from pants.engine.unions import UnionRule
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
 class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
+    default_file_extension: ClassVar[str]
     output_path: OutputPathField
     package_name: NfpmPackageNameField
     description: DescriptionField
@@ -70,24 +72,28 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
 
 @dataclass(frozen=True)
 class NfpmApkPackageFieldSet(NfpmPackageFieldSet):
+    default_file_extension = "apk"
     required_fields = APK_FIELDS
 
 
 # noinspection DuplicatedCode
 @dataclass(frozen=True)
 class NfpmArchlinuxPackageFieldSet(NfpmPackageFieldSet):
+    default_file_extension = "tar.zst"
     required_fields = ARCHLINUX_FIELDS
 
 
 # noinspection DuplicatedCode
 @dataclass(frozen=True)
 class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
+    default_file_extension = "deb"
     required_fields = DEB_FIELDS
 
 
 # noinspection DuplicatedCode
 @dataclass(frozen=True)
 class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
+    default_file_extension = "rpm"
     required_fields = RPM_FIELDS
     ghost_contents = NfpmRpmGhostContents
 
