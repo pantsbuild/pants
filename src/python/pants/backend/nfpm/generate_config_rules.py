@@ -26,7 +26,7 @@ from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class RequestNfpmPackageConfig:
+class NfpmPackageConfigRequest:
     field_set: NfpmPackageFieldSet
 
 
@@ -36,7 +36,7 @@ class NfpmPackageConfig:
 
 
 @rule(level=LogLevel.DEBUG)
-async def generate_nfpm_yaml(request: RequestNfpmPackageConfig) -> NfpmPackageConfig:
+async def generate_nfpm_yaml(request: NfpmPackageConfigRequest) -> NfpmPackageConfig:
     transitive_targets = await Get(
         TransitiveTargets,
         TransitiveTargetsWithoutTraversingPackagesRequest([request.field_set.address]),
