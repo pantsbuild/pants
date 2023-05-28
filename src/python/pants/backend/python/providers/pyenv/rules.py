@@ -147,7 +147,7 @@ async def get_pyenv_install_info(
                         if [ ! -f "$PYENV_ROOT"/done/$1/DONE ]; then
                             {python_binary.path} install_python_shim.py $1
                         fi
-                        echo "$DEST"/bin/python
+                        echo "$PYENV_ROOT"/versions/$1/bin/python
                         """
                     ).encode(),
                     is_executable=True,
@@ -180,7 +180,7 @@ async def get_pyenv_install_info(
                                 return
                             # If a previous install failed this directory may exist in an intermediate
                             # state, and pyenv may choke trying to install into it, so we remove it.
-                            shutil.rmtree(SPECIFIC_VERSION_PATH)
+                            shutil.rmtree(SPECIFIC_VERSION_PATH, ignore_errors=True)
                             subprocess.run(["{pyenv.exe}", "install", SPECIFIC_VERSION], check=True)
                             # Removing write perms helps ensure users aren't accidentally modifying
                             # Python or the site-packages
