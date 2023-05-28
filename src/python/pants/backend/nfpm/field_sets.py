@@ -97,11 +97,21 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
         return config
 
 
+NFPM_PACKAGE_FIELD_SET_TYPES = FrozenOrderedSet(
+    (
+        NfpmApkPackageFieldSet,
+        NfpmArchlinuxPackageFieldSet,
+        NfpmDebPackageFieldSet,
+        NfpmRpmPackageFieldSet,
+    )
+)
+
+
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PackageFieldSet, NfpmApkPackageFieldSet),
-        UnionRule(PackageFieldSet, NfpmArchlinuxPackageFieldSet),
-        UnionRule(PackageFieldSet, NfpmDebPackageFieldSet),
-        UnionRule(PackageFieldSet, NfpmRpmPackageFieldSet),
+        *(
+            UnionRule(PackageFieldSet, field_set_type)
+            for field_set_type in NFPM_PACKAGE_FIELD_SET_TYPES
+        ),
     ]
