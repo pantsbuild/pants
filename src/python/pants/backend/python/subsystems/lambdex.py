@@ -50,6 +50,11 @@ class Lambdex(PythonToolBase):
             as recommended by cloud vendors.  (If you are using `python_awslambda`, you will need to
             also update the handlers configured in the cloud from `lambdex_handler.handler` to
             `lambda_function.handler`.)
+
+            See the docs for more details:
+
+            * https://www.pantsbuild.org/v2.18/docs/awslambda-python#migrating-from-pants-216-and-earlier
+            * https://www.pantsbuild.org/v2.18/docs/google-cloud-function-python#migrating-from-pants-216-and-earlier
             """
         ),
     )
