@@ -27,7 +27,7 @@ class RustupBinary(BinaryPath):
     """Path to the rustup binary used to select and gain access to Rust toolchains."""
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class RustToolchainProcess:
     binary: str
     args: tuple[str, ...]
@@ -51,15 +51,15 @@ class RustToolchainProcess:
         platform: Platform | None = None,
         cache_scope: ProcessCacheScope | None = None,
     ):
-        self.binary = binary
-        self.args = tuple(args)
-        self.input_digest = input_digest
-        self.description = description
-        self.level = level
-        self.output_files = tuple(output_files or ())
-        self.output_directories = tuple(output_directories or ())
-        self.platform = platform
-        self.cache_scope = cache_scope
+        object.__setattr__(self, "binary", binary)
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "output_files", tuple(output_files or ()))
+        object.__setattr__(self, "output_directories", tuple(output_directories or ()))
+        object.__setattr__(self, "platform", platform)
+        object.__setattr__(self, "cache_scope", cache_scope)
 
 
 @rule
