@@ -385,7 +385,7 @@ class ScalacPluginTarget(Target):
 
 # Defining this field and making it required in the `ScalaArtifactFieldSet`
 # prevents the `JvmArtifactFieldSet` matching against `scala_artifact` targets
-# and raising an error when resolving a classpath in which such targets are been
+# and raising an error when resolving a classpath in which such targets have been
 # used as explicit dependencies of other targets.
 #
 # This way classpath entries for `scala_artifact` targets will be resolved using
