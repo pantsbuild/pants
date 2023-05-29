@@ -23,10 +23,20 @@ class PreambleRequest(FmtFilesRequest):
 
 @memoized
 def _template_checker_regex(template: str) -> re.Pattern:
-    maybe_shebang = r"(#!.*\n)?"
+    shebang = r"(?P<shebang>#!.*\n)"
+    if re.match(shebang, template):
+        # If the template already contains a shebang, don't attempt to match one.
+        shebang = r"(?P<shebang>)"
+    maybe_shebang = f"{shebang}?"
+
     subbed = string.Template(template).safe_substitute(year=r"====YEAR====")
     raw_regex = re.escape(subbed).replace("====YEAR====", r"\d{4}")
-    return re.compile(maybe_shebang + raw_regex)
+    maybe_template = f"(?P<template>{raw_regex})?"
+
+    # Wrap in `?s` to enable matching newlines with `.`.
+    body = "(?s:(?P<body>.*))"
+
+    return re.compile(maybe_shebang + maybe_template + body)
 
 
 @memoized
@@ -57,10 +67,15 @@ async def preamble_fmt(
     for path, template in template_by_path.items():
         regex = _template_checker_regex(template)
         file_content = contents_by_path[path].content
-        if not regex.match(file_content.decode("utf-8")):
-            new_content = _substituted_template(template).encode("utf-8") + file_content
+        matched = regex.fullmatch(file_content.decode("utf-8"))
+        # The regex produced by `_template_checker_regex` is infallible.
+        assert matched
+        if not matched.group("template"):
+            shebang = matched.group("shebang")
+            body = matched.group("body")
+            new_content = (shebang if shebang else "") + _substituted_template(template) + body
             contents_by_path[path] = dataclasses.replace(
-                contents_by_path[path], content=new_content
+                contents_by_path[path], content=new_content.encode("utf-8")
             )
 
     output_snapshot = await Get(Snapshot, CreateDigest(contents_by_path.values()))

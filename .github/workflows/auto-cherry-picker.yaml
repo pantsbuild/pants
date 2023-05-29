@@ -19,15 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
-          # Always checkout the latest commit of main
+          # Always checkout the latest commit of main, for latest changes to the script
           ref: "main"
+          # NB: we're usually cherrypicking the HEAD of main, and we need its parent commit to diff
+          # for the cherry-pick, so we can save an extra round-trip by just getting that parent now
+          fetch-depth: 2
 
       - name: Cherry-Pick
         run: |
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
-          build-support/bin/cherry_pick.sh ${{ github.event.pull_request.number || inputs.PR_number }} origin
+          bash -x build-support/bin/cherry_pick.sh ${{ github.event.pull_request.number || inputs.PR_number }} origin
         env:
           GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}

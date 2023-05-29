@@ -1,9 +1,18 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
+
 from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules
+from pants.option.option_types import EnumOption
+from pants.util.strutil import softwrap
+
+
+class LambdexLayout(Enum):
+    LAMBDEX = "lambdex"
+    ZIP = "zip"
 
 
 class Lambdex(PythonToolBase):
@@ -19,6 +28,31 @@ class Lambdex(PythonToolBase):
 
     default_lockfile_resource = ("pants.backend.python.subsystems", "lambdex.lock")
     lockfile_rules_type = LockfileRules.SIMPLE
+
+    layout = EnumOption(
+        default=LambdexLayout.ZIP,
+        help=softwrap(
+            """
+            Explicitly control the layout used for `python_awslambda` and
+            `python_google_cloud_function` targets. This option exists for the transition from
+            Lambdex-based layout to the plain zip layout, as recommended by cloud vendors.
+            """
+        ),
+        removal_version="2.19.0.dev0",
+        removal_hint=softwrap(
+            """
+            Remove the whole [lambdex] section, as Lambdex is deprecated and its functionality be
+            removed. If you have `layout = "zip"`, no further action is required, as you are already using
+            the recommended layout.
+
+            If you have `layout = "lambdex"`, removing the section will switch any
+            `python_awslambda` and `python_google_cloud_function` targets to using the `zip` layout,
+            as recommended by cloud vendors.  (If you are using `python_awslambda`, you will need to
+            also update the handlers configured in the cloud from `lambdex_handler.handler` to
+            `lambda_function.handler`.)
+            """
+        ),
+    )
 
 
 def rules():
