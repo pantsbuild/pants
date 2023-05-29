@@ -383,6 +383,26 @@ class ScalacPluginTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+# Defining this field and making it required in the `ScalaArtifactFieldSet`
+# prevents the `JvmArtifactFieldSet` matching against `scala_artifact` targets
+# and raising an error when resolving a classpath in which such targets have been
+# used as explicit dependencies of other targets.
+#
+# This way classpath entries for `scala_artifact` targets will be resolved using
+# their own rules, bringing the actual JAR dependency as a transitive one.
+class ScalaArtifactArtifactField(StringField):
+    alias = "artifact"
+    required = True
+    value: str
+    help = help_text(
+        """
+        The 'artifact' part of a Maven-compatible Scala-versioned coordinate to a third-party JAR artifact.
+
+        For the JAR coordinate `org.typelevel:cats-core_2.13:2.9.0`, the artifact is `cats-core`.
+        """
+    )
+
+
 class ScalaCrossVersion(Enum):
     PARTIAL = "partial"
     FULL = "full"
@@ -441,7 +461,7 @@ class ScalaArtifactExclusionsField(JvmArtifactExclusionsField):
 @dataclass(frozen=True)
 class ScalaArtifactFieldSet(FieldSet):
     group: JvmArtifactGroupField
-    artifact: JvmArtifactArtifactField
+    artifact: ScalaArtifactArtifactField
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
     exclusions: ScalaArtifactExclusionsField
@@ -449,7 +469,7 @@ class ScalaArtifactFieldSet(FieldSet):
 
     required_fields = (
         JvmArtifactGroupField,
-        JvmArtifactArtifactField,
+        ScalaArtifactArtifactField,
         JvmArtifactVersionField,
         JvmArtifactPackagesField,
         ScalaArtifactCrossversionField,

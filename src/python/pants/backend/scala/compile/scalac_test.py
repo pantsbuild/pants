@@ -17,7 +17,12 @@ from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
 from pants.backend.scala.goals.check import ScalacCheckRequest
 from pants.backend.scala.goals.check import rules as scalac_check_rules
-from pants.backend.scala.target_types import ScalacPluginTarget, ScalaSourcesGeneratorTarget
+from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
+from pants.backend.scala.target_types import (
+    ScalaArtifactTarget,
+    ScalacPluginTarget,
+    ScalaSourcesGeneratorTarget,
+)
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
@@ -54,13 +59,19 @@ def rule_runner() -> RuleRunner:
             *testutil.rules(),
             *util_rules(),
             *scala_dep_inf_rules(),
+            *scala_artifact_rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
             QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
         ],
-        target_types=[JvmArtifactTarget, ScalaSourcesGeneratorTarget, ScalacPluginTarget],
+        target_types=[
+            JvmArtifactTarget,
+            ScalaArtifactTarget,
+            ScalaSourcesGeneratorTarget,
+            ScalacPluginTarget,
+        ],
     )
     rule_runner.set_options(
         args=["--scala-version-for-resolve={'jvm-default':'2.13.8'}"],
@@ -872,3 +883,86 @@ def test_compile_no_deps_scala3(
     assert len(check_results.results) == 1
     check_result = check_results.results[0]
     assert check_result.exit_code == 0
+
+
+@pytest.fixture
+def cats_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "cats.test.lock",
+        [
+            "org.typelevel:cats-core_2.13:2.9.0",
+            "org.scala-lang:scala-library:2.13.8",
+        ],
+    )
+
+
+@pytest.fixture
+def cats_jvm_lockfile(
+    cats_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return cats_jvm_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_compile_dep_on_scala_artifact(
+    rule_runner: RuleRunner,
+    scala_stdlib_jvm_lockfile: JVMLockfileFixture,
+    cats_jvm_lockfile: JVMLockfileFixture,
+) -> None:
+    third_party_build_file = scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets() + dedent(
+        """\
+        scala_artifact(
+            name = "cats",
+            group = "org.typelevel",
+            artifact = "cats-core",
+            version = "2.9.0"
+        )
+        """
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                scala_sources(
+                    name = 'lib',
+                    dependencies = ["3rdparty/jvm:cats"]
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": third_party_build_file,
+            "3rdparty/jvm/default.lock": cats_jvm_lockfile.serialized_lockfile,
+            "ExampleLib.scala": dedent(
+                """
+                import cats._
+                import cats.implicits._
+
+                object ExampleLib {
+                    val values = Functor[List].map(List(1, 2, 3, 4))(_.toString)
+                }
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        args=[
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="lib")
+    )
+
+    classpath = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
+    )
+    assert classpath.content == {
+        ".ExampleLib.scala.lib.scalac.jar": {
+            "ExampleLib$.class",
+            "ExampleLib.class",
+            "META-INF/MANIFEST.MF",
+        }
+    }
