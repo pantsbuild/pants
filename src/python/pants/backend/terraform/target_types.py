@@ -67,7 +67,6 @@ class TerraformBackendConfigField(OptionalSingleSourceField):
 
 class TerraformVarFilesField(MultipleSourcesField):
     alias = "var_files"
-    default = ("*.tfvars",)
     expected_file_extensions = (".tfvars",)
     help = generate_multiple_sources_field_help_message(
         "Example: `var_files=['common.tfvars', 'prod.tfvars']`"
