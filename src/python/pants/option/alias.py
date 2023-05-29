@@ -105,7 +105,7 @@ class CliAlias:
         )
 
     def check_name_conflicts(
-        self, known_scopes: dict[str, ScopeInfo], known_flags: dict[str, set[str]]
+        self, known_scopes: dict[str, ScopeInfo], known_flags: dict[str, frozenset[str]]
     ) -> None:
         for alias in self.definitions.keys():
             scope = known_scopes.get(alias)
