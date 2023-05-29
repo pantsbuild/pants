@@ -693,6 +693,9 @@ class ScalameterBenchmarkTarget(Target):
 
 class ScalameterBenchmarksGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Bench.scala",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Bench.scala', '!BenchIgnore.scala']`"
+    )
 
 
 class ScalameterBenchmarksGeneratorTarget(TargetFilesGenerator):
