@@ -282,8 +282,9 @@ class DockerImageBuildSecretsOptionField(
         Secret files to expose to the build (only if BuildKit enabled).
 
         Secrets may use absolute paths, or paths relative to your build root, or the BUILD file
-        if prefixed with `./`. The id should be valid as used by the Docker build `--secret`
-        option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
+        if prefixed with `./`. Paths to your home directory will be automatically expanded.
+        The id should be valid as used by the Docker build `--secret` option.
+        See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
         information.
 
         Example:
@@ -292,6 +293,7 @@ class DockerImageBuildSecretsOptionField(
                 secrets={
                     "mysecret": "/var/secrets/some-secret",
                     "repo-secret": "src/proj/secrets/some-secret",
+                    "home-dir-secret": "~/.config/some-secret",
                     "target-secret": "./secrets/some-secret",
                 }
             )
@@ -308,8 +310,9 @@ class DockerImageBuildSecretsOptionField(
             full_path = os.path.join(
                 get_buildroot(),
                 self.address.spec_path if re.match(r"\.{1,2}/", path) else "",
-                path,
+                os.path.expanduser(path),
             )
+
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
 

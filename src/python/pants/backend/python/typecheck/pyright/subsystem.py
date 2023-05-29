@@ -3,14 +3,14 @@
 
 from __future__ import annotations
 
-from pants.backend.javascript.subsystems.npx_tool import NpxToolBase
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.option_types import ArgsListOption, SkipOption, StrListOption
 from pants.util.strutil import help_text
 
 
-class Pyright(NpxToolBase):
+class Pyright(NodeJSToolBase):
     options_scope = "pyright"
     name = "Pyright"
     help = help_text(

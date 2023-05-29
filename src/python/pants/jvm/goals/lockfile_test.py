@@ -103,7 +103,6 @@ def test_artifact_collision(rule_runner: RuleRunner) -> None:
                       artifact='artifact',
                       version='1',
                       jar='jar.jar',
-                      excludes=['ex:clude'],
                   )
 
                 mk('one')

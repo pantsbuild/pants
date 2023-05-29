@@ -234,3 +234,42 @@ def test_packages_files_as_resource_in_workspace(
     rule_runner.write_digest(result.snapshot.digest)
     with open(os.path.join(rule_runner.build_root, "src/js/a/dist/index.cjs")) as f:
         assert f.read() == "blarb\n"
+
+
+def test_extra_envs(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_build_script(entry_point="build", extra_env_vars=["FOO=BAR"], output_files=["dist/index.cjs"])
+                    ]
+                )
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "browser": "lib/index.mjs",
+                    "scripts": {"build": "mkdir dist && echo $FOO >> dist/index.cjs"},
+                }
+            ),
+            "src/js/package-lock.json": json.dumps({}),
+            "src/js/lib/BUILD": dedent(
+                """\
+                javascript_sources()
+                """
+            ),
+            "src/js/lib/index.mjs": "",
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/js", generated_name="build"))
+    snapshot = rule_runner.request(Snapshot, (EMPTY_DIGEST,))
+    result = rule_runner.request(
+        GeneratedSources, [GenerateResourcesFromNodeBuildScriptRequest(snapshot, tgt)]
+    )
+    rule_runner.write_digest(result.snapshot.digest)
+    with open(os.path.join(rule_runner.build_root, "src/js/dist/index.cjs")) as f:
+        assert f.read() == "BAR\n"

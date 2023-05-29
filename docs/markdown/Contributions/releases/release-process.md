@@ -28,36 +28,7 @@ See <https://docs.github.com/en/github/authenticating-to-github/telling-git-abou
 
 Note: the last step is required on macOS.
 
-### 4. Create a PyPI account
-
-[pypi.org/account/register](https://pypi.org/account/register).
-
-Please enable two-factor authentication under "Account Settings".
-
-Generate an API token under "Account Settings" for all projects. Copy the token for the last step.
-
-### 5. Get added to pantsbuild.pants PyPI
-
-You can ask any of the current Owners to add you as a maintainer.
-
-### 6. Configure `~/.pypirc`
-
-Fill in with your PyPI token by running:
-
-```bash
-$ cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
-[pypi]
-username: __token__
-password: <fill me in>
-
-[server-login]
-username: __token__
-password: <fill me in>
-
-EOF
-```
-
-### 7. Authenticate with the Github API
+### 4. Authenticate with the Github API
 
 Ensure that you have a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) for your Github account in your `.netrc` file.
 
@@ -227,7 +198,7 @@ First, ensure that you are on your release branch at your version bump commit.
 Then, run:
 
 ```bash
-./build-support/bin/release.sh tag-release
+./pants run build-support/bin/release.py -- tag-release
 ```
 
 This will tag the release with your PGP key, and push the tag to origin, which will kick off a [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) to build the wheels and publish them to PyPI.
@@ -238,7 +209,7 @@ Step 4: Release a Pants PEX
 After the [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) for your tag has completed, you should additionally build and publish the "universal" PEX to Github.
 
 ```bash
-PANTS_PEX_RELEASE=STABLE ./build-support/bin/release.sh build-universal-pex
+PANTS_PEX_RELEASE=STABLE ./pants run build-support/bin/release.py -- build-universal-pex
 ```
 
 Then go to <https://github.com/pantsbuild/pants/tags>, find your release's tag, click `Edit tag`, and upload the PEX located at `dist/pex.pants.<version>.pex`.
@@ -249,7 +220,7 @@ Step 5: Test the release
 Run this script as a basic smoke test:
 
 ```bash
-./build-support/bin/release.sh test-release
+./pants run build-support/bin/release.py -- test-release
 ```
 
 You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm the changelog is correct on the "Project description" page and that the `macOS` and `manylinux` wheels show up in the "Download files" page. 

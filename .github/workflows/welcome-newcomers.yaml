@@ -1,11 +1,13 @@
-name: first-interaction
+name: Say Hello to First-timers
 
 on:
   issues:
     types: [opened]
-  pull_request:
-    branches: [main]
+  # NB: This is safe since we don't checkout the repo
+  # See https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+  pull_request_target:
     types: [opened]
+    branches: [main]
 
 jobs:
   check_for_first_interaction:

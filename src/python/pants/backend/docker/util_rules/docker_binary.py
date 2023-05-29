@@ -9,7 +9,6 @@ from typing import Mapping
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
-from pants.base.deprecated import warn_or_error
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
@@ -116,20 +115,6 @@ class DockerBinary(BinaryPath):
             env=self._get_process_environment(env or {}),
             immutable_input_digests=self.extra_input_digests,
         )
-
-
-@dataclass(frozen=True)
-class DockerBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(DockerBinary, DockerBinaryRequest)",
-            "Instead, simply use `Get(DockerBinary)` or put `DockerBinary` in the rule signature",
-        )
-
-
-async def find_docker(_: DockerBinaryRequest, docker: DockerBinary) -> DockerBinary:
-    return docker
 
 
 @rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)

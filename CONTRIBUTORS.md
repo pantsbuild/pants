@@ -166,6 +166,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Kyle Derr
 + Kyujin Cho
 + Larry Hosken
++ Lasse Alm
 + Lawrence Finn
 + Le Nucksi
 + Lei Wang
@@ -179,7 +180,9 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Marc Abramowitz
 + Marcelo Trylesinski
 + Marcin Podolski
++ Marcus Lim
 + Marek Żarnowski
++ Marijn Valk
 + Marilyn Cruz
 + Marius Eriksen
 + Mark Chu-Carroll
@@ -267,6 +270,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Ted Dziuba
 + Tejal Desai
 + Thales Menato
++ Theo Ribeiro
 + Tianshuo Deng
 + Tien Nguyen
 + Tim Gates

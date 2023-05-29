@@ -219,15 +219,6 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             return tuple(sorted(set(self._corepack_env_vars)))
 
 
-class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
-    pass
-
-
-@rule(level=LogLevel.DEBUG)
-async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolveAliases:
-    return UserChosenNodeJSResolveAliases((value, key) for key, value in nodejs.resolves.items())
-
-
 @dataclass(frozen=True)
 class NodeJSToolProcess:
     """A request for a tool installed with NodeJS."""
@@ -276,26 +267,6 @@ class NodeJSToolProcess:
             timeout_seconds=timeout_seconds,
             extra_env=extra_env or FrozenDict(),
             project_digest=project_digest,
-        )
-
-    @classmethod
-    def npx(
-        cls,
-        args: Iterable[str],
-        npm_package: str,
-        description: str,
-        level: LogLevel = LogLevel.INFO,
-        input_digest: Digest = EMPTY_DIGEST,
-        output_files: tuple[str, ...] = (),
-    ) -> NodeJSToolProcess:
-        return cls(
-            tool="npx",
-            tool_version=None,
-            args=("--yes", npm_package, *args),
-            description=description,
-            level=level,
-            input_digest=input_digest,
-            output_files=output_files,
         )
 
 

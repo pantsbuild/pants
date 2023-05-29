@@ -41,22 +41,14 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -105,25 +97,17 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -171,11 +155,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -183,14 +162,11 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -238,11 +214,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -250,10 +221,11 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run build-support/bin/release.py -- build-local-pex
 
+        ./pants run build-support/bin/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -297,10 +269,16 @@ jobs:
       uses: actions/checkout@v3
       with:
         ref: ${{ needs.determine_ref.outputs.build-ref }}
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - env:
         MODE: debug
       name: Fetch and stabilize wheels
-      run: ./build-support/bin/release.sh fetch-and-stabilize
+      run: ./pants run build-support/bin/release.py -- fetch-and-stabilize --dest=dest/pypi_release
     - name: Create Release -> Commit Mapping
       run: 'tag="${{ needs.determine_ref.outputs.build-ref }}"
 
@@ -317,7 +295,9 @@ jobs:
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
+        packages-dir: dest/pypi_release
         password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
+        skip-existing: true
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
