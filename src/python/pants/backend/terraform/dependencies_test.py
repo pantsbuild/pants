@@ -1,6 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
+import textwrap
 from pathlib import Path
 from typing import Optional
 
@@ -20,10 +21,10 @@ standard_deployment = standard_deployment
 
 
 def _do_init_terraform(
-    rule_runner, standard_deployment, initialise_backend: bool
+    rule_runner: RuleRunner, standard_deployment: StandardDeployment, initialise_backend: bool
 ) -> DigestContents:
     rule_runner.write_files(standard_deployment.files)
-    target = rule_runner.get_target(Address("src/tf", target_name="stg"))
+    target = rule_runner.get_target(standard_deployment.target)
     field_set = DeployTerraformFieldSet.create(target)
     result = rule_runner.request(
         InitialisedTerraform,
@@ -31,6 +32,7 @@ def _do_init_terraform(
             TerraformInitRequest(
                 (field_set.sources,),
                 field_set.backend_config,
+                field_set.dependencies,
                 initialise_backend=initialise_backend,
             )
         ],
@@ -83,3 +85,28 @@ def test_init_terraform_without_backends(
         initialised_files,
         ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
     ), "Did not find expected provider"
+
+
+def test_init_terraform_with_in_repo_module(rule_runner: RuleRunner, tmpdir) -> None:
+    deployment_files = {
+        "src/tf/deployment/BUILD": 'terraform_deployment(name="root")',
+        "src/tf/deployment/main.tf": textwrap.dedent(
+            """\
+            module "mod0" {
+              source = "../module/"
+            }"""
+        ),
+    }
+    module_files = {
+        "src/tf/module/BUILD": "terraform_module()",
+        "src/tf/module/main.tf": 'resource "null_resource" "dep" {}',
+    }
+
+    deployment = StandardDeployment(
+        {**deployment_files, **module_files},
+        Path(str(tmpdir.mkdir(".terraform").join("state.json"))),
+        Address("src/tf/deployment", target_name="root"),
+    )
+    initialised_files = _do_init_terraform(rule_runner, deployment, initialise_backend=True)
+
+    assert initialised_files

@@ -40,6 +40,7 @@ class TerraformFieldSet(FieldSet):
     required_fields = (TerraformModuleSourcesField,)
 
     sources: TerraformModuleSourcesField
+    dependencies: TerraformDependenciesField
 
 
 class TerraformModuleTarget(Target):
@@ -104,6 +105,7 @@ class TerraformDeploymentFieldSet(FieldSet):
     )
     description: DescriptionField
     sources: TerraformModuleSourcesField
+    dependencies: TerraformDependenciesField
 
     backend_config: TerraformBackendConfigField
     var_files: TerraformVarFilesField

@@ -41,6 +41,7 @@ async def prepare_terraform_deployment(
         TerraformInitRequest(
             (request.field_set.sources,),
             request.field_set.backend_config,
+            request.field_set.dependencies,
             initialise_backend=True,
         ),
     )

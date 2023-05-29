@@ -49,6 +49,7 @@ def rule_runner() -> RuleRunner:
 class StandardDeployment:
     files: dict[str, str]
     state_file: Path
+    target: Address = Address("src/tf", target_name="stg")
 
 
 @pytest.fixture

@@ -36,7 +36,9 @@ async def terraform_check(
     initialised_terraforms = await MultiGet(
         Get(
             InitialisedTerraform,
-            TerraformInitRequest((deployment.sources,), deployment.backend_config),
+            TerraformInitRequest(
+                (deployment.sources,), deployment.backend_config, deployment.dependencies
+            ),
         )
         for deployment in request.field_sets
     )
