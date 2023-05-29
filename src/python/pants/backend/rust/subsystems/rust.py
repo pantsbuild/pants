@@ -7,7 +7,7 @@ import os
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import help_text
+from pants.util.strutil import softwrap
 
 
 class RustSubsystem(Subsystem):
@@ -17,7 +17,7 @@ class RustSubsystem(Subsystem):
     toolchain = StrOption(
         "--toolchain",
         default="stable",
-        help=help_text(
+        help=softwrap(
             """
             Name of a Rust toolchain to use for all builds. The toolchain name will be provided to
             Rustup to find the Toolchain.
@@ -28,7 +28,7 @@ class RustSubsystem(Subsystem):
     _rustup_search_paths = StrListOption(
         "--rustup-search-paths",
         default=["<PATH>"],
-        help=help_text(
+        help=softwrap(
             """
             A list of paths to search for Rustup.
 
