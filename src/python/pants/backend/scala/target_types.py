@@ -629,6 +629,9 @@ class ScalaJmhBenchmarkTarget(Target):
 
 class ScalaJmhBenchmarksGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Benchmark.scala",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Benchmark.scala', '!BenchmarkIgnore.scala']`"
+    )
 
 
 class ScalaJmhBenchmarksGeneratorTarget(TargetFilesGenerator):
