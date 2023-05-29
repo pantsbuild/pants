@@ -383,6 +383,19 @@ class ScalacPluginTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+class ScalaArtifactArtifactField(StringField):
+    alias = "artifact"
+    required = True
+    value: str
+    help = help_text(
+        """
+        The 'artifact' part of a Maven-compatible Scala-versioned coordinate to a third-party JAR artifact.
+
+        For the JAR coordinate `org.typelevel:cats-core_2.13:2.9.0`, the artifact is `cats-core`.
+        """
+    )
+
+
 class ScalaCrossVersion(Enum):
     PARTIAL = "partial"
     FULL = "full"
@@ -441,7 +454,7 @@ class ScalaArtifactExclusionsField(JvmArtifactExclusionsField):
 @dataclass(frozen=True)
 class ScalaArtifactFieldSet(FieldSet):
     group: JvmArtifactGroupField
-    artifact: JvmArtifactArtifactField
+    artifact: ScalaArtifactArtifactField
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
     exclusions: ScalaArtifactExclusionsField
@@ -449,7 +462,7 @@ class ScalaArtifactFieldSet(FieldSet):
 
     required_fields = (
         JvmArtifactGroupField,
-        JvmArtifactArtifactField,
+        ScalaArtifactArtifactField,
         JvmArtifactVersionField,
         JvmArtifactPackagesField,
         ScalaArtifactCrossversionField,
