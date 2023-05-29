@@ -34,12 +34,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonAwsLambdaFieldSet(PackageFieldSet):
-    required_fields = (PythonAwsLambdaHandlerField,)
-
-    handler: PythonAwsLambdaHandlerField
+class _BaseFieldSet(PackageFieldSet):
     include_requirements: PythonAwsLambdaIncludeRequirements
-    include_sources: PythonAwsLambdaIncludeSources
     runtime: PythonAwsLambdaRuntime
     complete_platforms: PythonFaaSCompletePlatforms
     output_path: OutputPathField
@@ -47,16 +43,18 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
 
 
 @dataclass(frozen=True)
-class PythonAwsLambdaLayerFieldSet(PackageFieldSet):
+class PythonAwsLambdaFieldSet(_BaseFieldSet):
+    required_fields = (PythonAwsLambdaHandlerField,)
+
+    handler: PythonAwsLambdaHandlerField
+
+
+@dataclass(frozen=True)
+class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
     required_fields = (PythonAwsLambdaLayerDependenciesField,)
 
     dependencies: PythonAwsLambdaLayerDependenciesField
-    include_requirements: PythonAwsLambdaIncludeRequirements
     include_sources: PythonAwsLambdaIncludeSources
-    runtime: PythonAwsLambdaRuntime
-    complete_platforms: PythonFaaSCompletePlatforms
-    output_path: OutputPathField
-    environment: EnvironmentField
 
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
@@ -93,7 +91,7 @@ async def package_python_awslambda(
             handler=field_set.handler,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
-            include_sources=field_set.include_sources.value,
+            include_sources=True,
             reexported_handler_module=PythonAwsLambdaHandlerField.reexported_handler_module,
         ),
     )

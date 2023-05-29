@@ -133,7 +133,6 @@ class _AWSLambdaBaseTarget(Target):
         *COMMON_TARGET_FIELDS,
         OutputPathField,
         PythonAwsLambdaIncludeRequirements,
-        PythonAwsLambdaIncludeSources,
         PythonAwsLambdaRuntime,
         PythonFaaSCompletePlatforms,
         PythonResolveField,
@@ -174,6 +173,7 @@ class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
     alias = "python_aws_lambda_layer"
     core_fields = (
         *_AWSLambdaBaseTarget.core_fields,
+        PythonAwsLambdaIncludeSources,
         PythonAwsLambdaLayerDependenciesField,
     )
     help = help_text(
