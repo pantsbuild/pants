@@ -543,7 +543,7 @@ async def find_valid_field_sets_for_target_roots(
             secondary_owner_targets.add(tgt)
     if secondary_owner_targets:
         warn_or_error(
-            removal_version="2.18.0.dev0",
+            removal_version="2.18.0.dev1",
             entity=softwrap(
                 """
                 indirectly referring to a target by using a corresponding file argument, when the
