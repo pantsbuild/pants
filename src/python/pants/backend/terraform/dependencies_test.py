@@ -109,4 +109,17 @@ def test_init_terraform_with_in_repo_module(rule_runner: RuleRunner, tmpdir) -> 
     )
     initialised_files = _do_init_terraform(rule_runner, deployment, initialise_backend=True)
 
+    # Assert that our module got included in the module.json
     assert initialised_files
+    modules_file_raw = find_file(initialised_files, ".terraform/modules/modules.json")
+    assert modules_file_raw
+    modules_file = json.loads(modules_file_raw.content)
+    assert any(
+        module for module in modules_file["Modules"] if module["Key"] == "mod0"
+    ), "Did not find our module in modules.json"
+
+    # Assert that the module was explored as part of init
+    assert find_file(
+        initialised_files,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
+    ), "Did not find expected provider contained in module, did we successfully include it in the files passed to `init`?"
