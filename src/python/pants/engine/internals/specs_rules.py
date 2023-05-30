@@ -482,6 +482,61 @@ class AmbiguousImplementationsException(Exception):
         )
 
 
+def _warn_deprecated_secondary_owner_semantics(
+    expanded_filepaths: tuple[str, ...],
+    targets_to_applicable_field_sets: dict[Target, tuple[FieldSet, ...]],
+):
+    """Warn about deprecated semantics of implicitly referring to a target through "Secondary
+    Ownership".
+
+    E.g. If there's a `pex_binary` whose entry point is `foo.py`, using `foo.py` as a spec to mean
+    "package the pex binary" is deprecated, and the caller should specify the binary directly.
+
+    This shouldn't warn if both the primary and secondary owner are in the specs (which is common
+    with specs like `::` or `dir:`).
+    """
+    field_set_to_matched_paths = {
+        field_set: getattr(field_set, field_name).filespec_matcher.matches(expanded_filepaths)
+        for field_sets in targets_to_applicable_field_sets.values()
+        for field_set in field_sets
+        for field_name, field_type in field_set.fields.items()
+        if hasattr(field_type, "filespec_matcher")
+    }
+    path_to_field_sets = defaultdict(list)
+    for field_set, matched_paths in field_set_to_matched_paths.items():
+        for path in matched_paths:
+            path_to_field_sets[path].append(field_set)
+
+    problematic_target_specs = set()
+    for path, field_sets in path_to_field_sets.items():
+        for field_set in field_sets:
+            if any(
+                isinstance(field, SecondaryOwnerMixin) and field.filespec_matcher.matches(path)
+                for field in field_set.fields
+            ):
+                break
+        else:
+            problematic_target_specs.add(field_sets[0].address.spec)
+
+    if problematic_target_specs:
+        warn_or_error(
+            removal_version="2.18.0.dev1",
+            entity=softwrap(
+                """
+                indirectly referring to a target by using a corresponding file argument, when the
+                target owning the file isn't applicable
+                """
+            ),
+            hint=softwrap(
+                f"""
+                Refer to the following targets by their addresses:
+
+                {bullet_list(sorted(problematic_target_specs))}
+                """
+            ),
+        )
+
+
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
@@ -530,34 +585,10 @@ async def find_valid_field_sets_for_target_roots(
         ):
             logger.warning(str(no_applicable_exception))
 
-    secondary_owner_targets = set()
-    specified_literal_addresses = {
-        address_literal.to_address() for address_literal in specs.includes.address_literals
-    }
-    for tgt, field_sets in targets_to_applicable_field_sets.items():
-        is_secondary = any(
-            isinstance(field, SecondaryOwnerMixin) for field in tgt.field_values.values()
-        )
-        is_explicitly_specified = tgt.address in specified_literal_addresses
-        if is_secondary and not is_explicitly_specified:
-            secondary_owner_targets.add(tgt)
-    if secondary_owner_targets:
-        warn_or_error(
-            removal_version="2.18.0.dev1",
-            entity=softwrap(
-                """
-                indirectly referring to a target by using a corresponding file argument, when the
-                target owning the file isn't applicable
-                """
-            ),
-            hint=softwrap(
-                f"""
-                Refer to the following targets by their addresses:
-
-                {bullet_list(sorted(tgt.address.spec for tgt in secondary_owner_targets))}
-                """
-            ),
-        )
+    _warn_deprecated_secondary_owner_semantics(
+        (await Get(SpecsPaths, Specs, specs)).files,
+        targets_to_applicable_field_sets,
+    )
 
     if request.num_shards > 0:
         sharded_targets_to_applicable_field_sets = {
