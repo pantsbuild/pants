@@ -160,6 +160,7 @@ async def get_pyenv_install_info(
                         f"""\
                         import fcntl
                         import pathlib
+                        import shutil
                         import subprocess
                         import sys
 
