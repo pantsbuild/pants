@@ -42,7 +42,7 @@ class Lambdex(PythonToolBase):
         removal_version="2.19.0.dev0",
         removal_hint=softwrap(
             f"""
-            Remove the whole [lambdex] section, as Lambdex is deprecated and its functionality be
+            Remove the whole [lambdex] section, as Lambdex is deprecated and its functionality will be
             removed. If you have `layout = "zip"`, no further action is required, as you are already using
             the recommended layout.
 
