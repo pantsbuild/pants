@@ -54,7 +54,7 @@ python_sources(name="lib")
 python_google_cloud_function(
     name="cloud_function",
     runtime="python38",
-    # Pants will convert this to `project.lambda_example:example_handler`.
+    # Pants will convert this to `project.google_cloud_function_example:example_handler`.
     handler="google_cloud_function_example.py:example_handler",
     type="event",
 )
@@ -98,6 +98,32 @@ You can use any of the various Google Cloud methods to upload your zip file, suc
 
 You must specify the handler as `handler`. This is a re-export of the function referred to by the `handler` field of the target.
 
+Advanced: Using PEX directly
+----------------------------
+
+In the rare case where you need access to PEX features, such as dynamic selection of dependencies, a PEX file created by `pex_binary` can be used as a Google Cloud Function package directly. A PEX file is a carefully constructed zip file, and can be understood natively by Google Cloud Functions. Note: using `pex_binary` results in larger packages and slower cold starts and is likely to be less convenient than using `python_google_cloud_function`.
+
+The handler of a `pex_binary` is not re-exported at the fixed `main.handler` path, and the Google Cloud Function must be configured with the `__pex__` pseudo-package followed by the handler's normal module path (for instance, if the handler is in `some/module/path.py` within [a source root](doc:source-roots), then use `__pex__.some.module.path`). This may require being configured via [`GOOGLE_FUNCTION_SOURCE`](https://cloud.google.com/docs/buildpacks/service-specific-configs#google_function_source). The `__pex__` pseudo-package ensures dependencies are initialized before running any of your code.
+
+For example:
+
+```python project/BUILD
+python_sources()
+
+pex_binary(
+    name="gcf",
+    entry_point="gcf_example.py",
+    # specify an appropriate platform(s) for the targetted GCF runtime (complete_platforms works too)
+    platforms=[linux_x86_64-cp39-cp39"],
+)
+```
+```python project/gcf_example.py
+def example_handler(event, context):
+    print("Hello GCF!")
+```
+
+Then, use  `pants package project:gcf`, and upload the resulting `project/gcf.pex` to Google Cloud Functions. You will need to specify the handler as `example_handler` and set `GOOGLE_FUNCTION_SOURCE=__pex__.gcf_example` (assuming `project` is a [source root](doc:source-roots)).
+
 Migrating from Pants 2.16 and earlier
 -------------------------------------
 
@@ -121,4 +147,4 @@ To opt-in to the new behaviour in Pants 2.17, set:
 layout = "zip"
 ```
 
-To temporarily continue using the old behaviour in Pants 2.17, instead set `layout = "lambdex"`. This will not be supported in Pants 2.19. If you encounter a bug with `layout = "zip"`, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose).
+To temporarily continue using the old behaviour in Pants 2.17, instead set `layout = "lambdex"`. This will not be supported in Pants 2.19. If you encounter a bug with `layout = "zip"`, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose). If you require advanced PEX features, [switch to using `pex_binary` directly](#advanced-using-pex-directly).

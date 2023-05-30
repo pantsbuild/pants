@@ -130,6 +130,32 @@ docker_image(
 
 Then, use `pants package project:my_image`, for example. Pants will first build your AWS Lambda, and then will build the Docker image and copy it into the AWS Lambda.
 
+Advanced: Using PEX directly
+----------------------------
+
+In the rare case where you need access to PEX features, such as dynamic selection of dependencies, a PEX file created by `pex_binary` can be used as a Lambda package directly. A PEX file is a carefully constructed zip file, and can be understood natively by AWS. Note: using `pex_binary` results in larger packages and slower cold starts and is likely to be less convenient than using `python_awslambda`.
+
+The handler of a `pex_binary` is not re-exported at the fixed `lambda_function.handler` path, and the Lambda must be configured with the `__pex__` pseudo-package followed by the handler's normal module path (for instance, if the handler is called `func` in `some/module/path.py` within [a source root](doc:source-roots), then use `__pex__.some.module.path.func`). The `__pex__` pseudo-package ensures dependencies are initialized before running any of your code.
+
+For example:
+
+```python project/BUILD
+python_sources()
+
+pex_binary(
+    name="lambda",
+    entry_point="lambda_example.py",
+    # specify an appropriate platform(s) for the targetted Lambda runtime (complete_platforms works too)
+    platforms=[linux_x86_64-cp39-cp39"],
+)
+```
+```python project/lambda_example.py
+def example_handler(event, context):
+    print("Hello AWS!")
+```
+
+Then, use  `pants package project:lambda`, and upload the resulting `project/lambdex.pex` to AWS.  The handler will need to be configured in AWS as `__pex__.lambda_example.example_handler` (assuming `project` is a [source root](doc:source-roots)).
+
 Migrating from Pants 2.16 and earlier
 -------------------------------------
 
@@ -153,4 +179,4 @@ To opt-in to the new behaviour in Pants 2.17, add the following to the end of yo
 layout = "zip"
 ```
 
-To temporarily continue using the old behaviour in Pants 2.17, instead set `layout = "lambdex"`. This will not be supported in Pants 2.19. If you encounter a bug with `layout = "zip"`, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose).
+To temporarily continue using the old behaviour in Pants 2.17, instead set `layout = "lambdex"`. This will not be supported in Pants 2.19. If you encounter a bug with `layout = "zip"`, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose). If you require advanced PEX features, [switch to using `pex_binary` directly](#advanced-using-pex-directly).
