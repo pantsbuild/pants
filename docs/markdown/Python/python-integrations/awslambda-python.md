@@ -28,12 +28,14 @@ This adds the new `python_awslambda` target, which you can confirm by running `p
 
 > 🚧 Set `layout = "zip"` for Pants 2.17
 >
-> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility (see [below](#migrating-from-pants-216-and-earlier) for more details). To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`
+> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility. To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`
 >
 > ```toml pants.toml
 > [lambdex]
 > layout = "zip"
 > ```
+>
+> If you have existing `python_awslambda` targets, this will change the handler from `lambdex_handler.handler` to `lambda_function.handler` (see [below](#migrating-from-pants-216-and-earlier) for more details).
 
 Step 2: Define a `python_awslambda` target
 ------------------------------------------
