@@ -391,7 +391,14 @@ class _Constants:
         )
         self._head_committer_date = (
             subprocess.run(
-                ["git", "show", "--no-patch", "--format=%ct", self._head_sha],
+                [
+                    "git",
+                    "show",
+                    "--no-patch",
+                    "--format=%cd",
+                    "--date=format:%Y%m%d%H%M",
+                    self._head_sha,
+                ],
                 stdout=subprocess.PIPE,
                 check=True,
             )
