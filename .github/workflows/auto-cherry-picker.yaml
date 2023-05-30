@@ -14,9 +14,42 @@ on:
         required: true
 
 jobs:
-  picker:
+  prerequisites:
     if: (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'needs-cherrypick') ) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    outputs:
+      milestones: ${{ steps.get-prereqs.outputs.milestones }}
+      merge_commit: ${{ steps.get-prereqs.outputs.merge_commit }}
+      pr_num: ${{ steps.get-prereqs.outputs.pr_num }}
+    steps:
+      - id: get-prereqs
+        name: Get Cherry-Pick prerequisites
+        env:
+          PR_NUM: ${{ github.event.pull_request.number || inputs.PR_number }}
+        run: |
+          TARGET_MILESTONE=$(gh pr view "$PR_NUM" --json milestone --jq '.milestone.title')
+          RELEVANT_MILESTONES=$(gh api graphql -F owner=":owner" -F name=":repo" -f query='
+            query ListMilestones($name: String!, $owner: String!) {
+              repository(owner: $owner, name: $name) {
+                milestones(last: 10) {
+                  nodes {title}
+                }
+              }
+            }' --jq .data.repository.milestones.nodes.[].title | sort -V | awk "/$TARGET_MILESTONE/{p=1}p" -)
+
+          echo "milestones=[$(RELEVANT_MILESTONES | tr '\n' ',')]" >> "$GITHUB_OUTPUT"
+
+          MERGE_COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
+          echo "merge_commit=$MERGE_COMMIT" >> "$GITHUB_OUTPUT"
+
+          echo "pr_num=$PR_NUM" >> "$GITHUB_OUTPUT"
+
+  picker:
+    needs: prerequisites
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        milestone: ${{ needs.prerequisites.outputs.milestones }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -31,6 +64,10 @@ jobs:
         run: |
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
-          bash -x build-support/bin/cherry_pick.sh ${{ github.event.pull_request.number || inputs.PR_number }} origin
+          git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
+          bash -x build-support/bin/cherry_pick_one.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
+
+          # @TODO: If the above errors, we should comment on PR, and label it
+
         env:
           GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
