@@ -144,7 +144,7 @@ async def get_pyenv_install_info(
                         #!/usr/bin/env bash
                         set -e
                         export PYENV_ROOT=$(readlink {PYENV_NAMED_CACHE})/{installation_fingerprint}
-                        if [ ! -f "$PYENV_ROOT"/pants_donefiles/$1/DONE ]; then
+                        if [ ! -f "$PYENV_ROOT"/pants_donefiles/$1.DONE ]; then
                             {python_binary.path} install_python_shim.py $1
                         fi
                         echo "$PYENV_ROOT"/versions/$1/bin/python
@@ -166,8 +166,8 @@ async def get_pyenv_install_info(
                         PYENV_ROOT = pathlib.Path("{PYENV_NAMED_CACHE}", "{installation_fingerprint}").resolve()
                         SPECIFIC_VERSION = sys.argv[1]
                         SPECIFIC_VERSION_PATH = PYENV_ROOT / "versions" / SPECIFIC_VERSION
-                        DONEFILE_DIR = PYENV_ROOT / "pants_donefiles" / SPECIFIC_VERSION
-                        DONEFILE_PATH = DONEFILE_DIR / "DONE"
+                        DONEFILE_DIR = PYENV_ROOT / "pants_donefiles"
+                        DONEFILE_PATH = DONEFILE_DIR / (SPECIFIC_VERSION + ".DONE")
                         DONEFILE_LOCK_PATH = DONEFILE_DIR / "DONE.lock"
 
                         def main():
