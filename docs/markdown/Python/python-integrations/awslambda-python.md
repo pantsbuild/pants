@@ -28,7 +28,7 @@ This adds the new `python_awslambda` target, which you can confirm by running `p
 
 > 🚧 Set `layout = "zip"` for Pants 2.17
 >
-> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility. To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`
+> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility. To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`:
 >
 > ```toml pants.toml
 > [lambdex]
@@ -135,7 +135,7 @@ Advanced: Using PEX directly
 
 In the rare case where you need access to PEX features, such as dynamic selection of dependencies, a PEX file created by `pex_binary` can be used as a Lambda package directly. A PEX file is a carefully constructed zip file, and can be understood natively by AWS. Note: using `pex_binary` results in larger packages and slower cold starts and is likely to be less convenient than using `python_awslambda`.
 
-The handler of a `pex_binary` is not re-exported at the fixed `lambda_function.handler` path, and the Lambda must be configured with the `__pex__` pseudo-package followed by the handler's normal module path (for instance, if the handler is called `func` in `some/module/path.py` within [a source root](doc:source-roots), then use `__pex__.some.module.path.func`). The `__pex__` pseudo-package ensures dependencies are initialized before running any of your code.
+The handler of a `pex_binary` is not re-exported at the fixed `lambda_function.handler` path, and the Lambda handler must be configured as the `__pex__` pseudo-package followed by the handler's normal module path (for instance, if the handler is called `func` in `some/module/path.py` within [a source root](doc:source-roots), then use `__pex__.some.module.path.func`). The `__pex__` pseudo-package ensures dependencies are initialized before running any of your code.
 
 For example:
 
@@ -145,8 +145,8 @@ python_sources()
 pex_binary(
     name="lambda",
     entry_point="lambda_example.py",
-    # specify an appropriate platform(s) for the targetted Lambda runtime (complete_platforms works too)
-    platforms=[linux_x86_64-cp39-cp39"],
+    # specify an appropriate platform(s) for the targeted Lambda runtime (complete_platforms works too)
+    platforms=["linux_x86_64-cp39-cp39"],
 )
 ```
 ```python project/lambda_example.py
@@ -161,7 +161,7 @@ Migrating from Pants 2.16 and earlier
 
 Pants has implemented a new way to package Lambdas in 2.17, resulting in smaller packages and faster cold starts. This involves some changes:
 
-- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](doc:pex-files) and then use Lambdex to adapt this into a zip file understood by AWS by adding a shim handler at the path `lambdex_handler.handler`. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during the "INIT" phase.
+- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](doc:pex-files) and then use Lambdex to adapt this to be better understood by AWS by adding a shim handler at the path `lambdex_handler.handler`. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during the "INIT" phase.
 - In Pants 2.17, the use of Lambdex is deprecated, in favour of choosing the appropriate dependencies ahead of time, as described above, without needing to do this on each cold start. This results in a zip file laid out in the format recommended by AWS, and includes a re-export of the handler at the path `lambda_function.handler`.
 - In Pants 2.18, the new behaviour will become the default behaviour.
 - In Pants 2.19, the old Lambdex behaviour will be entirely removed.

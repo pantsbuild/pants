@@ -29,7 +29,7 @@ This adds the new `python_google_cloud_function` target, which you can confirm b
 
 > 🚧 Set `layout = "zip"` for Pants 2.17
 >
-> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility (see [below](#migrating-from-pants-216-and-earlier) for more details). To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`
+> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility (see [below](#migrating-from-pants-216-and-earlier) for more details). To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`:
 >
 > ```toml pants.toml
 > [lambdex]
@@ -103,7 +103,7 @@ Advanced: Using PEX directly
 
 In the rare case where you need access to PEX features, such as dynamic selection of dependencies, a PEX file created by `pex_binary` can be used as a Google Cloud Function package directly. A PEX file is a carefully constructed zip file, and can be understood natively by Google Cloud Functions. Note: using `pex_binary` results in larger packages and slower cold starts and is likely to be less convenient than using `python_google_cloud_function`.
 
-The handler of a `pex_binary` is not re-exported at the fixed `main.handler` path, and the Google Cloud Function must be configured with the `__pex__` pseudo-package followed by the handler's normal module path (for instance, if the handler is in `some/module/path.py` within [a source root](doc:source-roots), then use `__pex__.some.module.path`). This may require being configured via [`GOOGLE_FUNCTION_SOURCE`](https://cloud.google.com/docs/buildpacks/service-specific-configs#google_function_source). The `__pex__` pseudo-package ensures dependencies are initialized before running any of your code.
+The handler of a `pex_binary` is not re-exported at the fixed `main.handler` path, and the Google Cloud Function handler must be configured as the `__pex__` pseudo-package followed by the handler's normal module path (for instance, if the handler is in `some/module/path.py` within [a source root](doc:source-roots), then use `__pex__.some.module.path`). This may require being configured via [`GOOGLE_FUNCTION_SOURCE`](https://cloud.google.com/docs/buildpacks/service-specific-configs#google_function_source). The `__pex__` pseudo-package ensures dependencies are initialized before running any of your code.
 
 For example:
 
@@ -113,8 +113,8 @@ python_sources()
 pex_binary(
     name="gcf",
     entry_point="gcf_example.py",
-    # specify an appropriate platform(s) for the targetted GCF runtime (complete_platforms works too)
-    platforms=[linux_x86_64-cp39-cp39"],
+    # specify an appropriate platform(s) for the targeted GCF runtime (complete_platforms works too)
+    platforms=["linux_x86_64-cp39-cp39"],
 )
 ```
 ```python project/gcf_example.py
@@ -129,7 +129,7 @@ Migrating from Pants 2.16 and earlier
 
 Pants has implemented a new way to package Google Cloud Functions in 2.17, resulting in smaller packages and faster cold starts. This involves some changes:
 
-- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](doc:pex-files) and then use Lambdex to adapt this into a zip file understood by GCF by adding a shim handler. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during initialization.
+- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](doc:pex-files) and then use Lambdex to adapt this to be better understood by GCF by adding a shim handler. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during initialization.
 - In Pants 2.17, the use of Lambdex is deprecated, in favour of choosing the appropriate dependencies ahead of time, as described above, without needing to do this on each cold start. This results in a zip file laid out in the format recommended by GCF, and includes a re-export of the handler.
 - In Pants 2.18, the new behaviour will become the default behaviour.
 - In Pants 2.19, the old Lambdex behaviour will be entirely removed.
