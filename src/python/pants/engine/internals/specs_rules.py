@@ -507,7 +507,7 @@ def _warn_deprecated_secondary_owner_semantics(
         for path in matched_paths:
             path_to_field_sets[path].append(field_set)
 
-    problematic_target_specs = set()
+    problematic_target_specs = set[str]()
     for path, field_sets in path_to_field_sets.items():
         for field_set in field_sets:
             if any(
