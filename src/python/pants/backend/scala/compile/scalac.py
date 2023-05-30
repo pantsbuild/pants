@@ -14,8 +14,8 @@ from pants.backend.scala.compile.scalac_plugins import (
     ScalaPluginsRequest,
     ScalaPluginTargetsForTarget,
 )
-from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
+from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaGeneratorFieldSet, ScalaSourceField
