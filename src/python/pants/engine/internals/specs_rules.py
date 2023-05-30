@@ -483,6 +483,7 @@ class AmbiguousImplementationsException(Exception):
 
 
 def _warn_deprecated_secondary_owner_semantics(
+    literal_specs: tuple[AddressLiteralSpec, ...],
     expanded_filepaths: tuple[str, ...],
     targets_to_applicable_field_sets: dict[Target, tuple[FieldSet, ...]],
 ):
@@ -495,6 +496,10 @@ def _warn_deprecated_secondary_owner_semantics(
     This shouldn't warn if both the primary and secondary owner are in the specs (which is common
     with specs like `::` or `dir:`).
     """
+    specified_literal_addresses = {
+        address_literal.to_address() for address_literal in literal_specs
+    }
+
     field_set_to_matched_paths = {
         field_set: getattr(field_set, field_name).filespec_matcher.matches(expanded_filepaths)
         for field_sets in targets_to_applicable_field_sets.values()
@@ -516,7 +521,11 @@ def _warn_deprecated_secondary_owner_semantics(
             ):
                 break
         else:
-            problematic_target_specs.update(field_set.address.spec for field_set in field_sets)
+            problematic_target_specs.update(
+                field_set.address.spec
+                for field_set in field_sets
+                if field_set.address not in specified_literal_addresses
+            )
 
     if problematic_target_specs:
         warn_or_error(
@@ -586,6 +595,7 @@ async def find_valid_field_sets_for_target_roots(
             logger.warning(str(no_applicable_exception))
 
     _warn_deprecated_secondary_owner_semantics(
+        specs.includes.address_literals,
         (await Get(SpecsPaths, Specs, specs)).files,
         targets_to_applicable_field_sets,
     )
