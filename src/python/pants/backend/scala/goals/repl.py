@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.util_rules.versions import ScalaArtifactsForVersionRequest, ScalaArtifactsForVersionResult
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses
@@ -36,29 +37,14 @@ async def create_scala_repl_request(
     jdk = max(environs, key=lambda j: j.jre_major_version)
 
     scala_version = scala_subsystem.version_for_resolve(user_classpath.resolve.name)
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
     tool_classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(
             prefix="__toolcp",
-            artifact_requirements=ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-compiler",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-library",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-reflect",
-                        version=scala_version,
-                    ),
-                ]
-            ),
+            artifact_requirements=ArtifactRequirements.from_coordinates(scala_artifacts.all_coordinates),
         ),
     )
 
@@ -77,7 +63,7 @@ async def create_scala_repl_request(
         args=[
             *jdk.args(bash, tool_classpath.classpath_entries(), chroot="{chroot}"),
             "-Dscala.usejavacp=true",
-            "scala.tools.nsc.MainGenericRunner",
+            scala_artifacts.repl_main,
             "-classpath",
             ":".join(user_classpath.args(prefix=user_classpath_prefix)),
         ],
