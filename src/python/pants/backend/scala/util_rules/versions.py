@@ -23,7 +23,10 @@ class ScalaArtifactsForVersionResult:
 
     @property
     def all_coordinates(self) -> tuple[Coordinate, ...]:
-        return (self.compiler_coordinate, self.library_coordinate, self.reflect_coordinate)
+        coords = [self.compiler_coordinate, self.library_coordinate]
+        if self.reflect_coordinate:
+            coords.append(self.reflect_coordinate)
+        return tuple(coords)
 
 
 @rule
@@ -43,8 +46,9 @@ async def resolve_scala_artifacts_for_version(
                 artifact="scala3-library_3",
                 version=request.scala_version,
             ),
+            reflect_coordinate=None,
             compiler_main="dotty.tools.dotc.Main",
-            repl_main="dotty.tools.repl.Main"
+            repl_main="dotty.tools.repl.Main",
         )
 
     return ScalaArtifactsForVersionResult(
@@ -64,7 +68,7 @@ async def resolve_scala_artifacts_for_version(
             version=request.scala_version,
         ),
         compiler_main="scala.tools.nsc.Main",
-        repl_main="scala.tools.nsc.MainGenericRunner"
+        repl_main="scala.tools.nsc.MainGenericRunner",
     )
 
 
