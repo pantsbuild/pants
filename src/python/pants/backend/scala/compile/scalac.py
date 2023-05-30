@@ -14,6 +14,7 @@ from pants.backend.scala.compile.scalac_plugins import (
     ScalaPluginsRequest,
     ScalaPluginTargetsForTarget,
 )
+from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
@@ -246,6 +247,7 @@ def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
+        *scala_artifact_rules(),
         *scalac_plugins_rules(),
         *versions.rules(),
         UnionRule(ClasspathEntryRequest, CompileScalaSourceRequest),
