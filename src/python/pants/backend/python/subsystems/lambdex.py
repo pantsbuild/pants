@@ -8,6 +8,7 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.base.deprecated import warn_or_error
 from pants.engine.rules import collect_rules
 from pants.option.option_types import EnumOption
+from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
 
 
@@ -64,6 +65,11 @@ class Lambdex(PythonToolBase):
                     You can also explicitly set `layout = "lambdex"` to silence this warning and
                     continue using the Lambdex-based layout in this release of Pants. This layout
                     will disappear in future.
+
+                    See the docs for more details:
+
+                    * {doc_url('awslambda-python#migrating-from-pants-216-and-earlier')}
+                    * {doc_url('google-cloud-function-python#migrating-from-pants-216-and-earlier')}
                     """
                 ),
             )
