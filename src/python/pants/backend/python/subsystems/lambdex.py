@@ -7,6 +7,7 @@ from pants.backend.python.subsystems.python_tool_base import LockfileRules, Pyth
 from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules
 from pants.option.option_types import EnumOption
+from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
 
 
@@ -40,7 +41,7 @@ class Lambdex(PythonToolBase):
         ),
         removal_version="2.19.0.dev0",
         removal_hint=softwrap(
-            """
+            f"""
             Remove the whole [lambdex] section, as Lambdex is deprecated and its functionality be
             removed. If you have `layout = "zip"`, no further action is required, as you are already using
             the recommended layout.
@@ -53,8 +54,8 @@ class Lambdex(PythonToolBase):
 
             See the docs for more details:
 
-            * https://www.pantsbuild.org/v2.18/docs/awslambda-python#migrating-from-pants-216-and-earlier
-            * https://www.pantsbuild.org/v2.18/docs/google-cloud-function-python#migrating-from-pants-216-and-earlier
+            * {doc_url('awslambda-python#migrating-from-pants-216-and-earlier')}
+            * {doc_url('google-cloud-function-python#migrating-from-pants-216-and-earlier')}
             """
         ),
     )
