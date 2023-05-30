@@ -516,7 +516,7 @@ def _warn_deprecated_secondary_owner_semantics(
             ):
                 break
         else:
-            problematic_target_specs.add(field_sets[0].address.spec)
+            problematic_target_specs.update(field_set.address.spec for field_set in field_sets)
 
     if problematic_target_specs:
         warn_or_error(
