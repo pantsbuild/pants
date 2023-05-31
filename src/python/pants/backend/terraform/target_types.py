@@ -61,10 +61,6 @@ class TerraformBackendConfigField(OptionalSingleSourceField):
     alias = "backend_config"
     help = "Configuration to be merged with what is in the configuration file's 'backend' block"
 
-    def empty(self) -> TerraformBackendConfigField:
-        """Clear the backend config to ensure that."""
-        return TerraformBackendConfigField(None, self.address)
-
 
 class TerraformVarFilesField(MultipleSourcesField):
     alias = "var_files"
