@@ -44,7 +44,9 @@ while IFS= read -r REVIEWER; do PR_CREATE_CMD+=(--reviewer "$REVIEWER"); done <<
 PR_CREATE_CMD+=(--reviewer "$(gh pr view "$PR_NUM" --json author --jq '.author.login')")
 
 # NB: Don't quote $FETCH_OPTS, it might contain spaces.
-git fetch $FETCH_OPTS https://github.com/pantsbuild/pants "$MILESTONE"
+if !git fetch $FETCH_OPTS https://github.com/thejcannon/pants "$MILESTONE" then
+  fail "Couldn't fetch the milestone branch. Assuming that means it doesn't exist yet." 0
+fi
 git checkout -b "$BRANCH_NAME" FETCH_HEAD
 
 if git cherry-pick "$COMMIT"; then
