@@ -490,8 +490,7 @@ class AmbiguousImplementationsException(Exception):
 # NB: Remove when SecondaryOwnerMixin is removed
 def _maybe_warn_deprecated_secondary_owner_semantics(
     addresses_from_nonfile_specs: Addresses,
-    addresses_from_file_specs: Addresses,
-    owners_info: Owners,
+    owners_from_filespecs: Owners,
     matched_addresses: collections.abc.Set[Address],
 ):
     """Warn about deprecated semantics of implicitly referring to a target through "Secondary
@@ -506,8 +505,8 @@ def _maybe_warn_deprecated_secondary_owner_semantics(
     problematic_target_specs = {
         address.spec
         for address in matched_addresses
-        if address in addresses_from_file_specs
-        and not owners_info[address]
+        if address in owners_from_filespecs
+        and not owners_from_filespecs[address]
         and address not in addresses_from_nonfile_specs
     }
 
@@ -588,11 +587,6 @@ async def find_valid_field_sets_for_target_roots(
                         Addresses,
                         RawSpecsWithoutFileOwners,
                         RawSpecsWithoutFileOwners.from_raw_specs(specs.includes),
-                    ),
-                    Get(
-                        Addresses,
-                        RawSpecsWithOnlyFileOwners,
-                        RawSpecsWithOnlyFileOwners.from_raw_specs(specs.includes),
                     ),
                     Get(
                         Owners,
