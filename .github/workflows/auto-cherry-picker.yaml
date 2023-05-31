@@ -15,6 +15,7 @@ on:
 
 jobs:
   prerequisites:
+    name: Gather Prerequisites
     if: (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'needs-cherrypick') ) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
@@ -45,6 +46,7 @@ jobs:
           echo "pr_num=$PR_NUM" >> "$GITHUB_OUTPUT"
 
   picker:
+    name: Cherry-Pick
     needs: prerequisites
     runs-on: ubuntu-latest
     strategy:
@@ -56,20 +58,53 @@ jobs:
         with:
           # Always checkout the latest commit of main, for latest changes to the script
           ref: "main"
-          # NB: we're usually cherrypicking the HEAD of main, and we need its parent commit to diff
-          # for the cherry-pick, so we can save an extra round-trip by just getting that parent now
-          fetch-depth: 2
 
       - name: Cherry-Pick
+        env:
+          GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
         run: |
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
           git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
-          bash -x build-support/bin/cherry_pick_one.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
+          bash -x build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
 
-          # @TODO: If the above errors, we should comment on PR, and label it
+      - name: Comment regarding failure
+        if: ${{ failure() }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: ${{ needs.prerequisites.outputs.pr_num }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['auto-cherry-picking-failed']
+            })
+            github.rest.issues.createComment({
+              issue_number: ${{ needs.prerequisites.outputs.pr_num }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'I was unable to cherry-pick this PR to ${{ matrix.milestone }}, likely due to merge-conflicts. \
+                \n\n \
+                Please checkout and pull pull `main`, \
+                and run `build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"`. \
+                \n\n \
+                It should reproduce the merge conflicts locally, and tell you how to proceed after fixing.'
+            })
 
-        env:
-          GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
-
-  # TODO: If all of the jobs succeeded, we can remove the label
+  label-remover:
+    name: Remove "needs-cherrypick" label
+    needs: picker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+          script: |
+            github.rest.issues.removeLabel({
+              issue_number: ${{ needs.prerequisites.outputs.pr_num }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'needs-cherrypick'
+            })

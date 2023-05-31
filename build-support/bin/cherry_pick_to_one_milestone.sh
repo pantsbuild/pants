@@ -4,6 +4,8 @@ set -e
 # CLI Args:
 #   $1 - PR Number (E.g. "12345")
 #   $2 - Milestone
+# NOTE: This script assumes you have already fetched the commit that merged the PR to `main`, along
+# with its parent.
 
 function fail {
   printf '%s\n' "$1" >&2
@@ -54,6 +56,7 @@ else
   fail "
   Cherry-picking failed, likely due to a merge-conflict.
   Please fix the above conflicts, commit, and then run the following command.
+  (When you're done cherry-picking, you'll want to remove the "needs-cherrypick" label from the original PR)
 
     ${ESCAPED_PR_CREATE_CMD[*]}
   "

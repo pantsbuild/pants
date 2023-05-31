@@ -70,23 +70,15 @@ If there are things that must be removed, you can either:
 2. Remove it yourself, either in the release prep or as a precursor PR.
 3. Bump the removal date back by one dev release.
 
-### 0c. Release candidates - cherry-pick relevant changes
+### 0c. Release candidates - Check for cherry-picks
 
-Cherry-pick all changes labeled `needs-cherrypick` with the relevant milestone for the stable branch, e.g. the milestone `2.9.x`. 
+PRs labeled "needs-cherrypick" are automatically cherry-picked to each relevant branch, and on success have their label removed.
 
-These pull requests must have been merged into main first, so they will already be closed.
+There are instances where this process fails (e.g. when there's a merge-conflict) or never runs (e.g. the label was added after merging or the milestone was missing).
 
-To cherry-pick, for example, from 2.9.x:
+If the process fails, it should tag the PR with "auto-cherry-picking-failed". These PRs will need to be picked manually following the steps in the comment on PR.
 
-1. `git fetch https://github.com/pantsbuild/pants 2.9.x`
-2. `git checkout -b <new-branch-name> FETCH_HEAD`
-3. Find the commit SHA by running `git log main` or looking in GitHub: <https://github.com/pantsbuild/pants/commits/main>.
-4. `git cherry-pick <sha>`, using the SHA from the previous step.
-5. Open a pull request to merge into the release branch, e.g. `2.9.x`.
-
-Do not push directly to the release branch. All changes should be added through a pull request.
-
-After a commit has been cherry-picked, remove the `needs-cherrypick` label and remove it from the release milestone.
+If the process was never run, a manual run of the auto-cherry-picker can be triggered by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
 
 ### 1. Prepare the changelog
 
