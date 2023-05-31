@@ -66,7 +66,7 @@ jobs:
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
           git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
-          bash -x build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
+          bash -x build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}" "--fetch-depth 1"
 
       - name: Comment regarding failure
         if: ${{ failure() }}

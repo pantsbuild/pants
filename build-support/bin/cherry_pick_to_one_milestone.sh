@@ -4,6 +4,7 @@ set -e
 # CLI Args:
 #   $1 - PR Number (E.g. "12345")
 #   $2 - Milestone
+#   $3 - (Optional) Fetch options to use when fetching the milestone branch.
 # NOTE: This script assumes you have already fetched the commit that merged the PR to `main`, along
 # with its parent.
 
@@ -22,6 +23,7 @@ fi
 
 PR_NUM=$1
 TARGET_MILESTONE=$2
+FETCH_OPTS=${3-}
 
 COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 if [[ -z $COMMIT ]]; then
@@ -41,7 +43,8 @@ while IFS= read -r REVIEWER; do PR_CREATE_CMD+=(--reviewer "$REVIEWER"); done <<
 # NB: Add the author in case someone else creates the PR (like WorkerPants)
 PR_CREATE_CMD+=(--reviewer "$(gh pr view "$PR_NUM" --json author --jq '.author.login')")
 
-git fetch https://github.com/pantsbuild/pants "$MILESTONE"
+# NB: Don't quote $FETCH_OPTS, it might contain spaces.
+git fetch $FETCH_OPTS https://github.com/pantsbuild/pants "$MILESTONE"
 git checkout -b "$BRANCH_NAME" FETCH_HEAD
 
 if git cherry-pick "$COMMIT"; then
