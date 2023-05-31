@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import dataclasses
 import itertools
 import logging
@@ -46,7 +47,6 @@ from pants.engine.target import (
     FilteredTargets,
     NoApplicableTargetsBehavior,
     RegisteredTargetTypes,
-    SecondaryOwnerMixin,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -227,7 +227,7 @@ async def addresses_from_raw_specs_without_file_owners(
 @rule(_masked_types=[EnvironmentName])
 async def addresses_from_raw_specs_with_only_file_owners(
     specs: RawSpecsWithOnlyFileOwners,
-) -> Addresses:
+) -> Owners:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
         Get(Paths, PathGlobs, specs.path_globs_for_spec(spec)) for spec in specs.all_specs()
@@ -242,6 +242,11 @@ async def addresses_from_raw_specs_with_only_file_owners(
             match_if_owning_build_file_included_in_sources=False,
         ),
     )
+    return owners
+
+
+@rule(_masked_types=[EnvironmentName])
+async def addresses_from_owners(owners: Owners) -> Addresses:
     return Addresses(sorted(owners))
 
 
@@ -482,10 +487,12 @@ class AmbiguousImplementationsException(Exception):
         )
 
 
-def _warn_deprecated_secondary_owner_semantics(
-    literal_specs: tuple[AddressLiteralSpec, ...],
-    expanded_filepaths: tuple[str, ...],
-    targets_to_applicable_field_sets: dict[Target, tuple[FieldSet, ...]],
+# NB: Remove when SecondaryOwnerMixin is removed
+def _maybe_warn_deprecated_secondary_owner_semantics(
+    addresses_from_nonfile_specs: Addresses,
+    addresses_from_file_specs: Addresses,
+    owners_info: Owners,
+    matched_addresses: collections.abc.Set[Address],
 ):
     """Warn about deprecated semantics of implicitly referring to a target through "Secondary
     Ownership".
@@ -496,36 +503,13 @@ def _warn_deprecated_secondary_owner_semantics(
     This shouldn't warn if both the primary and secondary owner are in the specs (which is common
     with specs like `::` or `dir:`).
     """
-    specified_literal_addresses = {
-        address_literal.to_address() for address_literal in literal_specs
+    problematic_target_specs = {
+        address.spec
+        for address in matched_addresses
+        if address in addresses_from_file_specs
+        and not owners_info[address]
+        and address not in addresses_from_nonfile_specs
     }
-
-    field_set_to_matched_paths = {
-        field_set: getattr(field_set, field_name).filespec_matcher.matches(expanded_filepaths)
-        for field_sets in targets_to_applicable_field_sets.values()
-        for field_set in field_sets
-        for field_name, field_type in field_set.fields.items()
-        if hasattr(field_type, "filespec_matcher")
-    }
-    path_to_field_sets = defaultdict(list)
-    for field_set, matched_paths in field_set_to_matched_paths.items():
-        for path in matched_paths:
-            path_to_field_sets[path].append(field_set)
-
-    problematic_target_specs: set[str] = set()
-    for path, field_sets in path_to_field_sets.items():
-        for field_set in field_sets:
-            if any(
-                isinstance(field, SecondaryOwnerMixin) and field.filespec_matcher.matches(path)
-                for field in field_set.fields
-            ):
-                break
-        else:
-            problematic_target_specs.update(
-                field_set.address.spec
-                for field_set in field_sets
-                if field_set.address not in specified_literal_addresses
-            )
 
     if problematic_target_specs:
         warn_or_error(
@@ -594,11 +578,31 @@ async def find_valid_field_sets_for_target_roots(
         ):
             logger.warning(str(no_applicable_exception))
 
-    _warn_deprecated_secondary_owner_semantics(
-        specs.includes.address_literals,
-        (await Get(SpecsPaths, Specs, specs)).files,
-        targets_to_applicable_field_sets,
-    )
+    # NB: Remove when SecondaryOwnerMixin is removed
+    if targets_to_applicable_field_sets:
+        _maybe_warn_deprecated_secondary_owner_semantics(
+            # NB: All of these should be memoized, so it's not inappropriate to request simply for warning sake.
+            *(
+                await MultiGet(
+                    Get(
+                        Addresses,
+                        RawSpecsWithoutFileOwners,
+                        RawSpecsWithoutFileOwners.from_raw_specs(specs.includes),
+                    ),
+                    Get(
+                        Addresses,
+                        RawSpecsWithOnlyFileOwners,
+                        RawSpecsWithOnlyFileOwners.from_raw_specs(specs.includes),
+                    ),
+                    Get(
+                        Owners,
+                        RawSpecsWithOnlyFileOwners,
+                        RawSpecsWithOnlyFileOwners.from_raw_specs(specs.includes),
+                    ),
+                )
+            ),
+            {tgt.address for tgt in targets_to_applicable_field_sets},
+        )
 
     if request.num_shards > 0:
         sharded_targets_to_applicable_field_sets = {
