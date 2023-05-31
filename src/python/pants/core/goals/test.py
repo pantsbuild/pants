@@ -1069,7 +1069,7 @@ class RuntimePackageDependenciesField(SpecialCasedDependencies):
         have, but without the `--distdir` prefix (e.g. `dist/`).
 
         You can include anything that can be built by `{bin_name()} package`, e.g. a `pex_binary`,
-        `python_awslambda`, or an `archive`.
+        `python_aws_lambda_function`, or an `archive`.
         """
     )
 
