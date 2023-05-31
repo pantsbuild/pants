@@ -389,6 +389,22 @@ class _Constants:
             .stdout.decode()
             .strip()
         )
+        self._head_committer_date = (
+            subprocess.run(
+                [
+                    "git",
+                    "show",
+                    "--no-patch",
+                    "--format=%cd",
+                    "--date=format:%Y%m%d%H%M",
+                    self._head_sha,
+                ],
+                stdout=subprocess.PIPE,
+                check=True,
+            )
+            .stdout.decode()
+            .strip()
+        )
         self.pants_version_file = Path("src/python/pants/VERSION")
         self.pants_stable_version = self.pants_version_file.read_text().strip()
 
@@ -418,7 +434,9 @@ class _Constants:
 
     @property
     def pants_unstable_version(self) -> str:
-        return f"{self.pants_stable_version}+git{self._head_sha[:8]}"
+        # include the commit's timestamp to make multiple builds of a single stable version more
+        # easily orderable
+        return f"{self.pants_stable_version}+{self._head_committer_date}.git{self._head_sha[:8]}"
 
     @property
     def twine_venv_dir(self) -> Path:
