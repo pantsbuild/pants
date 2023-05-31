@@ -978,7 +978,7 @@ def acyclic_scala212_lockfile_def() -> JVMLockfileFixtureDefinition:
         "acyclic-scala212.test.lock",
         [
             "com.lihaoyi:acyclic_2.12:0.2.1",
-            "org.scala-lang:scala-library:2.12.13",
+            "org.scala-lang:scala-library:2.12.15",
         ],
     )
 
@@ -1015,7 +1015,7 @@ def test_cross_compile_with_scalac_plugin(
                 version_in_target_name=True, resolve="scala2.12"
             ),
             "3rdparty/jvm/BUILD.2_13": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(
-                version_in_target_name=True, resolve="scala2.12"
+                version_in_target_name=True, resolve="scala2.13"
             ),
             "3rdparty/jvm/scala213.lock": acyclic_jvm_lockfile.serialized_lockfile,
             "3rdparty/jvm/scala212.lock": acyclic_scala212_lockfile.serialized_lockfile,
@@ -1058,12 +1058,12 @@ def test_cross_compile_with_scalac_plugin(
     rule_runner.set_options(
         [
             '--scala-version-for-resolve={"scala2.12":"2.12.15","scala2.13":"2.13.8"}',
-            '--jvm-resolves={"scala2.12":"3rdparty/jvm/scala2.12.lock","scala2.13":"3rdparty/jvm/scala2.13.lock"}',
+            '--jvm-resolves={"scala2.12":"3rdparty/jvm/scala212.lock","scala2.13":"3rdparty/jvm/scala213.lock"}',
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     classpath_2_12 = rule_runner.request(
-        ClasspathEntry,
+        FallibleClasspathEntry,
         [
             CompileScalaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -1075,21 +1075,16 @@ def test_cross_compile_with_scalac_plugin(
                         parameters={"resolve": "scala2.12"},
                     ),
                 ),
-                resolve=make_resolve(rule_runner, "scala2.12", "3rdparty/jvm/scala2.12.lock"),
+                resolve=make_resolve(rule_runner, "scala2.12", "3rdparty/jvm/scala212.lock"),
             )
         ],
     )
-    entries_2_12 = list(ClasspathEntry.closure([classpath_2_12]))
-    filenames_2_12 = sorted(
-        itertools.chain.from_iterable(entry.filenames for entry in entries_2_12)
-    )
-    assert filenames_2_12 == [
-        ".lib.Example.scala.main_2.12.scalac.jar",
-        "org.scala-lang_scala-library_2.12.15.jar",
-    ]
+
+    assert classpath_2_12.result == CompileResult.FAILED and classpath_2_12.stderr
+    assert "error: Unwanted cyclic dependency" in classpath_2_12.stderr
 
     classpath_2_13 = rule_runner.request(
-        ClasspathEntry,
+        FallibleClasspathEntry,
         [
             CompileScalaSourceRequest(
                 component=expect_single_expanded_coarsened_target(
@@ -1101,15 +1096,10 @@ def test_cross_compile_with_scalac_plugin(
                         parameters={"resolve": "scala2.13"},
                     ),
                 ),
-                resolve=make_resolve(rule_runner, "scala2.13", "3rdparty/jvm/scala2.13.lock"),
+                resolve=make_resolve(rule_runner, "scala2.13", "3rdparty/jvm/scala213.lock"),
             )
         ],
     )
-    entries_2_13 = list(ClasspathEntry.closure([classpath_2_13]))
-    filenames_2_13 = sorted(
-        itertools.chain.from_iterable(entry.filenames for entry in entries_2_13)
-    )
-    assert filenames_2_13 == [
-        ".Example.scala.main_2.13.scalac.jar",
-        "org.scala-lang_scala-library_2.13.8.jar",
-    ]
+
+    assert classpath_2_13.result == CompileResult.FAILED and classpath_2_13.stderr
+    assert "error: Unwanted cyclic dependency" in classpath_2_13.stderr

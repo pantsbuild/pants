@@ -7,7 +7,7 @@
 #   "version": 1,
 #   "generated_with_requirements": [
 #     "com.lihaoyi:acyclic_2.12:0.2.1,url=not_provided,jar=not_provided",
-#     "org.scala-lang:scala-library:2.12.13,url=not_provided,jar=not_provided"
+#     "org.scala-lang:scala-library:2.12.15,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -28,13 +28,13 @@ serialized_bytes_length = 64455
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.scala-lang_scala-library_2.12.13.jar"
+file_name = "org.scala-lang_scala-library_2.12.15.jar"
 
 [entries.coord]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.12.13"
+version = "2.12.15"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "1bb415cff43f792636556a1137b213b192ab0246be003680a3b006d01235dd89"
-serialized_bytes_length = 5436868
+fingerprint = "e518bb640e2175de5cb1f8e326679b8d975376221f1b547757de429bbf4563f0"
+serialized_bytes_length = 5443542
