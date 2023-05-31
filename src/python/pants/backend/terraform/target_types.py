@@ -62,7 +62,7 @@ class TerraformBackendConfigField(OptionalSingleSourceField):
     help = "Configuration to be merged with what is in the configuration file's 'backend' block"
 
 
-class TerraformVarFilesField(MultipleSourcesField):
+class TerraformVarFileSourcesField(MultipleSourcesField):
     alias = "var_files"
     expected_file_extensions = (".tfvars",)
     help = generate_multiple_sources_field_help_message(
@@ -87,7 +87,7 @@ class TerraformDeploymentTarget(Target):
         TerraformDependenciesField,
         TerraformModuleSourcesField,
         TerraformBackendConfigField,
-        TerraformVarFilesField,
+        TerraformVarFileSourcesField,
         TerraformExtraArgs,
     )
     help = "A deployment of Terraform"
@@ -104,7 +104,7 @@ class TerraformDeploymentFieldSet(FieldSet):
     dependencies: TerraformDependenciesField
 
     backend_config: TerraformBackendConfigField
-    var_files: TerraformVarFilesField
+    var_files: TerraformVarFileSourcesField
     extra_args: TerraformExtraArgs
 
 
