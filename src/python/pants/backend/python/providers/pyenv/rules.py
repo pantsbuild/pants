@@ -160,23 +160,31 @@ async def get_pyenv_install_info(
                         f"""\
                         import fcntl
                         import pathlib
+                        import shutil
                         import subprocess
                         import sys
 
                         PYENV_ROOT = pathlib.Path("{PYENV_NAMED_CACHE}", "{installation_fingerprint}").resolve()
                         SPECIFIC_VERSION = sys.argv[1]
                         SPECIFIC_VERSION_PATH = PYENV_ROOT / "versions" / SPECIFIC_VERSION
+
+                        # NB: We put the "DONE" file inside the specific version destination so that
+                        # users can wipe the directory clean and expect Pants to re-install that version.
                         DONEFILE_PATH = SPECIFIC_VERSION_PATH / "DONE"
-                        DONEFILE_LOCK_PATH = SPECIFIC_VERSION_PATH / "DONE.lock"
-                        DONEFILE_LOCK_FD = DONEFILE_LOCK_PATH.open(mode="w")
 
                         def main():
                             if DONEFILE_PATH.exists():
                                 return
-                            fcntl.lockf(DONEFILE_LOCK_FD, fcntl.LOCK_EX)
+
+                            lockfile_fd = SPECIFIC_VERSION_PATH.with_suffix(".lock").open(mode="w")
+                            fcntl.lockf(lockfile_fd, fcntl.LOCK_EX)
                             # Use double-checked locking to ensure that we really need to do the work
                             if DONEFILE_PATH.exists():
                                 return
+
+                            # If a previous install failed this directory may exist in an intermediate
+                            # state, and pyenv may choke trying to install into it, so we remove it.
+                            shutil.rmtree(SPECIFIC_VERSION_PATH, ignore_errors=True)
 
                             subprocess.run(["{pyenv.exe}", "install", SPECIFIC_VERSION], check=True)
                             # Removing write perms helps ensure users aren't accidentally modifying
