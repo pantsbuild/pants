@@ -18,7 +18,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
-from pants.option.option_types import BoolOption, StrListOption
+from pants.option.option_types import ArgsListOption, BoolOption, StrListOption
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
@@ -227,6 +227,16 @@ class TerraformTool(TemplatedExternalTool):
         ),
         advanced=True,
     )
+    args = ArgsListOption(
+        example="-auto-approve",
+        passthrough=True,
+        extra_help=softwrap(
+            """
+            Additional arguments to pass to the Terraform command line.
+            """
+        ),
+    )
+
     tailor = BoolOption(
         default=True,
         help="If true, add `terraform_module` targets with the `tailor` goal.",

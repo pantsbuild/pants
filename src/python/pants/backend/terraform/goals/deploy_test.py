@@ -42,6 +42,7 @@ def rule_runner() -> RuleRunner:
         ],
         preserve_tmpdirs=True,
     )
+    rule_runner.set_options(["--download-terraform-args='-auto-approve'"])
     return rule_runner
 
 
@@ -58,7 +59,7 @@ def standard_deployment(tmpdir) -> StandardDeployment:
     state_file = Path(str(tmpdir.mkdir(".terraform").join("state.json")))
     return StandardDeployment(
         {
-            "src/tf/BUILD": """terraform_deployment(name="stg", var_files=["stg.tfvars"],extra_args=["--auto-approve"],backend_config="stg.tfbackend")""",
+            "src/tf/BUILD": """terraform_deployment(name="stg", var_files=["stg.tfvars"],backend_config="stg.tfbackend")""",
             "src/tf/main.tf": textwrap.dedent(
                 """\
         terraform {
@@ -80,8 +81,10 @@ def standard_deployment(tmpdir) -> StandardDeployment:
 def test_run_terraform_deploy(rule_runner: RuleRunner, standard_deployment, tmpdir) -> None:
     """Test end-to-end running of a deployment."""
     rule_runner.write_files(standard_deployment.files)
-    with mock_console(rule_runner.options_bootstrapper, stdin_content="yes"):
-        result = rule_runner.run_goal_rule(Deploy, args=["src/tf:stg"])
+    with mock_console(rule_runner.options_bootstrapper, stdin_content="yes") as (_, m):
+        result = rule_runner.run_goal_rule(
+            Deploy, args=["src/tf:stg", *rule_runner.options_bootstrapper.args]
+        )
 
     # assert Pants thinks we succeeded
     assert result.stdout.splitlines() == []
@@ -107,5 +110,5 @@ def test_deploy_terraform_forwards_args(rule_runner: RuleRunner, standard_deploy
 
     assert "-chdir=src/tf" in argv, "Did not find expected -chdir"
     assert "-var-file=stg.tfvars" in argv, "Did not find expected -var-file"
-    assert "--auto-approve" in argv, "Did not find expected extra_args"
+    assert "-auto-approve" in argv, "Did not find expected passthrough args"
     # assert standard_deployment.state_file.check()

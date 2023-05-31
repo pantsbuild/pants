@@ -14,7 +14,6 @@ from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
     OptionalSingleSourceField,
-    StringSequenceField,
     Target,
     Targets,
     generate_multiple_sources_field_help_message,
@@ -70,16 +69,6 @@ class TerraformVarFileSourcesField(MultipleSourcesField):
     )
 
 
-class TerraformExtraArgs(StringSequenceField):
-    alias = "extra_args"
-    help = help_text(
-        """
-        Extra arguments for `terraform apply`
-        Example: `extra_args=["-var" "'var0=hihello'"]`"
-        """
-    )
-
-
 class TerraformDeploymentTarget(Target):
     alias = "terraform_deployment"
     core_fields = (
@@ -88,7 +77,6 @@ class TerraformDeploymentTarget(Target):
         TerraformModuleSourcesField,
         TerraformBackendConfigField,
         TerraformVarFileSourcesField,
-        TerraformExtraArgs,
     )
     help = "A deployment of Terraform"
 
@@ -105,7 +93,6 @@ class TerraformDeploymentFieldSet(FieldSet):
 
     backend_config: TerraformBackendConfigField
     var_files: TerraformVarFileSourcesField
-    extra_args: TerraformExtraArgs
 
 
 class AllTerraformDeploymentTargets(Targets):

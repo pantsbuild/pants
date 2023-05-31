@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
-from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.terraform.tool import TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -34,7 +34,7 @@ class TerraformDeploymentRequest(EngineAwareParameter):
 
 @rule
 async def prepare_terraform_deployment(
-    request: TerraformDeploymentRequest,
+    request: TerraformDeploymentRequest, terraform_subsystem: TerraformTool
 ) -> InteractiveProcess:
     initialised_terraform = await Get(
         InitialisedTerraform,
@@ -58,8 +58,8 @@ async def prepare_terraform_deployment(
         Digest, MergeDigests([var_files.snapshot.digest, initialised_terraform.sources_and_deps])
     )
 
-    if request.field_set.extra_args.value:
-        args.extend(request.field_set.extra_args.value)
+    if terraform_subsystem.args:
+        args.extend(terraform_subsystem.args)
 
     process = await Get(
         Process,
