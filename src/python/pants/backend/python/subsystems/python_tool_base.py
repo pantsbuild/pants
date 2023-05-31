@@ -104,11 +104,25 @@ class PythonToolRequirementsBase(Subsystem):
     version = StrOption(
         advanced=True,
         default=lambda cls: cls.default_version,
+        removal_version="2.18.0.dev1",
+        removal_hint=lambda cls: softwrap(
+            f"""\
+            Custom tool versions are now installed from named resolves, as
+            described at {doc_url("python-lockfiles")}.
+            """
+        ),
         help="Requirement string for the tool.",
     )
     extra_requirements = StrListOption(
         advanced=True,
         default=lambda cls: cls.default_extra_requirements,
+        removal_version="2.18.0.dev1",
+        removal_hint=lambda cls: softwrap(
+            f"""\
+            Custom tool versions are now installed from named resolves, as
+            described at {doc_url("python-lockfiles")}.
+            """
+        ),
         help="Any additional requirement strings to use with the tool. This is useful if the "
         "tool allows you to install plugins or if you need to constrain a dependency to "
         "a certain version.",
