@@ -227,11 +227,6 @@ class TerraformTool(TemplatedExternalTool):
         ),
         advanced=True,
     )
-
-    @property
-    def env_vars(self) -> tuple[str, ...]:
-        return tuple(sorted(set(self.extra_env_vars)))
-
     tailor = BoolOption(
         default=True,
         help="If true, add `terraform_module` targets with the `tailor` goal.",
@@ -260,7 +255,7 @@ async def setup_terraform_process(
         ExternalToolRequest,
         terraform.get_request(platform),
     )
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.env_vars))
+    env = await Get(EnvironmentVars, EnvironmentVarsRequest(terraform.extra_env_vars))
 
     immutable_input_digests = {"__terraform": downloaded_terraform.digest}
 
