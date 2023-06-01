@@ -24,7 +24,7 @@ backend_packages.add = [
 ]
 ```
 
-This adds the new `python_awslambda` target, which you can confirm by running `pants help python_awslambda`
+This adds the new `python_aws_lambda_function` target, which you can confirm by running `pants help python_aws_lambda_function`
 
 Step 2: Define a `python_aws_lambda_function` target
 ----------------------------------------------------
@@ -33,7 +33,7 @@ First, add your lambda function in a Python file like you would [normally do wit
 
 Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to automate this.
 
-Add a `python_awslambda` target and define the `runtime` and `handler` fields. The `runtime` should be one of the values from <https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html>. The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
+Add a `python_aws_lambda_function` target and define the `runtime` and `handler` fields. The `runtime` should be one of the values from <https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html>. The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
 
 For example:
 
@@ -41,7 +41,7 @@ For example:
 # The default `sources` field will include our handler file.
 python_sources(name="lib")
 
-python_awslambda(
+python_aws_lambda_function(
     name="lambda",
     runtime="python3.8",
     # Pants will convert this to `project.lambda_example:example_handler`.
@@ -64,7 +64,7 @@ You can optionally set the `output_path` field to change the generated zip file'
 Step 3: Run `package`
 ---------------------
 
-Now run `pants package` on your `python_awslambda` target to create a zipped file.
+Now run `pants package` on your `python_aws_lambda_function` target to create a zipped file.
 
 For example:
 
@@ -105,7 +105,7 @@ CMD ["lambda_function.handler"]
 ```python project/BUILD
 python_sources()
 
-python_awslambda(
+python_aws_lambda_function(
     name="lambda",
     runtime="python3.8",
     handler="main.py:lambda_handler"
@@ -136,7 +136,7 @@ This split means making a change to first-party sources only requires rebuilding
 ```python project/BUILD
 python_sources(name="lib")
 
-python_awslambda(
+python_aws_lambda_function(
     name="function",
     runtime="python3.8",
     handler="lambda_example.py:example_handler",
@@ -208,7 +208,7 @@ Pants has implemented a new way to package Lambda functions in 2.17, which is no
 - In Pants 2.18, the new behaviour is now the default behaviour. Layers can now be built using Pants, and this addition includes renaming the `python_awslambda` target to `python_aws_lambda_function`.
 - In Pants 2.19, the old Lambdex behaviour will be entirely removed.
 
-When upgrading to Pants 2.18, any existing `python_awslambda` functions will need to be renamed to `python_aws_lambda_function`, which can be done via `pants update-build-files ::`. Additional changes may be required:
+When upgrading to Pants 2.18, any existing `python_awslambda` targets will need to be renamed to `python_aws_lambda_function`, which can be done via `pants update-build-files ::`. Additional changes may be required:
 
 - If you already use Pants 2.17 and set `layout = "zip"` in the `[lambdex]` section of `pants.toml`, you already use the new behaviour: nice one! All you need to do is delete the whole `[lambdex]` section.
 - If you use Pants 2.16 or earlier, or use Pants 2.17 with `layout = "lambdex"`, upgrading will change how these targets are built. To migrate, we suggest you first migrate to using `layout = "zip"` in Pants 2.17, by [following its instructions](/v2.17/docs/awslambda-python#migrating-from-pants-216-and-earlier), and upgrade to Pants 2.18 after that.
