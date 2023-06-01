@@ -25,13 +25,16 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::convert::AsRef;
+use std::convert::{AsRef, Infallible};
 use std::env;
+use std::ffi::{CString, OsString};
+use std::os::unix::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::SystemTime;
 
 use log::debug;
+use nix::unistd::execv;
 use strum::VariantNames;
 use strum_macros::{AsRefStr, EnumString, EnumVariantNames};
 
@@ -135,6 +138,31 @@ fn find_pantsd(
   Ok(pantsd_settings)
 }
 
+fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> {
+  let exe = PathBuf::from(pants_server.clone());
+  let c_exe = CString::new(exe.into_os_string().into_vec())
+    .expect("Failed to convert executable to a C string.");
+
+  let mut c_args = vec![c_exe.clone()];
+  c_args.extend(
+    std::env::args_os()
+      .skip(1)
+      .map(|arg| CString::new(arg.into_vec()).expect("Failed to convert argument to a C string.")),
+  );
+
+  execv(&c_exe, &c_args).map_err(|errno| {
+    eprintln!("Failed to exec pants at {pants_server:?}: {}", errno.desc());
+    1
+  })
+}
+
+fn execv_fallback_client(pants_server: OsString) -> Infallible {
+  if let Err(exit_code) = try_execv_fallback_client(pants_server) {
+    std::process::exit(exit_code);
+  }
+  unreachable!()
+}
+
 // The value is taken from this C precedent:
 // ```
 // $ grep 75 /usr/include/sysexits.h
@@ -142,16 +170,46 @@ fn find_pantsd(
 // ```
 const EX_TEMPFAIL: i32 = 75;
 
+// An environment variable which if set, points to a non-native entrypoint to fall back to if
+// `pantsd` is not already running with the appropriate fingerprint.
+//
+// This environment variable constitutes a public API used by `scie-pants` and the `pants` script.
+// But in future, the native client may become the only client for `pantsd` (by directly handling
+// forking the `pantsd` process and then connecting to it).
+const PANTS_SERVER_EXE: &str = "_PANTS_SERVER_EXE";
+// An end-user-settable environment variable to skip attempting to use the native client, and
+// immediately delegate to the legacy client.
+const PANTS_NO_NATIVE_CLIENT: &str = "PANTS_NO_NATIVE_CLIENT";
+
 #[tokio::main]
 async fn main() {
   let start = SystemTime::now();
-  match execute(start).await {
-    Err(err) => {
+  let no_native_client =
+    matches!(env::var_os(PANTS_NO_NATIVE_CLIENT), Some(value) if !value.is_empty());
+  let pants_server = env::var_os(PANTS_SERVER_EXE);
+
+  match &pants_server {
+    Some(pants_server) if no_native_client => {
+      // The user requested that the native client not be used. Immediately fall back to the legacy
+      // client.
+      execv_fallback_client(pants_server.clone());
+      return;
+    }
+    _ => {}
+  }
+
+  match (execute(start).await, pants_server) {
+    (Err(_), Some(pants_server)) => {
+      // We failed to connect to `pantsd`, but a server variable was provided. Fall back
+      // to `execv`'ing the legacy Python client, which will handle spawning `pantsd`.
+      execv_fallback_client(pants_server);
+    }
+    (Err(err), None) => {
       eprintln!("{err}");
       // We use this exit code to indicate an error running pants via the nailgun protocol to
       // differentiate from a successful nailgun protocol session.
       std::process::exit(EX_TEMPFAIL);
     }
-    Ok(exit_code) => std::process::exit(exit_code),
+    (Ok(exit_code), _) => std::process::exit(exit_code),
   }
 }

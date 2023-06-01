@@ -7,8 +7,8 @@ import logging
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
     AdhocToolExecutionDependenciesField,
+    AdhocToolExtraEnvVarsField,
     AdhocToolLogOutputField,
-    AdhocToolOutputDependenciesField,
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
@@ -34,7 +34,7 @@ from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_s
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
+from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -103,7 +103,6 @@ async def run_in_sandbox_request(
         ResolveExecutionDependenciesRequest(
             target.address,
             target.get(AdhocToolExecutionDependenciesField).value,
-            target.get(AdhocToolOutputDependenciesField).value,
             target.get(AdhocToolRunnableDependenciesField).value,
         ),
     )
@@ -162,10 +161,12 @@ async def run_in_sandbox_request(
         append_only_caches=FrozenDict.frozen(merged_extras.append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
-        fetch_env_vars=(),
+        fetch_env_vars=target.get(AdhocToolExtraEnvVarsField).value or (),
         supplied_env_var_values=FrozenDict(extra_env),
         log_on_process_errors=None,
         log_output=target[AdhocToolLogOutputField].value,
+        capture_stderr_file=target[AdhocToolStderrFilenameField].value,
+        capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
     )
 
     adhoc_result = await Get(
@@ -176,23 +177,7 @@ async def run_in_sandbox_request(
         },
     )
 
-    result = adhoc_result.process_result
-    adjusted = adhoc_result.adjusted_digest
-
-    extras = (
-        (target[AdhocToolStdoutFilenameField].value, result.stdout),
-        (target[AdhocToolStderrFilenameField].value, result.stderr),
-    )
-    extra_contents = {i: j for i, j in extras if i}
-
-    if extra_contents:
-        extra_digest = await Get(
-            Digest,
-            CreateDigest(FileContent(name, content) for name, content in extra_contents.items()),
-        )
-        adjusted = await Get(Digest, MergeDigests((adjusted, extra_digest)))
-
-    output = await Get(Snapshot, Digest, adjusted)
+    output = await Get(Snapshot, Digest, adhoc_result.adjusted_digest)
     return GeneratedSources(output)
 
 

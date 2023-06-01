@@ -22,7 +22,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
-from pants.util.docutil import bin_name, git_url
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -48,12 +48,8 @@ class Pydocstyle(PythonToolBase):
     default_requirements = [default_version]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.pydocstyle", "pydocstyle.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/pydocstyle/pydocstyle.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--select=D101,D102")

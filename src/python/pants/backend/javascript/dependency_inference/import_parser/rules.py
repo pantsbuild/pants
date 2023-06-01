@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -15,10 +16,13 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -77,7 +81,7 @@ async def parse_js_imports(
     input_digest = await Get(Digest, MergeDigests([parser.digest, files.snapshot.digest]))
 
     result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         NodeJSToolProcess,
         NodeJSToolProcess.npm(
             args=["run", "--silent", "parse", *files.files],
@@ -85,6 +89,17 @@ async def parse_js_imports(
             input_digest=input_digest,
         ),
     )
+    if result.exit_code != 0:
+        _logger.warning(
+            softwrap(
+                f"""
+                Javascript source import parser failed for '{request.source.file_path}'.
+                This is most likely due to an unrecoverable syntax error, such as redefining module imports.
+                """
+            )
+        )
+        _logger.warning(result.stderr.decode())
+        return JSImportStrings()
 
     return JSImportStrings(result.stdout.decode().splitlines())
 

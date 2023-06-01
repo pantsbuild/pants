@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -33,7 +34,7 @@ from pants.core.goals.update_build_files import (
 from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
 from pants.engine.fs import EMPTY_DIGEST
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import rule
 from pants.engine.unions import UnionRule
 from pants.option.ranked_value import Rank, RankedValue
 from pants.testutil.option_util import create_subsystem
@@ -73,7 +74,7 @@ def generic_goal_rule_runner() -> RuleRunner:
             update_build_files,
             add_line,
             reverse_lines,
-            SubsystemRule(UpdateBuildFilesSubsystem),
+            *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
             UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
         )
@@ -143,9 +144,9 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
 
     def assert_ics(
         lckfile: str,
-        expected: list[str],
+        expected: Iterable[str],
         *,
-        ics: RankedValue = RankedValue(Rank.HARDCODED, Black.default_interpreter_constraints),
+        ics: RankedValue = RankedValue(Rank.HARDCODED, list(Black.default_interpreter_constraints)),
         metadata: PythonLockfileMetadata | None = default_metadata,
     ) -> None:
         black = create_subsystem(
@@ -208,8 +209,8 @@ def black_rule_runner() -> RuleRunner:
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
-            SubsystemRule(Black),
-            SubsystemRule(UpdateBuildFilesSubsystem),
+            *Black.rules(),
+            *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
         ),
         target_types=[GenericTarget],
@@ -281,8 +282,8 @@ def run_yapf(
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
-            SubsystemRule(Yapf),
-            SubsystemRule(UpdateBuildFilesSubsystem),
+            *Yapf.rules(),
+            *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
         ),
         target_types=[GenericTarget],

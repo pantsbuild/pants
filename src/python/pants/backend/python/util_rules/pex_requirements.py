@@ -19,6 +19,7 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadata,
     PythonLockfileMetadataV2,
 )
+from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.lockfile_metadata import (
     InvalidLockfileError,
@@ -38,7 +39,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.strutil import comma_separated_list, pluralize, softwrap
 
 if TYPE_CHECKING:
     from pants.backend.python.util_rules.pex import Pex
@@ -52,7 +53,13 @@ class Resolve:
     # A named resolve for a "user lockfile".
     # Soon to be the only kind of lockfile, as this class will help
     # get rid of the "tool lockfile" concept.
+    # TODO: Once we get rid of old-style tool lockfiles we can possibly
+    #  unify this with EntireLockfile.
+    # TODO: We might want to add the requirements subset to this data structure,
+    #  to further detangle this from PexRequirements.
     name: str
+
+    use_entire_lockfile: bool
 
 
 @dataclass(frozen=True)
@@ -273,39 +280,38 @@ class EntireLockfile:
 class PexRequirements:
     """A request to resolve a series of requirements (optionally from a "superset" resolve)."""
 
-    req_strings: FrozenOrderedSet[str]
+    req_strings_or_addrs: FrozenOrderedSet[str | Address]
     constraints_strings: FrozenOrderedSet[str]
     # If these requirements should be resolved as a subset of either a repository PEX, or a
     # PEX-native lockfile, the superset to use. # NB: Use of a lockfile here asserts that the
     # lockfile is PEX-native, because legacy lockfiles do not support subset resolves.
     from_superset: Pex | Resolve | None
+    description_of_origin: str
 
     def __init__(
         self,
-        req_strings: Iterable[str] = (),
+        req_strings_or_addrs: Iterable[str | Address] = (),
         *,
         constraints_strings: Iterable[str] = (),
         from_superset: Pex | Resolve | None = None,
+        description_of_origin: str = "",
     ) -> None:
         """
-        :param req_strings: The requirement strings to resolve.
+        :param req_strings_or_addrs: The requirement strings to resolve, or addresses
+          of targets that refer to them, or string specs of such addresses.
         :param constraints_strings: Constraints strings to apply during the resolve.
         :param from_superset: An optional superset PEX or lockfile to resolve the req strings from.
+        :param description_of_origin: A human-readable description of what these requirements
+          represent, for use in error messages.
         """
-        object.__setattr__(self, "req_strings", FrozenOrderedSet(sorted(req_strings)))
+        object.__setattr__(
+            self, "req_strings_or_addrs", FrozenOrderedSet(sorted(req_strings_or_addrs))
+        )
         object.__setattr__(
             self, "constraints_strings", FrozenOrderedSet(sorted(constraints_strings))
         )
         object.__setattr__(self, "from_superset", from_superset)
-
-    @classmethod
-    def create_from_requirement_fields(
-        cls,
-        fields: Iterable[PythonRequirementsField],
-        constraints_strings: Iterable[str],
-    ) -> PexRequirements:
-        field_requirements = {str(python_req) for fld in fields for python_req in fld.value}
-        return PexRequirements(field_requirements, constraints_strings=constraints_strings)
+        object.__setattr__(self, "description_of_origin", description_of_origin)
 
     @classmethod
     def req_strings_from_requirement_fields(
@@ -313,10 +319,12 @@ class PexRequirements:
     ) -> FrozenOrderedSet[str]:
         """A convenience when you only need the raw requirement strings from fields and don't need
         to consider things like constraints or resolves."""
-        return cls.create_from_requirement_fields(fields, constraints_strings=()).req_strings
+        return FrozenOrderedSet(
+            sorted(str(python_req) for fld in fields for python_req in fld.value)
+        )
 
     def __bool__(self) -> bool:
-        return bool(self.req_strings)
+        return bool(self.req_strings_or_addrs)
 
 
 # NB: This is defined here so that our rule for ResolvePexConfigRequest -> ResolvePexConfig
@@ -474,18 +482,19 @@ def validate_metadata(
     interpreter_constraints: InterpreterConstraints,
     lockfile: Lockfile,
     consumed_req_strings: Iterable[str],
+    validate_consumed_req_strings: bool,
     python_setup: PythonSetup,
     resolve_config: ResolvePexConfig,
 ) -> None:
     """Given interpreter constraints and requirements to be consumed, validate lockfile metadata."""
 
     # TODO(#12314): Improve the exception if invalid strings
-    user_requirements = {PipRequirement.parse(i) for i in consumed_req_strings}
+    user_requirements = [PipRequirement.parse(i) for i in consumed_req_strings]
     validation = metadata.is_valid_for(
         expected_invalidation_digest=lockfile.lockfile_hex_digest,
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
-        user_requirements=user_requirements,
+        user_requirements=user_requirements if validate_consumed_req_strings else {},
         manylinux=resolve_config.manylinux,
         requirement_constraints=(
             resolve_config.constraints_file.constraints
@@ -561,12 +570,21 @@ def _invalid_lockfile_error(
     *,
     is_old_style_tool_lockfile: bool,
     is_default_user_lockfile: bool,
-    user_requirements: set[PipRequirement],
+    user_requirements: list[PipRequirement],
     user_interpreter_constraints: InterpreterConstraints,
     maybe_constraints_file_path: str | None,
 ) -> Iterator[str]:
     resolve = lockfile.resolve_name
-    yield "\n\nYou are using "
+    consumed_msg_parts = [f"`{str(r)}`" for r in user_requirements[0:2]]
+    if len(user_requirements) > 2:
+        consumed_msg_parts.append(
+            (
+                f"{len(user_requirements) - 2} other "
+                f"{pluralize(len(user_requirements) - 2, 'requirement', include_count=False)}"
+            )
+        )
+
+    yield f"\n\nYou are consuming {comma_separated_list(consumed_msg_parts)} from "
     if lockfile.url.startswith("resource://"):
         yield f"the built-in `{resolve}` lockfile provided by Pants "
     else:
@@ -622,7 +640,7 @@ def _invalid_lockfile_error(
             # validated that the transitive closure is using the same resolve, via
             # pex_from_targets.py. This implies that we don't need to worry about users depending
             # on python_requirement targets that aren't in that code's resolve.
-            not_in_lock = sorted(str(r) for r in user_requirements - metadata.requirements)
+            not_in_lock = sorted(str(r) for r in set(user_requirements) - metadata.requirements)
             yield f"\n\n- The requirements not provided by the `{resolve}` resolve are:\n  "
             yield str(not_in_lock)
 
@@ -637,14 +655,14 @@ def _invalid_lockfile_error(
         )
         if is_old_style_tool_lockfile:
             yield softwrap(
-                """
+                """\n\n
                 - The input interpreter constraints may be specified by
                 `[{resolve}].interpreter_constraints` (if applicable).
                 """
             )
         else:
             yield softwrap(
-                """
+                """\n\n
                 - The input interpreter constraints are specified by your code, using
                 the `[python].interpreter_constraints` option and the `interpreter_constraints`
                 target field.
@@ -654,7 +672,7 @@ def _invalid_lockfile_error(
                 (see below).
                 """
             )
-        yield "\n\nSee {doc_url('python-interpreter-compatibility')} for details."
+        yield f"\n\nSee {doc_url('python-interpreter-compatibility')} for details."
 
     yield "\n\n"
     yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)

@@ -7,7 +7,7 @@ from typing import cast
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.environments import determine_bootstrap_environment
-from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
+from pants.core.util_rules.system_binaries import GitBinary
 from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.scheduler import SchedulerSession
@@ -15,6 +15,7 @@ from pants.engine.internals.selectors import Params
 from pants.engine.rules import QueryRule
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.util.frozendict import FrozenDict
 from pants.vcs.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
 
@@ -58,9 +59,7 @@ def calculate_specs(
 
     bootstrap_environment = determine_bootstrap_environment(session)
 
-    (git_binary,) = session.product_request(
-        GitBinary, [Params(GitBinaryRequest(), bootstrap_environment)]
-    )
+    (git_binary,) = session.product_request(GitBinary, [Params(bootstrap_environment)])
     (maybe_git_worktree,) = session.product_request(
         MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary, bootstrap_environment)]
     )
@@ -87,7 +86,7 @@ def calculate_specs(
                 path_component=address_input.path_component,
                 target_component=address_input.target_component,
                 generated_component=address_input.generated_component,
-                parameters=address_input.parameters,
+                parameters=FrozenDict(address_input.parameters),
             )
         )
 
@@ -109,6 +108,6 @@ def calculate_specs(
 def rules():
     return [
         QueryRule(ChangedAddresses, [ChangedRequest, EnvironmentName]),
-        QueryRule(GitBinary, [GitBinaryRequest, EnvironmentName]),
+        QueryRule(GitBinary, [EnvironmentName]),
         QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary, EnvironmentName]),
     ]

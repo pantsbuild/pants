@@ -651,21 +651,13 @@ class GenericTarget(Target):
 
 
 @dataclass(frozen=True)
-class AllAssetTargetsRequest:
-    pass
-
-
-@dataclass(frozen=True)
 class AllAssetTargets:
     resources: tuple[Target, ...]
     files: tuple[Target, ...]
 
 
 @rule(desc="Find all assets in project")
-def find_all_assets(
-    all_targets: AllTargets,
-    _: AllAssetTargetsRequest,
-) -> AllAssetTargets:
+def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
     resources = []
     files = []
     for tgt in all_targets:
@@ -744,7 +736,7 @@ class ArchivePackagesField(SpecialCasedDependencies):
         `["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`.
         It will include the results in your archive using the same name they would normally have,
         but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can
-        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_awslambda`, or even another
+        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_aws_lambda_function`, or even another
         `archive`.
         """
     )
@@ -893,7 +885,16 @@ class LockfileTarget(Target):
 
 
 class LockfilesGeneratorSourcesField(MultipleSourcesField):
+    """Sources field for synthesized `_lockfiles` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
     help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
 class LockfilesGeneratorTarget(TargetFilesGenerator):

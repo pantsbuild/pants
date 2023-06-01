@@ -14,13 +14,13 @@ http = "0.2"
 itertools = "0.10"
 rustls-native-certs = "0.5"
 lazy_static = "1"
-pin-project = "1.0"
+pin-project = "1.0.12"
 pin-project-lite = "0.2"
 prost = "0.9"
 rand = "0.8"
 rustls = { version = "0.19", features = ["dangerous_configuration"] }
 rustls-pemfile = "0.2"
-tokio = { version = "1.21", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.28", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.22"
 tokio-util = { version = "0.6", features = ["codec"] }
 tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }

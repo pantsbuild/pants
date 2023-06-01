@@ -271,6 +271,9 @@ class Registrar:
                 )
             kwargs["name"] = None
 
+        frame = inspect.currentframe()
+        source_line = frame.f_back.f_lineno if frame and frame.f_back else "??"
+        kwargs["__description_of_origin__"] = f"{self._parse_state.filepath()}:{source_line}"
         raw_values = dict(self._parse_state.defaults.get(self._type_alias))
         raw_values.update(kwargs)
         target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
@@ -323,7 +326,11 @@ class Parser:
             return alias, Registrar(
                 parse_state,
                 alias,
-                registered_target_types.aliases_to_types[alias].class_field_types(union_membership),
+                tuple(
+                    registered_target_types.aliases_to_types[alias].class_field_types(
+                        union_membership
+                    )
+                ),
             )
 
         type_aliases = dict(map(create_registrar_for_target, registered_target_types.aliases))
@@ -382,7 +389,8 @@ class Parser:
             defined_symbols = set()
             while True:
                 try:
-                    exec(build_file_content, global_symbols)
+                    code = compile(build_file_content, filepath, "exec", dont_inherit=True)
+                    exec(code, global_symbols)
                 except NameError as e:
                     bad_symbol = _extract_symbol_from_name_error(e)
                     if bad_symbol in defined_symbols:
@@ -408,7 +416,8 @@ class Parser:
             return self._parse_state.parsed_targets()
 
         try:
-            exec(build_file_content, global_symbols)
+            code = compile(build_file_content, filepath, "exec", dont_inherit=True)
+            exec(code, global_symbols)
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             original = e.args[0].capitalize()

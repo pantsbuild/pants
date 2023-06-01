@@ -15,7 +15,6 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption, StrListOption, StrOption
-from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
@@ -29,12 +28,8 @@ class Yamllint(PythonToolBase):
     default_requirements = ["yamllint>=1.28.0,<2"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.yamllint", "yamllint.lock")
-    default_lockfile_path = "src/python/pants/backend/tools/yamllint/yamllint.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
     export = ExportToolOption()

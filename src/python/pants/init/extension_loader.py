@@ -8,7 +8,6 @@ from typing import Dict, List, Optional
 
 from pkg_resources import Requirement, WorkingSet
 
-from pants import ox
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal.builtins import register_builtin_goals
@@ -139,8 +138,7 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     """
     backend_module = backend_package + ".register"
     try:
-        with ox.traditional_import_machinery():
-            module = importlib.import_module(backend_module)
+        module = importlib.import_module(backend_module)
     except ImportError as ex:
         traceback.print_exc()
         raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")

@@ -51,9 +51,10 @@ from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarg
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import rule
 from pants.engine.target import ExplicitlyProvidedDependencies, InferredDependencies
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
@@ -72,7 +73,7 @@ def assert_owners_not_found_error(
 
 
 def test_infer_python_imports(caplog) -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
@@ -202,7 +203,7 @@ def test_infer_python_imports(caplog) -> None:
 
 
 def test_infer_python_assets(caplog) -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
@@ -363,13 +364,13 @@ def test_infer_python_assets(caplog) -> None:
 
 @pytest.mark.parametrize("behavior", InitFilesInference)
 def test_infer_python_inits(behavior: InitFilesInference) -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *ancestor_files.rules(),
             *target_types_rules.rules(),
             *core_target_types_rules(),
             infer_python_init_dependencies,
-            SubsystemRule(PythonInferSubsystem),
+            *PythonInferSubsystem.rules(),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -431,13 +432,13 @@ def test_infer_python_inits(behavior: InitFilesInference) -> None:
 
 
 def test_infer_python_conftests() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *ancestor_files.rules(),
             *target_types_rules.rules(),
             *core_target_types_rules(),
             infer_python_conftest_dependencies,
-            SubsystemRule(PythonInferSubsystem),
+            *PythonInferSubsystem.rules(),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
         target_types=[PythonTestsGeneratorTarget, PythonTestUtilsGeneratorTarget],
@@ -488,12 +489,12 @@ def test_infer_python_conftests() -> None:
 
 
 @pytest.fixture
-def imports_rule_runner() -> RuleRunner:
+def imports_rule_runner() -> PythonRuleRunner:
     return mk_imports_rule_runner([])
 
 
-def mk_imports_rule_runner(more_rules: Iterable) -> RuleRunner:
-    return RuleRunner(
+def mk_imports_rule_runner(more_rules: Iterable) -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *more_rules,
             *import_rules(),
@@ -512,7 +513,7 @@ def mk_imports_rule_runner(more_rules: Iterable) -> RuleRunner:
     )
 
 
-def test_infer_python_ignore_unowned_imports(imports_rule_runner: RuleRunner, caplog) -> None:
+def test_infer_python_ignore_unowned_imports(imports_rule_runner: PythonRuleRunner, caplog) -> None:
     """Test handling unowned imports that are set explicitly to be ignored."""
     imports_rule_runner.write_files(
         {
@@ -589,7 +590,7 @@ def test_infer_python_ignore_unowned_imports(imports_rule_runner: RuleRunner, ca
         )
 
 
-def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
+def test_infer_python_strict(imports_rule_runner: PythonRuleRunner, caplog) -> None:
     imports_rule_runner.write_files(
         {
             "src/python/cheesey.py": dedent(
@@ -687,7 +688,7 @@ def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
         assert not caplog.records
 
 
-def test_infer_python_strict_multiple_resolves(imports_rule_runner: RuleRunner) -> None:
+def test_infer_python_strict_multiple_resolves(imports_rule_runner: PythonRuleRunner) -> None:
     imports_rule_runner.write_files(
         {
             "project/base.py": "",
@@ -833,35 +834,35 @@ class TestCategoriseImportsInfo:
         assert resolved.status == expected_status
         return resolved
 
-    def test_unambiguous_imports(self, imports_rule_runner: RuleRunner) -> None:
+    def test_unambiguous_imports(self, imports_rule_runner: PythonRuleRunner) -> None:
         case_name = "unambiguous"
         resolved = self.do_test(case_name, ImportOwnerStatus.unambiguous)
         assert resolved.address == self.import_cases[case_name][1].unambiguous
 
-    def test_unambiguous_with_pyi(self, imports_rule_runner: RuleRunner) -> None:
+    def test_unambiguous_with_pyi(self, imports_rule_runner: PythonRuleRunner) -> None:
         case_name = "unambiguous_with_pyi"
         resolved = self.do_test(case_name, ImportOwnerStatus.unambiguous)
         assert resolved.address == self.import_cases[case_name][1].unambiguous
 
-    def test_unownable_root(self, imports_rule_runner: RuleRunner) -> None:
+    def test_unownable_root(self, imports_rule_runner: PythonRuleRunner) -> None:
         case_name = "json"
         self.do_test(case_name, ImportOwnerStatus.unownable)
 
-    def test_unownable_nonroot(self, imports_rule_runner: RuleRunner) -> None:
+    def test_unownable_nonroot(self, imports_rule_runner: PythonRuleRunner) -> None:
         case_name = "os.path"
         self.do_test(case_name, ImportOwnerStatus.unownable)
 
-    def test_weak_owned(self, imports_rule_runner: RuleRunner) -> None:
+    def test_weak_owned(self, imports_rule_runner: PythonRuleRunner) -> None:
         case_name = "weak_owned"
         resolved = self.do_test(case_name, ImportOwnerStatus.unambiguous)
         assert resolved.address == self.import_cases[case_name][1].unambiguous
 
-    def test_weak_unowned(self, imports_rule_runner: RuleRunner) -> None:
+    def test_weak_unowned(self, imports_rule_runner: PythonRuleRunner) -> None:
         case_name = "weak_unowned"
         resolved = self.do_test(case_name, ImportOwnerStatus.weak_ignore)
         assert resolved.address == tuple()
 
-    def test_unowned(self, imports_rule_runner: RuleRunner) -> None:
+    def test_unowned(self, imports_rule_runner: PythonRuleRunner) -> None:
         case_name = "unowned"
         resolved = self.do_test(case_name, ImportOwnerStatus.unowned)
         assert resolved.address == tuple()
@@ -898,7 +899,7 @@ class TestFindOtherOwners:
             ]
         )
 
-    def do_test(self, imports_rule_runner: RuleRunner):
+    def do_test(self, imports_rule_runner: PythonRuleRunner):
         resolves = {"python-default": "", self.other_resolve: "", self.other_other_resolve: ""}
         imports_rule_runner.set_options(
             [
@@ -931,7 +932,7 @@ class TestFindOtherOwners:
         r = self.do_test(_imports_rule_runner)
         assert not r.value
 
-    def test_other_owners_found_in_single_resolve(self, _imports_rule_runner: RuleRunner):
+    def test_other_owners_found_in_single_resolve(self, _imports_rule_runner: PythonRuleRunner):
         _imports_rule_runner.write_files(
             {
                 "other/BUILD": dedent(
@@ -958,7 +959,7 @@ class TestFindOtherOwners:
             )
         ]
 
-    def test_other_owners_found_in_multiple_resolves(self, _imports_rule_runner: RuleRunner):
+    def test_other_owners_found_in_multiple_resolves(self, _imports_rule_runner: PythonRuleRunner):
         _imports_rule_runner.write_files(
             {
                 "other/BUILD": dedent(

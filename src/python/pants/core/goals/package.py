@@ -160,7 +160,13 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     )
 
     merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
-    workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
+    all_relpaths = [
+        artifact.relpath for pkg in packages for artifact in pkg.artifacts if artifact.relpath
+    ]
+
+    workspace.write_digest(
+        merged_digest, path_prefix=str(dist_dir.relpath), clear_paths=all_relpaths
+    )
     for pkg in packages:
         for artifact in pkg.artifacts:
             msg = []

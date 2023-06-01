@@ -13,11 +13,14 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals import package_pex_binary
+from pants.backend.python.goals import package_dists, package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
     PexLayout,
+    PythonDistribution,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
 )
@@ -32,34 +35,39 @@ from pants.core.target_types import (
 )
 from pants.core.target_types import rules as core_target_types_rules
 from pants.testutil.python_interpreter_selection import skip_unless_python36_present
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *package_pex_binary.rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             *core_target_types_rules(),
+            *package_dists.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
+            QueryRule(BuiltPackage, [PythonDistributionFieldSet]),
         ],
         target_types=[
             FileTarget,
             FilesGeneratorTarget,
             PexBinary,
+            PythonDistribution,
             PythonRequirementTarget,
             PythonSourcesGeneratorTarget,
             RelocatedFiles,
             ResourcesGeneratorTarget,
         ],
+        objects={"python_artifact": PythonArtifact},
     )
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
 
 
-def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
+def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -95,10 +103,67 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert not caplog.records
     result = rule_runner.request(BuiltPackage, [field_set])
     assert caplog.records
-    assert f"The `pex_binary` target {tgt.address} transitively depends on" in caplog.text
+    assert f"The target {tgt.address} (`pex_binary`) transitively depends on" in caplog.text
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text
+
+    assert len(result.artifacts) == 1
+    assert result.artifacts[0].relpath == "src.py.project/project.pex"
+
+
+def test_include_sources_avoids_files_targets_warning(
+    rule_runner: PythonRuleRunner, caplog
+) -> None:
+    rule_runner.write_files(
+        {
+            "assets/f.txt": "",
+            "assets/BUILD": dedent(
+                """\
+                files(name='files', sources=['f.txt'])
+                relocated_files(
+                    name='relocated',
+                    files_targets=[':files'],
+                    src='assets',
+                    dest='new_assets',
+                )
+                """
+            ),
+            "src/py/project/__init__.py": "",
+            "src/py/project/app.py": "print('hello')",
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(
+                    name='sources',
+                )
+
+                python_distribution(
+                    name='wheel',
+                    dependencies=[
+                        ':sources',
+                        'assets:relocated',
+                    ],
+                    provides=python_artifact(
+                        name='my-dist',
+                        version='1.2.3',
+                    ),
+                )
+
+                pex_binary(
+                    dependencies=[':wheel'],
+                    entry_point="none",
+                    include_sources=False,
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+
+    assert not caplog.records
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert not caplog.records
 
     assert len(result.artifacts) == 1
     assert result.artifacts[0].relpath == "src.py.project/project.pex"
@@ -108,15 +173,15 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     "layout",
     [pytest.param(layout, id=layout.value) for layout in PexLayout],
 )
-def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
+def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
     rule_runner.write_files(
         {
             "src/py/project/app.py": dedent(
                 """\
                 import os
                 import sys
-                print(f"FOO={os.environ.get('FOO')}")
-                print(f"BAR={os.environ.get('BAR')}")
+                for env in ["FOO", "--inject-arg", "quotes '"]:
+                    print(f"{env}={os.environ.get(env)}")
                 print(f"ARGV={sys.argv[1:]}")
                 """
             ),
@@ -125,8 +190,8 @@ def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
                 python_sources(name="lib")
                 pex_binary(
                     entry_point="app.py",
-                    args=['123', 'abc'],
-                    env={{'FOO': 'xxx', 'BAR': 'yyy'}},
+                    args=['123', 'abc', '--inject-env', "quotes 'n spaces"],
+                    env={{'FOO': 'xxx', '--inject-arg': 'yyy', "quotes '": 'n spaces'}},
                     layout="{layout.value}",
                 )
                 """
@@ -150,15 +215,16 @@ def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
     stdout = dedent(
         """\
         FOO=xxx
-        BAR=yyy
-        ARGV=['123', 'abc']
+        --inject-arg=yyy
+        quotes '=n spaces
+        ARGV=['123', 'abc', '--inject-env', "quotes 'n spaces"]
         """
     ).encode()
     assert stdout == subprocess.run([executable], check=True, stdout=subprocess.PIPE).stdout
 
 
 @pytest.fixture
-def pex_executable(rule_runner: RuleRunner) -> str:
+def pex_executable(rule_runner: PythonRuleRunner) -> str:
     rule_runner.write_files(
         {
             "pex_exe/BUILD": dedent(
@@ -179,7 +245,7 @@ def pex_executable(rule_runner: RuleRunner) -> str:
     return os.path.join(rule_runner.build_root, expected_pex_relpath)
 
 
-def test_resolve_local_platforms(pex_executable: str, rule_runner: RuleRunner) -> None:
+def test_resolve_local_platforms(pex_executable: str, rule_runner: PythonRuleRunner) -> None:
     complete_current_platform = subprocess.run(
         args=[pex_executable, "interpreter", "inspect", "-mt"],
         env=dict(PEX_MODULE="pex.cli", **os.environ),
@@ -218,7 +284,7 @@ def test_resolve_local_platforms(pex_executable: str, rule_runner: RuleRunner) -
 
 
 @skip_unless_python36_present
-def test_complete_platforms(rule_runner: RuleRunner) -> None:
+def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
     linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py36.json")
     assert linux_complete_platform is not None
 
@@ -267,7 +333,7 @@ def test_complete_platforms(rule_runner: RuleRunner) -> None:
     ) == sorted(pex_info["distributions"])
 
 
-def test_non_hermetic_venv_scripts(rule_runner: RuleRunner) -> None:
+def test_non_hermetic_venv_scripts(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/py/project/app.py": dedent(

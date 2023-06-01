@@ -12,8 +12,8 @@ hashing = { path = "../hashing" }
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
 log = "0.4"
 task_executor = { path = "../task_executor" }
-tempfile = "3"
+tempfile = "3.5.0"
 
 [dev-dependencies]
 parking_lot = "0.12"
-tokio = { version = "1.21", features = ["macros"] }
+tokio = { version = "1.28", features = ["macros"] }

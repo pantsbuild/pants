@@ -1,0 +1,14 @@
+{
+  "main": "index.cjs",
+  "private": true,
+  "name": "@pants/test-mocha-coverage-project",
+  "version": "0.0.1",
+  "scripts": {
+    "test": "mocha",
+    "test:coverage": "nyc --reporter=lcov npm run test"
+  },
+  "devDependencies": {
+    "mocha": "^10.2.0",
+    "nyc": "^15.1.0"
+  }
+}

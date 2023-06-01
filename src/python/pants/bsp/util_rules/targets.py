@@ -205,10 +205,7 @@ async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
         Get(BSPBuildTargetInternal, _ParseOneBSPMappingRequest(name, definition))
         for name, definition in definitions.items()
     )
-    target_mapping = {
-        key: bsp_internal_target
-        for key, bsp_internal_target in zip(definitions.keys(), bsp_internal_targets)
-    }
+    target_mapping = dict(zip(definitions.keys(), bsp_internal_targets))
     return BSPBuildTargets(FrozenDict(target_mapping))
 
 

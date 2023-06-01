@@ -8,7 +8,7 @@ use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use workunit_store::WorkunitStore;
 
 use crate::remote::ByteStore;
@@ -50,6 +50,7 @@ async fn loads_huge_file_via_temp_file() {
     .await
     .unwrap()
     .unwrap();
+  file.rewind().await.unwrap();
 
   let mut buf = String::new();
   file.read_to_string(&mut buf).await.unwrap();
@@ -261,6 +262,7 @@ async fn write_file_errors() {
 
 #[tokio::test]
 async fn write_connection_error() {
+  let _ = WorkunitStore::setup_for_tests();
   let store = ByteStore::new(
     "http://doesnotexist.example",
     None,
@@ -291,7 +293,7 @@ async fn list_missing_digests_none_missing() {
   let store = new_byte_store(&cas);
   assert_eq!(
     store
-      .list_missing_digests(store.find_missing_blobs_request(vec![TestData::roland().digest()]),)
+      .list_missing_digests(vec![TestData::roland().digest()])
       .await,
     Ok(HashSet::new())
   );
@@ -310,9 +312,7 @@ async fn list_missing_digests_some_missing() {
   digest_set.insert(digest);
 
   assert_eq!(
-    store
-      .list_missing_digests(store.find_missing_blobs_request(vec![digest]))
-      .await,
+    store.list_missing_digests(vec![digest]).await,
     Ok(digest_set)
   );
 }
@@ -325,7 +325,7 @@ async fn list_missing_digests_error() {
   let store = new_byte_store(&cas);
 
   let error = store
-    .list_missing_digests(store.find_missing_blobs_request(vec![TestData::roland().digest()]))
+    .list_missing_digests(vec![TestData::roland().digest()])
     .await
     .expect_err("Want error");
   assert!(

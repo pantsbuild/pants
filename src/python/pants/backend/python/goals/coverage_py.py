@@ -55,7 +55,6 @@ from pants.option.option_types import (
     StrOption,
 )
 from pants.source.source_root import AllSourceRoots
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -114,12 +113,8 @@ class CoverageSubsystem(PythonToolBase):
     default_requirements = [default_version]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/coverage_py.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
     filter = StrListOption(

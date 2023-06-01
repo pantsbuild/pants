@@ -296,15 +296,11 @@ def test_group_field_sets_by_constraints() -> None:
         MockFieldSet.create_for_test(Address("", target_name="py3"), "==3.6.*"),
         MockFieldSet.create_for_test(Address("", target_name="py3_second"), "==3.6.*"),
     ]
-    no_constraints_fs = MockFieldSet.create_for_test(
-        Address("", target_name="no_constraints"), None
-    )
     assert InterpreterConstraints.group_field_sets_by_constraints(
-        [py2_fs, *py3_fs, no_constraints_fs],
+        [py2_fs, *py3_fs],
         python_setup=create_subsystem(PythonSetup, interpreter_constraints=[]),
     ) == FrozenDict(
         {
-            InterpreterConstraints(): (no_constraints_fs,),
             InterpreterConstraints(["CPython>=2.7,<3"]): (py2_fs,),
             InterpreterConstraints(["CPython==3.6.*"]): tuple(py3_fs),
         }

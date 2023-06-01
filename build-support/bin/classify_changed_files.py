@@ -38,8 +38,7 @@ _release_globs = [
     "src/python/pants/VERSION",
     "src/python/pants/init/BUILD",
     "src/python/pants/notes/*",
-    "build-support/bin/release.sh",
-    "build-support/bin/_release_helper.py",
+    "build-support/bin/release.py",
 ]
 _ci_config_globs = [
     "build-support/bin/classify_changed_files.py",
@@ -67,9 +66,7 @@ def classify(changed_files: list[str]) -> set[Affected]:
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        return
-    affecteds = classify(sys.argv[1].split("|"))
+    affecteds = classify(sys.stdin.read().splitlines())
     for affected in sorted([a.name for a in affecteds]):
         print(affected)
 

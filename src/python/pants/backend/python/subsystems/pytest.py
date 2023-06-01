@@ -38,7 +38,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
-from pants.util.docutil import bin_name, doc_url, git_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
@@ -81,10 +81,7 @@ class PyTest(PythonToolBase):
 
     default_main = ConsoleScript("pytest")
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "pytest.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/pytest.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
     junit_family = StrOption(

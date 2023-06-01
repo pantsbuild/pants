@@ -13,7 +13,6 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
-from pants.util.docutil import git_url
 
 
 class PyUpgrade(PythonToolBase):
@@ -28,12 +27,8 @@ class PyUpgrade(PythonToolBase):
     default_requirements = [default_version]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.pyupgrade", "pyupgrade.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/pyupgrade/pyupgrade.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("fmt", "lint")

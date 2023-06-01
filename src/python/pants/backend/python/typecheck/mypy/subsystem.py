@@ -47,7 +47,6 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     FieldSet,
     Target,
     TransitiveTargets,
@@ -63,7 +62,7 @@ from pants.option.option_types import (
     StrOption,
     TargetListOption,
 )
-from pants.util.docutil import bin_name, doc_url, git_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
@@ -100,12 +99,8 @@ class MyPy(PythonToolBase):
 
     # See `mypy/rules.py`. We only use these default constraints in some situations.
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.typecheck.mypy", "mypy.lock")
-    default_lockfile_path = "src/python/pants/backend/python/typecheck/mypy/mypy.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")
@@ -156,6 +151,13 @@ class MyPy(PythonToolBase):
     )
     extra_type_stubs = StrListOption(
         advanced=True,
+        removal_version="2.18.0.dev1",
+        removal_hint=softwrap(
+            f"""
+            Extra type stubs are now installed from a named resolve, as described
+            at {doc_url("python-lockfiles")}.
+            """
+        ),
         help=softwrap(
             f"""
             Extra type stub requirements to install when running MyPy.
@@ -181,6 +183,13 @@ class MyPy(PythonToolBase):
         advanced=True,
         # Note that there is no default lockfile, as by default, extra_type_stubs is empty.
         default=NO_TOOL_LOCKFILE,
+        removal_version="2.18.0.dev1",
+        removal_hint=softwrap(
+            f"""
+            Extra type stubs are now installed from a named resolve, as described
+            at {doc_url("python-lockfiles")}.
+            """
+        ),
         help=softwrap(
             f"""
             Path to a lockfile for the option `[mypy].extra_type_stubs`.
@@ -415,7 +424,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
     #
     # This first finds the ICs of each partition. Then, it ORs all unique resulting interpreter
     # constraints. The net effect is that every possible Python interpreter used will be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
+    all_tgts = await Get(AllTargets)
     all_field_sets = [
         MyPyFieldSet.create(tgt) for tgt in all_tgts if MyPyFieldSet.is_applicable(tgt)
     ]

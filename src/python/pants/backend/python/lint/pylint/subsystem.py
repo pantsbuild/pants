@@ -43,7 +43,7 @@ from pants.option.option_types import (
     SkipOption,
     TargetListOption,
 )
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -76,10 +76,7 @@ class Pylint(PythonToolBase):
     default_main = ConsoleScript("pylint")
     default_requirements = [default_version]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/pylint/pylint.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore=foo.py,bar.py --disable=C0330,W0311")

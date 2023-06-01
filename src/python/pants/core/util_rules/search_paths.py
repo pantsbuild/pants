@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, ClassVar, Iterable
 
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.rules import Rule, _uncacheable_rule, collect_rules, rule
+from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.memo import memoized_property
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import help_text, softwrap
 
 _logger = logging.getLogger(__name__)
 
@@ -140,6 +144,50 @@ async def validate_search_paths(request: ValidateSearchPathsRequest) -> Validate
         )
 
     return ValidatedSearchPaths(search_paths)
+
+
+class ExecutableSearchPathsOptionMixin:
+    env_vars_used_by_options: ClassVar[tuple[str, ...]] = ("PATH",)
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        if "PATH" not in cls.env_vars_used_by_options:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    {ExecutableSearchPathsOptionMixin.__name__} depends on the PATH environment variable.
+
+                    Please add it to the {cls.__name__}.env_vars_used_by_options.
+                    """
+                )
+            )
+
+    executable_search_paths_help: str
+    _options_env: EnvironmentVars
+
+    _executable_search_paths = StrListOption(
+        default=["<PATH>"],
+        help=lambda cls: help_text(
+            f"""
+            {cls.executable_search_paths_help}
+            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+            """
+        ),
+        advanced=True,
+        metavar="<binary-paths>",
+    )
+
+    @memoized_property
+    def executable_search_path(self) -> tuple[str, ...]:
+        def iter_path_entries():
+            for entry in self._executable_search_paths:
+                if entry == "<PATH>":
+                    path = self._options_env.get("PATH")
+                    if path:
+                        yield from path.split(os.pathsep)
+                else:
+                    yield entry
+
+        return tuple(OrderedSet(iter_path_entries()))
 
 
 def rules() -> Iterable[Rule]:

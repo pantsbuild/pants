@@ -13,7 +13,6 @@ from pants.backend.python.lint.bandit.rules import BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.lint import LintResult, Partitions
@@ -26,12 +25,13 @@ from pants.testutil.python_interpreter_selection import (
     has_python_version,
     skip_unless_python27_and_python3_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *bandit_rules(),
             *bandit_subsystem_rules(),
@@ -50,7 +50,7 @@ BAD_FILE = "hashlib.md5()\n"  # An insecure hashing function.
 
 
 def run_bandit(
-    rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
 ) -> Sequence[LintResult]:
     rule_runner.set_options(
         [
@@ -74,7 +74,7 @@ def run_bandit(
 
 
 def assert_success(
-    rule_runner: RuleRunner, target: Target, *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, target: Target, *, extra_args: list[str] | None = None
 ) -> None:
     result = run_bandit(rule_runner, [target], extra_args=extra_args)
     assert len(result) == 1
@@ -86,9 +86,9 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
-def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(
@@ -98,7 +98,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_bandit(rule_runner, [tgt])
@@ -108,7 +108,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
+def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
@@ -125,7 +125,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_python27_and_python3_present
-def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
+def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.py": "version: str = 'Py3 > Py2'\n",
@@ -172,7 +172,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert "No issues identified." in batched_py3_result.stdout
 
 
-def test_respects_config_file(rule_runner: RuleRunner) -> None:
+def test_respects_config_file(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.py": BAD_FILE,
@@ -184,13 +184,13 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
     assert_success(rule_runner, tgt, extra_args=["--bandit-config=.bandit"])
 
 
-def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_respects_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--bandit-args='--skip=B303'"])
 
 
-def test_skip(rule_runner: RuleRunner) -> None:
+def test_skip(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_bandit(rule_runner, [tgt], extra_args=["--bandit-skip"])
@@ -198,7 +198,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.skipif(not (has_python_version("3.7")), reason="Missing requisite Python")
-def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
+def test_3rdparty_plugin(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.py": "aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n",
@@ -219,7 +219,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_report_file(rule_runner: RuleRunner) -> None:
+def test_report_file(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_bandit(
@@ -235,7 +235,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_type_stubs(rule_runner: RuleRunner) -> None:
+def test_type_stubs(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.pyi": BAD_FILE,

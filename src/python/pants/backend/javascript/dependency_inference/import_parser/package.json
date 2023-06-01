@@ -12,12 +12,13 @@
   },
   "license": "APACHE2",
   "files": ["script.cjs"],
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Parses commonjs and esmodule import statements.",
   "keywords": [],
   "author": "",
   "dependencies": {
     "@babel/parser": "^7.20.13",
     "@babel/traverse": "^7.20.13"
-  }
+  },
+  "packageManager": "npm@8.5.5"
 }

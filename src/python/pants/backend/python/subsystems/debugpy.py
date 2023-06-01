@@ -8,7 +8,6 @@ from pants.backend.python.target_types import EntryPoint
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption
-from pants.util.docutil import git_url
 
 
 class DebugPy(PythonToolBase):
@@ -21,12 +20,8 @@ class DebugPy(PythonToolBase):
     default_requirements = [default_version]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "debugpy.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/debugpy.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
     args = ArgsListOption(example="--log-to-stderr")

@@ -6,6 +6,40 @@ hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
 ---
 
+2.17
+----
+
+### Deprecated some `Request` types in favor of `Get` with only one arg
+
+For several APIs like `pants.core.util_rules.system_binaries`, we had an eager and lazy version of the same API. You could do either of these two:
+
+```python
+from pants.core.util_rules.system_binaries import ZipBinary, ZipBinaryRequest
+from pants.engine.rules import Get, rule
+
+class MyOutput:
+    pass
+
+@rule
+def my_rule(zip_binary: ZipBinary) -> MyOutput:
+    return MyOutput()
+
+@rule
+async def my_rule_lazy() -> MyOutput:
+    zip_binary = await Get(ZipBinary, ZipBinaryRequest())
+    return MyOutput()
+```
+
+The lazy API is useful, for example, when you only want to `Get` that output type inside an `if` branch.
+
+We added syntax in 2.17 to now use `Get(OutputType)`, whereas before you had to do `Get(OutputType, OutputTypeRequest)` or (as of 2.15) `Get(OutputType, {})`. So, these `OutputTypeRequest` types are now redudent and deprecated in favor of simply using `Get(OutputType)`.
+
+
+### `EnvironmentBehavior.UNMIGRATED` is no longer available
+
+Following the deprecation cycle in 2.15, all `Goal`s need to set `EnvironmentBehavior.LOCAL_ONLY` or `EnvironmentBehavior.USES_ENVIRONMENTS`.
+
+
 2.16
 ----
 

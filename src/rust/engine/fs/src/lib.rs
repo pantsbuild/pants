@@ -28,6 +28,7 @@
 pub mod directory;
 #[cfg(test)]
 mod directory_tests;
+pub mod gitignore;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
@@ -38,6 +39,7 @@ pub use crate::directory::{
   DigestTrie, DirectoryDigest, Entry, SymlinkBehavior, TypedPath, EMPTY_DIGEST_TREE,
   EMPTY_DIRECTORY_DIGEST,
 };
+pub use crate::gitignore::GitignoreStyleExcludes;
 pub use crate::glob_matching::{
   FilespecMatcher, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
@@ -50,19 +52,10 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
-use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use async_trait::async_trait;
 use bytes::Bytes;
 use deepsize::DeepSizeOf;
-use lazy_static::lazy_static;
 use serde::Serialize;
-
-lazy_static! {
-  static ref EMPTY_IGNORE: Arc<GitignoreStyleExcludes> = Arc::new(GitignoreStyleExcludes {
-    patterns: vec![],
-    gitignore: Gitignore::empty(),
-  });
-}
 
 const TARGET_NOFILE_LIMIT: u64 = 10000;
 
@@ -248,76 +241,6 @@ impl PathStat {
 
 #[derive(Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct DirectoryListing(pub Vec<Stat>);
-
-#[derive(Debug)]
-pub struct GitignoreStyleExcludes {
-  patterns: Vec<String>,
-  gitignore: Gitignore,
-}
-
-impl GitignoreStyleExcludes {
-  pub fn create(patterns: Vec<String>) -> Result<Arc<Self>, String> {
-    Self::create_with_gitignore_file(patterns, None)
-  }
-
-  pub fn empty() -> Arc<Self> {
-    EMPTY_IGNORE.clone()
-  }
-
-  pub fn create_with_gitignore_file(
-    patterns: Vec<String>,
-    gitignore_path: Option<PathBuf>,
-  ) -> Result<Arc<Self>, String> {
-    if patterns.is_empty() && gitignore_path.is_none() {
-      return Ok(EMPTY_IGNORE.clone());
-    }
-
-    let mut ignore_builder = GitignoreBuilder::new("");
-
-    if let Some(path) = gitignore_path {
-      if let Some(err) = ignore_builder.add(path) {
-        return Err(format!("Error adding .gitignore path: {err:?}"));
-      }
-    }
-    for pattern in &patterns {
-      ignore_builder
-        .add_line(None, pattern)
-        .map_err(|e| format!("Could not parse glob exclude pattern `{pattern:?}`: {e:?}"))?;
-    }
-
-    let gitignore = ignore_builder
-      .build()
-      .map_err(|e| format!("Could not build ignore patterns: {e:?}"))?;
-
-    Ok(Arc::new(Self {
-      patterns: patterns,
-      gitignore,
-    }))
-  }
-
-  fn exclude_patterns(&self) -> &[String] {
-    self.patterns.as_slice()
-  }
-
-  fn is_ignored(&self, stat: &Stat) -> bool {
-    let is_dir = matches!(stat, &Stat::Dir(_));
-    self.is_ignored_path(stat.path(), is_dir)
-  }
-
-  pub fn is_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
-    match self.gitignore.matched(path, is_dir) {
-      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
-      ::ignore::Match::Ignore(_) => true,
-    }
-  }
-
-  pub fn is_ignored_or_child_of_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
-    match self.gitignore.matched_path_or_any_parents(path, is_dir) {
-      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
-      ::ignore::Match::Ignore(_) => true,
-    }
-  }
-}
 
 #[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
@@ -830,41 +753,6 @@ pub fn increase_limits() -> Result<String, String> {
     } else {
       return Ok(format!("File handle limit is: {cur}"));
     };
-  }
-}
-
-///
-/// Like std::fs::create_dir_all, except handles concurrent calls among multiple
-/// threads or processes. Originally lifted from rustc.
-///
-pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
-  match fs::create_dir(path) {
-    Ok(()) => return Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => return Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::NotFound => {}
-    Err(e) => return Err(e),
-  }
-  match path.parent() {
-    Some(p) => safe_create_dir_all_ioerror(p)?,
-    None => return Ok(()),
-  }
-  match fs::create_dir(path) {
-    Ok(()) => Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-    Err(e) => Err(e),
-  }
-}
-
-pub fn safe_create_dir_all(path: &Path) -> Result<(), String> {
-  safe_create_dir_all_ioerror(path)
-    .map_err(|e| format!("Failed to create dir {path:?} due to {e:?}"))
-}
-
-pub fn safe_create_dir(path: &Path) -> Result<(), String> {
-  match fs::create_dir(path) {
-    Ok(()) => Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-    Err(err) => Err(format!("{err}")),
   }
 }
 

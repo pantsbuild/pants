@@ -79,6 +79,8 @@ pub mod local;
 pub mod local_tests;
 
 pub mod named_caches;
+#[cfg(test)]
+pub mod named_caches_tests;
 
 extern crate uname;
 

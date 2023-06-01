@@ -189,6 +189,13 @@ This can happen if your temporary directory (`/tmp/` by default) is not on the s
 
 The solution is to move `~/.cache/pants`, or at least the `named_caches_dir`(see [above](#how-to-change-your-cache-directory)), to the same filesystem as the temporary directory, or vice versa.
 
+Issues packaging AWS CDK into a PEX
+-----------------------------------
+
+If you get errors like `ModuleNotFoundError: No module named 'aws_cdk.asset_awscli_v1`, set `execution_mode="venv"` and `venv_site_packages_copies=True` on your `pex_binary` target.
+
+This ensures that the `aws_cdk` subpackages are properly nested under the parent package, despite those distributions not being configured as [namespace packages](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/).
+
 "Double requirement given" error when resolving Python requirements
 -------------------------------------------------------------------
 
@@ -264,3 +271,14 @@ It works mostly same as a normal installation, but has an important difference: 
 This may cause problems if your code or tests ry to create a container with a bind-mount of a directory or file _under the current working directory_.  Container creation will fail with "invalid mount config for type "bind": bind source path does not exist", because Pants' default `local_execution_root_dir` option is `/tmp`, which the Snap-based Docker service cannot access.
 
 You can work around this issue by explicitly setting `[GLOBAL].local_execution_root_dir` to a directory outside the system `/tmp` directory, such as `"%(buildroot)s/tmp"`.
+
+Using pants on self-hosted GitHub actions runner
+------------------------------------------------
+
+Setting up pants to run with Python executables provided by [setup-python](https://github.com/marketplace/actions/setup-python) will not work on vanilla actions runner setup. This is due to the [known limitation](https://github.com/pantsbuild/pants/issues/16565) of pants which does not allow leaking arbitrary environment variable (in this case `LD_LIBRARY_PATH` for us) when evaluating dependency inference rules. If you fall into this situation, you will face an error complaining about missing shared object files, like this:
+
+```
+/home/ubuntu/.cache/python-tools/Python/3.11.3/x64/bin/python3.11: error while loading shared libraries: libpython3.11.so.1.0: cannot open shared object file: No such file or directory
+```
+
+One of the workaround to fix this issue is setting up python tool cache files at `/opt/hostedtoolcache` directory. This is the default path which `setup-python` action uses to download relevant files on hosted GitHub actions runner. Overriding tool cache download directory can be achieved by following [setup-python documentation](https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#linux).

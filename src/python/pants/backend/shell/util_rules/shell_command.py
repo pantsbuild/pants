@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import shlex
 from dataclasses import dataclass
 
@@ -15,11 +14,9 @@ from pants.backend.shell.target_types import (
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
-    ShellCommandOutputDependenciesField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
-    ShellCommandOutputsField,
     ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
     ShellCommandTarget,
@@ -37,6 +34,7 @@ from pants.core.util_rules.adhoc_process_support import (
     MergeExtraSandboxContents,
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
+    parse_relative_directory,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
@@ -54,6 +52,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -78,9 +77,7 @@ async def _prepare_process_request_from_target(
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     working_directory = shell_command[ShellCommandWorkdirField].value
-
-    if not working_directory:
-        working_directory = "."
+    assert working_directory is not None, "working_directory should always be a string"
 
     command = shell_command[ShellCommandCommandField].value
     if not command:
@@ -91,13 +88,13 @@ async def _prepare_process_request_from_target(
         ResolveExecutionDependenciesRequest(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
-            shell_command.get(ShellCommandOutputDependenciesField).value,
             shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
     )
     dependencies_digest = execution_environment.digest
 
-    output_files, output_directories = _parse_outputs_from_command(shell_command, description)
+    output_files = shell_command.get(ShellCommandOutputFilesField).value or ()
+    output_directories = shell_command.get(ShellCommandOutputDirectoriesField).value or ()
 
     # Resolve the `tools` field into a digest
     tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value or ()
@@ -159,25 +156,9 @@ async def _prepare_process_request_from_target(
         immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
         log_output=shell_command[ShellCommandLogOutputField].value,
+        capture_stdout_file=None,
+        capture_stderr_file=None,
     )
-
-
-def _parse_outputs_from_command(
-    adhoc_process_target: Target, description: str
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    outputs = adhoc_process_target.get(ShellCommandOutputsField).value or ()
-    output_files = adhoc_process_target.get(ShellCommandOutputFilesField).value or ()
-    output_directories = adhoc_process_target.get(ShellCommandOutputDirectoriesField).value or ()
-    if outputs and (output_files or output_directories):
-        raise ValueError(
-            "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
-            f"specified in {description}. To fix, move all values from `outputs` to "
-            "`output_files` or `output_directories`."
-        )
-    elif outputs:
-        output_files = tuple(f for f in outputs if not f.endswith("/"))
-        output_directories = tuple(d for d in outputs if d.endswith("/"))
-    return output_files, output_directories
 
 
 @rule
@@ -237,7 +218,6 @@ async def _interactive_shell_command(
     bash: BashBinary,
 ) -> Process:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
-    shell_name = shell_command.address.spec
     working_directory = shell_command[RunShellCommandWorkdirField].value
 
     if working_directory is None:
@@ -256,24 +236,24 @@ async def _interactive_shell_command(
         ResolveExecutionDependenciesRequest(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
-            shell_command.get(ShellCommandOutputDependenciesField).value,
             shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
     )
     dependencies_digest = execution_environment.digest
 
-    _working_directory = working_directory or "."
-    relpath = os.path.relpath(
-        _working_directory, start="/" if os.path.isabs(_working_directory) else "."
-    )
-    boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
+    relpath = parse_relative_directory(working_directory, shell_command.address)
+    boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "" else ""
 
     return Process(
-        argv=(bash.path, "-c", boot_script + command, shell_name),
+        argv=(
+            bash.path,
+            "-c",
+            boot_script + command,
+            f"{bin_name()} run {shell_command.address.spec} --",
+        ),
         description=f"Running {description}",
         env=command_env,
         input_digest=dependencies_digest,
-        working_directory=working_directory,
     )
 
 

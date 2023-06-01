@@ -12,7 +12,6 @@ from typing import Optional, cast
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
-from pants import ox
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
@@ -57,20 +56,19 @@ async def resolve_plugins(
     `named_caches` directory), but consequently needs to disable the process cache: see the
     ProcessCacheScope reference in the body.
     """
+    req_strings = sorted(global_options.plugins)
     requirements = PexRequirements(
-        req_strings=sorted(global_options.plugins),
+        req_strings_or_addrs=req_strings,
         constraints_strings=(str(constraint) for constraint in request.constraints),
+        description_of_origin="configured Pants plugins",
     )
     if not requirements:
         return ResolvedPluginDistributions()
 
     python: PythonExecutable | None = None
     if not request.interpreter_constraints:
-        python = cast(
-            PythonExecutable,
-            PythonExecutable.fingerprinted(
-                sys.executable, ".".join(map(str, sys.version_info[:3])).encode("utf8")
-            ),
+        python = PythonExecutable.fingerprinted(
+            sys.executable, ".".join(map(str, sys.version_info[:3])).encode("utf8")
         )
 
     plugins_pex = await Get(
@@ -81,7 +79,7 @@ async def resolve_plugins(
             python=python,
             requirements=requirements,
             interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
-            description=f"Resolving plugins: {', '.join(requirements.req_strings)}",
+            description=f"Resolving plugins: {', '.join(req_strings)}",
         ),
     )
 
@@ -132,15 +130,13 @@ class PluginResolver:
         env: CompleteEnvironmentVars,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
-
-        with ox.traditional_import_machinery():
-            for resolved_plugin_location in self._resolve_plugins(
-                options_bootstrapper, env, self._request
-            ):
-                site.addsitedir(
-                    resolved_plugin_location
-                )  # Activate any .pth files plugin wheels may have.
-                self._working_set.add_entry(resolved_plugin_location)
+        for resolved_plugin_location in self._resolve_plugins(
+            options_bootstrapper, env, self._request
+        ):
+            site.addsitedir(
+                resolved_plugin_location
+            )  # Activate any .pth files plugin wheels may have.
+            self._working_set.add_entry(resolved_plugin_location)
         return self._working_set
 
     def _resolve_plugins(

@@ -16,7 +16,10 @@ class MaybeColor:
 
     def __init__(self, color: bool) -> None:
         self._color = color
-        noop = lambda x, **_: x
+
+        def noop(x, **_):
+            return x
+
         self.maybe_color = ansicolor if color else noop
         self.maybe_cyan = cyan if color else noop
         self.maybe_green = green if color else noop

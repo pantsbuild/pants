@@ -33,7 +33,6 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     AllUnexpandedTargets,
     AsyncFieldMixin,
     CoarsenedTargets,
@@ -51,6 +50,7 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
+    InvalidTargetException,
     MultipleSourcesField,
     OverridesField,
     SecondaryOwnerMixin,
@@ -144,8 +144,8 @@ class MockTargetGenerator(TargetFilesGenerator):
 def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(AllTargets, [AllTargetsRequest]),
-            QueryRule(AllUnexpandedTargets, [AllTargetsRequest]),
+            QueryRule(AllTargets, []),
+            QueryRule(AllUnexpandedTargets, []),
             QueryRule(CoarsenedTargets, [Addresses]),
             QueryRule(Targets, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
@@ -669,7 +669,7 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
             "dir/BUILD": "target()",
         }
     )
-    all_tgts = transitive_targets_rule_runner.request(AllTargets, [AllTargetsRequest()])
+    all_tgts = transitive_targets_rule_runner.request(AllTargets, [])
     expected = {
         Address("", target_name="generator", relative_file_path="f1.txt"),
         Address("", target_name="generator", relative_file_path="f2.txt"),
@@ -678,10 +678,26 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     }
     assert {t.address for t in all_tgts} == expected
 
-    all_unexpanded = transitive_targets_rule_runner.request(
-        AllUnexpandedTargets, [AllTargetsRequest()]
-    )
+    all_unexpanded = transitive_targets_rule_runner.request(AllUnexpandedTargets, [])
     assert {t.address for t in all_unexpanded} == {*expected, Address("", target_name="generator")}
+
+
+def test_invalid_target(transitive_targets_rule_runner: RuleRunner) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "path/to/BUILD": dedent(
+                """\
+                target(name='t1', frobnot='is-unknown')
+                """
+            ),
+        }
+    )
+
+    def get_target(name: str) -> Target:
+        return transitive_targets_rule_runner.get_target(Address("path/to", target_name=name))
+
+    with engine_error(InvalidTargetException, contains="path/to/BUILD:1: Unrecognized field"):
+        get_target("t1")
 
 
 class MockSecondaryOwnerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
@@ -1373,7 +1389,9 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
     ],
 )
 def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:
-    with engine_error(InvalidFieldException, contains=f"Unrecognized field `{field_content}`"):
+    with engine_error(
+        InvalidTargetException, contains=f"demo/BUILD:1: Unrecognized field `{field_content}`"
+    ):
         assert_generated(
             generated_targets_rule_runner,
             Address("demo"),
@@ -1954,6 +1972,23 @@ def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
     )
     assert_dependencies_resolved(dependencies_rule_runner, Address("no_deps"), expected=[])
     assert_dependencies_resolved(dependencies_rule_runner, Address("ignore"), expected=[])
+
+
+def test_target_error_message_for_bad_field_values(dependencies_rule_runner: RuleRunner) -> None:
+    dependencies_rule_runner.write_files(
+        {
+            "src/BUILD": "smalltalk_libraries(sources=['//'])",
+            "dep/BUILD": "target(dependencies=['//::typo#addr'])",
+        }
+    )
+    err = "src/BUILD:1: Invalid field value for 'sources' in target src:src: Absolute paths not supported: \"//\""
+    with engine_error(InvalidFieldException, contains=err):
+        dependencies_rule_runner.get_target(Address("src"))
+
+    err = "dep/BUILD:1: Failed to get dependencies for dep:dep: Failed to parse address spec"
+    with engine_error(InvalidFieldException, contains=err):
+        target = dependencies_rule_runner.get_target(Address("dep"))
+        dependencies_rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
 
 
 def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> None:
