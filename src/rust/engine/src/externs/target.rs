@@ -13,6 +13,7 @@ use crate::externs::address::Address;
 
 pub fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<Field>()?;
+  m.add_class::<NoFieldValue>()?;
 
   m.add("NO_VALUE", NoFieldValue)?;
 

@@ -258,8 +258,14 @@ class PyExecutor:
 # to actually enforce this, outside of convention.
 ImmutableValue = Any
 
+class _NoValue:
+    def __bool__(self) -> bool:
+        """NB: Always returns `False`."""
+        ...
+    def __repr__(self) -> str: ...
+
 # Marker for unspecified field values that should use the default value if applicable.
-NO_VALUE: Any
+NO_VALUE: _NoValue
 
 class Field:
     """A Field.
