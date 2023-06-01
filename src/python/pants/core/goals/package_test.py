@@ -28,6 +28,7 @@ from pants.engine.target import (
     Target,
     Targets,
     TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -101,7 +102,7 @@ def rule_runner() -> RuleRunner:
             package_mock_target,
             UnionRule(PackageFieldSet, MockPackageFieldSet),
             QueryRule(Targets, [DependenciesRequest]),
-            QueryRule(TransitiveTargets, [TransitiveTargetsWithoutTraversingPackagesRequest]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[MockTarget],
     )
