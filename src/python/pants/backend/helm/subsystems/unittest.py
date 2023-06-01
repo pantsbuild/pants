@@ -9,7 +9,6 @@ from pants.backend.helm.util_rules.tool import (
     ExternalHelmPluginBinding,
     ExternalHelmPluginRequest,
 )
-from pants.base.deprecated import deprecated
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -40,9 +39,6 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         "0.2.8|macos_x86_64|1dc95699320894bdebf055c4f4cc084c2cfa0133d3cb7fd6a4c0adca94df5c96|18161928",
         "0.2.8|macos_arm64 |436e3167c26f71258b96e32c2877b4f97c051064db941de097cf3db2fc861342|17621648",
     ]
-    legacy_url_template: ClassVar[
-        str
-    ] = "https://github.com/quintush/helm-unittest/releases/download/v{version}/helm-unittest-{platform}-{version}.tgz"
     default_url_template = "https://github.com/helm-unittest/helm-unittest/releases/download/v{version}/helm-unittest-{platform}-{version}.tgz"
     default_url_platform_mapping = {
         "linux_arm64": "linux-arm64",
@@ -50,6 +46,11 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         "macos_arm64": "macos-arm64",
         "macos_x86_64": "macos-amd64",
     }
+
+    # TODO Remove after dropping support for the legacy tool
+    legacy_url_template: ClassVar[
+        str
+    ] = "https://github.com/quintush/helm-unittest/releases/download/v{version}/helm-unittest-{platform}-{version}.tgz"
 
     color = BoolOption(
         "--color",
@@ -65,14 +66,12 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
     skip = SkipOption("test")
 
     @property
-    @deprecated("2.19.dev0")
-    def is_legacy(self) -> bool:
+    def _is_legacy(self) -> bool:
         version_parts = self.version.split(".")
         return len(version_parts) >= 2 and version_parts[1] == "2"
 
-    @deprecated("2.19.dev0")
     def generate_url(self, plat: Platform) -> str:
-        if self.is_legacy:
+        if self._is_legacy:
             platform = self.url_platform_mapping.get(plat.value, "")
             return self.legacy_url_template.format(version=self.version, platform=platform)
         return super().generate_url(plat)
