@@ -4,22 +4,9 @@
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     MultipleSourcesField,
-    SingleSourceField,
     Target,
 )
 from pants.util.strutil import help_text
-
-
-class CargoTomlSourceField(SingleSourceField):
-    default = "Cargo.toml"
-
-
-class RustWorkspaceTarget(Target):
-    alias = "rust_workspace"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        CargoTomlSourceField,
-    )
 
 
 class RustPackageSourcesField(MultipleSourcesField):
