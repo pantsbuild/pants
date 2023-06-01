@@ -21,7 +21,7 @@ from pants.engine.target import DependenciesRequest, SourcesField, Targets
 
 
 @dataclass(frozen=True)
-class GetTerraformDependenciesRequest:
+class TerraformDependenciesRequest:
     source_files: SourceFiles
     directories: Tuple[str, ...]
     backend_config: SourceFiles
@@ -32,14 +32,14 @@ class GetTerraformDependenciesRequest:
 
 
 @dataclass(frozen=True)
-class TerraformDependencies:
+class TerraformDependenciesResponse:
     fetched_deps: Tuple[Tuple[str, Digest], ...]
 
 
 @rule
 async def get_terraform_providers(
-    req: GetTerraformDependenciesRequest,
-) -> TerraformDependencies:
+    req: TerraformDependenciesRequest,
+) -> TerraformDependenciesResponse:
     args = ["init"]
     if req.backend_config.files:
         args.append(
@@ -81,7 +81,7 @@ async def get_terraform_providers(
         for directory in req.directories
     )
 
-    return TerraformDependencies(
+    return TerraformDependenciesResponse(
         tuple(zip(req.directories, (x.output_digest for x in fetched_deps)))
     )
 
@@ -97,14 +97,14 @@ class TerraformInitRequest:
 
 
 @dataclass(frozen=True)
-class InitialisedTerraform:
+class TerraformInitResponse:
     sources_and_deps: Digest
     terraform_files: tuple[str, ...]
     chdir: str
 
 
 @rule
-async def init_terraform(request: TerraformInitRequest) -> InitialisedTerraform:
+async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse:
     root_dependencies = await Get(Targets, DependenciesRequest(request.dependencies))
 
     source_files, backend_config, dependencies_files = await MultiGet(
@@ -115,8 +115,8 @@ async def init_terraform(request: TerraformInitRequest) -> InitialisedTerraform:
     files_by_directory = partition_files_by_directory(source_files.files)
 
     fetched_deps = await Get(
-        TerraformDependencies,
-        GetTerraformDependenciesRequest(
+        TerraformDependenciesResponse,
+        TerraformDependenciesRequest(
             source_files,
             tuple(files_by_directory.keys()),
             backend_config,
@@ -136,7 +136,7 @@ async def init_terraform(request: TerraformInitRequest) -> InitialisedTerraform:
 
     assert len(files_by_directory) == 1, "Multiple directories found, unable to identify a root"
     chdir, files = next(iter(files_by_directory.items()))
-    return InitialisedTerraform(sources_and_deps, tuple(files), chdir)
+    return TerraformInitResponse(sources_and_deps, tuple(files), chdir)
 
 
 def rules():

@@ -1,6 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
+from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
@@ -35,7 +35,7 @@ async def terraform_check(
 
     initialised_terraforms = await MultiGet(
         Get(
-            InitialisedTerraform,
+            TerraformInitResponse,
             TerraformInitRequest(
                 (deployment.sources,), deployment.backend_config, deployment.dependencies
             ),

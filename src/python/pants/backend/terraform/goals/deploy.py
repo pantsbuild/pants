@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
+from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
@@ -37,7 +37,7 @@ async def prepare_terraform_deployment(
     request: TerraformDeploymentRequest, terraform_subsystem: TerraformTool
 ) -> InteractiveProcess:
     initialised_terraform = await Get(
-        InitialisedTerraform,
+        TerraformInitResponse,
         TerraformInitRequest(
             (request.field_set.sources,),
             request.field_set.backend_config,

@@ -5,7 +5,7 @@ import textwrap
 from pathlib import Path
 from typing import Optional
 
-from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
+from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.goals.deploy_test import (
     StandardDeployment,
@@ -27,7 +27,7 @@ def _do_init_terraform(
     target = rule_runner.get_target(standard_deployment.target)
     field_set = DeployTerraformFieldSet.create(target)
     result = rule_runner.request(
-        InitialisedTerraform,
+        TerraformInitResponse,
         [
             TerraformInitRequest(
                 (field_set.sources,),

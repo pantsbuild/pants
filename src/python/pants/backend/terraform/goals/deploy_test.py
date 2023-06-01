@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from pants.backend.terraform import dependencies, dependency_inference, tool
-from pants.backend.terraform.dependencies import InitialisedTerraform, TerraformInitRequest
+from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.goals.deploy import rules as terraform_deploy_rules
 from pants.backend.terraform.target_types import TerraformDeploymentTarget, TerraformModuleTarget
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *core_rules(),
             *process.rules(),
             QueryRule(DeployProcess, (DeployTerraformFieldSet,)),
-            QueryRule(InitialisedTerraform, (TerraformInitRequest,)),
+            QueryRule(TerraformInitResponse, (TerraformInitRequest,)),
         ],
         preserve_tmpdirs=True,
     )
