@@ -201,7 +201,7 @@ async def transitive_targets_without_traversing_packages_request(
 ) -> TransitiveTargetsRequest:
     package_field_set_types = union_membership.get(PackageFieldSet)
 
-    def do_traverse_deps(tgt: Target) -> bool:
+    def should_traverse_deps(tgt: Target) -> bool:
         for field_set_type in package_field_set_types:
             if field_set_type.is_applicable(tgt):
                 # False means do not traverse dependencies of this target
@@ -211,7 +211,7 @@ async def transitive_targets_without_traversing_packages_request(
     return TransitiveTargetsRequest(
         request.roots,
         include_special_cased_deps=request.include_special_cased_deps,
-        do_traverse_deps_predicate=do_traverse_deps,
+        should_traverse_deps_predicate=should_traverse_deps,
     )
 
 
