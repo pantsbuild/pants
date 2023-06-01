@@ -212,7 +212,7 @@ async def resolve_scala_plugins_for_target(
         if plugin_name not in plugins:
             raise Exception(
                 f"Could not find Scala plugin `{plugin_name}` in resolve `{resolve}` "
-                f"for target {request.target}"
+                f"for target {request.target.address}."
             )
 
     plugin_targets, artifact_targets = zip(*plugins.values()) if plugins else ((), ())
