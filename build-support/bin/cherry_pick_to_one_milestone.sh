@@ -25,26 +25,26 @@ PR_NUM=$1
 MILESTONE=$2
 FETCH_OPTS=${3-}
 
-COMMIT=$(gh pr view -R thejcannon/pants "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
+COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 if [[ -z $COMMIT ]]; then
   fail "Wasn't able to retrieve merge commit for $PR_NUM."
 fi
 
-TITLE=$(gh pr view -R thejcannon/pants "$PR_NUM" --json title --jq '.title')
-CATEGORY_LABEL=$(gh pr view -R thejcannon/pants "$PR_NUM" --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
-REVIEWERS=$(gh pr view -R thejcannon/pants "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
+TITLE=$(gh pr view "$PR_NUM" --json title --jq '.title')
+CATEGORY_LABEL=$(gh pr view "$PR_NUM" --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
+REVIEWERS=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
 BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.XXXXXX")
 BRANCH_NAME="cherry-pick-$PR_NUM-to-$MILESTONE"
 
 gh pr view "$PR_NUM" --json body --jq '.body' > "$BODY_FILE"
 
-PR_CREATE_CMD=(gh pr create -R thejcannon/pants --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE")
+PR_CREATE_CMD=(gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE")
 while IFS= read -r REVIEWER; do PR_CREATE_CMD+=(--reviewer "$REVIEWER"); done <<< "$REVIEWERS"
 # NB: Add the author in case someone else creates the PR (like WorkerPants)
-PR_CREATE_CMD+=(--reviewer "$(gh pr view -R thejcannon/pants "$PR_NUM" --json author --jq '.author.login')")
+PR_CREATE_CMD+=(--reviewer "$(gh pr view "$PR_NUM" --json author --jq '.author.login')")
 
 # NB: Don't quote $FETCH_OPTS, it might contain spaces.
-if ! git fetch $FETCH_OPTS https://github.com/thejcannon/pants "$MILESTONE"; then
+if ! git fetch $FETCH_OPTS https://github.com/pantsbuild/pants "$MILESTONE"; then
   fail "Couldn't fetch the milestone branch. Assuming that means it doesn't exist yet." 0
 fi
 git checkout -b "$BRANCH_NAME" FETCH_HEAD
@@ -53,8 +53,7 @@ if git cherry-pick "$COMMIT"; then
   if [[ $CI = true ]]; then
     # By default, `gh pr create` mirrors the branch to the relevant git remote, but does so by
     # prompting the user. To workaround this in CI, we push the branch ourselves.
-    #git push -u origin "$BRANCH_NAME"
-    echo "whatever"
+    git push -u origin "$BRANCH_NAME"
   fi
   "${PR_CREATE_CMD[@]}"
 else

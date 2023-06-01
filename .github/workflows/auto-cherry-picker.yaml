@@ -23,43 +23,35 @@ jobs:
       merge_commit: ${{ steps.get-prereqs.outputs.merge_commit }}
       milestones: ${{ steps.get-prereqs.outputs.milestones }}
     steps:
-      - name: Install gh
-        run: |
-          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-          && sudo apt update \
-          && sudo apt install gh -y
-
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - run: npm install semver
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
-        env:
-          PR_NUM: ${{ github.event.pull_request.number || inputs.PR_number }}
-          GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
-        run: |
-          echo "pr_num=$PR_NUM" >> "$GITHUB_OUTPUT"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+          script: |
+            const semver = require('semver')
 
-          MERGE_COMMIT=$(gh pr view -R thejcannon/pants "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
-          echo "merge_commit=$MERGE_COMMIT" >> "$GITHUB_OUTPUT"
+            const pr_num = "${{ github.event.pull_request.number || inputs.PR_number }}"
+            const pull = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr_num,
+            })).data
+            const target_milestone = pull.milestone.title
+            const all_milestones = (await github.rest.issues.listMilestones({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })).data.map(milestone => milestone.title).sort((a, b) => semver.compare(semver.coerce(a), semver.coerce(b)))
 
-          TARGET_MILESTONE=$(gh pr view -R thejcannon/pants "$PR_NUM" --json milestone --jq '.milestone.title')
-          RELEVANT_MILESTONES=$(gh api graphql -F owner="thejcannon" -F name="pants" -f query='
-            query ListMilestones($name: String!, $owner: String!) {
-              repository(owner: $owner, name: $name) {
-                milestones(last: 10) {
-                  nodes {title}
-                }
-              }
-            }' --jq .data.repository.milestones.nodes.[].title | sort -V | awk "/$TARGET_MILESTONE/{p=1}p" -)
+            // @TODO: If no milestones match, error
 
-          if [ -z $RELEVANT_MILESTONES ]; then
-            echo "Couldn't find relevant milestones for cherry-picking."
-            exit 1
-          fi
-
-          QUOTED_MILESTONES=$(echo "$RELEVANT_MILESTONES" | tr '\n' '\0' | xargs -0 -I {} echo "\"{}\"" | tr '\n' ',' | sed 's/,$//')
-          echo "milestones=[$(echo "$QUOTED_MILESTONES" | sed 's/,$//')]" >> "$GITHUB_OUTPUT"
+            core.setOutput('pr_num', pr_num)
+            core.setOutput('merge_commit', pull.merge_commit_sha)
+            core.setOutput('milestones', all_milestones.slice(all_milestones.indexOf(target_milestone)))
 
   picker:
     name: Cherry-Pick
@@ -69,23 +61,12 @@ jobs:
       matrix:
         milestone: ${{ fromJSON(needs.prerequisites.outputs.milestones) }}
     steps:
-      - name: Install gh
-        run: |
-          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-          && sudo apt update \
-          && sudo apt install gh -y
-
       - name: Check out code
         uses: actions/checkout@v3
         with:
           # Always checkout the latest commit of main, for latest changes to the script
-          ref: "jcannon/better-cherries"
-          repository: thejcannon/pants
+          ref: main
           token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
-
       - name: Cherry-Pick
         env:
           GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
@@ -94,7 +75,6 @@ jobs:
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
           git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
           bash -x build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}" "--depth 1"
-
       - name: Comment regarding failure
         if: ${{ failure() }}
         uses: actions/github-script@v6
@@ -103,14 +83,14 @@ jobs:
           script: |
             github.rest.issues.addLabels({
               issue_number: ${{ needs.prerequisites.outputs.pr_num }},
-              owner: 'thejcannon',
-              repo: 'pants',
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               labels: ['auto-cherry-picking-failed']
             })
             github.rest.issues.createComment({
               issue_number: ${{ needs.prerequisites.outputs.pr_num }},
-              owner: 'thejcannon',
-              repo: 'pants',
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               body: 'I was unable to cherry-pick this PR to ${{ matrix.milestone }}, likely due to merge-conflicts. \
             See [the job output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs/${{ github.job }}) \
             \n\n \
@@ -119,7 +99,6 @@ jobs:
             \n\n \
             It should reproduce the merge conflicts locally, and tell you how to proceed after fixing.'
             })
-
   label-remover:
     name: Remove "needs-cherrypick" label
     needs: picker
@@ -132,7 +111,7 @@ jobs:
           script: |
             github.rest.issues.removeLabel({
               issue_number: ${{ needs.prerequisites.outputs.pr_num }},
-              owner: 'thejcannon',
-              repo: 'pants',
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               name: 'needs-cherrypick'
             })
