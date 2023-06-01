@@ -113,7 +113,6 @@ def test_simple_success_with_legacy_tool(rule_runner: RuleRunner) -> None:
     field_set = HelmUnitTestFieldSet.create(target)
 
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
-    print(result.stdout)
 
     assert result.exit_code == 0
     assert result.xml_results and result.xml_results.files
