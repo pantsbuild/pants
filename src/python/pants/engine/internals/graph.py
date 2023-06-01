@@ -674,20 +674,6 @@ class _DependencyMappingRequest:
     expanded_targets: bool
 
 
-def _partition(
-    predicate: Callable[[Target], bool], targets: FrozenOrderedSet[Target]
-) -> tuple[FrozenOrderedSet[Target], FrozenOrderedSet[Target]]:
-    # https://stackoverflow.com/a/46217079
-    predicate_is_true = []
-    predicate_is_false = []
-    for tgt in targets:
-        if predicate(tgt):
-            predicate_is_true.append(tgt)
-        else:
-            predicate_is_false.append(tgt)
-    return FrozenOrderedSet(predicate_is_true), FrozenOrderedSet(predicate_is_false)
-
-
 @dataclass(frozen=True)
 class _DependencyMapping:
     mapping: FrozenDict[Address, tuple[Address, ...]]
@@ -708,12 +694,13 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     dependency_mapping: dict[Address, tuple[Address, ...]] = {}
     while queued:
         applicable: FrozenOrderedSet[Target]
-        filtered: FrozenOrderedSet[Target]
         if request.tt_request.should_traverse_deps_predicate is None or queued is roots_set:
             # "queued is roots_set" ensures we always include at least the roots
-            applicable, filtered = queued, FrozenOrderedSet()
+            applicable = queued
         else:
-            applicable, filtered = _partition(request.tt_request.should_traverse_deps_predicate, queued)
+            predicate = request.tt_request.should_traverse_deps_predicate
+            applicable = FrozenOrderedSet(tgt for tgt in queued if predicate(tgt))
+        filtered = queued - applicable
 
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
