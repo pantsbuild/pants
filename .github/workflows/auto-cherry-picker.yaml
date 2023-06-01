@@ -12,7 +12,7 @@ on:
         description: The PR number to cherry-pick
         type: string
         required: true
-# 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
+
 jobs:
   prerequisites:
     name: Gather Prerequisites
@@ -93,7 +93,7 @@ jobs:
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
           git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
-          bash -x build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}" "--fetch-depth 1"
+          bash -x build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}" "--depth 1"
 
       - name: Comment regarding failure
         if: ${{ failure() }}

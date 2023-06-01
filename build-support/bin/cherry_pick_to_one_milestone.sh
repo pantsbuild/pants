@@ -22,7 +22,7 @@ if [[ -n $(git status --porcelain) ]]; then
 fi
 
 PR_NUM=$1
-TARGET_MILESTONE=$2
+MILESTONE=$2
 FETCH_OPTS=${3-}
 
 COMMIT=$(gh pr view -R thejcannon/pants "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
@@ -54,6 +54,7 @@ if git cherry-pick "$COMMIT"; then
     # By default, `gh pr create` mirrors the branch to the relevant git remote, but does so by
     # prompting the user. To workaround this in CI, we push the branch ourselves.
     #git push -u origin "$BRANCH_NAME"
+    echo "whatever"
   fi
   "${PR_CREATE_CMD[@]}"
 else
