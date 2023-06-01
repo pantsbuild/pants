@@ -5,7 +5,7 @@ excerpt: "Create a Lambda with Python code."
 hidden: false
 createdAt: "2020-05-05T16:51:03.851Z"
 ---
-Pants can create a Lambda-compatible zip file from your Python code, allowing you to develop your Lambdas in your repository instead of using the online Cloud9 editor.
+Pants can create a Lambda-compatible zip file from your Python code, allowing you to develop your Lambda functions and layers in your repository instead of using the online Cloud9 editor.
 
 > 📘 FYI: how Pants does this
 >
@@ -24,27 +24,16 @@ backend_packages.add = [
 ]
 ```
 
-This adds the new `python_awslambda` target, which you can confirm by running `pants help python_awslambda`
+This adds the new `python_aws_lambda_function` target, which you can confirm by running `pants help python_aws_lambda_function`
 
-> 🚧 Set `layout = "zip"` for Pants 2.17
->
-> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility. To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`:
->
-> ```toml pants.toml
-> [lambdex]
-> layout = "zip"
-> ```
->
-> If you have existing `python_awslambda` targets, this will change the handler from `lambdex_handler.handler` to `lambda_function.handler` (see [below](#migrating-from-pants-216-and-earlier) for more details).
-
-Step 2: Define a `python_awslambda` target
-------------------------------------------
+Step 2: Define a `python_aws_lambda_function` target
+----------------------------------------------------
 
 First, add your lambda function in a Python file like you would [normally do with AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html). Specifically, create a function `def my_handler_name(event, context)` with the name you want.
 
 Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to automate this.
 
-Add a `python_awslambda` target and define the `runtime` and `handler` fields. The `runtime` should be one of the values from <https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html>. The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
+Add a `python_aws_lambda_function` target and define the `runtime` and `handler` fields. The `runtime` should be one of the values from <https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html>. The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
 
 For example:
 
@@ -52,7 +41,7 @@ For example:
 # The default `sources` field will include our handler file.
 python_sources(name="lib")
 
-python_awslambda(
+python_aws_lambda_function(
     name="lambda",
     runtime="python3.8",
     # Pants will convert this to `project.lambda_example:example_handler`.
@@ -70,12 +59,12 @@ You can optionally set the `output_path` field to change the generated zip file'
 
 > 🚧 Use `resource` instead of `file`
 >
-> `file` / `files` targets will not be included in the built AWS Lambda because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` and `resources` target. See [Assets and archives](doc:assets) for further explanation.
+> `file` / `files` targets will not be included in the built AWS Lambda artifacts because filesystem APIs like `open()` would not load them as expected. Instead, use the `resource` and `resources` target. See [Assets and archives](doc:assets) for further explanation.
 
 Step 3: Run `package`
 ---------------------
 
-Now run `pants package` on your `python_awslambda` target to create a zipped file.
+Now run `pants package` on your `python_aws_lambda_function` target to create a zipped file.
 
 For example:
 
@@ -87,7 +76,7 @@ Wrote dist/project/lambda.zip
 
 > 🚧 Running from macOS and failing to build?
 >
-> AWS Lambdas must run on Linux, so Pants tells PEX and Pip to build for Linux when resolving your third party dependencies. This means that you can only use pre-built [wheels](https://packaging.python.org/glossary/#term-wheel) (bdists). If your project requires any source distributions ([sdists](https://packaging.python.org/glossary/#term-source-distribution-or-sdist)) that must be built locally, PEX and pip will fail to run.
+> AWS Lambda functions must run on Linux, so Pants tells PEX and Pip to build for Linux when resolving your third party dependencies. This means that you can only use pre-built [wheels](https://packaging.python.org/glossary/#term-wheel) (bdists). If your project requires any source distributions ([sdists](https://packaging.python.org/glossary/#term-source-distribution-or-sdist)) that must be built locally, PEX and pip will fail to run.
 >
 > If this happens, you must either change your dependencies to only use dependencies with pre-built [wheels](https://pythonwheels.com) or find a Linux environment to run `pants package`.
 
@@ -116,7 +105,7 @@ CMD ["lambda_function.handler"]
 ```python project/BUILD
 python_sources()
 
-python_awslambda(
+python_aws_lambda_function(
     name="lambda",
     runtime="python3.8",
     handler="main.py:lambda_handler"
@@ -128,14 +117,67 @@ docker_image(
 )
 ```
 
-Then, use `pants package project:my_image`, for example. Pants will first build your AWS Lambda, and then will build the Docker image and copy it into the AWS Lambda.
+Then, use `pants package project:my_image`, for example. Pants will first build your AWS Lambda function, and then will build the Docker image and copy it into the AWS Lambda.
+
+Building a Lambda Layer
+-----------------------
+
+[AWS Lambda layers](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-concepts.html#gettingstarted-concepts-layer) allow including additional code in the execution environment of a Lambda function, without having to include that code in the function package. Using a layer can allow for including more code in a single function, sharing common dependencies across several functions, and may even give faster builds and deploys.
+
+Pants uses the `python_aws_lambda_layer` target to build AWS Lambda layers. The contents of the layer must be specified in the `dependencies` field, and Pants will pull in all of the code that implies (transitively) as usual, including any exclusions via `!` and `!!`. The `include_sources` and `include_requirements` fields provide additional control over the contents of the layer.
+
+For example, one use of layers is splitting the deployment package for a Lambda function into:
+
+1. a function artifact with only the code in your repository (first-party sources)
+2. a layer artifact with the third-party requirements that the function imports
+
+This split means making a change to first-party sources only requires rebuilding and re-deploying the function artifact. Since this artifact doesn't need to include all of the third-party requirements, rebuilding is likely to much faster and the resulting package will be smaller. The layer will only need to be rebuilt and redeployed if the third-party dependencies change, like a version upgrade or an additional `import`.
+
+```python project/BUILD
+python_sources(name="lib")
+
+python_aws_lambda_function(
+    name="function",
+    runtime="python3.8",
+    handler="lambda_example.py:example_handler",
+    # only include the sources, the boto3 requirement is packaged in `:layer`
+    include_requirements=False,
+)
+
+python_aws_lambda_layer(
+    name="layer",
+    runtime="python3.8"
+    # specify the handler file, and pants will automatically find its transitive dependencies
+    dependencies=["./lambda_example.py"],
+    # only include the boto3 requirement, any sources are packaged in `:function`
+    include_sources=False,
+)
+```
+```python project/lambda_example.py
+from . import library_code
+
+def example_handler(event, context):
+    library_code.say_hi()
+```
+```python project/library_code.py
+# an example dependency
+import boto3
+
+def say_hi():
+    print("Hello AWS!")
+```
+
+Run `pants package project:layer project:function` to produce two zip files:
+
+- `dist/project/layer.zip`: this must be published as a layer in AWS, such as through the console or using the CLI (`aws lambda publish-layer-version`).
+- `dist/project/function.zip`: as [above](#step-4-upload-to-aws), this can be uploaded to AWS in various ways and the handler can be set to `lambda_function.handler`. The function will need specify that it uses the layer created above.
 
 Advanced: Using PEX directly
 ----------------------------
 
-In the rare case where you need access to PEX features, such as dynamic selection of dependencies, a PEX file created by `pex_binary` can be used as a Lambda package directly. A PEX file is a carefully constructed zip file, and can be understood natively by AWS. Note: using `pex_binary` results in larger packages and slower cold starts and is likely to be less convenient than using `python_awslambda`.
+In the rare case where you need access to PEX features, such as dynamic selection of dependencies, a PEX file created by `pex_binary` can be used as a Lambda function package directly. A PEX file is a carefully constructed zip file, and can be understood natively by AWS. Note: using `pex_binary` results in larger packages and slower cold starts and is likely to be less convenient than using `python_aws_lambda_function`.
 
-The handler of a `pex_binary` is not re-exported at the fixed `lambda_function.handler` path, and the Lambda handler must be configured as the `__pex__` pseudo-package followed by the handler's normal module path (for instance, if the handler is called `func` in `some/module/path.py` within [a source root](doc:source-roots), then use `__pex__.some.module.path.func`). The `__pex__` pseudo-package ensures dependencies are initialized before running any of your code.
+The handler of a `pex_binary` is not re-exported at the fixed `lambda_function.handler` path, and the Lambda function handler must be configured as the `__pex__` pseudo-package followed by the handler's normal module path (for instance, if the handler is called `func` in `some/module/path.py` within [a source root](doc:source-roots), then use `__pex__.some.module.path.func`). The `__pex__` pseudo-package ensures dependencies are initialized before running any of your code.
 
 For example:
 
@@ -159,24 +201,16 @@ Then, use  `pants package project:lambda`, and upload the resulting `project/lam
 Migrating from Pants 2.16 and earlier
 -------------------------------------
 
-Pants has implemented a new way to package Lambdas in 2.17, resulting in smaller packages and faster cold starts. This involves some changes:
+Pants has implemented a new way to package Lambda functions in 2.17, which is now the default in 2.18, resulting in smaller packages and faster cold starts. This involves some changes:
 
 - In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](doc:pex-files) and then use Lambdex to adapt this to be better understood by AWS by adding a shim handler at the path `lambdex_handler.handler`. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during the "INIT" phase.
-- In Pants 2.17, the use of Lambdex is deprecated, in favour of choosing the appropriate dependencies ahead of time, as described above, without needing to do this on each cold start. This results in a zip file laid out in the format recommended by AWS, and includes a re-export of the handler at the path `lambda_function.handler`.
-- In Pants 2.18, the new behaviour will become the default behaviour.
+- In Pants 2.17, the use of Lambdex was deprecated, in favour of choosing the appropriate dependencies ahead of time, as described above, without needing to do this on each cold start. This results in a zip file laid out in the format recommended by AWS, and includes a re-export of the handler at the path `lambda_function.handler`.
+- In Pants 2.18, the new behaviour is now the default behaviour. Layers can now be built using Pants, and this addition includes renaming the `python_awslambda` target to `python_aws_lambda_function`.
 - In Pants 2.19, the old Lambdex behaviour will be entirely removed.
 
-Any existing `python_awslambda` targets will change how they are built. Migrating has three steps:
+When upgrading to Pants 2.18, any existing `python_awslambda` targets will need to be renamed to `python_aws_lambda_function`, which can be done via `pants update-build-files ::`. Additional changes may be required:
 
-1. opt-in to the new behaviour in Pants 2.17
-2. package the new targets
-3. upload those packages to AWS, and update the configured handler from `lambdex_handler.handler` (old) to `lambda_function.handler` (new)
+- If you already use Pants 2.17 and set `layout = "zip"` in the `[lambdex]` section of `pants.toml`, you already use the new behaviour: nice one! All you need to do is delete the whole `[lambdex]` section.
+- If you use Pants 2.16 or earlier, or use Pants 2.17 with `layout = "lambdex"`, upgrading will change how these targets are built. To migrate, we suggest you first migrate to using `layout = "zip"` in Pants 2.17, by [following its instructions](/v2.17/docs/awslambda-python#migrating-from-pants-216-and-earlier), and upgrade to Pants 2.18 after that.
 
-To opt-in to the new behaviour in Pants 2.17, add the following to the end of your `pants.toml`:
-
-``` toml pants.toml
-[lambdex]
-layout = "zip"
-```
-
-To temporarily continue using the old behaviour in Pants 2.17, instead set `layout = "lambdex"`. This will not be supported in Pants 2.19. If you encounter a bug with `layout = "zip"`, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose). If you require advanced PEX features, [switch to using `pex_binary` directly](#advanced-using-pex-directly).
+If you encounter a bug with the new behaviour, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose). If you require advanced PEX features, [switch to using `pex_binary` directly](#advanced-using-pex-directly).
