@@ -193,7 +193,9 @@ def test_create_hello_world_lambda_with_lambdex(
         ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" in names
     ), "third-party dep `mureq` must be included"
     if sys.platform == "darwin":
-        assert "`python_aws_lambda_function` targets built on macOS may fail to build." in caplog.text
+        assert (
+            "`python_aws_lambda_function` targets built on macOS may fail to build." in caplog.text
+        )
 
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
