@@ -72,7 +72,7 @@ impl EngineAwareReturnType {
 
     for kv_pair in artifacts_dict.items().into_iter() {
       let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-      let artifact_output = if value.is_instance_of::<PyFileDigest>().unwrap_or(false) {
+      let artifact_output = if value.is_instance_of::<PyFileDigest>() {
         lift_file_digest(value).map(ArtifactOutput::FileDigest)
       } else {
         let digest_value = value.getattr("digest").ok()?;

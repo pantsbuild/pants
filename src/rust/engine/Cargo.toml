@@ -154,8 +154,7 @@ num_enum = "0.5"
 parking_lot = "0.12"
 petgraph = "0.6"
 process_execution = { path = "process_execution" }
-# TODO: Change to ^0.18.4 once https://github.com/PyO3/pyo3/pull/3152 is released
-pyo3 =  { git = "https://github.com/PyO3/pyo3.git", rev = "edb952233159dd6d16089f9c1d855404090a9f4c" }
+pyo3 = "0.19"
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
