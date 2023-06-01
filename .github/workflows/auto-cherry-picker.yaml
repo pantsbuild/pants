@@ -12,24 +12,39 @@ on:
         description: The PR number to cherry-pick
         type: string
         required: true
-
+# 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
 jobs:
   prerequisites:
     name: Gather Prerequisites
     if: (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'needs-cherrypick') ) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
-      milestones: ${{ steps.get-prereqs.outputs.milestones }}
-      merge_commit: ${{ steps.get-prereqs.outputs.merge_commit }}
       pr_num: ${{ steps.get-prereqs.outputs.pr_num }}
+      merge_commit: ${{ steps.get-prereqs.outputs.merge_commit }}
+      milestones: ${{ steps.get-prereqs.outputs.milestones }}
     steps:
+      - name: Install gh
+        run: |
+          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && sudo apt update \
+          && sudo apt install gh -y
+
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
         env:
           PR_NUM: ${{ github.event.pull_request.number || inputs.PR_number }}
+          GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
         run: |
-          TARGET_MILESTONE=$(gh pr view "$PR_NUM" --json milestone --jq '.milestone.title')
-          RELEVANT_MILESTONES=$(gh api graphql -F owner=":owner" -F name=":repo" -f query='
+          echo "pr_num=$PR_NUM" >> "$GITHUB_OUTPUT"
+
+          MERGE_COMMIT=$(gh pr view -R thejcannon/pants "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
+          echo "merge_commit=$MERGE_COMMIT" >> "$GITHUB_OUTPUT"
+
+          TARGET_MILESTONE=$(gh pr view -R thejcannon/pants "$PR_NUM" --json milestone --jq '.milestone.title')
+          RELEVANT_MILESTONES=$(gh api graphql -F owner="thejcannon" -F name="pants" -f query='
             query ListMilestones($name: String!, $owner: String!) {
               repository(owner: $owner, name: $name) {
                 milestones(last: 10) {
@@ -38,12 +53,13 @@ jobs:
               }
             }' --jq .data.repository.milestones.nodes.[].title | sort -V | awk "/$TARGET_MILESTONE/{p=1}p" -)
 
-          echo "milestones=[$(RELEVANT_MILESTONES | tr '\n' ',')]" >> "$GITHUB_OUTPUT"
+          if [ -z $RELEVANT_MILESTONES ]; then
+            echo "Couldn't find relevant milestones for cherry-picking."
+            exit 1
+          fi
 
-          MERGE_COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
-          echo "merge_commit=$MERGE_COMMIT" >> "$GITHUB_OUTPUT"
-
-          echo "pr_num=$PR_NUM" >> "$GITHUB_OUTPUT"
+          QUOTED_MILESTONES=$(echo "$RELEVANT_MILESTONES" | tr '\n' '\0' | xargs -0 -I {} echo "\"{}\"" | tr '\n' ',' | sed 's/,$//')
+          echo "milestones=[$(echo "$QUOTED_MILESTONES" | sed 's/,$//')]" >> "$GITHUB_OUTPUT"
 
   picker:
     name: Cherry-Pick
@@ -51,13 +67,24 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        milestone: ${{ needs.prerequisites.outputs.milestones }}
+        milestone: ${{ fromJSON(needs.prerequisites.outputs.milestones) }}
     steps:
+      - name: Install gh
+        run: |
+          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && sudo apt update \
+          && sudo apt install gh -y
+
       - name: Check out code
         uses: actions/checkout@v3
         with:
           # Always checkout the latest commit of main, for latest changes to the script
-          ref: "main"
+          ref: "jcannon/better-cherries"
+          repository: thejcannon/pants
+          token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
 
       - name: Cherry-Pick
         env:
@@ -76,20 +103,21 @@ jobs:
           script: |
             github.rest.issues.addLabels({
               issue_number: ${{ needs.prerequisites.outputs.pr_num }},
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner: 'thejcannon',
+              repo: 'pants',
               labels: ['auto-cherry-picking-failed']
             })
             github.rest.issues.createComment({
               issue_number: ${{ needs.prerequisites.outputs.pr_num }},
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner: 'thejcannon',
+              repo: 'pants',
               body: 'I was unable to cherry-pick this PR to ${{ matrix.milestone }}, likely due to merge-conflicts. \
-                \n\n \
-                Please checkout and pull pull `main`, \
-                and run `build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"`. \
-                \n\n \
-                It should reproduce the merge conflicts locally, and tell you how to proceed after fixing.'
+            See [the job output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs/${{ github.job }}) \
+            \n\n \
+            Please checkout and pull pull `main`, \
+            and run `build-support/bin/cherry_pick_to_one_milestone.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"`. \
+            \n\n \
+            It should reproduce the merge conflicts locally, and tell you how to proceed after fixing.'
             })
 
   label-remover:
@@ -104,7 +132,7 @@ jobs:
           script: |
             github.rest.issues.removeLabel({
               issue_number: ${{ needs.prerequisites.outputs.pr_num }},
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner: 'thejcannon',
+              repo: 'pants',
               name: 'needs-cherrypick'
             })
