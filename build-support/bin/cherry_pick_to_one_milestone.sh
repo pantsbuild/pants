@@ -41,7 +41,7 @@ gh pr view "$PR_NUM" --json body --jq '.body' > "$BODY_FILE"
 PR_CREATE_CMD=(gh pr create -R thejcannon/pants --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE")
 while IFS= read -r REVIEWER; do PR_CREATE_CMD+=(--reviewer "$REVIEWER"); done <<< "$REVIEWERS"
 # NB: Add the author in case someone else creates the PR (like WorkerPants)
-PR_CREATE_CMD+=(--reviewer "$(gh pr view "$PR_NUM" --json author --jq '.author.login')")
+PR_CREATE_CMD+=(--reviewer "$(gh pr view -R thejcannon/pants "$PR_NUM" --json author --jq '.author.login')")
 
 # NB: Don't quote $FETCH_OPTS, it might contain spaces.
 if ! git fetch $FETCH_OPTS https://github.com/thejcannon/pants "$MILESTONE"; then
