@@ -25,14 +25,14 @@ PR_NUM=$1
 TARGET_MILESTONE=$2
 FETCH_OPTS=${3-}
 
-COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
+COMMIT=$(gh pr view -R thejcannon/pants "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 if [[ -z $COMMIT ]]; then
   fail "Wasn't able to retrieve merge commit for $PR_NUM."
 fi
 
-TITLE=$(gh pr view "$PR_NUM" --json title --jq '.title')
-CATEGORY_LABEL=$(gh pr view "$PR_NUM" --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
-REVIEWERS=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
+TITLE=$(gh pr view -R thejcannon/pants "$PR_NUM" --json title --jq '.title')
+CATEGORY_LABEL=$(gh pr view -R thejcannon/pants "$PR_NUM" --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
+REVIEWERS=$(gh pr view -R thejcannon/pants "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
 BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.XXXXXX")
 BRANCH_NAME="cherry-pick-$PR_NUM-to-$MILESTONE"
 
