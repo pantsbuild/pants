@@ -26,22 +26,16 @@ class PutativeRustTargetsRequest(PutativeTargetsRequest):
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Rust targets to create")
 async def find_putative_rust_targets(
-    request: PutativeRustTargetsRequest, all_owned_sources: AllOwnedSources
+    request: PutativeRustTargetsRequest
 ) -> PutativeTargets:
-    putative_targets = []
-
     all_cargo_toml_files = await Get(Paths, PathGlobs, request.path_globs("Cargo.toml"))
-    unowned_cargo_toml_files = set(all_cargo_toml_files.files) - set(all_owned_sources)
 
-    for dirname, filenames in group_by_dir(unowned_cargo_toml_files).items():
-        putative_targets.append(
-            PutativeTarget.for_target_type(
-                RustPackageTarget,
-                path=dirname,
-                name=None,
-                triggering_sources=sorted(filenames),
-            )
-        )
+    putative_targets = [PutativeTarget.for_target_type(
+        RustPackageTarget,
+        path=dirname,
+        name=None,
+        triggering_sources=sorted(filenames),
+    ) for dirname, filenames in group_by_dir(all_cargo_toml_files.files).items()]
 
     return PutativeTargets(putative_targets)
 
