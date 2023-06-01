@@ -196,3 +196,23 @@ def test_complete_platforms_should_choose_appropriate_dependencies_when_possible
             "out/psycopg2/__init__.py",
         ),
     )
+
+
+def test_prefix_should_add_path(
+    local_pex: Pex,
+    rule_runner: RuleRunner,
+) -> None:
+    run_and_validate(
+        rule_runner,
+        PexVenvRequest(
+            pex=local_pex,
+            layout=PexVenvLayout.FLAT,
+            prefix="some/prefix",
+            output_path=Path("out/dir"),
+            description="testing",
+        ),
+        check_globs_exist=(
+            "out/dir/some/prefix/psycopg2/__init__.py",
+            "out/dir/some/prefix/first/party.py",
+        ),
+    )
