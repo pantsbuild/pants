@@ -34,9 +34,10 @@ class Lambdex(PythonToolBase):
         default=LambdexLayout.ZIP,
         help=softwrap(
             """
-            Explicitly control the layout used for `python_awslambda` and
-            `python_google_cloud_function` targets. This option exists for the transition from
-            Lambdex-based layout to the plain zip layout, as recommended by cloud vendors.
+            Explicitly control the layout used for `python_aws_lambda_function` (formerly
+            `python_awslambda`) and `python_google_cloud_function` targets. This option exists for
+            the transition from Lambdex-based layout to the plain zip layout, as recommended by
+            cloud vendors.
             """
         ),
         removal_version="2.19.0.dev0",
@@ -47,9 +48,10 @@ class Lambdex(PythonToolBase):
             the recommended layout.
 
             If you have `layout = "lambdex"`, removing the section will switch any
-            `python_awslambda` and `python_google_cloud_function` targets to using the `zip` layout,
-            as recommended by cloud vendors.  (If you are using `python_awslambda`, you will need to
-            also update the handlers configured in the cloud from `lambdex_handler.handler` to
+            `python_aws_lambda_function` (formerly `python_awslambda`) and
+            `python_google_cloud_function` targets to using the `zip` layout, as recommended by
+            cloud vendors.  (If you are using `python_aws_lambda_function`, you will need to also
+            update the handlers configured in the cloud from `lambdex_handler.handler` to
             `lambda_function.handler`.)
 
             See the docs for more details:

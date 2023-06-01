@@ -410,7 +410,7 @@ class NoApplicableTargetsException(Exception):
         # command only works if at least one of the targets has a SourcesField field.
         #
         # NB: Even with the "secondary owners" mechanism - used by target types like `pex_binary`
-        # and `python_awslambda` to still work with file args - those targets will not show the
+        # and `python_aws_lambda_function` to still work with file args - those targets will not show the
         # associated files when using filedeps.
         filedeps_goal_works = any(
             tgt.class_has_field(SourcesField, union_membership) for tgt in applicable_target_types

@@ -57,8 +57,8 @@ class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
     include_sources: PythonAwsLambdaIncludeSources
 
 
-@rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
-async def package_python_awslambda(
+@rule(desc="Create Python AWS Lambda Function", level=LogLevel.DEBUG)
+async def package_python_aws_lambda_function(
     field_set: PythonAwsLambdaFieldSet,
     lambdex: Lambdex,
 ) -> BuiltPackage:
