@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from pants.backend.rust.target_types import RustPackageTarget
 from pants.core.goals.tailor import (
-    AllOwnedSources,
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
