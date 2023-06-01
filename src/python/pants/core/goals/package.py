@@ -182,22 +182,11 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     return Package(exit_code=0)
 
 
-@dataclass(frozen=True)
-class TransitiveTargetsWithoutTraversingPackagesRequest:
-    roots: tuple[Address, ...]
-    include_special_cased_deps: bool
-
-    def __init__(
-        self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
-    ) -> None:
-        object.__setattr__(self, "roots", tuple(roots))
-        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
-
-
-@rule
-async def transitive_targets_without_traversing_packages_request(
-    request: TransitiveTargetsWithoutTraversingPackagesRequest,
+def transitive_targets_without_traversing_packages_request(
+    *,
+    roots: Iterable[Address],
     union_membership: UnionMembership,
+    include_special_cased_deps: bool = False,
 ) -> TransitiveTargetsRequest:
     package_field_set_types = union_membership.get(PackageFieldSet)
 
@@ -209,8 +198,8 @@ async def transitive_targets_without_traversing_packages_request(
         return True
 
     return TransitiveTargetsRequest(
-        request.roots,
-        include_special_cased_deps=request.include_special_cased_deps,
+        roots,
+        include_special_cased_deps=include_special_cased_deps,
         should_traverse_deps_predicate=should_traverse_deps,
     )
 

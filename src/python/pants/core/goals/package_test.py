@@ -15,7 +15,7 @@ from pants.core.goals.package import (
     BuiltPackageArtifact,
     Package,
     PackageFieldSet,
-    TransitiveTargetsWithoutTraversingPackagesRequest,
+    transitive_targets_without_traversing_packages_request,
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -29,7 +29,7 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -229,8 +229,15 @@ def test_transitive_targets_without_traversing_packages_request(rule_runner: Rul
     direct_deps = rule_runner.request(Targets, [DependenciesRequest(z[MockDependenciesField])])
     assert direct_deps == Targets([y])
 
+    union_membership = rule_runner.request(UnionMembership, ())
     transitive_targets = rule_runner.request(
-        TransitiveTargets, [TransitiveTargetsWithoutTraversingPackagesRequest([z.address])]
+        TransitiveTargets,
+        [
+            transitive_targets_without_traversing_packages_request(
+                roots=[z.address],
+                union_membership=union_membership,
+            )
+        ]
     )
     assert transitive_targets.roots == (z,)
     # deps: z -> y -> x,w
