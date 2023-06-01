@@ -4,20 +4,10 @@
 from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import ConsoleScript, InterpreterConstraintsField
-from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet
-from pants.engine.unions import UnionRule
+from pants.backend.python.target_types import ConsoleScript
+from pants.engine.rules import collect_rules
 from pants.option.option_types import BoolOption
-from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
@@ -25,7 +15,6 @@ class IPython(PythonToolBase):
     options_scope = "ipython"
     help = "The IPython enhanced REPL (https://ipython.org/)."
 
-    default_version = "ipython>=7.34,<8"  # ipython 8 does not support Python 3.7.
     default_main = ConsoleScript("ipython")
     default_requirements = ["ipython>=7.34,<9"]
 
@@ -49,38 +38,8 @@ class IPython(PythonToolBase):
     )
 
 
-class IPythonLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = IPython.options_scope
-
-
-class _IpythonFieldSetForLockfiles(FieldSet):
-    required_fields = (InterpreterConstraintsField,)
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by iPython in your project
-        (for lockfile generation)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def setup_ipython_lockfile(
-    _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    if not ipython.uses_custom_lockfile:
-        return ipython.to_lockfile_request()
-
-    interpreter_constraints = await _find_all_unique_interpreter_constraints(
-        python_setup, _IpythonFieldSetForLockfiles
-    )
-    return ipython.to_lockfile_request(interpreter_constraints)
-
-
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, IPythonLockfileSentinel),
     )
