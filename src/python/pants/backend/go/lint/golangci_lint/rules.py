@@ -9,6 +9,7 @@ from pants.backend.go.lint.golangci_lint.skip_field import SkipGolangciLintField
 from pants.backend.go.lint.golangci_lint.subsystem import GolangciLint
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
     GoModInfoRequest,
@@ -111,11 +112,18 @@ async def run_golangci_lint(
         Get(GoModInfo, GoModInfoRequest(address)) for address in owning_go_mod_addresses
     )
 
+    go_build_opts = await MultiGet(
+        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(address))
+        for address in owning_go_mod_addresses
+    )
+
+    cgo_enabled = any(build_opts.cgo_enabled for build_opts in go_build_opts)
+
     # If cgo is enabled, golangci-lint needs to be able to locate the
     # associated tools in its environment. This is injected in $PATH in the
     # wrapper script.
-    cgo_tool_search_paths = (
-        ":".join(golang_env_aware.cgo_tool_search_paths) if golang_subsystem.cgo_enabled else ""
+    tool_search_path = ":".join(
+        ["${GOROOT}/bin", *(golang_env_aware.cgo_tool_search_paths if cgo_enabled else ())]
     )
 
     # golangci-lint requires a absolute path to a cache
@@ -125,11 +133,11 @@ async def run_golangci_lint(
             f"""\
             export GOROOT={goroot.path}
             sandbox_root="$(/bin/pwd)"
-            export PATH="${{GOROOT}}/bin:{cgo_tool_search_paths}"
+            export PATH="{tool_search_path}"
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/gocache"
             export GOLANGCI_LINT_CACHE="$GOCACHE"
-            export CGO_ENABLED={1 if golang_subsystem.cgo_enabled else 0}
+            export CGO_ENABLED={1 if cgo_enabled else 0}
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
             exec "$@"
             """
