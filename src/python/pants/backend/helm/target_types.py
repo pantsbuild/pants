@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
 from pants.base.deprecated import warn_or_error
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
 from pants.engine.internals.native_engine import AddressInput
@@ -444,6 +445,7 @@ class HelmDeploymentSkipCrdsField(BoolField):
 class HelmDeploymentSourcesField(MultipleSourcesField):
     default = ("*.yaml", "*.yml")
     expected_file_extensions = (".yaml", ".yml")
+    default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
     help = "Helm configuration files for a given deployment."
 
 
