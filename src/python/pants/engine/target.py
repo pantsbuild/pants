@@ -986,6 +986,7 @@ class TransitiveTargets:
         """The roots and the dependencies combined."""
         return FrozenOrderedSet([*self.roots, *self.dependencies])
 
+ShouldTraverseDepsPredicate = Callable[[Target], bool]
 
 @dataclass(frozen=True)
 class TransitiveTargetsRequest:
@@ -998,14 +999,14 @@ class TransitiveTargetsRequest:
     roots: Tuple[Address, ...]
     include_special_cased_deps: bool
     # If this predicate returns false, then the target's dependencies will be ignored.
-    should_traverse_deps_predicate: Callable[[Target], bool] | None
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None
 
     def __init__(
         self,
         roots: Iterable[Address],
         *,
         include_special_cased_deps: bool = False,
-        should_traverse_deps_predicate: Callable[[Target], bool] | None = None,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None = None,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
