@@ -808,7 +808,6 @@ def test_include_sources_without_transitive_package_sources(rule_runner: PythonR
     snapshot = rule_runner.request(Snapshot, [pex_request.sources])
 
     # the packaged transitive dep is excluded
-    assert "dep/dep.py" not in snapshot.files
     assert snapshot.files == ("app/app.py",)
 
 
