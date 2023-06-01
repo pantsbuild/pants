@@ -126,15 +126,14 @@ async def run_helm_unittest(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
-    strict = field_set.strict.value
     process_result = await Get(
         FallibleProcessResult,
         HelmProcess(
             argv=[
                 unittest_subsystem.plugin_name,
-                "--helm3",
+                *(("--helm3",) if unittest_subsystem.is_legacy else ()),
                 *(("--color",) if unittest_subsystem.color else ()),
-                *(("--strict",) if strict else ()),
+                *(("--strict",) if field_set.strict.value else ()),
                 "--output-type",
                 unittest_subsystem.output_type.value,
                 "--output-file",
