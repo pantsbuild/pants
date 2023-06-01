@@ -19,6 +19,7 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
+from pants.engine.internals.native_engine import NativeDependenciesRequest
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -194,7 +195,8 @@ async def parse_python_dependencies(
     has_custom_dep_inferences = len(union_membership[PythonDependencyVisitorRequest]) > 1
     if python_infer_subsystem.use_rust_parser and not has_custom_dep_inferences:
         native_result = await Get(
-            NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest
+            NativeParsedPythonDependencies,
+            NativeDependenciesRequest(stripped_sources.snapshot.digest),
         )
         imports = dict(native_result.imports)
         assets = set()

@@ -64,6 +64,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::scheduler::register(m)?;
   externs::testutil::register(m)?;
   externs::workunits::register(m)?;
+  externs::dep_inference::register(m)?;
 
   m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
@@ -234,6 +235,9 @@ impl PyTypes {
       docker_resolve_image_request: TypeId::new(docker_resolve_image_request),
       docker_resolve_image_result: TypeId::new(docker_resolve_image_result),
       parsed_python_deps_result: TypeId::new(parsed_python_deps_result),
+      deps_request: TypeId::new(
+        py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
+      ),
     })))
   }
 }

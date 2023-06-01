@@ -153,8 +153,11 @@ class _AWSLambdaBaseTarget(Target):
 
 
 class PythonAWSLambda(_AWSLambdaBaseTarget):
-    # TODO: rename to python_aws_lambda_function
-    alias = "python_awslambda"
+    alias = "python_aws_lambda_function"
+
+    deprecated_alias = "python_awslambda"
+    deprecated_alias_removal_version = "2.19.0.dev0"
+
     core_fields = (
         *_AWSLambdaBaseTarget.core_fields,
         PythonFaaSDependencies,

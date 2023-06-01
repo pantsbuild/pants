@@ -64,24 +64,24 @@ def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:
             "project/platform-py37.json": "",
             "project/BUILD": dedent(
                 """\
-                python_awslambda(
+                python_aws_lambda_function(
                     name='runtime',
                     handler='project.app:func',
                     runtime='python3.7',
                 )
                 file(name="python37", source="platform-py37.json")
-                python_awslambda(
+                python_aws_lambda_function(
                     name='complete_platforms',
                     handler='project.app:func',
                     complete_platforms=[':python37'],
                 )
-                python_awslambda(
+                python_aws_lambda_function(
                     name='both',
                     handler='project.app:func',
                     runtime='python3.7',
                     complete_platforms=[':python37'],
                 )
-                python_awslambda(
+                python_aws_lambda_function(
                     name='neither',
                     handler='project.app:func',
                 )
@@ -110,7 +110,7 @@ def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:
             re.escape(
                 softwrap(
                     """
-                    InvalidTargetException: The `python_awslambda` target project:neither must
+                    InvalidTargetException: The `python_aws_lambda_function` target project:neither must
                     specify either a `runtime` or `complete_platforms` or both.
                     """
                 )
