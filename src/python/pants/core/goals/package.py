@@ -186,11 +186,14 @@ def transitive_targets_without_traversing_packages_request(
     *,
     roots: Iterable[Address],
     union_membership: UnionMembership,
+    always_traverse_roots: bool = True,  # traverse roots even if they are package targets
     include_special_cased_deps: bool = False,
 ) -> TransitiveTargetsRequest:
     package_field_set_types = union_membership.get(PackageFieldSet)
 
     def should_traverse_deps(tgt: Target) -> bool:
+        if always_traverse_roots and tgt.address in roots:
+            return True
         for field_set_type in package_field_set_types:
             if field_set_type.is_applicable(tgt):
                 # False means do not traverse dependencies of this target

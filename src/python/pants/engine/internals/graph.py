@@ -690,12 +690,11 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     """
     roots_as_targets = await Get(UnexpandedTargets, Addresses(request.tt_request.roots))
     visited: OrderedSet[Target] = OrderedSet()
-    queued = roots_set = FrozenOrderedSet(roots_as_targets)
+    queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: dict[Address, tuple[Address, ...]] = {}
     while queued:
         applicable: FrozenOrderedSet[Target]
-        if request.tt_request.should_traverse_deps_predicate is None or queued is roots_set:
-            # "queued is roots_set" ensures we always include at least the roots
+        if request.tt_request.should_traverse_deps_predicate is None:
             applicable = queued
         else:
             predicate = request.tt_request.should_traverse_deps_predicate
