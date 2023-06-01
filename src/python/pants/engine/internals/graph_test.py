@@ -411,7 +411,8 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
         [
             TransitiveTargetsRequest(
                 [root.address, d2.address],
-                should_traverse_deps_predicate=lambda tgt: "skip_deps" not in (tgt[Tags].value or []),
+                should_traverse_deps_predicate=lambda tgt: "skip_deps"
+                not in (tgt[Tags].value or []),
             )
         ],
     )

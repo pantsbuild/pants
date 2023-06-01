@@ -986,7 +986,9 @@ class TransitiveTargets:
         """The roots and the dependencies combined."""
         return FrozenOrderedSet([*self.roots, *self.dependencies])
 
+
 ShouldTraverseDepsPredicate = Callable[[Target], bool]
+
 
 @dataclass(frozen=True)
 class TransitiveTargetsRequest:

@@ -11,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Callable, Iterable, Iterator, NamedTuple, NewType, Sequence, Type, cast
+from typing import Any, Iterable, Iterator, NamedTuple, NewType, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec

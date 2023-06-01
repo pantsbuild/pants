@@ -237,7 +237,7 @@ def test_transitive_targets_without_traversing_packages_request(rule_runner: Rul
                 roots=[z.address],
                 union_membership=union_membership,
             )
-        ]
+        ],
     )
     assert transitive_targets.roots == (z,)
     # deps: z -> y -> x,w
