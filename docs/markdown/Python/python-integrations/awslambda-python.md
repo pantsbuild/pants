@@ -26,19 +26,8 @@ backend_packages.add = [
 
 This adds the new `python_awslambda` target, which you can confirm by running `pants help python_awslambda`
 
-> 🚧 Set `layout = "zip"` for Pants 2.17
->
-> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility. To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`:
->
-> ```toml pants.toml
-> [lambdex]
-> layout = "zip"
-> ```
->
-> If you have existing `python_awslambda` targets, this will change the handler from `lambdex_handler.handler` to `lambda_function.handler` (see [below](#migrating-from-pants-216-and-earlier) for more details).
-
-Step 2: Define a `python_awslambda` target
-------------------------------------------
+Step 2: Define a `python_aws_lambda_function` target
+----------------------------------------------------
 
 First, add your lambda function in a Python file like you would [normally do with AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html). Specifically, create a function `def my_handler_name(event, context)` with the name you want.
 

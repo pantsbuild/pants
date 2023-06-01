@@ -27,15 +27,6 @@ backend_packages.add = [
 
 This adds the new `python_google_cloud_function` target, which you can confirm by running `pants help python_google_cloud_function `
 
-> 🚧 Set `layout = "zip"` for Pants 2.17
->
-> Pants 2.17 is transitioning to a new, better layout, but defaults to the old Lambdex layout for backwards compatibility (see [below](#migrating-from-pants-216-and-earlier) for more details). To silence the warnings and be ready for Pants 2.18, add the following to the end of your `pants.toml`:
->
-> ```toml pants.toml
-> [lambdex]
-> layout = "zip"
-> ```
-
 Step 2: Define a `python_google_cloud_function ` target
 -------------------------------------------------------
 
