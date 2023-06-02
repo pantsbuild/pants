@@ -412,7 +412,7 @@ class HelmDeploymentChartField(StringField, AsyncFieldMixin):
             "chart address in `dependencies`",
             softwrap(
                 f"""
-                You should specify the chart address in the new {self.alias} field in
+                You should specify the chart address in the new `{self.alias}` field in
                 {HelmDeploymentTarget.alias}. In future versions this will be mandatory.
                 """
             ),
