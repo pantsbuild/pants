@@ -367,7 +367,7 @@ def test_transitive_targets_tolerates_generated_target_cycles(
     ]
 
 
-def test_transitive_targets_with_should_traverse_deps_predicate(
+def test_transitive_targets_with_should_resolve_deps_predicate(
     transitive_targets_rule_runner: RuleRunner,
 ) -> None:
     transitive_targets_rule_runner.write_files(
@@ -411,7 +411,7 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
         [
             TransitiveTargetsRequest(
                 [root.address, d2.address],
-                should_traverse_deps_predicate=lambda tgt: "skip_deps"
+                should_resolve_deps_predicate=lambda tgt, fld: "skip_deps"
                 not in (tgt[Tags].value or []),
             )
         ],
@@ -422,7 +422,7 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
     assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, d4, t2, t1])
     # `//:d4` depends on `//:skipped` which depends on `//:t3`.
     # Nothing else depends on `//:skipped` or `//:t3`, so they should not
-    # be present in the list of transitive deps thanks to `should_traverse_deps_predicate`.
+    # be present in the list of transitive deps thanks to `should_resolve_deps_predicate`.
     assert skipped not in transitive_targets.dependencies
     assert t3 not in transitive_targets.dependencies
     assert skipped not in transitive_targets.closure

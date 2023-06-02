@@ -693,14 +693,6 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: dict[Address, tuple[Address, ...]] = {}
     while queued:
-        applicable: FrozenOrderedSet[Target]
-        if request.tt_request.should_traverse_deps_predicate is None:
-            applicable = queued
-        else:
-            predicate = request.tt_request.should_traverse_deps_predicate
-            applicable = FrozenOrderedSet(tgt for tgt in queued if predicate(tgt))
-        filtered = queued - applicable
-
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
             direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
@@ -712,7 +704,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                         include_special_cased_deps=request.tt_request.include_special_cased_deps,
                     ),
                 )
-                for tgt in applicable
+                for tgt in queued
             )
         else:
             direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
@@ -724,16 +716,15 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                         include_special_cased_deps=request.tt_request.include_special_cased_deps,
                     ),
                 )
-                for tgt in applicable
+                for tgt in queued
             )
 
         dependency_mapping.update(
             zip(
-                (t.address for t in applicable),
+                (t.address for t in queued),
                 (tuple(t.address for t in deps) for deps in direct_dependencies),
             )
         )
-        dependency_mapping.update((t.address, ()) for t in filtered)
 
         queued = FrozenOrderedSet(itertools.chain.from_iterable(direct_dependencies)).difference(
             visited

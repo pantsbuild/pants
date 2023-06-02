@@ -992,9 +992,6 @@ class TransitiveTargets:
         return FrozenOrderedSet([*self.roots, *self.dependencies])
 
 
-ShouldTraverseDepsPredicate = Callable[[Target], bool]
-
-
 @dataclass(frozen=True)
 class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
@@ -1006,8 +1003,6 @@ class TransitiveTargetsRequest:
     roots: Tuple[Address, ...]
     should_resolve_deps_predicate: ShouldResolveDepsPredicate
     include_special_cased_deps: bool
-    # If this predicate returns false, then the target's dependencies will be ignored.
-    should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None
 
     def __init__(
         self,
@@ -1015,14 +1010,12 @@ class TransitiveTargetsRequest:
         *,
         should_resolve_deps_predicate: ShouldResolveDepsPredicate | None = None,
         include_special_cased_deps: bool = False,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None = None,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         if should_resolve_deps_predicate is None:
             should_resolve_deps_predicate = should_resolve_deps_default_predicate
         object.__setattr__(self, "should_resolve_deps_predicate", should_resolve_deps_predicate)
         object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
-        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
 @dataclass(frozen=True)
