@@ -6,11 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.rust.target_types import RustPackageTarget
-from pants.core.goals.tailor import (
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsRequest,
-)
+from pants.core.goals.tailor import PutativeTarget, PutativeTargets, PutativeTargetsRequest
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule

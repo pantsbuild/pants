@@ -10,6 +10,7 @@ import ast
 import json
 import sys
 
+
 class DjangoDependencyVisitor(ast.NodeVisitor):
     def __init__(self):
         self.info = set()
