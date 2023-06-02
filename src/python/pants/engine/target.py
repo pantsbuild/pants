@@ -956,6 +956,7 @@ class CoarsenedTargetsRequest:
 
     roots: Tuple[Address, ...]
     expanded_targets: bool
+    should_resolve_deps_predicate: ShouldResolveDepsPredicate
     include_special_cased_deps: bool
 
     def __init__(
@@ -963,10 +964,14 @@ class CoarsenedTargetsRequest:
         roots: Iterable[Address],
         *,
         expanded_targets: bool = False,
+        should_resolve_deps_predicate: ShouldResolveDepsPredicate | None = None,
         include_special_cased_deps: bool = False,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "expanded_targets", expanded_targets)
+        if should_resolve_deps_predicate is None:
+            should_resolve_deps_predicate = should_resolve_deps_default_predicate
+        object.__setattr__(self, "should_resolve_deps_predicate", should_resolve_deps_predicate)
         object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
@@ -999,6 +1004,7 @@ class TransitiveTargetsRequest:
     """
 
     roots: Tuple[Address, ...]
+    should_resolve_deps_predicate: ShouldResolveDepsPredicate
     include_special_cased_deps: bool
     # If this predicate returns false, then the target's dependencies will be ignored.
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None
@@ -1007,10 +1013,14 @@ class TransitiveTargetsRequest:
         self,
         roots: Iterable[Address],
         *,
+        should_resolve_deps_predicate: ShouldResolveDepsPredicate | None = None,
         include_special_cased_deps: bool = False,
         should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None = None,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
+        if should_resolve_deps_predicate is None:
+            should_resolve_deps_predicate = should_resolve_deps_default_predicate
+        object.__setattr__(self, "should_resolve_deps_predicate", should_resolve_deps_predicate)
         object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
         object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
@@ -2594,9 +2604,27 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         )
 
 
+# If this predicate returns false, then the target's field's deps will be ignored.
+# ShouldResolveDepsPredicate = Callable[[Target, Dependencies], bool]
+# ShouldResolveDepsPredicate = Callable[[Target, Dependencies|SpecialCasedDependencies], bool]
+ShouldResolveDepsPredicate = Callable[[Target, Field], bool]
+
+
+# The default implementation skips fields (like SpecialCasedDependencies) that are not Dependencies subclasses
+# noinspection PyUnusedLocal
+def should_resolve_deps_default_predicate(tgt: Target, fld: Field) -> bool:
+    """This is the default ShouldResolveDepsPredicate implementation.
+
+    This skips resolving dependencies for fields (like SpecialCasedDependencies)
+    that are not subclasses of Dependencies.
+    """
+    return isinstance(fld, Dependencies)
+
+
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
-    field: Dependencies
+    field: Dependencies  # | SpecialCasedDependencies
+    should_resolve_deps_predicate: ShouldResolveDepsPredicate = should_resolve_deps_default_predicate
     include_special_cased_deps: bool = False
 
     def debug_hint(self) -> str:

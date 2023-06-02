@@ -708,6 +708,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     Targets,
                     DependenciesRequest(
                         tgt.get(Dependencies),
+                        should_resolve_deps_predicate=request.tt_request.should_resolve_deps_predicate,
                         include_special_cased_deps=request.tt_request.include_special_cased_deps,
                     ),
                 )
@@ -719,6 +720,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     UnexpandedTargets,
                     DependenciesRequest(
                         tgt.get(Dependencies),
+                        should_resolve_deps_predicate=request.tt_request.should_resolve_deps_predicate,
                         include_special_cased_deps=request.tt_request.include_special_cased_deps,
                     ),
                 )
@@ -796,7 +798,9 @@ async def coarsened_targets(
         _DependencyMapping,
         _DependencyMappingRequest(
             TransitiveTargetsRequest(
-                request.roots, include_special_cased_deps=request.include_special_cased_deps
+                request.roots,
+                should_resolve_deps_predicate=request.should_resolve_deps_predicate,
+                include_special_cased_deps=request.include_special_cased_deps,
             ),
             expanded_targets=request.expanded_targets,
         ),
@@ -1215,7 +1219,7 @@ class TransitiveExcludesNotSupportedError(ValueError):
 
 @rule
 async def determine_explicitly_provided_dependencies(
-    request: DependenciesRequest,
+    request: DependenciesRequest,  # this rule ignores request.should_resolve_deps_predicate
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
     subproject_roots: SubprojectRoots,
@@ -1295,7 +1299,7 @@ async def _fill_parameters(
 
 @rule(desc="Resolve direct dependencies of target", _masked_types=[EnvironmentName])
 async def resolve_dependencies(
-    request: DependenciesRequest,
+    request: DependenciesRequest,  # one request per deps field on the target
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     union_membership: UnionMembership,
     subproject_roots: SubprojectRoots,
@@ -1309,6 +1313,13 @@ async def resolve_dependencies(
         WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
     )
     tgt = wrapped_tgt.target
+
+    # This predicate allows the dep graph to ignore dependencies of selected targets
+    # including any explicit deps and any inferred deps.
+    # For example, to avoid traversing the deps of package targets.
+    if not request.should_resolve_deps_predicate(tgt, request.field):
+        return Addresses([])
+
     try:
         explicitly_provided = await Get(
             ExplicitlyProvidedDependencies, DependenciesRequest, request
@@ -1384,6 +1395,9 @@ async def resolve_dependencies(
             )
         )
 
+    # TODO: remove include_special_cased_deps handling in favor of request.should_resolve_deps_predicate()
+    #       (That means that there may be multiple DependenciesRequests per target
+    #       when a target has more than one dependencies field.)
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to
