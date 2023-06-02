@@ -1,7 +1,7 @@
 {
-  "main": "index.cjs",
+  "main": "helper.cj",
   "private": true,
-  "name": "@pants/test-jest-coverage-project",
+  "name": "@pants/cherry-pick-helper",
   "version": "0.0.1",
   "scripts": {
     "test": "jest"

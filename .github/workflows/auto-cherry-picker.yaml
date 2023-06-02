@@ -27,40 +27,27 @@ jobs:
         with:
           node-version: 16
       - run: npm install semver
+      - name: Check out code
+        uses: actions/checkout@v3
+        with:
+          # Always checkout the latest commit of main, for latest changes to the script
+          ref: main
+          token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
-            const semver = require("semver");
+            const Helper = require('build-support/bin/cherry_pick/helper.js');
+            const helper = new Helper({github, context, core});
+            const prereqs = await helper.get_prereqs();
 
-            const pr_num = "${{ github.event.pull_request.number || inputs.PR_number }}"
-            const {data: pull} = await github.rest.pulls.get({
-                ...context.repo,
-              pull_number: pr_num,
-            })
-            const target_milestone = pull.milestone.title
-
-            const { data: all_milestones } =
-              await github.rest.issues.listMilestones({
-                ...context.repo,
-                state: "open",
-              });
-            const sorted_milestones = all_milestones
-              .map((milestone) => milestone.title)
-              .sort((a, b) => semver.compare(semver.coerce(a), semver.coerce(b)));
-            const relevant_milestones = sorted_milestones.slice(
-              sorted_milestones.indexOf(target_milestone)
-            );
-
-            if (relevant_milestones.length === 0) {
-              core.setFailed(`Couldn't find any relevant milestones.`);
+            if (prereqs !== null) {
+              core.setOutput("pr_num", prereqs.pr_num);
+              core.setOutput("merge_commit", prereqs.merge_commit);
+              core.setOutput("milestones", prereqs.milestones);
             }
-
-            core.setOutput('pr_num', pr_num)
-            core.setOutput('merge_commit', pull.merge_commit_sha)
-            core.setOutput('milestones', relevant_milestones)
 
   cherry_picker:
     name: Cherry-Pick
@@ -90,24 +77,30 @@ jobs:
           BRANCH_NAME="cherry-pick-${{ needs.prerequisites.outputs.pr_num }}-to-${{ matrix.milestone }}"
           git checkout -b "$BRANCH_NAME" FETCH_HEAD
 
-          # @TODO: Comment on failure, and add label
           git cherry-pick "${{ needs.prerequisites.outputs.merge_commit }}"
 
           git push -u origin "$BRANCH_NAME"
           build-support/bin/cherry_pick/make_pr.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
-
-  label-remover:
-    name: Remove "needs-cherrypick" label
-    needs: [cherry_picker, prerequisites]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Remove label
+      - name: Handle Cherry-Pick Failure
+        if: ${{ failed() }}
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
-            github.rest.issues.removeLabel({
-              issue_number: ${{ needs.prerequisites.outputs.pr_num }},
-              ...context.repo,
-              name: 'needs-cherrypick'
-            })
+            const Helper = require('build-support/bin/cherry_pick/helper.js');
+            const helper = new Helper({github, context, core});
+            await helper.cherry_pick_failed("${{ needs.prerequisites.outputs.merge_commit }}", "${{ matrix.milestone }}");
+
+  handle_success:
+    name: Handle Cherry-Pick Success
+    needs: [cherry_picker, prerequisites]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Script
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+          script: |
+            const Helper = require('build-support/bin/cherry_pick/helper.js');
+            const helper = new Helper({github, context, core});
+            await helper.cherry_pick_succeeded(${{ needs.prerequisites.outputs.milestones }});
