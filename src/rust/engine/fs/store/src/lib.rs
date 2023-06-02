@@ -29,7 +29,7 @@
 mod immutable_inputs;
 pub use crate::immutable_inputs::{ImmutableInputs, WorkdirSymlink};
 mod snapshot;
-pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
+pub use crate::snapshot::{OneOffStoreFileByDigest, ShallowSnapshot, Snapshot, StoreFileByDigest};
 mod snapshot_ops;
 #[cfg(test)]
 mod snapshot_ops_tests;
@@ -487,7 +487,7 @@ impl Store {
     impl StoreFileByDigest<String> for Digester {
       fn store_by_digest(
         &self,
-        _: fs::File,
+        _: &fs::File,
       ) -> future::BoxFuture<'static, Result<hashing::Digest, String>> {
         future::ok(self.digest).boxed()
       }
@@ -638,10 +638,14 @@ impl Store {
 
     let (path_stats, maybe_digests): (Vec<_>, Vec<_>) =
       Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter)).unzip();
-    let file_digests = maybe_digests.into_iter().flatten().collect();
+    let file_digests = maybe_digests
+      .iter()
+      .flatten()
+      .map(|(p, d)| (p.as_ref(), *d))
+      .collect();
 
     let tree =
-      DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), &file_digests)?;
+      DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), file_digests)?;
     let computed_digest = tree.compute_root_digest();
     if digest.as_digest() != computed_digest {
       return Err(

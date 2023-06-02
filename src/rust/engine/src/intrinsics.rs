@@ -399,9 +399,9 @@ fn path_globs_to_paths(
       Snapshot::lift_path_globs(py_path_globs)
     })
     .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
-    let paths = context.get(Paths::from_path_globs(path_globs)).await?;
+    let shallow_snapshot = context.get(Paths::from_path_globs(path_globs)).await?;
     Ok(Python::with_gil(|py| {
-      Paths::store_paths(py, &core, &paths)
+      Paths::store_paths(py, &core, &shallow_snapshot)
     })?)
   }
   .boxed()
@@ -450,7 +450,7 @@ fn create_digest_to_digest(
   };
 
   let mut typed_paths: Vec<TypedPath> = Vec::with_capacity(items.len());
-  let mut file_digests: HashMap<PathBuf, Digest> = HashMap::with_capacity(items.len());
+  let mut file_digests: HashMap<&Path, Digest> = HashMap::with_capacity(items.len());
   let mut items_to_store = Vec::with_capacity(new_file_count);
 
   for item in &items {
@@ -462,28 +462,28 @@ fn create_digest_to_digest(
           path,
           is_executable: *is_executable,
         });
-        file_digests.insert(path.to_path_buf(), digest);
+        file_digests.insert(path, digest);
       }
       CreateDigestItem::FileEntry(path, digest, is_executable) => {
         typed_paths.push(TypedPath::File {
           path,
           is_executable: *is_executable,
         });
-        file_digests.insert(path.to_path_buf(), *digest);
+        file_digests.insert(path, *digest);
       }
       CreateDigestItem::SymlinkEntry(path, target) => {
         typed_paths.push(TypedPath::Link { path, target });
-        file_digests.insert(path.to_path_buf(), EMPTY_DIGEST);
+        file_digests.insert(path, EMPTY_DIGEST);
       }
       CreateDigestItem::Dir(path) => {
         typed_paths.push(TypedPath::Dir(path));
-        file_digests.insert(path.to_path_buf(), EMPTY_DIGEST);
+        file_digests.insert(path, EMPTY_DIGEST);
       }
     }
   }
 
   let store = context.core.store();
-  let trie = DigestTrie::from_unique_paths(typed_paths, &file_digests).unwrap();
+  let trie = DigestTrie::from_unique_paths(typed_paths, file_digests).unwrap();
   async move {
     store.store_file_bytes_batch(items_to_store, true).await?;
     Ok(Python::with_gil(|py| {

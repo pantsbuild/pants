@@ -665,7 +665,7 @@ pub async fn prepare_workdir_digest(
 
   // Finally, create a tree for all of the additional paths, and merge it with the input
   // Digest.
-  let additions = DigestTrie::from_unique_paths(paths, &HashMap::new())?;
+  let additions = DigestTrie::from_unique_paths(paths, HashMap::new())?;
 
   store.merge(vec![input_digest, additions.into()]).await
 }

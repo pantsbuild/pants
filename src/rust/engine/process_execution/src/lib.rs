@@ -1483,7 +1483,7 @@ pub fn extract_output_files(
   }
 
   impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
-    fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
+    fn store_by_digest(&self, file: &File) -> future::BoxFuture<'static, Result<Digest, String>> {
       match self.map_of_paths_to_digests.get(&file.path) {
         Some(digest) => future::ok(*digest),
         None => future::err(format!(

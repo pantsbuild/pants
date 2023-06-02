@@ -415,7 +415,7 @@ impl DigestTrie {
   /// Create a DigestTrie from unique TypedPath. Fails for duplicate items.
   pub fn from_unique_paths(
     mut path_stats: Vec<TypedPath>,
-    file_digests: &HashMap<PathBuf, Digest>,
+    file_digests: HashMap<&Path, Digest>,
   ) -> Result<Self, String> {
     // Sort and ensure that there were no duplicate entries.
     #[allow(clippy::unnecessary_sort_by)]
@@ -436,13 +436,13 @@ impl DigestTrie {
       ));
     }
 
-    Self::from_sorted_paths(PathBuf::new(), path_stats, file_digests)
+    Self::from_sorted_paths(PathBuf::new(), path_stats, &file_digests)
   }
 
   fn from_sorted_paths(
     prefix: PathBuf,
     paths: Vec<TypedPath>,
-    file_digests: &HashMap<PathBuf, Digest>,
+    file_digests: &HashMap<&Path, Digest>,
   ) -> Result<Self, String> {
     let mut entries = Vec::new();
 

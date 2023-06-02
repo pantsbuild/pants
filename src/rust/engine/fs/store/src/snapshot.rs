@@ -87,10 +87,10 @@ impl Snapshot {
     file_digester: S,
     path_stats: Vec<PathStat>,
   ) -> Result<Snapshot, String> {
-    let (paths, files): (Vec<_>, Vec<_>) = path_stats
+    let (paths, files): (Vec<&Path>, Vec<&File>) = path_stats
       .iter()
       .filter_map(|ps| match ps {
-        PathStat::File { path, stat } => Some((path.clone(), stat.clone())),
+        PathStat::File { path, stat } => Some((<PathBuf as AsRef<Path>>::as_ref(path), stat)),
         _ => None,
       })
       .unzip();
@@ -110,7 +110,26 @@ impl Snapshot {
 
     let tree = DigestTrie::from_unique_paths(
       path_stats.iter().map(|p| p.into()).collect(),
-      &file_digests_map,
+      file_digests_map,
+    )?;
+    Ok(Self {
+      digest: tree.compute_root_digest(),
+      tree,
+    })
+  }
+
+  pub fn from_path_stats_shallow(path_stats: Vec<PathStat>) -> Result<ShallowSnapshot, String> {
+    let file_digests_map = path_stats
+      .iter()
+      .filter_map(|ps| match ps {
+        PathStat::File { path, .. } => Some((path.as_ref(), EMPTY_DIGEST)),
+        _ => None,
+      })
+      .collect::<HashMap<_, _>>();
+
+    let tree = DigestTrie::from_unique_paths(
+      path_stats.iter().map(|p| p.into()).collect(),
+      file_digests_map,
     )?;
     Ok(Self {
       digest: tree.compute_root_digest(),
@@ -178,41 +197,26 @@ impl Snapshot {
   }
 
   /// Creates a snapshot containing empty Files for testing purposes.
-  pub fn create_for_testing(files: Vec<String>, dirs: Vec<String>) -> Result<Self, String> {
-    // NB: All files receive the EMPTY_DIGEST.
-    let file_digests = files
-      .iter()
-      .map(|s| (PathBuf::from(&s), EMPTY_DIGEST))
-      .collect();
-    let file_path_stats: Vec<PathStat> = files
-      .into_iter()
-      .map(|s| {
-        PathStat::file(
-          PathBuf::from(s.clone()),
-          File {
-            path: PathBuf::from(s),
-            is_executable: false,
-          },
-        )
-      })
-      .collect();
-    let dir_path_stats: Vec<PathStat> = dirs
-      .into_iter()
-      .map(|s| PathStat::dir(PathBuf::from(&s), Dir(PathBuf::from(s))))
-      .collect();
+  pub fn create_for_testing(
+    files: Vec<String>,
+    dirs: Vec<String>,
+  ) -> Result<ShallowSnapshot, String> {
+    let mut path_stats = Vec::with_capacity(files.len() + dirs.len());
 
-    let tree = DigestTrie::from_unique_paths(
-      [file_path_stats, dir_path_stats]
-        .concat()
-        .iter()
-        .map(|p| p.into())
-        .collect(),
-      &file_digests,
-    )?;
-    Ok(Self {
-      digest: tree.compute_root_digest(),
-      tree,
-    })
+    for s in files {
+      path_stats.push(PathStat::file(
+        PathBuf::from(s.clone()),
+        File {
+          path: PathBuf::from(s),
+          is_executable: false,
+        },
+      ));
+    }
+    for s in dirs {
+      path_stats.push(PathStat::dir(PathBuf::from(&s), Dir(PathBuf::from(s))));
+    }
+
+    Self::from_path_stats_shallow(path_stats)
   }
 }
 
@@ -233,12 +237,16 @@ impl From<Snapshot> for DirectoryDigest {
   }
 }
 
+/// A typedef that indicates that a Snapshot is only being used to store Path type information,
+/// but _not_ content. All File contents in the Snapshot will be the EMPTY_DIGEST.
+pub type ShallowSnapshot = Snapshot;
+
 // StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be
 // looked up by the Digest produced by the store_by_digest method.
 // It is a separate trait so that caching implementations can be written which wrap the Store (used
 // to store the bytes) and Vfs (used to read the files off disk if needed).
 pub trait StoreFileByDigest<Error> {
-  fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, Error>>;
+  fn store_by_digest(&self, file: &File) -> future::BoxFuture<'static, Result<Digest, Error>>;
 }
 
 ///
@@ -263,14 +271,12 @@ impl OneOffStoreFileByDigest {
 }
 
 impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
-  fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
+  fn store_by_digest(&self, file: &File) -> future::BoxFuture<'static, Result<Digest, String>> {
     let store = self.store.clone();
     let posix_fs = self.posix_fs.clone();
     let immutable = self.immutable;
-    let res = async move {
-      let path = posix_fs.file_path(&file);
-      store.store_file(true, immutable, path).await
-    };
+    let path = posix_fs.file_path(file);
+    let res = async move { store.store_file(true, immutable, path).await };
     res.boxed()
   }
 }

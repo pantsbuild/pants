@@ -383,7 +383,7 @@ async fn roundtrip_symlink() {
   impl StoreFileByDigest<String> for NoopDigester {
     fn store_by_digest(
       &self,
-      _: fs::File,
+      _: &fs::File,
     ) -> futures::future::BoxFuture<'static, Result<hashing::Digest, String>> {
       unimplemented!();
     }

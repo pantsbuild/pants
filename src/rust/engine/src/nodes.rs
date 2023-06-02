@@ -99,9 +99,10 @@ impl Vfs<Failure> for Context {
 impl StoreFileByDigest<Failure> for Context {
   fn store_by_digest(
     &self,
-    file: File,
+    file: &File,
   ) -> future::BoxFuture<'static, Result<hashing::Digest, Failure>> {
     let context = self.clone();
+    let file = file.clone();
     async move { context.get(DigestFile(file)).await }.boxed()
   }
 }
@@ -679,22 +680,21 @@ impl Paths {
       .await
   }
 
-  pub fn store_paths(py: Python, core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
-    let mut files = Vec::new();
-    let mut dirs = Vec::new();
-    for ps in item.iter() {
-      match ps {
-        PathStat::File { path, .. } => {
-          files.push(Snapshot::store_path(py, path)?);
-        }
-        PathStat::Link { path, .. } => {
-          panic!("Paths shouldn't be symlink-aware {path:?}");
-        }
-        PathStat::Dir { path, .. } => {
-          dirs.push(Snapshot::store_path(py, path)?);
-        }
-      }
-    }
+  pub fn store_paths(
+    py: Python,
+    core: &Arc<Core>,
+    item: &store::Snapshot,
+  ) -> Result<Value, String> {
+    let files = item
+      .files()
+      .iter()
+      .map(|p| Snapshot::store_path(py, p))
+      .collect::<Result<_, _>>()?;
+    let dirs = item
+      .directories()
+      .iter()
+      .map(|p| Snapshot::store_path(py, p))
+      .collect::<Result<_, _>>()?;
     Ok(externs::unsafe_call(
       py,
       core.types.paths,
@@ -705,15 +705,15 @@ impl Paths {
     ))
   }
 
-  async fn run_node(self, context: Context) -> NodeResult<Arc<Vec<PathStat>>> {
+  async fn run_node(self, context: Context) -> NodeResult<store::ShallowSnapshot> {
     let path_globs = self.path_globs.parse().map_err(throw)?;
     let path_stats = Self::create(context, path_globs).await?;
-    Ok(Arc::new(path_stats))
+    Ok(store::Snapshot::from_path_stats_shallow(path_stats)?)
   }
 }
 
 impl CompoundNode<NodeKey> for Paths {
-  type Item = Arc<Vec<PathStat>>;
+  type Item = store::ShallowSnapshot;
 }
 
 impl From<Paths> for NodeKey {
@@ -1637,10 +1637,7 @@ pub enum NodeOutput {
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
-  // Allow clippy::rc_buffer due to non-trivial issues that would arise in using the
-  // suggested Arc<[PathStat]> type. See https://github.com/rust-lang/rust-clippy/issues/6170
-  #[allow(clippy::rc_buffer)]
-  Paths(Arc<Vec<PathStat>>),
+  Paths(store::ShallowSnapshot),
   Value(Value),
 }
 
@@ -1697,16 +1694,6 @@ impl TryFrom<NodeOutput> for store::Snapshot {
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
       NodeOutput::Snapshot(v) => Ok(v),
-      _ => Err(()),
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for Arc<Vec<PathStat>> {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
       NodeOutput::Paths(v) => Ok(v),
       _ => Err(()),
     }

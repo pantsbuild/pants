@@ -480,7 +480,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             fs::Stat::File(f) => {
               let digest =
                 store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs), false)
-                  .store_by_digest(f)
+                  .store_by_digest(&f)
                   .await
                   .unwrap();
 

@@ -333,7 +333,7 @@ async fn memfs_expand_basic() {
         is_executable: false,
       },
     ],
-    &vec![(p1.clone(), EMPTY_DIGEST), (p3.clone(), EMPTY_DIGEST)]
+    [(p1.as_ref(), EMPTY_DIGEST), (p3.as_ref(), EMPTY_DIGEST)]
       .into_iter()
       .collect(),
   )

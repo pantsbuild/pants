@@ -1,22 +1,22 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
-
 use crate::directory::{DigestTrie, Entry, Name, TypedPath};
 use crate::MAX_LINK_DEPTH;
 use hashing::EMPTY_DIGEST;
 use std::path::{Path, PathBuf};
 
 fn make_tree(path_stats: Vec<TypedPath>) -> DigestTrie {
-  let mut file_digests = HashMap::new();
-  file_digests.extend(
-    path_stats
-      .iter()
-      .map(|path| (path.to_path_buf(), EMPTY_DIGEST)),
-  );
+  let file_digests = path_stats
+    .iter()
+    .map(|path| ((*path).to_owned(), EMPTY_DIGEST))
+    .collect::<Vec<_>>();
 
-  DigestTrie::from_unique_paths(path_stats, &file_digests).unwrap()
+  DigestTrie::from_unique_paths(
+    path_stats,
+    file_digests.iter().map(|(p, d)| (p.as_ref(), *d)).collect(),
+  )
+  .unwrap()
 }
 
 fn assert_entry_is_none(tree: &DigestTrie, path: &str) {

@@ -1,7 +1,6 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
 use std::convert::From;
 use std::fmt::{Debug, Display};
 use std::iter::Iterator;
@@ -232,16 +231,18 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
       .await
       .map_err(|err| format!("Error matching globs against {directory_digest:?}: {err}"))?;
 
-    let mut files = HashMap::new();
+    let mut files = Vec::with_capacity(path_stats.len());
     input_tree.walk(SymlinkBehavior::Oblivious, &mut |path, entry| match entry {
       directory::Entry::File(f) => {
-        files.insert(path.to_owned(), f.digest());
+        files.push((path.to_owned(), f.digest()));
       }
       directory::Entry::Symlink(_) => panic!("Unexpected symlink"),
       directory::Entry::Directory(_) => (),
     });
 
-    Ok(DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), &files)?.into())
+    let files = files.iter().map(|(p, d)| (p.as_ref(), *d)).collect();
+
+    Ok(DigestTrie::from_unique_paths(path_stats.iter().map(|p| p.into()).collect(), files)?.into())
   }
 
   async fn create_empty_dir(&self, path: &RelativePath) -> Result<DirectoryDigest, Self::Error> {
