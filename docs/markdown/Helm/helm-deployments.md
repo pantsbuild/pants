@@ -34,11 +34,23 @@ name: example
 version: 0.1.0
 ```
 ```python src/deployment/BUILD
-helm_deployment(name="dev", sources=["common-values.yaml", "dev-override.yaml"], chart="//src/chart")
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  sources=["common-values.yaml", "dev-override.yaml"]
+)
 
-helm_deployment(name="stage", sources=["common-values.yaml", "stage-override.yaml"], chart="//src/chart")
+helm_deployment(
+  name="stage",
+  chart="//src/chart",
+  sources=["common-values.yaml", "stage-override.yaml"]
+)
 
-helm_deployment(name="prod", sources=["common-values.yaml", "prod-override.yaml"], chart="//src/chart")
+helm_deployment(
+  name="prod",
+  chart="//src/chart",
+  sources=["common-values.yaml", "prod-override.yaml"]
+)
 ```
 ```yaml src/deployment/common-values.yaml
 # Default values common to all deployments
@@ -64,7 +76,7 @@ env:
 There are quite a few things to notice in the previous example:
 
 * The `helm_deployment` target requires you to explicitly specify which chart to use using the `chart` field.
-* We have three different deployments that using configuration files with the specified chart.
+* We have three different deployments that using different set of configuration files with the same chart.
 * One of those value files (`common-values.yaml`) provides with default values that are common to all deployments.
 * Each deployment uses an additional `xxx-override.yaml` file with values that are specific to the given deployment.
 
@@ -159,7 +171,11 @@ src/deployment/last.yaml
 And also the following `helm_deployment` target definition:
 
 ```python src/deployment/BUILD
-helm_deployment(name="dev", chart="//src/chart", sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"])
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"]
+)
 ```
 
 In this case, the final ordering of the files would be as follows:
