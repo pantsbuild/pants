@@ -416,6 +416,7 @@ class HelmDeploymentChartField(StringField, AsyncFieldMixin):
                 {HelmDeploymentTarget.alias}. In future versions this will be mandatory.
                 """
             ),
+            start_version="2.18.0.dev1",
         )
         return None
 
