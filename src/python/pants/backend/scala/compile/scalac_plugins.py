@@ -127,7 +127,7 @@ async def _resolve_scalac_plugin_artifact(
     field_defaults: FieldDefaults,
 ) -> WrappedTarget:
     """Helps resolving the actual artifact for a scalac plugin even in the scenario in which the
-    artifact has been declated as a scala_artifact and it has been parametrized (i.e. across
+    artifact has been declared as a scala_artifact and it has been parametrized (i.e. across
     multiple resolves for cross building)."""
 
     environment_name = local_environment_name.val
