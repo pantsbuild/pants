@@ -200,7 +200,7 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
     # Test that using a file path results in ignoring all targets which are not an ancestor. We can
     # do this because we know the file name must be in the current directory or subdir of the
-    # `python_awslambda`.
+    # `python_aws_lambda_function`.
     assert_inferred(
         Address("project", target_name="another_root__file_used"),
         expected=Address(
