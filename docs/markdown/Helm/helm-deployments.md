@@ -34,11 +34,11 @@ name: example
 version: 0.1.0
 ```
 ```python src/deployment/BUILD
-helm_deployment(name="dev", sources=["common-values.yaml", "dev-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(name="dev", sources=["common-values.yaml", "dev-override.yaml"], chart="//src/chart")
 
-helm_deployment(name="stage", sources=["common-values.yaml", "stage-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(name="stage", sources=["common-values.yaml", "stage-override.yaml"], chart="//src/chart")
 
-helm_deployment(name="prod", sources=["common-values.yaml", "prod-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(name="prod", sources=["common-values.yaml", "prod-override.yaml"], chart="//src/chart")
 ```
 ```yaml src/deployment/common-values.yaml
 # Default values common to all deployments
@@ -112,7 +112,7 @@ spec:
 ```
 ```python src/deployment/BUILD
 # Overrides the `image` value for the chart using the target address for the first-party docker image.
-helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
+helm_deployment(chart="src/chart", values={"image": "src/docker"})
 ```
 
 > 📘 Docker image references VS Pants' target addresses
@@ -140,7 +140,7 @@ Value files
 It's very common that Helm deployments use a series of files providing with values that customise the given chart. When using deployments that may have more than one YAML file as the source of configuration values, the Helm backend needs to sort the file names in a way that is consistent across different machines, as the order in which those files are passed to the Helm command is relevant. The final order depends on the same order in which those files are specified in the `sources` field of the `helm_deployment` target. For example, given the following `BUILD` file:
 
 ```python src/deployment/BUILD
-helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "second.yaml", "last.yaml"])
+helm_deployment(name="dev", chart="//src/chart", sources=["first.yaml", "second.yaml", "last.yaml"])
 ```
 
 This will result in the Helm command receiving the value files as in that exact order.
@@ -159,7 +159,7 @@ src/deployment/last.yaml
 And also the following `helm_deployment` target definition:
 
 ```python src/deployment/BUILD
-helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"])
+helm_deployment(name="dev", chart="//src/chart", sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"])
 ```
 
 In this case, the final ordering of the files would be as follows:
@@ -185,7 +185,7 @@ Inline values are defined as a key-value dictionary, like in the following examp
 ```python src/deployment/BUILD
 helm_deployment(
   name="dev",
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   values={
     "nameOverride": "my_custom_name",
     "image.pullPolicy": "Always",
@@ -200,7 +200,7 @@ Inline values also support interpolation of environment variables. Since Pants r
 ```python src/deployment/BUILD
 helm_deployment(
   name="dev",
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   values={
     "configmap.deployedAt": "{env.DEPLOY_TIME}",
   },
@@ -240,7 +240,7 @@ helm_artifact(
 ```python src/deploy/BUILD
 helm_deployment(
   name="main",
-  dependencies=["//3rdparty/helm/jetstack:cert-manager"],
+  chart="//3rdparty/helm/jetstack:cert-manager",
   values={
     "installCRDs": "true"
   },
@@ -284,7 +284,7 @@ run_shell_command(
 )
 
 helm_deployment(
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   post_renderers=[":vals"],
 )
 ```

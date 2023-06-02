@@ -41,8 +41,16 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, ExplicitlyProvidedDependencies, Target, Targets
+from pants.engine.target import (
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
+    Target,
+    Targets,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -136,13 +144,13 @@ async def _merge_subchart_digests(charts: Iterable[HelmChart]) -> Digest:
     return await Get(Digest, AddPrefix(merged_digests, "charts"))
 
 
-async def _get_subcharts(
-    subtargets: Targets, *, description_of_origin: str
+async def _find_charts_by_targets(
+    targets: Iterable[Target], *, description_of_origin: str
 ) -> tuple[HelmChart, ...]:
     requests = [
         *(
             Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(target))
-            for target in subtargets
+            for target in targets
             if HelmChartFieldSet.is_applicable(target)
         ),
         *(
@@ -154,7 +162,7 @@ async def _get_subcharts(
                     description_of_origin=description_of_origin,
                 ),
             )
-            for target in subtargets
+            for target in targets
             if HelmArtifactFieldSet.is_applicable(target)
         ),
     ]
@@ -179,7 +187,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     )
 
     subcharts_digest = EMPTY_DIGEST
-    subcharts = await _get_subcharts(
+    subcharts = await _find_charts_by_targets(
         dependencies, description_of_origin=f"the `helm_chart` {request.field_set.address}"
     )
     if subcharts:
@@ -287,22 +295,32 @@ class FindHelmDeploymentChart(EngineAwareParameter):
 
 @rule(desc="Find Helm deployment's chart", level=LogLevel.DEBUG)
 async def find_chart_for_deployment(request: FindHelmDeploymentChart) -> HelmChart:
-    explicit_dependencies = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
-    )
-    explicit_targets = await Get(
-        Targets,
-        Addresses(
-            [
-                addr
-                for addr in explicit_dependencies.includes
-                if addr not in explicit_dependencies.ignores
-            ]
-        ),
-    )
+    targets = []
+    address_input = request.field_set.chart.to_address_input()
+    if address_input:
+        address = await Get(Address, AddressInput, address_input)
+        wrapped_target = await Get(
+            WrappedTarget, WrappedTargetRequest(address, address_input.description_of_origin)
+        )
+        targets.append(wrapped_target.target)
+    else:
+        explicit_dependencies = await Get(
+            ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
+        )
+        explicit_targets = await Get(
+            Targets,
+            Addresses(
+                [
+                    addr
+                    for addr in explicit_dependencies.includes
+                    if addr not in explicit_dependencies.ignores
+                ]
+            ),
+        )
+        targets.extend(explicit_targets)
 
-    found_charts = await _get_subcharts(
-        explicit_targets, description_of_origin=f"the `helm_deployment` {request.field_set.address}"
+    found_charts = await _find_charts_by_targets(
+        targets, description_of_origin=f"the `helm_deployment` {request.field_set.address}"
     )
 
     if not found_charts:

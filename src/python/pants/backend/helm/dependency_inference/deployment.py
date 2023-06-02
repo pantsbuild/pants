@@ -24,6 +24,7 @@ from pants.backend.helm.utils.yaml import FrozenYamlIndex, MutableYamlIndex
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import Digest, DigestEntries, FileEntry
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -152,6 +153,11 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
 ) -> InferredDependencies:
+    chart_address = None
+    chart_address_input = request.field_set.chart.to_address_input()
+    if chart_address_input:
+        chart_address = await Get(Address, AddressInput, chart_address_input)
+
     explicitly_provided_deps, mapping = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
         Get(
@@ -161,6 +167,8 @@ async def inject_deployment_dependencies(
     )
 
     dependencies: OrderedSet[Address] = OrderedSet()
+    if chart_address:
+        dependencies.add(chart_address)
     for imager_ref, candidate_address in mapping.indexed_docker_addresses.values():
         matches = frozenset([candidate_address]).difference(explicitly_provided_deps.includes)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
