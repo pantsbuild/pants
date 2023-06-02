@@ -47,6 +47,7 @@ class DjangoDependencyVisitor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
+
 def main(filename):
     with open(filename, "rb") as f:
         content = f.read()
@@ -60,6 +61,7 @@ def main(filename):
     # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
     buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
     buffer.write(json.dumps(sorted(visitor.info)).encode("utf8"))
+
 
 if __name__ == "__main__":
     main(sys.argv[1])
