@@ -2608,8 +2608,8 @@ ShouldResolveDepsPredicate = Callable[[Target, Field], bool]
 def should_resolve_deps_default_predicate(tgt: Target, fld: Field) -> bool:
     """This is the default ShouldResolveDepsPredicate implementation.
 
-    This skips resolving dependencies for fields (like SpecialCasedDependencies)
-    that are not subclasses of Dependencies.
+    This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
+    subclasses of Dependencies.
     """
     return isinstance(fld, Dependencies)
 
@@ -2617,7 +2617,9 @@ def should_resolve_deps_default_predicate(tgt: Target, fld: Field) -> bool:
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies  # | SpecialCasedDependencies
-    should_resolve_deps_predicate: ShouldResolveDepsPredicate = should_resolve_deps_default_predicate
+    should_resolve_deps_predicate: ShouldResolveDepsPredicate = (
+        should_resolve_deps_default_predicate
+    )
     include_special_cased_deps: bool = False
 
     def debug_hint(self) -> str:
