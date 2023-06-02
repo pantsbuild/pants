@@ -63,7 +63,7 @@ env:
 
 There are quite a few things to notice in the previous example:
 
-* The `helm_deployment` target requires you to explicitly define as a dependency which chart to use.
+* The `helm_deployment` target requires you to explicitly which chart to use using the `chart` field.
 * We have three different deployments that using configuration files with the specified chart.
 * One of those value files (`common-values.yaml`) provides with default values that are common to all deployments.
 * Each deployment uses an additional `xxx-override.yaml` file with values that are specific to the given deployment.
