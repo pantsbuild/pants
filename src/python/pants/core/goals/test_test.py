@@ -717,3 +717,17 @@ def test_timeout_calculation() -> None:
     assert_timeout_calculated(field_value=None, expected=None)
     assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
     assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
+
+
+def test_non_utf8_output() -> None:
+    test_result = TestResult(
+        exit_code=1,  # "test error" so stdout/stderr are output in message
+        stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stdout_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
+        stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stderr_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
+        addresses=(),
+        output_setting=ShowOutput.ALL,
+        result_metadata=None,
+    )
+    assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"
