@@ -18,6 +18,7 @@ from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
     FieldSet,
+    should_resolve_all_deps_predicate,
 )
 from pants.util.logging import LogLevel
 
@@ -39,7 +40,14 @@ async def check_visibility_rule_violations(
     request: EnforceVisibilityRules.Batch, platform: Platform, run_id: RunId
 ) -> LintResult:
     all_dependencies = await MultiGet(
-        Get(Addresses, DependenciesRequest(field_set.dependencies, include_special_cased_deps=True))
+        Get(
+            Addresses,
+            DependenciesRequest(
+                field_set.dependencies,
+                should_resolve_deps_predicate=should_resolve_all_deps_predicate,
+                include_special_cased_deps=True,
+            ),
+        )
         for field_set in request.elements
     )
     all_dependencies_rule_action = await MultiGet(

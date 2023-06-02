@@ -2485,7 +2485,6 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 ShouldResolveDepsPredicate = Callable[[Target, Field], bool]
 
 
-# The default implementation skips fields (like SpecialCasedDependencies) that are not Dependencies subclasses
 # noinspection PyUnusedLocal
 def should_resolve_deps_default_predicate(tgt: Target, fld: Field) -> bool:
     """This is the default ShouldResolveDepsPredicate implementation.
@@ -2494,6 +2493,16 @@ def should_resolve_deps_default_predicate(tgt: Target, fld: Field) -> bool:
     subclasses of Dependencies.
     """
     return isinstance(fld, Dependencies)
+
+
+# noinspection PyUnusedLocal
+def should_resolve_all_deps_predicate(tgt: Target, fld: Field) -> bool:
+    """A predicate to use when a request needs all deps.
+
+    This includes deps from fields like SpecialCasedDependencies which are
+    ignored in most cases.
+    """
+    return True
 
 
 @dataclass(frozen=True)

@@ -30,6 +30,7 @@ from pants.engine.target import (
     Target,
     Targets,
     UnexpandedTargets,
+    should_resolve_all_deps_predicate,
 )
 from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
@@ -179,7 +180,11 @@ async def get_target_data(
     dependencies_per_target = await MultiGet(
         Get(
             Targets,
-            DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
+            DependenciesRequest(
+                tgt.get(Dependencies),
+                should_resolve_deps_predicate=should_resolve_all_deps_predicate,
+                include_special_cased_deps=True,
+            ),
         )
         for tgt in sorted_targets
     )

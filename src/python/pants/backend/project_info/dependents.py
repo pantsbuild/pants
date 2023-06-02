@@ -10,7 +10,12 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import AllUnexpandedTargets, Dependencies, DependenciesRequest
+from pants.engine.target import (
+    AllUnexpandedTargets,
+    Dependencies,
+    DependenciesRequest,
+    should_resolve_all_deps_predicate,
+)
 from pants.option.option_types import BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -25,7 +30,14 @@ class AddressToDependents:
 @rule(desc="Map all targets to their dependents", level=LogLevel.DEBUG)
 async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> AddressToDependents:
     dependencies_per_target = await MultiGet(
-        Get(Addresses, DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True))
+        Get(
+            Addresses,
+            DependenciesRequest(
+                tgt.get(Dependencies),
+                should_resolve_deps_predicate=should_resolve_all_deps_predicate,
+                include_special_cased_deps=True,
+            ),
+        )
         for tgt in all_targets
     )
 
