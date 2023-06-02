@@ -413,7 +413,7 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
         {"BUILD": "python_aws_lambda_layer(name='lambda', runtime='python3.7')"}
     )
     with pytest.raises(
-        ExecutionError, match="The 'dependencies' field in target //:lambda must be defined"
+        ExecutionError, match="The `dependencies` field in target //:lambda must be defined"
     ):
         create_python_awslambda(
             rule_runner,
