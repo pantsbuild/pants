@@ -593,9 +593,8 @@ class PythonSetup(Subsystem):
         self,
         option_value: dict[str, _T],
         option_name: str,
-        all_python_tool_resolve_names: tuple[str, ...],
     ) -> dict[str, _T]:
-        all_valid_resolves = {*self.resolves, *all_python_tool_resolve_names}
+        all_valid_resolves = set(self.resolves)
         unrecognized_resolves = set(option_value.keys()) - {
             RESOLVE_OPTION_KEY__DEFAULT,
             *all_valid_resolves,
@@ -612,38 +611,29 @@ class PythonSetup(Subsystem):
         return {resolve: option_value.get(resolve, default_val) for resolve in all_valid_resolves}
 
     @memoized_method
-    def resolves_to_constraints_file(
-        self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, str]:
+    def resolves_to_constraints_file(self) -> dict[str, str]:
         return self._resolves_to_option_helper(
             self._resolves_to_constraints_file,
             "resolves_to_constraints_file",
-            all_python_tool_resolve_names,
         )
 
     @memoized_method
-    def resolves_to_no_binary(
-        self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[str]]:
+    def resolves_to_no_binary(self) -> dict[str, list[str]]:
         return {
             resolve: [canonicalize_name(v) for v in vals]
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_no_binary,
                 "resolves_to_no_binary",
-                all_python_tool_resolve_names,
             ).items()
         }
 
     @memoized_method
-    def resolves_to_only_binary(
-        self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[str]]:
+    def resolves_to_only_binary(self) -> dict[str, list[str]]:
         return {
             resolve: sorted([canonicalize_name(v) for v in vals])
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_only_binary,
                 "resolves_to_only_binary",
-                all_python_tool_resolve_names,
             ).items()
         }
 

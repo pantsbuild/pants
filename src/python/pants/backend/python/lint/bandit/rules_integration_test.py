@@ -23,10 +23,11 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     has_python_version,
-    skip_unless_python27_and_python3_present,
+    skip_unless_python37_and_python39_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
+from pants.util.resources import read_resource
 
 
 @pytest.fixture
@@ -124,52 +125,47 @@ def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-@skip_unless_python27_and_python3_present
+@skip_unless_python37_and_python39_present
 def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
-            "f.py": "version: str = 'Py3 > Py2'\n",
+            "f.py": "y = (x := 5)'\n",
             "BUILD": dedent(
                 """\
-                python_sources(name="py2", interpreter_constraints=["==2.7.*"])
-                python_sources(name="py3", interpreter_constraints=[">=3.7"])
+                python_sources(name="py37", interpreter_constraints=["==3.7.*"])
+                python_sources(name="py39", interpreter_constraints=["==3.9.*"])
                 """
             ),
         }
     )
-    extra_args = [
-        "--bandit-version=bandit>=1.6.2,<1.7",
-        "--bandit-extra-requirements=['setuptools']",
-        "--bandit-lockfile=<none>",
-    ]
 
-    py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
-    py2_result = run_bandit(rule_runner, [py2_tgt], extra_args=extra_args)
-    assert len(py2_result) == 1
-    assert py2_result[0].exit_code == 0
-    assert "f.py (syntax error while parsing AST from file)" in py2_result[0].stdout
+    py37_tgt = rule_runner.get_target(Address("", target_name="py37", relative_file_path="f.py"))
+    py37_result = run_bandit(rule_runner, [py37_tgt])
+    assert len(py37_result) == 1
+    assert py37_result[0].exit_code == 0
+    assert "f.py (syntax error while parsing AST from file)" in py37_result[0].stdout
 
-    py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
-    py3_result = run_bandit(rule_runner, [py3_tgt], extra_args=extra_args)
-    assert len(py3_result) == 1
-    assert py3_result[0].exit_code == 0
-    assert "No issues identified." in py3_result[0].stdout
+    py39_tgt = rule_runner.get_target(Address("", target_name="py39", relative_file_path="f.py"))
+    py39_result = run_bandit(rule_runner, [py39_tgt])
+    assert len(py39_result) == 1
+    assert py39_result[0].exit_code == 0
+    assert "No issues identified." in py39_result[0].stdout
 
-    # Test that we partition incompatible targets when passed in a single batch. We expect Py2
-    # to still fail, but Py3 should pass.
-    combined_result = run_bandit(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
+    # Test that we partition incompatible targets when passed in a single batch. We expect Py37
+    # to still fail, but Py39 should pass.
+    combined_result = run_bandit(rule_runner, [py37_tgt, py39_tgt])
     assert len(combined_result) == 2
 
-    batched_py2_result, batched_py3_result = sorted(
+    batched_py37_result, batched_py39_result = sorted(
         combined_result, key=lambda result: result.stderr
     )
-    assert batched_py2_result.exit_code == 0
-    assert batched_py2_result.partition_description == "['CPython==2.7.*']"
-    assert "f.py (syntax error while parsing AST from file)" in batched_py2_result.stdout
+    assert batched_py37_result.exit_code == 0
+    assert batched_py37_result.partition_description == "['CPython==3.7.*']"
+    assert "f.py (syntax error while parsing AST from file)" in batched_py37_result.stdout
 
-    assert batched_py3_result.exit_code == 0
-    assert batched_py3_result.partition_description == "['CPython>=3.7']"
-    assert "No issues identified." in batched_py3_result.stdout
+    assert batched_py39_result.exit_code == 0
+    assert batched_py39_result.partition_description == "['CPython==3.9.*']"
+    assert "No issues identified." in batched_py39_result.stdout
 
 
 def test_respects_config_file(rule_runner: PythonRuleRunner) -> None:
@@ -205,13 +201,19 @@ def test_3rdparty_plugin(rule_runner: PythonRuleRunner) -> None:
             # NB: `bandit-aws` does not currently work with Python 3.8. See
             #  https://github.com/pantsbuild/pants/issues/10545.
             "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.7,<3.8'])",
+            "bandit.lock": read_resource(
+                "pants.backend.python.lint.bandit", "bandit_plugin_test.lock"
+            ),
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_bandit(
         rule_runner,
         [tgt],
-        extra_args=["--bandit-extra-requirements=bandit-aws", "--bandit-lockfile=<none>"],
+        extra_args=[
+            "--python-resolves={'bandit':'bandit.lock'}",
+            "--bandit-install-from-resolve=bandit",
+        ],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
