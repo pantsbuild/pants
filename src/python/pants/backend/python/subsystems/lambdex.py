@@ -3,7 +3,7 @@
 
 from enum import Enum
 
-from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules
 from pants.option.option_types import EnumOption
@@ -20,15 +20,13 @@ class Lambdex(PythonToolBase):
     options_scope = "lambdex"
     help = "A tool for turning .pex files into Function-as-a-Service artifacts (https://github.com/pantsbuild/lambdex)."
 
-    default_version = "lambdex>=0.1.9"
     default_main = ConsoleScript("lambdex")
-    default_requirements = [default_version]
+    default_requirements = ["lambdex>=0.1.9"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.12"]
 
     default_lockfile_resource = ("pants.backend.python.subsystems", "lambdex.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
     layout = EnumOption(
         default=LambdexLayout.ZIP,

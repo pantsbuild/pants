@@ -24,6 +24,7 @@ from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.rules import _run_yapf
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
 from pants.backend.python.util_rules import pex
 from pants.base.specs import Specs
 from pants.engine.console import Console
@@ -312,7 +313,7 @@ async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
-    yapf_ics = await Yapf._find_python_interpreter_constraints_from_lockfile(yapf)
+    yapf_ics = await get_lockfile_interpreter_constraints(yapf)
     result = await _run_yapf(
         YapfRequest.Batch(
             Yapf.options_scope,
@@ -346,7 +347,7 @@ async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
-    black_ics = await Black._find_python_interpreter_constraints_from_lockfile(black)
+    black_ics = await get_lockfile_interpreter_constraints(black)
     result = await _run_black(
         BlackRequest.Batch(
             Black.options_scope,
