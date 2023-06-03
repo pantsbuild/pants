@@ -127,7 +127,6 @@ class NodeJSProject:
         project: _TentativeProject,
         nodejs: NodeJS,
         pnpm_workspaces: PnpmWorkspaces,
-        resolve_names: UserChosenNodeJSResolveAliases,
     ) -> NodeJSProject:
         root_ws = project.root_workspace()
         package_manager: str | None = None
@@ -232,8 +231,7 @@ async def find_node_js_projects(
     }
     merged_projects = _merge_workspaces(node_js_projects)
     all_projects = AllNodeJSProjects(
-        NodeJSProject.from_tentative(p, nodejs, pnpm_workspaces, resolve_names)
-        for p in merged_projects
+        NodeJSProject.from_tentative(p, nodejs, pnpm_workspaces) for p in merged_projects
     )
     _ensure_resolve_names_are_unique(all_projects, resolve_names)
 
