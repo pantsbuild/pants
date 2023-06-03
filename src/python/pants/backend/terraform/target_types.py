@@ -5,20 +5,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
+    AsyncFieldMixin,
     Dependencies,
     DescriptionField,
     FieldSet,
     MultipleSourcesField,
     OptionalSingleSourceField,
+    StringField,
     Target,
     Targets,
     generate_multiple_sources_field_help_message,
 )
-from pants.util.strutil import help_text
+from pants.util.strutil import help_text, softwrap
 
 
 class TerraformDependenciesField(Dependencies):
@@ -56,6 +59,35 @@ class TerraformModuleTarget(Target):
     )
 
 
+class TerraformRootModuleField(StringField, AsyncFieldMixin):
+    """The module to use as the root module for a Terraform deployment."""
+
+    required = True
+    alias = "root_module"
+    help = help_text(
+        """
+        The Terraform module to use as the root module.
+
+        Example: `root_module=":my_module"`
+        """
+    )
+
+    def to_address_input(self) -> AddressInput:
+        if not self.value:
+            raise ValueError(
+                softwrap(
+                    f"""
+            A Terraform deployment must have a nonempty {self.alias} field,
+             but {self.address} was empty"""
+                )
+            )
+        return AddressInput.parse(
+            self.value,
+            relative_to=self.address.spec_path,
+            description_of_origin=f"the `{self.alias} field in the `{TerraformDeploymentTarget.alias}` target {self.address}",
+        )
+
+
 class TerraformBackendConfigField(OptionalSingleSourceField):
     alias = "backend_config"
     help = "Configuration to be merged with what is in the configuration file's 'backend' block"
@@ -74,7 +106,7 @@ class TerraformDeploymentTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         TerraformDependenciesField,
-        TerraformModuleSourcesField,
+        TerraformRootModuleField,
         TerraformBackendConfigField,
         TerraformVarFileSourcesField,
     )
@@ -85,10 +117,10 @@ class TerraformDeploymentTarget(Target):
 class TerraformDeploymentFieldSet(FieldSet):
     required_fields = (
         TerraformDependenciesField,
-        TerraformModuleSourcesField,
+        TerraformRootModuleField,
     )
     description: DescriptionField
-    sources: TerraformModuleSourcesField
+    root_module: TerraformRootModuleField
     dependencies: TerraformDependenciesField
 
     backend_config: TerraformBackendConfigField

@@ -39,7 +39,7 @@ async def prepare_terraform_deployment(
     initialised_terraform = await Get(
         TerraformInitResponse,
         TerraformInitRequest(
-            (request.field_set.sources,),
+            request.field_set.root_module,
             request.field_set.backend_config,
             request.field_set.dependencies,
             initialise_backend=True,

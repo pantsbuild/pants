@@ -3,21 +3,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Tuple
+from typing import Tuple
 
 from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import (
     TerraformBackendConfigField,
     TerraformDependenciesField,
+    TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
+from pants.engine.internals.native_engine import (
+    EMPTY_DIGEST,
+    Address,
+    AddressInput,
+    Digest,
+    MergeDigests,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import DependenciesRequest, SourcesField, Targets
+from pants.engine.target import (
+    DependenciesRequest,
+    SourcesField,
+    Targets,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 
 
 @dataclass(frozen=True)
@@ -88,7 +101,7 @@ async def get_terraform_providers(
 
 @dataclass(frozen=True)
 class TerraformInitRequest:
-    sources: Iterable[SourcesField]
+    root_module: TerraformRootModuleField
     backend_config: TerraformBackendConfigField
     dependencies: TerraformDependenciesField
 
@@ -105,12 +118,29 @@ class TerraformInitResponse:
 
 @rule
 async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse:
-    root_dependencies = await Get(Targets, DependenciesRequest(request.dependencies))
+    address_input = request.root_module.to_address_input()
+    module_address = await Get(Address, AddressInput, address_input)
+    module = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            module_address, description_of_origin=address_input.description_of_origin
+        ),
+    )
+
+    root_dependencies, module_dependencies = await MultiGet(
+        Get(Targets, DependenciesRequest(request.dependencies)),
+        Get(Targets, DependenciesRequest(module.target.get(TerraformDependenciesField))),
+    )
 
     source_files, backend_config, dependencies_files = await MultiGet(
-        Get(SourceFiles, SourceFilesRequest(request.sources)),
+        Get(SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])),
         Get(SourceFiles, SourceFilesRequest([request.backend_config])),
-        Get(SourceFiles, SourceFilesRequest([tgt.get(SourcesField) for tgt in root_dependencies])),
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                [tgt.get(SourcesField) for tgt in (*root_dependencies, *module_dependencies)]
+            ),
+        ),
     )
     files_by_directory = partition_files_by_directory(source_files.files)
 

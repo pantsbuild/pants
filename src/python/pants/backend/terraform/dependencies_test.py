@@ -30,7 +30,7 @@ def _do_init_terraform(
         TerraformInitResponse,
         [
             TerraformInitRequest(
-                (field_set.sources,),
+                field_set.root_module,
                 field_set.backend_config,
                 field_set.dependencies,
                 initialise_backend=initialise_backend,
@@ -89,12 +89,18 @@ def test_init_terraform_without_backends(
 
 def test_init_terraform_with_in_repo_module(rule_runner: RuleRunner, tmpdir) -> None:
     deployment_files = {
-        "src/tf/deployment/BUILD": 'terraform_deployment(name="root")',
+        "src/tf/deployment/BUILD": textwrap.dedent(
+            """\
+            terraform_deployment(name="root", root_module=":mod")
+            terraform_module(name="mod")
+        """
+        ),
         "src/tf/deployment/main.tf": textwrap.dedent(
             """\
             module "mod0" {
               source = "../module/"
-            }"""
+            }
+        """
         ),
     }
     module_files = {

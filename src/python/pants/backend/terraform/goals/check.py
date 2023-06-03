@@ -37,7 +37,7 @@ async def terraform_check(
         Get(
             TerraformInitResponse,
             TerraformInitRequest(
-                (deployment.sources,), deployment.backend_config, deployment.dependencies
+                deployment.root_module, deployment.backend_config, deployment.dependencies
             ),
         )
         for deployment in request.field_sets
@@ -58,10 +58,10 @@ async def terraform_check(
     )
 
     check_results = []
-    for deployment, result in zip(initialised_terraforms, results):
+    for deployment, result, field_set in zip(initialised_terraforms, results, request.field_sets):
         check_results.append(
             CheckResult.from_fallible_process_result(
-                result, partition_description=f"`terraform validate` on `{deployment.chdir}`"
+                result, partition_description=f"`terraform validate` on `{field_set.address}`"
             )
         )
 

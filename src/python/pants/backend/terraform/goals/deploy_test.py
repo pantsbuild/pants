@@ -59,17 +59,27 @@ def standard_deployment(tmpdir) -> StandardDeployment:
     state_file = Path(str(tmpdir.mkdir(".terraform").join("state.json")))
     return StandardDeployment(
         {
-            "src/tf/BUILD": """terraform_deployment(name="stg", var_files=["stg.tfvars"],backend_config="stg.tfbackend")""",
+            "src/tf/BUILD": textwrap.dedent(
+                """\
+                terraform_deployment(
+                    name="stg",
+                    var_files=["stg.tfvars"],
+                    backend_config="stg.tfbackend",
+                    root_module=":mod",
+                )
+                terraform_module(name="mod")
+            """
+            ),
             "src/tf/main.tf": textwrap.dedent(
                 """\
-        terraform {
-            backend "local" {
-                path = "/tmp/will/not/exist"
-            }
-        }
-        variable "var0" {}
-        resource "null_resource" "dep" {}
-        """
+                terraform {
+                    backend "local" {
+                        path = "/tmp/will/not/exist"
+                    }
+                }
+                variable "var0" {}
+                resource "null_resource" "dep" {}
+                """
             ),
             "src/tf/stg.tfvars": "var0=0",
             "src/tf/stg.tfbackend": f'path="{state_file}"',
@@ -112,3 +122,27 @@ def test_deploy_terraform_forwards_args(rule_runner: RuleRunner, standard_deploy
     assert "-var-file=stg.tfvars" in argv, "Did not find expected -var-file"
     assert "-auto-approve" in argv, "Did not find expected passthrough args"
     # assert standard_deployment.state_file.check()
+
+
+def test_deploy_terraform_with_module(rule_runner: RuleRunner) -> None:
+    """Test that we can deploy a root module with a nearby shared module."""
+    files = {
+        "src/tf/root/BUILD": """terraform_deployment(root_module=":mod")\nterraform_module(name="mod")""",
+        "src/tf/root/main.tf": """module "mod0" { source = "../mod0" }""",
+        "src/tf/mod0/BUILD": """terraform_module()""",
+        "src/tf/mod0/main.tf": """resource "null_resource" "dep" {}""",
+    }
+    rule_runner.write_files(files)
+
+    with mock_console(rule_runner.options_bootstrapper, stdin_content="yes") as (_, m):
+        result = rule_runner.run_goal_rule(
+            Deploy, args=["src/tf::", *rule_runner.options_bootstrapper.args]
+        )
+
+    # assert Pants thinks we succeeded
+    assert result.stdout.splitlines() == []
+
+    # assert deployment succeeded
+    assert "✓ src/tf/root:root deployed" in result.stderr.splitlines()
+    # assert module was not deployed
+    assert not any("src/tf/mod0" in line for line in result.stderr.splitlines())
