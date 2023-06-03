@@ -512,7 +512,7 @@ def _maybe_warn_deprecated_secondary_owner_semantics(
 
     if problematic_target_specs:
         warn_or_error(
-            # TODO(Joshua Cannon) removal at 2.18.0.dev2
+            # TODO(Joshua Cannon): removal at 2.18.0.dev2
             removal_version="2.18.0.dev2",
             entity=softwrap(
                 """
