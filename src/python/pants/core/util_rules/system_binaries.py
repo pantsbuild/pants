@@ -558,7 +558,8 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
 @rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
 async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
     warn_or_error(
-        removal_version="2.18.0.dev1",
+        # TODO(Joshua Cannon): removal at 2.18.0.dev2
+        removal_version="2.18.0.dev2",
         entity="Requesting `PythonBinary`",
         hint="Use the `PythonBuildStandalone` type instead (be sure to provide the `immutable_input_digests` to any applicable process).",
     )
