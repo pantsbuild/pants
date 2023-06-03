@@ -13,16 +13,18 @@ function get_octokit(milestone) {
       actions: {
         listRepoWorkflows: jest.fn((obj) => {
           return {
-            data: [
-              {
-                name: "Auto Cherry-Picker",
-                url: "<WORKFLOW_URL>",
-              },
-              {
-                name: "CI Green",
-                url: "<OTHER_URL>",
-              },
-            ],
+            data: {
+              workflows: [
+                {
+                  name: "Auto Cherry-Picker",
+                  url: "<WORKFLOW_URL>",
+                },
+                {
+                  name: "CI Green",
+                  url: "<OTHER_URL>",
+                },
+              ],
+            },
           };
         }),
       },
@@ -194,7 +196,8 @@ test("cherry_pick_succeeded", async () => {
   });
 
   helper.octokit.rest.pulls.list.mockImplementation((obj) => {
-    const match = obj.head.match(/^cherry-pick-19214-to-(.+)$/);
+    console.log(obj.head);
+    const match = obj.head.match(/^pantsbuild:cherry-pick-19214-to-(.+)$/);
     return {
       data: [{ html_url: `<URL for branch ${match[1]}>` }],
     };

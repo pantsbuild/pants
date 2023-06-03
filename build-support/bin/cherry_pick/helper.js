@@ -3,17 +3,22 @@ class CherryPickHelper {
     this.octokit = octokit;
     this.context = context;
     this.core = core;
+    this.pull_number =
+      this.context.issue.number || this.context.payload.inputs.PR_number;
   }
 
   get #issue_context() {
-    const pull_number =
-      this.context.issue.number ||
-      core.getInput("inputName", { required: true });
     return {
       ...this.context.repo,
       // NB: In GitHub nomenclature, pull requests are (also) issues.
-      issue_number: pull_number,
-      pull_number,
+      issue_number: this.pull_number,
+    };
+  }
+
+  get #pull_context() {
+    return {
+      ...this.context.repo,
+      pull_number: this.pull_number,
     };
   }
 
@@ -22,9 +27,7 @@ class CherryPickHelper {
   }
 
   #get_branch_name(milestone_title) {
-    return `cherry-pick-${
-      this.#issue_context.pull_number
-    }-to-${milestone_title}`;
+    return `cherry-pick-${this.pull_number}-to-${milestone_title}`;
   }
 
   async #add_failed_label() {
@@ -60,16 +63,16 @@ class CherryPickHelper {
 
   async get_prereqs() {
     const { data: pull } = await this.octokit.rest.pulls.get({
-      ...this.#issue_context,
+      ...this.#pull_context,
     });
 
     if (pull.milestone == null) {
       const { data: workflows } =
         // NB: GitHub doesn't give you the URL to the workflow, or the filename, when running a workflow.
         await this.octokit.rest.actions.listRepoWorkflows({
-          ...this.#issue_context,
+          ...this.context.repo,
         });
-      const workflow_url = workflows.filter(
+      const workflow_url = workflows.workflows.filter(
         (workflow) => workflow.name === this.context.workflow
       )[0].url;
 
@@ -89,7 +92,7 @@ ${this.#run_link}`
       pull.milestone.title
     );
     return {
-      pr_num: this.#issue_context.pull_number,
+      pr_num: this.pull_number,
       merge_commit: pull.merge_commit_sha,
       milestones: milestones,
     };
@@ -112,7 +115,7 @@ To resolve:
     \`\`\`
 3. Fix the merge conflicts, commit the changes, and push the branch to a remote
 4. Run \`pants run build-support/bin/cherry_pick/make_pr.js -- --pull-number="${
-        this.#issue_context.pull_number
+        this.pull_number
       }" --milestone="${milestone_title}"\`
 
 ${this.#run_link}`
@@ -126,9 +129,11 @@ ${this.#run_link}`
     const pr_urls = await Promise.all(
       milestone_titles.map(async (milestone_title) => {
         return this.octokit.rest.pulls.list({
-          ...this.#issue_context,
+          ...this.#pull_context,
           state: "open",
-          head: this.#get_branch_name(milestone_title),
+          head: `${this.context.repo.owner}:${this.#get_branch_name(
+            milestone_title
+          )}`,
         });
       })
     ).then((all_pulls) =>

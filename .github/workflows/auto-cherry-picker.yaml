@@ -26,21 +26,17 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
-      - run: npm install semver
       - name: Check out code
         uses: actions/checkout@v3
-        with:
-          # Always checkout the latest commit of main, for latest changes to the script
-          ref: main
-          token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+      - run: npm install build-support/bin/cherry_pick
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
-            const Helper = require('build-support/bin/cherry_pick/helper.js');
-            const helper = new Helper({github, context, core});
+            const Helper = require('./build-support/bin/cherry_pick/helper.js');
+            const helper = new Helper({octokit: github, context, core});
             const prereqs = await helper.get_prereqs();
 
             if (prereqs !== null) {
@@ -59,10 +55,6 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
-        with:
-          # Always checkout the latest commit of main, for latest changes to the script
-          ref: main
-          token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
       - name: Create Cherry-Pick Branch
         env:
           GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
@@ -87,8 +79,8 @@ jobs:
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
-            const Helper = require('build-support/bin/cherry_pick/helper.js');
-            const helper = new Helper({github, context, core});
+            const Helper = require('./build-support/bin/cherry_pick/helper.js');
+            const helper = new Helper({octokit: github, context, core});
             await helper.cherry_pick_failed("${{ needs.prerequisites.outputs.merge_commit }}", "${{ matrix.milestone }}");
 
   handle_success:
@@ -96,11 +88,13 @@ jobs:
     needs: [cherry_picker, prerequisites]
     runs-on: ubuntu-latest
     steps:
+      - name: Check out code
+        uses: actions/checkout@v3
       - name: Run Script
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
-            const Helper = require('build-support/bin/cherry_pick/helper.js');
-            const helper = new Helper({github, context, core});
+            const Helper = require('./build-support/bin/cherry_pick/helper.js');
+            const helper = new Helper({octokit: github, context, core});
             await helper.cherry_pick_succeeded(${{ needs.prerequisites.outputs.milestones }});
