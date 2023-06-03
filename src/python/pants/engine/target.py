@@ -839,7 +839,6 @@ class CoarsenedTargetsRequest:
     roots: Tuple[Address, ...]
     expanded_targets: bool
     should_resolve_deps_predicate: ShouldResolveDepsPredicate
-    include_special_cased_deps: bool
 
     def __init__(
         self,
@@ -847,14 +846,12 @@ class CoarsenedTargetsRequest:
         *,
         expanded_targets: bool = False,
         should_resolve_deps_predicate: ShouldResolveDepsPredicate | None = None,
-        include_special_cased_deps: bool = False,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "expanded_targets", expanded_targets)
         if should_resolve_deps_predicate is None:
             should_resolve_deps_predicate = should_resolve_deps_default_predicate
         object.__setattr__(self, "should_resolve_deps_predicate", should_resolve_deps_predicate)
-        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
 @dataclass(frozen=True)
@@ -884,20 +881,17 @@ class TransitiveTargetsRequest:
 
     roots: Tuple[Address, ...]
     should_resolve_deps_predicate: ShouldResolveDepsPredicate
-    include_special_cased_deps: bool
 
     def __init__(
         self,
         roots: Iterable[Address],
         *,
         should_resolve_deps_predicate: ShouldResolveDepsPredicate | None = None,
-        include_special_cased_deps: bool = False,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         if should_resolve_deps_predicate is None:
             should_resolve_deps_predicate = should_resolve_deps_default_predicate
         object.__setattr__(self, "should_resolve_deps_predicate", should_resolve_deps_predicate)
-        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
 @dataclass(frozen=True)
@@ -2499,8 +2493,7 @@ def should_resolve_deps_default_predicate(tgt: Target, fld: Field) -> bool:
 def should_resolve_all_deps_predicate(tgt: Target, fld: Field) -> bool:
     """A predicate to use when a request needs all deps.
 
-    This includes deps from fields like SpecialCasedDependencies which are
-    ignored in most cases.
+    This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
     """
     return True
 
@@ -2511,7 +2504,6 @@ class DependenciesRequest(EngineAwareParameter):
     should_resolve_deps_predicate: ShouldResolveDepsPredicate = (
         should_resolve_deps_default_predicate
     )
-    include_special_cased_deps: bool = False
 
     def debug_hint(self) -> str:
         return self.field.address.spec

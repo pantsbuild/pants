@@ -119,7 +119,6 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
         TransitiveTargetsRequest(
             [root.address],
             should_resolve_deps_predicate=should_resolve_all_deps_predicate,
-            include_special_cased_deps=True,
         ),
     )
 
@@ -129,7 +128,6 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
             DependenciesRequest(
                 tgt.get(Dependencies),
                 should_resolve_deps_predicate=should_resolve_all_deps_predicate,
-                include_special_cased_deps=True,
             ),
         )
         for tgt in transitive_targets.closure

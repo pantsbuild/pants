@@ -45,7 +45,6 @@ async def check_visibility_rule_violations(
             DependenciesRequest(
                 field_set.dependencies,
                 should_resolve_deps_predicate=should_resolve_all_deps_predicate,
-                include_special_cased_deps=True,
             ),
         )
         for field_set in request.elements

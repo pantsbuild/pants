@@ -701,7 +701,6 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     DependenciesRequest(
                         tgt.get(Dependencies),
                         should_resolve_deps_predicate=request.tt_request.should_resolve_deps_predicate,
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
                     ),
                 )
                 for tgt in queued
@@ -713,7 +712,6 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     DependenciesRequest(
                         tgt.get(Dependencies),
                         should_resolve_deps_predicate=request.tt_request.should_resolve_deps_predicate,
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
                     ),
                 )
                 for tgt in queued
@@ -791,7 +789,6 @@ async def coarsened_targets(
             TransitiveTargetsRequest(
                 request.roots,
                 should_resolve_deps_predicate=request.should_resolve_deps_predicate,
-                include_special_cased_deps=request.include_special_cased_deps,
             ),
             expanded_targets=request.expanded_targets,
         ),
@@ -1386,39 +1383,37 @@ async def resolve_dependencies(
             )
         )
 
-    # TODO: remove include_special_cased_deps handling in favor of request.should_resolve_deps_predicate()
-    #       (That means that there may be multiple DependenciesRequests per target
-    #       when a target has more than one dependencies field.)
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to
-    # being handled elsewhere in the calling code.
-    special_cased: tuple[Address, ...] = ()
-    if request.include_special_cased_deps:
-        # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
-        # SpecialCasedDependencies.
-        special_cased_fields = tuple(
-            field
-            for field in tgt.field_values.values()
-            if isinstance(field, SpecialCasedDependencies)
-        )
-        # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
-        special_cased = await MultiGet(
-            Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(
-                    addr,
-                    relative_to=tgt.address.spec_path,
-                    subproject_roots=subproject_roots,
-                    description_of_origin=(
-                        f"the `{special_cased_field.alias}` field from the target {tgt.address}"
-                    ),
+    # being handled elsewhere in the calling code. So, we only include fields based on
+    # the should_resolve_deps_predicate.
+
+    # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
+    # SpecialCasedDependencies.
+    special_cased_fields = tuple(
+        field
+        for field in tgt.field_values.values()
+        if isinstance(field, SpecialCasedDependencies)
+        and request.should_resolve_deps_predicate(tgt, field)
+    )
+    # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
+    special_cased = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(
+                addr,
+                relative_to=tgt.address.spec_path,
+                subproject_roots=subproject_roots,
+                description_of_origin=(
+                    f"the `{special_cased_field.alias}` field from the target {tgt.address}"
                 ),
-            )
-            for special_cased_field in special_cased_fields
-            for addr in special_cased_field.to_unparsed_address_inputs().values
+            ),
         )
+        for special_cased_field in special_cased_fields
+        for addr in special_cased_field.to_unparsed_address_inputs().values
+    )
 
     excluded = explicitly_provided_ignores.union(
         *itertools.chain(deps.exclude for deps in inferred)

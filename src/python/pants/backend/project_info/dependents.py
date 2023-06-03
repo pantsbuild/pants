@@ -35,7 +35,6 @@ async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> Addr
             DependenciesRequest(
                 tgt.get(Dependencies),
                 should_resolve_deps_predicate=should_resolve_all_deps_predicate,
-                include_special_cased_deps=True,
             ),
         )
         for tgt in all_targets

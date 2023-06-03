@@ -77,7 +77,6 @@ async def file_deps(
             TransitiveTargetsRequest(
                 addresses,
                 should_resolve_deps_predicate=should_resolve_all_deps_predicate,
-                include_special_cased_deps=True,
             ),
         )
         targets = transitive_targets.closure
