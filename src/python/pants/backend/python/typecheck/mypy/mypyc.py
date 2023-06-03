@@ -71,14 +71,9 @@ async def get_mypyc_build_environment(
             hardcoded_interpreter_constraints=request.interpreter_constraints,
         ),
     )
-    extra_type_stubs_pex_get = Get(
-        Pex, PexRequest, mypy.extra_type_stubs_pex_request(request.interpreter_constraints)
-    )
-    mypy_pex, requirements_pex, extra_type_stubs_pex = await MultiGet(
-        mypy_pex_get, requirements_pex_get, extra_type_stubs_pex_get
-    )
+    mypy_pex, requirements_pex = await MultiGet(mypy_pex_get, requirements_pex_get)
     return DistBuildEnvironment(
-        extra_build_time_requirements=(mypy_pex, requirements_pex, extra_type_stubs_pex),
+        extra_build_time_requirements=(mypy_pex, requirements_pex),
         extra_build_time_inputs=mypy_config_file.digest,
     )
 

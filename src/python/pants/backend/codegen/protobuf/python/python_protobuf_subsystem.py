@@ -10,10 +10,7 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
@@ -70,13 +67,11 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     options_scope = "mypy-protobuf"
     help = "Configuration of the mypy-protobuf type stub generation plugin."
 
-    default_version = "mypy-protobuf==3.4.0"
     default_requirements = ["mypy-protobuf>=3.4.0,<4"]
 
     register_interpreter_constraints = True
 
     default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "mypy_protobuf.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)
