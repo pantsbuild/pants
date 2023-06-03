@@ -243,7 +243,7 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
             },
             (
                 f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}', '/']",
-                "--pyright-install-from-resolve=",  # See: https://github.com/pantsbuild/pants/issues/18924
+                "--pyright-install-from-resolve=nodejs-default",
             ),
             id="from_resolve_at_root",
         ),
