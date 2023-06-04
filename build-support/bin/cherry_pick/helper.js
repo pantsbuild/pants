@@ -148,7 +148,7 @@ ${this.#run_link}`
     await this.#add_comment(
       `I was successfully able to open the following PRs:
 ${prs_list}
-Please note that I cannot re-kick CI if a job fails. Please work with your PR approver(s) to re-kick CI if necessary.
+Please note that I cannot re-run CI if a job fails. Please work with your PR approver(s) to re-run CI if necessary.
 
 Thanks again for your contributions!
 
