@@ -946,7 +946,7 @@ where
     result
   } else {
     let contents = request.read_digest(store).await?;
-    let result = Some(dependencies_parser(&contents, request)?);
+    let result = dependencies_parser(&contents, request)?;
     core
       .local_cache
       .store(
@@ -959,7 +959,6 @@ where
       .await?;
     result
   };
-  let result = result.unwrap();
   Ok(result)
 }
 
