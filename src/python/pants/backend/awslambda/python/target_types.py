@@ -12,6 +12,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
+    PythonFaaSKnownRuntime,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
@@ -98,6 +99,16 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         packaging the AWS Lambda PEX or running it as a deployed AWS Lambda function, you should try
         using `complete_platforms` instead.
         """
+    )
+
+    # https://gallery.ecr.aws/lambda/python
+    known_runtimes_docker_repo = "public.ecr.aws/lambda/python"
+    known_runtimes = (
+        PythonFaaSKnownRuntime(3, 6, "3.6"),
+        PythonFaaSKnownRuntime(3, 7, "3.7"),
+        PythonFaaSKnownRuntime(3, 8, "3.8-x86_64"),
+        PythonFaaSKnownRuntime(3, 9, "3.9-x86_64"),
+        PythonFaaSKnownRuntime(3, 10, "3.10-x86_64"),
     )
 
     @classmethod

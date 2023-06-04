@@ -9,7 +9,7 @@ import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, cast
+from typing import ClassVar, Optional, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
@@ -255,9 +255,28 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
     )
 
 
+@dataclass(frozen=True)
+class PythonFaaSKnownRuntime:
+    major: int
+    minor: int
+    tag: str
+
+    def file_name(self) -> str:
+        return f"complete_platform_{self.tag}.json"
+
+
 class PythonFaaSRuntimeField(StringField, ABC):
     alias = "runtime"
     default = None
+
+    known_runtimes: ClassVar[tuple[PythonFaaSKnownRuntime, ...]] = ()
+    known_runtimes_docker_repo: ClassVar[str]
+
+    @classmethod
+    def known_runtimes_complete_platforms_module(cls) -> str:
+        # the runtime field subclasses are conventionally in a `target_types.py` file, and we want
+        # to put the JSONs in a sibling file
+        return cls.__module__.rsplit(".", 1)[0]
 
     @abstractmethod
     def to_interpreter_version(self) -> None | tuple[int, int]:
