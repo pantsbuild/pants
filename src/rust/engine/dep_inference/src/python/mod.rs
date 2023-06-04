@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
 
-include!(concat!(env!("OUT_DIR"), "/constants.rs"));
-include!(concat!(env!("OUT_DIR"), "/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/python/constants.rs"));
+include!(concat!(env!("OUT_DIR"), "/python/visitor.rs"));
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use serde_derive::{Deserialize, Serialize};
