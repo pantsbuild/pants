@@ -10,7 +10,6 @@ import pytest
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import export
 from pants.backend.python.goals.export import ExportVenvsRequest, PythonResolveExportFormat
-from pants.backend.python.lint.flake8 import subsystem as flake8_subsystem
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     PythonDistribution,
@@ -37,7 +36,6 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *distdir.rules(),
             *local_dists_pep660.rules(),
-            *flake8_subsystem.rules(),
             QueryRule(Targets, [RawSpecs]),
             QueryRule(ExportResults, [ExportVenvsRequest]),
         ],
@@ -87,7 +85,6 @@ def test_export_venv_new_codepath(
             "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
             "--export-resolve=a",
             "--export-resolve=b",
-            "--export-resolve=flake8",
             # Turn off lockfile validation to make the test simpler.
             "--python-invalid-lockfile-behavior=ignore",
             # Turn off python synthetic lockfile targets to make the test simpler.
@@ -99,7 +96,7 @@ def test_export_venv_new_codepath(
     )
     all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets=())])
 
-    for result, resolve in zip(all_results, ["a", "b", "flake8"]):
+    for result, resolve in zip(all_results, ["a", "b"]):
         if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
             assert len(result.post_processing_cmds) == 2
             ppc0, ppc1 = result.post_processing_cmds
@@ -150,5 +147,4 @@ def test_export_venv_new_codepath(
     assert reldirs == [
         f"python/virtualenvs/a/{current_interpreter}",
         f"python/virtualenvs/b/{current_interpreter}",
-        f"python/virtualenvs/flake8/{current_interpreter}",
     ]
