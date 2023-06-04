@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::{Path, PathBuf};
 
-use fnv::FnvHashMap as HashMap;
 use fnv::FnvHashSet as HashSet;
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::{Node, Parser};
@@ -23,38 +22,29 @@ pub struct ParsedJavascriptDependencies {
   pub package_imports: HashSet<String>,
 }
 
-#[derive(Debug, Eq, PartialEq, Deserialize, Default)]
-pub struct JavascriptMetadata {
-  pub root: String,
-  pub patterns: HashMap<String, Vec<String>>,
-}
-
 pub fn get_dependencies(
   contents: &str,
   filepath: PathBuf,
   metadata: JavascriptInferenceMetadata,
 ) -> Result<ParsedJavascriptDependencies, String> {
-  let metadata = JavascriptMetadata {
-    root: metadata.package_root,
-    patterns: metadata
-      .import_patterns
-      .into_iter()
-      .map(|pattern| (pattern.pattern, pattern.replacements))
-      .collect(),
-  };
+  let patterns = metadata
+    .import_patterns
+    .into_iter()
+    .map(|pattern| (pattern.pattern, pattern.replacements))
+    .collect();
   let mut collector = ImportCollector::new(contents);
   collector.collect();
   let (relative_files, packages): (HashSet<String>, HashSet<String>) = collector
     .imports
     .into_iter()
-    .flat_map(|import| imports_from_patterns(&metadata.root, &metadata.patterns, import))
+    .flat_map(|import| imports_from_patterns(&metadata.package_root, &patterns, import))
     .partition(|import| {
       import.starts_with('.')
         || import.starts_with('/')
-        || (!metadata.root.is_empty() && import.starts_with(&metadata.root))
+        || (!metadata.package_root.is_empty() && import.starts_with(&metadata.package_root))
     });
   Ok(ParsedJavascriptDependencies {
-    file_imports: normalize_from_path(&metadata.root, filepath, relative_files),
+    file_imports: normalize_from_path(&metadata.package_root, filepath, relative_files),
     package_imports: packages,
   })
 }
