@@ -113,7 +113,7 @@ To resolve:
       && git checkout -b ${this.#get_branch_name(milestone_title)} FETCH_HEAD \\
       && git cherry-pick ${merge_commit_sha}
     \`\`\`
-3. Fix the merge conflicts, commit the changes, and push the branch to a remote
+3. Fix the merge conflicts, and commit the changes
 4. Run \`pants run build-support/bin/cherry_pick/make_pr.js -- --pull-number="${
         this.pull_number
       }" --milestone="${milestone_title}"\`
