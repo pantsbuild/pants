@@ -50,7 +50,11 @@ pub fn get_dependencies(
     }
 
     let mut new_key_parts = path_parts[0..((path_parts.len() - level) + 1)].to_vec();
-    new_key_parts.push(nonrelative);
+    if !nonrelative.is_empty() {
+      // an import like `from .. import *` can end up with key == '..', and hence nonrelative == "";
+      // the result should just be the raw parent traversal, without a suffix part
+      new_key_parts.push(nonrelative);
+    }
 
     let old_value = import_map.remove(&key).unwrap();
     import_map.insert(new_key_parts.join("."), old_value);
@@ -152,6 +156,7 @@ impl ImportCollector<'_> {
   fn normalize_import_node(node: tree_sitter::Node) -> Option<tree_sitter::Node> {
     match node.kind_id() {
       KindID::ALIASED_IMPORT => node.named_child(0),
+      KindID::WILDCARD_IMPORT => None,
       KindID::ERROR => None,
       _ => Some(node),
     }
@@ -224,8 +229,27 @@ impl Visitor for ImportCollector<'_> {
 
   fn visit_import_from_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     if !self.is_pragma_ignored(node) {
+      // the grammar is something like `from $module_name import $($name),* | '*'`, where $... is a field
+      // name.
+      let module_name = node
+        .child_by_field_name("module_name")
+        .expect("`from ... import ...` must have module_name");
+
+      let mut any_names = false;
       for child in node.children_by_field_name("name", &mut node.walk()) {
-        self.insert_import(node.named_child(0).unwrap(), Some(child), false);
+        self.insert_import(module_name, Some(child), false);
+        any_names = true;
+      }
+
+      if !any_names {
+        // There's no names (i.e. it's probably not `from ... import some, names`), let's look for
+        // the * in a wildcard import. (It doesn't have a field name, so we have to search for it
+        // manually.)
+        for child in node.children(&mut node.walk()) {
+          if child.kind_id() == KindID::WILDCARD_IMPORT {
+            self.insert_import(module_name, Some(child), false);
+          }
+        }
       }
     }
     ChildBehavior::Ignore

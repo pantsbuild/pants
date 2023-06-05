@@ -109,6 +109,7 @@ fn pragma_ignore() {
   assert_imports("import a.b  # pants: no-infer-dep", &[]);
   assert_imports("import a.b as d  # pants: no-infer-dep", &[]);
   assert_imports("from a import b  # pants: no-infer-dep", &[]);
+  assert_imports("from a import *  # pants: no-infer-dep", &[]);
   assert_imports("from a import b, c  # pants: no-infer-dep", &[]);
   assert_imports("from a import b, c as d  # pants: no-infer-dep", &[]);
   assert_imports(
@@ -186,6 +187,12 @@ fn pragma_ignore() {
         as \
         dd,  # pants: no-infer-dep
     )",
+    &[],
+  );
+  assert_imports(
+    r"
+    from a.b import \
+        *  # pants: no-infer-dep",
     &[],
   );
 }
@@ -532,11 +539,16 @@ fn syntax_errors_and_other_fun() {
   assert_imports("import .b", &[]);
   assert_imports("import a....b", &["a....b"]);
   assert_imports("import a.", &[]);
+  assert_imports("import *", &[]);
   assert_imports("from a import", &[]);
   assert_imports("from a imp x", &[]);
   assert_imports("from from import a as .as", &[]);
   assert_imports("from a import ......g", &["a.g"]);
   assert_imports("from a. import b", &[]);
+  assert_imports("from a import *, b", &["a"]);
+  assert_imports("from a import b, *", &["a.b"]);
+  assert_imports("from a import (*)", &[]);
+  assert_imports("from * import b", &["b"]);
   assert_imports("try:...\nexcept:import a", &["a"]);
   assert_imports("try:...\nexcept 1:import a", &["a"]);
   assert_imports("try:...\nexcept x=1:import a", &["a"]);
