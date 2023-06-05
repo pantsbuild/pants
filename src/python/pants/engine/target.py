@@ -2474,8 +2474,6 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
 
 # If this predicate returns false, then the target's field's deps will be ignored.
-# ShouldTraverseDepsPredicate = Callable[[Target, Dependencies], bool]
-# ShouldTraverseDepsPredicate = Callable[[Target, Dependencies|SpecialCasedDependencies], bool]
 ShouldTraverseDepsPredicate = Callable[[Target, Field], bool]
 
 
@@ -2500,7 +2498,7 @@ def should_traverse_all_deps_predicate(tgt: Target, fld: Field) -> bool:
 
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
-    field: Dependencies  # | SpecialCasedDependencies
+    field: Dependencies
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate = (
         should_traverse_deps_default_predicate
     )

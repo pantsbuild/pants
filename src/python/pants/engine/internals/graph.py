@@ -1287,7 +1287,7 @@ async def _fill_parameters(
 
 @rule(desc="Resolve direct dependencies of target", _masked_types=[EnvironmentName])
 async def resolve_dependencies(
-    request: DependenciesRequest,  # one request per deps field on the target
+    request: DependenciesRequest,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     union_membership: UnionMembership,
     subproject_roots: SubprojectRoots,
