@@ -305,7 +305,7 @@ class BenchmarkRequest:
 
 
 class BenchmarkSubsystem(GoalSubsystem):
-    name = "bench"
+    name = "experimental-bench"
     help = "Run benchmarks"
 
     @classmethod
