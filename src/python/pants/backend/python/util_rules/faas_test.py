@@ -1,5 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 from textwrap import dedent
 from typing import List, Optional
 
@@ -14,12 +16,16 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     InferPythonFaaSHandlerDependency,
+    KnownRuntimeCompletePlatformRequest,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
     PythonFaaSHandlerInferenceFieldSet,
+    PythonFaaSKnownRuntime,
+    PythonFaaSRuntimeField,
     ResolvedPythonFaaSHandler,
     ResolvePythonFaaSHandlerRequest,
 )
+from pants.backend.python.util_rules.pex import PexPlatforms
 from pants.build_graph.address import Address
 from pants.core.target_types import FileTarget
 from pants.engine.target import InferredDependencies, InvalidFieldException, Target
@@ -225,3 +231,43 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     # Test that we can turn off the inference.
     rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_inferred(Address("project", target_name="first_party"), expected=None)
+
+
+class TestRuntimeField(PythonFaaSRuntimeField):
+    known_runtimes = (
+        PythonFaaSKnownRuntime(12, 34, tag="12-34-tag"),
+        PythonFaaSKnownRuntime(56, 78, tag="56-78-tag"),
+    )
+    known_runtimes_docker_repo = ""
+
+    def to_interpreter_version(self) -> None | tuple[int, int]:
+        if self.value is None:
+            return None
+
+        first, second = self.value.split(".")
+        return int(first), int(second)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_platforms", "expected_file_name"),
+    [
+        pytest.param(None, [], (None), id="empty"),
+        pytest.param("12.34", [], ("complete_platform_12-34-tag.json"), id="known 12.34"),
+        pytest.param("56.78", [], ("complete_platform_56-78-tag.json"), id="known 56.78"),
+        pytest.param("98.76", ["linux_x86_64-cp-9876-cp9876"], (None), id="known 56.78"),
+    ],
+)
+def test_runtime_to_platform_args(
+    value: str | None, expected_platforms: list[str], expected_file_name: None | str
+) -> None:
+    expected_request = KnownRuntimeCompletePlatformRequest(
+        module="pants.backend.python.util_rules", file_name=expected_file_name
+    )
+
+    address = Address("path", target_name="target")
+    field = TestRuntimeField(value, address)
+
+    platforms, request = field.to_platform_args()
+
+    assert platforms == PexPlatforms(expected_platforms)
+    assert request == expected_request
