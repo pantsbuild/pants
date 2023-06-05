@@ -251,8 +251,9 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
         f"""
         {PexCompletePlatformsField.help}
 
-        N.B.: If specifying `complete_platforms` to work around packaging failures encountered when
-        using the `runtime` field, ensure you delete the `runtime` field from the target.
+        N.B.: only one of this and `runtime` can be set. If `runtime` is set, a default complete
+        platform is chosen, if one is known for that runtime. Explicitly set this to `[]` to use the
+        platform's ambient interpreter, such as when running in an docker environment.
         """
     )
 

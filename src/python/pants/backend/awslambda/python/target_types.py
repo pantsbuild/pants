@@ -16,6 +16,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
@@ -94,10 +95,10 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         The identifier of the AWS Lambda runtime to target (pythonX.Y).
         See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
 
-        In general you'll want to define either a `runtime` or one `complete_platforms` but not
-        both. Specifying a `runtime` is simpler, but less accurate. If you have issues either
+        N.B.: only one of this and `complete_platforms` can be set. If `runtime` is set, a default complete
+        platform is chosen, if one is known for that runtime. If you have issues either
         packaging the AWS Lambda PEX or running it as a deployed AWS Lambda function, you should try
-        using `complete_platforms` instead.
+        using an explicit `complete_platforms` instead.
         """
     )
 
@@ -151,15 +152,34 @@ class _AWSLambdaBaseTarget(Target):
     )
 
     def validate(self) -> None:
-        if self[PythonAwsLambdaRuntime].value is None and not self[PexCompletePlatformsField].value:
+        has_runtime = self[PythonAwsLambdaRuntime].value is not None
+        has_complete_platforms = self[PexCompletePlatformsField].value is not None
+
+        runtime_alias = self[PythonAwsLambdaRuntime].alias
+        complete_platforms_alias = self[PexCompletePlatformsField].alias
+
+        if not (has_runtime or has_complete_platforms):
             raise InvalidTargetException(
                 softwrap(
                     f"""
                     The `{self.alias}` target {self.address} must specify either a
-                    `{self[PythonAwsLambdaRuntime].alias}` or
-                    `{self[PexCompletePlatformsField].alias}` or both.
+                    `{runtime_alias}` or `{complete_platforms_alias}`.
                     """
                 )
+            )
+
+        if has_runtime and has_complete_platforms:
+            warn_or_error(
+                "2.19.0.dev0",
+                f"using both `{runtime_alias}` and `{complete_platforms_alias}` in the `{self.alias}` target {self.address}",
+                softwrap(
+                    f"""
+                    The `{complete_platforms_alias}` now takes precedence over the `{runtime_alias}` field, if
+                    it is set. Remove the `{runtime_alias}` field to only use the `{complete_platforms_alias}`
+                    value, or remove the `{complete_platforms_alias}` field to use the default platform
+                    implied by `{runtime_alias}`.
+                    """
+                ),
             )
 
 
