@@ -541,10 +541,13 @@ fn syntax_errors_and_other_fun() {
   assert_imports("import a.", &[]);
   assert_imports("import *", &[]);
   assert_imports("from a import", &[]);
+  assert_imports("from a import;", &["a."]);
+  assert_imports("from a import ()", &["a."]);
   assert_imports("from a imp x", &[]);
   assert_imports("from from import a as .as", &[]);
   assert_imports("from a import ......g", &["a.g"]);
   assert_imports("from a. import b", &[]);
+  assert_imports("from a as c import b as d", &["a.b"]);
   assert_imports("from a import *, b", &["a"]);
   assert_imports("from a import b, *", &["a.b"]);
   assert_imports("from a import (*)", &[]);

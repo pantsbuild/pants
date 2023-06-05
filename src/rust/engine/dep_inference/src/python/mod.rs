@@ -235,21 +235,30 @@ impl Visitor for ImportCollector<'_> {
         .child_by_field_name("module_name")
         .expect("`from ... import ...` must have module_name");
 
-      let mut any_names = false;
+      let mut any_inserted = false;
       for child in node.children_by_field_name("name", &mut node.walk()) {
         self.insert_import(module_name, Some(child), false);
-        any_names = true;
+        any_inserted = true;
       }
 
-      if !any_names {
+      if !any_inserted {
         // There's no names (i.e. it's probably not `from ... import some, names`), let's look for
         // the * in a wildcard import. (It doesn't have a field name, so we have to search for it
         // manually.)
         for child in node.children(&mut node.walk()) {
           if child.kind_id() == KindID::WILDCARD_IMPORT {
             self.insert_import(module_name, Some(child), false);
+            any_inserted = true
           }
         }
+      }
+
+      if !any_inserted {
+        // Still nothing inserted, which means something has probably gone wrong and/or we haven't
+        // understood the syntax tree! We're working on a definite import statement, so silently
+        // doing nothing with it is likely to be wrong. Let's insert the import node itself and let
+        // that be surfaced as an dep-inference failure.
+        self.insert_import(node, None, false)
       }
     }
     ChildBehavior::Ignore
