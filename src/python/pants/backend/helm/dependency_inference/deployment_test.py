@@ -112,6 +112,36 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
     assert set(dependencies_report.all_image_refs) == set(expected_container_refs)
 
 
+def test_inject_chart_into_deployment_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/mychart/BUILD": "helm_chart()",
+            "src/mychart/Chart.yaml": HELM_CHART_FILE,
+            "src/mychart/values.yaml": HELM_VALUES_FILE,
+            "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/deployment/BUILD": "helm_deployment(name='foo', chart='//src/mychart')",
+        }
+    )
+
+    source_root_patterns = ("src/*",)
+    rule_runner.set_options(
+        [f"--source-root-patterns={repr(source_root_patterns)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    deployment_addr = Address("src/deployment", target_name="foo")
+    tgt = rule_runner.get_target(deployment_addr)
+    field_set = HelmDeploymentFieldSet.create(tgt)
+
+    inferred_dependencies = rule_runner.request(
+        InferredDependencies,
+        [InferHelmDeploymentDependenciesRequest(field_set)],
+    )
+
+    assert len(inferred_dependencies.include) == 1
+    assert list(inferred_dependencies.include)[0] == Address("src/mychart")
+
+
 def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
