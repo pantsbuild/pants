@@ -162,17 +162,13 @@ impl ImportCollector<'_> {
     }
   }
 
-  /// Various different styles of references to modules.
-  ///
-  /// NB. this diverges slightly from the core tree-sitter grammar by calling base module reference
-  /// (the part that always exists) "module_name", with "name" only used to refer to the extra bit
-  /// in `from ... import ...`:
+  /// Handle different styles of references to modules/imports
   ///
   /// ```python
-  /// import $base_name
-  /// from $base_name import * # (the * node is passed as imported_name too)
-  /// from $base_name import $imported_name
-  /// "$base_name"
+  /// import $base
+  /// "$base"  # string import
+  /// from $base import *  # (the * node is passed as `imported` too)
+  /// from $base import $imported
   /// ```
   fn insert_import(
     &mut self,
