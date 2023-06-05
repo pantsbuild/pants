@@ -25,7 +25,7 @@ from pants.backend.python.util_rules.faas import (
     ResolvedPythonFaaSHandler,
     ResolvePythonFaaSHandlerRequest,
 )
-from pants.backend.python.util_rules.pex import PexPlatforms
+from pants.backend.python.util_rules.pex import CompletePlatforms, PexPlatforms
 from pants.build_graph.address import Address
 from pants.core.target_types import FileTarget
 from pants.engine.target import InferredDependencies, InvalidFieldException, Target
@@ -46,6 +46,7 @@ def rule_runner() -> RuleRunner:
             *python_target_types_rules(),
             QueryRule(ResolvedPythonFaaSHandler, [ResolvePythonFaaSHandlerRequest]),
             QueryRule(InferredDependencies, [InferPythonFaaSHandlerDependency]),
+            QueryRule(CompletePlatforms, [KnownRuntimeCompletePlatformRequest]),
         ],
         target_types=[
             FileTarget,
@@ -271,3 +272,22 @@ def test_runtime_to_platform_args(
 
     assert platforms == PexPlatforms(expected_platforms)
     assert request == expected_request
+
+
+@pytest.mark.parametrize(
+    "file_name",
+    [None, "complete_platform_faas-test.json"],
+)
+def test_known_runtime_complete_platform_rule(
+    file_name: None | str, rule_runner: RuleRunner
+) -> None:
+    request = KnownRuntimeCompletePlatformRequest(
+        module="pants.backend.python.util_rules", file_name=file_name
+    )
+
+    cp = rule_runner.request(CompletePlatforms, [request])
+
+    if file_name is None:
+        assert cp == CompletePlatforms()
+    else:
+        assert cp == CompletePlatforms([file_name])
