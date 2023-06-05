@@ -536,7 +536,7 @@ fn syntax_errors_and_other_fun() {
 
   assert_imports("imprt a", &[]);
   assert_imports("form a import b", &["b"]);
-  assert_imports("import .b", &[]);
+  assert_imports("import .b", &["."]);
   assert_imports("import a....b", &["a....b"]);
   assert_imports("import a.", &[]);
   assert_imports("import *", &[]);

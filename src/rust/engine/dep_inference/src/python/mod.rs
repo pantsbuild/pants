@@ -153,12 +153,12 @@ impl ImportCollector<'_> {
     false
   }
 
-  fn normalize_import_node(node: tree_sitter::Node) -> Option<tree_sitter::Node> {
+  fn unnest_alias(node: tree_sitter::Node) -> tree_sitter::Node {
     match node.kind_id() {
-      KindID::ALIASED_IMPORT => node.named_child(0),
-      KindID::WILDCARD_IMPORT => None,
-      KindID::ERROR => None,
-      _ => Some(node),
+      KindID::ALIASED_IMPORT => node
+        .named_child(0)
+        .expect("aliased imports must have a child"),
+      _ => node,
     }
   }
 
@@ -167,24 +167,28 @@ impl ImportCollector<'_> {
   /// ```python
   /// import $base
   /// "$base"  # string import
-  /// from $base import *  # (the * node is passed as `imported` too)
-  /// from $base import $imported
+  /// from $base import *  # (the * node is passed as `specific` too)
+  /// from $base import $specific
   /// ```
   fn insert_import(
     &mut self,
     base: tree_sitter::Node,
-    imported: Option<tree_sitter::Node>,
+    specific: Option<tree_sitter::Node>,
     is_string: bool,
   ) {
     // the specifically-imported item takes precedence over the base name for ignoring and lines
     // etc.
-    let most_specific = imported.unwrap_or(base);
+    let most_specific = specific.unwrap_or(base);
 
     if self.is_pragma_ignored(most_specific) {
       return;
     }
-    let Some(base) = ImportCollector::normalize_import_node(base) else { return };
-    let imported = imported.and_then(ImportCollector::normalize_import_node);
+
+    let base = ImportCollector::unnest_alias(base);
+    // * and errors are the same as not having an specific import
+    let specific = specific
+      .map(ImportCollector::unnest_alias)
+      .filter(|n| !matches!(n.kind_id(), KindID::WILDCARD_IMPORT | KindID::ERROR));
 
     let base_range = base.range();
     let base_ref = if is_string {
@@ -193,13 +197,13 @@ impl ImportCollector<'_> {
       self.code_at(base_range)
     };
 
-    let full_name = match imported {
-      Some(imported) => {
-        let imported_ref = self.code_at(imported.range());
-        // `from ... import a` => `...a` should concat base_ref and imported_ref directly, but `from
+    let full_name = match specific {
+      Some(specific) => {
+        let specific_ref = self.code_at(specific.range());
+        // `from ... import a` => `...a` should concat base_ref and specific_ref directly, but `from
         // x import a` => `x.a` needs to insert a . between them
         let joiner = if base_ref.ends_with('.') { "" } else { "." };
-        [base_ref, imported_ref].join(joiner)
+        [base_ref, specific_ref].join(joiner)
       }
       None => base_ref.to_string(),
     };
