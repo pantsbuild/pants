@@ -520,14 +520,14 @@ impl PosixFS {
     let Some(file_name) = path_to_stat.file_name() else {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
-        "Argument path_to_stat to PosixFS::stat must have a file name.",
+        "Argument path_to_stat to PosixFS::stat_internal must have a file name.",
       ));
     };
-    if !path_to_stat.is_absolute() {
+    if cfg!(debug_assertions) && !path_to_stat.is_absolute() {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-          "Argument path_to_stat to PosixFS::stat must be absolute path, got {path_to_stat:?}"
+          "Argument path_to_stat to PosixFS::stat_internal must be absolute path, got {path_to_stat:?}"
         ),
       ));
     }
@@ -558,6 +558,14 @@ impl PosixFS {
   /// avoid many small spawned tasks).
   ///
   pub fn stat_sync(&self, relative_path: &Path) -> Result<Option<Stat>, io::Error> {
+    if cfg!(debug_assertions) && relative_path.is_absolute() {
+      return Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!(
+          "Argument relative_path to PosixFS::stat_sync must be relative path, got {relative_path:?}"
+        ),
+      ));
+    }
     let abs_path = self.root.0.join(relative_path);
     let metadata = match self.symlink_behavior {
       SymlinkBehavior::Aware => fs::symlink_metadata(&abs_path),
