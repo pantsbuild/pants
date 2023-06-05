@@ -838,20 +838,20 @@ class CoarsenedTargetsRequest:
 
     roots: Tuple[Address, ...]
     expanded_targets: bool
-    should_resolve_deps_predicate: ShouldResolveDepsPredicate
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate
 
     def __init__(
         self,
         roots: Iterable[Address],
         *,
         expanded_targets: bool = False,
-        should_resolve_deps_predicate: ShouldResolveDepsPredicate | None = None,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None = None,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "expanded_targets", expanded_targets)
-        if should_resolve_deps_predicate is None:
-            should_resolve_deps_predicate = should_resolve_deps_default_predicate
-        object.__setattr__(self, "should_resolve_deps_predicate", should_resolve_deps_predicate)
+        if should_traverse_deps_predicate is None:
+            should_traverse_deps_predicate = should_traverse_deps_default_predicate
+        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
 @dataclass(frozen=True)
@@ -880,18 +880,18 @@ class TransitiveTargetsRequest:
     """
 
     roots: Tuple[Address, ...]
-    should_resolve_deps_predicate: ShouldResolveDepsPredicate
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate
 
     def __init__(
         self,
         roots: Iterable[Address],
         *,
-        should_resolve_deps_predicate: ShouldResolveDepsPredicate | None = None,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None = None,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
-        if should_resolve_deps_predicate is None:
-            should_resolve_deps_predicate = should_resolve_deps_default_predicate
-        object.__setattr__(self, "should_resolve_deps_predicate", should_resolve_deps_predicate)
+        if should_traverse_deps_predicate is None:
+            should_traverse_deps_predicate = should_traverse_deps_default_predicate
+        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
 @dataclass(frozen=True)
@@ -2474,14 +2474,14 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
 
 # If this predicate returns false, then the target's field's deps will be ignored.
-# ShouldResolveDepsPredicate = Callable[[Target, Dependencies], bool]
-# ShouldResolveDepsPredicate = Callable[[Target, Dependencies|SpecialCasedDependencies], bool]
-ShouldResolveDepsPredicate = Callable[[Target, Field], bool]
+# ShouldTraverseDepsPredicate = Callable[[Target, Dependencies], bool]
+# ShouldTraverseDepsPredicate = Callable[[Target, Dependencies|SpecialCasedDependencies], bool]
+ShouldTraverseDepsPredicate = Callable[[Target, Field], bool]
 
 
 # noinspection PyUnusedLocal
-def should_resolve_deps_default_predicate(tgt: Target, fld: Field) -> bool:
-    """This is the default ShouldResolveDepsPredicate implementation.
+def should_traverse_deps_default_predicate(tgt: Target, fld: Field) -> bool:
+    """This is the default ShouldTraverseDepsPredicate implementation.
 
     This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
     subclasses of Dependencies.
@@ -2490,7 +2490,7 @@ def should_resolve_deps_default_predicate(tgt: Target, fld: Field) -> bool:
 
 
 # noinspection PyUnusedLocal
-def should_resolve_all_deps_predicate(tgt: Target, fld: Field) -> bool:
+def should_traverse_all_deps_predicate(tgt: Target, fld: Field) -> bool:
     """A predicate to use when a request needs all deps.
 
     This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
@@ -2501,8 +2501,8 @@ def should_resolve_all_deps_predicate(tgt: Target, fld: Field) -> bool:
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies  # | SpecialCasedDependencies
-    should_resolve_deps_predicate: ShouldResolveDepsPredicate = (
-        should_resolve_deps_default_predicate
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate = (
+        should_traverse_deps_default_predicate
     )
 
     def debug_hint(self) -> str:

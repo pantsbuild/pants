@@ -19,7 +19,7 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    should_resolve_all_deps_predicate,
+    should_traverse_all_deps_predicate,
 )
 from pants.option.option_types import StrOption
 
@@ -118,7 +118,7 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
         TransitiveTargets,
         TransitiveTargetsRequest(
             [root.address],
-            should_resolve_deps_predicate=should_resolve_all_deps_predicate,
+            should_traverse_deps_predicate=should_traverse_all_deps_predicate,
         ),
     )
 
@@ -127,7 +127,7 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
             Targets,
             DependenciesRequest(
                 tgt.get(Dependencies),
-                should_resolve_deps_predicate=should_resolve_all_deps_predicate,
+                should_traverse_deps_predicate=should_traverse_all_deps_predicate,
             ),
         )
         for tgt in transitive_targets.closure

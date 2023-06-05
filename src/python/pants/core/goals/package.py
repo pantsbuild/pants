@@ -205,7 +205,7 @@ def transitive_targets_without_traversing_packages_request(
 
     return TransitiveTargetsRequest(
         roots,
-        should_resolve_deps_predicate=should_traverse_deps,
+        should_traverse_deps_predicate=should_traverse_deps,
     )
 
 

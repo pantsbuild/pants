@@ -14,7 +14,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
-    should_resolve_all_deps_predicate,
+    should_traverse_all_deps_predicate,
 )
 from pants.option.option_types import BoolOption
 
@@ -47,7 +47,7 @@ async def dependencies(
             TransitiveTargets,
             TransitiveTargetsRequest(
                 addresses,
-                should_resolve_deps_predicate=should_resolve_all_deps_predicate,
+                should_traverse_deps_predicate=should_traverse_all_deps_predicate,
             ),
         )
         targets = Targets(transitive_targets.dependencies)
@@ -62,7 +62,7 @@ async def dependencies(
                 Targets,
                 DependenciesRequest(
                     tgt.get(DependenciesField),
-                    should_resolve_deps_predicate=should_resolve_all_deps_predicate,
+                    should_traverse_deps_predicate=should_traverse_all_deps_predicate,
                 ),
             )
             for tgt in target_roots
