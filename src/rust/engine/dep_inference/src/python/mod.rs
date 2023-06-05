@@ -149,48 +149,67 @@ impl ImportCollector<'_> {
     false
   }
 
+  fn normalize_import_node(node: tree_sitter::Node) -> Option<tree_sitter::Node> {
+    match node.kind_id() {
+      KindID::ALIASED_IMPORT => node.named_child(0),
+      KindID::ERROR => None,
+      _ => Some(node),
+    }
+  }
+
+  /// Various different styles of references to modules.
+  ///
+  /// NB. this diverges slightly from the core tree-sitter grammar by calling base module reference
+  /// (the part that always exists) "module_name", with "name" only used to refer to the extra bit
+  /// in `from ... import ...`:
+  ///
+  /// ```python
+  /// import $base_name
+  /// from $base_name import * # (the * node is passed as imported_name too)
+  /// from $base_name import $imported_name
+  /// "$base_name"
+  /// ```
   fn insert_import(
     &mut self,
-    name: tree_sitter::Node,
-    module_name: Option<tree_sitter::Node>,
+    base: tree_sitter::Node,
+    imported: Option<tree_sitter::Node>,
     is_string: bool,
   ) {
-    let dotted_name = match name.kind_id() {
-      KindID::ALIASED_IMPORT => name
-        .named_child(0)
-        .expect("Expected named child of aliased_import while parsing Python file."),
-      KindID::ERROR => {
-        return;
-      }
-      _ => name,
-    };
-    let name_range = dotted_name.range();
+    // the specifically-imported item takes precedence over the base name for ignoring and lines
+    // etc.
+    let most_specific = imported.unwrap_or(base);
 
-    if self.is_pragma_ignored(name) {
+    if self.is_pragma_ignored(most_specific) {
       return;
     }
+    let Some(base) = ImportCollector::normalize_import_node(base) else { return };
+    let imported = imported.and_then(ImportCollector::normalize_import_node);
 
-    let name_ref = if is_string {
-      self.string_at(name_range)
+    let base_range = base.range();
+    let base_ref = if is_string {
+      self.string_at(base_range)
     } else {
-      self.code_at(name_range)
+      self.code_at(base_range)
     };
-    let full_name = match module_name {
-      Some(module_name) => {
-        let mod_text = self.code_at(module_name.range());
-        // `from ... import a` => `...a` mod_text alone, but `from x import a` => `x.a` needs to
-        // insert a .
-        let joiner = if mod_text.ends_with('.') { "" } else { "." };
-        [mod_text, name_ref].join(joiner)
+
+    let full_name = match imported {
+      Some(imported) => {
+        let imported_ref = self.code_at(imported.range());
+        // `from ... import a` => `...a` should concat base_ref and imported_ref directly, but `from
+        // x import a` => `x.a` needs to insert a . between them
+        let joiner = if base_ref.ends_with('.') { "" } else { "." };
+        [base_ref, imported_ref].join(joiner)
       }
-      None => name_ref.to_string(),
+      None => base_ref.to_string(),
     };
+
+    let line0 = most_specific.range().start_point.row;
 
     self
       .import_map
       .entry(full_name)
       .and_modify(|v| *v = (v.0, v.1 && self.weaken_imports))
-      .or_insert(((name_range.start_point.row as u64) + 1, self.weaken_imports));
+      .or_insert(((line0 as u64) + 1, self.weaken_imports));
   }
 }
 
@@ -206,7 +225,7 @@ impl Visitor for ImportCollector<'_> {
   fn visit_import_from_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     if !self.is_pragma_ignored(node) {
       for child in node.children_by_field_name("name", &mut node.walk()) {
-        self.insert_import(child, Some(node.named_child(0).unwrap()), false);
+        self.insert_import(node.named_child(0).unwrap(), Some(child), false);
       }
     }
     ChildBehavior::Ignore
