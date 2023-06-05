@@ -2,21 +2,26 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+from collections import deque
 
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from itertools import chain
-from typing import Iterable
+from typing import Iterable, Iterator
+import asyncio
 
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest
 from pants.engine.console import Console
+from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -24,6 +29,7 @@ from pants.engine.target import (
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
+    Targets,
 )
 from pants.engine.unions import union
 from pants.util.strutil import pluralize
@@ -162,6 +168,73 @@ async def _invoke_process(
     return res.exit_code, tuple(results)
 
 
+@dataclass(frozen=True)
+class _DeployStep:
+    address: Address
+    process: DeployProcess
+    depends_on: tuple[_DeployStep, ...]
+
+    def closure(self) -> Iterator[_DeployStep]:
+        visited = set()
+        queue = deque(self.depends_on)
+
+        while queue:
+            step = deque.popleft()
+            if step.address in visited:
+                continue
+            visited.add(step.address)
+            yield step
+            queue.extend(step.depends_on)
+        yield self
+
+    def publish_dependencies(self) -> Iterator[Target]:
+        for step in self.closure():
+            yield from step.process.publish_dependencies
+
+@dataclass(frozen=True)
+class _FallibleDeployStepResult:
+    exit_code: int
+    results: tuple[str, ...]
+
+async def _build_deploy_graph(target: Target) -> _DeployStep:
+    process, dependencies = await MultiGet(
+        Get(DeployProcess, DeployFieldSet, DeployFieldSet.create(target)),
+        Get(Targets, DependenciesRequest(target[Dependencies]))
+    )
+
+    deployable_dependencies = [tgt for tgt in dependencies if DeployFieldSet.is_applicable(tgt)]
+    depends_on = await asyncio.gather(*[_build_deploy_graph(tgt) for tgt in deployable_dependencies])
+    return _DeployStep(target.address, process, tuple(depends_on))
+
+async def _run_deploy_steps(steps: Iterable[_DeployStep], console: Console) -> _FallibleDeployStepResult:
+    if len(steps) > 0:
+        dependency_results = await asyncio.gather(*[_run_deploy_step(step, console) for step in steps])
+        exit_code = max(result.exit_code for result in dependency_results)
+        results = [chain.from_iterable(result.results) for result in dependency_results]
+        return _FallibleDeployStepResult(exit_code, results)
+    else:
+        return _FallibleDeployStepResult(0, [])
+
+async def _run_deploy_step(step: _DeployStep, console: Console) -> _FallibleDeployStepResult:
+    dependencies_result = await _run_deploy_steps(step.depends_on, console)
+
+    exit_code = dependencies_result.exit_code
+    results = dependencies_result.results
+    
+    if exit_code == 0:
+        # Invoke the deployment.
+        ec, statuses = await _invoke_process(
+            console,
+            step.deploy.process,
+            names=[step.deploy.name],
+            success_status="deployed",
+            description=step.deploy.description,
+        )
+        exit_code = ec if ec != 0 else exit_code
+        results.extend(statuses)
+
+    return _FallibleDeployStepResult(exit_code, results)
+
 @goal_rule
 async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Deploy:
     target_roots_to_deploy_field_sets = await Get(
@@ -173,24 +246,16 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
         ),
     )
 
-    deploy_processes = await MultiGet(
-        Get(DeployProcess, DeployFieldSet, field_set)
-        for field_set in target_roots_to_deploy_field_sets.field_sets
-    )
+    deployment_steps = [await _build_deploy_graph(tgt) for tgt in target_roots_to_deploy_field_sets.targets]
+    publish_dependencies = chain.from_iterable(step.publish_dependencies for step in deployment_steps)
 
-    publish_targets = set(
-        chain.from_iterable([deploy.publish_dependencies for deploy in deploy_processes])
-    )
-    logger.debug(f"Found {pluralize(len(publish_targets), 'dependency')}")
-    publish_processes = await _all_publish_processes(publish_targets)
-
-    exit_code: int = 0
-    results: list[str] = []
-
-    if publish_processes:
-        logger.info(f"Publishing {pluralize(len(publish_processes), 'dependency')}...")
+    exit_code = 0
+    results = []
+    if publish_dependencies:
+        logger.info(f"Publishing {pluralize(len(publish_dependencies), 'dependency')} ...")
 
         # Publish all deployment dependencies first.
+        publish_processes = await _all_publish_processes(publish_dependencies)
         for publish in publish_processes:
             ec, statuses = await _invoke_process(
                 console,
@@ -202,21 +267,11 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
             exit_code = ec if ec != 0 else exit_code
             results.extend(statuses)
 
-    # Only proceed to deploy of all dependencies have been successfully published
-    if exit_code == 0 and deploy_processes:
+    if exit_code == 0:
         logger.info("Deploying targets...")
-
-        for deploy in deploy_processes:
-            # Invoke the deployment.
-            ec, statuses = await _invoke_process(
-                console,
-                deploy.process,
-                names=[deploy.name],
-                success_status="deployed",
-                description=deploy.description,
-            )
-            exit_code = ec if ec != 0 else exit_code
-            results.extend(statuses)
+        deployment_result = await _run_deploy_steps(deployment_steps, console)
+        exit_code = deployment_result.exit_code
+        results.extend(deployment_result.results)
 
     console.print_stderr("")
     if not results:
@@ -226,7 +281,7 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
     for line in results:
         console.print_stderr(line)
 
-    return Deploy(exit_code)
+    return Deploy(deployment_result.exit_code)
 
 
 def rules():
