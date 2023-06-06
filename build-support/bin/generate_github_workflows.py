@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
@@ -294,6 +295,33 @@ def install_go() -> Step:
     }
 
 
+def copy_to_s3(
+    name: str,
+    *,
+    src_prefix: str,
+    dst_prefix: str,
+    path: str,
+    always: bool = True,
+) -> Step:
+    return {
+        "name": name,
+        "if": "always()",
+        "continue-on-error": True,
+        "run": dedent(
+            f"""\
+            ./build-support/bin/copy_to_s3.py \
+              --src-prefix={src_prefix} \
+              --dst_prefix={dst_prefix} \
+              --path={path}
+            """
+        ),
+        "env": {
+            "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
+            "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
+        },
+    }
+
+
 def deploy_to_s3(
     name: str,
     *,
@@ -545,8 +573,38 @@ class Helper:
             "if": "always()",
             "continue-on-error": True,
             "with": {
-                "name": f"pants-log-{name.replace('/', '_')}-{self.platform_name()}",
-                "path": ".pants.d/pants.log",
+                "name": f"logs-{name.replace('/', '_')}-{self.platform_name()}",
+                "path": ".pants.d/*.log",
+            },
+        }
+
+    def upload_test_reports(self) -> Step:
+        date_str = datetime.now(timezone.utc).date().isoformat()
+        # The path purposely doesn't include job ID, as we want to aggregate test reports
+        # across all jobs/shards in a workflow.  We do, however, qualify by run attempt, so we
+        # apture separate reports for tests that flake between attempts on the same workflow run.
+        s3_path = (
+            "test/reports/"
+            + self.platform_name()
+            + "/"
+            + date_str
+            + "/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}"
+        )
+        return {
+            "name": "Upload test reports",
+            "if": "always()",
+            "continue-on-error": True,
+            "run": dedent(
+                f"""\
+                    ./build-support/bin/copy_to_s3.py \
+                      --src-prefix=dist/test/reports \
+                      --dst_prefix=s3://logs.pantsbuild.org/{s3_path} \
+                      --path=''
+                    """
+            ),
+            "env": {
+                "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
+                "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
             },
         }
 
@@ -685,6 +743,7 @@ def test_jobs(
                 "name": human_readable_step_name,
                 "run": pants_args_str,
             },
+            helper.upload_test_reports(),
             helper.upload_log_artifacts(name=log_name),
         ],
     }
