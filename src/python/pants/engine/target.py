@@ -849,9 +849,11 @@ class CoarsenedTargetsRequest:
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "expanded_targets", expanded_targets)
-        if should_traverse_deps_predicate is None:
-            should_traverse_deps_predicate = should_traverse_deps_default_predicate
-        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
+        object.__setattr__(
+            self,
+            "should_traverse_deps_predicate",
+            should_traverse_deps_predicate or traverse_if_dependencies_field,
+        )
 
 
 @dataclass(frozen=True)
@@ -889,9 +891,11 @@ class TransitiveTargetsRequest:
         should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None = None,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
-        if should_traverse_deps_predicate is None:
-            should_traverse_deps_predicate = should_traverse_deps_default_predicate
-        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
+        object.__setattr__(
+            self,
+            "should_traverse_deps_predicate",
+            should_traverse_deps_predicate or traverse_if_dependencies_field,
+        )
 
 
 @dataclass(frozen=True)
@@ -2477,18 +2481,16 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 ShouldTraverseDepsPredicate = Callable[[Target, Field], bool]
 
 
-# noinspection PyUnusedLocal
-def should_traverse_deps_default_predicate(tgt: Target, fld: Field) -> bool:
+def traverse_if_dependencies_field(target: Target, field: Field) -> bool:
     """This is the default ShouldTraverseDepsPredicate implementation.
 
     This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
     subclasses of Dependencies.
     """
-    return isinstance(fld, Dependencies)
+    return isinstance(field, Dependencies)
 
 
-# noinspection PyUnusedLocal
-def should_traverse_all_deps_predicate(tgt: Target, fld: Field) -> bool:
+def always_traverse(target: Target, field: Field) -> bool:
     """A predicate to use when a request needs all deps.
 
     This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
@@ -2499,9 +2501,7 @@ def should_traverse_all_deps_predicate(tgt: Target, fld: Field) -> bool:
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
-    should_traverse_deps_predicate: ShouldTraverseDepsPredicate = (
-        should_traverse_deps_default_predicate
-    )
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field
 
     def debug_hint(self) -> str:
         return self.field.address.spec

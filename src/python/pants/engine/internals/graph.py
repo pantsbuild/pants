@@ -1207,7 +1207,7 @@ class TransitiveExcludesNotSupportedError(ValueError):
 
 @rule
 async def determine_explicitly_provided_dependencies(
-    request: DependenciesRequest,  # this rule ignores request.should_traverse_deps_predicate
+    request: DependenciesRequest,  # NB: This rule ignores request.should_traverse_deps_predicate.
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
     subproject_roots: SubprojectRoots,

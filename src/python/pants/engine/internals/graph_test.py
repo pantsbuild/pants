@@ -65,7 +65,7 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    should_traverse_all_deps_predicate,
+    always_traverse,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.filespec import Filespec
@@ -316,12 +316,7 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
 
     direct_deps = transitive_targets_rule_runner.request(
         Targets,
-        [
-            DependenciesRequest(
-                root[Dependencies],
-                should_traverse_deps_predicate=should_traverse_all_deps_predicate,
-            )
-        ],
+        [DependenciesRequest(root[Dependencies], should_traverse_deps_predicate=always_traverse)],
     )
     assert direct_deps == Targets([d1, d2, d3])
 
@@ -336,8 +331,7 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
         TransitiveTargets,
         [
             TransitiveTargetsRequest(
-                [root.address, d2.address],
-                should_traverse_deps_predicate=should_traverse_all_deps_predicate,
+                [root.address, d2.address], should_traverse_deps_predicate=always_traverse
             )
         ],
     )

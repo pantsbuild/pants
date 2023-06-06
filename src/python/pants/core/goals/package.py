@@ -20,12 +20,12 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
-    Dependencies,
     Field,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
+    SpecialCasedDependencies,
     StringField,
     Target,
     TargetRootsToFieldSets,
@@ -192,13 +192,13 @@ def transitive_targets_without_traversing_packages_request(
 ) -> TransitiveTargetsRequest:
     package_field_set_types = union_membership.get(PackageFieldSet)
 
-    def should_traverse_deps(tgt: Target, fld: Field) -> bool:
-        if not isinstance(fld, Dependencies):  # SpecialCasedDependencies
+    def should_traverse_deps(target: Target, field: Field) -> bool:
+        if isinstance(field, SpecialCasedDependencies):
             return False
-        if always_traverse_roots and tgt.address in roots:
+        if always_traverse_roots and target.address in roots:
             return True
         for field_set_type in package_field_set_types:
-            if field_set_type.is_applicable(tgt):
+            if field_set_type.is_applicable(target):
                 # False means do not traverse dependencies of this target
                 return False
         return True

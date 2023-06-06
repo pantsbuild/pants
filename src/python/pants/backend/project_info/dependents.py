@@ -14,7 +14,7 @@ from pants.engine.target import (
     AllUnexpandedTargets,
     Dependencies,
     DependenciesRequest,
-    should_traverse_all_deps_predicate,
+    always_traverse,
 )
 from pants.option.option_types import BoolOption
 from pants.util.frozendict import FrozenDict
@@ -33,8 +33,7 @@ async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> Addr
         Get(
             Addresses,
             DependenciesRequest(
-                tgt.get(Dependencies),
-                should_traverse_deps_predicate=should_traverse_all_deps_predicate,
+                tgt.get(Dependencies), should_traverse_deps_predicate=always_traverse
             ),
         )
         for tgt in all_targets

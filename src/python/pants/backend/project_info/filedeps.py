@@ -19,7 +19,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
-    should_traverse_all_deps_predicate,
+    always_traverse,
 )
 from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
@@ -74,10 +74,7 @@ async def file_deps(
     if filedeps_subsystem.transitive:
         transitive_targets = await Get(
             TransitiveTargets,
-            TransitiveTargetsRequest(
-                addresses,
-                should_traverse_deps_predicate=should_traverse_all_deps_predicate,
-            ),
+            TransitiveTargetsRequest(addresses, should_traverse_deps_predicate=always_traverse),
         )
         targets = transitive_targets.closure
     else:
