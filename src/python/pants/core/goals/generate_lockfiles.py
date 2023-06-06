@@ -278,7 +278,6 @@ class LockfileDiffPrinter(MaybeColor):
 
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
-NO_TOOL_LOCKFILE = "<none>"
 
 
 class UnrecognizedResolveNamesError(Exception):
@@ -413,7 +412,7 @@ def filter_tool_lockfile_requests(
     result = []
     for wrapped_req in specified_requests:
         req = wrapped_req.request
-        if req.lockfile_dest not in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE):
+        if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
             result.append(req)
             continue
         if resolve_specified:

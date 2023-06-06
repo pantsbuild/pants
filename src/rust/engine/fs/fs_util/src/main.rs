@@ -473,7 +473,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               .ok_or_else(|| format!("File being saved must have parent but {path:?} did not"))?,
           );
           let file = posix_fs
-            .stat_sync(PathBuf::from(path.file_name().unwrap()))
+            .stat_sync(Path::new(path.file_name().unwrap()))
             .unwrap()
             .ok_or_else(|| format!("Tried to save file {path:?} but it did not exist"))?;
           match file {

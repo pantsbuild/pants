@@ -108,6 +108,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Huon Wilson
 + Hwasung Lee
 + Ian Tabolt
++ Idan Attias
 + Igor Morozov
 + Ikai Lan
 + In-Ho Yi
