@@ -1,0 +1,42 @@
+name: Say Hello to First-timers
+
+on:
+  issues:
+    types: [opened]
+  # NB: This is safe since we don't checkout the repo
+  # See https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+  pull_request_target:
+    types: [opened]
+    branches: [main]
+
+jobs:
+  check_for_first_interaction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.WORKER_PANTS_SAY_HI_PAT }}
+          issue-message: |
+            Welcome to the Pantsbuild Community. This looks like your first issue here. Thanks for taking the time to write it.
+
+            If you haven't already, feel free to [come say hi on Slack](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link).
+
+            If you have questions, or just want to surface this issue, check out the `#development` channel.
+            (If you want to check it out without logging in, check out our [Linen mirror](https://chat.pantsbuild.org/))
+
+            Thanks again, and we look forward to your next Issue/PR :smile:!
+
+          pr-message: |
+            Welcome to the Pantsbuild Community. This looks like your first PR here.
+
+            We are so grateful for each an every contribution, big or small.
+            So thanks for spending your time and energy making this project better.
+
+            If you haven't gotten a reply in a week, feel free to gently comment "bump" to ping the project admins.
+
+            If you haven't already, feel free to [come say hi on Slack](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link).
+
+            If you have questions, or just want to surface this PR, check out the `#development` channel.
+            (If you want to check it out without logging in, check out our [Linen mirror](https://chat.pantsbuild.org/))
+
+            Thanks again for this PR, and we'll be on the lookout for your next one :smile:!

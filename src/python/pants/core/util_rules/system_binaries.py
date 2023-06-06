@@ -250,18 +250,6 @@ class BashBinary(BinaryPath):
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
 
-@dataclass(frozen=True)
-class BashBinaryRequest:
-    search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
-
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(BashBinary, BashBinaryRequest)",
-            "Instead, simply use `Get(BashBinary)` or put `BashBinary` in the rule signature.",
-        )
-
-
 class PythonBinary(BinaryPath):
     """A Python3 interpreter for use by `@rule` code as an alternative to BashBinary scripts.
 
@@ -293,26 +281,6 @@ class UnzipBinary(BinaryPath):
         # Note that the `output_dir` does not need to already exist.
         # The caller should validate that it's a valid `.zip` file.
         return (self.path, archive_path, "-d", extract_path)
-
-
-@dataclass(frozen=True)
-class GunzipBinary:
-    python: PythonBinary
-
-    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
-        archive_name = os.path.basename(archive_path)
-        dest_file_name = os.path.splitext(archive_name)[0]
-        dest_path = os.path.join(extract_path, dest_file_name)
-        script = dedent(
-            f"""
-            import gzip
-            import shutil
-            with gzip.GzipFile(filename={archive_path!r}, mode="rb") as source:
-                with open({dest_path!r}, "wb") as dest:
-                    shutil.copyfileobj(source, dest)
-            """
-        )
-        return (self.python.path, "-c", script)
 
 
 @dataclass(frozen=True)
@@ -476,11 +444,6 @@ def _create_shim(bash: str, binary: str) -> bytes:
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
-async def find_bash(_: BashBinaryRequest, bash_binary: BashBinary) -> BashBinary:
-    return bash_binary
-
-
-@rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
 async def get_bash() -> BashBinary:
     request = BinaryPathRequest(
         binary_name="bash",
@@ -594,6 +557,13 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
 
 @rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
 async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
+    warn_or_error(
+        # TODO(Joshua Cannon): removal at 2.18.0.dev2
+        removal_version="2.18.0.dev2",
+        entity="Requesting `PythonBinary`",
+        hint="Use the `PythonBuildStandalone` type instead (be sure to provide the `immutable_input_digests` to any applicable process).",
+    )
+
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
     # for maximum compatibility with internal scripts.
     interpreter_search_paths = python_bootstrap.interpreter_search_paths
@@ -686,11 +656,6 @@ async def find_unzip() -> UnzipBinary:
         request, rationale="download the tools Pants needs to run"
     )
     return UnzipBinary(first_path.path, first_path.fingerprint)
-
-
-@rule
-def find_gunzip(python: PythonBinary) -> GunzipBinary:
-    return GunzipBinary(python)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
@@ -787,161 +752,6 @@ async def find_git() -> GitBinary:
         request, rationale="track changes to files in your build environment"
     )
     return GitBinary(first_path.path, first_path.fingerprint)
-
-
-# -------------------------------------------------------------------------------------------
-# (Deprecated). Rules for lazy requests
-# -------------------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class ZipBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(ZipBinary, ZipBinaryRequest)",
-            "Instead, simply use `Get(ZipBinary)` or put `ZipBinary` in the rule signature",
-        )
-
-
-@dataclass(frozen=True)
-class UnzipBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(UnzipBinary, UnzipBinaryRequest)",
-            "Instead, simply use `Get(UnipBinary)` or put `UnzipBinary` in the rule signature",
-        )
-
-
-@dataclass(frozen=True)
-class GunzipBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(GunzipBinary, GunzipBinaryRequest)",
-            "Instead, simply use `Get(GunzipBinary)` or put `GunzipBinary` in the rule signature",
-        )
-
-
-class CatBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(CatBinary, CatBinaryRequest)",
-            "Instead, simply use `Get(CatBinary)` or put `CatBinary` in the rule signature",
-        )
-
-
-class TarBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(TarBinary, TarBinaryRequest)",
-            "Instead, simply use `Get(TarBinary)` or put `TarBinary` in the rule signature",
-        )
-
-
-@dataclass(frozen=True)
-class MkdirBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(MkdirBinary, MkdirBinaryRequest)",
-            "Instead, simply use `Get(MkdirBinary)` or put `MkdirBinary` in the rule signature",
-        )
-
-
-@dataclass(frozen=True)
-class ChmodBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(ChmodBinary, ChmodBinaryRequest)",
-            "Instead, simply use `Get(ChmodBinary)` or put `ChmodBinary` in the rule signature",
-        )
-
-
-@dataclass(frozen=True)
-class DiffBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(DiffBinary, DiffBinaryRequest)",
-            "Instead, simply use `Get(DiffBinary)` or put `DiffBinary` in the rule signature",
-        )
-
-
-@dataclass(frozen=True)
-class ReadlinkBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(ReadlinkBinary, ReadlinkBinaryRequest)",
-            "Instead, simply use `Get(ReadlinkBinary)` or put `ReadlinkBinary` in the rule signature",
-        )
-
-
-@dataclass(frozen=True)
-class GitBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(GitBinary, GitBinaryRequest)",
-            "Instead, simply use `Get(GitBinary)` or put `GitBinary` in the rule signature",
-        )
-
-
-@rule
-async def find_zip_wrapper(_: ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBinary:
-    return zip_binary
-
-
-@rule
-async def find_unzip_wrapper(_: UnzipBinaryRequest, unzip_binary: UnzipBinary) -> UnzipBinary:
-    return unzip_binary
-
-
-@rule
-async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> GunzipBinary:
-    return gunzip
-
-
-@rule
-async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
-    return tar_binary
-
-
-@rule
-async def find_cat_wrapper(_: CatBinaryRequest, cat_binary: CatBinary) -> CatBinary:
-    return cat_binary
-
-
-@rule
-async def find_mkdir_wrapper(_: MkdirBinaryRequest, mkdir_binary: MkdirBinary) -> MkdirBinary:
-    return mkdir_binary
-
-
-@rule
-async def find_readlink_wrapper(
-    _: ReadlinkBinaryRequest, readlink_binary: ReadlinkBinary
-) -> ReadlinkBinary:
-    return readlink_binary
-
-
-@rule
-async def find_chmod_wrapper(_: ChmodBinaryRequest, chmod_binary: ChmodBinary) -> ChmodBinary:
-    return chmod_binary
-
-
-@rule
-async def find_diff_wrapper(_: DiffBinaryRequest, diff_binary: DiffBinary) -> DiffBinary:
-    return diff_binary
-
-
-@rule
-async def find_git_wrapper(_: GitBinaryRequest, git_binary: GitBinary) -> GitBinary:
-    return git_binary
 
 
 def rules():

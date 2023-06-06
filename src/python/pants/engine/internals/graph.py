@@ -11,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, Iterable, Iterator, NamedTuple, NewType, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -40,7 +40,6 @@ from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRe
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     AllUnexpandedTargets,
     CoarsenedTarget,
     CoarsenedTargets,
@@ -571,18 +570,6 @@ async def resolve_targets(
     return Targets(expanded_targets)
 
 
-@rule(_masked_types=[EnvironmentName])
-def find_all_targets_deprecated(_: AllTargetsRequest, all_targets: AllTargets) -> AllTargets:
-    return all_targets
-
-
-@rule(_masked_types=[EnvironmentName])
-def find_all_unexpanded_targets_deprecated(
-    _: AllTargetsRequest, all_targets: AllUnexpandedTargets
-) -> AllUnexpandedTargets:
-    return all_targets
-
-
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def find_all_targets() -> AllTargets:
     tgts = await Get(
@@ -909,7 +896,15 @@ class OwnersRequest:
     match_if_owning_build_file_included_in_sources: bool = False
 
 
-class Owners(Collection[Address]):
+# NB: This was changed from:
+# class Owners(Collection[Address]):
+#     pass
+# In https://github.com/pantsbuild/pants/pull/19191 to facilitate surgical warning of deprecation
+# of SecondaryOwnerMixin. After the Deprecation ends, it can be changed back.
+IsPrimary = NewType("IsPrimary", bool)
+
+
+class Owners(FrozenDict[Address, IsPrimary]):
     pass
 
 
@@ -964,7 +959,7 @@ async def find_owners(
     )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
-    matching_addresses: OrderedSet[Address] = OrderedSet()
+    result = {}
     unmatched_sources = set(owners_request.sources)
     for live in (True, False):
         candidate_tgts: Sequence[Target]
@@ -989,6 +984,8 @@ async def find_owners(
             matching_files = set(
                 candidate_tgt.get(SourcesField).filespec_matcher.matches(list(sources_set))
             )
+            is_primary = bool(matching_files)
+
             # Also consider secondary ownership, meaning it's not a `SourcesField` field with
             # primary ownership, but the target still should match the file. We can't use
             # `tgt.get()` because this is a mixin, and there technically may be >1 field.
@@ -999,8 +996,9 @@ async def find_owners(
             )
             for secondary_owner_field in secondary_owner_fields:
                 matching_files.update(
-                    *secondary_owner_field.filespec_matcher.matches(list(sources_set))
+                    secondary_owner_field.filespec_matcher.matches(list(sources_set))
                 )
+
             if not matching_files and not (
                 owners_request.match_if_owning_build_file_included_in_sources
                 and bfa.rel_path in sources_set
@@ -1008,7 +1006,7 @@ async def find_owners(
                 continue
 
             unmatched_sources -= matching_files
-            matching_addresses.add(candidate_tgt.address)
+            result[candidate_tgt.address] = IsPrimary(is_primary)
 
     if (
         unmatched_sources
@@ -1018,7 +1016,7 @@ async def find_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
         )
 
-    return Owners(matching_addresses)
+    return Owners(result)
 
 
 # -----------------------------------------------------------------------------------------------

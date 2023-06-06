@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Sequence
+from typing import Dict, Sequence
 
 import pytest
 
-from pants.backend.terraform import tool
+from pants.backend.terraform import dependency_inference, tool
 from pants.backend.terraform.goals import check
 from pants.backend.terraform.goals.check import TerraformCheckRequest
 from pants.backend.terraform.target_types import TerraformFieldSet, TerraformModuleTarget
@@ -29,6 +29,7 @@ def rule_runner() -> RuleRunner:
             *check.rules(),
             *tool.rules(),
             *source_files.rules(),
+            *dependency_inference.rules(),
             QueryRule(CheckResults, (TerraformCheckRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
@@ -56,6 +57,16 @@ BAD_SOURCE = FileContent(
           bad_base = "xyzzy"
           bar = "${bad_base}"
         }
+        """
+    ).encode("utf-8"),
+)
+
+# This resource uses the null_resource provider. Terraform will need to run `init` to init the provider
+SOURCE_WITH_PROVIDER = FileContent(
+    "provided.tf",
+    textwrap.dedent(
+        """
+        resource "null_resource" "dep" {}
         """
     ).encode("utf-8"),
 )
@@ -133,3 +144,72 @@ def test_skip(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
     lint_results = run_terraform_validate(rule_runner, [target], args=["--terraform-validate-skip"])
     assert not lint_results
+
+
+def test_with_dependency(rule_runner: RuleRunner) -> None:
+    """Sources with a provider need to have `terraform init` run before to initialise the provider.
+
+    Without `init`, `terraform validate` fails. It is therefore sufficient to just test that the
+    process ran successfully
+    """
+    targets = [make_target(rule_runner, [SOURCE_WITH_PROVIDER])]
+    check_results = run_terraform_validate(rule_runner, targets)
+    assert check_results[0].exit_code == 0
+
+
+def test_in_folder(rule_runner: RuleRunner) -> None:
+    """Test that we can `check` terraform files not in the root folder."""
+    target_name = "in_folder"
+    files = {
+        "folder/BUILD": f"terraform_module(name='{target_name}')\n",
+        "folder/provided.tf": textwrap.dedent(
+            """
+            resource "null_resource" "dep" {}
+            resource "random_pet" "random" {}
+            """
+        ),
+    }
+    rule_runner.write_files(files)
+    target = rule_runner.get_target(Address("folder", target_name=target_name))
+
+    check_results = run_terraform_validate(rule_runner, [target])
+    assert check_results[0].exit_code == 0
+
+
+def test_conflicting_provider_versions(rule_runner: RuleRunner) -> None:
+    """Test that 2 separate terraform_modules can request conflicting providers."""
+    target_name = "in_folder"
+    versions = ["3.2.1", "3.0.0"]
+
+    def make_terraform_module(version: str) -> Dict[str, str]:
+        return {
+            f"folder{version}/BUILD": f"terraform_module(name='{target_name}')\n",
+            f"folder{version}/provided.tf": textwrap.dedent(
+                """
+            terraform {
+              required_providers {
+                null = {
+                  source = "hashicorp/null"
+                  version = "%s"
+                }
+              }
+            }
+            resource "null_resource" "res" {}
+            """
+                % version
+            ),
+        }
+
+    files = {}
+    for version in versions:
+        files.update(make_terraform_module(version))
+
+    rule_runner.write_files(files)
+    targets = [
+        rule_runner.get_target(Address(folder, target_name=target_name))
+        for folder in (f"folder{version}" for version in versions)
+    ]
+
+    check_results = run_terraform_validate(rule_runner, targets)
+    assert len(check_results) == len(versions)
+    assert all(check_result.exit_code == 0 for check_result in check_results)

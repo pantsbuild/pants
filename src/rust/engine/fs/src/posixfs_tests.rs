@@ -46,7 +46,7 @@ async fn stat_executable_file() {
   let path = PathBuf::from("photograph_marmosets");
   make_file(&dir.path().join(&path), &[], 0o700);
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&path).unwrap().unwrap(),
     super::Stat::File(File {
       path: path,
       is_executable: true,
@@ -61,7 +61,7 @@ async fn stat_nonexecutable_file() {
   let path = PathBuf::from("marmosets");
   make_file(&dir.path().join(&path), &[], 0o600);
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&path).unwrap().unwrap(),
     super::Stat::File(File {
       path: path,
       is_executable: false,
@@ -76,7 +76,7 @@ async fn stat_dir() {
   let path = PathBuf::from("enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&path).unwrap().unwrap(),
     super::Stat::Dir(Dir(path))
   )
 }
@@ -91,7 +91,7 @@ async fn stat_symlink() {
   let link_path = PathBuf::from("remarkably_similar_marmoset");
   std::os::unix::fs::symlink(dir.path().join(path.clone()), dir.path().join(&link_path)).unwrap();
   assert_eq!(
-    posix_fs.stat_sync(link_path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&link_path).unwrap().unwrap(),
     super::Stat::Link(Link {
       path: link_path,
       target: dir.path().join(path)
@@ -110,7 +110,7 @@ async fn stat_symlink_oblivious() {
   std::os::unix::fs::symlink(dir.path().join(path), dir.path().join(&link_path)).unwrap();
   // Symlink oblivious stat will give us the destination type.
   assert_eq!(
-    posix_fs.stat_sync(link_path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&link_path).unwrap().unwrap(),
     super::Stat::File(File {
       path: link_path,
       is_executable: false,
@@ -121,9 +121,7 @@ async fn stat_symlink_oblivious() {
 #[tokio::test]
 async fn stat_other() {
   assert_eq!(
-    new_posixfs("/dev")
-      .stat_sync(PathBuf::from("null"))
-      .unwrap(),
+    new_posixfs("/dev").stat_sync(Path::new("null")).unwrap(),
     None,
   );
 }
@@ -132,10 +130,7 @@ async fn stat_other() {
 async fn stat_missing() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs(dir.path());
-  assert_eq!(
-    posix_fs.stat_sync(PathBuf::from("no_marmosets")).unwrap(),
-    None,
-  );
+  assert_eq!(posix_fs.stat_sync(Path::new("no_marmosets")).unwrap(), None,);
 }
 
 #[tokio::test]
@@ -156,25 +151,27 @@ async fn scandir() {
   let path = PathBuf::from("enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
 
-  let a_marmoset = path.join("a_marmoset");
-  let feed = path.join("feed");
-  let hammock = path.join("hammock");
-  let remarkably_similar_marmoset = path.join("remarkably_similar_marmoset");
-  let sneaky_marmoset = path.join("sneaky_marmoset");
+  let a_marmoset = PathBuf::from("a_marmoset");
+  let feed = PathBuf::from("feed");
+  let hammock = PathBuf::from("hammock");
+  let remarkably_similar_marmoset = PathBuf::from("remarkably_similar_marmoset");
+  let sneaky_marmoset = PathBuf::from("sneaky_marmoset");
 
-  make_file(&dir.path().join(&feed), &[], 0o700);
-  make_file(&dir.path().join(&a_marmoset), &[], 0o600);
-  make_file(&dir.path().join(&sneaky_marmoset), &[], 0o600);
+  make_file(&dir.path().join(&path).join(&feed), &[], 0o700);
+  make_file(&dir.path().join(&path).join(&a_marmoset), &[], 0o600);
+  make_file(&dir.path().join(&path).join(&sneaky_marmoset), &[], 0o600);
   std::os::unix::fs::symlink(
-    dir.path().join(&a_marmoset),
-    dir
-      .path()
-      .join(dir.path().join(&remarkably_similar_marmoset)),
+    dir.path().join(&path).join(&a_marmoset),
+    dir.path().join(&path).join(&remarkably_similar_marmoset),
   )
   .unwrap();
-  std::fs::create_dir(dir.path().join(&hammock)).unwrap();
+  std::fs::create_dir(dir.path().join(&path).join(&hammock)).unwrap();
   make_file(
-    &dir.path().join(&hammock).join("napping_marmoset"),
+    &dir
+      .path()
+      .join(&path)
+      .join(&hammock)
+      .join("napping_marmoset"),
     &[],
     0o600,
   );
@@ -197,7 +194,7 @@ async fn scandir() {
       Stat::Dir(Dir(hammock.clone())),
       Stat::Link(Link {
         path: remarkably_similar_marmoset.clone(),
-        target: dir.path().join(&a_marmoset)
+        target: dir.path().join(&path).join(&a_marmoset)
       }),
       Stat::File(File {
         path: sneaky_marmoset.clone(),
@@ -282,7 +279,7 @@ async fn stats_for_paths() {
     PathBuf::from("doesnotexist"),
   ]
   .into_iter()
-  .map(|p| posix_fs.stat_sync(p).unwrap())
+  .map(|p| posix_fs.stat_sync(&p).unwrap())
   .collect::<Vec<_>>();
   let v: Vec<Option<Stat>> = vec![
     Some(Stat::File(File {
@@ -299,7 +296,7 @@ async fn stats_for_paths() {
       target: PathBuf::from("executable_file"),
     })),
     Some(Stat::Link(Link {
-      path: PathBuf::from("dir/recursive_symlink"),
+      path: PathBuf::from("recursive_symlink"),
       target: PathBuf::from("../symlink"),
     })),
     Some(Stat::Link(Link {

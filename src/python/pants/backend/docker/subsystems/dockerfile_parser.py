@@ -9,10 +9,7 @@ from pathlib import PurePath
 
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -38,13 +35,11 @@ class DockerfileParser(PythonToolRequirementsBase):
     options_scope = "dockerfile-parser"
     help = "Used to parse Dockerfile build specs to infer their dependencies."
 
-    default_version = "dockerfile==3.2.0"
     default_requirements = ["dockerfile>=3.2.0,<4"]
 
     register_interpreter_constraints = True
 
     default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)

@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import sys
 import venv
-import xmlrpc.client
 from configparser import ConfigParser
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -21,7 +20,6 @@ from enum import Enum
 from functools import total_ordering
 from math import ceil
 from pathlib import Path
-from time import sleep
 from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
@@ -81,57 +79,6 @@ _expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi", "kaos"}
 DISABLED_BACKENDS_CONFIG = {
     "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants.explorer.server"]',
 }
-
-
-class PackageAccessValidator:
-    @classmethod
-    def validate_all(cls):
-        instance = cls()
-        for pkg_name in _known_packages:
-            instance.validate_package_access(pkg_name)
-
-    def __init__(self):
-        self._client = xmlrpc.client.ServerProxy("https://pypi.org/pypi")
-
-    @property
-    def client(self):
-        # The PyPI XML-RPC API requires at least 1 second between requests, or it rejects them
-        # with HTTPTooManyRequests.
-        sleep(1.0)
-        return self._client
-
-    @staticmethod
-    def validate_role_sets(role: str, actual: set[str], expected: set[str]) -> str:
-        err_msg = ""
-        if actual != expected:
-            expected_not_actual = sorted(expected - actual)
-            actual_not_expected = sorted(actual - expected)
-            if expected_not_actual:
-                err_msg += f"Missing expected {role}s: {','.join(expected_not_actual)}."
-            if actual_not_expected:
-                err_msg += f"Found unexpected {role}s: {','.join(actual_not_expected)}"
-        return err_msg
-
-    def validate_package_access(self, pkg_name: str) -> None:
-        actual_owners = set()
-        actual_maintainers = set()
-        for role_assignment in self.client.package_roles(pkg_name):
-            role, username = role_assignment
-            if role == "Owner":
-                actual_owners.add(username)
-            elif role == "Maintainer":
-                actual_maintainers.add(username)
-            else:
-                raise ValueError(f"Unrecognized role {role} for user {username}")
-
-        err_msg = ""
-        err_msg += self.validate_role_sets("owner", actual_owners, _expected_owners)
-        err_msg += self.validate_role_sets("maintainer", actual_maintainers, _expected_maintainers)
-
-        if err_msg:
-            die(f"Role discrepancies for {pkg_name}: {err_msg}")
-
-        print(f"Roles for package {pkg_name} as expected.")
 
 
 @total_ordering
@@ -311,6 +258,7 @@ def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[st
                 env={
                     **os.environ,
                     **DISABLED_BACKENDS_CONFIG,
+                    "NO_SCIE_WARNING": "1",
                 },
             )
             .stdout.decode()
@@ -441,6 +389,22 @@ class _Constants:
             .stdout.decode()
             .strip()
         )
+        self._head_committer_date = (
+            subprocess.run(
+                [
+                    "git",
+                    "show",
+                    "--no-patch",
+                    "--format=%cd",
+                    "--date=format:%Y%m%d%H%M",
+                    self._head_sha,
+                ],
+                stdout=subprocess.PIPE,
+                check=True,
+            )
+            .stdout.decode()
+            .strip()
+        )
         self.pants_version_file = Path("src/python/pants/VERSION")
         self.pants_stable_version = self.pants_version_file.read_text().strip()
 
@@ -470,7 +434,9 @@ class _Constants:
 
     @property
     def pants_unstable_version(self) -> str:
-        return f"{self.pants_stable_version}+git{self._head_sha[:8]}"
+        # include the commit's timestamp to make multiple builds of a single stable version more
+        # easily orderable
+        return f"{self.pants_stable_version}+{self._head_committer_date}.git{self._head_sha[:8]}"
 
     @property
     def twine_venv_dir(self) -> Path:
@@ -786,20 +752,16 @@ def build_fs_util() -> None:
 def build_pex(fetch: bool) -> None:
     stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
     if fetch:
-        # TODO: Support macOS on ARM64.
+        # TODO: Support macos and linux arm64.
         extra_pex_args = [
             "--python-shebang",
             "/usr/bin/env python",
-            *(
-                f"--platform={plat}-{abi}"
-                for plat in ("linux_x86_64", "macosx_11.0_x86_64")
-                for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
-            ),
+            *(f"--platform={plat}-cp-39-cp39" for plat in ("linux_x86_64", "macosx_11.0_x86_64")),
         ]
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
         banner(f"Building {pex_name} by fetching wheels.")
     else:
-        # TODO: Support macOS on ARM64. Will require qualifying the pex name with the arch.
+        # TODO: Support macos and linux arm64. Will require qualifying the pex name with the arch.
         major, minor = sys.version_info[:2]
         extra_pex_args = [
             f"--interpreter-constraint=CPython=={major}.{minor}.*",
@@ -818,7 +780,8 @@ def build_pex(fetch: bool) -> None:
         fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
         check_pants_wheels_present(CONSTANTS.deploy_dir)
         if stable:
-            reversion_prebuilt_wheels()
+            stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
+            reversion_prebuilt_wheels(str(stable_wheel_dir))
     else:
         build_pants_wheels()
         build_3rdparty_wheels()
@@ -871,31 +834,39 @@ def build_pex(fetch: bool) -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Publish
+# Fetch and stabilize the versions of wheels for publishing
 # -----------------------------------------------------------------------------------------------
 
 
-def publish() -> None:
-    banner("Releasing to PyPI and GitHub")
-    # Check prereqs.
-    check_clean_git_branch()
-    prompt_artifact_freshness()
-    check_pgp()
-    check_roles()
-
+def fetch_and_stabilize(dest_dir: str) -> None:
+    # TODO: Because wheels are now built specifically for a particular tag, we could likely remove
+    # "reversioning".
+    banner(f"Fetching and stabilizing wheels to {dest_dir}.")
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
     fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
     check_pants_wheels_present(CONSTANTS.deploy_dir)
-    reversion_prebuilt_wheels()
+    reversion_prebuilt_wheels(dest_dir)
+    banner("Successfully fetched and stabilized wheels")
 
-    # Release.
-    create_twine_venv()
-    upload_wheels_via_twine()
-    tag_release()
-    banner("Successfully released to PyPI and GitHub")
+
+# -----------------------------------------------------------------------------------------------
+# Begin a release by pushing a release tag
+# -----------------------------------------------------------------------------------------------
+
+
+def tag_release() -> None:
+    banner("Tagging release")
+
+    check_clean_git_branch()
+    check_pgp()
+
+    prompt_artifact_freshness()
     prompt_to_generate_docs()
+
+    run_tag_release()
+    banner("Successfully tagged release")
 
 
 def check_clean_git_branch() -> None:
@@ -946,25 +917,7 @@ def check_pgp() -> None:
         )
 
 
-def check_roles() -> None:
-    # Check that the packages we plan to publish are correctly owned.
-    banner("Checking current user.")
-    username = get_pypi_config("server-login", "username")
-    if (
-        username != "__token__"  # See: https://pypi.org/help/#apitoken
-        and username not in _expected_owners
-        and username not in _expected_maintainers
-    ):
-        die(f"User {username} not authorized to publish.")
-    banner("Checking package roles.")
-    validator = PackageAccessValidator()
-    for pkg in PACKAGES:
-        if pkg.name not in _known_packages:
-            die(f"Unknown package {pkg}")
-        validator.validate_package_access(pkg.name)
-
-
-def reversion_prebuilt_wheels() -> None:
+def reversion_prebuilt_wheels(dest_dir: str) -> None:
     # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We use
     # manylinux2014 images.
     source_platform = "linux_"
@@ -974,18 +927,17 @@ def reversion_prebuilt_wheels() -> None:
         whl.rename(str(whl).replace(source_platform, dest_platform))
 
     # Now, reversion to use the STABLE_VERSION.
-    stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
-    stable_wheel_dir.mkdir(parents=True, exist_ok=True)
+    Path(dest_dir).mkdir(parents=True, exist_ok=True)
     for whl in unstable_wheel_dir.glob("*.whl"):
         reversion(
             whl_file=str(whl),
-            dest_dir=str(stable_wheel_dir),
+            dest_dir=dest_dir,
             target_version=CONSTANTS.pants_stable_version,
             extra_globs=["pants/_version/VERSION"],
         )
 
 
-def tag_release() -> None:
+def run_tag_release() -> None:
     tag_name = f"release_{CONSTANTS.pants_stable_version}"
     subprocess.run(
         [
@@ -1177,13 +1129,12 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 10:
+        if is_cross_platform(local_files) and len(local_files) != 4:
             formatted_local_files = "\n    ".join(sorted(f.name for f in local_files))
             missing_packages.append(
                 softwrap(
                     f"""
-                    {package.name}. Expected 10 wheels ({{cp37m, cp38, cp39}} x
-                    {{macosx10.15-x86_64, macosx11-x86_64, linux-x86_64}} + cp39-macosx-arm64),
+                    {package.name}. Expected 4 wheels (linux/mac X x86_64/arm64),
                     but found {len(local_files)}:\n    {formatted_local_files}
                     """
                 )
@@ -1202,13 +1153,19 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("publish")
+    subparsers.add_parser("tag-release")
+
+    fetch_and_stabilize = subparsers.add_parser("fetch-and-stabilize")
+    fetch_and_stabilize.add_argument(
+        "--dest",
+        help="A destination directory to put stabilized wheels in.",
+    )
+
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
     subparsers.add_parser("build-local-pex")
     subparsers.add_parser("build-universal-pex")
-    subparsers.add_parser("validate-roles")
     subparsers.add_parser("validate-freshness")
     subparsers.add_parser("list-prebuilt-wheels")
     subparsers.add_parser("check-pants-wheels")
@@ -1217,8 +1174,10 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = create_parser().parse_args()
-    if args.command == "publish":
-        publish()
+    if args.command == "tag-release":
+        tag_release()
+    if args.command == "fetch-and-stabilize":
+        fetch_and_stabilize(args.dest)
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":
@@ -1229,8 +1188,6 @@ def main() -> None:
         build_pex(fetch=False)
     if args.command == "build-universal-pex":
         build_pex(fetch=True)
-    if args.command == "validate-roles":
-        PackageAccessValidator.validate_all()
     if args.command == "validate-freshness":
         prompt_artifact_freshness()
     if args.command == "list-prebuilt-wheels":

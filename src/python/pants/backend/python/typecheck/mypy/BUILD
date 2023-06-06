@@ -3,7 +3,15 @@
 
 resource(name="lockfile", source="mypy.lock")
 
-resource(name="older_lockfile_for_testing", source="older_mypy_for_testing.lock")
+resources(
+    name="test_lockfiles",
+    sources=[
+        "older_mypy_for_testing.lock",
+        "mypy_with_django_stubs.lock",
+        "mypy_with_more_itertools.lock",
+        "mypy_shadowing_typed_ast.lock",
+    ],
+)
 
 python_sources(
     overrides={"subsystem.py": {"dependencies": [":lockfile"]}},
@@ -19,7 +27,7 @@ python_tests(
         },
         "subsystem_test.py": {"timeout": 180},
         "rules_integration_test.py": {
-            "dependencies": [":older_lockfile_for_testing"],
+            "dependencies": [":test_lockfiles"],
             "tags": ["platform_specific_behavior"],
             "timeout": 480,
         },

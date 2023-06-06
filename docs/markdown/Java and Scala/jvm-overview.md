@@ -95,6 +95,19 @@ jvm_artifact(
 )
 ```
 
+If your third party dependency is a Scala library, you should use the `scala_artifact` target instead like follows:
+
+```python BUILD
+scala_artifact(
+    group="org.typelevel",
+    artifact="cats-core",
+    version="2.9.0",
+    packages=["cats.**"],
+)
+```
+
+Pants will use the right artifact for the Scala version corresponding for the resolve specified (or the default one).
+
 Pants requires use of a lockfile for thirdparty dependencies. After adding or editing `jvm_artifact` targets, you will need to update affected lockfiles by running `pants generate-lockfiles`. The default lockfile is located at `3rdparty/jvm/default.lock`, but it can be relocated (as well as additional resolves declared) via the [`[jvm].resolves` option](doc:reference-jvm#section-resolves).
 
 > 📘 Thirdparty symbols and the `packages` argument
