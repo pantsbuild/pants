@@ -41,7 +41,7 @@ backend_packages.add = [
   "internal_plugins.test_lockfile_fixtures",
 ]
 plugins = [
-  "hdrhistogram",  # For use with `--stats-log`.
+  "hdrhistogram", # For use with `--stats-log`.
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
