@@ -53,20 +53,6 @@ class _ExportVenvForResolveRequest(EngineAwareParameter):
     resolve: str
 
 
-@dataclass(frozen=True)
-class ExportPythonTool(EngineAwareParameter):
-    """How to export a particular Python tool.
-
-    If `pex_request=None`, the tool will be skipped.
-    """
-
-    resolve_name: str
-    pex_request: PexRequest | None
-
-    def debug_hint(self) -> str | None:
-        return self.resolve_name
-
-
 class PythonResolveExportFormat(Enum):
     """How to export Python resolves."""
 
@@ -381,26 +367,6 @@ async def export_virtualenv_for_resolve(
         ),
     )
     return MaybeExportResult(export_result)
-
-
-@rule
-async def export_tool(request: ExportPythonTool) -> ExportResult:
-    assert request.pex_request is not None
-
-    export_result = await Get(
-        ExportResult,
-        VenvExportRequest(
-            request.pex_request,
-            # TODO: It seems unnecessary to qualify with "tools", since the tool resolve names don't collide
-            #  with user resolve names.  We should get rid of this via a deprecation cycle.
-            os.path.join("python", "virtualenvs", "tools"),
-            request.resolve_name,
-            # TODO: It is pretty ad-hoc that we do add the interpreter version for resolves but not for tools.
-            #  We should pick one and deprecate the other.
-            qualify_path_with_python_version=False,
-        ),
-    )
-    return export_result
 
 
 @rule
