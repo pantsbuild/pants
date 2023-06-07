@@ -795,16 +795,6 @@ class UnzipBinaryRequest:
         )
 
 
-@dataclass(frozen=True)
-class GunzipBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(GunzipBinary, GunzipBinaryRequest)",
-            "Instead, simply use `Get(GunzipBinary)` or put `GunzipBinary` in the rule signature",
-        )
-
-
 class CatBinaryRequest:
     def __post_init__(self) -> None:
         warn_or_error(
@@ -881,11 +871,6 @@ async def find_zip_wrapper(_: ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBin
 @rule
 async def find_unzip_wrapper(_: UnzipBinaryRequest, unzip_binary: UnzipBinary) -> UnzipBinary:
     return unzip_binary
-
-
-@rule
-async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> GunzipBinary:
-    return gunzip
 
 
 @rule
