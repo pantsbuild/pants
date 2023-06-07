@@ -203,7 +203,7 @@ tests:
 Additional files can be referenced from any location inside your workspace. Note that the actual path to the additional files
 will be relative to the source roots configured in Pants.
 
-In this previous example, since Helm charts define their source root at the location of the `Chart.yaml` file and the `extra-values.yml`
+In this example, since Helm charts define their source root at the location of the `Chart.yaml` file and the `extra-values.yml`
 file is inside the `tests` folder relative to the chart, the test suite can access it as being local to it.
 
 However, in the following case, we need to reference the extra file as been relative to the chart root. Note the
