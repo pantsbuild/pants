@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
@@ -552,7 +551,6 @@ class Helper:
         }
 
     def upload_test_reports(self) -> Step:
-        date_str = datetime.now(timezone.utc).date().isoformat()
         # The path doesn't include job ID, as we want to aggregate test reports across all
         # jobs/shards in a workflow.  We do, however, qualify by run attempt, so we capture
         # separate reports for tests that flake between attempts on the same workflow run.
@@ -560,8 +558,8 @@ class Helper:
             "test/reports/"
             + self.platform_name()
             + "/"
-            + date_str
-            + "/${GITHUB_REF_NAME//\\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}"
+            + "$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/"
+            + "${GITHUB_REF_NAME//\\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}"
         )
         return {
             "name": "Upload test reports",
