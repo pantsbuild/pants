@@ -140,6 +140,8 @@ To resolve:
 3. Fix the merge conflicts and commit the changes
 4. Run \`build-support/bin/cherry_pick/make_pr.sh -- --pull-number="${this.pull_number}" --milestone="${milestone}"\`
 
+Please note that I cannot re-run CI if a job fails. Please work with your PR approver(s) to re-run CI if necessary.
+
 </details>`;
       } else {
         comment_body += `## :heavy_check_mark: ${milestone}
