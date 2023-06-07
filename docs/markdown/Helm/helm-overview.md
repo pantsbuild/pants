@@ -200,7 +200,7 @@ tests:
           value: "var2Value"
 ```
 
-Additional files can be reference in any kind of location inside your workspace. Note that the actual path to the addtional files
+Additional files can be referenced from any location inside your workspace. Note that the actual path to the additional files
 will be relative to the source roots configured in Pants.
 
 In this previous example, since Helm charts define their source root at the location of the `Chart.yaml` file and the `extra-values.yml`
