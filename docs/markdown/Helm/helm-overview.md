@@ -160,7 +160,7 @@ pants test ::
 
 ### Feeding additional files to unit tests
 
-In some cases we may want our tests to have access to additional value files which are not part of the chart. This can be
+In some cases we may want our tests to have access to additional files which are not part of the chart. This can be
 achieved by setting a dependency between our unit test targets and a `resources` target like follows:
 
 ```python src/helm/example/tests/BUILD
