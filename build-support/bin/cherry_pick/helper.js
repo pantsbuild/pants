@@ -137,7 +137,7 @@ To resolve:
       && git checkout -b ${branch_name} FETCH_HEAD \\
       && git cherry-pick ${merge_commit_sha}
     \`\`\`
-3. Fix the merge conflicts, commit the changes, and push the branch to a remote
+3. Fix the merge conflicts and commit the changes
 4. Run \`build-support/bin/cherry_pick/make_pr.sh -- --pull-number="${this.pull_number}" --milestone="${milestone}"\`
 
 </details>`;

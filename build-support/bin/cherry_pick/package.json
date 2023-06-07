@@ -1,5 +1,5 @@
 {
-  "main": "helper.cj",
+  "main": "helper.js",
   "private": true,
   "name": "@pants/cherry-pick-helper",
   "version": "0.0.1",
