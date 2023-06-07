@@ -172,7 +172,7 @@ tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
-url = "2.3"
+url = "2.4"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 remote = { path = "process_execution/remote" }
