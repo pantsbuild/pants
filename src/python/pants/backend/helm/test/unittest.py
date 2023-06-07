@@ -30,7 +30,15 @@ from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
-from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import (
+    AddPrefix,
+    Digest,
+    DigestSubset,
+    MergeDigests,
+    PathGlobs,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -107,16 +115,21 @@ async def run_helm_unittest(
         ),
     )
 
-    stripped_test_files = await Get(
-        Digest, RemovePrefix(test_files.snapshot.digest, chart_root.path)
-    )
-
     reports_dir = "__reports_dir"
     reports_file = os.path.join(reports_dir, f"{field_set.address.path_safe_spec}.xml")
 
+    snapshot_relpaths = {
+        os.path.join(os.path.relpath(os.path.dirname(file), chart_root.path), "__snapshot__")
+        for file in test_files.snapshot.files
+    }
+    test_snapshot_digest, stripped_test_files = await MultiGet(
+        Get(Digest, PathGlobs([os.path.join(chart_root.path, path) for path in snapshot_relpaths])),
+        Get(Digest, RemovePrefix(test_files.snapshot.digest, chart_root.path)),
+    )
+
     merged_digests = await Get(
         Digest,
-        MergeDigests([chart.snapshot.digest, stripped_test_files, extra_files.snapshot.digest]),
+        MergeDigests([chart.snapshot.digest, stripped_test_files, test_snapshot_digest, extra_files.snapshot.digest]),
     )
     input_digest = await Get(Digest, AddPrefix(merged_digests, chart.name))
 
@@ -134,6 +147,7 @@ async def run_helm_unittest(
             start_version="2.18.0.dev1",
         )
 
+    snapshot_output_dirs = {os.path.join(chart.name, relpath) for relpath in snapshot_relpaths}
     process_result = await Get(
         FallibleProcessResult,
         HelmProcess(
@@ -143,6 +157,7 @@ async def run_helm_unittest(
                 *(("--helm3",) if uses_legacy else ()),
                 *(("--color",) if unittest_subsystem.color else ()),
                 *(("--strict",) if field_set.strict.value else ()),
+                *(("--update-snapshot",) if unittest_subsystem.update_snapshot else ()),
                 "--output-type",
                 unittest_subsystem.output_type.value,
                 "--output-file",
@@ -153,16 +168,48 @@ async def run_helm_unittest(
             input_digest=input_digest,
             cache_scope=cache_scope,
             timeout_seconds=field_set.timeout.calculate_from_global_options(test_subsystem),
-            output_directories=(reports_dir,),
+            output_directories=(
+                reports_dir,
+                *(snapshot_output_dirs if unittest_subsystem.update_snapshot else ()),
+            ),
         ),
     )
-    xml_results = await Get(Snapshot, RemovePrefix(process_result.output_digest, reports_dir))
+
+    reports_digest, test_snapshot_output_digest = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(
+                process_result.output_digest, PathGlobs([os.path.join(reports_dir, "**")])
+            ),
+        ),
+        Get(
+            Digest,
+            DigestSubset(
+                process_result.output_digest,
+                PathGlobs(
+                    [
+                        os.path.join(snapshot_path, "**/*.snap")
+                        for snapshot_path in snapshot_output_dirs
+                    ]
+                ),
+            ),
+        ),
+    )
+    stripped_test_snapshot_output = await Get(
+        Digest, RemovePrefix(test_snapshot_output_digest, chart.name)
+    )
+
+    reports, normalised_test_snapshots = await MultiGet(
+        Get(Snapshot, RemovePrefix(reports_digest, reports_dir)),
+        Get(Snapshot, AddPrefix(stripped_test_snapshot_output, chart_root.path)),
+    )
 
     return TestResult.from_fallible_process_result(
         process_result,
         address=field_set.address,
         output_setting=test_subsystem.output,
-        xml_results=xml_results,
+        xml_results=reports,
+        extra_output=normalised_test_snapshots,
     )
 
 

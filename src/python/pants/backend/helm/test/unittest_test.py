@@ -175,6 +175,42 @@ def test_simple_failure(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 1
 
+def test_simple_success_updating_snapshot(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": "helm_chart(name='mychart')",
+            "src/Chart.yaml": HELM_CHART_FILE,
+            "src/values.yaml": HELM_VALUES_FILE,
+            "src/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/templates/service.yaml": K8S_SERVICE_TEMPLATE,
+            "src/tests/BUILD": "helm_unittest_test(name='test', source='service_test.yaml')",
+            "src/tests/service_test.yaml": dedent(
+                """\
+                suite: test service
+                templates:
+                  - service.yaml
+                values:
+                  - ../values.yaml
+                tests:
+                  - it: should match snapshot
+                    asserts:
+                      - matchSnapshot: {}
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(["--helm-unittest-update-snapshot"])
+    target = rule_runner.get_target(Address("src/tests", target_name="test"))
+    field_set = HelmUnitTestFieldSet.create(target)
+
+    result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
+
+    assert result.exit_code == 0
+    assert result.xml_results and result.xml_results.files
+    assert result.xml_results.files == (f"{target.address.path_safe_spec}.xml",)
+    assert result.extra_output and result.extra_output.files
+    assert result.extra_output.files == ("src/tests/__snapshot__/service_test.yaml.snap",)
 
 def test_test_with_local_resource_file(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -412,3 +448,4 @@ def test_test_with_relocated_file(rule_runner: RuleRunner) -> None:
 
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 0
+    
