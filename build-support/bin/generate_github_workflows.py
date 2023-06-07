@@ -561,7 +561,7 @@ class Helper:
             + self.platform_name()
             + "/"
             + date_str
-            + "/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}"
+            + "/${GITHUB_REF_NAME//\\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}"
         )
         return {
             "name": "Upload test reports",
@@ -572,7 +572,7 @@ class Helper:
                     ./build-support/bin/copy_to_s3.py \
                       --src-prefix=dist/test/reports \
                       --dst-prefix=s3://logs.pantsbuild.org/{s3_path} \
-                      --path=
+                      --path=""
                     """
             ),
             "env": {

@@ -672,7 +672,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-ARM64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-ARM64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -758,7 +758,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -844,7 +844,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -930,7 +930,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -1016,7 +1016,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -1102,7 +1102,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -1188,7 +1188,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -1274,7 +1274,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -1360,7 +1360,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -1446,7 +1446,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -1532,7 +1532,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
@@ -1586,7 +1586,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/macOS11-x86_64/2023-06-07/${GITHUB_REF}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}                       --path=
+      run: './build-support/bin/copy_to_s3.py                       --src-prefix=dist/test/reports                       --dst-prefix=s3://logs.pantsbuild.org/test/reports/macOS11-x86_64/2023-06-07/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}                       --path=""
 
         '
     - continue-on-error: true
