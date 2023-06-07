@@ -160,8 +160,7 @@ pants test ::
 
 ### Feeding additional files to unit tests
 
-In some cases we may want our tests to have access to additional files which are not part of the chart. This can be
-achieved by setting a dependency between our unit test targets and a `resources` target as follows:
+In some cases we may want our tests to have access to additional files which are not part of the chart. This can be achieved by setting a dependency between our unit test targets and a `resources` target as follows:
 
 ```python src/helm/example/tests/BUILD
 helm_unittest_tests(dependencies=[":extra-values"])
@@ -200,14 +199,11 @@ tests:
           value: "var2Value"
 ```
 
-Additional files can be referenced from any location inside your workspace. Note that the actual path to the additional files
-will be relative to the source roots configured in Pants.
+Additional files can be referenced from any location inside your workspace. Note that the actual path to the additional files will be relative to the source roots configured in Pants.
 
-In this example, since Helm charts define their source root at the location of the `Chart.yaml` file and the `extra-values.yml`
-file is inside the `tests` folder relative to the chart, the test suite can access it as being local to it.
+In this example, since Helm charts define their source root at the location of the `Chart.yaml` file and the `extra-values.yml` file is inside the `tests` folder relative to the chart, the test suite can access it as being local to it.
 
-However, in the following case, we need to reference the extra file relative to the chart root. Note the
-`../data/extra-values.yml` path in the test suite.
+However, in the following case, we need to reference the extra file relative to the chart root. Note the `../data/extra-values.yml` path in the test suite.
 
 ```toml pants.toml
 [source]
