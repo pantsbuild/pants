@@ -32,8 +32,9 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
-from pants.core.target_types import ResourceSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
@@ -96,21 +97,18 @@ async def run_helm_unittest(
         raise MissingUnitTestChartDependency(field_set.address)
 
     chart_target = chart_targets[0]
-    chart, chart_root, test_files = await MultiGet(
+    chart, chart_root, test_files, extra_files = await MultiGet(
         Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_target)),
         Get(HelmChartRoot, HelmChartRootRequest(chart_target[HelmChartMetaSourceField])),
         Get(
             SourceFiles,
+            SourceFilesRequest(sources_fields=[field_set.source]),
+        ),
+        Get(
+            StrippedSourceFiles,
             SourceFilesRequest(
-                sources_fields=[
-                    field_set.source,
-                    *(
-                        tgt.get(SourcesField)
-                        for tgt in transitive_targets.dependencies
-                        if not HelmChartFieldSet.is_applicable(tgt)
-                    ),
-                ],
-                for_sources_types=(HelmUnitTestSourceField, ResourceSourceField),
+                sources_fields=[tgt.get(SourcesField) for tgt in transitive_targets.dependencies],
+                for_sources_types=(ResourceSourceField, FileSourceField),
                 enable_codegen=True,
             ),
         ),
@@ -125,7 +123,7 @@ async def run_helm_unittest(
 
     merged_digests = await Get(
         Digest,
-        MergeDigests([chart.snapshot.digest, stripped_test_files]),
+        MergeDigests([chart.snapshot.digest, stripped_test_files, extra_files.snapshot.digest]),
     )
     input_digest = await Get(Digest, AddPrefix(merged_digests, chart.name))
 
