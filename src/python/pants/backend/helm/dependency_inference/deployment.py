@@ -132,7 +132,7 @@ async def first_party_helm_deployment_mapping(
     docker_target_addresses = {tgt.address.spec: tgt.address for tgt in docker_targets}
 
     def lookup_docker_addreses(image_ref: str) -> tuple[str, Address] | None:
-        addr = docker_target_addresses.get(str(image_ref), None)
+        addr = docker_target_addresses.get(image_ref, None)
         if addr:
             return image_ref, addr
         return None

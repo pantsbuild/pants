@@ -5,7 +5,11 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.helm.target_types import HelmChartTarget, HelmUnitTestTestTarget
+from pants.backend.helm.target_types import (
+    HelmChartTarget,
+    HelmUnitTestTestsGeneratorTarget,
+    HelmUnitTestTestTarget,
+)
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.test.unittest import HelmUnitTestFieldSet, HelmUnitTestRequest
 from pants.backend.helm.test.unittest import rules as unittest_rules
@@ -17,6 +21,7 @@ from pants.backend.helm.testutil import (
 )
 from pants.backend.helm.util_rules import chart
 from pants.core.goals.test import TestResult
+from pants.core.target_types import ResourcesGeneratorTarget
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
@@ -27,7 +32,12 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[HelmChartTarget, HelmUnitTestTestTarget],
+        target_types=[
+            HelmChartTarget,
+            HelmUnitTestTestTarget,
+            HelmUnitTestTestsGeneratorTarget,
+            ResourcesGeneratorTarget,
+        ],
         rules=[
             *external_tool.rules(),
             *chart.rules(),
@@ -153,3 +163,55 @@ def test_simple_failure(rule_runner: RuleRunner) -> None:
 
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 1
+
+
+def test_test_with_resource_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "helm_chart(name='mychart')",
+            "Chart.yaml": HELM_CHART_FILE,
+            "templates/configmap.yaml": dedent(
+                """\
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: foo-config
+                data:
+                  foo_key: {{ .Values.input }}
+                """
+            ),
+            "tests/BUILD": dedent(
+                """\
+                helm_unittest_test(name="test", source="configmap_test.yaml", dependencies=[":values"])
+
+                resources(name="values", sources=["general-values.yml"])
+                """
+            ),
+            "tests/configmap_test.yaml": dedent(
+                """\
+                suite: test config map
+                templates:
+                  - configmap.yaml
+                values:
+                  - general-values.yml
+                tests:
+                  - it: should work
+                    asserts:
+                      - equal:
+                          path: data.foo_key
+                          value: bar_input
+                """
+            ),
+            "tests/general-values.yml": dedent(
+                """\
+                input: bar_input
+                """
+            ),
+        }
+    )
+
+    target = rule_runner.get_target(Address("tests", target_name="test"))
+    field_set = HelmUnitTestFieldSet.create(target)
+
+    result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
+    assert result.exit_code == 0
