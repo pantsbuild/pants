@@ -32,9 +32,6 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
-from pants.core.target_types import ResourceSourceField
-from pants.base.deprecated import warn_or_error
-from pants.core.goals.test import TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
