@@ -554,8 +554,8 @@ class Helper:
         # The path doesn't include job ID, as we want to aggregate test reports across all
         # jobs/shards in a workflow.  We do, however, qualify by run attempt, so we capture
         # separate reports for tests that flake between attempts on the same workflow run.
-        s3_path = (
-            "test/reports/"
+        s3_dst = (
+            "s3://logs.pantsbuild.org/test/reports/"
             + self.platform_name()
             + "/"
             + "$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/"
@@ -567,11 +567,13 @@ class Helper:
             "continue-on-error": True,
             "run": dedent(
                 f"""\
-                    ./build-support/bin/copy_to_s3.py \
-                      --src-prefix=dist/test/reports \
-                      --dst-prefix=s3://logs.pantsbuild.org/{s3_path} \
-                      --path=""
-                    """
+                export S3_DST={s3_dst}
+                echo "Uploading test reports to ${{S3_DST}}"
+                ./build-support/bin/copy_to_s3.py \
+                  --src-prefix=dist/test/reports \
+                  --dst-prefix=${{S3_DST}} \
+                  --path=""
+                """
             ),
             "env": {
                 "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
