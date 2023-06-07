@@ -736,7 +736,7 @@ class ArchivePackagesField(SpecialCasedDependencies):
         `["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`.
         It will include the results in your archive using the same name they would normally have,
         but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can
-        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_awslambda`, or even another
+        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_aws_lambda_function`, or even another
         `archive`.
         """
     )

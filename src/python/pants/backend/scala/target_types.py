@@ -9,6 +9,7 @@ from typing import ClassVar
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
+from pants.build_graph.address import AddressInput
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.rules import collect_rules, rule
@@ -344,6 +345,15 @@ class ScalacPluginArtifactField(StringField, AsyncFieldMixin):
     required = True
     value: str
     help = "The address of either a `jvm_artifact` or a `scala_artifact` that defines a plugin for `scalac`."
+
+    def to_address_input(self) -> AddressInput:
+        return AddressInput.parse(
+            self.value,
+            relative_to=self.address.spec_path,
+            description_of_origin=(
+                f"the `{self.alias}` field in the `{ScalacPluginTarget.alias}` target {self.address}"
+            ),
+        )
 
 
 class ScalacPluginNameField(StringField):

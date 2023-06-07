@@ -154,14 +154,14 @@ def test_create_hello_world_lambda_with_lambdex(
                 python_sources(name='lib')
 
                 file(name="platform", source="platform.json")
-                python_awslambda(
+                python_aws_lambda_function(
                     name='lambda',
                     dependencies=[':lib'],
                     handler='foo.bar.hello_world:handler',
                     runtime='python3.7',
                     complete_platforms=[':platform'],
                 )
-                python_awslambda(
+                python_aws_lambda_function(
                     name='slimlambda',
                     include_requirements=False,
                     dependencies=[':lib'],
@@ -193,7 +193,9 @@ def test_create_hello_world_lambda_with_lambdex(
         ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" in names
     ), "third-party dep `mureq` must be included"
     if sys.platform == "darwin":
-        assert "`python_awslambda` targets built on macOS may fail to build." in caplog.text
+        assert (
+            "`python_aws_lambda_function` targets built on macOS may fail to build." in caplog.text
+        )
 
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
@@ -247,7 +249,7 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
                     dependencies=['assets:files', 'assets:relocated', 'assets:resources'],
                 )
 
-                python_awslambda(
+                python_aws_lambda_function(
                     name='lambda',
                     dependencies=[':lib'],
                     handler='foo.bar.hello_world:handler',
@@ -271,7 +273,7 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
     assert (
-        "The target src/py/project:lambda (`python_awslambda`) transitively depends on"
+        "The target src/py/project:lambda (`python_aws_lambda_function`) transitively depends on"
         in caplog.text
     )
     assert "assets/f.txt:files" in caplog.text
@@ -295,12 +297,12 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
                 python_sources()
 
-                python_awslambda(
+                python_aws_lambda_function(
                     name='lambda',
                     handler='foo.bar.hello_world:handler',
                     runtime="python3.7",
                 )
-                python_awslambda(
+                python_aws_lambda_function(
                     name='slimlambda',
                     include_requirements=False,
                     handler='foo.bar.hello_world:handler',
@@ -411,7 +413,7 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
         {"BUILD": "python_aws_lambda_layer(name='lambda', runtime='python3.7')"}
     )
     with pytest.raises(
-        ExecutionError, match="The 'dependencies' field in target //:lambda must be defined"
+        ExecutionError, match="The `dependencies` field in target //:lambda must be defined"
     ):
         create_python_awslambda(
             rule_runner,

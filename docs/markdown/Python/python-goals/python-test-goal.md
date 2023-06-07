@@ -449,7 +449,7 @@ You can include the result of `pants package` in your test through the `runtime_
 
 This allows you to test your packaging pipeline by simply running `pants test ::`, without needing custom integration test scripts.
 
-To depend on a built package, use the `runtime_package_dependencies` field on the `python_test` / `python_tests` target, which is a list of addresses to targets that can be built with `pants package`, such as `pex_binary`, `python_awslambda`, and `archive` targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix (set by the `output_path` field).
+To depend on a built package, use the `runtime_package_dependencies` field on the `python_test` / `python_tests` target, which is a list of addresses to targets that can be built with `pants package`, such as `pex_binary`, `python_aws_lambda_function`, and `archive` targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix (set by the `output_path` field).
 
 For example:
 

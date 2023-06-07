@@ -23,6 +23,7 @@ use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
 mod address;
+pub mod dep_inference;
 pub mod engine_aware;
 pub mod fs;
 mod interface;
@@ -32,6 +33,7 @@ pub mod nailgun;
 pub mod process;
 pub mod scheduler;
 mod stdio;
+mod target;
 pub mod testutil;
 pub mod workunits;
 
@@ -370,7 +372,7 @@ impl PyGeneratorResponseGet {
         ))
       }
       (Some(input_arg0), None) => {
-        if input_arg0.is_instance_of::<PyType>()? {
+        if input_arg0.is_instance_of::<PyType>() {
           return Err(PyTypeError::new_err(format!(
             "Invalid Get. Because you are using the shorthand form \
             Get(OutputType, InputType(constructor args)), the second argument should be \
@@ -410,7 +412,7 @@ impl PyGeneratorResponseGet {
           ))
         })?;
 
-        if input_arg1.is_instance_of::<PyType>()? {
+        if input_arg1.is_instance_of::<PyType>() {
           return Err(PyTypeError::new_err(format!(
             "Invalid Get. Because you are using the longhand form \
           Get(OutputType, InputType, input), the third argument should be \

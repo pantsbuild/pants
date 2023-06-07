@@ -18,7 +18,6 @@ import pytest
 from pants.backend.python import target_types_rules
 from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
     EntryPoint,
     PexLayout,
@@ -79,7 +78,6 @@ def rule_runner() -> PythonRuleRunner:
             QueryRule(GlobalRequirementConstraints, ()),
             QueryRule(ChosenPythonResolve, [ChosenPythonResolveRequest]),
             *setuptools.rules(),
-            QueryRule(Setuptools, []),
         ],
         target_types=[
             PythonSourcesGeneratorTarget,

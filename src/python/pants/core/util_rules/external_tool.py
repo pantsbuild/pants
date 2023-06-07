@@ -340,7 +340,7 @@ class TemplatedExternalTool(ExternalTool, TemplatedExternalToolOptionsMixin):
     The platform mapping dict is optional.
     """
 
-    def generate_url(self, plat: Platform):
+    def generate_url(self, plat: Platform) -> str:
         platform = self.url_platform_mapping.get(plat.value, "")
         return self.url_template.format(version=self.version, platform=platform)
 

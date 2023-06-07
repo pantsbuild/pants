@@ -24,9 +24,11 @@ from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.sources import HelmChartRoot, HelmChartRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.test import TestFieldSet, TestRequest, TestResult, TestSubsystem
-from pants.core.target_types import ResourceSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
@@ -88,21 +90,18 @@ async def run_helm_unittest(
         raise MissingUnitTestChartDependency(field_set.address)
 
     chart_target = chart_targets[0]
-    chart, chart_root, test_files = await MultiGet(
+    chart, chart_root, test_files, extra_files = await MultiGet(
         Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_target)),
         Get(HelmChartRoot, HelmChartRootRequest(chart_target[HelmChartMetaSourceField])),
         Get(
             SourceFiles,
+            SourceFilesRequest(sources_fields=[field_set.source]),
+        ),
+        Get(
+            StrippedSourceFiles,
             SourceFilesRequest(
-                sources_fields=[
-                    field_set.source,
-                    *(
-                        tgt.get(SourcesField)
-                        for tgt in transitive_targets.dependencies
-                        if not HelmChartFieldSet.is_applicable(tgt)
-                    ),
-                ],
-                for_sources_types=(HelmUnitTestSourceField, ResourceSourceField),
+                sources_fields=[tgt.get(SourcesField) for tgt in transitive_targets.dependencies],
+                for_sources_types=(ResourceSourceField, FileSourceField),
                 enable_codegen=True,
             ),
         ),
@@ -117,7 +116,7 @@ async def run_helm_unittest(
 
     merged_digests = await Get(
         Digest,
-        MergeDigests([chart.snapshot.digest, stripped_test_files]),
+        MergeDigests([chart.snapshot.digest, stripped_test_files, extra_files.snapshot.digest]),
     )
     input_digest = await Get(Digest, AddPrefix(merged_digests, chart.name))
 
@@ -126,15 +125,24 @@ async def run_helm_unittest(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
-    strict = field_set.strict.value
+    uses_legacy = unittest_subsystem._is_legacy
+    if uses_legacy:
+        warn_or_error(
+            "2.19.0.dev0",
+            f"[{unittest_subsystem.options_scope}].version < {unittest_subsystem.default_version}",
+            "You should upgrade your test suites to work with latest version.",
+            start_version="2.18.0.dev1",
+        )
+
     process_result = await Get(
         FallibleProcessResult,
         HelmProcess(
             argv=[
                 unittest_subsystem.plugin_name,
-                "--helm3",
+                # TODO remove this flag once support for legacy unittest tool is dropped.
+                *(("--helm3",) if uses_legacy else ()),
                 *(("--color",) if unittest_subsystem.color else ()),
-                *(("--strict",) if strict else ()),
+                *(("--strict",) if field_set.strict.value else ()),
                 "--output-type",
                 unittest_subsystem.output_type.value,
                 "--output-file",

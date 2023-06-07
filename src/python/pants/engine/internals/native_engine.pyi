@@ -6,6 +6,8 @@ from __future__ import annotations
 from io import RawIOBase
 from typing import (
     Any,
+    Callable,
+    ClassVar,
     FrozenSet,
     Generic,
     Iterable,
@@ -35,7 +37,7 @@ class PyFailure:
     def get_error(self) -> Exception | None: ...
 
 # ------------------------------------------------------------------------------
-# Address (parsing)
+# Address
 # ------------------------------------------------------------------------------
 
 BANNED_CHARS_IN_TARGET_NAME: FrozenSet
@@ -249,6 +251,103 @@ class PyExecutor:
     def shutdown(self, duration_secs: float) -> None: ...
 
 # ------------------------------------------------------------------------------
+# Target
+# ------------------------------------------------------------------------------
+
+# Type alias to express the intent that the type should be immutable and hashable. There's nothing
+# to actually enforce this, outside of convention.
+ImmutableValue = Any
+
+class _NoValue:
+    def __bool__(self) -> bool:
+        """NB: Always returns `False`."""
+        ...
+    def __repr__(self) -> str: ...
+
+# Marker for unspecified field values that should use the default value if applicable.
+NO_VALUE: _NoValue
+
+class Field:
+    """A Field.
+
+    The majority of fields should use field templates like `BoolField`, `StringField`, and
+    `StringSequenceField`. These subclasses will provide sensible type hints and validation
+    automatically.
+
+    If you are directly subclassing `Field`, you should likely override `compute_value()`
+    to perform any custom hydration and/or validation, such as converting unhashable types to
+    hashable types or checking for banned values. The returned value must be hashable
+    (and should be immutable) so that this Field may be used by the engine. This means, for
+    example, using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
+
+    If you plan to use the engine to fully hydrate the value, you can also inherit
+    `AsyncFieldMixin`, which will store an `address: Address` property on the `Field` instance.
+
+    Subclasses should also override the type hints for `value` and `raw_value` to be more precise
+    than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
+    `./pants help $target_type`.
+
+    Set the `help` class property with a description, which will be used in `./pants help`. For the
+    best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
+    hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
+
+    Example:
+
+        # NB: Really, this should subclass IntField. We only use Field as an example.
+        class Timeout(Field):
+            alias = "timeout"
+            value: Optional[int]
+            default = None
+            help = "A timeout field.\n\nMore information."
+
+            @classmethod
+            def compute_value(cls, raw_value: Optional[int], address: Address) -> Optional[int]:
+                value_or_default = super().compute_value(raw_value, address=address)
+                if value_or_default is not None and not isinstance(value_or_default, int):
+                    raise ValueError(
+                        "The `timeout` field expects an integer, but was given"
+                        f"{value_or_default} for target {address}."
+                    )
+                return value_or_default
+    """
+
+    # Opt-in per field class to use a "no value" marker for the `raw_value` in `compute_value()` in
+    # case the field was not represented in the BUILD file.
+    #
+    # This will allow users to provide `None` as the field value (when applicable) without getting
+    # the fields default value.
+    none_is_valid_value: ClassVar[bool] = False
+
+    # Subclasses must define these.
+    alias: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
+
+    # Subclasses must define at least one of these two.
+    default: ClassVar[ImmutableValue]
+    required: ClassVar[bool] = False
+
+    # Subclasses may define these.
+    removal_version: ClassVar[str | None] = None
+    removal_hint: ClassVar[str | None] = None
+
+    deprecated_alias: ClassVar[str | None] = None
+    deprecated_alias_removal_version: ClassVar[str | None] = None
+
+    value: ImmutableValue | None
+
+    def __init__(self, raw_value: Any | None, address: Address) -> None: ...
+    @classmethod
+    def compute_value(cls, raw_value: Any | None, address: Address) -> ImmutableValue:
+        """Convert the `raw_value` into `self.value`.
+
+        You should perform any optional validation and/or hydration here. For example, you may want
+        to check that an integer is > 0 or convert an `Iterable[str]` to `List[str]`.
+
+        The resulting value must be hashable (and should be immutable).
+        """
+        ...
+
+# ------------------------------------------------------------------------------
 # FS
 # ------------------------------------------------------------------------------
 
@@ -443,6 +542,37 @@ class PyStubCAS:
     def address(self) -> str: ...
     def remove(self, digest: FileDigest | Digest) -> bool: ...
     def action_cache_len(self) -> int: ...
+
+# ------------------------------------------------------------------------------
+# Dependency inference
+# ------------------------------------------------------------------------------
+
+class InferenceMetadata:
+    @staticmethod
+    def javascript(
+        package_root: str, import_patterns: dict[str, list[str]]
+    ) -> InferenceMetadata: ...
+    def __eq__(self, other: InferenceMetadata | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class NativeDependenciesRequest:
+    """A request to parse the dependencies of a file.
+
+    * The `digest` is expected to contain exactly one source file.
+    * Depending on the implementation, a `metadata` structure
+      can be passed. It will be supplied to the native parser, and
+      it will be incorporated into the cache key.
+
+
+    Example:
+        result = await Get(NativeParsedPythonDependencies, NativeDependenciesRequest(input_digest, None)
+    """
+
+    def __init__(self, digest: Digest, metadata: InferenceMetadata | None = None) -> None: ...
+    def __eq__(self, other: NativeDependenciesRequest | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
 
 # ------------------------------------------------------------------------------
 # (etc.)

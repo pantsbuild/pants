@@ -11,7 +11,7 @@ def test_generate_lockfile_without_python_backend() -> None:
     run_pants(
         [
             "--backend-packages=pants.backend.experimental.cc.lint.clangformat",
-            "--clang-format-lockfile=cf.lock",
+            "--python-resolves={'clang-format':'cf.lock'}",
             "generate-lockfiles",
             "--resolve=clang-format",
         ]
