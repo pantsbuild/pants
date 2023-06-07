@@ -253,7 +253,7 @@ tests:
 
 > 🚧 Using `file`, `files` and `relocated_files` targets
 >
-> Other file centric targets are also supported, just be aware that `file` and `files` targets are
+> Other file-centric targets are also supported, just be aware that `file` and `files` targets are
 > not affected by the source roots setting. When using `relocated_files`, the files will be relative
 > to the value set in the `dest` field.
 
