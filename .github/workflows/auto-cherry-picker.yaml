@@ -21,7 +21,7 @@ jobs:
     outputs:
       pr_num: ${{ steps.get-prereqs.outputs.pr_num }}
       merge_commit: ${{ steps.get-prereqs.outputs.merge_commit }}
-      milestones: ${{ steps.get-prereqs.outputs.milestones }}
+      matrix: ${{ steps.get-prereqs.outputs.matrix }}
     steps:
       - uses: actions/setup-node@v3
         with:
@@ -42,7 +42,12 @@ jobs:
             if (prereqs !== null) {
               core.setOutput("pr_num", prereqs.pr_num);
               core.setOutput("merge_commit", prereqs.merge_commit);
-              core.setOutput("milestones", prereqs.milestones);
+              core.setOutput("matrix", prereqs.milestones.map(
+                milestone => {
+                  milestone,
+                  branch_name: `cherry-pick-${prereqs.pr_num}-to-${milestone}`,
+                }
+              ));
             }
 
   cherry_picker:
@@ -51,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        milestone: ${{ fromJSON(needs.prerequisites.outputs.milestones) }}
+        include: ${{ fromJSON(needs.prerequisites.outputs.milestones) }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -66,27 +71,18 @@ jobs:
           # NB: If this fetch fails, we assume that means the milestone branch hasn't been created yet
           git fetch --depth 1 origin "${{ matrix.milestone }}" || exit 0
 
-          BRANCH_NAME="cherry-pick-${{ needs.prerequisites.outputs.pr_num }}-to-${{ matrix.milestone }}"
-          git checkout -b "$BRANCH_NAME" FETCH_HEAD
+          git checkout -b "${{ matrix.branch_name }}" FETCH_HEAD
 
           git cherry-pick "${{ needs.prerequisites.outputs.merge_commit }}"
 
-          git push -u origin "$BRANCH_NAME"
+          git push -u origin "${{ matrix.branch_name }}"
           build-support/bin/cherry_pick/make_pr.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
-      - name: Handle Cherry-Pick Failure
-        if: ${{ failed() }}
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
-          script: |
-            const Helper = require('./build-support/bin/cherry_pick/helper.js');
-            const helper = new Helper({octokit: github, context, core});
-            await helper.cherry_pick_failed("${{ needs.prerequisites.outputs.merge_commit }}", "${{ matrix.milestone }}");
 
-  handle_success:
-    name: Handle Cherry-Pick Success
+  post_pick:
+    name: Post-Pick Actions
     needs: [cherry_picker, prerequisites]
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -97,4 +93,4 @@ jobs:
           script: |
             const Helper = require('./build-support/bin/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});
-            await helper.cherry_pick_succeeded(${{ needs.prerequisites.outputs.milestones }});
+            await helper.cherry_pick_finished("${{ needs.prerequisites.outputs.merge_commit }}", ${{ needs.prerequisites.outputs.matrix }});

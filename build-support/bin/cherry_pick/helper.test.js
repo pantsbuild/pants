@@ -35,13 +35,24 @@ function get_octokit(milestone) {
             data: {
               merge_commit_sha: "5b01f3797d102ca97969bef746bfa8d72c75832a",
               milestone: milestone,
+              merged_by: {
+                login: "steve_buscemi",
+              },
             },
           };
         }),
         list: jest.fn(),
       },
       issues: {
-        addLabels: jest.fn(),
+        addLabels: jest.fn((obj) => {
+          // NB: GitHub's actual code forwarded extra keys to the API, which rejected the data.
+          expect(Object.keys(obj)).toEqual([
+            "owner",
+            "repo",
+            "issue_number",
+            "labels",
+          ]);
+        }),
         removeLabel: jest.fn(),
         createComment: jest.fn(),
         listMilestones: jest.fn(),
@@ -94,7 +105,7 @@ test("get_prereqs fails when no milestone", async () => {
   ).toEqual(
     `I was unable to cherry-pick this PR; the milestone seems to be missing.
 
-Please add the milestone to the PR and re-run the [Auto Cherry-Picker job](<WORKFLOW_URL>) using the "Run workflow" button.
+@steve_buscemi: Please add the milestone to the PR and re-run the [Auto Cherry-Picker job](<WORKFLOW_URL>) using the "Run workflow" button.
 
 :robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558/jobs/9269746089)`
   );
@@ -153,14 +164,29 @@ test("get_prereqs ok_with_no_relevant_milestones", async () => {
   expect(helper.core.setFailed).not.toBeCalled();
 });
 
-test("cherry_pick_failed", async () => {
+test("cherry_pick_finished one pass one fail", async () => {
   const helper = new Helper({
     octokit: get_octokit(),
     context: get_context(),
     core: get_core(),
   });
 
-  await helper.cherry_pick_failed("1234ABCD", "2.16.x");
+  helper.octokit.rest.pulls.list.mockImplementation((obj) => {
+    if (obj.head === "pantsbuild:cherry-pick-19214-to-2.17.x") {
+      return {
+        data: [{ html_url: `<URL for 2.17.x>` }],
+      };
+    } else {
+      return {
+        data: [],
+      };
+    }
+  });
+
+  await helper.cherry_pick_finished("1234ABCD", [
+    { branch_name: "cherry-pick-19214-to-2.16.x", milestone: "2.16.x" },
+    { branch_name: "cherry-pick-19214-to-2.17.x", milestone: "2.17.x" },
+  ]);
 
   expect(helper.octokit.rest.issues.addLabels).toBeCalledTimes(1);
   expect(helper.octokit.rest.issues.addLabels.mock.calls[0][0].labels).toEqual([
@@ -169,7 +195,14 @@ test("cherry_pick_failed", async () => {
   expect(
     helper.octokit.rest.issues.createComment.mock.calls[0][0].body
   ).toEqual(
-    `I was unable to cherry-pick this PR to 2.16.x, likely due to merge-conflicts.
+    `I tried to automatically cherry-pick this change back to each relevant milestone, so that it is available in those older releases of Pants.
+
+## :x: 2.16.x
+
+I was unable to cherry-pick this PR to 2.16.x, likely due to merge-conflicts.
+
+<details>
+<summary>Steps to Cherry-Pick locally</summary>
 
 To resolve:
 1. (Ensure your git working directory is clean)
@@ -182,13 +215,25 @@ To resolve:
       && git cherry-pick 1234ABCD
     \`\`\`
 3. Fix the merge conflicts, commit the changes, and push the branch to a remote
-4. Run \`pants run build-support/bin/cherry_pick/make_pr.js -- --pull-number="19214" --milestone="2.16.x"\`
+4. Run \`build-support/bin/cherry_pick/make_pr.sh -- --pull-number="19214" --milestone="2.16.x"\`
+
+</details>
+
+## :heavy_check_mark: 2.17.x
+
+Successfully opened <URL for 2.17.x>.
+
+
+
+---
+
+Thanks again for your contributions!
 
 :robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558/jobs/9269746089)`
   );
 });
 
-test("cherry_pick_succeeded", async () => {
+test("cherry_pick_finished all pass", async () => {
   const helper = new Helper({
     octokit: get_octokit(),
     context: get_context(),
@@ -196,14 +241,14 @@ test("cherry_pick_succeeded", async () => {
   });
 
   helper.octokit.rest.pulls.list.mockImplementation((obj) => {
-    console.log(obj.head);
-    const match = obj.head.match(/^pantsbuild:cherry-pick-19214-to-(.+)$/);
     return {
-      data: [{ html_url: `<URL for branch ${match[1]}>` }],
+      data: [{ html_url: `<URL for 2.16.x>` }],
     };
   });
 
-  await helper.cherry_pick_succeeded(["2.16.x", "2.17.x"]);
+  await helper.cherry_pick_finished("1234ABCD", [
+    { branch_name: "cherry-pick-19214-to-2.16.x", milestone: "2.16.x" },
+  ]);
 
   expect(helper.octokit.rest.issues.removeLabel).toBeCalledTimes(1);
   expect(helper.octokit.rest.issues.removeLabel.mock.calls[0][0].name).toEqual(
@@ -212,11 +257,15 @@ test("cherry_pick_succeeded", async () => {
   expect(
     helper.octokit.rest.issues.createComment.mock.calls[0][0].body
   ).toEqual(
-    `I was successfully able to open the following PRs:
-- Cherry-pick to 2.16.x: <URL for branch 2.16.x>
-- Cherry-pick to 2.17.x: <URL for branch 2.17.x>
+    `I tried to automatically cherry-pick this change back to each relevant milestone, so that it is available in those older releases of Pants.
 
-Please note that I cannot re-kick CI if a job fails. Please work with your PR approver(s) to re-kick CI if necessary.
+## :heavy_check_mark: 2.16.x
+
+Successfully opened <URL for 2.16.x>.
+
+
+
+---
 
 Thanks again for your contributions!
 

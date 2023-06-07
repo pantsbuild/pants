@@ -26,10 +26,6 @@ class CherryPickHelper {
     return `:robot: [Beep Boop here's my run link](${this.context.serverUrl}/${this.context.repo.owner}/${this.context.repo.repo}/actions/runs/${this.context.runId}/jobs/${this.context.job})`;
   }
 
-  #get_branch_name(milestone_title) {
-    return `cherry-pick-${this.pull_number}-to-${milestone_title}`;
-  }
-
   async #add_failed_label() {
     await this.octokit.rest.issues.addLabels({
       ...this.#issue_context,
@@ -80,7 +76,9 @@ class CherryPickHelper {
       await this.#add_comment(
         `I was unable to cherry-pick this PR; the milestone seems to be missing.
 
-Please add the milestone to the PR and re-run the [Auto Cherry-Picker job](${workflow_url}) using the "Run workflow" button.
+@${
+          pull.merged_by.login
+        }: Please add the milestone to the PR and re-run the [Auto Cherry-Picker job](${workflow_url}) using the "Run workflow" button.
 
 ${this.#run_link}`
       );
@@ -98,10 +96,36 @@ ${this.#run_link}`
     };
   }
 
-  async cherry_pick_failed(merge_commit_sha, milestone_title) {
-    this.#add_failed_label();
-    await this.#add_comment(
-      `I was unable to cherry-pick this PR to ${milestone_title}, likely due to merge-conflicts.
+  async cherry_pick_finished(merge_commit_sha, matrix_info) {
+    // NB: Unfortunately, we can't have the cherry-pick job use outputs to send the PR numbers, since
+    //  it uses a matrix and currently GitHub doesn't support matrix job outputs well
+    //  (See https://github.com/orgs/community/discussions/26639#discussioncomment-3252675).
+    const infos = await Promise.all(
+      matrix_info.map(async ({ branch_name, milestone }) => {
+        return this.octokit.rest.pulls.list({
+          ...this.#pull_context,
+          state: "open",
+          head: `${this.context.repo.owner}:${branch_name}`,
+        });
+      })
+    ).then((all_pulls) =>
+      all_pulls.map(({ data: pulls }, index) => {
+        return { ...matrix_info[index], pr_url: (pulls[0] || {}).html_url };
+      })
+    );
+
+    let any_failed = false;
+    let comment_body = "";
+    console.log(infos);
+    infos.forEach(({ pr_url, milestone, branch_name }) => {
+      if (pr_url === undefined) {
+        any_failed = true;
+        comment_body += `## :x: ${milestone}
+
+I was unable to cherry-pick this PR to ${milestone}, likely due to merge-conflicts.
+
+<details>
+<summary>Steps to Cherry-Pick locally</summary>
 
 To resolve:
 1. (Ensure your git working directory is clean)
@@ -109,55 +133,41 @@ To resolve:
     \`\`\`bash
     git checkout https://github.com/pantsbuild/pants main \\
       && git pull \\
-      && git fetch https://github.com/pantsbuild/pants ${milestone_title} \\
-      && git checkout -b ${this.#get_branch_name(milestone_title)} FETCH_HEAD \\
+      && git fetch https://github.com/pantsbuild/pants ${milestone} \\
+      && git checkout -b ${branch_name} FETCH_HEAD \\
       && git cherry-pick ${merge_commit_sha}
     \`\`\`
 3. Fix the merge conflicts, commit the changes, and push the branch to a remote
-4. Run \`pants run build-support/bin/cherry_pick/make_pr.js -- --pull-number="${
-        this.pull_number
-      }" --milestone="${milestone_title}"\`
+4. Run \`build-support/bin/cherry_pick/make_pr.sh -- --pull-number="${this.pull_number}" --milestone="${milestone}"\`
 
-${this.#run_link}`
-    );
-  }
+</details>`;
+      } else {
+        comment_body += `## :heavy_check_mark: ${milestone}
 
-  async cherry_pick_succeeded(milestone_titles) {
-    // NB: Unfortunately, we can't have the cherry-pick job use outputs to send the PR numbers, since
-    //  it uses a matrix and currently GitHub doesn't support matrix job outputs well
-    //  (See https://github.com/orgs/community/discussions/26639#discussioncomment-3252675).
-    const pr_urls = await Promise.all(
-      milestone_titles.map(async (milestone_title) => {
-        return this.octokit.rest.pulls.list({
-          ...this.#pull_context,
-          state: "open",
-          head: `${this.context.repo.owner}:${this.#get_branch_name(
-            milestone_title
-          )}`,
-        });
-      })
-    ).then((all_pulls) =>
-      all_pulls.map(({ data: pulls }) => pulls[0].html_url)
-    );
-
-    let prs_list = "";
-    for (let i = 0; i < pr_urls.length; i++) {
-      prs_list += `- Cherry-pick to ${milestone_titles[i]}: ${pr_urls[i]}\n`;
-    }
+Successfully opened ${pr_url}.`;
+      }
+      comment_body += "\n\n";
+    });
 
     await this.#add_comment(
-      `I was successfully able to open the following PRs:
-${prs_list}
-Please note that I cannot re-kick CI if a job fails. Please work with your PR approver(s) to re-kick CI if necessary.
+      `I tried to automatically cherry-pick this change back to each relevant milestone, so that it is available in those older releases of Pants.
+
+${comment_body}
+
+---
 
 Thanks again for your contributions!
 
 ${this.#run_link}`
     );
-    await this.octokit.rest.issues.removeLabel({
-      ...this.#issue_context,
-      name: "needs-cherrypick",
-    });
+    if (any_failed) {
+      this.#add_failed_label();
+    } else {
+      await this.octokit.rest.issues.removeLabel({
+        ...this.#issue_context,
+        name: "needs-cherrypick",
+      });
+    }
   }
 }
 

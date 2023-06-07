@@ -28,5 +28,5 @@ REVIEWERS="$(echo "$PR_INFO" | jq -r '.reviews[].author.login' | tr '\n' ' ') $A
 BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.XXXXXX")
 echo "$PR_INFO" | jq .body > "$BODY_FILE"
 
-gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE" --reviewers "$(echo "$REVIEWERS" | tr ' ' ',')"
+gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --milestone "$MILESTONE" --body-file "$BODY_FILE" --reviewers "$(echo "$REVIEWERS" | tr ' ' ',')"
 rm "$BODY_FILE"
