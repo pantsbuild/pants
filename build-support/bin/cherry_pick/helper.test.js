@@ -161,6 +161,14 @@ test("get_prereqs ok_with_no_relevant_milestones", async () => {
     pr_num: 19214,
   });
 
+  // PR milestone is no longer open. That's OK, assume all milestones
+  project_milestones = ["2.17.x", "2.18.x"];
+  expect(await helper.get_prereqs()).toEqual({
+    merge_commit: "5b01f3797d102ca97969bef746bfa8d72c75832a",
+    milestones: ["2.17.x", "2.18.x"],
+    pr_num: 19214,
+  });
+
   expect(helper.core.setFailed).not.toBeCalled();
 });
 

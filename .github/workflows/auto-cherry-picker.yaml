@@ -31,9 +31,11 @@ jobs:
       - run: npm install build-support/bin/cherry_pick
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
-        uses: actions/github-script@v6
+        # NB: See https://github.com/actions/github-script/pull/397
+        uses: thejcannon/github-script@7ed0cc648959192a3868f0de9862110d7922b7cc
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+          allow-empty-token: true
           script: |
             const Helper = require('./build-support/bin/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});
@@ -43,10 +45,10 @@ jobs:
               core.setOutput("pr_num", prereqs.pr_num);
               core.setOutput("merge_commit", prereqs.merge_commit);
               core.setOutput("matrix", prereqs.milestones.map(
-                milestone => {
+                milestone => {return {
                   milestone,
                   branch_name: `cherry-pick-${prereqs.pr_num}-to-${milestone}`,
-                }
+                }}
               ));
             }
 
@@ -56,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include: ${{ fromJSON(needs.prerequisites.outputs.milestones) }}
+        include: ${{ fromJSON(needs.prerequisites.outputs.matrix) }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -64,18 +66,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
         run: |
-          git config --local user.email "pantsbuild+github-automation@gmail.com"
-          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+          if [ -z "$ACT" ]; then
+            git config --local user.email "pantsbuild+github-automation@gmail.com"
+            git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
 
-          git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
-          # NB: If this fetch fails, we assume that means the milestone branch hasn't been created yet
-          git fetch --depth 1 origin "${{ matrix.milestone }}" || exit 0
-
-          git checkout -b "${{ matrix.branch_name }}" FETCH_HEAD
-
-          git cherry-pick "${{ needs.prerequisites.outputs.merge_commit }}"
-
-          git push -u origin "${{ matrix.branch_name }}"
+            git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
+            # NB: If this fetch fails, we assume that means the milestone branch hasn't been created yet
+            git fetch --depth 1 origin "${{ matrix.milestone }}" || exit 0
+            git checkout -b "${{ matrix.branch_name }}" FETCH_HEAD
+            git cherry-pick "${{ needs.prerequisites.outputs.merge_commit }}"
+            git push -u origin "${{ matrix.branch_name }}"
+          fi
           build-support/bin/cherry_pick/make_pr.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
 
   post_pick:
@@ -87,9 +88,11 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
       - name: Run Script
-        uses: actions/github-script@v6
+        # NB: See https://github.com/actions/github-script/pull/397
+        uses: thejcannon/github-script@7ed0cc648959192a3868f0de9862110d7922b7cc
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+          allow-empty-token: true
           script: |
             const Helper = require('./build-support/bin/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});

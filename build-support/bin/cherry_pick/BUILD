@@ -7,3 +7,5 @@ javascript_sources()
 javascript_tests(name="tests")
 
 shell_sources(name="shell")
+
+files(name="support_files", sources=["*"])

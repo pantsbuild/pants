@@ -51,9 +51,8 @@ class CherryPickHelper {
       .map((milestone) => milestone.title)
       .filter((title) => title.startsWith("2.") && title.endsWith(".x"))
       .sort((a, b) => semver.compare(semver.coerce(a), semver.coerce(b)));
-    const relevant_milestones = sorted_milestones.slice(
-      sorted_milestones.indexOf(milestone_title)
-    );
+    const index = sorted_milestones.indexOf(milestone_title);
+    const relevant_milestones = sorted_milestones.slice(index === -1 ? 0: index);
     return relevant_milestones;
   }
 
@@ -116,7 +115,6 @@ ${this.#run_link}`
 
     let any_failed = false;
     let comment_body = "";
-    console.log(infos);
     infos.forEach(({ pr_url, milestone, branch_name }) => {
       if (pr_url === undefined) {
         any_failed = true;
