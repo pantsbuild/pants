@@ -47,6 +47,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    ExplicitlyProvidedDependenciesRequest,
     Field,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
@@ -1206,8 +1207,24 @@ class TransitiveExcludesNotSupportedError(ValueError):
 
 
 @rule
+async def convert_dependencies_request_to_explicitly_provided_dependencies_request(
+    request: DependenciesRequest,
+) -> ExplicitlyProvidedDependenciesRequest:
+    """This rule discards any deps predicate from DependenciesRequest.
+
+    Calculating ExplicitlyProvidedDependencies does not use any deps traversal predicates as it is
+    meant to list all explicit deps from the given field. By stripping the predicate from the
+    request, we ensure that the cache key for ExplicitlyProvidedDependencies calculation does not
+    include the predicate increasing the cache-hit rate.
+    """
+    # TODO: Maybe require Get(ExplicitlyProvidedDependencies, ExplicitlyProvidedDependenciesRequest)
+    #       and deprecate Get(ExplicitlyProvidedDependencies, DependenciesRequest) via this rule.
+    return ExplicitlyProvidedDependenciesRequest(request.field)
+
+
+@rule
 async def determine_explicitly_provided_dependencies(
-    request: DependenciesRequest,  # NB: This rule ignores request.should_traverse_deps_predicate.
+    request: ExplicitlyProvidedDependenciesRequest,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
     subproject_roots: SubprojectRoots,

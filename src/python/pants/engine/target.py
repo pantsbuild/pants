@@ -714,6 +714,27 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
+# NB: ShouldTraverseDepsPredicate is defined below after SpecialCasedDependencies.
+# Implementations are defined here, however, before *DependenciesRequest types.
+
+
+def traverse_if_dependencies_field(target: Target, field: Field) -> bool:
+    """This is the default ShouldTraverseDepsPredicate implementation.
+
+    This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
+    subclasses of Dependencies.
+    """
+    return isinstance(field, Dependencies)
+
+
+def always_traverse(target: Target, field: Field) -> bool:
+    """A predicate to use when a request needs all deps.
+
+    This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
+    """
+    return True
+
+
 class CoarsenedTarget(EngineAwareParameter):
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
         """A set of Targets which cyclicly reach one another, and are thus indivisible.
@@ -845,15 +866,11 @@ class CoarsenedTargetsRequest:
         roots: Iterable[Address],
         *,
         expanded_targets: bool = False,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None = None,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "expanded_targets", expanded_targets)
-        object.__setattr__(
-            self,
-            "should_traverse_deps_predicate",
-            should_traverse_deps_predicate or traverse_if_dependencies_field,
-        )
+        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
 @dataclass(frozen=True)
@@ -888,14 +905,10 @@ class TransitiveTargetsRequest:
         self,
         roots: Iterable[Address],
         *,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate | None = None,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
-        object.__setattr__(
-            self,
-            "should_traverse_deps_predicate",
-            should_traverse_deps_predicate or traverse_if_dependencies_field,
-        )
+        object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
 @dataclass(frozen=True)
@@ -2477,31 +2490,19 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         )
 
 
-# If this predicate returns false, then the target's field's deps will be ignored.
-ShouldTraverseDepsPredicate = Callable[[Target, Field], bool]
-
-
-def traverse_if_dependencies_field(target: Target, field: Field) -> bool:
-    """This is the default ShouldTraverseDepsPredicate implementation.
-
-    This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
-    subclasses of Dependencies.
-    """
-    return isinstance(field, Dependencies)
-
-
-def always_traverse(target: Target, field: Field) -> bool:
-    """A predicate to use when a request needs all deps.
-
-    This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
-    """
-    return True
-
-
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
+
+# NB: ExplicitlyProvidedDependenciesRequest does not have a predicate unlike DependenciesRequest.
+@dataclass(frozen=True)
+class ExplicitlyProvidedDependenciesRequest(EngineAwareParameter):
+    field: Dependencies
 
     def debug_hint(self) -> str:
         return self.field.address.spec
@@ -2770,6 +2771,13 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
             owning_address=self.address,
             description_of_origin=f"the `{self.alias}` from the target {self.address}",
         )
+
+
+# If this predicate returns false, then the target's field's deps will be ignored.
+# NB: This has to be defined after SpecialCasedDependencies. Implementations are defined above.
+ShouldTraverseDepsPredicate = Callable[
+    [Target, Union[Dependencies, SpecialCasedDependencies]], bool
+]
 
 
 # -----------------------------------------------------------------------------------------------
