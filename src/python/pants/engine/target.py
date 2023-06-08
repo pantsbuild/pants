@@ -2499,6 +2499,15 @@ class DependenciesRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
+# NB: ExplicitlyProvidedDependenciesRequest does not have a predicate unlike DependenciesRequest.
+@dataclass(frozen=True)
+class ExplicitlyProvidedDependenciesRequest(EngineAwareParameter):
+    field: Dependencies
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
+
 @dataclass(frozen=True)
 class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
