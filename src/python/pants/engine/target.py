@@ -39,7 +39,7 @@ from typing import (
     get_type_hints,
 )
 
-from typing_extensions import Protocol, Self, final
+from typing_extensions import Protocol, Self, TypeAlias, final
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
@@ -714,12 +714,14 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
+# If this predicate returns false, then the target's field's deps will be ignored.
+ShouldTraverseDepsPredicate: TypeAlias = (
+    "Callable[[Target, Dependencies | SpecialCasedDependencies], bool]"
+)
+
+
 class DepsTraversalPredicates:
     """All methods on this class are ShouldTraverseDepsPredicate implementations."""
-
-    # NB: ShouldTraverseDepsPredicate is defined below after SpecialCasedDependencies.
-    # Implementations are defined here, however, before using them as arg defaults
-    # in CoarsenedTargetsRequest, TransitiveTargetsRequest, and DependenciesRequest.
 
     @staticmethod
     def if_dependencies_field(
@@ -2780,13 +2782,6 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
             owning_address=self.address,
             description_of_origin=f"the `{self.alias}` from the target {self.address}",
         )
-
-
-# If this predicate returns false, then the target's field's deps will be ignored.
-# NB: This has to be defined after SpecialCasedDependencies. Implementations are defined above.
-ShouldTraverseDepsPredicate = Callable[
-    [Target, Union[Dependencies, SpecialCasedDependencies]], bool
-]
 
 
 # -----------------------------------------------------------------------------------------------
