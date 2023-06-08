@@ -701,6 +701,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     DependenciesRequest(
                         tgt.get(Dependencies),
                         include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
                     ),
                 )
                 for tgt in queued
@@ -712,6 +713,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     DependenciesRequest(
                         tgt.get(Dependencies),
                         include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
                     ),
                 )
                 for tgt in queued
@@ -787,7 +789,9 @@ async def coarsened_targets(
         _DependencyMapping,
         _DependencyMappingRequest(
             TransitiveTargetsRequest(
-                request.roots, include_special_cased_deps=request.include_special_cased_deps
+                request.roots,
+                include_special_cased_deps=request.include_special_cased_deps,
+                should_traverse_deps_predicate=request.should_traverse_deps_predicate,
             ),
             expanded_targets=request.expanded_targets,
         ),
@@ -1206,7 +1210,7 @@ class TransitiveExcludesNotSupportedError(ValueError):
 
 @rule
 async def determine_explicitly_provided_dependencies(
-    request: DependenciesRequest,
+    request: DependenciesRequest,  # NB: This rule ignores request.should_traverse_deps_predicate.
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
     subproject_roots: SubprojectRoots,
@@ -1300,6 +1304,13 @@ async def resolve_dependencies(
         WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
     )
     tgt = wrapped_tgt.target
+
+    # This predicate allows the dep graph to ignore dependencies of selected targets
+    # including any explicit deps and any inferred deps.
+    # For example, to avoid traversing the deps of package targets.
+    if not request.should_traverse_deps_predicate(tgt, request.field):
+        return Addresses([])
+
     try:
         explicitly_provided = await Get(
             ExplicitlyProvidedDependencies, DependenciesRequest, request
