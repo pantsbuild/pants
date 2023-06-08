@@ -718,7 +718,7 @@ class DepsTraversalPredicates:
     """All methods on this class are ShouldTraverseDepsPredicate implementations."""
 
     # NB: ShouldTraverseDepsPredicate is defined below after SpecialCasedDependencies.
-    # Implementations are defined here, however, before they are using them as defaults
+    # Implementations are defined here, however, before using them as arg defaults
     # in CoarsenedTargetsRequest, TransitiveTargetsRequest, and DependenciesRequest.
 
     @staticmethod
