@@ -316,7 +316,7 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
 
     direct_deps = transitive_targets_rule_runner.request(
         Targets,
-        [DependenciesRequest(root[Dependencies], include_special_cased_deps=True, should_traverse_deps_predicate=always_traverse)]
+        [DependenciesRequest(root[Dependencies], should_traverse_deps_predicate=always_traverse)]
     )
     assert direct_deps == Targets([d1, d2, d3])
 
@@ -331,7 +331,7 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
         TransitiveTargets,
         [
             TransitiveTargetsRequest(
-                [root.address, d2.address], include_special_cased_deps=True, should_traverse_deps_predicate=always_traverse
+                [root.address, d2.address], should_traverse_deps_predicate=always_traverse
             )
         ],
     )

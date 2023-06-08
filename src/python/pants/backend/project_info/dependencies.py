@@ -14,6 +14,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
+    always_traverse,
 )
 from pants.option.option_types import BoolOption
 
@@ -43,7 +44,8 @@ async def dependencies(
 ) -> Dependencies:
     if dependencies_subsystem.transitive:
         transitive_targets = await Get(
-            TransitiveTargets, TransitiveTargetsRequest(addresses, include_special_cased_deps=True)
+            TransitiveTargets,
+            TransitiveTargetsRequest(addresses, should_traverse_deps_predicate=always_traverse),
         )
         targets = Targets(transitive_targets.dependencies)
     else:
@@ -55,7 +57,9 @@ async def dependencies(
         dependencies_per_target_root = await MultiGet(
             Get(
                 Targets,
-                DependenciesRequest(tgt.get(DependenciesField), include_special_cased_deps=True),
+                DependenciesRequest(
+                    tgt.get(DependenciesField), should_traverse_deps_predicate=always_traverse
+                ),
             )
             for tgt in target_roots
         )
