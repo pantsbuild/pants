@@ -40,7 +40,8 @@ def perform_deploy(*, aws_cli_symlink_path: str | None = None, scope: str | None
         src_prefix="dist/deploy",
         dst_prefix="s3://binaries.pantsbuild.org",
         path=scope or "",
-        dst_region="us-east-1",
+        region="us-east-1",
+        acl="public-read",
         aws_cli_symlink_path=aws_cli_symlink_path,
     )
 
