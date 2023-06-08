@@ -717,6 +717,7 @@ class UnexpandedTargets(Collection[Target]):
 # NB: ShouldTraverseDepsPredicate is defined below after SpecialCasedDependencies.
 # Implementations are defined here, however, before *DependenciesRequest types.
 
+
 def traverse_if_dependencies_field(target: Target, field: Field) -> bool:
     """This is the default ShouldTraverseDepsPredicate implementation.
 
@@ -865,7 +866,7 @@ class CoarsenedTargetsRequest:
         roots: Iterable[Address],
         *,
         expanded_targets: bool = False,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "expanded_targets", expanded_targets)
@@ -904,7 +905,7 @@ class TransitiveTargetsRequest:
         self,
         roots: Iterable[Address],
         *,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
@@ -2765,7 +2766,9 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 # If this predicate returns false, then the target's field's deps will be ignored.
 # NB: This has to be defined after SpecialCasedDependencies. Implementations are defined above.
-ShouldTraverseDepsPredicate = Callable[[Target, Union[Dependencies, SpecialCasedDependencies]], bool]
+ShouldTraverseDepsPredicate = Callable[
+    [Target, Union[Dependencies, SpecialCasedDependencies]], bool
+]
 
 
 # -----------------------------------------------------------------------------------------------
