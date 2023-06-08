@@ -722,7 +722,9 @@ class DepsTraversalPredicates:
     # in CoarsenedTargetsRequest, TransitiveTargetsRequest, and DependenciesRequest.
 
     @staticmethod
-    def if_dependencies_field(target: Target, field: Field) -> bool:
+    def if_dependencies_field(
+        target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> bool:
         """This is the default ShouldTraverseDepsPredicate implementation.
 
         This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
@@ -731,7 +733,7 @@ class DepsTraversalPredicates:
         return isinstance(field, Dependencies)
 
     @staticmethod
-    def always(target: Target, field: Field) -> bool:
+    def always(target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
         """A predicate to use when a request needs all deps.
 
         This includes deps from fields like SpecialCasedDependencies which are ignored in most
