@@ -38,6 +38,7 @@ from pants.engine.target import (
     CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
+    DepsTraversalPredicates,
     ExplicitlyProvidedDependencies,
     Field,
     FieldDefaultFactoryRequest,
@@ -65,7 +66,6 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    always_traverse,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.filespec import Filespec
@@ -316,7 +316,11 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
 
     direct_deps = transitive_targets_rule_runner.request(
         Targets,
-        [DependenciesRequest(root[Dependencies], should_traverse_deps_predicate=always_traverse)],
+        [
+            DependenciesRequest(
+                root[Dependencies], should_traverse_deps_predicate=DepsTraversalPredicates.always
+            )
+        ],
     )
     assert direct_deps == Targets([d1, d2, d3])
 
@@ -331,7 +335,8 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
         TransitiveTargets,
         [
             TransitiveTargetsRequest(
-                [root.address, d2.address], should_traverse_deps_predicate=always_traverse
+                [root.address, d2.address],
+                should_traverse_deps_predicate=DepsTraversalPredicates.always,
             )
         ],
     )

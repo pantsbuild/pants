@@ -17,8 +17,8 @@ from pants.engine.target import (
     DependenciesRequest,
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
+    DepsTraversalPredicates,
     FieldSet,
-    always_traverse,
 )
 from pants.util.logging import LogLevel
 
@@ -43,7 +43,8 @@ async def check_visibility_rule_violations(
         Get(
             Addresses,
             DependenciesRequest(
-                field_set.dependencies, should_traverse_deps_predicate=always_traverse
+                field_set.dependencies,
+                should_traverse_deps_predicate=DepsTraversalPredicates.always,
             ),
         )
         for field_set in request.elements

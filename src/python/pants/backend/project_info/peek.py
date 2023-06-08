@@ -23,6 +23,7 @@ from pants.engine.target import (
     DependenciesRequest,
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
+    DepsTraversalPredicates,
     Field,
     HydratedSources,
     HydrateSourcesRequest,
@@ -30,7 +31,6 @@ from pants.engine.target import (
     Target,
     Targets,
     UnexpandedTargets,
-    always_traverse,
 )
 from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
@@ -181,7 +181,7 @@ async def get_target_data(
         Get(
             Targets,
             DependenciesRequest(
-                tgt.get(Dependencies), should_traverse_deps_predicate=always_traverse
+                tgt.get(Dependencies), should_traverse_deps_predicate=DepsTraversalPredicates.always
             ),
         )
         for tgt in sorted_targets

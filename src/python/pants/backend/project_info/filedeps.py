@@ -12,6 +12,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    DepsTraversalPredicates,
     HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
@@ -19,7 +20,6 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
-    always_traverse,
 )
 from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
@@ -74,7 +74,9 @@ async def file_deps(
     if filedeps_subsystem.transitive:
         transitive_targets = await Get(
             TransitiveTargets,
-            TransitiveTargetsRequest(addresses, should_traverse_deps_predicate=always_traverse),
+            TransitiveTargetsRequest(
+                addresses, should_traverse_deps_predicate=DepsTraversalPredicates.always
+            ),
         )
         targets = transitive_targets.closure
     else:
