@@ -726,6 +726,14 @@ def traverse_if_dependencies_field(target: Target, field: Field) -> bool:
     return isinstance(field, Dependencies)
 
 
+def always_traverse(target: Target, field: Field) -> bool:
+    """A predicate to use when a request needs all deps.
+
+    This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
+    """
+    return True
+
+
 class CoarsenedTarget(EngineAwareParameter):
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
         """A set of Targets which cyclicly reach one another, and are thus indivisible.
@@ -2764,7 +2772,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 # If this predicate returns false, then the target's field's deps will be ignored.
 # NB: This has to be defined after SpecialCasedDependencies. Implementations are defined above.
-ShouldTraverseDepsPredicate = Callable[[Target, Dependencies], bool]
+ShouldTraverseDepsPredicate = Callable[[Target, Union[Dependencies, SpecialCasedDependencies]], bool]
 
 
 # -----------------------------------------------------------------------------------------------

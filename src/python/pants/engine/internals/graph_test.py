@@ -65,6 +65,7 @@ from pants.engine.target import (
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
+    always_traverse,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.filespec import Filespec
@@ -314,7 +315,8 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
     assert direct_deps == Targets()
 
     direct_deps = transitive_targets_rule_runner.request(
-        Targets, [DependenciesRequest(root[Dependencies], include_special_cased_deps=True)]
+        Targets,
+        [DependenciesRequest(root[Dependencies], include_special_cased_deps=True, should_traverse_deps_predicate=always_traverse)]
     )
     assert direct_deps == Targets([d1, d2, d3])
 
@@ -327,7 +329,11 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
 
     transitive_targets = transitive_targets_rule_runner.request(
         TransitiveTargets,
-        [TransitiveTargetsRequest([root.address, d2.address], include_special_cased_deps=True)],
+        [
+            TransitiveTargetsRequest(
+                [root.address, d2.address], include_special_cased_deps=True, should_traverse_deps_predicate=always_traverse
+            )
+        ],
     )
     assert transitive_targets.roots == (root, d2)
     assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])

@@ -1389,7 +1389,8 @@ async def resolve_dependencies(
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to
-    # being handled elsewhere in the calling code.
+    # being handled elsewhere in the calling code. So, we only include fields based on
+    # the should_traverse_deps_predicate.
     special_cased: tuple[Address, ...] = ()
     if request.include_special_cased_deps:
         # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
@@ -1398,6 +1399,7 @@ async def resolve_dependencies(
             field
             for field in tgt.field_values.values()
             if isinstance(field, SpecialCasedDependencies)
+            and request.should_traverse_deps_predicate(tgt, field)
         )
         # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
         special_cased = await MultiGet(
