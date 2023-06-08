@@ -129,7 +129,14 @@ async def run_helm_unittest(
 
     merged_digests = await Get(
         Digest,
-        MergeDigests([chart.snapshot.digest, stripped_test_files, test_snapshot_digest, extra_files.snapshot.digest]),
+        MergeDigests(
+            [
+                chart.snapshot.digest,
+                stripped_test_files,
+                test_snapshot_digest,
+                extra_files.snapshot.digest,
+            ]
+        ),
     )
     input_digest = await Get(Digest, AddPrefix(merged_digests, chart.name))
 

@@ -175,6 +175,7 @@ def test_simple_failure(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 1
 
+
 def test_simple_success_updating_snapshot(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -211,6 +212,7 @@ def test_simple_success_updating_snapshot(rule_runner: RuleRunner) -> None:
     assert result.xml_results.files == (f"{target.address.path_safe_spec}.xml",)
     assert result.extra_output and result.extra_output.files
     assert result.extra_output.files == ("src/tests/__snapshot__/service_test.yaml.snap",)
+
 
 def test_test_with_local_resource_file(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -448,4 +450,3 @@ def test_test_with_relocated_file(rule_runner: RuleRunner) -> None:
 
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 0
-    
