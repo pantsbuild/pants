@@ -1,6 +1,9 @@
 [GLOBAL]
 colors = true
 
+[test]
+report = true
+
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]
 
