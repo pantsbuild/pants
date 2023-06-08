@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "workunit_store"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -16,7 +16,7 @@ log = "0.4"
 parking_lot = "0.12"
 petgraph = "0.6"
 rand = "0.8"
-smallvec = { version = "1", features=["union"] }
+smallvec = { version = "1", features = ["union"] }
 strum = "0.24"
 strum_macros = "0.24"
 tokio = { version = "1.28", features = ["rt", "sync"] }
