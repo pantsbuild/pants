@@ -2,7 +2,7 @@
 name = "ui"
 version = "0.0.1"
 edition = "2021"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 
 [lib]
 path = "src/console_ui.rs"
@@ -15,7 +15,11 @@ indicatif = "0.17"
 logging = { path = "../logging" }
 parking_lot = "0.12"
 # TODO: See https://github.com/Byron/prodash/pull/9.
-prodash = { git = "https://github.com/stuhood/prodash", rev = 'stuhood/raw-messages-draft', version = "16", default-features = false, features = ["progress-tree", "render-line", "render-line-termion"] }
+prodash = { git = "https://github.com/stuhood/prodash", rev = 'stuhood/raw-messages-draft', version = "16", default-features = false, features = [
+  "progress-tree",
+  "render-line",
+  "render-line-termion",
+] }
 stdio = { path = "../stdio" }
 terminal_size = "0.1.15"
 task_executor = { path = "../task_executor" }
