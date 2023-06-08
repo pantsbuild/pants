@@ -76,8 +76,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-bootstrap-Linux-ARM64
-        path: .pants.d/pants.log
+        name: logs-bootstrap-Linux-ARM64
+        path: .pants.d/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
@@ -161,8 +161,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-bootstrap-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-bootstrap-Linux-x86_64
+        path: .pants.d/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
@@ -258,8 +258,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-bootstrap-macOS11-x86_64
-        path: .pants.d/pants.log
+        name: logs-bootstrap-macOS11-x86_64
+        path: .pants.d/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
@@ -325,8 +325,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-Linux-ARM64
-        path: .pants.d/pants.log
+        name: logs-wheels-Linux-ARM64
+        path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -379,8 +379,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-wheels-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -434,8 +434,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macOS10-15-x86_64
-        path: .pants.d/pants.log
+        name: logs-wheels-macOS10-15-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -489,8 +489,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macOS11-ARM64
-        path: .pants.d/pants.log
+        name: logs-wheels-macOS11-ARM64
+        path: .pants.d/*.log
     timeout-minutes: 90
   check_labels:
     if: github.repository_owner == 'pantsbuild'
@@ -585,8 +585,8 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-lint-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-lint-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 30
   merge_ok:
     if: always()
@@ -667,12 +667,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-ARM64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-Linux-ARM64
-        path: .pants.d/pants.log
+        name: logs-python-test-Linux-ARM64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_0:
     env: {}
@@ -744,12 +757,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-0_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-0_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_1:
     env: {}
@@ -821,12 +847,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-1_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-1_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_2:
     env: {}
@@ -898,12 +937,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-2_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-2_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_3:
     env: {}
@@ -975,12 +1027,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-3_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-3_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_4:
     env: {}
@@ -1052,12 +1117,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-4_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-4_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_5:
     env: {}
@@ -1129,12 +1207,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-5_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-5_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_6:
     env: {}
@@ -1206,12 +1297,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-6_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-6_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_7:
     env: {}
@@ -1283,12 +1387,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-7_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-7_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_8:
     env: {}
@@ -1360,12 +1477,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-8_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-8_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_9:
     env: {}
@@ -1437,12 +1567,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-9_10-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-9_10-Linux-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
   test_python_macos11_x86_64:
     env:
@@ -1482,12 +1625,25 @@ jobs:
 
         '
     - continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: always()
+      name: Upload test reports
+      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS11-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
+
+        echo "Uploading test reports to ${S3_DST}"
+
+        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+
+        '
+    - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-macOS11-x86_64
-        path: .pants.d/pants.log
+        name: logs-python-test-macOS11-x86_64
+        path: .pants.d/*.log
     timeout-minutes: 90
 name: Pull Request CI
 'on':

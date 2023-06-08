@@ -36,12 +36,17 @@ def main() -> None:
         help="The AWS region to connect to.",
         default="us-east-1",
     )
+    parser.add_argument(
+        "--acl",
+        help="An optional ACL to set on copied objects.",
+    )
     options = parser.parse_args()
     perform_copy(
         src_prefix=options.src_prefix,
         dst_prefix=options.dst_prefix,
         path=options.path,
-        dst_region=options.dst_region,
+        region=options.region,
+        acl=options.acl,
     )
 
 
@@ -65,7 +70,8 @@ def perform_copy(
     src_prefix: str,
     dst_prefix: str,
     path: str,
-    dst_region: str,
+    region: str,
+    acl: str | None = None,
     aws_cli_symlink_path: str | None = None,
 ) -> None:
     """Recursively copy the files at src_prefix/src_path to S3.
@@ -75,14 +81,15 @@ def perform_copy(
     :param path: The relpath under the src_prefix to copy.
       src_prefix/path will be (recursively) copied to dst_prefix/path.
       If empty, the entire src_prefix will be copied.
-    :param dst_region:  The AWS region to access (should be the one the bucket is in).
+    :param region: The AWS region to access (should be the one the bucket is in).
+    :param acl: An optional ACL to set on the copied objects.
     :param aws_cli_symlink_path: If specified, symlink the aws cli into this dir. Otherwise,
       it will be synlinked into the system standard Path.
     """
     if shutil.which("aws") is None:
         _install_aws_cli(symlink_path=aws_cli_symlink_path)
     _validate_authentication()
-    _copy(src_prefix=src_prefix, dst_prefix=dst_prefix, path=path, dst_region=dst_region)
+    _copy(src_prefix=src_prefix, dst_prefix=dst_prefix, path=path, region=region, acl=acl)
 
 
 def _install_aws_cli(symlink_path: str | None = None) -> None:
@@ -105,7 +112,7 @@ def _validate_relpath(path_str: str, descr: str) -> None:
         raise ValueError(f"{descr} `{path_str}` must be a relative path with no parent refs")
 
 
-def _copy(src_prefix: str, dst_prefix: str, path: str, dst_region: str) -> None:
+def _copy(src_prefix: str, dst_prefix: str, path: str, region: str, acl: str | None = None) -> None:
     _validate_relpath(src_prefix, "src_prefix")
     _validate_relpath(path, "path")
     if not dst_prefix.startswith("s3://"):
@@ -116,27 +123,29 @@ def _copy(src_prefix: str, dst_prefix: str, path: str, dst_region: str) -> None:
     copy_from = os.path.join(src_prefix, path)
     copy_to = f"{dst_prefix}/{path}"
 
+    if not os.path.exists(copy_from):
+        logger.warning(f"Local path {copy_from} does not exist. Skipping copy to s3.")
+        return
+
     # NB: we use the sync command to avoid transferring files that have not changed. See
     # https://github.com/pantsbuild/pants/issues/7258.
-    _run(
-        [
-            "aws",
-            "--region",
-            dst_region,
-            "s3",
-            "sync",
-            # This instructs the sync command to ignore timestamps, which we must do to allow
-            # distinct shards—which may finish building their wheels at different times—to not
-            # overwrite otherwise-identical wheels.
-            "--size-only",
-            # Turn off the dynamic progress display, which clutters the CI output.
-            "--no-progress",
-            "--acl",
-            "public-read",
-            copy_from,
-            copy_to,
-        ]
-    )
+    cmd = [
+        "aws",
+        "--region",
+        region,
+        "s3",
+        "sync",
+        # This instructs the sync command to ignore timestamps, which we must do to allow
+        # distinct shards—which may finish building their wheels at different times—to not
+        # overwrite otherwise-identical wheels.
+        "--size-only",
+        # Turn off the dynamic progress display, which clutters the CI output.
+        "--no-progress",
+        *(["--acl", acl] if acl else []),
+        copy_from,
+        copy_to,
+    ]
+    _run(cmd)
 
 
 if __name__ == "__main__":
