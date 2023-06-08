@@ -700,7 +700,6 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     Targets,
                     DependenciesRequest(
                         tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
                         should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
                     ),
                 )
@@ -712,7 +711,6 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     UnexpandedTargets,
                     DependenciesRequest(
                         tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
                         should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
                     ),
                 )
@@ -790,7 +788,6 @@ async def coarsened_targets(
         _DependencyMappingRequest(
             TransitiveTargetsRequest(
                 request.roots,
-                include_special_cased_deps=request.include_special_cased_deps,
                 should_traverse_deps_predicate=request.should_traverse_deps_predicate,
             ),
             expanded_targets=request.expanded_targets,
@@ -1391,33 +1388,32 @@ async def resolve_dependencies(
     # include those dependencies because they should often be excluded from the result due to
     # being handled elsewhere in the calling code. So, we only include fields based on
     # the should_traverse_deps_predicate.
-    special_cased: tuple[Address, ...] = ()
-    if request.include_special_cased_deps:
-        # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
-        # SpecialCasedDependencies.
-        special_cased_fields = tuple(
-            field
-            for field in tgt.field_values.values()
-            if isinstance(field, SpecialCasedDependencies)
-            and request.should_traverse_deps_predicate(tgt, field)
-        )
-        # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
-        special_cased = await MultiGet(
-            Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(
-                    addr,
-                    relative_to=tgt.address.spec_path,
-                    subproject_roots=subproject_roots,
-                    description_of_origin=(
-                        f"the `{special_cased_field.alias}` field from the target {tgt.address}"
-                    ),
+
+    # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
+    # SpecialCasedDependencies.
+    special_cased_fields = tuple(
+        field
+        for field in tgt.field_values.values()
+        if isinstance(field, SpecialCasedDependencies)
+        and request.should_traverse_deps_predicate(tgt, field)
+    )
+    # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
+    special_cased = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(
+                addr,
+                relative_to=tgt.address.spec_path,
+                subproject_roots=subproject_roots,
+                description_of_origin=(
+                    f"the `{special_cased_field.alias}` field from the target {tgt.address}"
                 ),
-            )
-            for special_cased_field in special_cased_fields
-            for addr in special_cased_field.to_unparsed_address_inputs().values
+            ),
         )
+        for special_cased_field in special_cased_fields
+        for addr in special_cased_field.to_unparsed_address_inputs().values
+    )
 
     excluded = explicitly_provided_ignores.union(
         *itertools.chain(deps.exclude for deps in inferred)

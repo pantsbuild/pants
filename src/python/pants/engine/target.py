@@ -859,20 +859,17 @@ class CoarsenedTargetsRequest:
     roots: Tuple[Address, ...]
     expanded_targets: bool
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate
-    include_special_cased_deps: bool
 
     def __init__(
         self,
         roots: Iterable[Address],
         *,
         expanded_targets: bool = False,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field,
-        include_special_cased_deps: bool = False,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "expanded_targets", expanded_targets)
         object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
-        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
 @dataclass(frozen=True)
@@ -902,18 +899,15 @@ class TransitiveTargetsRequest:
 
     roots: Tuple[Address, ...]
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate
-    include_special_cased_deps: bool
 
     def __init__(
         self,
         roots: Iterable[Address],
         *,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field,
-        include_special_cased_deps: bool = False,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
-        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
 @dataclass(frozen=True)
@@ -2498,7 +2492,6 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
-    include_special_cased_deps: bool = False
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field
 
     def debug_hint(self) -> str:
