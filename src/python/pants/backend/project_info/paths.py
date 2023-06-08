@@ -16,10 +16,10 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    DepsTraversalPredicates,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    always_traverse,
 )
 from pants.option.option_types import StrOption
 
@@ -116,14 +116,16 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
 
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest([root.address], should_traverse_deps_predicate=always_traverse),
+        TransitiveTargetsRequest(
+            [root.address], should_traverse_deps_predicate=DepsTraversalPredicates.always
+        ),
     )
 
     adjacent_targets_per_target = await MultiGet(
         Get(
             Targets,
             DependenciesRequest(
-                tgt.get(Dependencies), should_traverse_deps_predicate=always_traverse
+                tgt.get(Dependencies), should_traverse_deps_predicate=DepsTraversalPredicates.always
             ),
         )
         for tgt in transitive_targets.closure

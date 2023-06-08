@@ -714,25 +714,32 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
-# NB: ShouldTraverseDepsPredicate is defined below after SpecialCasedDependencies.
-# Implementations are defined here, however, before *DependenciesRequest types.
+class DepsTraversalPredicates:
+    """All methods on this class are ShouldTraverseDepsPredicate implementations."""
 
+    # NB: ShouldTraverseDepsPredicate is defined below after SpecialCasedDependencies.
+    # Implementations are defined here, however, before using them as arg defaults
+    # in CoarsenedTargetsRequest, TransitiveTargetsRequest, and DependenciesRequest.
 
-def traverse_if_dependencies_field(target: Target, field: Field) -> bool:
-    """This is the default ShouldTraverseDepsPredicate implementation.
+    @staticmethod
+    def if_dependencies_field(
+        target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> bool:
+        """This is the default ShouldTraverseDepsPredicate implementation.
 
-    This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
-    subclasses of Dependencies.
-    """
-    return isinstance(field, Dependencies)
+        This skips resolving dependencies for fields (like SpecialCasedDependencies) that are not
+        subclasses of Dependencies.
+        """
+        return isinstance(field, Dependencies)
 
+    @staticmethod
+    def always(target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
+        """A predicate to use when a request needs all deps.
 
-def always_traverse(target: Target, field: Field) -> bool:
-    """A predicate to use when a request needs all deps.
-
-    This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
-    """
-    return True
+        This includes deps from fields like SpecialCasedDependencies which are ignored in most
+        cases.
+        """
+        return True
 
 
 class CoarsenedTarget(EngineAwareParameter):
@@ -866,7 +873,7 @@ class CoarsenedTargetsRequest:
         roots: Iterable[Address],
         *,
         expanded_targets: bool = False,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = DepsTraversalPredicates.if_dependencies_field,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "expanded_targets", expanded_targets)
@@ -905,7 +912,7 @@ class TransitiveTargetsRequest:
         self,
         roots: Iterable[Address],
         *,
-        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field,
+        should_traverse_deps_predicate: ShouldTraverseDepsPredicate = DepsTraversalPredicates.if_dependencies_field,
     ) -> None:
         object.__setattr__(self, "roots", tuple(roots))
         object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
@@ -2493,7 +2500,9 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 @dataclass(frozen=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
-    should_traverse_deps_predicate: ShouldTraverseDepsPredicate = traverse_if_dependencies_field
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate = (
+        DepsTraversalPredicates.if_dependencies_field
+    )
 
     def debug_hint(self) -> str:
         return self.field.address.spec
