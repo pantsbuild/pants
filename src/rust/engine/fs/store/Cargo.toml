@@ -37,13 +37,7 @@ task_executor = { path = "../../task_executor" }
 tempfile = "3.5.0"
 tokio-rustls = "0.23"
 tokio = { version = "1.28", features = ["fs"] }
-tonic = { version = "0.6", features = [
-  "transport",
-  "codegen",
-  "tls",
-  "tls-roots",
-  "prost",
-] }
+tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
 uuid = { version = "1.1.2", features = ["v4"] }

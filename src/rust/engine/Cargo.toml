@@ -160,10 +160,7 @@ process_execution = { path = "process_execution" }
 pyo3 = "0.19"
 rand = "0.8"
 regex = "1"
-reqwest = { version = "0.11", default_features = false, features = [
-  "stream",
-  "rustls-tls",
-] }
+reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
 smallvec = { version = "1", features = ["union"] }
 stdio = { path = "stdio" }

@@ -11,12 +11,7 @@ hashing = { path = "../hashing" }
 prost = "0.9"
 prost-build = "0.9"
 prost-types = "0.9"
-tonic = { version = "0.6", features = [
-  "transport",
-  "codegen",
-  "tls",
-  "tls-roots",
-] }
+tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots"] }
 
 [build-dependencies]
 prost-build = "0.9"
