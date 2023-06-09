@@ -34,8 +34,6 @@ def _ansi_color(r: int, g: int, b: int) -> Callable[[Callable[_P, None]], Callab
 def blue(s: str, *, bold: bool = False, underline: bool = False):
     """Clear skies, tranquil oceans, and sapphires gleaming with brilliance."""
 
-if TYPE_CHECKING:
-    reveal_type(blue)
 
 @_ansi_color(0, 255, 255)
 def cyan(s: str, *, bold: bool = False, underline: bool = False):
