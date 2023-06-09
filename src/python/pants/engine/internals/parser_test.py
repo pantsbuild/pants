@@ -20,6 +20,7 @@ from pants.engine.unions import UnionMembership
 from pants.testutil.pytest_util import no_exception
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -72,7 +73,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
         with pytest.raises(ParseError) as exc:
             parser.parse(
                 "dir/BUILD",
-                "fake",
+                "FAKE",
                 prelude_symbols,
                 EnvironmentVars({}),
                 False,
@@ -80,14 +81,16 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 dependents_rules=None,
                 dependencies_rules=None,
             )
-        assert str(exc.value) == (
-            f"Name 'fake' is not defined.\n\n{dym}"
-            "If you expect to see more symbols activated in the below list,"
-            f" refer to {doc_url('enabling-backends')} for all available"
-            " backends to activate.\n\n"
-            "All registered symbols: ['__defaults__', '__dependencies_rules__', "
-            f"'__dependents_rules__', 'build_file_dir', 'caof', 'env', {fmt_extra_sym}"
-            "'obj', 'prelude', 'tgt']"
+        assert str(exc.value) == softwrap(
+            f"""
+            Name 'FAKE' is not defined.
+
+            {dym}If you expect to see more symbols activated in the below list, refer to
+            {doc_url('enabling-backends')} for all available backends to activate.
+
+            All registered symbols: [{fmt_extra_sym}'__defaults__', '__dependencies_rules__',
+            '__dependents_rules__', 'build_file_dir', 'caof', 'env', 'obj', 'prelude', 'tgt']
+            """
         )
 
         with no_exception():
@@ -102,7 +105,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             )
             parser.parse(
                 "dir/BUILD",
-                "fake",
+                "FAKE",
                 prelude_symbols,
                 EnvironmentVars({}),
                 False,
@@ -111,14 +114,14 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 dependencies_rules=None,
             )
 
-    test_targs = ["fake1", "fake2", "fake3", "fake4", "fake5"]
+    test_targs = ["FAKE1", "FAKE2", "FAKE3", "FAKE4", "FAKE5"]
 
     perform_test([], "")
-    dym_one = "Did you mean fake1?\n\n"
+    dym_one = "Did you mean FAKE1?\n\n"
     perform_test(test_targs[:1], dym_one)
-    dym_two = "Did you mean fake2 or fake1?\n\n"
+    dym_two = "Did you mean FAKE2 or FAKE1?\n\n"
     perform_test(test_targs[:2], dym_two)
-    dym_many = "Did you mean fake5, fake4, or fake3?\n\n"
+    dym_many = "Did you mean FAKE5, FAKE4, or FAKE3?\n\n"
     perform_test(test_targs, dym_many)
 
 

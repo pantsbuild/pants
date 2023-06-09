@@ -420,7 +420,7 @@ class Parser:
             exec(code, global_symbols)
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
-            original = e.args[0].capitalize()
+            original = e.args[0][0].upper() + e.args[0][1:]
             help_str = softwrap(
                 f"""
                 If you expect to see more symbols activated in the below list, refer to
