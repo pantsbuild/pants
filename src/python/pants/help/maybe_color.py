@@ -12,7 +12,7 @@ class MaybeColor:
     def __init__(self, color: bool) -> None:
         self._color = color
 
-        def noop(x, **_):
+        def noop(x, bold: bool = False, underline: bool = False):
             return x
 
         self.maybe_cyan = cyan if color else noop

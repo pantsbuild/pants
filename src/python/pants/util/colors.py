@@ -4,7 +4,7 @@
 
 import functools
 import re
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from typing_extensions import ParamSpec
 
@@ -25,7 +25,7 @@ def _ansi_color(r: int, g: int, b: int) -> Callable[[Callable[_P, None]], Callab
                 f"\x1b[{'1;' if bold else ''}{'4;' if underline else ''}38;2;{r};{g};{b}m{s}\x1b[0m"
             )
 
-        return wrapper
+        return wrapper  # type: ignore
 
     return decorator
 
@@ -34,6 +34,8 @@ def _ansi_color(r: int, g: int, b: int) -> Callable[[Callable[_P, None]], Callab
 def blue(s: str, *, bold: bool = False, underline: bool = False):
     """Clear skies, tranquil oceans, and sapphires gleaming with brilliance."""
 
+if TYPE_CHECKING:
+    reveal_type(blue)
 
 @_ansi_color(0, 255, 255)
 def cyan(s: str, *, bold: bool = False, underline: bool = False):
@@ -52,7 +54,7 @@ def magenta(s: str, *, bold: bool = False, underline: bool = False):
 
 @_ansi_color(255, 165, 0)
 def orange(s: str, *, bold: bool = False, underline: bool = False):
-    """Zest of ripe citrus fruits, fiery autumn leaves, and the energetic glow of a setting sun.."""
+    """Zest of ripe citrus fruits, fiery autumn leaves, and the energetic glow of a setting sun."""
 
 
 @_ansi_color(255, 0, 0)
