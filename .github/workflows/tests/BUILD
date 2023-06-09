@@ -9,14 +9,9 @@
 shell_sources(name="tests")
 
 
-def _run_test(filename):
-    filepath = build_file_dir() / filename
-    return f"chmod +x {filepath} && {filepath}"
-
-
 experimental_test_shell_command(
     name="Test workflow_dispatch dryrun",
-    command=_run_test("smoke_test_all_using_dryrun.sh"),
+    command=f"bash { build_file_dir() / 'smoke_test_all_using_dryrun.sh'}",
     tools=["chmod"],
     execution_dependencies=[
         "//build-support/bin/act:act-at-root",
