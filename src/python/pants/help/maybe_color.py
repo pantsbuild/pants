@@ -3,7 +3,7 @@
 
 from typing import List
 
-from pants.util.colors import cyan, default, green, magenta, orange, red, yellow
+from pants.util.colors import blue, cyan, default, green, magenta, orange, red, yellow
 
 
 class MaybeColor:
@@ -16,6 +16,7 @@ class MaybeColor:
             return x
 
         self.maybe_default = default if color else noop
+        self.maybe_blue = blue if color else noop
         self.maybe_cyan = cyan if color else noop
         self.maybe_green = green if color else noop
         self.maybe_orange = orange if color else noop
