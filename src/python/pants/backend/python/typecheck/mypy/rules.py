@@ -312,7 +312,7 @@ async def mypy_typecheck_partition(
         "MYPY_FORCE_COLOR": "1",
         # Mypy needs to know the terminal so it can use appropriate escape sequences. ansi is a
         # reasonable lowest common denominator for the sort of escapes mypy uses (NB. TERM=xterm
-        # uses some additional codes that pants.util.strip_color doesn't remove).
+        # uses some additional codes that pants.util.colors.strip_color doesn't remove).
         "TERM": "ansi",
         # Force a fixed terminal width. This is effectively infinite, disabling mypy's
         # builtin truncation and line wrapping. Terminals do an acceptable job of soft-wrapping
