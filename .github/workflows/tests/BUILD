@@ -5,17 +5,11 @@
 # These aren't meant to be comprehensive, as they can be quite expensive to run. However, they are
 # still useful as they can expose bugs before the action is run in "prod".
 
-
-shell_sources(name="tests")
-
-
 experimental_test_shell_command(
     name="Test workflow_dispatch dryrun",
-    command=f"bash { build_file_dir() / 'smoke_test_all_using_dryrun.sh'}",
-    tools=["chmod"],
+    command="./act workflow_dispatch --dryrun",
     execution_dependencies=[
         "//build-support/bin/act:act-at-root",
-        "./smoke_test_all_using_dryrun.sh",
         ".github/workflows:workflows",
     ],
     workdir="/",
