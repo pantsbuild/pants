@@ -58,8 +58,6 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         help="Enforce printing colored output even if stdout is not a tty.",
     )
 
-    update_snapshot = BoolOption(default=False, help="Generate new test snapshots.")
-
     output_type = EnumOption(
         default=HelmUnitTestReportFormat.XUNIT,
         help="Output type used for the test report.",
