@@ -8,8 +8,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generic, Iterable, TypeVar, cast
 
-import colors
-
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.multi_tool_goal_helper import (
     OnlyOption,
@@ -28,6 +26,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
 from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
+from pants.util.colors import strip_color
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
@@ -57,7 +56,7 @@ class CheckResult:
     ) -> CheckResult:
         def prep_output(s: bytes) -> str:
             chroot = strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-            formatting = cast(str, colors.strip_color(chroot)) if strip_formatting else chroot
+            formatting = strip_color(chroot) if strip_formatting else chroot
             return formatting
 
         return CheckResult(

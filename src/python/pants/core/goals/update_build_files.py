@@ -13,8 +13,6 @@ from enum import Enum
 from io import BytesIO
 from typing import DefaultDict, cast
 
-from colors import green, red
-
 from pants.backend.build_files.fix.deprecations import renamed_fields_rules, renamed_targets_rules
 from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
@@ -47,6 +45,7 @@ from pants.engine.internals.parser import ParseError
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
+from pants.util.colors import green, red
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized

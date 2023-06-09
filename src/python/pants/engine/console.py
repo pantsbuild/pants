@@ -5,10 +5,9 @@ from __future__ import annotations
 import sys
 from typing import Callable, TextIO
 
-from colors import blue, cyan, green, magenta, red, yellow
-
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.util.colors import blue, cyan, green, magenta, red, yellow
 
 
 class Console(SideEffecting):

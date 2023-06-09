@@ -218,25 +218,25 @@ class LockfileDiffPrinter(MaybeColor):
         if not output:
             return
         self.console.print_stderr(
-            self.style(" " * 66, style="underline")
+            self.style(" " * 66, underline=True)
             + f"\nLockfile diff: {diff.path} [{diff.resolve_name}]\n"
             + output
         )
 
     def output_sections(self, diff: LockfileDiff) -> Iterator[str]:
         if self.include_unchanged:
-            yield from self.output_reqs("Unchanged dependencies", diff.unchanged, fg="blue")
+            yield from self.output_reqs("Unchanged dependencies", diff.unchanged, color="blue")
         yield from self.output_changed("Upgraded dependencies", diff.upgraded)
         yield from self.output_changed("!! Downgraded dependencies !!", diff.downgraded)
-        yield from self.output_reqs("Added dependencies", diff.added, fg="green", style="bold")
-        yield from self.output_reqs("Removed dependencies", diff.removed, fg="magenta")
+        yield from self.output_reqs("Added dependencies", diff.added, color="green", bold=True)
+        yield from self.output_reqs("Removed dependencies", diff.removed, color="magenta")
 
-    def style(self, text: str, **kwargs) -> str:
-        return cast(str, self.maybe_color(text, **kwargs))
+    def style(self, text: str, *, color: str, **kwargs) -> str:
+        return cast(str, getattr(self, color)(text, **kwargs))
 
     def title(self, text: str) -> str:
         heading = f"== {text:^60} =="
-        return self.style("\n".join((" " * len(heading), heading, "")), style="underline")
+        return self.style("\n".join((" " * len(heading), heading, "")), underline=True)
 
     def output_reqs(self, heading: str, reqs: LockfilePackages, **kwargs) -> Iterator[str]:
         if not reqs:
@@ -244,7 +244,7 @@ class LockfileDiffPrinter(MaybeColor):
 
         yield self.title(heading)
         for name, version in reqs.items():
-            name_s = self.style(f"{name:30}", fg="yellow")
+            name_s = self.style(f"{name:30}", color="yellow")
             version_s = self.style(str(version), **kwargs)
             yield f"  {name_s} {version_s}"
 
@@ -256,18 +256,18 @@ class LockfileDiffPrinter(MaybeColor):
         label = "-->"
         for name, (prev, curr) in reqs.items():
             bump_attrs = self.get_bump_attrs(prev, curr)
-            name_s = self.style(f"{name:30}", fg="yellow")
-            prev_s = self.style(f"{str(prev):10}", fg="cyan")
+            name_s = self.style(f"{name:30}", color="yellow")
+            prev_s = self.style(f"{str(prev):10}", color="cyan")
             bump_s = self.style(f"{label:^7}", **bump_attrs)
             curr_s = self.style(str(curr), **bump_attrs)
             yield f"  {name_s} {prev_s} {bump_s} {curr_s}"
 
     _BUMPS = (
-        ("major", dict(fg="red", style="bold")),
-        ("minor", dict(fg="yellow")),
-        ("micro", dict(fg="green")),
+        ("major", dict(color="red", bold=True)),
+        ("minor", dict(color="yellow")),
+        ("micro", dict(color="green")),
         # Default style
-        (None, dict(fg="magenta")),
+        (None, dict(color="magenta")),
     )
 
     def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> dict[str, str]:
