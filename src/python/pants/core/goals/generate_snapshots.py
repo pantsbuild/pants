@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
@@ -18,6 +19,8 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
+
+logger = logging.getLogger(__name__)
 
 
 @union
@@ -87,9 +90,11 @@ async def generate_snapshots(workspace: Workspace) -> GenerateSnapshots:
     )
 
     all_snapshots = await Get(
-        Digest, MergeDigests([result.snapshot.digest for result in snapshot_results])
+        Snapshot, MergeDigests([result.snapshot.digest for result in snapshot_results])
     )
-    workspace.write_digest(all_snapshots)
+    workspace.write_digest(all_snapshots.digest)
+    for file in all_snapshots.files:
+        logger.info(f"Generated {file}")
     return GenerateSnapshots(exit_code=0)
 
 
