@@ -9,6 +9,7 @@ import logging
 import re
 import threading
 import tokenize
+import traceback
 from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
@@ -419,15 +420,17 @@ class Parser:
             code = compile(build_file_content, filepath, "exec", dont_inherit=True)
             exec(code, global_symbols)
         except NameError as e:
-            valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
-            original = e.args[0][0].upper() + e.args[0][1:]
+            frame = traceback.extract_tb(e.__traceback__, limit=-1)[0]
+            msg = e.args[0][0].upper() + e.args[0][1:]
+            location = f":{frame.name}" if frame.name != "<module>" else ""
+            original = f"{frame.filename}:{frame.lineno}{location}: {msg}"
             help_str = softwrap(
                 f"""
                 If you expect to see more symbols activated in the below list, refer to
                 {doc_url('enabling-backends')} for all available backends to activate.
                 """
             )
-
+            valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             candidates = get_close_matches(build_file_content, valid_symbols)
             if candidates:
                 if len(candidates) == 1:
