@@ -4,7 +4,7 @@
 
 import functools
 import re
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 from typing_extensions import ParamSpec
 
