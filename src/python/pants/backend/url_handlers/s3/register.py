@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from http.client import HTTPMessage
 from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlsplit
@@ -74,11 +75,7 @@ async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredenti
     if request.query:
         path_style_url += f"?{request.query}"
 
-    headers: dict[str, str] = {}
-    if aws_credentials.creds.token:
-        # Workaround https://github.com/boto/botocore/pull/2948
-        headers["X-Amz-Security-Token"] = ""
-
+    headers = HTTPMessage()
     http_request = SimpleNamespace(
         url=path_style_url,
         headers=headers,
