@@ -20,6 +20,8 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
+    CoarsenedTarget,
+    CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
     FieldSet,
@@ -130,6 +132,28 @@ async def _publish_processes_for_targets(targets: Iterable[Target]) -> PublishPr
 
     return PublishProcesses(chain.from_iterable(processes_per_target))
 
+
+@dataclass(frozen=True)
+class _DeployTargetRequest:
+    target: CoarsenedTarget
+
+class _DeployTargetStepResult:
+    pass
+
+async def _deploy_coarsened_target(request: _DeployTargetRequest) -> _DeployTargetStepResult:
+    field_sets_per_target = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(DeployFieldSet, request.target.members)
+    )
+    deploy_processes = await MultiGet(
+        Get(DeployProcess, DeployFieldSet, field_set)
+        for field_set in field_sets_per_target.field_sets
+    )
+
+    publish_dependencies = chain.from_iterable([proc.publish_dependencies for proc in deploy_processes])
+    publish_processes = await _publish_processes_for_targets(publish_dependencies)
+    if publish_processes:
+        publish_results = await Effect()
+    
 
 @dataclass(frozen=True)
 class _FallibleProcResult:
@@ -312,6 +336,9 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
         ),
     )
+
+    coarsened_targets = await Get(CoarsenedTargets, Addresses([tgt.address for tgt in target_roots_to_deploy_field_sets.targets]))
+
 
     deployment_graph = await _build_deploy_graph(
         [tgt.address for tgt in target_roots_to_deploy_field_sets.targets]
