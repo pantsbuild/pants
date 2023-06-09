@@ -190,3 +190,54 @@ def test_unrecognized_symbol_in_prelude(
         'build_file_dir', 'caof', 'env', 'macro', 'obj']
         """
     )
+
+
+def test_referencing_BUILD_file_symbol_from_prelude(
+    defaults_parser_state: BuildFileDefaultsParserState,
+) -> None:
+    build_file_aliases = BuildFileAliases(
+        objects={"obj": 0},
+        context_aware_object_factories={"caof": lambda parse_context: lambda _: None},
+    )
+    parser = Parser(
+        build_root="",
+        registered_target_types=RegisteredTargetTypes({"tgt": GenericTarget}),
+        union_membership=UnionMembership({}),
+        object_aliases=build_file_aliases,
+        ignore_unrecognized_symbols=False,
+    )
+    prelude: dict[str, Any] = {}
+    exec(
+        compile(
+            dedent(
+                """\
+                # This macro references BASE_VALUE defined in the current BUILD file
+                def add_with(value):
+                    return BUILD.BASE_VALUE + value
+                """
+            ),
+            "preludes/funcs.py",
+            "exec",
+            dont_inherit=True,
+        ),
+        {},
+        prelude,
+    )
+    prelude_symbols = BuildFilePreludeSymbols.create(prelude, ())
+    targets = parser.parse(
+        filepath="dir/BUILD",
+        build_file_content=dedent(
+            """\
+            BASE_VALUE = 40
+            tgt(name="result", description=f"{BASE_VALUE} + 2 = {add_with(2)}")
+            """
+        ),
+        extra_symbols=prelude_symbols,
+        env_vars=EnvironmentVars({}),
+        is_bootstrap=False,
+        defaults=defaults_parser_state,
+        dependents_rules=None,
+        dependencies_rules=None,
+    )
+    assert len(targets) == 1
+    assert targets[0].kwargs["description"] == "40 + 2 = 42"

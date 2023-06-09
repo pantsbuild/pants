@@ -10,6 +10,7 @@ import re
 import threading
 import tokenize
 import traceback
+import types
 from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
@@ -67,6 +68,12 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
         for name, symb in ns.items():
             info[name] = BuildFileSymbolInfo(name, symb)
         return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
+
+    def _set_global(self, key: str, value: Any) -> None:
+        for symbol in self.symbols.values():
+            if hasattr(symbol, "__globals__"):
+                symbol.__globals__[key] = value
+                break
 
 
 @dataclass(frozen=True)
@@ -293,6 +300,23 @@ class Registrar:
         return resolve_field_default
 
 
+class ParserNamespace(types.SimpleNamespace):
+    def __getattribute__(self, key: str) -> Any:
+        try:
+            return super().__getattribute__(key)
+        except AttributeError:
+            # Translate AttributeError to NameError to treat undefined symbols in the namespace the same as for globals.
+            frame = inspect.currentframe()
+            if frame:
+                frame = frame.f_back
+            if not frame:
+                raise
+            else:
+                raise NameError(f"name '{key}' is not defined.").with_traceback(
+                    types.TracebackType(None, frame, frame.f_lasti, frame.f_lineno)
+                )
+
+
 class Parser:
     def __init__(
         self,
@@ -381,17 +405,18 @@ class Parser:
             env_vars=env_vars,
         )
 
-        global_symbols: dict[str, Any] = {
+        global_symbols = ParserNamespace(
             **self.symbols,
             **extra_symbols.symbols,
-        }
+        )
+        extra_symbols._set_global("BUILD", global_symbols)
 
         if self.ignore_unrecognized_symbols:
             defined_symbols = set()
             while True:
                 try:
                     code = compile(build_file_content, filepath, "exec", dont_inherit=True)
-                    exec(code, global_symbols)
+                    exec(code, global_symbols.__dict__)
                 except NameError as e:
                     bad_symbol = _extract_symbol_from_name_error(e)
                     if bad_symbol in defined_symbols:
@@ -401,7 +426,7 @@ class Parser:
                         raise
                     defined_symbols.add(bad_symbol)
 
-                    global_symbols[bad_symbol] = _unrecognized_symbol_func
+                    setattr(global_symbols, bad_symbol, _unrecognized_symbol_func)
                     self._parse_state.reset(
                         filepath=filepath,
                         is_bootstrap=is_bootstrap,
@@ -418,7 +443,7 @@ class Parser:
 
         try:
             code = compile(build_file_content, filepath, "exec", dont_inherit=True)
-            exec(code, global_symbols)
+            exec(code, global_symbols.__dict__)
         except NameError as e:
             frame = traceback.extract_tb(e.__traceback__, limit=-1)[0]
             msg = e.args[0][0].upper() + e.args[0][1:]
@@ -430,7 +455,7 @@ class Parser:
                 {doc_url('enabling-backends')} for all available backends to activate.
                 """
             )
-            valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
+            valid_symbols = sorted(s for s in global_symbols.__dict__.keys() if s != "__builtins__")
             candidates = get_close_matches(build_file_content, valid_symbols)
             if candidates:
                 if len(candidates) == 1:
