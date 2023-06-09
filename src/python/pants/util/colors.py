@@ -17,13 +17,15 @@ def strip_color(s: str) -> str:
 _P = ParamSpec("_P")
 
 
-def _ansi_color(r: int, g: int, b: int) -> Callable[[Callable[_P, None]], Callable[_P, str]]:
+def _ansi_color(*rgb) -> Callable[[Callable[_P, None]], Callable[_P, str]]:
+    codes = ""
+    if rgb:
+        codes = "2;" + ";".join(str(n) for n in rgb)
+
     def decorator(func: Callable[_P, None]) -> Callable[_P, str]:
         @functools.wraps(func)
         def wrapper(s: str, *, bold: bool = False, underline: bool = False) -> str:
-            return (
-                f"\x1b[{'1;' if bold else ''}{'4;' if underline else ''}38;2;{r};{g};{b}m{s}\x1b[0m"
-            )
+            return f"\x1b[{'1;' if bold else ''}{'4;' if underline else ''}38;{codes}m{s}\x1b[0m"
 
         return wrapper  # type: ignore
 
@@ -63,3 +65,8 @@ def red(s: str, *, bold: bool = False, underline: bool = False):
 @_ansi_color(255, 255, 0)
 def yellow(s: str, *, bold: bool = False, underline: bool = False):
     """Sunshine, golden fields of daffodils, and the cheerful vibrancy of lemon zest."""
+
+
+@_ansi_color()
+def default(s: str, *, bold: bool = False, underline: bool = False):
+    """Initial state, conventional choice, and the pre-established configuration."""

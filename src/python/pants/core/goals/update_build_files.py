@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
-from typing import DefaultDict, cast
+from typing import DefaultDict
 
 from pants.backend.build_files.fix.deprecations import renamed_fields_rules, renamed_targets_rules
 from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
@@ -93,10 +93,10 @@ class RewrittenBuildFileRequest(EngineAwareParameter):
             raise ParseError(f"Failed to parse {self.path}: {e}")
 
     def red(self, s: str) -> str:
-        return cast(str, red(s)) if self.colors_enabled else s
+        return red(s) if self.colors_enabled else s
 
     def green(self, s: str) -> str:
-        return cast(str, green(s)) if self.colors_enabled else s
+        return green(s) if self.colors_enabled else s
 
 
 class DeprecationFixerRequest(RewrittenBuildFileRequest):

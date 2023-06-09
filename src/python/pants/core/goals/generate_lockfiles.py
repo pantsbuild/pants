@@ -218,7 +218,7 @@ class LockfileDiffPrinter(MaybeColor):
         if not output:
             return
         self.console.print_stderr(
-            self.style(" " * 66, underline=True)
+            self.style(" " * 66, color="default", underline=True)
             + f"\nLockfile diff: {diff.path} [{diff.resolve_name}]\n"
             + output
         )
@@ -236,7 +236,9 @@ class LockfileDiffPrinter(MaybeColor):
 
     def title(self, text: str) -> str:
         heading = f"== {text:^60} =="
-        return self.style("\n".join((" " * len(heading), heading, "")), underline=True)
+        return self.style(
+            "\n".join((" " * len(heading), heading, "")), color="default", underline=True
+        )
 
     def output_reqs(self, heading: str, reqs: LockfilePackages, **kwargs) -> Iterator[str]:
         if not reqs:
@@ -270,7 +272,7 @@ class LockfileDiffPrinter(MaybeColor):
         (None, dict(color="magenta")),
     )
 
-    def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> dict[str, str]:
+    def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> dict[str, str | bool]:
         for key, attrs in self._BUMPS:
             if key is None or getattr(prev, key, None) != getattr(curr, key, None):
                 return attrs
