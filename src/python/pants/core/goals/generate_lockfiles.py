@@ -231,7 +231,7 @@ class LockfileDiffPrinter(MaybeColor):
         yield from self.output_reqs("Added dependencies", diff.added, color="green", bold=True)
         yield from self.output_reqs("Removed dependencies", diff.removed, color="magenta")
 
-    def style(self, text: str, *, color: str, **kwargs) -> str:
+    def style(self, text: str, *, color: str, **kwargs: bool) -> str:
         return cast(str, getattr(self, f"maybe_{color}")(text, **kwargs))
 
     def title(self, text: str) -> str:
@@ -257,26 +257,24 @@ class LockfileDiffPrinter(MaybeColor):
         yield self.title(title)
         label = "-->"
         for name, (prev, curr) in reqs.items():
-            bump_attrs = self.get_bump_attrs(prev, curr)
+            bump_color, bump_bold = self.get_bump_attrs(prev, curr)
             name_s = self.style(f"{name:30}", color="yellow")
             prev_s = self.style(f"{str(prev):10}", color="cyan")
-            bump_s = self.style(f"{label:^7}", **bump_attrs)
-            curr_s = self.style(str(curr), **bump_attrs)
+            bump_s = self.style(f"{label:^7}", color=bump_color, bump=bump_bold)
+            curr_s = self.style(str(curr), color=bump_color, bump=bump_bold)
             yield f"  {name_s} {prev_s} {bump_s} {curr_s}"
 
     _BUMPS = (
-        ("major", dict(color="red", bold=True)),
-        ("minor", dict(color="yellow")),
-        ("micro", dict(color="green")),
-        # Default style
-        (None, dict(color="magenta")),
+        ("major", ("red", True)),
+        ("minor", ("yellow", False)),
+        ("micro", ("green", False)),
     )
 
-    def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> dict[str, str | bool]:
+    def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> tuple[str, bool]:
         for key, attrs in self._BUMPS:
-            if key is None or getattr(prev, key, None) != getattr(curr, key, None):
+            if getattr(prev, key, None) != getattr(curr, key, None):
                 return attrs
-        return {}  # Should never happen, but let's be safe.
+        return ("magenta", False)
 
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
