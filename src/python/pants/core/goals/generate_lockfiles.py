@@ -232,7 +232,7 @@ class LockfileDiffPrinter(MaybeColor):
         yield from self.output_reqs("Removed dependencies", diff.removed, color="magenta")
 
     def style(self, text: str, *, color: str, **kwargs) -> str:
-        return cast(str, getattr(self, color)(text, **kwargs))
+        return cast(str, getattr(self, f"maybe_{color}")(text, **kwargs))
 
     def title(self, text: str) -> str:
         heading = f"== {text:^60} =="
