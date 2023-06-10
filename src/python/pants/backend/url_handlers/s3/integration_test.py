@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
+from http.client import HTTPMessage
 from http.server import BaseHTTPRequestHandler
 from types import SimpleNamespace
 
@@ -47,6 +48,8 @@ def monkeypatch_botocore(monkeypatch):
         fake_session = object()
         fake_creds = SimpleNamespace(access_key="ACCESS", secret_key="SECRET", token=None)
         botocore.session = SimpleNamespace(get_session=lambda: fake_session)
+        # NB: HTTPHeaders is just a simple subclass of HTTPMessage
+        botocore.compat = SimpleNamespace(HTTPHeaders=HTTPMessage)
 
         def fake_resolver_creator(session):
             assert session is fake_session
