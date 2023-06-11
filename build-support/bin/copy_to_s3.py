@@ -11,7 +11,7 @@ import shutil
 import subprocess
 from pathlib import PurePath
 
-from common import die
+from pants_release.common import die
 
 logger = logging.getLogger(__name__)
 
