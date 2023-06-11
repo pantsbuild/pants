@@ -72,13 +72,14 @@ If there are things that must be removed, you can either:
 
 ### 0c. Release candidates - Check for cherry-picks
 
-PRs labeled "needs-cherrypick" are automatically cherry-picked to each relevant branch, and on success have their label removed.
+There's many instances of landing a change in `main` and then wanting it to also apply to older releases. This is indicated by the `needs-cherrypick` label on a pull request. There's automation that attempts to automatically cherry-pick those changes back to the relevant branches.
 
-There are instances where this process fails (e.g. when there's a merge-conflict) or never runs (e.g. the label was added after merging or the milestone was missing).
+This automation may not always succeed, so [check for any pending cherry-picks](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick+is%3Aclosed), and find the relevant ones by looking at the milestone: for instance, if doing a release for 2.16, the relevant cherry-picks are those for milestone `2.16.x` or earlier.
 
-If the process fails, it should tag the PR with "auto-cherry-picking-failed". These PRs will need to be picked manually following the steps in the comment on PR.
+The process may fail in two ways:
 
-If the process was never run, a manual run of the auto-cherry-picker can be triggered by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
+- The cherry-picking process failed, and tagged the PR with `auto-cherry-picking-failed`: follow the instructions in the comment on the pull request. (This likely means there's merge conflicts that require manual resolution.)
+- the cherry-pick didn't (yet) run: trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
 
 ### 1. Prepare the changelog
 

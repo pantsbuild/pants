@@ -136,7 +136,7 @@ To resolve:
       && git cherry-pick ${merge_commit_sha}
     \`\`\`
 3. Fix the merge conflicts and commit the changes
-4. Run \`build-support/bin/cherry_pick/make_pr.sh -- --pull-number="${this.pull_number}" --milestone="${milestone}"\`
+4. Run \`build-support/cherry_pick/make_pr.sh -- "${this.pull_number}" "${milestone}"\`
 
 Please note that I cannot re-run CI if a job fails. Please work with your PR approver(s) to re-run CI if necessary.
 

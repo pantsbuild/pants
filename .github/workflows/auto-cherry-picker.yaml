@@ -28,7 +28,7 @@ jobs:
           node-version: 16
       - name: Check out code
         uses: actions/checkout@v3
-      - run: npm install build-support/bin/cherry_pick
+      - run: npm install build-support/cherry_pick
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
         # NB: See https://github.com/actions/github-script/pull/397
@@ -37,7 +37,7 @@ jobs:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           allow-empty-token: true
           script: |
-            const Helper = require('./build-support/bin/cherry_pick/helper.js');
+            const Helper = require('./build-support/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});
             const prereqs = await helper.get_prereqs();
 
@@ -62,22 +62,23 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+      - name: Prepare cherry-pick branch
+        if: ${{ !env.ACT }}
+        run: |
+          git config --local user.email "pantsbuild+github-automation@gmail.com"
+          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+
+          git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
+          # NB: If this fetch fails, we assume that means the milestone branch hasn't been created yet
+          git fetch --depth 1 origin "${{ matrix.milestone }}" || exit 0
+          git checkout -b "${{ matrix.branch_name }}" FETCH_HEAD
+          git cherry-pick "${{ needs.prerequisites.outputs.merge_commit }}"
+          git push -u origin "${{ matrix.branch_name }}"
       - name: Create Cherry-Pick Branch
         env:
           GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
         run: |
-          if [ -z "$ACT" ]; then
-            git config --local user.email "pantsbuild+github-automation@gmail.com"
-            git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
-
-            git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
-            # NB: If this fetch fails, we assume that means the milestone branch hasn't been created yet
-            git fetch --depth 1 origin "${{ matrix.milestone }}" || exit 0
-            git checkout -b "${{ matrix.branch_name }}" FETCH_HEAD
-            git cherry-pick "${{ needs.prerequisites.outputs.merge_commit }}"
-            git push -u origin "${{ matrix.branch_name }}"
-          fi
-          build-support/bin/cherry_pick/make_pr.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
+          bash build-support/cherry_pick/make_pr.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}"
 
   post_pick:
     name: Post-Pick Actions
@@ -94,6 +95,6 @@ jobs:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           allow-empty-token: true
           script: |
-            const Helper = require('./build-support/bin/cherry_pick/helper.js');
+            const Helper = require('./build-support/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});
             await helper.cherry_pick_finished("${{ needs.prerequisites.outputs.merge_commit }}", ${{ needs.prerequisites.outputs.matrix }});
