@@ -180,6 +180,7 @@ impl ImportCollector<'_> {
 
     let line0 = most_specific.range().start_point.row;
 
+    println!("{}@{}", full_name, self.weaken_imports);
     self
       .import_map
       .entry(full_name)
@@ -191,6 +192,7 @@ impl ImportCollector<'_> {
 // NB: https://tree-sitter.github.io/tree-sitter/playground is very helpful
 impl Visitor for ImportCollector<'_> {
   fn visit_import_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
+      println!("{:?}", node);
     if !self.is_pragma_ignored(node) {
       self.insert_import(node.named_child(0).unwrap(), None, false);
     }
@@ -278,6 +280,35 @@ impl Visitor for ImportCollector<'_> {
     ChildBehavior::Ignore
   }
 
+  fn visit_with_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
+    let with_clause = node.named_child(0).unwrap();
+    let are_suppressing = with_clause.named_children(&mut with_clause.walk()).any(|x| {self.withitem_is_with_contextlib_suppress(x)});
+    println!("anchor, {:?}", are_suppressing);
+
+    let body_node = node.child_by_field_name("body").unwrap();
+    let body: Vec<_> = body_node.named_children(&mut body_node.walk()).collect();
+
+    if are_suppressing {
+      self.weaken_imports = true;
+
+
+      for child in body{
+        println!("weak walkies");
+        println!("{}", child.kind());
+        self.walk(&mut child.walk());
+      }
+      self.weaken_imports = false;
+
+    } else {
+      for child in body{
+        println!("walkies");
+        self.walk(&mut child.walk());
+      }
+    }
+
+    ChildBehavior::Ignore
+  }
+
   fn visit_call(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let funcname = node.named_child(0).unwrap();
     if self.code_at(funcname.range()) != "__import__" {
@@ -305,6 +336,36 @@ impl Visitor for ImportCollector<'_> {
         .insert(text.to_string(), (range.start_point.row + 1) as u64);
     }
     ChildBehavior::Ignore
+  }
+}
+
+impl ImportCollector<'_> {
+  fn withitem_is_with_contextlib_suppress(&mut self, with_node: tree_sitter::Node) -> bool {
+    if with_node.kind_id() == KindID::WITH_ITEM {
+      let node = with_node.child_by_field_name("value").unwrap();  // synthetic
+
+      if !(node.kind_id() == KindID::CALL) {
+        return false;
+      }
+      let function_name_expr = node.child_by_field_name("function").unwrap();
+      return match function_name_expr.kind_id() {
+        KindID::ATTRIBUTE => {
+          let attr = function_name_expr;
+          let identifier = attr.child_by_field_name("attribute").unwrap();
+          let is_suppress = self.code_at(identifier.range()) == "suppress";
+          println!("{}", is_suppress);
+          // ???
+          is_suppress
+        }
+        KindID::IDENTIFIER => {
+          let identifier = function_name_expr;
+          let is_suppress = self.code_at(identifier.range()) == "suppress";
+          // ???
+          is_suppress
+        }
+        _ => { false }
+      }
+    } else { return false }
   }
 }
 
