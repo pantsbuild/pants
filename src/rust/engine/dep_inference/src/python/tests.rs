@@ -431,6 +431,15 @@ fn contextlib_suppress_weak_imports() {
   &["strong0"],
   &["weak0"],
   );
+  // Allow other error types to be suppressed
+  assert_imports_strong_weak(
+    r"
+    with suppress(NameError, ImportError):
+        import weak0
+    ",
+    &[],
+  &["weak0"],
+  );
   // We should respect the intention of any function that is obviously suppressing ImportErrors
   assert_imports_strong_weak(
     r"

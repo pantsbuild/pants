@@ -353,15 +353,20 @@ impl ImportCollector<'_> {
           let attr = function_name_expr;
           let identifier = attr.child_by_field_name("attribute").unwrap();
           let is_suppress = self.code_at(identifier.range()) == "suppress";
-          println!("{}", is_suppress);
-          // ???
-          is_suppress
+
+          let cur = &mut node.walk();
+          let has_importerror = node.child_by_field_name("arguments").unwrap().named_children(cur).any(|x|{ println!("iter {:?}", x); self.code_at(x.range()) == "ImportError"});
+
+          is_suppress && has_importerror
         }
         KindID::IDENTIFIER => {
           let identifier = function_name_expr;
           let is_suppress = self.code_at(identifier.range()) == "suppress";
-          // ???
-          is_suppress
+
+          let cur = &mut node.walk();
+          let has_importerror = node.child_by_field_name("arguments").unwrap().named_children(cur).any(|x|{ println!("iter {:?}", x); self.code_at(x.range()) == "ImportError"});
+
+          is_suppress && has_importerror
         }
         _ => { false }
       }
