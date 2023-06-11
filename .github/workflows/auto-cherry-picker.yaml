@@ -28,7 +28,7 @@ jobs:
           node-version: 16
       - name: Check out code
         uses: actions/checkout@v3
-      - run: npm install build-support/cherry_pick
+      - run: npm install ./build-support/cherry_pick
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
         # NB: See https://github.com/actions/github-script/pull/397
@@ -88,6 +88,7 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+      - run: npm install ./build-support/cherry_pick
       - name: Run Script
         # NB: See https://github.com/actions/github-script/pull/397
         uses: thejcannon/github-script@7ed0cc648959192a3868f0de9862110d7922b7cc

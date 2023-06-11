@@ -70,4 +70,4 @@ def test_auto_cherry_pick():
     print(stdout)
     assert "make_pr.sh 12345 2.16.x" in stdout
     assert "make_pr.sh 12345 2.17.x" in stdout
-    assert "We finished: ABCDEF12345 [object Object],[object Object]" in stdout
+    assert 'cherry_picked_finished: ABCDEF12345 [{"milestone":"2.16.x","branch_name":"cherry-pick-12345-to-2.16.x"},{"milestone":"2.17.x","branch_name":"cherry-pick-12345-to-2.17.x"}]' in stdout
