@@ -343,28 +343,31 @@ impl ImportCollector<'_> {
         return false;
       }
       let function_name_expr = node.child_by_field_name("function").unwrap();
-      return match function_name_expr.kind_id() {
+      let is_supress = match function_name_expr.kind_id() {
         KindID::ATTRIBUTE => {
-          let attr = function_name_expr;
-          let identifier = attr.child_by_field_name("attribute").unwrap();
-          let is_suppress = self.code_at(identifier.range()) == "suppress";
-
-          let cur = &mut node.walk();
-          let has_importerror = node.child_by_field_name("arguments").unwrap().named_children(cur).any(|x|{ self.code_at(x.range()) == "ImportError"});
-
-          is_suppress && has_importerror
+          function_name_expr
+              .child_by_field_name("attribute")
+              .map(|identifier|{self.code_at(identifier.range()) == "suppress"})
+              .unwrap_or(false)
         }
         KindID::IDENTIFIER => {
-          let identifier = function_name_expr;
-          let is_suppress = self.code_at(identifier.range()) == "suppress";
-
-          let cur = &mut node.walk();
-          let has_importerror = node.child_by_field_name("arguments").unwrap().named_children(cur).any(|x|{ self.code_at(x.range()) == "ImportError"});
-
-          is_suppress && has_importerror
+          self.code_at(function_name_expr.range()) == "suppress"
         }
-        _ => { false }
+        _ => false
+      };
+      if !is_supress {
+        return false
       }
+      let cur = &mut node.walk();
+      let has_importerror = node
+          .child_by_field_name("arguments")
+          .map(|x| {x
+              .named_children(cur)
+              .any(|x|{
+                self.code_at(x.range()) == "ImportError"})
+          }).unwrap_or(false);
+
+      return is_supress && has_importerror
     } else { return false }
   }
 }
