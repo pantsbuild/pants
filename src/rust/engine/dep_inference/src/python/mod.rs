@@ -180,7 +180,6 @@ impl ImportCollector<'_> {
 
     let line0 = most_specific.range().start_point.row;
 
-    println!("{}@{}", full_name, self.weaken_imports);
     self
       .import_map
       .entry(full_name)
@@ -192,7 +191,6 @@ impl ImportCollector<'_> {
 // NB: https://tree-sitter.github.io/tree-sitter/playground is very helpful
 impl Visitor for ImportCollector<'_> {
   fn visit_import_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
-      println!("{:?}", node);
     if !self.is_pragma_ignored(node) {
       self.insert_import(node.named_child(0).unwrap(), None, false);
     }
@@ -284,7 +282,6 @@ impl Visitor for ImportCollector<'_> {
   fn visit_with_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let with_clause = node.named_child(0).unwrap();
     let are_suppressing = with_clause.named_children(&mut with_clause.walk()).any(|x| {self.withitem_is_with_contextlib_suppress(x)});
-    println!("anchor, {:?}", are_suppressing);
 
     let body_node = node.child_by_field_name("body").unwrap();
     let body: Vec<_> = body_node.named_children(&mut body_node.walk()).collect();
@@ -293,17 +290,13 @@ impl Visitor for ImportCollector<'_> {
       let previous_weaken = self.weaken_imports;
       self.weaken_imports = true;
 
-
       for child in body{
-        println!("weak walkies");
-        println!("{}", child.kind());
         self.walk(&mut child.walk());
       }
       self.weaken_imports = previous_weaken;
 
     } else {
       for child in body{
-        println!("walkies");
         self.walk(&mut child.walk());
       }
     }
@@ -357,7 +350,7 @@ impl ImportCollector<'_> {
           let is_suppress = self.code_at(identifier.range()) == "suppress";
 
           let cur = &mut node.walk();
-          let has_importerror = node.child_by_field_name("arguments").unwrap().named_children(cur).any(|x|{ println!("iter {:?}", x); self.code_at(x.range()) == "ImportError"});
+          let has_importerror = node.child_by_field_name("arguments").unwrap().named_children(cur).any(|x|{ self.code_at(x.range()) == "ImportError"});
 
           is_suppress && has_importerror
         }
@@ -366,7 +359,7 @@ impl ImportCollector<'_> {
           let is_suppress = self.code_at(identifier.range()) == "suppress";
 
           let cur = &mut node.walk();
-          let has_importerror = node.child_by_field_name("arguments").unwrap().named_children(cur).any(|x|{ println!("iter {:?}", x); self.code_at(x.range()) == "ImportError"});
+          let has_importerror = node.child_by_field_name("arguments").unwrap().named_children(cur).any(|x|{ self.code_at(x.range()) == "ImportError"});
 
           is_suppress && has_importerror
         }
