@@ -180,9 +180,9 @@ class MockTestRequest(TestRequest):
         addresses = [field_set.address for field_set in field_sets]
         return TestResult(
             exit_code=cls.exit_code(addresses),
-            stdout="",
+            stdout_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
-            stderr="",
+            stderr_bytes=b"",
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=tuple(addresses),
             coverage_data=MockCoverageData(addresses),
@@ -438,8 +438,8 @@ def _assert_test_summary(
     assert expected == _format_test_summary(
         TestResult(
             exit_code=exit_code,
-            stdout="",
-            stderr="",
+            stdout_bytes=b"",
+            stderr_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=(Address(spec_path="", target_name="dummy_address"),),
@@ -599,9 +599,9 @@ def assert_streaming_output(
 ) -> None:
     result = TestResult(
         exit_code=exit_code,
-        stdout=stdout,
+        stdout_bytes=stdout.encode(),
         stdout_digest=EMPTY_FILE_DIGEST,
-        stderr=stderr,
+        stderr_bytes=stderr.encode(),
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         addresses=(Address("demo_test"),),
@@ -717,3 +717,17 @@ def test_timeout_calculation() -> None:
     assert_timeout_calculated(field_value=None, expected=None)
     assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
     assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
+
+
+def test_non_utf8_output() -> None:
+    test_result = TestResult(
+        exit_code=1,  # "test error" so stdout/stderr are output in message
+        stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stdout_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
+        stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stderr_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
+        addresses=(),
+        output_setting=ShowOutput.ALL,
+        result_metadata=None,
+    )
+    assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"

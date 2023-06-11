@@ -3,6 +3,11 @@
 
 resource(name="lockfile", source="pylint.lock")
 
+resources(
+    name="test_lockfiles",
+    sources=["pylint_3rdparty_plugin_test.lock", "pylint_source_plugin_test.lock"],
+)
+
 python_sources(
     overrides={"subsystem.py": {"dependencies": [":lockfile"]}},
 )
@@ -14,6 +19,7 @@ python_tests(
         "rules_integration_test.py": {
             "timeout": 330,
             "tags": ["platform_specific_behavior"],
+            "dependencies": [":test_lockfiles"],
         },
     },
 )

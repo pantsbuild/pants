@@ -1,9 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
-from typing import Match, Optional, Tuple, cast
+from typing import ClassVar, Match, Optional, Tuple, cast
 
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
@@ -20,6 +22,7 @@ from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
+    Field,
     InvalidFieldException,
     InvalidTargetException,
     Target,
@@ -63,8 +66,20 @@ class PythonAwsLambdaIncludeRequirements(BoolField):
     default = True
     help = help_text(
         """
-        Whether to resolve requirements and include them in the Pex. This is most useful with Lambda
-        Layers to make code uploads smaller when deps are in layers.
+        Whether to resolve requirements and include them in the AWS Lambda artifact. This is most useful with Lambda
+        Layers to make code uploads smaller when third-party requirements are in layers.
+        https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html
+        """
+    )
+
+
+class PythonAwsLambdaIncludeSources(BoolField):
+    alias = "include_sources"
+    default = True
+    help = help_text(
+        """
+        Whether to resolve first party sources and include them in the AWS Lambda artifact. This is
+        most useful to allow creating a Lambda Layer with only third-party requirements.
         https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html
         """
     )
@@ -109,25 +124,19 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         return int(mo.group("major")), int(mo.group("minor"))
 
 
-class PythonAWSLambda(Target):
-    alias = "python_awslambda"
-    core_fields = (
+class PythonAwsLambdaLayerDependenciesField(PythonFaaSDependencies):
+    required = True
+
+
+class _AWSLambdaBaseTarget(Target):
+    core_fields: ClassVar[tuple[type[Field], ...]] = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        PythonFaaSDependencies,
-        PythonAwsLambdaHandlerField,
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
         PythonFaaSCompletePlatforms,
         PythonResolveField,
         EnvironmentField,
-    )
-    help = help_text(
-        f"""
-        A self-contained Python function suitable for uploading to AWS Lambda.
-
-        See {doc_url('awslambda-python')}.
-        """
     )
 
     def validate(self) -> None:
@@ -141,6 +150,42 @@ class PythonAWSLambda(Target):
                     """
                 )
             )
+
+
+class PythonAWSLambda(_AWSLambdaBaseTarget):
+    alias = "python_aws_lambda_function"
+
+    deprecated_alias = "python_awslambda"
+    deprecated_alias_removal_version = "2.19.0.dev0"
+
+    core_fields = (
+        *_AWSLambdaBaseTarget.core_fields,
+        PythonFaaSDependencies,
+        PythonAwsLambdaHandlerField,
+    )
+    help = help_text(
+        f"""
+        A self-contained Python function suitable for uploading to AWS Lambda.
+
+        See {doc_url('awslambda-python')}.
+        """
+    )
+
+
+class PythonAWSLambdaLayer(_AWSLambdaBaseTarget):
+    alias = "python_aws_lambda_layer"
+    core_fields = (
+        *_AWSLambdaBaseTarget.core_fields,
+        PythonAwsLambdaIncludeSources,
+        PythonAwsLambdaLayerDependenciesField,
+    )
+    help = help_text(
+        f"""
+        A Python layer suitable for uploading to AWS Lambda.
+
+        See {doc_url('awslambda-python')}.
+        """
+    )
 
 
 def rules():

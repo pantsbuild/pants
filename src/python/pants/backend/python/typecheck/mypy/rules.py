@@ -166,9 +166,6 @@ async def mypy_typecheck_partition(
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
         ),
     )
-    extra_type_stubs_pex_get = Get(
-        Pex, PexRequest, mypy.extra_type_stubs_pex_request(partition.interpreter_constraints)
-    )
 
     mypy_pex_get = Get(
         VenvPex,
@@ -182,12 +179,10 @@ async def mypy_typecheck_partition(
     (
         roots_sources,
         mypy_pex,
-        extra_type_stubs_pex,
         requirements_pex,
     ) = await MultiGet(
         roots_sources_get,
         mypy_pex_get,
-        extra_type_stubs_pex_get,
         requirements_pex_get,
     )
 
@@ -210,7 +205,7 @@ async def mypy_typecheck_partition(
         PexRequest(
             output_filename="requirements_venv.pex",
             internal_only=True,
-            pex_path=[requirements_pex, extra_type_stubs_pex],
+            pex_path=[requirements_pex],
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )

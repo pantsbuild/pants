@@ -127,7 +127,7 @@ class PythonInferSubsystem(Subsystem):
         help=softwrap(
             """
             Infer dependencies on targets' entry points, e.g. `pex_binary`'s
-            `entry_point` field, `python_awslambda`'s `handler` field and
+            `entry_point` field, `python_aws_lambda_function`'s `handler` field and
             `python_distribution`'s `entry_points` field.
             """
         ),

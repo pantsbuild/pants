@@ -26,3 +26,12 @@ def read_resource(package_or_module: str, resource: str) -> bytes:
         resource = resource_parts[-1]
 
     return resources.read_binary(package, resource)
+
+
+def read_sibling_resource(sibling_name: str, resource: str) -> bytes:
+    """A convenience function for reading a resource that is a sibling of the calling module.
+
+    The caller should pass __name__ as the name arg, and the relpath to the resource as the resource
+    arg.
+    """
+    return read_resource(sibling_name.rpartition(".")[0], resource)

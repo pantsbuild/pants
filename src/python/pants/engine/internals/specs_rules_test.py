@@ -1132,3 +1132,7 @@ def test_secondary_owner_warning(caplog) -> None:
     assert len(caplog.records) == 1
     assert "secondary1" not in caplog.text
     assert "secondary2" in caplog.text
+
+    result = run_rule([RecursiveGlobSpec("")])
+    assert len(caplog.records) == 0
+    assert result.mapping

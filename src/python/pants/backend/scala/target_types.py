@@ -9,6 +9,7 @@ from typing import ClassVar
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
+from pants.build_graph.address import AddressInput
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.rules import collect_rules, rule
@@ -345,6 +346,15 @@ class ScalacPluginArtifactField(StringField, AsyncFieldMixin):
     value: str
     help = "The address of either a `jvm_artifact` or a `scala_artifact` that defines a plugin for `scalac`."
 
+    def to_address_input(self) -> AddressInput:
+        return AddressInput.parse(
+            self.value,
+            relative_to=self.address.spec_path,
+            description_of_origin=(
+                f"the `{self.alias}` field in the `{ScalacPluginTarget.alias}` target {self.address}"
+            ),
+        )
+
 
 class ScalacPluginNameField(StringField):
     alias = "plugin_name"
@@ -381,6 +391,26 @@ class ScalacPluginTarget(Target):
 # -----------------------------------------------------------------------------------------------
 # `scala_artifact` target
 # -----------------------------------------------------------------------------------------------
+
+
+# Defining this field and making it required in the `ScalaArtifactFieldSet`
+# prevents the `JvmArtifactFieldSet` matching against `scala_artifact` targets
+# and raising an error when resolving a classpath in which such targets have been
+# used as explicit dependencies of other targets.
+#
+# This way classpath entries for `scala_artifact` targets will be resolved using
+# their own rules, bringing the actual JAR dependency as a transitive one.
+class ScalaArtifactArtifactField(StringField):
+    alias = "artifact"
+    required = True
+    value: str
+    help = help_text(
+        """
+        The 'artifact' part of a Maven-compatible Scala-versioned coordinate to a third-party JAR artifact.
+
+        For the JAR coordinate `org.typelevel:cats-core_2.13:2.9.0`, the artifact is `cats-core`.
+        """
+    )
 
 
 class ScalaCrossVersion(Enum):
@@ -441,7 +471,7 @@ class ScalaArtifactExclusionsField(JvmArtifactExclusionsField):
 @dataclass(frozen=True)
 class ScalaArtifactFieldSet(FieldSet):
     group: JvmArtifactGroupField
-    artifact: JvmArtifactArtifactField
+    artifact: ScalaArtifactArtifactField
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
     exclusions: ScalaArtifactExclusionsField
@@ -449,7 +479,7 @@ class ScalaArtifactFieldSet(FieldSet):
 
     required_fields = (
         JvmArtifactGroupField,
-        JvmArtifactArtifactField,
+        ScalaArtifactArtifactField,
         JvmArtifactVersionField,
         JvmArtifactPackagesField,
         ScalaArtifactCrossversionField,

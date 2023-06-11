@@ -51,10 +51,11 @@ from pants.engine.unions import UnionRule
 from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
-    skip_unless_python27_and_python3_present,
+    skip_unless_python37_and_python39_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule, mock_console
+from pants.util.resources import read_sibling_resource
 
 
 @pytest.fixture
@@ -280,41 +281,36 @@ def test_dependencies(rule_runner: PythonRuleRunner) -> None:
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
 
-@skip_unless_python27_and_python3_present
+@skip_unless_python37_and_python39_present
 def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
                 """\
                 def test() -> None:
-                  pass
+                  y = (x := 5)
                 """
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_tests(name='py2', interpreter_constraints=['==2.7.*'])
-                python_tests(name='py3', interpreter_constraints=['>=3.6.0'])
+                python_tests(name='py37', interpreter_constraints=['==3.7.*'])
+                python_tests(name='py39', interpreter_constraints=['==3.9.*'])
                 """
             ),
         }
     )
-    extra_args = [
-        "--pytest-version=pytest>=4.6.6,<4.7",
-        "--pytest-extra-requirements=[]",
-        "--pytest-lockfile=<none>",
-    ]
 
-    py2_tgt = rule_runner.get_target(
-        Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
+    py37_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py37", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py2_tgt], extra_args=extra_args, test_debug_adapter=False)
+    result = run_pytest(rule_runner, [py37_tgt], test_debug_adapter=False)
     assert result.exit_code == 2
     assert "SyntaxError: invalid syntax" in result.stdout
 
-    py3_tgt = rule_runner.get_target(
-        Address(PACKAGE, target_name="py3", relative_file_path="tests.py")
+    py39_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py39", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py3_tgt], extra_args=extra_args, test_debug_adapter=False)
+    result = run_pytest(rule_runner, [py39_tgt], test_debug_adapter=False)
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
@@ -459,7 +455,13 @@ def test_force(rule_runner: PythonRuleRunner) -> None:
 
 def test_extra_output(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
-        {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
+        {
+            f"{PACKAGE}/tests.py": GOOD_TEST,
+            f"{PACKAGE}/BUILD": "python_tests()",
+            # The test lockfile provides pytest-html and also setuptools, which it requires
+            # because it does not use PEP 517.
+            "pytest.lock": read_sibling_resource(__name__, "pytest_extra_output_test.lock"),
+        }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(
@@ -467,10 +469,8 @@ def test_extra_output(rule_runner: PythonRuleRunner) -> None:
         [tgt],
         extra_args=[
             "--pytest-args='--html=extra-output/report.html'",
-            "--pytest-extra-requirements=pytest-html==3.1",
-            # pytest-html requires setuptools to be installed because it does not use PEP 517.
-            "--pytest-extra-requirements=setuptools",
-            "--pytest-lockfile=<none>",
+            "--python-resolves={'pytest':'pytest.lock'}",
+            "--pytest-install-from-resolve=pytest",
         ],
     )
     assert result.exit_code == 0
