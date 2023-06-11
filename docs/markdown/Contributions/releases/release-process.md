@@ -86,7 +86,7 @@ Update the release page in `src/python/pants/notes` for this release series, e.g
 
 Run `git fetch --all --tags` to be sure you have the latest release tags available locally.
 
-From the `main` branch, run `pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
+From the `main` branch, run `./pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions.
 
 This will generate the sections to copy into the release notes. Delete any empty sections. Do not paste the `Internal` section into the notes file. Instead, paste into a comment on the prep PR.
 
@@ -104,7 +104,7 @@ You are encouraged to fix typos and tweak change descriptions for clarity to use
 
 ### 2. Update `CONTRIBUTORS.md`
 
-Run `pants run build-support/bin/contributors.py`
+Run `./pants run build-support/bin/contributors.py`
 
 Take note of any new contributors since the last release so that you can give a shoutout in the announcement email.
 
@@ -164,7 +164,7 @@ On the relevant release branch, run `npx rdme docs docs/markdown --version v<pan
 
 ### Regenerate the references
 
-Still on the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
+Still on the relevant release branch, run `./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 
 ### `stable` releases - Update the default docsite
 
@@ -204,7 +204,13 @@ After the [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/
 PANTS_PEX_RELEASE=STABLE ./pants run build-support/bin/release.py -- build-universal-pex
 ```
 
-Then go to <https://github.com/pantsbuild/pants/tags>, find your release's tag, click `Edit tag`, and upload the PEX located at `dist/pex.pants.<version>.pex`.
+Then:
+
+- Go to <https://github.com/pantsbuild/pants/tags>, find your release's tag and click `Create release from tag`.
+- If this is not the latest stable release, deselect "Set as the latest release".
+- If this is not a stable release, select "Set as a pre-release".
+- Attach the PEX located at `dist/pex.pants.<version>.pex`.
+- Click "Publish release"
 
 Step 5: Test the release
 ------------------------
@@ -235,7 +241,7 @@ pants run ./build-support/bin/contributors.py -- -s <tag>
 
 > ❗️ Update the links in these templates!
 > 
-> When copy pasting these templates, please always check that all versions match the relevant release. When adding a link, use "Test this link" to ensure that it loads properly.
+> When copy-pasting these templates, please always check that all versions match the relevant release. When adding a link, use "Test this link" to ensure that it loads properly.
 
 #### Dev release
 

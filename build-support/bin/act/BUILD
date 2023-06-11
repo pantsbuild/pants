@@ -1,3 +1,9 @@
+# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+# This contains all the plumbing in order to get https://github.com/nektos/act working in a sandbox
+# and in `run`.
+# To run `act`, use `pants run build-support/bin/act -- --version` (or whatever args you want).
 
 file(
     name="downloaded-act",
@@ -26,7 +32,7 @@ file(
             sha256="06418ca7430df409940812afe343c00118d7df889b11422232ff31a32a32b737",
             filename="act.tar.gz",
         ),
-    )
+    ),
 )
 
 shell_command(
