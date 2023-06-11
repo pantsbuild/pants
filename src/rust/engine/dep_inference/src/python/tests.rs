@@ -421,7 +421,7 @@ fn tryexcept_weak_imports() {
     import strong1
     ",
     &["strong0", "strong1"],
-    &["weak0", "weak1", "weak2"]
+    &["weak0", "weak1", "weak2"],
   );
 }
 
@@ -433,8 +433,8 @@ fn contextlib_suppress_weak_imports() {
     with contextlib.suppress(ImportError):
         import weak0
     ",
-  &[],
-  &["weak0"],
+    &[],
+    &["weak0"],
   );
   // ensure we reset the weakened status
   assert_imports_strong_weak(
@@ -444,8 +444,8 @@ fn contextlib_suppress_weak_imports() {
 
     import strong0
     ",
-  &["strong0"],
-  &["weak0"],
+    &["strong0"],
+    &["weak0"],
   );
   // Allow other error types to be suppressed
   assert_imports_strong_weak(
@@ -454,7 +454,7 @@ fn contextlib_suppress_weak_imports() {
         import weak0
     ",
     &[],
-  &["weak0"],
+    &["weak0"],
   );
   // We should respect the intention of any function that is obviously suppressing ImportErrors
   assert_imports_strong_weak(
@@ -463,7 +463,7 @@ fn contextlib_suppress_weak_imports() {
         import weak0
     ",
     &[],
-  &["weak0"],
+    &["weak0"],
   );
   // We should not weaken because of other suppressions
   assert_imports_strong_weak(
@@ -472,7 +472,7 @@ fn contextlib_suppress_weak_imports() {
         import strong0
       ",
     &["strong0"],
-  &[],
+    &[],
   );
   // Ensure we preserve the stack of weakens
   assert_imports_strong_weak(
@@ -484,7 +484,7 @@ fn contextlib_suppress_weak_imports() {
         import weak2
     ",
     &[],
-    &["weak0", "weak1", "weak2"]
+    &["weak0", "weak1", "weak2"],
   );
   // Ensure we preserve the stack of weakens with try-except
   assert_imports_strong_weak(
@@ -497,17 +497,17 @@ fn contextlib_suppress_weak_imports() {
         import weak2
     ",
     &[],
-    &["weak0", "weak1", "weak2"]
+    &["weak0", "weak1", "weak2"],
   );
   // Ensure we aren't affected by weirdness in tree-sitter
-    assert_imports_strong_weak(
+  assert_imports_strong_weak(
     r"
     with suppress(ImportError):
         import weak0
         import weak1
     ",
     &[],
-    &["weak0", "weak1"]
+    &["weak0", "weak1"],
   );
 }
 

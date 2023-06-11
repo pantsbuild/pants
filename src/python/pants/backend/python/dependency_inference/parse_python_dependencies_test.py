@@ -253,52 +253,56 @@ def test_try_except(rule_runner: RuleRunner) -> None:
 
 
 def test_with_contextlib_suppress(rule_runner: RuleRunner) -> None:
-    content = dedent("""\
-        # standard contextlib.suppress 
-with contextlib.suppress(ImportError):
-    import weak0
+    content = dedent(
+        """\
+        # standard contextlib.suppress
+        with contextlib.suppress(ImportError):
+            import weak0
 
-# ensure that we reset the weaken status
-import strong0
+        # ensure that we reset the weaken status
+        import strong0
 
-# We should respect the intention of any function that is obviously suppressing ImportErrors 
-with suppress(ImportError):
-    import weak1
-    
-# We should not weaken because of other suppressions
-with contextlib.suppress(NameError):
-    import strong1
-    
-# Ensure that we preserve the stack of weakens
-with suppress(ImportError):
-    import weak2_0
-    with suppress(ImportError):
-        import weak2_1
-    import weak2_2
+        # We should respect the intention of any function that is obviously suppressing ImportErrors
+        with suppress(ImportError):
+            import weak1
 
-# Ensure that we preserve the stack of weakens with `try-except`
-with suppress(ImportError):
-    try:
-        import weak3_0
-    except ImportError:
-        import weak3_1
-    import weak3_2
+        # We should not weaken because of other suppressions
+        with contextlib.suppress(NameError):
+            import strong1
+
+        # Ensure that we preserve the stack of weakens
+        with suppress(ImportError):
+            import weak2_0
+            with suppress(ImportError):
+                import weak2_1
+            import weak2_2
+
+        # Ensure that we preserve the stack of weakens with `try-except`
+        with suppress(ImportError):
+            try:
+                import weak3_0
+            except ImportError:
+                import weak3_1
+            import weak3_2
         """
-                     )
+    )
 
-    assert_deps_parsed(rule_runner, content, expected_imports={
-        "weak0": ImpInfo(lineno=3, weak=True),
-        "strong0": ImpInfo(lineno=6, weak=False),
-        "weak1": ImpInfo(lineno=10, weak=True),
-        "strong1": ImpInfo(lineno=14, weak=False),
-        "weak2_0": ImpInfo(lineno=18, weak=True),
-        "weak2_1": ImpInfo(lineno=20, weak=True),
-        "weak2_2": ImpInfo(lineno=21, weak=True),
-        "weak3_0": ImpInfo(lineno=26, weak=True),
-        "weak3_1": ImpInfo(lineno=28, weak=True),
-        "weak3_2": ImpInfo(lineno=29, weak=True),
-    })
-
+    assert_deps_parsed(
+        rule_runner,
+        content,
+        expected_imports={
+            "weak0": ImpInfo(lineno=3, weak=True),
+            "strong0": ImpInfo(lineno=6, weak=False),
+            "weak1": ImpInfo(lineno=10, weak=True),
+            "strong1": ImpInfo(lineno=14, weak=False),
+            "weak2_0": ImpInfo(lineno=18, weak=True),
+            "weak2_1": ImpInfo(lineno=20, weak=True),
+            "weak2_2": ImpInfo(lineno=21, weak=True),
+            "weak3_0": ImpInfo(lineno=26, weak=True),
+            "weak3_1": ImpInfo(lineno=28, weak=True),
+            "weak3_2": ImpInfo(lineno=29, weak=True),
+        },
+    )
 
 
 @pytest.mark.parametrize("basename", ["foo.py", "__init__.py"])

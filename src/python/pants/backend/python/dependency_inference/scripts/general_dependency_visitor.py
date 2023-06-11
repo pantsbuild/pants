@@ -158,24 +158,26 @@ class GeneralDependencyVisitor(DependencyVisitorBase):
             attr = call.func
             if isinstance(attr.value, ast.Name):
                 # is_contextlib = attr.value.id == 'contextlib'
-                is_suppress = attr.attr == 'suppress'
+                is_suppress = attr.attr == "suppress"
                 args = call.args
             else:
                 return False
         # suppress(ImportError)
         elif isinstance(call.func, ast.Name):
-            is_suppress = call.func.id == 'suppress'
+            is_suppress = call.func.id == "suppress"
             args = call.args
         else:
             return False
 
         import sys
+
         print(f"is_suppress {is_suppress}", file=sys.stderr)
-        has_importerror = any(isinstance(arg, ast.Name) and arg.id == 'ImportError' for arg in args)
+        has_importerror = any(isinstance(arg, ast.Name) and arg.id == "ImportError" for arg in args)
         return is_suppress and has_importerror
 
     def visit_With(self, node: ast.With):
-        """Explore `with` nodes for weakening imports wrapped in `contextlib.suppress(ImportError)`"""
+        """Explore `with` nodes for weakening imports wrapped in
+        `contextlib.suppress(ImportError)`"""
 
         is_suppressing = any(self._is_with_contexlib_suppress(withitem) for withitem in node.items)
         if is_suppressing:

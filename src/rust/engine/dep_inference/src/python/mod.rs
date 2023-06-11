@@ -271,7 +271,9 @@ impl Visitor for ImportCollector<'_> {
 
   fn visit_with_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let with_clause = node.named_child(0).unwrap();
-    let are_suppressing = with_clause.named_children(&mut with_clause.walk()).any(|x| {self.withitem_is_with_contextlib_suppress(x)});
+    let are_suppressing = with_clause
+      .named_children(&mut with_clause.walk())
+      .any(|x| self.withitem_is_with_contextlib_suppress(x));
 
     let body_node = node.child_by_field_name("body").unwrap();
     let body: Vec<_> = body_node.named_children(&mut body_node.walk()).collect();
@@ -280,13 +282,12 @@ impl Visitor for ImportCollector<'_> {
       let previous_weaken = self.weaken_imports;
       self.weaken_imports = true;
 
-      for child in body{
+      for child in body {
         self.walk(&mut child.walk());
       }
       self.weaken_imports = previous_weaken;
-
     } else {
-      for child in body{
+      for child in body {
         self.walk(&mut child.walk());
       }
     }
@@ -327,38 +328,35 @@ impl Visitor for ImportCollector<'_> {
 impl ImportCollector<'_> {
   fn withitem_is_with_contextlib_suppress(&mut self, with_node: tree_sitter::Node) -> bool {
     if with_node.kind_id() == KindID::WITH_ITEM {
-      let node = with_node.child_by_field_name("value").unwrap();  // synthetic
+      let node = with_node.child_by_field_name("value").unwrap(); // synthetic
 
-      if !(node.kind_id() == KindID::CALL) {
+      if node.kind_id() != KindID::CALL {
         return false;
       }
       let function_name_expr = node.child_by_field_name("function").unwrap();
       let is_supress = match function_name_expr.kind_id() {
-        KindID::ATTRIBUTE => {
-          function_name_expr
-              .child_by_field_name("attribute")
-              .map(|identifier|{self.code_at(identifier.range()) == "suppress"})
-              .unwrap_or(false)
-        }
-        KindID::IDENTIFIER => {
-          self.code_at(function_name_expr.range()) == "suppress"
-        }
-        _ => false
+        KindID::ATTRIBUTE => function_name_expr
+          .child_by_field_name("attribute")
+          .map(|identifier| self.code_at(identifier.range()) == "suppress")
+          .unwrap_or(false),
+        KindID::IDENTIFIER => self.code_at(function_name_expr.range()) == "suppress",
+        _ => false,
       };
       if !is_supress {
-        return false
+        return false;
       }
       let cur = &mut node.walk();
       let has_importerror = node
-          .child_by_field_name("arguments")
-          .map(|x| {x
-              .named_children(cur)
-              .any(|x|{
-                self.code_at(x.range()) == "ImportError"})
-          }).unwrap_or(false);
-
-      return is_supress && has_importerror
-    } else { return false }
+        .child_by_field_name("arguments")
+        .map(|x| {
+          x.named_children(cur)
+            .any(|x| self.code_at(x.range()) == "ImportError")
+        })
+        .unwrap_or(false);
+      is_supress && has_importerror
+    } else {
+      false
+    }
   }
 }
 
