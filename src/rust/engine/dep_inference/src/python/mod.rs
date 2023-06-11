@@ -271,11 +271,12 @@ impl Visitor for ImportCollector<'_> {
     }
 
     for child in children.iter() {
+      let previous_weaken = self.weaken_imports;
       if child.kind_id() == KindID::BLOCK {
         self.weaken_imports = should_weaken;
       }
       self.walk(&mut child.walk());
-      self.weaken_imports = false;
+      self.weaken_imports = previous_weaken;
     }
     ChildBehavior::Ignore
   }
@@ -289,6 +290,7 @@ impl Visitor for ImportCollector<'_> {
     let body: Vec<_> = body_node.named_children(&mut body_node.walk()).collect();
 
     if are_suppressing {
+      let previous_weaken = self.weaken_imports;
       self.weaken_imports = true;
 
 
@@ -297,7 +299,7 @@ impl Visitor for ImportCollector<'_> {
         println!("{}", child.kind());
         self.walk(&mut child.walk());
       }
-      self.weaken_imports = false;
+      self.weaken_imports = previous_weaken;
 
     } else {
       for child in body{
