@@ -234,16 +234,6 @@ impl Visitor for ImportCollector<'_> {
     ChildBehavior::Ignore
   }
 
-  // @TODO: If we wanted to be most correct, this should use a stack. But realistically, that's
-  // kinda complicated:
-  // try:
-  //   try:
-  //       import weak1
-  //   except Whatever:
-  //       ...
-  //   import weak2
-  // except ImportError:
-  //   ...
   fn visit_try_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let mut should_weaken = false;
     let mut cursor = node.walk();

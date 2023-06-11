@@ -407,6 +407,22 @@ fn tryexcept_weak_imports() {
     &["one.two.three"],
     &[],
   );
+  // Ensure we preserve the stack of weakens with try-except
+  assert_imports_strong_weak(
+    r"
+    try:
+        with suppress(ImportError):
+            import weak0
+        import weak1
+    except ImportError:
+        with suppress(ImportError):
+            import weak2
+        import strong0
+    import strong1
+    ",
+    &["strong0", "strong1"],
+    &["weak0", "weak1", "weak2"]
+  );
 }
 
 #[test]
