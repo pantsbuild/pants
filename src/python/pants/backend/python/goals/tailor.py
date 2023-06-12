@@ -13,6 +13,9 @@ from typing import Iterable
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
 from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements
 from pants.backend.python.macros.poetry_requirements import PyProjectToml, parse_pyproject_toml
+from pants.backend.python.macros.python_requirements import (
+    parse_pyproject_toml as parse_pep621_pyproject_toml,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
@@ -200,7 +203,7 @@ async def find_putative_targets(
                 path, name = os.path.split(fp)
 
                 try:
-                    validate(fp, contents[fp], alias)
+                    validate(fp, contents[fp], alias, target_name)
                 except Exception as e:
                     logger.warning(
                         f"An error occurred when validating `{fp}`: {e}.\n\n"
@@ -225,8 +228,10 @@ async def find_putative_targets(
                     )
                 )
 
-        def validate(path: str, contents: bytes, alias: str) -> None:
+        def validate(path: str, contents: bytes, alias: str, target_name: str) -> None:
             if alias == "python_requirements":
+                if target_name == "pep621":
+                    return validate_pep621_requirements(path, contents)
                 return validate_python_requirements(path, contents)
             elif alias == "pipenv_requirements":
                 return validate_pipenv_requirements(contents)
@@ -236,6 +241,9 @@ async def find_putative_targets(
         def validate_python_requirements(path: str, contents: bytes) -> None:
             for _ in parse_requirements_file(contents.decode(), rel_path=path):
                 pass
+
+        def validate_pep621_requirements(path: str, contents: bytes) -> None:
+            list(parse_pep621_pyproject_toml(contents.decode(), rel_path=path))
 
         def validate_pipenv_requirements(contents: bytes) -> None:
             parse_pipenv_requirements(contents)
@@ -250,6 +258,21 @@ async def find_putative_targets(
             {fc for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
             "poetry_requirements",
             "poetry",
+        )
+
+        def pyproject_toml_has_pep621(fc) -> bool:
+            try:
+                return (
+                    len(list(parse_pep621_pyproject_toml(fc.content.decode(), rel_path=fc.path)))
+                    > 0
+                )
+            except Exception:
+                return False
+
+        add_req_targets(
+            {fc for fc in all_pyproject_toml_contents if pyproject_toml_has_pep621(fc)},
+            "python_requirements",
+            "pep621",
         )
 
     if python_setup.tailor_pex_binary_targets:
