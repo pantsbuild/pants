@@ -77,6 +77,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 ]
             """
             ),
+            "pep621/requirements.txt": "",  # requirements in same dir as pep621 pyproject.toml causes conflict for name
             "already_owned/requirements.txt": "",
             "already_owned/Pipfile.lock": "",
             "already_owned/pyproject.toml": "[tool.poetry]",
@@ -145,9 +146,15 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     PythonRequirementsTargetGenerator,
                     path="pep621",
-                    name="pep621",
+                    name="reqs",
                     triggering_sources=["pep621/pyproject.toml"],
                     kwargs={"source": "pyproject.toml"},
+                ),
+                PutativeTarget.for_target_type(
+                    PythonRequirementsTargetGenerator,
+                    path="pep621",
+                    name="reqs",
+                    triggering_sources=["pep621/requirements.txt"],
                 ),
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget, "src/python/foo", None, ["__init__.py"]

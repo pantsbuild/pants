@@ -230,7 +230,7 @@ async def find_putative_targets(
 
         def validate(path: str, contents: bytes, alias: str, target_name: str) -> None:
             if alias == "python_requirements":
-                if target_name == "pep621":
+                if path.endswith("pyproject.toml"):
                     return validate_pep621_requirements(path, contents)
                 return validate_python_requirements(path, contents)
             elif alias == "pipenv_requirements":
@@ -272,7 +272,7 @@ async def find_putative_targets(
         add_req_targets(
             {fc for fc in all_pyproject_toml_contents if pyproject_toml_has_pep621(fc)},
             "python_requirements",
-            "pep621",
+            "reqs",
         )
 
     if python_setup.tailor_pex_binary_targets:
