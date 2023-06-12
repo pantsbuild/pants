@@ -54,7 +54,9 @@ class CherryPickHelper {
       .filter((title) => title.startsWith("2.") && title.endsWith(".x"))
       .sort((a, b) => semver.compare(semver.coerce(a), semver.coerce(b)));
     const index = sorted_milestones.indexOf(milestone_title);
-    const relevant_milestones = sorted_milestones.slice(index === -1 ? 0: index);
+    const relevant_milestones = sorted_milestones.slice(
+      index === -1 ? 0 : index
+    );
     return relevant_milestones;
   }
 
