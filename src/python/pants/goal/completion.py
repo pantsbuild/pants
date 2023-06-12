@@ -5,20 +5,16 @@ from __future__ import annotations
 
 from enum import Enum
 import logging
-from typing import Iterable
 
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
-from pants.bsp import spec
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
 from pants.option.option_types import EnumOption
 from pants.option.options import Options
-from pants.option.options_test import global_scope
 from pants.option.scope import GLOBAL_SCOPE
-from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
