@@ -563,6 +563,7 @@ class ResourceTarget(Target):
         """
     )
 
+
 class GenerateResourceSourceRequest(GenerateSourcesRequest):
     input = ResourceSourceField
     output = ResourceSourceField
