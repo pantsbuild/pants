@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
-# To change, edit `build-support/bin/generate_github_workflows.py` and run:
-#   ./pants run build-support/bin/generate_github_workflows.py
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
 
 
 jobs:
@@ -60,7 +60,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -119,7 +119,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -178,7 +178,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -237,7 +237,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   determine_ref:
     if: github.repository_owner == 'pantsbuild'
@@ -303,7 +303,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3
-      run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
+      run: ./src/python/pants_release/deploy_to_s3.py --scope tags/pantsbuild.pants
 name: Release
 'on':
   push:

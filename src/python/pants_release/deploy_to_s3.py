@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import logging
 
-from copy_to_s3 import perform_copy
+from pants_release.copy_to_s3 import perform_copy
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 from typing import Any, Dict, Sequence, cast
 
 import toml
@@ -20,8 +20,8 @@ from pants.util.strutil import softwrap
 HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
-    # To change, edit `build-support/bin/generate_github_workflows.py` and run:
-    #   ./pants run build-support/bin/generate_github_workflows.py
+    # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+    #   ./pants run src/python/pants_release/generate_github_workflows.py
     """
 )
 
@@ -299,7 +299,7 @@ def deploy_to_s3(
     *,
     scope: str | None = None,
 ) -> Step:
-    run = "./build-support/bin/deploy_to_s3.py"
+    run = "./src/python/pants_release/deploy_to_s3.py"
     if scope:
         run = f"{run} --scope {scope}"
     return {
@@ -569,7 +569,7 @@ class Helper:
                 f"""\
                 export S3_DST={s3_dst}
                 echo "Uploading test reports to ${{S3_DST}}"
-                ./build-support/bin/copy_to_s3.py \
+                ./src/python/pants_release/copy_to_s3.py \
                   --src-prefix=dist/test/reports \
                   --dst-prefix=${{S3_DST}} \
                   --path=""
@@ -643,7 +643,7 @@ def bootstrap_jobs(
                         "name": "Validate CI config",
                         "run": dedent(
                             """\
-                    ./pants run build-support/bin/generate_github_workflows.py -- --check
+                    ./pants run src/python/pants_release/generate_github_workflows.py -- --check
                     """
                         ),
                     }
