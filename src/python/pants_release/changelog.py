@@ -13,11 +13,11 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from textwrap import dedent
 
 import requests
 from packaging.version import Version
 from pants_release.common import die
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ def instructions(new_version: str, entries: list[Entry]) -> str:
             return ""
         return f"\n### {heading}\n\n{lines}\n"
 
-    return dedent(
+    return softwrap(
         f"""\
         Copy the below headers into `src/python/pants/notes/{major}.{minor}.x.md`. Then, put each
         external-facing commit into the relevant category. Commits that are internal-only (i.e.,
@@ -180,8 +180,10 @@ def instructions(new_version: str, entries: list[Entry]) -> str:
         ---------------------------------------------------------------------
 
         ## {new_version} ({date})
+
         {{new_features}}{{user_api_changes}}{{plugin_api_changes}}{{bugfixes}}{{performance}}{{documentation}}{{internal}}
         --------------------------------------------------------------------
+
         {{uncategorized}}
         """
     ).format(
