@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import requests
-from reversion import reversion
+from pants_release.reversion import reversion
 
 
 def test_reversion(tmp_path: Path) -> None:

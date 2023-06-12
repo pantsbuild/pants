@@ -44,9 +44,9 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
-        ./pants run build-support/bin/release.py -- build-wheels
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
         '
     - continue-on-error: true
@@ -103,9 +103,9 @@ jobs:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
-        ./pants run build-support/bin/release.py -- build-wheels
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
         '
     - continue-on-error: true
@@ -162,9 +162,9 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
-        ./pants run build-support/bin/release.py -- build-wheels
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
         '
     - continue-on-error: true
@@ -221,9 +221,9 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
-        ./pants run build-support/bin/release.py -- build-wheels
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
         '
     - continue-on-error: true
@@ -278,7 +278,8 @@ jobs:
     - env:
         MODE: debug
       name: Fetch and stabilize wheels
-      run: ./pants run build-support/bin/release.py -- fetch-and-stabilize --dest=dest/pypi_release
+      run: ./pants run src/python/pants_release/release.py -- fetch-and-stabilize
+        --dest=dest/pypi_release
     - name: Create Release -> Commit Mapping
       run: 'tag="${{ needs.determine_ref.outputs.build-ref }}"
 
