@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Sequence
 
+from pants.backend.helm.goals.tailor import _SNAPSHOT_FOLDER_NAME, _TESTS_FOLDER_NAME
 from pants.backend.helm.target_types import AllHelmChartTargets, HelmUnitTestDependenciesField
 from pants.core.target_types import AllAssetTargetsByPath
 from pants.engine.addresses import Address
@@ -62,13 +63,13 @@ async def infer_chart_dependency_into_unittests(
     unittest_target_addr: Address = request.field_set.address
 
     putative_chart_path, unittest_target_dir = os.path.split(unittest_target_addr.spec_path)
-    if unittest_target_dir != "tests":
+    if unittest_target_dir != _TESTS_FOLDER_NAME:
         raise InvalidUnitTestTestFolder(unittest_target_addr, unittest_target_addr.spec_path)
 
     def is_snapshot_resource(path: PurePath) -> bool:
         if not path.parent:
             return False
-        if path.parent.name != "__snapshot__":
+        if path.parent.name != _SNAPSHOT_FOLDER_NAME:
             return False
         if not path.parent.parent:
             return False

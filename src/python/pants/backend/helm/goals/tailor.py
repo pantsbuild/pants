@@ -37,6 +37,7 @@ class PutativeHelmTargetsRequest(PutativeTargetsRequest):
     pass
 
 
+_TESTS_FOLDER_NAME = "tests"
 _SNAPSHOT_FOLDER_NAME = "__snapshot__"
 _SNAPSHOT_FILE_GLOBS = ("*_test.yaml.snap", "*_test.yml.snap")
 
@@ -78,7 +79,7 @@ async def find_putative_helm_targets(
                 Paths,
                 PathGlobs(
                     [
-                        os.path.join(chart_root, "tests", glob)
+                        os.path.join(chart_root, _TESTS_FOLDER_NAME, glob)
                         for glob in HelmUnitTestGeneratingSourcesField.default
                         for chart_root in chart_folders
                     ]
