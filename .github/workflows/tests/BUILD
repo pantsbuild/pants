@@ -8,6 +8,7 @@
 python_tests(
     name="tests",
     dependencies=["//build-support/bin/act:act-at-root"],
+    timeout=120,
 )
 
 experimental_test_shell_command(
