@@ -57,24 +57,20 @@ def test_find_helm_unittests(rule_runner: RuleRunner) -> None:
             "src/owned/Chart.yaml": "",
             "src/owned/tests/owned_test.yaml": "",
             "src/owned/tests/__snapshot__/owned_test.yaml.snap": "",
+            "src/foo/BUILD": "helm_chart()",
             "src/foo/Chart.yaml": "",
             "src/foo/tests/foo_test.yaml": "",
             "src/foo/tests/__snapshot__/foo_test.yaml.snap": "",
         }
     )
 
-    rule_runner.set_options(["--helm-no-tailor-charts"])
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
             PutativeHelmTargetsRequest(
                 (
                     "src/owned",
-                    "src/owned/tests",
-                    "src/owned/tests/__snapshot__",
                     "src/foo",
-                    "src/foo/tests",
-                    "src/foo/tests/__snapshot__",
                 )
             ),
             AllOwnedSources(
@@ -82,6 +78,7 @@ def test_find_helm_unittests(rule_runner: RuleRunner) -> None:
                     "src/owned/Chart.yaml",
                     "src/owned/tests/owned_test.yaml",
                     "src/owned/tests/__snapshot__/owned_test.yaml.snap",
+                    "src/foo/Chart.yaml",
                 ]
             ),
         ],

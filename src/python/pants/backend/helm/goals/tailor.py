@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 
@@ -26,6 +27,9 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -66,66 +70,91 @@ async def find_putative_helm_targets(
                 )
             )
 
-    if helm_subsystem.tailor_unittests:
-        all_unittest_files = await Get(
-            Paths, PathGlobs, request.path_globs(*HelmUnitTestGeneratingSourcesField.default)
-        )
-        unonwned_unittest_files = set(all_unittest_files.files) - set(all_owned_sources)
-        unittest_filespec_matcher = FilespecMatcher(HelmUnitTestGeneratingSourcesField.default, ())
-        unittest_files = {
-            path
-            for path in unonwned_unittest_files
-            if os.path.basename(path)
-            in set(
-                unittest_filespec_matcher.matches(
-                    [os.path.basename(path) for path in unonwned_unittest_files]
-                )
+        if helm_subsystem.tailor_unittests:
+            chart_folders = {os.path.dirname(path) for path in all_chart_files.files}
+            # Helm charts have a rigid folder structure and we rely on it
+            # to successfully identify unit tests without false positives.
+            all_unittest_files = await Get(
+                Paths,
+                PathGlobs(
+                    [
+                        os.path.join(chart_root, "tests", glob)
+                        for glob in HelmUnitTestGeneratingSourcesField.default
+                        for chart_root in chart_folders
+                    ]
+                ),
             )
-        }
-        grouped_unittest_files = group_by_dir(unittest_files)
-
-        # To prevent false positives, we look for snapshot files relative to the unit test sources
-        all_snapshot_files = await Get(
-            Paths,
-            PathGlobs(
-                [
-                    os.path.join(dirname, _SNAPSHOT_FOLDER_NAME, glob)
-                    for glob in _SNAPSHOT_FILE_GLOBS
-                    for dirname in grouped_unittest_files.keys()
-                ]
-            ),
-        )
-        unowned_snapshot_files = set(all_snapshot_files.files) - set(all_owned_sources)
-        grouped_snapshot_files = group_by_dir(unowned_snapshot_files)
-        snapshot_folders = list(grouped_snapshot_files.keys())
-
-        def find_snapshot_files_for(unittest_dir: str) -> set[str]:
-            key = [folder for folder in snapshot_folders if os.path.dirname(folder) == unittest_dir]
-            if not key:
-                return set()
-            return grouped_snapshot_files[key[0]]
-
-        for dirname, filenames in grouped_unittest_files.items():
-            putative_targets.append(
-                PutativeTarget.for_target_type(
-                    HelmUnitTestTestsGeneratorTarget,
-                    path=dirname,
-                    name=None,
-                    triggering_sources=sorted(filenames),
-                )
+            unonwned_unittest_files = set(all_unittest_files.files) - set(all_owned_sources)
+            unittest_filespec_matcher = FilespecMatcher(
+                HelmUnitTestGeneratingSourcesField.default, ()
             )
-
-            snapshot_files = find_snapshot_files_for(dirname)
-            if snapshot_files:
-                putative_targets.append(
-                    PutativeTarget.for_target_type(
-                        ResourcesGeneratorTarget,
-                        path=os.path.join(dirname, _SNAPSHOT_FOLDER_NAME),
-                        name=None,
-                        triggering_sources=sorted(snapshot_files),
-                        kwargs={"sources": _SNAPSHOT_FILE_GLOBS},
+            unittest_files = {
+                path
+                for path in unonwned_unittest_files
+                if os.path.basename(path)
+                in set(
+                    unittest_filespec_matcher.matches(
+                        [os.path.basename(path) for path in unonwned_unittest_files]
                     )
                 )
+            }
+            grouped_unittest_files = group_by_dir(unittest_files)
+
+            # To prevent false positives, we look for snapshot files relative to the unit test sources
+            all_snapshot_files = await Get(
+                Paths,
+                PathGlobs(
+                    [
+                        os.path.join(dirname, _SNAPSHOT_FOLDER_NAME, glob)
+                        for glob in _SNAPSHOT_FILE_GLOBS
+                        for dirname in grouped_unittest_files.keys()
+                    ]
+                ),
+            )
+            unowned_snapshot_files = set(all_snapshot_files.files) - set(all_owned_sources)
+            grouped_snapshot_files = group_by_dir(unowned_snapshot_files)
+            snapshot_folders = list(grouped_snapshot_files.keys())
+
+            def find_snapshot_files_for(unittest_dir: str) -> set[str]:
+                key = [
+                    folder for folder in snapshot_folders if os.path.dirname(folder) == unittest_dir
+                ]
+                if not key:
+                    return set()
+                return grouped_snapshot_files[key[0]]
+
+            for dirname, filenames in grouped_unittest_files.items():
+                putative_targets.append(
+                    PutativeTarget.for_target_type(
+                        HelmUnitTestTestsGeneratorTarget,
+                        path=dirname,
+                        name=None,
+                        triggering_sources=sorted(filenames),
+                    )
+                )
+
+                snapshot_files = find_snapshot_files_for(dirname)
+                if snapshot_files:
+                    putative_targets.append(
+                        PutativeTarget.for_target_type(
+                            ResourcesGeneratorTarget,
+                            path=os.path.join(dirname, _SNAPSHOT_FOLDER_NAME),
+                            name=None,
+                            triggering_sources=sorted(snapshot_files),
+                            kwargs={"sources": _SNAPSHOT_FILE_GLOBS},
+                        )
+                    )
+
+    elif helm_subsystem.tailor_unittests:
+        logging.warning(
+            softwrap(
+                """
+                Pants can not identify Helm unit tests when `[helm].tailor_charts` has been set to `False`.
+
+                If this is intentional, then set `[helm].tailor_unittests` to `False` to disable this warning.
+                """
+            )
+        )
 
     return PutativeTargets(putative_targets)
 
