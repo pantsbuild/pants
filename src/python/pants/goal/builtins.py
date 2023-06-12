@@ -7,7 +7,7 @@ from pants.bsp.goal import BSPGoal
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal import help
 from pants.goal.builtin_goal import BuiltinGoal
-from pants.goal.completion_helper import CompletionHelperBuiltinGoal
+from pants.goal.completion import CompletionBuiltinGoal
 from pants.goal.explorer import ExplorerBuiltinGoal
 
 
@@ -18,7 +18,7 @@ def register_builtin_goals(build_configuration: BuildConfiguration.Builder) -> N
 def builtin_goals() -> tuple[type[BuiltinGoal], ...]:
     return (
         BSPGoal,
-        CompletionHelperBuiltinGoal,
+        CompletionBuiltinGoal,
         ExplorerBuiltinGoal,
         help.AllHelpBuiltinGoal,
         help.NoGoalHelpBuiltinGoal,
