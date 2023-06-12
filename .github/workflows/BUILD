@@ -12,5 +12,5 @@ files(
                 "//build-support/cherry_pick/make_pr.sh:support_files",
             ]
         }
-    }
+    },
 )
