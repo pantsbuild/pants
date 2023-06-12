@@ -4,9 +4,11 @@
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Sequence
 
 from pants.backend.helm.target_types import AllHelmChartTargets, HelmUnitTestDependenciesField
+from pants.core.target_types import AllAssetTargetsByPath
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -53,13 +55,31 @@ class InferHelmUnitTestChartDependencyRequest(InferDependenciesRequest):
 
 @rule
 async def infer_chart_dependency_into_unittests(
-    request: InferHelmUnitTestChartDependencyRequest, all_helm_charts: AllHelmChartTargets
+    request: InferHelmUnitTestChartDependencyRequest,
+    all_helm_charts: AllHelmChartTargets,
+    all_asset_targets: AllAssetTargetsByPath,
 ) -> InferredDependencies:
     unittest_target_addr: Address = request.field_set.address
 
     putative_chart_path, unittest_target_dir = os.path.split(unittest_target_addr.spec_path)
     if unittest_target_dir != "tests":
         raise InvalidUnitTestTestFolder(unittest_target_addr, unittest_target_addr.spec_path)
+
+    def is_snapshot_resource(path: PurePath) -> bool:
+        if not path.parent:
+            return False
+        if path.parent.name != "__snapshot__":
+            return False
+        if not path.parent.parent:
+            return False
+        return str(path.parent.parent) == unittest_target_addr.spec_path
+
+    snapshot_resources = {
+        tgt.address
+        for path, targets in all_asset_targets.resources.items()
+        if is_snapshot_resource(path)
+        for tgt in targets
+    }
 
     def is_parent_chart(target: Target) -> bool:
         chart_folder = target.address.spec_path
@@ -68,7 +88,7 @@ async def infer_chart_dependency_into_unittests(
     candidate_charts: OrderedSet[Address] = OrderedSet(
         [tgt.address for tgt in all_helm_charts if is_parent_chart(tgt)]
     )
-    chart_dependencies: OrderedSet[Address] = OrderedSet()
+    found_charts = set()
 
     explicitly_provided_deps = await Get(
         ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
@@ -83,21 +103,25 @@ async def infer_chart_dependency_into_unittests(
         )
         maybe_disambiguated = explicitly_provided_deps.disambiguated((candidate_chart,))
         if maybe_disambiguated:
-            chart_dependencies.add(maybe_disambiguated)
+            found_charts.add(maybe_disambiguated)
 
-    if len(chart_dependencies) > 1:
+    if len(found_charts) > 1:
         raise AmbiguousHelmUnitTestChart(
             target_addr=unittest_target_addr.spec,
-            putative_addresses=[addr.spec for addr in chart_dependencies],
+            putative_addresses=[addr.spec for addr in found_charts],
         )
 
-    if len(chart_dependencies) == 1:
-        found_dep = list(chart_dependencies)[0]
+    if len(found_charts) == 1:
+        found_dep = list(found_charts)[0]
         logger.debug(
             f"Found Helm chart at '{found_dep.spec}' for unittest at: {unittest_target_addr.spec}"
         )
 
-    return InferredDependencies(chart_dependencies)
+    dependencies: OrderedSet[Address] = OrderedSet()
+    dependencies.update(snapshot_resources)
+    dependencies.update(found_charts)
+
+    return InferredDependencies(dependencies)
 
 
 def rules():
