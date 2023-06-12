@@ -13,7 +13,7 @@ from typing import Any, Dict, Sequence, cast
 
 import toml
 import yaml
-from common import die
+from pants_release.common import die
 
 from pants.util.strutil import softwrap
 
@@ -525,8 +525,8 @@ class Helper:
             # it cleans out `dist/deploy`, which the build-wheels runs populate for
             # later attention by deploy_to_s3.py.
             """\
-            ./pants run build-support/bin/release.py -- build-local-pex
-            ./pants run build-support/bin/release.py -- build-wheels
+            ./pants run src/python/pants_release/release.py -- build-local-pex
+            ./pants run src/python/pants_release/release.py -- build-wheels
             """
         )
 
@@ -1057,7 +1057,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 *helper.expose_all_pythons(),
                 {
                     "name": "Fetch and stabilize wheels",
-                    "run": f"./pants run build-support/bin/release.py -- fetch-and-stabilize --dest={pypi_release_dir}",
+                    "run": f"./pants run src/python/pants_release/release.py -- fetch-and-stabilize --dest={pypi_release_dir}",
                     "env": {
                         # This step does not actually build anything: only download wheels from S3.
                         "MODE": "debug",

@@ -25,9 +25,9 @@ from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
 import requests
-from common import banner, die, green
 from packaging.version import Version
-from reversion import reversion
+from pants_release.common import banner, die, green
+from pants_release.reversion import reversion
 
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property

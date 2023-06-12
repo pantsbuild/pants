@@ -16,8 +16,8 @@ from enum import Enum
 from textwrap import dedent
 
 import requests
-from common import die
 from packaging.version import Version
+from pants_release.common import die
 
 logger = logging.getLogger(__name__)
 
