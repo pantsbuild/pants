@@ -138,6 +138,18 @@ class HelmSubsystem(TemplatedExternalTool):
         default=True,
         help="If true, add `helm_chart` targets with the `tailor` goal.",
         advanced=True,
+        removal_hint="Use `[helm].tailor_charts` instead.",
+        removal_version="2.19.0.dev0",
+    )
+    tailor_charts = BoolOption(
+        default=None,
+        help="If true, add `helm_chart` targets with the `tailor` goal.",
+        advanced=True,
+    )
+    tailor_unittests = BoolOption(
+        default=True,
+        help="If true, add `helm_unittest_tests` targets with the `tailor` goal.",
+        advanced=True,
     )
 
     args = ArgsListOption(

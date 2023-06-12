@@ -273,7 +273,7 @@ def all_helm_unittest_test_targets(all_targets: AllTargets) -> AllHelmUnitTestTe
 
 
 class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
-    default = ("*_test.yaml",)
+    default = ("*_test.yaml", "*_test.yml")
     expected_file_extensions = (
         ".yaml",
         ".yml",
