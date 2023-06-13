@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import time
 from typing import NoReturn
 
@@ -31,3 +32,17 @@ def elapsed_time() -> tuple[int, int]:
     now = time.time()
     elapsed_seconds = int(now - _SCRIPT_START_TIME)
     return elapsed_seconds // 60, elapsed_seconds % 60
+
+
+def sorted_contributors(git_range: str) -> list[str]:
+    contributors = set(
+        subprocess.run(
+            ["git", "log", "--use-mailmap", "--format=format:%aN", git_range],
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+        .stdout.decode()
+        .splitlines()
+    )
+    contributors -= {"dependabot[bot]"}
+    return sorted(contributors)
