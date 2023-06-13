@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import pytest
+from packaging.version import Version
 from pants_release.changelog import determine_release_branch
 
 
@@ -24,4 +25,4 @@ from pants_release.changelog import determine_release_branch
     ],
 )
 def test_determine_release_branch(version: str, branch: str) -> None:
-    assert determine_release_branch(version) == branch
+    assert determine_release_branch(Version(version)) == branch

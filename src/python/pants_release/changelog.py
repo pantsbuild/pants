@@ -27,20 +27,19 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--prior",
         required=True,
-        type=str,
+        type=Version,
         help="The version of the prior release, e.g. `2.0.0.dev0` or `2.0.0rc1`.",
     )
     parser.add_argument(
         "--new",
         required=True,
-        type=str,
+        type=Version,
         help="The version for the new release, e.g. `2.0.0.dev1` or `2.0.0rc2`.",
     )
     return parser
 
 
-def determine_release_branch(new_version_str: str) -> str:
-    new_version = Version(new_version_str)
+def determine_release_branch(new_version: Version) -> str:
     # Use the main branch for all dev releases, and for the first alpha (which creates a stable branch).
     use_main_branch = new_version.is_devrelease or (
         new_version.pre
@@ -51,7 +50,7 @@ def determine_release_branch(new_version_str: str) -> str:
     return release_branch
 
 
-def relevant_shas(prior: str, release_ref: str) -> list[str]:
+def relevant_shas(prior: Version, release_ref: str) -> list[str]:
     prior_tag = f"release_{prior}"
     return git("log", "--format=format:%H", release_ref, f"^{prior_tag}").splitlines()
 
@@ -128,10 +127,9 @@ def prepare_sha(sha: str) -> Entry:
     return Entry(category=category, text=f"* {subject_with_url}")
 
 
-def instructions(new_version: str, entries: list[Entry]) -> str:
+def instructions(new_version: Version, entries: list[Entry]) -> str:
     date = datetime.date.today().strftime("%b %d, %Y")
-    version_components = new_version.split(".", maxsplit=4)
-    major, minor = version_components[0], version_components[1]
+    major, minor = new_version.major, new_version.minor
 
     entries_by_category = defaultdict(list)
     for entry in entries:
