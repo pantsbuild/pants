@@ -15,8 +15,7 @@ from enum import Enum
 
 import requests
 from packaging.version import Version
-from pants_release.common import die
-from pants_release.git import git
+from pants_release.git import git, git_fetch
 
 from pants.util.strutil import softwrap
 
@@ -49,18 +48,12 @@ def determine_release_branch(new_version_str: str) -> str:
         and new_version.micro == 0
     )
     release_branch = "main" if use_main_branch else f"{new_version.major}.{new_version.minor}.x"
-    branch_confirmation = input(
-        f"Have you recently pulled from upstream on the branch `{release_branch}`? "
-        "This is needed to ensure the changelog is exhaustive. [Y/n]"
-    )
-    if branch_confirmation and branch_confirmation.lower() != "y":
-        die(f"Please checkout to the branch `{release_branch}` and pull from upstream. ")
     return release_branch
 
 
-def relevant_shas(prior: str, release_branch: str) -> list[str]:
+def relevant_shas(prior: str, release_ref: str) -> list[str]:
     prior_tag = f"release_{prior}"
-    return git("log", "--format=format:%H", release_branch, f"^{prior_tag}").splitlines()
+    return git("log", "--format=format:%H", release_ref, f"^{prior_tag}").splitlines()
 
 
 class Category(Enum):
@@ -186,7 +179,8 @@ def instructions(new_version: str, entries: list[Entry]) -> str:
 def main() -> None:
     args = create_parser().parse_args()
     release_branch = determine_release_branch(args.new)
-    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, release_branch)]
+    branch_sha = git_fetch(release_branch)
+    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, branch_sha)]
     print(instructions(args.new, entries))
 
 
