@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from dataclasses import dataclass
 from enum import Enum
@@ -13,6 +14,8 @@ from typing import Any, Dict, Sequence, cast
 
 import toml
 import yaml
+
+from pants_release import generate_release_announcement
 from pants_release.common import die
 
 from pants.util.strutil import softwrap
@@ -1005,6 +1008,8 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
 def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
+    announcement = generate_release_announcement.announcement_text()
+
     inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
     pypi_release_dir = "dest/pypi_release"
@@ -1089,6 +1094,25 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         "password": gha_expr("secrets.PANTSBUILD_PYPI_API_TOKEN"),
                         "packages-dir": pypi_release_dir,
                         "skip-existing": True,
+                    },
+                },
+                {
+                    "name": "Announce to Slack",
+                    "uses": "slackapi/slack-github-action@v1.23.0",
+                    "with": {
+                        "channel-id": "C18RRR4JK",
+                        "payload": json.dumps({
+                            "blocks": [
+                                {
+                                    "type": "section",
+                                    "text": {
+                                        "type": "mrkdwn",
+                                        "text": announcement,
+                                    }
+                                },
+                            ]
+                        }),
+                    "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"}
                     },
                 },
                 deploy_to_s3(
