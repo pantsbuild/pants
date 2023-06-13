@@ -329,6 +329,11 @@ async def setup_render_helm_deployment_process(
         if request.post_renderer
         else ProcessCacheScope.SUCCESSFUL
     )
+
+    extra_args = list(request.extra_argv)
+    if "--create-namespace" not in extra_args and request.field_set.create_namespace.value:
+        extra_args.append("--create-namespace")
+
     process = HelmProcess(
         argv=[
             request.cmd.value,
@@ -358,7 +363,7 @@ async def setup_render_helm_deployment_process(
                 if inline_values
                 else ()
             ),
-            *request.extra_argv,
+            *extra_args,
         ],
         extra_env=env,
         extra_immutable_input_digests=immutable_input_digests,

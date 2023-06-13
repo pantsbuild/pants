@@ -539,6 +539,15 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
         return result
 
 
+class HelmDeploymentCreateNamespaceField(BoolField):
+    alias = "create_namespace"
+    default = False
+    help = "If true, the namespace will be created if it doesn't exist."
+
+    removal_hint = "Use the passthrough argument `--create-namespace` instead."
+    removal_version = "2.19.0.dev0"
+
+
 class HelmDeploymentNoHooksField(BoolField):
     alias = "no_hooks"
     default = False
@@ -584,6 +593,7 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentNamespaceField,
         HelmDeploymentSkipCrdsField,
         HelmDeploymentValuesField,
+        HelmDeploymentCreateNamespaceField,
         HelmDeploymentNoHooksField,
         HelmDeploymentTimeoutField,
         HelmDeploymentPostRenderersField,
@@ -603,6 +613,7 @@ class HelmDeploymentFieldSet(FieldSet):
     description: DescriptionField
     release_name: HelmDeploymentReleaseNameField
     namespace: HelmDeploymentNamespaceField
+    create_namespace: HelmDeploymentCreateNamespaceField
     sources: HelmDeploymentSourcesField
     skip_crds: HelmDeploymentSkipCrdsField
     no_hooks: HelmDeploymentNoHooksField
