@@ -419,7 +419,7 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
     assert direct_deps == Targets([d1, d2, d3, d4])
 
     @dataclass(frozen=True)
-    class SkipMeTagOrTraverse(ShouldTraverseDepsPredicate):
+    class SkipDepsTagOrTraverse(ShouldTraverseDepsPredicate):
         def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
             return "skip_deps" not in (target[Tags].value or [])
 
@@ -428,7 +428,7 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
         [
             TransitiveTargetsRequest(
                 [root.address, d2.address],
-                should_traverse_deps_predicate=SkipMeTagOrTraverse(),
+                should_traverse_deps_predicate=SkipDepsTagOrTraverse(),
             )
         ],
     )
