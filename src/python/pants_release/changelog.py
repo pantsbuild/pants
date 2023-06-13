@@ -12,6 +12,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 import requests
 from packaging.version import Version
@@ -39,15 +40,26 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def determine_release_branch(new_version: Version) -> str:
-    # Use the main branch for all dev releases, and for the first alpha (which creates a stable branch).
-    use_main_branch = new_version.is_devrelease or (
-        new_version.pre
-        and "a0" == "".join(str(p) for p in new_version.pre)
-        and new_version.micro == 0
-    )
-    release_branch = "main" if use_main_branch else f"{new_version.major}.{new_version.minor}.x"
-    return release_branch
+@dataclass(frozen=True)
+class ReleaseInfo:
+    version: Version
+    slug: str
+    branch: str
+
+    @staticmethod
+    def determine(new_version: Version) -> ReleaseInfo:
+        slug = f"{new_version.major}.{new_version.minor}.x"
+        # Use the main branch for all dev releases, and for the first alpha (which creates a stable branch).
+        use_main_branch = new_version.is_devrelease or (
+            new_version.pre
+            and "a0" == "".join(str(p) for p in new_version.pre)
+            and new_version.micro == 0
+        )
+        branch = "main" if use_main_branch else slug
+        return ReleaseInfo(version=new_version, slug=slug, branch=branch)
+
+    def notes_file_name(self) -> Path:
+        return Path(f"src/python/pants/notes/{self.slug}.md")
 
 
 def relevant_shas(prior: Version, release_ref: str) -> list[str]:
@@ -127,9 +139,8 @@ def prepare_sha(sha: str) -> Entry:
     return Entry(category=category, text=f"* {subject_with_url}")
 
 
-def instructions(new_version: Version, entries: list[Entry]) -> str:
+def instructions(release_info: ReleaseInfo, entries: list[Entry]) -> str:
     date = datetime.date.today().strftime("%b %d, %Y")
-    major, minor = new_version.major, new_version.minor
 
     entries_by_category = defaultdict(list)
     for entry in entries:
@@ -145,7 +156,7 @@ def instructions(new_version: Version, entries: list[Entry]) -> str:
 
     return softwrap(
         f"""\
-        Copy the below headers into `src/python/pants/notes/{major}.{minor}.x.md`. Then, put each
+        Copy the below headers into `{release_info.notes_file_name()}`. Then, put each
         external-facing commit into the relevant category. Commits that are internal-only (i.e.,
         that are only of interest to Pants developers and have no user-facing implications) should
         be pasted into a PR comment for review, not the release notes.
@@ -155,7 +166,7 @@ def instructions(new_version: Version, entries: list[Entry]) -> str:
 
         ---------------------------------------------------------------------
 
-        ## {new_version} ({date})
+        ## {release_info.version} ({date})
 
         {{new_features}}{{user_api_changes}}{{plugin_api_changes}}{{bugfixes}}{{performance}}{{documentation}}{{internal}}
         --------------------------------------------------------------------
@@ -176,10 +187,10 @@ def instructions(new_version: Version, entries: list[Entry]) -> str:
 
 def main() -> None:
     args = create_parser().parse_args()
-    release_branch = determine_release_branch(args.new)
-    branch_sha = git_fetch(release_branch)
+    release_info = ReleaseInfo.determine(args.new)
+    branch_sha = git_fetch(release_info.branch)
     entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, branch_sha)]
-    print(instructions(args.new, entries))
+    print(instructions(release_info, entries))
 
 
 if __name__ == "__main__":
