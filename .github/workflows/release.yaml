@@ -299,6 +299,18 @@ jobs:
         packages-dir: dest/pypi_release
         password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
         skip-existing: true
+    - name: Generate announcement
+      run: './pants run src/python/pants_release/generate_release_announcement.py                         --
+        --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+
+        '
+    - env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      name: Announce to Slack
+      uses: slackapi/slack-github-action@v1.24.0
+      with:
+        channel-id: C18RRR4JK
+        payload-file-path: ${{ runner.temp }}/slack_announcement.json
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
