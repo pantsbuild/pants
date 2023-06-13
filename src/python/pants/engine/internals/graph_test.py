@@ -34,11 +34,11 @@ from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     AllTargets,
     AllUnexpandedTargets,
+    AlwaysTraverseDeps,
     AsyncFieldMixin,
     CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
-    DepsTraversalPredicates,
     ExplicitlyProvidedDependencies,
     Field,
     FieldDefaultFactoryRequest,
@@ -55,6 +55,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     SecondaryOwnerMixin,
+    ShouldTraverseDepsPredicate,
     SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -318,7 +319,7 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
         Targets,
         [
             DependenciesRequest(
-                root[Dependencies], should_traverse_deps_predicate=DepsTraversalPredicates.always
+                root[Dependencies], should_traverse_deps_predicate=AlwaysTraverseDeps()
             )
         ],
     )
@@ -336,7 +337,7 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
         [
             TransitiveTargetsRequest(
                 [root.address, d2.address],
-                should_traverse_deps_predicate=DepsTraversalPredicates.always,
+                should_traverse_deps_predicate=AlwaysTraverseDeps(),
             )
         ],
     )
@@ -417,13 +418,17 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
     )
     assert direct_deps == Targets([d1, d2, d3, d4])
 
+    @dataclass(frozen=True)
+    class SkipMeTagOrTraverse(ShouldTraverseDepsPredicate):
+        def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
+            return "skip_deps" not in (target[Tags].value or [])
+
     transitive_targets = transitive_targets_rule_runner.request(
         TransitiveTargets,
         [
             TransitiveTargetsRequest(
                 [root.address, d2.address],
-                should_traverse_deps_predicate=lambda tgt, fld: "skip_deps"
-                not in (tgt[Tags].value or []),
+                should_traverse_deps_predicate=SkipMeTagOrTraverse(),
             )
         ],
     )

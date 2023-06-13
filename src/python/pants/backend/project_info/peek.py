@@ -19,11 +19,11 @@ from pants.engine.internals.build_files import _get_target_family_and_adaptor_fo
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
+    AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
-    DepsTraversalPredicates,
     Field,
     HydratedSources,
     HydrateSourcesRequest,
@@ -181,7 +181,7 @@ async def get_target_data(
         Get(
             Targets,
             DependenciesRequest(
-                tgt.get(Dependencies), should_traverse_deps_predicate=DepsTraversalPredicates.always
+                tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
             ),
         )
         for tgt in sorted_targets

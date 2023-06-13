@@ -7,10 +7,10 @@ from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.target import AlwaysTraverseDeps
 from pants.engine.target import Dependencies as DependenciesField
 from pants.engine.target import (
     DependenciesRequest,
-    DepsTraversalPredicates,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -46,7 +46,7 @@ async def dependencies(
         transitive_targets = await Get(
             TransitiveTargets,
             TransitiveTargetsRequest(
-                addresses, should_traverse_deps_predicate=DepsTraversalPredicates.always
+                addresses, should_traverse_deps_predicate=AlwaysTraverseDeps()
             ),
         )
         targets = Targets(transitive_targets.dependencies)
@@ -61,7 +61,7 @@ async def dependencies(
                 Targets,
                 DependenciesRequest(
                     tgt.get(DependenciesField),
-                    should_traverse_deps_predicate=DepsTraversalPredicates.always,
+                    should_traverse_deps_predicate=AlwaysTraverseDeps(),
                 ),
             )
             for tgt in target_roots
