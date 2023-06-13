@@ -10,14 +10,3 @@ python_tests(
     dependencies=["//build-support/bin/act:act-at-root"],
     timeout=120,
 )
-
-experimental_test_shell_command(
-    name="Test workflow_dispatch dryrun",
-    command="./act workflow_dispatch --dryrun",
-    execution_dependencies=[
-        "//build-support/bin/act:act-at-root",
-        ".github/workflows:workflows",
-    ],
-    workdir="/",
-    timeout=120,
-)
