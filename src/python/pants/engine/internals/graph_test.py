@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import os.path
 from dataclasses import dataclass
@@ -418,17 +419,21 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
     )
     assert direct_deps == Targets([d1, d2, d3, d4])
 
-    @dataclass(frozen=True)
     class SkipDepsTagOrTraverse(ShouldTraverseDepsPredicate):
         def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
             return "skip_deps" not in (target[Tags].value or [])
+
+    predicate = SkipDepsTagOrTraverse()
+    # Assert the class is frozen even though it was not decorated with @dataclass(frozen=True)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        # The dataclass(frozen=True) decorator is only needed if the subclass adds fields.
+        predicate._callable = SkipDepsTagOrTraverse.__call__  # type: ignore[misc] # noqa
 
     transitive_targets = transitive_targets_rule_runner.request(
         TransitiveTargets,
         [
             TransitiveTargetsRequest(
-                [root.address, d2.address],
-                should_traverse_deps_predicate=SkipDepsTagOrTraverse(),
+                [root.address, d2.address], should_traverse_deps_predicate=predicate
             )
         ],
     )
