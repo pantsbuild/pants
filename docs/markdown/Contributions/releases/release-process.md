@@ -341,7 +341,7 @@ pushing a file mapping the release tag to the commit it tags out to
 fixed by running the following in an environment where you have both `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` of an account that has permissions to push to the Pantsbuild S3 bucket:
 ```
-pants run build-support/bin/backfill_s3_release_tag_mappings.py -- \
+pants run src/python/pants_release/backfill_s3_release_tag_mappings.py -- \
    --aws-cli-symlink-path $HOME/bin
 ```
 If this sounds mysterious or new to you, you probably don't have such an account and should ask for
