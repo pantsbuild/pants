@@ -426,9 +426,39 @@ class HelmDeploymentReleaseNameField(StringField):
     help = "Name of the release used in the deployment. If not set, the target name will be used instead."
 
 
-class HelmDeploymentNamespaceField(StringField):
+class HelmDeploymentNamespaceField(StringField, AsyncFieldMixin):
     alias = "namespace"
-    help = "Kubernetes namespace for the given deployment."
+    help = help_text(
+        """
+        Kubernetes namespace for the given deployment.
+
+        This field supports value interpolation, so `mynamespace-{env.NS_SUFFIX}` would use the `NS_SUFFIX`
+        environment variable value as part of the namespace. Note that in this case the environment
+        variable must be present at all times.
+        """
+    )
+
+    def format_with(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> str | None:
+        source = InterpolationContext.TextSource(
+            self.address,
+            target_alias=HelmDeploymentTarget.alias,
+            field_alias=HelmDeploymentNamespaceField.alias,
+        )
+
+        if not self.value:
+            return None
+
+        try:
+            return interpolation_context.format(
+                self.value,
+                source=source,
+            )
+        except InterpolationError as err:
+            if ignore_missing:
+                return None
+            raise err
 
 
 class HelmDeploymentDependenciesField(Dependencies):
@@ -447,7 +477,7 @@ class HelmDeploymentSourcesField(MultipleSourcesField):
     help = "Helm configuration files for a given deployment."
 
 
-class HelmDeploymentValuesField(DictStringToStringField):
+class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
     alias = "values"
     required = False
     help = help_text(
@@ -480,11 +510,33 @@ class HelmDeploymentValuesField(DictStringToStringField):
         """
     )
 
+    def format_with(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> dict[str, str]:
+        source = InterpolationContext.TextSource(
+            self.address,
+            target_alias=HelmDeploymentTarget.alias,
+            field_alias=HelmDeploymentValuesField.alias,
+        )
 
-class HelmDeploymentCreateNamespaceField(BoolField):
-    alias = "create_namespace"
-    default = False
-    help = "If true, the namespace will be created if it doesn't exist."
+        def format_value(text: str) -> str | None:
+            try:
+                return interpolation_context.format(
+                    text,
+                    source=source,
+                )
+            except InterpolationError as err:
+                if ignore_missing:
+                    return None
+                raise err
+
+        result = {}
+        for key, value in (self.value or {}).items():
+            formatted_value = format_value(value)
+            if formatted_value is not None:
+                result[key] = formatted_value
+
+        return result
 
 
 class HelmDeploymentNoHooksField(BoolField):
@@ -532,7 +584,6 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentNamespaceField,
         HelmDeploymentSkipCrdsField,
         HelmDeploymentValuesField,
-        HelmDeploymentCreateNamespaceField,
         HelmDeploymentNoHooksField,
         HelmDeploymentTimeoutField,
         HelmDeploymentPostRenderersField,
@@ -552,7 +603,6 @@ class HelmDeploymentFieldSet(FieldSet):
     description: DescriptionField
     release_name: HelmDeploymentReleaseNameField
     namespace: HelmDeploymentNamespaceField
-    create_namespace: HelmDeploymentCreateNamespaceField
     sources: HelmDeploymentSourcesField
     skip_crds: HelmDeploymentSkipCrdsField
     no_hooks: HelmDeploymentNoHooksField
@@ -560,34 +610,6 @@ class HelmDeploymentFieldSet(FieldSet):
     values: HelmDeploymentValuesField
     post_renderers: HelmDeploymentPostRenderersField
     enable_dns: HelmDeploymentEnableDNSField
-
-    def format_values(
-        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
-    ) -> dict[str, str]:
-        source = InterpolationContext.TextSource(
-            self.address,
-            target_alias=HelmDeploymentTarget.alias,
-            field_alias=HelmDeploymentValuesField.alias,
-        )
-
-        def format_value(text: str) -> str | None:
-            try:
-                return interpolation_context.format(
-                    text,
-                    source=source,
-                )
-            except InterpolationError as err:
-                if ignore_missing:
-                    return None
-                raise err
-
-        result = {}
-        for key, value in (self.values.value or {}).items():
-            formatted_value = format_value(value)
-            if formatted_value is not None:
-                result[key] = formatted_value
-
-        return result
 
 
 class AllHelmDeploymentTargets(Targets):

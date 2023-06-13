@@ -23,6 +23,7 @@ from pants.util.strutil import bullet_list, help_text, softwrap
 _VALID_PASSTHROUGH_FLAGS = [
     "--atomic",
     "--cleanup-on-fail",
+    "--create-namespace",
     "--debug",
     "--dry-run",
     "--force",

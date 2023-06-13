@@ -311,7 +311,8 @@ async def setup_render_helm_deployment_process(
         request.field_set.release_name.value
         or request.field_set.address.target_name.replace("_", "-")
     )
-    inline_values = request.field_set.format_values(
+    namespace = request.field_set.namespace.format_with(interpolation_context)
+    inline_values = request.field_set.values.format_with(
         interpolation_context, ignore_missing=request.cmd == HelmDeploymentCmd.RENDER
     )
 
@@ -338,12 +339,7 @@ async def setup_render_helm_deployment_process(
                 if request.field_set.description.value
                 else ()
             ),
-            *(
-                ("--namespace", request.field_set.namespace.value)
-                if request.field_set.namespace.value
-                else ()
-            ),
-            *(("--create-namespace",) if request.field_set.create_namespace.value else ()),
+            *(("--namespace", namespace) if namespace else ()),
             *(("--skip-crds",) if request.field_set.skip_crds.value else ()),
             *(("--no-hooks",) if request.field_set.no_hooks.value else ()),
             *(("--output-dir", output_dir) if output_dir else ()),
