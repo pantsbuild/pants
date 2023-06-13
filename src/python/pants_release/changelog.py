@@ -18,8 +18,6 @@ import requests
 from packaging.version import Version
 from pants_release.git import git, git_fetch
 
-from pants.util.strutil import softwrap
-
 logger = logging.getLogger(__name__)
 
 
@@ -139,9 +137,13 @@ def prepare_sha(sha: str) -> Entry:
     return Entry(category=category, text=f"* {subject_with_url}")
 
 
-def instructions(release_info: ReleaseInfo, entries: list[Entry]) -> str:
-    date = datetime.date.today().strftime("%b %d, %Y")
+@dataclass(frozen=True)
+class Formatted:
+    external: str
+    internal: str
 
+
+def format_notes(release_info: ReleaseInfo, entries: list[Entry], date: datetime.date) -> Formatted:
     entries_by_category = defaultdict(list)
     for entry in entries:
         entries_by_category[entry.category].append(entry.text)
@@ -152,45 +154,65 @@ def instructions(release_info: ReleaseInfo, entries: list[Entry]) -> str:
         lines = "\n\n".join(entries)
         if not entries:
             return ""
-        return f"\n### {heading}\n\n{lines}\n"
+        return f"### {heading}\n\n{lines}"
 
-    return softwrap(
-        f"""\
-        Copy the below headers into `{release_info.notes_file_name()}`. Then, put each
-        external-facing commit into the relevant category. Commits that are internal-only (i.e.,
-        that are only of interest to Pants developers and have no user-facing implications) should
-        be pasted into a PR comment for review, not the release notes.
+    external_categories = [
+        Category.NewFeatures,
+        Category.UserAPIChanges,
+        Category.PluginAPIChanges,
+        Category.BugFixes,
+        Category.Performance,
+        Category.Documentation,
+        # ensure uncategorized entries appear
+        None,
+    ]
 
-        You can tweak descriptions to be more descriptive or to fix typos, and you can reorder
-        based on relative importance to end users. Delete any unused headers.
-
-        ---------------------------------------------------------------------
-
-        ## {release_info.version} ({date})
-
-        {{new_features}}{{user_api_changes}}{{plugin_api_changes}}{{bugfixes}}{{performance}}{{documentation}}{{internal}}
-        --------------------------------------------------------------------
-
-        {{uncategorized}}
-        """
-    ).format(
-        new_features=format_entries(Category.NewFeatures),
-        user_api_changes=format_entries(Category.UserAPIChanges),
-        plugin_api_changes=format_entries(Category.PluginAPIChanges),
-        bugfixes=format_entries(Category.BugFixes),
-        performance=format_entries(Category.Performance),
-        documentation=format_entries(Category.Documentation),
-        internal=format_entries(Category.Internal),
-        uncategorized=format_entries(None),
+    external = "\n\n".join(
+        [
+            f"## {release_info.version} ({date:%b %d, %Y})",
+            *(
+                formatted
+                for category in external_categories
+                if (formatted := format_entries(category))
+            ),
+        ]
     )
+    internal = format_entries(Category.Internal)
+
+    return Formatted(external=external, internal=internal)
+
+
+def splice(existing_contents: str, new_section: str) -> str:
+    # Find the first `## 2.minor...` heading, to be able to insert immediately before it, or the end
+    # of file, if not such section exists
+    try:
+        index = existing_contents.index("\n## 2.")
+    except ValueError:
+        index = len(existing_contents)
+    return "".join([existing_contents[:index], "\n", new_section, "\n", existing_contents[index:]])
+
+
+def splice_into_file(release_info: ReleaseInfo, formatted: Formatted) -> None:
+    file_name = release_info.notes_file_name()
+    try:
+        existing_contents = file_name.read_text()
+    except FileNotFoundError:
+        # default content if the file doesn't exist yet
+        existing_contents = f"# {release_info.slug} Release Series\n"
+
+    file_name.write_text(splice(existing_contents, formatted.external))
 
 
 def main() -> None:
     args = create_parser().parse_args()
     release_info = ReleaseInfo.determine(args.new)
     branch_sha = git_fetch(release_info.branch)
+    date = datetime.date.today()
     entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, branch_sha)]
-    print(instructions(release_info, entries))
+
+    formatted = format_notes(release_info, entries, date)
+    splice_into_file(release_info, formatted)
+    print(f"\nCommit {release_info.notes_file_name()} and create a PR.\n\n{formatted.internal}")
 
 
 if __name__ == "__main__":
