@@ -8,7 +8,6 @@ import argparse
 import datetime
 import logging
 import re
-import subprocess
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -17,6 +16,8 @@ from enum import Enum
 import requests
 from packaging.version import Version
 from pants_release.common import die
+from pants_release.git import git
+
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -59,15 +60,7 @@ def determine_release_branch(new_version_str: str) -> str:
 
 def relevant_shas(prior: str, release_branch: str) -> list[str]:
     prior_tag = f"release_{prior}"
-    return (
-        subprocess.run(
-            ["git", "log", "--format=format:%H", release_branch, f"^{prior_tag}"],
-            check=True,
-            stdout=subprocess.PIPE,
-        )
-        .stdout.decode()
-        .splitlines()
-    )
+    return git("log", "--format=format:%H", release_branch, f"^{prior_tag}").splitlines()
 
 
 class Category(Enum):
@@ -131,15 +124,7 @@ def categorize(pr_num: str) -> Category | None:
 
 
 def prepare_sha(sha: str) -> Entry:
-    subject = (
-        subprocess.run(
-            ["git", "log", "-1", "--format=format:%s", sha],
-            check=True,
-            stdout=subprocess.PIPE,
-        )
-        .stdout.decode()
-        .strip()
-    )
+    subject = git("log", "-1", "--format=format:%s", sha)
     pr_num_match = re.search(r"\(#(\d{4,5})\)\s*$", subject)
     if not pr_num_match:
         return Entry(category=None, text=f"* {subject}")
