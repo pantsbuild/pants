@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import deprecated, warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
 from pants.engine.internals.native_engine import AddressInput
@@ -543,8 +543,8 @@ class HelmDeploymentCreateNamespaceField(BoolField):
     default = False
     help = "If true, the namespace will be created if it doesn't exist."
 
-    removal_hint = "Use the passthrough argument `--create-namespace` instead."
     removal_version = "2.19.0.dev0"
+    removal_hint = "Use the passthrough argument `--create-namespace` instead."
 
 
 class HelmDeploymentNoHooksField(BoolField):
@@ -620,6 +620,14 @@ class HelmDeploymentFieldSet(FieldSet):
     values: HelmDeploymentValuesField
     post_renderers: HelmDeploymentPostRenderersField
     enable_dns: HelmDeploymentEnableDNSField
+
+    @deprecated(
+        "2.19.0.dev0", "Use `field_set.values.format_with()` instead.", start_version="2.18.0rc0"
+    )
+    def format_values(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> dict[str, str]:
+        return self.values.format_with(interpolation_context, ignore_missing=ignore_missing)
 
 
 class AllHelmDeploymentTargets(Targets):
