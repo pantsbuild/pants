@@ -305,15 +305,19 @@ async def setup_render_helm_deployment_process(
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
 
+    # Calculate values that may depend on the interpolation context
     interpolation_context = await _build_interpolation_context(helm_subsystem)
+    is_render_cmd = request.cmd == HelmDeploymentCmd.RENDER
 
     release_name = (
         request.field_set.release_name.value
         or request.field_set.address.target_name.replace("_", "-")
     )
-    namespace = request.field_set.namespace.format_with(interpolation_context)
+    namespace = request.field_set.namespace.format_with(
+        interpolation_context, ignore_missing=is_render_cmd
+    )
     inline_values = request.field_set.values.format_with(
-        interpolation_context, ignore_missing=request.cmd == HelmDeploymentCmd.RENDER
+        interpolation_context, ignore_missing=is_render_cmd
     )
 
     def maybe_escape_string_value(value: str) -> str:

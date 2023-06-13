@@ -433,8 +433,7 @@ class HelmDeploymentNamespaceField(StringField, AsyncFieldMixin):
         Kubernetes namespace for the given deployment.
 
         This field supports value interpolation, so `mynamespace-{env.NS_SUFFIX}` would use the `NS_SUFFIX`
-        environment variable value as part of the namespace. Note that in this case the environment
-        variable must be present at all times.
+        environment variable value as part of the namespace.
         """
     )
 
