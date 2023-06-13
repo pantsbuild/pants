@@ -111,7 +111,7 @@ def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:
                 softwrap(
                     """
                     InvalidTargetException: The `python_aws_lambda_function` target project:neither must
-                    specify either a `runtime` or `complete_platforms` or both.
+                    specify either a `runtime` or `complete_platforms`.
                     """
                 )
             )
