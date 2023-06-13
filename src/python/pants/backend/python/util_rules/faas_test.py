@@ -16,7 +16,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
     InferPythonFaaSHandlerDependency,
-    KnownRuntimeCompletePlatformRequest,
+    PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
     PythonFaaSHandlerInferenceFieldSet,
@@ -24,6 +24,8 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSRuntimeField,
     ResolvedPythonFaaSHandler,
     ResolvePythonFaaSHandlerRequest,
+    RuntimePlatforms,
+    RuntimePlatformsRequest,
 )
 from pants.backend.python.util_rules.pex import CompletePlatforms, PexPlatforms
 from pants.build_graph.address import Address
@@ -46,7 +48,7 @@ def rule_runner() -> RuleRunner:
             *python_target_types_rules(),
             QueryRule(ResolvedPythonFaaSHandler, [ResolvePythonFaaSHandlerRequest]),
             QueryRule(InferredDependencies, [InferPythonFaaSHandlerDependency]),
-            QueryRule(CompletePlatforms, [KnownRuntimeCompletePlatformRequest]),
+            QueryRule(RuntimePlatforms, [RuntimePlatformsRequest]),
         ],
         target_types=[
             FileTarget,
@@ -236,8 +238,8 @@ def test_infer_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
 
 class TestRuntimeField(PythonFaaSRuntimeField):
     known_runtimes = (
-        PythonFaaSKnownRuntime(12, 34, tag="12-34-tag"),
-        PythonFaaSKnownRuntime(56, 78, tag="56-78-tag"),
+        PythonFaaSKnownRuntime(3, 45, tag="faas-test-3-45"),
+        PythonFaaSKnownRuntime(67, 89, tag="faas-test-67-89"),
     )
     known_runtimes_docker_repo = ""
 
@@ -250,44 +252,50 @@ class TestRuntimeField(PythonFaaSRuntimeField):
 
 
 @pytest.mark.parametrize(
-    ("value", "expected_platforms", "expected_file_name"),
+    ("value", "expected_interpreter_version", "expected_platforms", "expected_complete_platforms"),
     [
-        pytest.param(None, [], (None), id="empty"),
-        pytest.param("12.34", [], ("complete_platform_12-34-tag.json"), id="known 12.34"),
-        pytest.param("56.78", [], ("complete_platform_56-78-tag.json"), id="known 56.78"),
-        pytest.param("98.76", ["linux_x86_64-cp-9876-cp9876"], (None), id="known 56.78"),
+        pytest.param(
+            "3.45", (3, 45), [], ["complete_platform_faas-test-3-45.json"], id="known 3.45"
+        ),
+        pytest.param(
+            "67.89", (67, 89), [], ["complete_platform_faas-test-67-89.json"], id="known 67.89"
+        ),
+        pytest.param("98.76", (98, 76), ["linux_x86_64-cp-9876-cp9876"], [], id="unknown 98.76"),
     ],
 )
-def test_runtime_to_platform_args(
-    value: str | None, expected_platforms: list[str], expected_file_name: None | str
+def test_infer_runtime_platforms_when_runtime_and_no_complete_platforms(
+    value: str,
+    expected_interpreter_version: tuple[int, int],
+    expected_platforms: list[str],
+    expected_complete_platforms: list[str],
+    rule_runner: RuleRunner,
 ) -> None:
-    expected_request = KnownRuntimeCompletePlatformRequest(
-        module="pants.backend.python.util_rules", file_name=expected_file_name
-    )
-
     address = Address("path", target_name="target")
-    field = TestRuntimeField(value, address)
 
-    platforms, request = field.to_platform_args()
-
-    assert platforms == PexPlatforms(expected_platforms)
-    assert request == expected_request
-
-
-@pytest.mark.parametrize(
-    "file_name",
-    [None, "complete_platform_faas-test.json"],
-)
-def test_known_runtime_complete_platform_rule(
-    file_name: None | str, rule_runner: RuleRunner
-) -> None:
-    request = KnownRuntimeCompletePlatformRequest(
-        module="pants.backend.python.util_rules", file_name=file_name
+    request = RuntimePlatformsRequest(
+        runtime=TestRuntimeField(value, address),
+        complete_platforms=PythonFaaSCompletePlatforms(None, address),
     )
 
-    cp = rule_runner.request(CompletePlatforms, [request])
+    platforms = rule_runner.request(RuntimePlatforms, [request])
 
-    if file_name is None:
-        assert cp == CompletePlatforms()
-    else:
-        assert cp == CompletePlatforms([file_name])
+    assert platforms == RuntimePlatforms(
+        expected_interpreter_version,
+        PexPlatforms(expected_platforms),
+        CompletePlatforms(expected_complete_platforms),
+    )
+
+
+def test_infer_runtime_platforms_when_complete_platforms(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files({"path/BUILD": "file(name='cp', source='cp.json')", "path/cp.json": ""})
+    address = Address("path", target_name="target")
+    request = RuntimePlatformsRequest(
+        runtime=TestRuntimeField("completely ignored!", address),
+        complete_platforms=PythonFaaSCompletePlatforms(["path:cp"], address),
+    )
+
+    platforms = rule_runner.request(RuntimePlatforms, [request])
+
+    assert platforms == RuntimePlatforms(None, PexPlatforms(), CompletePlatforms(["path/cp.json"]))

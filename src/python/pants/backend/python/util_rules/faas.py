@@ -293,36 +293,15 @@ class PythonFaaSRuntimeField(StringField, ABC):
         if interpreter_version is None:
             return None
 
-        return self._format_version(*interpreter_version)
+        return _format_platform_from_major_minor(*interpreter_version)
 
-    def _format_version(self, py_major: int, py_minor: int) -> str:
-        platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
-        # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
-        if py_major <= 3 and py_minor < 8:
-            platform_str += "m"
-        return platform_str
 
-    def to_platform_args(self) -> tuple[PexPlatforms, KnownRuntimeCompletePlatformRequest]:
-        module = self.known_runtimes_complete_platforms_module()
-        empty_request = KnownRuntimeCompletePlatformRequest(module=module, file_name=None)
-
-        version = self.to_interpreter_version()
-        if version is None:
-            return PexPlatforms(), empty_request
-
-        try:
-            file_name = next(
-                rt.file_name() for rt in self.known_runtimes if version == (rt.major, rt.minor)
-            )
-        except StopIteration:
-            # Not a known runtime, so fallback to just passing a platform
-            # TODO: maybe this should be an error, and we require users to specify
-            # complete_platforms themselves?
-            return PexPlatforms((self._format_version(*version),)), empty_request
-
-        return PexPlatforms(), KnownRuntimeCompletePlatformRequest(
-            module=module, file_name=file_name
-        )
+def _format_platform_from_major_minor(py_major: int, py_minor: int) -> str:
+    platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
+    # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
+    if py_major <= 3 and py_minor < 8:
+        platform_str += "m"
+    return platform_str
 
 
 @rule
@@ -335,21 +314,56 @@ async def digest_complete_platforms(
 
 
 @dataclass(frozen=True)
-class KnownRuntimeCompletePlatformRequest:
-    module: str
-    file_name: None | str
+class RuntimePlatformsRequest:
+    runtime: PythonFaaSRuntimeField
+    complete_platforms: PythonFaaSCompletePlatforms
+
+
+@dataclass(frozen=True)
+class RuntimePlatforms:
+    interpreter_version: None | tuple[int, int]
+    pex_platforms: PexPlatforms = PexPlatforms()
+    complete_platforms: CompletePlatforms = CompletePlatforms()
 
 
 @rule
-async def known_runtime_complete_platform(
-    request: KnownRuntimeCompletePlatformRequest,
-) -> CompletePlatforms:
-    if request.file_name is None:
-        return CompletePlatforms()
+async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePlatforms:
+    if request.complete_platforms.value is not None:
+        # explicit complete platforms wins:
+        complete_platforms = await Get(
+            CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
+        )
+        # Don't bother trying to infer the runtime version if the user has provided their own
+        # complete platform; they probably know what they're doing.
+        return RuntimePlatforms(interpreter_version=None, complete_platforms=complete_platforms)
 
-    content = importlib.resources.read_binary(request.module, request.file_name)
-    snapshot = await Get(Snapshot, CreateDigest([FileContent(request.file_name, content)]))
-    return CompletePlatforms.from_snapshot(snapshot)
+    version = request.runtime.to_interpreter_version()
+    if version is None:
+        return RuntimePlatforms(interpreter_version=None)
+
+    try:
+        file_name = next(
+            rt.file_name()
+            for rt in request.runtime.known_runtimes
+            if version == (rt.major, rt.minor)
+        )
+    except StopIteration:
+        # Not a known runtime, so fallback to just passing a platform
+        # TODO: maybe this should be an error, and we require users to specify
+        # complete_platforms themselves?
+        return RuntimePlatforms(
+            interpreter_version=version,
+            pex_platforms=PexPlatforms((_format_platform_from_major_minor(*version),)),
+        )
+
+    module = request.runtime.known_runtimes_complete_platforms_module()
+
+    content = importlib.resources.read_binary(module, file_name)
+    snapshot = await Get(Snapshot, CreateDigest([FileContent(file_name, content)]))
+
+    return RuntimePlatforms(
+        interpreter_version=version, complete_platforms=CompletePlatforms.from_snapshot(snapshot)
+    )
 
 
 @dataclass(frozen=True)
@@ -491,25 +505,21 @@ async def build_python_faas(
         "--resolve-local-platforms",
     )
 
-    if request.complete_platforms.value is None:
-        # if the user hasn't set complete_platforms, look at the runtime argument
-        pex_platforms, complete_platforms_request = request.runtime.to_platform_args()
-        complete_platforms_get = Get(
-            CompletePlatforms, KnownRuntimeCompletePlatformRequest, complete_platforms_request
-        )
-    else:
-        complete_platforms_get = Get(
-            CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
-        )
-        pex_platforms = PexPlatforms()
+    platforms_get = Get(
+        RuntimePlatforms,
+        RuntimePlatformsRequest(
+            runtime=request.runtime,
+            complete_platforms=request.complete_platforms,
+        ),
+    )
 
     if request.handler:
-        complete_platforms, handler = await MultiGet(
-            complete_platforms_get,
+        platforms, handler = await MultiGet(
+            platforms_get,
             Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
         )
     else:
-        complete_platforms = await complete_platforms_get
+        platforms = await platforms_get
         handler = None
 
     # TODO: improve diagnostics if there's more than one platform/complete_platform
@@ -541,8 +551,8 @@ async def build_python_faas(
         include_requirements=request.include_requirements,
         include_source_files=request.include_sources,
         output_filename=repository_filename,
-        platforms=pex_platforms,
-        complete_platforms=complete_platforms,
+        platforms=platforms.pex_platforms,
+        complete_platforms=platforms.complete_platforms,
         layout=PexLayout.PACKED,
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
@@ -559,8 +569,8 @@ async def build_python_faas(
         PexVenvRequest(
             pex=pex_result,
             layout=PexVenvLayout.FLAT_ZIPPED,
-            platforms=pex_platforms,
-            complete_platforms=complete_platforms,
+            platforms=platforms.pex_platforms,
+            complete_platforms=platforms.complete_platforms,
             prefix=request.prefix_in_artifact,
             output_path=Path(output_filename),
             description=f"Build {request.target_name} artifact for {request.address}",
