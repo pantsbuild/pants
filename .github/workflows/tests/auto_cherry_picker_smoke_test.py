@@ -37,7 +37,7 @@ def stub_helper():
                     constructor({ octokit, context, core }) {}
                     async get_prereqs() {
                         return {
-                            pr_num: context,
+                            pr_num: 12345,
                             merge_commit: "ABCDEF12345",
                             milestones: ["2.16.x", "2.17.x"],
                         };
@@ -61,7 +61,7 @@ def run_act(*extra_args) -> subprocess.CompletedProcess[str]:
             "-W",
             ".github/workflows/auto-cherry-picker.yaml",
             "--input",
-            "PR_number=12345",
+            "PR_number=17295",
             "--env",
             "GITHUB_REPOSITORY=pantsbuild/pants",
             "--secret",
