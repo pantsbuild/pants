@@ -279,7 +279,10 @@ def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_google_cloud_function(
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),
-        expected_extra_log_lines=("    Handler: handler",),
+        expected_extra_log_lines=(
+            "    Runtime: python37",
+            "    Handler: handler",
+        ),
     )
     assert "src.python.foo.bar/gcf.zip" == zip_file_relpath
 

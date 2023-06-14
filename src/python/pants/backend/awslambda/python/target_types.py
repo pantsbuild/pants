@@ -135,6 +135,10 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
 
+    @classmethod
+    def from_interpreter_version(cls, py_major: int, py_minor: int) -> str:
+        return f"python{py_major}.{py_minor}"
+
 
 class PythonAwsLambdaLayerDependenciesField(PythonFaaSDependencies):
     required = True

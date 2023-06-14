@@ -285,6 +285,11 @@ class PythonFaaSRuntimeField(StringField, ABC):
     def to_interpreter_version(self) -> None | tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
 
+    @classmethod
+    @abstractmethod
+    def from_interpreter_version(cls, py_major: int, py_minor: int) -> str:
+        """Returns an appropriately-formatted runtime argument."""
+
     def to_platform_string(self) -> None | str:
         # We hardcode the platform value to the appropriate one for each FaaS runtime.
         # (Running the "hello world" cloud function in the example code will report the platform, and can be
@@ -577,18 +582,23 @@ async def build_python_faas(
         ),
     )
 
-    if reexported_handler_func is None:
-        handler_log_lines = []
-    else:
+    extra_log_lines = []
+
+    if platforms.interpreter_version is not None:
+        extra_log_lines.append(
+            f"    Runtime: {request.runtime.from_interpreter_version(*platforms.interpreter_version)}"
+        )
+
+    if reexported_handler_func is not None:
         if request.log_only_reexported_handler_func:
             handler_text = reexported_handler_func
         else:
             handler_text = f"{request.reexported_handler_module}.{reexported_handler_func}"
-        handler_log_lines = [f"    Handler: {handler_text}"]
+        extra_log_lines.append(f"    Handler: {handler_text}")
 
     artifact = BuiltPackageArtifact(
         output_filename,
-        extra_log_lines=tuple(handler_log_lines),
+        extra_log_lines=tuple(extra_log_lines),
     )
     return BuiltPackage(digest=result.digest, artifacts=(artifact,))
 

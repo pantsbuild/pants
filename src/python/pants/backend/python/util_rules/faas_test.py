@@ -250,6 +250,10 @@ class TestRuntimeField(PythonFaaSRuntimeField):
         first, second = self.value.split(".")
         return int(first), int(second)
 
+    @classmethod
+    def from_interpreter_version(cls, py_major: int, py_minor: int) -> str:
+        return f"test:{py_major}.{py_minor}"
+
 
 @pytest.mark.parametrize(
     ("value", "expected_interpreter_version", "expected_platforms", "expected_complete_platforms"),
