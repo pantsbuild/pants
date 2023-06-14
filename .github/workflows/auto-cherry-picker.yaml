@@ -34,7 +34,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
-          allow-empty-token: true
           script: |
             const Helper = require('./build-support/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});
@@ -92,7 +91,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
-          allow-empty-token: true
           script: |
             const Helper = require('./build-support/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});
