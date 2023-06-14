@@ -505,7 +505,8 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
                 raise err
 
         result = {}
-        current_value: Mapping[str, str] = self.value or {}
+        default_curr_value: dict[str, str] = {}
+        current_value: Mapping[str, str] = self.value or default_curr_value
         for key, value in current_value.items():
             formatted_value = format_value(value)
             if formatted_value is not None:
@@ -528,7 +529,8 @@ class HelmDeploymentCreateNamespaceField(BoolField):
     help = "If true, the namespace will be created if it doesn't exist."
 
     removal_version = "2.19.0.dev0"
-    removal_hint = "Use the passthrough argument `--create-namespace` instead."
+    # TODO This causes and error in the parser as it believes it is using it as the `removal_version` attribute.
+    # removal_hint = "Use the passthrough argument `--create-namespace` instead."
 
 
 class HelmDeploymentNoHooksField(BoolField):

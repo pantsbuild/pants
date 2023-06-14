@@ -67,7 +67,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
               helm_deployment(
                 name="foo",
                 description="Foo deployment",
-                namespace="uat-{env('NS_SUFFIX')}",
+                namespace=f"uat-{env('NS_SUFFIX')}",
                 skip_crds=True,
                 no_hooks=True,
                 dependencies=["//src/chart", "//src/docker/myimage"],
@@ -76,7 +76,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                     "key": "foo",
                     "amount": "300",
                     "long_string": "This is a long string",
-                    "build_number": "{env('BUILD_NUMBER')}",
+                    "build_number": f"{env('BUILD_NUMBER')}",
                 },
                 timeout=150,
               )
@@ -116,13 +116,12 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "subdir/last.yaml",
     ]
 
-    extra_env_vars = ["BUILD_NUMBER", "NS_SUFFIX"]
     deploy_args = ["--kubeconfig", "./kubeconfig", "--create-namespace"]
     deploy_process = _run_deployment(
         rule_runner,
         "src/deployment",
         "foo",
-        args=[f"--helm-args={repr(deploy_args)}", f"--helm-extra-env-vars={repr(extra_env_vars)}"],
+        args=[f"--helm-args={repr(deploy_args)}"],
         env={"BUILD_NUMBER": expected_build_number, "NS_SUFFIX": expected_ns_suffix},
     )
 
