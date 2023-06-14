@@ -22,8 +22,8 @@ Pants is compatible with remote caching and remote execution servers that comply
 
 REAPI servers implement several related but distinct services:
 
-1. A "content-addressable storage" service that stores data keyed by the hash of that data (also known as a "CAS")
-2. An "action cache service" that maps process executions to their results
+1. A "content-addressable storage" service that stores data keyed by the hash of that data (also known as a "CAS").
+2. An "action cache service" that maps process executions to their results.
 3. An "execution service" that executes processes by using the content-addressable storage service to obtain the inputs and store the outputs from running those processes.
 
 Remote cache servers implement the CAS and action cache services. Remote execution servers implement all three services.
