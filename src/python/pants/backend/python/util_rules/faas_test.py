@@ -30,6 +30,7 @@ from pants.backend.python.util_rules.faas import (
 from pants.backend.python.util_rules.pex import CompletePlatforms, PexPlatforms
 from pants.build_graph.address import Address
 from pants.core.target_types import FileTarget
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InferredDependencies, InvalidFieldException, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.strutil import softwrap
@@ -277,6 +278,8 @@ def test_infer_runtime_platforms_when_runtime_and_no_complete_platforms(
     address = Address("path", target_name="target")
 
     request = RuntimePlatformsRequest(
+        address=address,
+        target_name="unused",
         runtime=TestRuntimeField(value, address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
     )
@@ -296,6 +299,8 @@ def test_infer_runtime_platforms_when_complete_platforms(
     rule_runner.write_files({"path/BUILD": "file(name='cp', source='cp.json')", "path/cp.json": ""})
     address = Address("path", target_name="target")
     request = RuntimePlatformsRequest(
+        address=address,
+        target_name="unused",
         runtime=TestRuntimeField("completely ignored!", address),
         complete_platforms=PythonFaaSCompletePlatforms(["path:cp"], address),
     )
@@ -303,3 +308,96 @@ def test_infer_runtime_platforms_when_complete_platforms(
     platforms = rule_runner.request(RuntimePlatforms, [request])
 
     assert platforms == RuntimePlatforms(None, PexPlatforms(), CompletePlatforms(["path/cp.json"]))
+
+
+@pytest.mark.parametrize(
+    ("ics", "expected_interpreter_version", "expected_platforms", "expected_complete_platforms"),
+    [
+        pytest.param(
+            "==3.45.*",
+            (3, 45),
+            [],
+            ["complete_platform_faas-test-3-45.json"],
+            id="known 3.45, any patch",
+        ),
+        pytest.param(
+            "==3.45.12",
+            (3, 45),
+            [],
+            ["complete_platform_faas-test-3-45.json"],
+            id="known 3.45, specific patch",
+        ),
+        pytest.param(
+            ">=3.33,<3.34", (3, 33), ["linux_x86_64-cp-333-cp333"], [], id="unknown, 3.33"
+        ),
+    ],
+)
+def test_infer_runtime_platforms_when_narrow_ics_only(
+    ics: str,
+    expected_interpreter_version: tuple[int, int],
+    expected_platforms: list[str],
+    expected_complete_platforms: list[str],
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.set_options(
+        ["--python-interpreter-versions-universe=[3.32,3.33,3.34,3.44,3.45,3.46]"]
+    )
+    rule_runner.write_files(
+        {
+            "path/BUILD": f"python_sources(name='target', interpreter_constraints=['{ics}'])",
+            "path/x.py": "",
+        }
+    )
+
+    address = Address("path", target_name="target")
+    request = RuntimePlatformsRequest(
+        address=address,
+        target_name="example_target",
+        runtime=TestRuntimeField(None, address),
+        complete_platforms=PythonFaaSCompletePlatforms(None, address),
+    )
+
+    platforms = rule_runner.request(RuntimePlatforms, [request])
+
+    assert platforms == RuntimePlatforms(
+        expected_interpreter_version,
+        PexPlatforms(expected_platforms),
+        CompletePlatforms(expected_complete_platforms),
+    )
+
+
+@pytest.mark.parametrize(
+    ("ics", "expected_message"),
+    [
+        pytest.param(">=3.44", "3 (3.44, 3.45, ...)", id="three"),
+        pytest.param(">=3.45", "2 (3.45, 3.46)", id="two"),
+    ],
+)
+def test_infer_runtime_platforms_errors_when_wide_ics(
+    ics: str,
+    expected_message: str,
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.set_options(["--python-interpreter-versions-universe=[3.44,3.45,3.46]"])
+    rule_runner.write_files(
+        {
+            "path/BUILD": f"python_sources(name='target', interpreter_constraints=['{ics}'])",
+            "path/x.py": "",
+        }
+    )
+
+    address = Address("path", target_name="target")
+    request = RuntimePlatformsRequest(
+        address=address,
+        target_name="example_target",
+        runtime=TestRuntimeField(None, address),
+        complete_platforms=PythonFaaSCompletePlatforms(None, address),
+    )
+
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(RuntimePlatforms, [request])
+    assert (
+        "The 'example_target' target path:target cannot have its runtime platform inferred"
+        in str(exc.value)
+    )
+    assert expected_message in str(exc.value)

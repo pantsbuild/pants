@@ -28,6 +28,7 @@ from pants.backend.python.target_types import (
     PexLayout,
     PythonResolveField,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     Pex,
@@ -36,7 +37,10 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
 )
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import (
+    InterpreterConstraintsRequest,
+    PexFromTargetsRequest,
+)
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
@@ -64,6 +68,7 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
+    InvalidTargetException,
     SecondaryOwnerMixin,
     StringField,
     TransitiveTargets,
@@ -73,7 +78,7 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import bin_name
-from pants.util.strutil import help_text
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -320,6 +325,9 @@ async def digest_complete_platforms(
 
 @dataclass(frozen=True)
 class RuntimePlatformsRequest:
+    address: Address
+    target_name: str
+
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
 
@@ -331,8 +339,55 @@ class RuntimePlatforms:
     complete_platforms: CompletePlatforms = CompletePlatforms()
 
 
+async def _infer_from_ics(
+    request: RuntimePlatformsRequest, python_setup: PythonSetup
+) -> tuple[int, int]:
+    ics = await Get(InterpreterConstraints, InterpreterConstraintsRequest([request.address]))
+
+    # (slight) future proofing: use the overall Pants interpreter universe, rather than the FaaS
+    # platform's known runtimes, it's more likely that the ICs cover exactly one version in future,
+    # and thus ease Pants upgrades (e.g. at the time of writing, '>=3.10' currently only covers one
+    # version supported by AWS Lambda (3.10), but will cover more when AWS adds support for 3.11)
+    major_minors = ics.partition_into_major_minor_ints(python_setup.interpreter_versions_universe)
+    if len(major_minors) == 1:
+        return major_minors[0]
+
+    # uhoh, 0 or 2+ versions, that's an error!
+    if major_minors:
+        # e.g. (3.9, 3.10) if there's just two, or (3.9, 3.10, ...) if there's more
+        formatted = ", ".join(
+            [
+                *(f"{major}.{minor}" for major, minor in major_minors[:2]),
+                *(("...",) if len(major_minors) > 2 else ()),
+            ]
+        )
+        details = f" ({formatted})"
+    else:
+        details = ""
+
+    raise InvalidTargetException(
+        softwrap(
+            f"""
+                The {request.target_name!r} target {request.address} cannot have its runtime
+                platform inferred, because inference requires the interpreter constraints to include
+                exactly one minor release of Python, but the constraints ({ics}) include {len(major_minors)}{details}.
+
+                To fix, provide one of the following:
+
+                - a value for the `{request.runtime.alias}` field, or
+
+                - a value for the `{request.complete_platforms.alias}` field, or
+
+                - narrower interpreter constraints
+                """
+        )
+    )
+
+
 @rule
-async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePlatforms:
+async def infer_runtime_platforms(
+    request: RuntimePlatformsRequest, python_setup: PythonSetup
+) -> RuntimePlatforms:
     if request.complete_platforms.value is not None:
         # explicit complete platforms wins:
         complete_platforms = await Get(
@@ -344,7 +399,8 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
 
     version = request.runtime.to_interpreter_version()
     if version is None:
-        return RuntimePlatforms(interpreter_version=None)
+        # if there's not a specified version, let's try to infer it from the interpreter constraints
+        version = await _infer_from_ics(request, python_setup)
 
     try:
         file_name = next(
@@ -513,6 +569,8 @@ async def build_python_faas(
     platforms_get = Get(
         RuntimePlatforms,
         RuntimePlatformsRequest(
+            address=request.address,
+            target_name=request.target_name,
             runtime=request.runtime,
             complete_platforms=request.complete_platforms,
         ),
