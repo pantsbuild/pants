@@ -83,7 +83,8 @@ jobs:
     name: Post-Pick Actions
     needs: [cherry_picker, prerequisites]
     runs-on: ubuntu-latest
-    if: success() || failure()
+    # NB: We don't want to run if the prerequisites job failed or was skipped
+    if: needs.prerequisites.conclusion == "success"
     steps:
       - name: Check out code
         uses: actions/checkout@v3

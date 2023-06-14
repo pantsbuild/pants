@@ -7,7 +7,7 @@ from textwrap import dedent
 import pytest
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 def stub_make_pr():
     with open("build-support/cherry_pick/make_pr.sh", "w") as f:
         f.write(
@@ -27,7 +27,7 @@ def stub_make_pr():
         )
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 def stub_helper():
     with open("build-support/cherry_pick/helper.js", "w") as f:
         f.write(
@@ -37,7 +37,7 @@ def stub_helper():
                     constructor({ octokit, context, core }) {}
                     async get_prereqs() {
                         return {
-                            pr_num: 12345,
+                            pr_num: context,
                             merge_commit: "ABCDEF12345",
                             milestones: ["2.16.x", "2.17.x"],
                         };
@@ -61,7 +61,7 @@ def run_act(*extra_args) -> subprocess.CompletedProcess[str]:
             "-W",
             ".github/workflows/auto-cherry-picker.yaml",
             "--input",
-            "PR_number=17295",
+            "PR_number=12345",
             "--env",
             "GITHUB_REPOSITORY=pantsbuild/pants",
             "--secret",
@@ -114,7 +114,18 @@ def test_auto_cherry_pick__PR_doesnt_match(tmp_path):
     assert not result.stderr
     # @TODO: Assert we didn't try and run _anything_. See https://github.com/pantsbuild/pants/issues/19305
 
+
 @pytest.mark.xfail(reason="https://github.com/nektos/act/issues/1865")
 def test_auto_cherry_pick__continue_on_failure():
     result = run_act("workflow_dispatch")
     assert "[Auto Cherry-Picker/Cherry-Pick-1       ]   ❌  Failure" not in result.stdout
+
+
+def test_auto_cherry_pick__prerequisites_failed():
+    with open("build-support/cherry_pick/helper.js", "w") as f:
+        f.write("garbage")
+
+    result = run_act("workflow_dispatch")
+    stdout = result.stdout
+    assert "[Auto Cherry-Picker/Gather Prerequisites]   ❌  Failure" in result.stdout
+    assert "cherry_picked_finished" not in stdout
