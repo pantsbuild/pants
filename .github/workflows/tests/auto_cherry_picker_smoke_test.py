@@ -7,7 +7,7 @@ from textwrap import dedent
 import pytest
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 def stub_make_pr():
     with open("build-support/cherry_pick/make_pr.sh", "w") as f:
         f.write(
@@ -24,7 +24,7 @@ def stub_make_pr():
         )
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 def stub_helper():
     with open("build-support/cherry_pick/helper.js", "w") as f:
         f.write(
@@ -78,6 +78,11 @@ def test_auto_cherry_pick__workflow_dispatch():
     stdout = result.stdout
     assert "make_pr.sh 12345 2.16.x" in stdout
     assert "make_pr.sh 12345 2.17.x" in stdout
+    # NB: Even if one fails, the other should run to completion and fail as well (e.g. continue-on-error)
+    # (although act has a bug where it doesn't cancel: https://github.com/nektos/act/issues/1865
+    # so we aren't _really_ testing `continue-on-error` until that is fixed)
+    assert "[Auto Cherry-Picker/Cherry-Pick-1       ]   ❌  Failure" in result.stdout
+    assert "[Auto Cherry-Picker/Cherry-Pick-2       ]   ❌  Failure" in result.stdout
     assert (
         'cherry_picked_finished: ABCDEF12345 [{"milestone":"2.16.x","branch_name":"cherry-pick-12345-to-2.16.x"},{"milestone":"2.17.x","branch_name":"cherry-pick-12345-to-2.17.x"}]'
         in stdout
@@ -100,13 +105,11 @@ def test_auto_cherry_pick__PR_merged(tmp_path):
     )
 
 
-@pytest.mark.xfail(reason="https://github.com/nektos/act/issues/1482")
-def test_auto_cherry_pick__PR_doesnt_match(tmp_path):
-    event_path = tmp_path / "event.json"
-    event_path.write_text(json.dumps({"pull_request": {"merged": True, "labels": []}}))
+def test_auto_cherry_pick__prerequisites_failed():
+    with open("build-support/cherry_pick/helper.js", "w") as f:
+        f.write("garbage")
 
-    result = run_act("pull_request_target", "--eventpath", str(event_path))
+    result = run_act("workflow_dispatch")
     stdout = result.stdout
-    print(stdout)
-    assert not result.stderr
-    # @TODO: Assert we didn't try and run _anything_. See https://github.com/pantsbuild/pants/issues/19305
+    assert "[Auto Cherry-Picker/Gather Prerequisites]   ❌  Failure" in result.stdout
+    assert "cherry_picked_finished" not in stdout
