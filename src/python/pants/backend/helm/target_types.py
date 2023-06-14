@@ -485,7 +485,7 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
     )
 
     @memoized_method
-    @deprecated("2.19.9.dev0", start_version="2.18.0rc0")
+    @deprecated("2.19.0.dev0", start_version="2.18.0.dev0")
     def format_with(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
     ) -> dict[str, str]:
