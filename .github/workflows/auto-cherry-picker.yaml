@@ -31,11 +31,9 @@ jobs:
       - run: npm install ./build-support/cherry_pick
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
-        # NB: See https://github.com/actions/github-script/pull/397
-        uses: thejcannon/github-script@7ed0cc648959192a3868f0de9862110d7922b7cc
+        uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
-          allow-empty-token: true
           script: |
             const Helper = require('./build-support/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});
@@ -84,17 +82,15 @@ jobs:
     name: Post-Pick Actions
     needs: [cherry_picker, prerequisites]
     runs-on: ubuntu-latest
-    if: always()
+    if: success() || failure()
     steps:
       - name: Check out code
         uses: actions/checkout@v3
       - run: npm install ./build-support/cherry_pick
       - name: Run Script
-        # NB: See https://github.com/actions/github-script/pull/397
-        uses: thejcannon/github-script@7ed0cc648959192a3868f0de9862110d7922b7cc
+        uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
-          allow-empty-token: true
           script: |
             const Helper = require('./build-support/cherry_pick/helper.js');
             const helper = new Helper({octokit: github, context, core});
