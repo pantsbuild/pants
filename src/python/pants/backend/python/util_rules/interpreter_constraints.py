@@ -411,14 +411,25 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         that = other.enumerate_python_versions(interpreter_universe)
         return this.issuperset(that)
 
+    def partition_into_major_minor_ints(
+        self, interpreter_universe: Iterable[str]
+    ) -> tuple[tuple[int, int], ...]:
+        """Return all the valid major.minor versions, e.g. `((2, 7), (3, 6))`."""
+        return tuple(
+            OrderedSet(
+                (major, minor)
+                for major, minor, _ in self.enumerate_python_versions(interpreter_universe)
+            )
+        )
+
     def partition_into_major_minor_versions(
         self, interpreter_universe: Iterable[str]
     ) -> tuple[str, ...]:
         """Return all the valid major.minor versions, e.g. `('2.7', '3.6')`."""
-        result: OrderedSet[str] = OrderedSet()
-        for major, minor, _ in self.enumerate_python_versions(interpreter_universe):
-            result.add(f"{major}.{minor}")
-        return tuple(result)
+        return tuple(
+            f"{major}.{minor}"
+            for major, minor in self.partition_into_major_minor_ints(interpreter_universe)
+        )
 
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
