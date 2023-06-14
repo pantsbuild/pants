@@ -65,6 +65,8 @@ pants_ignore.add = [
   "!/pants.pex",
   # Ignore node modules for docs processing tools
   "/docs/node_modules",
+  # We have Pants stuff in here
+  "!.github/",
 ]
 
 build_ignore.add = [

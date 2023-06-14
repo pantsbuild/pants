@@ -20,22 +20,23 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
-    Field,
+    Dependencies,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
+    ShouldTraverseDepsPredicate,
     SpecialCasedDependencies,
     StringField,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
-    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
@@ -184,29 +185,35 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     return Package(exit_code=0)
 
 
-def transitive_targets_without_traversing_packages_request(
-    *,
-    roots: Iterable[Address],
-    union_membership: UnionMembership,
-    always_traverse_roots: bool = True,  # traverse roots even if they are package targets
-) -> TransitiveTargetsRequest:
-    package_field_set_types = union_membership.get(PackageFieldSet)
+@dataclass(frozen=True)
+class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
+    package_field_set_types: FrozenOrderedSet[PackageFieldSet]
+    roots: FrozenOrderedSet[Address]
+    always_traverse_roots: bool = True  # traverse roots even if they are package targets
 
-    def should_traverse_deps(target: Target, field: Field) -> bool:
+    def __init__(
+        self,
+        *,
+        union_membership: UnionMembership,
+        roots: Iterable[Address],
+        always_traverse_roots: bool = True,
+    ) -> None:
+        object.__setattr__(self, "package_field_set_types", union_membership.get(PackageFieldSet))
+        object.__setattr__(self, "roots", FrozenOrderedSet(roots))
+        object.__setattr__(self, "always_traverse_roots", always_traverse_roots)
+        self.__post_init__()
+
+    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
         if isinstance(field, SpecialCasedDependencies):
             return False
-        if always_traverse_roots and target.address in roots:
+        if self.always_traverse_roots and target.address in self.roots:
             return True
-        for field_set_type in package_field_set_types:
+        for field_set_type in self.package_field_set_types:
             if field_set_type.is_applicable(target):
                 # False means do not traverse dependencies of this target
                 return False
         return True
 
-    return TransitiveTargetsRequest(
-        roots,
-        should_traverse_deps_predicate=should_traverse_deps,
-    )
 
 
 def rules():

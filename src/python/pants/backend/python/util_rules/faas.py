@@ -4,12 +4,13 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, cast
+from typing import ClassVar, Optional, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
@@ -49,6 +50,7 @@ from pants.engine.fs import (
     GlobMatchErrorBehavior,
     PathGlobs,
     Paths,
+    Snapshot,
 )
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
@@ -249,15 +251,35 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
         f"""
         {PexCompletePlatformsField.help}
 
-        N.B.: If specifying `complete_platforms` to work around packaging failures encountered when
-        using the `runtime` field, ensure you delete the `runtime` field from the target.
+        N.B.: only one of this and `runtime` can be set. If `runtime` is set, a default complete
+        platform is chosen, if one is known for that runtime. Explicitly set this to `[]` to use the
+        platform's ambient interpreter, such as when running in an docker environment.
         """
     )
+
+
+@dataclass(frozen=True)
+class PythonFaaSKnownRuntime:
+    major: int
+    minor: int
+    tag: str
+
+    def file_name(self) -> str:
+        return f"complete_platform_{self.tag}.json"
 
 
 class PythonFaaSRuntimeField(StringField, ABC):
     alias = "runtime"
     default = None
+
+    known_runtimes: ClassVar[tuple[PythonFaaSKnownRuntime, ...]] = ()
+    known_runtimes_docker_repo: ClassVar[str]
+
+    @classmethod
+    def known_runtimes_complete_platforms_module(cls) -> str:
+        # the runtime field subclasses are conventionally in a `target_types.py` file, and we want
+        # to put the JSONs in a sibling file
+        return cls.__module__.rsplit(".", 1)[0]
 
     @abstractmethod
     def to_interpreter_version(self) -> None | tuple[int, int]:
@@ -271,12 +293,36 @@ class PythonFaaSRuntimeField(StringField, ABC):
         if interpreter_version is None:
             return None
 
-        py_major, py_minor = interpreter_version
+        return self._format_version(*interpreter_version)
+
+    def _format_version(self, py_major: int, py_minor: int) -> str:
         platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
         # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
         if py_major <= 3 and py_minor < 8:
             platform_str += "m"
         return platform_str
+
+    def to_platform_args(self) -> tuple[PexPlatforms, KnownRuntimeCompletePlatformRequest]:
+        module = self.known_runtimes_complete_platforms_module()
+        empty_request = KnownRuntimeCompletePlatformRequest(module=module, file_name=None)
+
+        version = self.to_interpreter_version()
+        if version is None:
+            return PexPlatforms(), empty_request
+
+        try:
+            file_name = next(
+                rt.file_name() for rt in self.known_runtimes if version == (rt.major, rt.minor)
+            )
+        except StopIteration:
+            # Not a known runtime, so fallback to just passing a platform
+            # TODO: maybe this should be an error, and we require users to specify
+            # complete_platforms themselves?
+            return PexPlatforms((self._format_version(*version),)), empty_request
+
+        return PexPlatforms(), KnownRuntimeCompletePlatformRequest(
+            module=module, file_name=file_name
+        )
 
 
 @rule
@@ -286,6 +332,24 @@ async def digest_complete_platforms(
     return await Get(
         CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
     )
+
+
+@dataclass(frozen=True)
+class KnownRuntimeCompletePlatformRequest:
+    module: str
+    file_name: None | str
+
+
+@rule
+async def known_runtime_complete_platform(
+    request: KnownRuntimeCompletePlatformRequest,
+) -> CompletePlatforms:
+    if request.file_name is None:
+        return CompletePlatforms()
+
+    content = importlib.resources.read_binary(request.module, request.file_name)
+    snapshot = await Get(Snapshot, CreateDigest([FileContent(request.file_name, content)]))
+    return CompletePlatforms.from_snapshot(snapshot)
 
 
 @dataclass(frozen=True)
@@ -419,9 +483,6 @@ class BuildPythonFaaSRequest:
 async def build_python_faas(
     request: BuildPythonFaaSRequest,
 ) -> BuiltPackage:
-    platform_str = request.runtime.to_platform_string()
-    pex_platforms = PexPlatforms([platform_str] if platform_str else [])
-
     additional_pex_args = (
         # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
         "--manylinux=manylinux2014",
@@ -430,9 +491,18 @@ async def build_python_faas(
         "--resolve-local-platforms",
     )
 
-    complete_platforms_get = Get(
-        CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
-    )
+    if request.complete_platforms.value is None:
+        # if the user hasn't set complete_platforms, look at the runtime argument
+        pex_platforms, complete_platforms_request = request.runtime.to_platform_args()
+        complete_platforms_get = Get(
+            CompletePlatforms, KnownRuntimeCompletePlatformRequest, complete_platforms_request
+        )
+    else:
+        complete_platforms_get = Get(
+            CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
+        )
+        pex_platforms = PexPlatforms()
+
     if request.handler:
         complete_platforms, handler = await MultiGet(
             complete_platforms_get,

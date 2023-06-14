@@ -15,7 +15,7 @@ from pants.core.goals.package import (
     BuiltPackageArtifact,
     Package,
     PackageFieldSet,
-    transitive_targets_without_traversing_packages_request,
+    TraverseIfNotPackageTarget,
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -209,7 +209,7 @@ def test_package_replace_existing(
         assert b.read_text() == "directory: b"
 
 
-def test_transitive_targets_without_traversing_packages_request(rule_runner: RuleRunner) -> None:
+def test_transitive_targets_without_traversing_packages(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
@@ -234,9 +234,12 @@ def test_transitive_targets_without_traversing_packages_request(rule_runner: Rul
     transitive_targets = rule_runner.request(
         TransitiveTargets,
         [
-            transitive_targets_without_traversing_packages_request(
-                roots=[z.address],
-                union_membership=union_membership,
+            TransitiveTargetsRequest(
+                [z.address],
+                should_traverse_deps_predicate=TraverseIfNotPackageTarget(
+                    roots=[z.address],
+                    union_membership=union_membership,
+                ),
             )
         ],
     )

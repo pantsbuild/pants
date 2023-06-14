@@ -5,7 +5,7 @@
 import itertools
 from pathlib import Path
 
-from common import die
+from pants_release.common import die
 
 DIRS_TO_CHECK = (
     "src/python",

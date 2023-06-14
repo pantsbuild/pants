@@ -5,7 +5,7 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from deploy_to_s3 import perform_deploy
+from pants_release.deploy_to_s3 import perform_deploy
 
 
 def main():
