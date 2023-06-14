@@ -5,7 +5,6 @@
 import importlib
 from itertools import chain
 
-import importlib_resources as resources
 
 
 def read_resource(package_or_module: str, resource: str) -> bytes:
@@ -25,7 +24,7 @@ def read_resource(package_or_module: str, resource: str) -> bytes:
         package = ".".join(chain((package_,), resource_parts[:-1]))
         resource = resource_parts[-1]
 
-    return resources.read_binary(package, resource)
+    return importlib.resources.files(package).joinpath(resource).read_bytes()
 
 
 def read_sibling_resource(sibling_name: str, resource: str) -> bytes:
