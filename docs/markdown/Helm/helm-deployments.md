@@ -124,7 +124,7 @@ spec:
 ```
 ```python src/deployment/BUILD
 # Overrides the `image` value for the chart using the target address for the first-party docker image.
-helm_deployment(chart="src/chart", values={"image": "src/docker"})
+helm_deployment(chart="src/chart", values={"image": "src/docker:docker"})
 ```
 
 > 📘 Docker image references VS Pants' target addresses
