@@ -7,6 +7,7 @@ python_sources(
     },
 )
 
+resource(name="complete_platform_faas-test", source="complete_platform_faas-test.json")
 python_tests(
     name="tests",
     overrides={
@@ -15,5 +16,6 @@ python_tests(
         "pex_test.py": {"timeout": 600},
         "package_dists_test.py": {"timeout": 150},
         "vcs_versioning_test.py": {"timeout": 120},
+        "faas_test.py": {"dependencies": [":complete_platform_faas-test"]},
     },
 )

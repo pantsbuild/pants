@@ -8,16 +8,15 @@ import argparse
 import datetime
 import logging
 import re
-import subprocess
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from textwrap import dedent
+from pathlib import Path
 
 import requests
 from packaging.version import Version
-from pants_release.common import die
+from pants_release.git import git, git_fetch
 
 logger = logging.getLogger(__name__)
 
@@ -27,47 +26,43 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--prior",
         required=True,
-        type=str,
+        type=Version,
         help="The version of the prior release, e.g. `2.0.0.dev0` or `2.0.0rc1`.",
     )
     parser.add_argument(
         "--new",
         required=True,
-        type=str,
+        type=Version,
         help="The version for the new release, e.g. `2.0.0.dev1` or `2.0.0rc2`.",
     )
     return parser
 
 
-def determine_release_branch(new_version_str: str) -> str:
-    new_version = Version(new_version_str)
-    # Use the main branch for all dev releases, and for the first alpha (which creates a stable branch).
-    use_main_branch = new_version.is_devrelease or (
-        new_version.pre
-        and "a0" == "".join(str(p) for p in new_version.pre)
-        and new_version.micro == 0
-    )
-    release_branch = "main" if use_main_branch else f"{new_version.major}.{new_version.minor}.x"
-    branch_confirmation = input(
-        f"Have you recently pulled from upstream on the branch `{release_branch}`? "
-        "This is needed to ensure the changelog is exhaustive. [Y/n]"
-    )
-    if branch_confirmation and branch_confirmation.lower() != "y":
-        die(f"Please checkout to the branch `{release_branch}` and pull from upstream. ")
-    return release_branch
+@dataclass(frozen=True)
+class ReleaseInfo:
+    version: Version
+    slug: str
+    branch: str
 
-
-def relevant_shas(prior: str, release_branch: str) -> list[str]:
-    prior_tag = f"release_{prior}"
-    return (
-        subprocess.run(
-            ["git", "log", "--format=format:%H", release_branch, f"^{prior_tag}"],
-            check=True,
-            stdout=subprocess.PIPE,
+    @staticmethod
+    def determine(new_version: Version) -> ReleaseInfo:
+        slug = f"{new_version.major}.{new_version.minor}.x"
+        # Use the main branch for all dev releases, and for the first alpha (which creates a stable branch).
+        use_main_branch = new_version.is_devrelease or (
+            new_version.pre
+            and "a0" == "".join(str(p) for p in new_version.pre)
+            and new_version.micro == 0
         )
-        .stdout.decode()
-        .splitlines()
-    )
+        branch = "main" if use_main_branch else slug
+        return ReleaseInfo(version=new_version, slug=slug, branch=branch)
+
+    def notes_file_name(self) -> Path:
+        return Path(f"src/python/pants/notes/{self.slug}.md")
+
+
+def relevant_shas(prior: Version, release_ref: str) -> list[str]:
+    prior_tag = f"release_{prior}"
+    return git("log", "--format=format:%H", release_ref, f"^{prior_tag}").splitlines()
 
 
 class Category(Enum):
@@ -131,15 +126,7 @@ def categorize(pr_num: str) -> Category | None:
 
 
 def prepare_sha(sha: str) -> Entry:
-    subject = (
-        subprocess.run(
-            ["git", "log", "-1", "--format=format:%s", sha],
-            check=True,
-            stdout=subprocess.PIPE,
-        )
-        .stdout.decode()
-        .strip()
-    )
+    subject = git("log", "-1", "--format=format:%s", sha)
     pr_num_match = re.search(r"\(#(\d{4,5})\)\s*$", subject)
     if not pr_num_match:
         return Entry(category=None, text=f"* {subject}")
@@ -150,11 +137,13 @@ def prepare_sha(sha: str) -> Entry:
     return Entry(category=category, text=f"* {subject_with_url}")
 
 
-def instructions(new_version: str, entries: list[Entry]) -> str:
-    date = datetime.date.today().strftime("%b %d, %Y")
-    version_components = new_version.split(".", maxsplit=4)
-    major, minor = version_components[0], version_components[1]
+@dataclass(frozen=True)
+class Formatted:
+    external: str
+    internal: str
 
+
+def format_notes(release_info: ReleaseInfo, entries: list[Entry], date: datetime.date) -> Formatted:
     entries_by_category = defaultdict(list)
     for entry in entries:
         entries_by_category[entry.category].append(entry.text)
@@ -165,42 +154,65 @@ def instructions(new_version: str, entries: list[Entry]) -> str:
         lines = "\n\n".join(entries)
         if not entries:
             return ""
-        return f"\n### {heading}\n\n{lines}\n"
+        return f"### {heading}\n\n{lines}"
 
-    return dedent(
-        f"""\
-        Copy the below headers into `src/python/pants/notes/{major}.{minor}.x.md`. Then, put each
-        external-facing commit into the relevant category. Commits that are internal-only (i.e.,
-        that are only of interest to Pants developers and have no user-facing implications) should
-        be pasted into a PR comment for review, not the release notes.
+    external_categories = [
+        Category.NewFeatures,
+        Category.UserAPIChanges,
+        Category.PluginAPIChanges,
+        Category.BugFixes,
+        Category.Performance,
+        Category.Documentation,
+        # ensure uncategorized entries appear
+        None,
+    ]
 
-        You can tweak descriptions to be more descriptive or to fix typos, and you can reorder
-        based on relative importance to end users. Delete any unused headers.
-
-        ---------------------------------------------------------------------
-
-        ## {new_version} ({date})
-        {{new_features}}{{user_api_changes}}{{plugin_api_changes}}{{bugfixes}}{{performance}}{{documentation}}{{internal}}
-        --------------------------------------------------------------------
-        {{uncategorized}}
-        """
-    ).format(
-        new_features=format_entries(Category.NewFeatures),
-        user_api_changes=format_entries(Category.UserAPIChanges),
-        plugin_api_changes=format_entries(Category.PluginAPIChanges),
-        bugfixes=format_entries(Category.BugFixes),
-        performance=format_entries(Category.Performance),
-        documentation=format_entries(Category.Documentation),
-        internal=format_entries(Category.Internal),
-        uncategorized=format_entries(None),
+    external = "\n\n".join(
+        [
+            f"## {release_info.version} ({date:%b %d, %Y})",
+            *(
+                formatted
+                for category in external_categories
+                if (formatted := format_entries(category))
+            ),
+        ]
     )
+    internal = format_entries(Category.Internal)
+
+    return Formatted(external=external, internal=internal)
+
+
+def splice(existing_contents: str, new_section: str) -> str:
+    # Find the first `## 2.minor...` heading, to be able to insert immediately before it, or the end
+    # of file, if not such section exists
+    try:
+        index = existing_contents.index("\n## 2.")
+    except ValueError:
+        index = len(existing_contents)
+    return "".join([existing_contents[:index], "\n", new_section, "\n", existing_contents[index:]])
+
+
+def splice_into_file(release_info: ReleaseInfo, formatted: Formatted) -> None:
+    file_name = release_info.notes_file_name()
+    try:
+        existing_contents = file_name.read_text()
+    except FileNotFoundError:
+        # default content if the file doesn't exist yet
+        existing_contents = f"# {release_info.slug} Release Series\n"
+
+    file_name.write_text(splice(existing_contents, formatted.external))
 
 
 def main() -> None:
     args = create_parser().parse_args()
-    release_branch = determine_release_branch(args.new)
-    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, release_branch)]
-    print(instructions(args.new, entries))
+    release_info = ReleaseInfo.determine(args.new)
+    branch_sha = git_fetch(release_info.branch)
+    date = datetime.date.today()
+    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, branch_sha)]
+
+    formatted = format_notes(release_info, entries, date)
+    splice_into_file(release_info, formatted)
+    print(f"\nCommit {release_info.notes_file_name()} and create a PR.\n\n{formatted.internal}")
 
 
 if __name__ == "__main__":

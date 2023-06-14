@@ -43,7 +43,7 @@ _release_globs = [
 ]
 _ci_config_globs = [
     "build-support/bin/classify_changed_files.py",
-    "build-support/bin/generate_github_workflows.py",
+    "src/python/pants_release/generate_github_workflows.py",
 ]
 
 

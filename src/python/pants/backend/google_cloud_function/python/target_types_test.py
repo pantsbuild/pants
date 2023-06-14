@@ -116,7 +116,7 @@ def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:
         match=r".*{}.*".format(
             re.escape(
                 "InvalidTargetException: The `python_google_cloud_function` target project:neither "
-                "must specify either a `runtime` or `complete_platforms` or both."
+                "must specify either a `runtime` or `complete_platforms`."
             )
         ),
     ):
