@@ -19,7 +19,6 @@ may be called via `./pants run` instead of direct invocation if desired.
 """
 from __future__ import annotations
 
-import subprocess
 import time
 from typing import NoReturn
 
@@ -48,17 +47,3 @@ def elapsed_time() -> tuple[int, int]:
     now = time.time()
     elapsed_seconds = int(now - _SCRIPT_START_TIME)
     return elapsed_seconds // 60, elapsed_seconds % 60
-
-
-def git_merge_base() -> str:
-    get_tracking_branch = [
-        "git",
-        "rev-parse",
-        "--symbolic-full-name",
-        "--abbrev-ref",
-        "HEAD@{upstream}",
-    ]
-    process = subprocess.run(
-        get_tracking_branch, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
-    )
-    return str(process.stdout.rstrip()) if process.stdout else "main"
