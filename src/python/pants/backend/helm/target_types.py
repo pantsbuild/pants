@@ -474,7 +474,7 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
         ```
         helm_deployment(
             values={
-                "configmap.deployedAt": "{env.DEPLOY_TIME}",
+                "configmap.deployedAt": f"{env('DEPLOY_TIME')}",
             },
         )
         ```
