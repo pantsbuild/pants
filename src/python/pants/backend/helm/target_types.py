@@ -519,7 +519,7 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
                 "2.19.0.dev0",
                 "Using the {env.VAR_NAME} interpolation syntax",
                 "Use the new `f\"prefix-{env('VAR_NAME')}\" syntax for interpolating values from environment variables.",
-                start_version="2.18.0rc0",
+                start_version="2.18.0.dev0",
             )
 
         return result
