@@ -8,20 +8,20 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 from typing import Any, Dict, Sequence, cast
 
 import toml
 import yaml
-from common import die
+from pants_release.common import die
 
 from pants.util.strutil import softwrap
 
 HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
-    # To change, edit `build-support/bin/generate_github_workflows.py` and run:
-    #   ./pants run build-support/bin/generate_github_workflows.py
+    # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+    #   ./pants run src/python/pants_release/generate_github_workflows.py
     """
 )
 
@@ -299,7 +299,7 @@ def deploy_to_s3(
     *,
     scope: str | None = None,
 ) -> Step:
-    run = "./build-support/bin/deploy_to_s3.py"
+    run = "./src/python/pants_release/deploy_to_s3.py"
     if scope:
         run = f"{run} --scope {scope}"
     return {
@@ -525,8 +525,8 @@ class Helper:
             # it cleans out `dist/deploy`, which the build-wheels runs populate for
             # later attention by deploy_to_s3.py.
             """\
-            ./pants run build-support/bin/release.py -- build-local-pex
-            ./pants run build-support/bin/release.py -- build-wheels
+            ./pants run src/python/pants_release/release.py -- build-local-pex
+            ./pants run src/python/pants_release/release.py -- build-wheels
             """
         )
 
@@ -569,7 +569,7 @@ class Helper:
                 f"""\
                 export S3_DST={s3_dst}
                 echo "Uploading test reports to ${{S3_DST}}"
-                ./build-support/bin/copy_to_s3.py \
+                ./src/python/pants_release/copy_to_s3.py \
                   --src-prefix=dist/test/reports \
                   --dst-prefix=${{S3_DST}} \
                   --path=""
@@ -643,7 +643,7 @@ def bootstrap_jobs(
                         "name": "Validate CI config",
                         "run": dedent(
                             """\
-                    ./pants run build-support/bin/generate_github_workflows.py -- --check
+                    ./pants run src/python/pants_release/generate_github_workflows.py -- --check
                     """
                         ),
                     }
@@ -1057,7 +1057,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 *helper.expose_all_pythons(),
                 {
                     "name": "Fetch and stabilize wheels",
-                    "run": f"./pants run build-support/bin/release.py -- fetch-and-stabilize --dest={pypi_release_dir}",
+                    "run": f"./pants run src/python/pants_release/release.py -- fetch-and-stabilize --dest={pypi_release_dir}",
                     "env": {
                         # This step does not actually build anything: only download wheels from S3.
                         "MODE": "debug",

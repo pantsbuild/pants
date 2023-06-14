@@ -32,7 +32,7 @@ from typing import Any, Dict, Iterable, cast
 
 import chevron
 import requests
-from common import die
+from pants_release.common import die
 from readme_api import DocRef, ReadmeAPI
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir

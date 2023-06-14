@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "graph"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
