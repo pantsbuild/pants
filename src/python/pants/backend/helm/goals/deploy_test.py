@@ -67,7 +67,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
               helm_deployment(
                 name="foo",
                 description="Foo deployment",
-                namespace="uat-{env.NS_SUFFIX}",
+                namespace="uat-{env('NS_SUFFIX')}",
                 skip_crds=True,
                 no_hooks=True,
                 dependencies=["//src/chart", "//src/docker/myimage"],
@@ -76,7 +76,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                     "key": "foo",
                     "amount": "300",
                     "long_string": "This is a long string",
-                    "build_number": "{env.BUILD_NUMBER}",
+                    "build_number": "{env('BUILD_NUMBER')}",
                 },
                 timeout=150,
               )

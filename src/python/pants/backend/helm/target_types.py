@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Mapping
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
 from pants.base.deprecated import deprecated, warn_or_error
@@ -37,6 +38,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
+from pants.util.memo import memoized_method
 from pants.util.strutil import help_text, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
@@ -428,36 +430,7 @@ class HelmDeploymentReleaseNameField(StringField):
 
 class HelmDeploymentNamespaceField(StringField, AsyncFieldMixin):
     alias = "namespace"
-    help = help_text(
-        """
-        Kubernetes namespace for the given deployment.
-
-        This field supports value interpolation, so `mynamespace-{env.NS_SUFFIX}` would use the `NS_SUFFIX`
-        environment variable value as part of the namespace.
-        """
-    )
-
-    def format_with(
-        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
-    ) -> str | None:
-        source = InterpolationContext.TextSource(
-            self.address,
-            target_alias=HelmDeploymentTarget.alias,
-            field_alias=HelmDeploymentNamespaceField.alias,
-        )
-
-        if not self.value:
-            return None
-
-        try:
-            return interpolation_context.format(
-                self.value,
-                source=source,
-            )
-        except InterpolationError as err:
-            if ignore_missing:
-                return None
-            raise err
+    help = help_text("""Kubernetes namespace for the given deployment.""")
 
 
 class HelmDeploymentDependenciesField(Dependencies):
@@ -509,6 +482,8 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
         """
     )
 
+    @memoized_method
+    @deprecated("2.19.9.dev0", start_version="2.18.0rc0")
     def format_with(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
     ) -> dict[str, str]:
@@ -530,10 +505,19 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
                 raise err
 
         result = {}
-        for key, value in (self.value or {}).items():
+        current_value: Mapping[str, str] = self.value or {}
+        for key, value in current_value.items():
             formatted_value = format_value(value)
             if formatted_value is not None:
                 result[key] = formatted_value
+
+        if result != current_value:
+            warn_or_error(
+                "2.19.0.dev0",
+                "Using the {env.VAR_NAME} interpolation syntax",
+                "Use the new `f\"prefix-{env('VAR_NAME')}\" syntax for interpolating values from environment variables.",
+                start_version="2.18.0rc0",
+            )
 
         return result
 

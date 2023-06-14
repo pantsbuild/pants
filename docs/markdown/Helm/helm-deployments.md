@@ -218,7 +218,7 @@ helm_deployment(
   name="dev",
   chart="//src/chart",
   values={
-    "configmap.deployedAt": "{env.DEPLOY_TIME}",
+    "configmap.deployedAt": "{env('DEPLOY_TIME')}",
   },
 )
 ```
