@@ -54,7 +54,7 @@ jobs:
     name: Cherry-Pick
     needs: prerequisites
     runs-on: ubuntu-latest
-    # continue-on-error: true # Don't cancel other jobs if this one fails
+    continue-on-error: true # Don't cancel other jobs if this one fails
     strategy:
       matrix:
         include: ${{ fromJSON(needs.prerequisites.outputs.matrix) }}
