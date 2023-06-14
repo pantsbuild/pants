@@ -46,7 +46,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
-from pants.core.goals.package import transitive_targets_without_traversing_packages_request
+from pants.core.goals.package import TraverseIfNotPackageTarget
 from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
@@ -540,9 +540,12 @@ async def create_pex_from_targets(
     if request.include_source_files:
         transitive_targets = await Get(
             TransitiveTargets,
-            transitive_targets_without_traversing_packages_request(
-                roots=request.addresses,
-                union_membership=union_membership,
+            TransitiveTargetsRequest(
+                request.addresses,
+                should_traverse_deps_predicate=TraverseIfNotPackageTarget(
+                    roots=request.addresses,
+                    union_membership=union_membership,
+                )
             ),
         )
         sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
