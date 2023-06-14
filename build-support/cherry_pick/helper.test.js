@@ -75,7 +75,6 @@ function get_context() {
       repo: REPO,
       number: 19214,
     },
-    job: "9269746089",
     runId: 5148273558,
     workflow: "Auto Cherry-Picker",
   };
@@ -109,7 +108,7 @@ test("get_prereqs fails when no milestone", async () => {
 
 @steve_buscemi: Please add the milestone to the PR and re-run the [Auto Cherry-Picker job](<WORKFLOW_URL>) using the "Run workflow" button.
 
-:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558/jobs/9269746089)`
+:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`
   );
   expect(helper.core.setFailed).toBeCalledTimes(1);
 });
@@ -235,13 +234,13 @@ Please note that I cannot re-run CI if a job fails. Please work with your PR app
 
 Successfully opened <URL for 2.17.x>.
 
-
-
 ---
+
+When you're done manually cherry-picking, please remove the \`needs-cherrypick\` label on this PR.
 
 Thanks again for your contributions!
 
-:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558/jobs/9269746089)`
+:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`
   );
 });
 
@@ -275,12 +274,10 @@ test("cherry_pick_finished all pass", async () => {
 
 Successfully opened <URL for 2.16.x>.
 
-
-
 ---
 
 Thanks again for your contributions!
 
-:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558/jobs/9269746089)`
+:robot: [Beep Boop here's my run link](https://github.com/pantsbuild/pants/actions/runs/5148273558)`
   );
 });

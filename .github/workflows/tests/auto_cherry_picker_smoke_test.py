@@ -17,6 +17,9 @@ def stub_make_pr():
                 set -euo pipefail
 
                 echo "make_pr.sh $@"
+                if [ $1 == "2.16.x" ]; then
+                    sleep 10
+                fi
                 # We exit 1 to test we still call the finish job
                 exit 1
                 """
@@ -110,3 +113,8 @@ def test_auto_cherry_pick__PR_doesnt_match(tmp_path):
     print(stdout)
     assert not result.stderr
     # @TODO: Assert we didn't try and run _anything_. See https://github.com/pantsbuild/pants/issues/19305
+
+@pytest.mark.xfail(reason="https://github.com/nektos/act/issues/1865")
+def test_auto_cherry_pick__continue_on_failure():
+    result = run_act("workflow_dispatch")
+    assert "[Auto Cherry-Picker/Cherry-Pick-1       ]   ❌  Failure" not in result.stdout
