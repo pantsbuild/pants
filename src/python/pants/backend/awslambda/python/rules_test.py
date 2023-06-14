@@ -281,7 +281,16 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
     assert "assets:resources" not in caplog.text
 
 
-def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("ics", "runtime"),
+    [
+        pytest.param(["==3.7"], None, id="runtime inferred from ICs"),
+        pytest.param(None, "python3.7", id="runtime explicitly set"),
+    ],
+)
+def test_create_hello_world_lambda(
+    ics: list[str] | None, runtime: None | str, rule_runner: PythonRuleRunner
+) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -293,20 +302,20 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             "src/python/foo/bar/BUILD": dedent(
-                """
+                f"""
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
-                python_sources()
+                python_sources(interpreter_constraints={ics!r})
 
                 python_aws_lambda_function(
                     name='lambda',
                     handler='foo.bar.hello_world:handler',
-                    runtime="python3.7",
+                    runtime={runtime!r},
                 )
                 python_aws_lambda_function(
                     name='slimlambda',
                     include_requirements=False,
                     handler='foo.bar.hello_world:handler',
-                    runtime="python3.7",
+                    runtime={runtime!r},
                 )
                 """
             ),

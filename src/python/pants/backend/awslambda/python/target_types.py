@@ -26,7 +26,6 @@ from pants.engine.target import (
     BoolField,
     Field,
     InvalidFieldException,
-    InvalidTargetException,
     Target,
 )
 from pants.util.docutil import doc_url
@@ -161,16 +160,6 @@ class _AWSLambdaBaseTarget(Target):
 
         runtime_alias = self[PythonAwsLambdaRuntime].alias
         complete_platforms_alias = self[PexCompletePlatformsField].alias
-
-        if not (has_runtime or has_complete_platforms):
-            raise InvalidTargetException(
-                softwrap(
-                    f"""
-                    The `{self.alias}` target {self.address} must specify either a
-                    `{runtime_alias}` or `{complete_platforms_alias}`.
-                    """
-                )
-            )
 
         if has_runtime and has_complete_platforms:
             warn_or_error(
