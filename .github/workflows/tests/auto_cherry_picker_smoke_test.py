@@ -17,9 +17,6 @@ def stub_make_pr():
                 set -euo pipefail
 
                 echo "make_pr.sh $@"
-                if [ $1 == "2.16.x" ]; then
-                    sleep 10
-                fi
                 # We exit 1 to test we still call the finish job
                 exit 1
                 """
@@ -81,6 +78,11 @@ def test_auto_cherry_pick__workflow_dispatch():
     stdout = result.stdout
     assert "make_pr.sh 12345 2.16.x" in stdout
     assert "make_pr.sh 12345 2.17.x" in stdout
+    # NB: Even if one fails, the other should run to completion and fail as well (e.g. continue-on-error)
+    # (although act has a bug where it doesn't cancel: https://github.com/nektos/act/issues/1865
+    # so we aren't _really_ testing `continue-on-error` until that is fixed)
+    assert "[Auto Cherry-Picker/Cherry-Pick-1       ]   ❌  Failure" in result.stdout
+    assert "[Auto Cherry-Picker/Cherry-Pick-2       ]   ❌  Failure" in result.stdout
     assert (
         'cherry_picked_finished: ABCDEF12345 [{"milestone":"2.16.x","branch_name":"cherry-pick-12345-to-2.16.x"},{"milestone":"2.17.x","branch_name":"cherry-pick-12345-to-2.17.x"}]'
         in stdout
@@ -101,24 +103,6 @@ def test_auto_cherry_pick__PR_merged(tmp_path):
         'cherry_picked_finished: ABCDEF12345 [{"milestone":"2.16.x","branch_name":"cherry-pick-12345-to-2.16.x"},{"milestone":"2.17.x","branch_name":"cherry-pick-12345-to-2.17.x"}]'
         in stdout
     )
-
-
-@pytest.mark.xfail(reason="https://github.com/nektos/act/issues/1482")
-def test_auto_cherry_pick__PR_doesnt_match(tmp_path):
-    event_path = tmp_path / "event.json"
-    event_path.write_text(json.dumps({"pull_request": {"merged": True, "labels": []}}))
-
-    result = run_act("pull_request_target", "--eventpath", str(event_path))
-    stdout = result.stdout
-    print(stdout)
-    assert not result.stderr
-    # @TODO: Assert we didn't try and run _anything_. See https://github.com/pantsbuild/pants/issues/19305
-
-
-@pytest.mark.xfail(reason="https://github.com/nektos/act/issues/1865")
-def test_auto_cherry_pick__continue_on_failure():
-    result = run_act("workflow_dispatch")
-    assert "[Auto Cherry-Picker/Cherry-Pick-1       ]   ❌  Failure" not in result.stdout
 
 
 def test_auto_cherry_pick__prerequisites_failed():
