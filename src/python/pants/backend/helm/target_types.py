@@ -610,7 +610,7 @@ class HelmDeploymentFieldSet(FieldSet):
     enable_dns: HelmDeploymentEnableDNSField
 
     @deprecated(
-        "2.19.0.dev0", "Use `field_set.values.format_with()` instead.", start_version="2.18.0rc0"
+        "2.19.0.dev0", "Use `field_set.values.format_with()` instead.", start_version="2.18.0.dev0"
     )
     def format_values(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
