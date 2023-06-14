@@ -215,6 +215,5 @@ class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
         return True
 
 
-
 def rules():
     return (*collect_rules(), *distdir.rules())
