@@ -94,7 +94,7 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
 
 
 def test_pipfile_lockfile_dependency(rule_runner: RuleRunner) -> None:
-    """This tests that we adds a dependency on the lockfile for the resolve for each generated
+    """This tests that we add a dependency on the lockfile for the resolve for each generated
     python_requirement."""
     rule_runner.set_options(["--python-enable-resolves"])
     file_addr = Address("", target_name="reqs", relative_file_path="Pipfile.lock")

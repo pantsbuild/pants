@@ -151,7 +151,7 @@ class DependencyOwner:
 
     We need this type to prevent rule ambiguities when computing the list of targets owned by an
     ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which is itself an
-    ExportedTarget) and checking if owner is the original ExportedTarget.
+    ExportedTarget) and checking if owner is the original ExportedTarget).
     """
 
     exported_target: ExportedTarget
@@ -634,7 +634,7 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
         )
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
-    # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have
+    # set. The user must have gone out of their way to use a `SetupKwargs` plugin, and to have
     # specified `SetupKwargs(_allow_banned_keys=True)`.
     setup_kwargs.update(
         {
