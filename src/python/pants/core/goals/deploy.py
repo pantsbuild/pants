@@ -18,10 +18,10 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishProcessesRequest,
 )
-from pants.engine.addresses import Addresses
+from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
@@ -137,13 +137,24 @@ async def _publish_processes_for_targets(targets: Iterable[Target]) -> PublishPr
 
 
 @dataclass(frozen=True)
-class _DeployTargetRequest:
+class _DeployTargetRequest(EngineAwareParameter):
     target: CoarsenedTarget
+    dependent: Address | None = None
+
+    def debug_hint(self) -> str:
+        return self.target.representative.address.spec
+
+
+class _DeployTargetRequests(Collection[_DeployTargetRequest]):
+    pass
 
 
 @dataclass(frozen=True)
-class _DeployTargetDependencies:
+class _DeployTargetDependenciesRequest(EngineAwareParameter):
     target: CoarsenedTarget
+
+    def debug_hint(self) -> str | None:
+        return self.target.representative.address.spec
 
 
 class _DeployStepAction(Enum):
@@ -240,7 +251,7 @@ class _DeployStepResult(EngineAwareReturnType):
 
     def message(self) -> str | None:
         if self.output:
-            return "\n".join(self.output) + "\n\n"
+            return "\n".join(self.output)
 
         return None
 
@@ -284,6 +295,9 @@ class _DeployStepResult(EngineAwareReturnType):
 class _DeployStepResults(Collection[_DeployStepResult]):
     @memoized_property
     def exit_code(self) -> int:
+        if len(self) == 0:
+            return 0
+
         return max(result.exit_code for result in self)
 
     @property
@@ -292,7 +306,7 @@ class _DeployStepResults(Collection[_DeployStepResult]):
             yield from result.closure
 
 
-@rule
+@rule(desc="Publish package dependencies", level=LogLevel.DEBUG)
 async def _run_publish_process(publish: PublishPackages) -> _DeployStepResult:
     if publish.process:
         # TODO cheating here, but only by invoking the underly process I can run this in a `@rule`
@@ -306,7 +320,7 @@ async def _run_publish_process(publish: PublishPackages) -> _DeployStepResult:
     )
 
 
-@rule
+@rule(desc="Run deployment step", level=LogLevel.DEBUG)
 async def _run_deploy_process(deploy: DeployProcess) -> _DeployStepResult:
     publish_results: Iterable[_DeployStepResult] = []
     if deploy.publish_dependencies:
@@ -337,19 +351,33 @@ async def _run_deploy_process(deploy: DeployProcess) -> _DeployStepResult:
     )
 
 
-@rule
+@rule(desc="Deploy target dependencies", level=LogLevel.DEBUG)
 async def _deploy_target_dependencies(
-    request: _DeployTargetDependencies,
-) -> _DeployStepResults:
-    results = await MultiGet(
-        Get(_DeployStepResult, _DeployTargetRequest(tgt)) for tgt in request.target.dependencies
+    request: _DeployTargetDependenciesRequest,
+) -> _DeployTargetRequests:
+    def should_ignore(dep: CoarsenedTarget) -> bool:
+        us = request.target.representative.address
+        them = dep.representative.address
+        return us.spec_path == them.spec_path and us.target_name == them.target_name
+
+    return _DeployTargetRequests(
+        [_DeployTargetRequest(dep) for dep in request.target.dependencies if not should_ignore(dep)]
     )
-    return _DeployStepResults(results)
 
 
 @rule
+async def _deploy_targets(requests: _DeployTargetRequests) -> _DeployStepResults:
+    result = await MultiGet(
+        Get(_DeployStepResult, _DeployTargetRequest, request) for request in requests
+    )
+    return _DeployStepResults(result)
+
+
+@rule(desc="Deploy target", level=LogLevel.DEBUG)
 async def _deploy_coarsened_target(request: _DeployTargetRequest) -> _DeployStepResult:
-    dependency_results = await Get(_DeployStepResults, _DeployTargetDependencies(request.target))
+    dependency_results = await Get(
+        _DeployStepResults, _DeployTargetDependenciesRequest(request.target)
+    )
     if dependency_results.exit_code != 0:
         return _DeployStepResult(
             exit_code=dependency_results.exit_code,
@@ -399,6 +427,9 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
         ),
     )
+
+    if not target_roots_to_deploy_field_sets.targets:
+        return Deploy(exit_code=0)
 
     coarsened_targets = await Get(
         CoarsenedTargets,
