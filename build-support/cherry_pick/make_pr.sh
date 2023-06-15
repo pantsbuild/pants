@@ -40,5 +40,5 @@ gh pr create \
   --milestone "$MILESTONE" \
   --body-file "$BODY_FILE" \
   --reviewer "$REVIEWERS" \
-  ${ADDITIONAL_ARGS[@]}
+  "${ADDITIONAL_ARGS[@]}"
 rm "$BODY_FILE"
