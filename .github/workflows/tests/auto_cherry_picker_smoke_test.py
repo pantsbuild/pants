@@ -76,8 +76,8 @@ def test_auto_cherry_pick__workflow_dispatch():
         "workflow_dispatch",
     )
     stdout = result.stdout
-    assert "make_pr.sh 12345 2.16.x" in stdout
-    assert "make_pr.sh 12345 2.17.x" in stdout
+    assert "make_pr.sh 12345 2.16.x cherry-pick-12345-to-2.16.x" in stdout
+    assert "make_pr.sh 12345 2.17.x cherry-pick-12345-to-2.17.x" in stdout
     # NB: Even if one fails, the other should run to completion and fail as well (e.g. continue-on-error)
     # (although act has a bug where it doesn't cancel: https://github.com/nektos/act/issues/1865
     # so we aren't _really_ testing `continue-on-error` until that is fixed)
@@ -97,8 +97,8 @@ def test_auto_cherry_pick__PR_merged(tmp_path):
 
     result = run_act("pull_request_target", "--eventpath", str(event_path))
     stdout = result.stdout
-    assert "make_pr.sh 12345 2.16.x" in stdout
-    assert "make_pr.sh 12345 2.17.x" in stdout
+    assert "make_pr.sh 12345 2.16.x cherry-pick-12345-to-2.16.x" in stdout
+    assert "make_pr.sh 12345 2.17.x cherry-pick-12345-to-2.17.x" in stdout
     assert (
         'cherry_picked_finished: ABCDEF12345 [{"milestone":"2.16.x","branch_name":"cherry-pick-12345-to-2.16.x"},{"milestone":"2.17.x","branch_name":"cherry-pick-12345-to-2.17.x"}]'
         in stdout
