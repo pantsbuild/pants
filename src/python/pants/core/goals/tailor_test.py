@@ -597,26 +597,35 @@ def test_resolve_specs_targetting_build_files(build_file_name) -> None:
             description_of_origin="CLI arguments",
             dir_literals=(DirLiteralSpec(f"src/{build_file_name}"), DirLiteralSpec("src/dir")),
             dir_globs=(DirGlobSpec("src/other/"),),
-            file_literals=(FileLiteralSpec(f"src/exists/{build_file_name}"),),
+            file_literals=(FileLiteralSpec(f"src/exists/{build_file_name}.suffix"),),
         ),
         ignores=RawSpecs(
             description_of_origin="CLI arguments",
             dir_literals=(DirLiteralSpec(f"bad/{build_file_name}"), DirLiteralSpec("bad/dir")),
             dir_globs=(DirGlobSpec("bad/other/"),),
-            file_literals=(FileLiteralSpec(f"bad/exists/{build_file_name}"),),
+            file_literals=(FileLiteralSpec(f"bad/exists/{build_file_name}.suffix"),),
         ),
     )
-    resolved = resolve_specs_with_build(specs, build_file_name)
+    build_file_patterns = (build_file_name, f"{build_file_name}.*")
+    resolved = resolve_specs_with_build(specs, build_file_patterns)
 
-    assert resolved.includes.file_literals == (FileLiteralSpec("src/exists"),)
-    assert resolved.ignores.file_literals == (FileLiteralSpec("bad/exists"),)
+    assert resolved.includes.file_literals == tuple()
+    assert resolved.ignores.file_literals == tuple()
 
-    assert resolved.includes.dir_literals == (DirLiteralSpec("src"), DirLiteralSpec("src/dir"))
-    assert resolved.ignores.dir_literals == (DirLiteralSpec("bad"), DirLiteralSpec("bad/dir"))
+    assert resolved.includes.dir_literals == (
+        DirLiteralSpec("src/exists"),
+        DirLiteralSpec("src"),
+        DirLiteralSpec("src/dir"),
+    )
+    assert resolved.ignores.dir_literals == (
+        DirLiteralSpec("bad/exists"),
+        DirLiteralSpec("bad"),
+        DirLiteralSpec("bad/dir"),
+    )
 
     assert resolved.includes.dir_globs == (
         DirGlobSpec("src/other/"),
-    ), "did not passthrough other target"
+    ), "did not passthrough other spec type"
     assert resolved.ignores.dir_globs == (
         DirGlobSpec("bad/other/"),
-    ), "did not passthrough other target"
+    ), "did not passthrough other spec type"
