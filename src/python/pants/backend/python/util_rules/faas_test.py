@@ -318,18 +318,9 @@ def test_infer_runtime_platforms_when_complete_platforms(
             (3, 45),
             [],
             ["complete_platform_faas-test-3-45.json"],
-            id="known 3.45, any patch",
+            id="known 3.45",
         ),
-        pytest.param(
-            "==3.45.12",
-            (3, 45),
-            [],
-            ["complete_platform_faas-test-3-45.json"],
-            id="known 3.45, specific patch",
-        ),
-        pytest.param(
-            ">=3.33,<3.34", (3, 33), ["linux_x86_64-cp-333-cp333"], [], id="unknown, 3.33"
-        ),
+        pytest.param(">=3.33,<3.34", (3, 33), ["linux_x86_64-cp-333-cp333"], [], id="unknown 3.33"),
     ],
 )
 def test_infer_runtime_platforms_when_narrow_ics_only(
@@ -339,9 +330,6 @@ def test_infer_runtime_platforms_when_narrow_ics_only(
     expected_complete_platforms: list[str],
     rule_runner: RuleRunner,
 ) -> None:
-    rule_runner.set_options(
-        ["--python-interpreter-versions-universe=[3.32,3.33,3.34,3.44,3.45,3.46]"]
-    )
     rule_runner.write_files(
         {
             "path/BUILD": f"python_sources(name='target', interpreter_constraints=['{ics}'])",
@@ -367,18 +355,19 @@ def test_infer_runtime_platforms_when_narrow_ics_only(
 
 
 @pytest.mark.parametrize(
-    ("ics", "expected_message"),
+    "ics",
     [
-        pytest.param(">=3.44", "3 (3.44, 3.45, ...)", id="three"),
-        pytest.param(">=3.45", "2 (3.45, 3.46)", id="two"),
+        # specific patch might not be what the FaaS provider is using
+        "==3.45.67",
+        # wide version constraints are ambiguous
+        ">=3.45",
+        "<3.47,>=3.45",
     ],
 )
 def test_infer_runtime_platforms_errors_when_wide_ics(
     ics: str,
-    expected_message: str,
     rule_runner: RuleRunner,
 ) -> None:
-    rule_runner.set_options(["--python-interpreter-versions-universe=[3.44,3.45,3.46]"])
     rule_runner.write_files(
         {
             "path/BUILD": f"python_sources(name='target', interpreter_constraints=['{ics}'])",
@@ -400,4 +389,4 @@ def test_infer_runtime_platforms_errors_when_wide_ics(
         "The 'example_target' target path:target cannot have its runtime platform inferred"
         in str(exc.value)
     )
-    assert expected_message in str(exc.value)
+    assert ics in str(exc.value)

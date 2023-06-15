@@ -348,38 +348,27 @@ async def _infer_from_ics(
     # platform's known runtimes, it's more likely that the ICs cover exactly one version in future,
     # and thus ease Pants upgrades (e.g. at the time of writing, '>=3.10' currently only covers one
     # version supported by AWS Lambda (3.10), but will cover more when AWS adds support for 3.11)
-    major_minors = ics.partition_into_major_minor_ints(python_setup.interpreter_versions_universe)
-    if len(major_minors) == 1:
-        return major_minors[0]
 
-    # uhoh, 0 or 2+ versions, that's an error!
-    if major_minors:
-        # e.g. (3.9, 3.10) if there's just two, or (3.9, 3.10, ...) if there's more
-        formatted = ", ".join(
-            [
-                *(f"{major}.{minor}" for major, minor in major_minors[:2]),
-                *(("...",) if len(major_minors) > 2 else ()),
-            ]
-        )
-        details = f" ({formatted})"
-    else:
-        details = ""
+    major_minor = ics.major_minor_version_when_single_and_entire()
+    if major_minor is not None:
+        return major_minor
 
     raise InvalidTargetException(
         softwrap(
             f"""
-                The {request.target_name!r} target {request.address} cannot have its runtime
-                platform inferred, because inference requires the interpreter constraints to include
-                exactly one minor release of Python, but the constraints ({ics}) include {len(major_minors)}{details}.
+            The {request.target_name!r} target {request.address} cannot have its runtime platform
+            inferred, because inference requires simple interpreter constraints covering exactly one
+            minor release of Python, and all its patch version. The constraints for this target
+            ({ics}) aren't understood.
 
-                To fix, provide one of the following:
+            To fix, provide one of the following:
 
-                - a value for the `{request.runtime.alias}` field, or
+            - a value for the `{request.runtime.alias}` field, or
 
-                - a value for the `{request.complete_platforms.alias}` field, or
+            - a value for the `{request.complete_platforms.alias}` field, or
 
-                - narrower interpreter constraints
-                """
+            - simple and narrow interpreter constraints (for example, `==3.10.*` or `>=3.10,<3.11` are simple enough to imply Python 3.10)
+            """
         )
     )
 

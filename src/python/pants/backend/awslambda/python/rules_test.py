@@ -284,7 +284,7 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
 @pytest.mark.parametrize(
     ("ics", "runtime"),
     [
-        pytest.param(["==3.7"], None, id="runtime inferred from ICs"),
+        pytest.param(["==3.7.*"], None, id="runtime inferred from ICs"),
         pytest.param(None, "python3.7", id="runtime explicitly set"),
     ],
 )

@@ -252,7 +252,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
 @pytest.mark.parametrize(
     ("ics", "runtime"),
     [
-        pytest.param(["==3.7"], None, id="runtime inferred from ICs"),
+        pytest.param(["==3.7.*"], None, id="runtime inferred from ICs"),
         pytest.param(None, "python37", id="runtime explicitly set"),
     ],
 )
