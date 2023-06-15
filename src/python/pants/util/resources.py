@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-import importlib
+import importlib.resources
 from itertools import chain
-
 
 
 def read_resource(package_or_module: str, resource: str) -> bytes:
