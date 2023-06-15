@@ -199,6 +199,20 @@ class _DeployStepResult(EngineAwareReturnType):
             substeps=tuple(substeps or []),
         )
 
+    @classmethod
+    def failed_dependencies(
+        cls, deploy: DeployProcess, results: _DeployStepResults
+    ) -> _DeployStepResult:
+        assert results.exit_code != 0
+        return _DeployStepResult(
+            exit_code=results.exit_code,
+            action=_DeployStepAction.DEPLOYMENT,
+            outcome=_DeployStepOutcome.FAILED_DEPENDENCIES,
+            names=(deploy.name,),
+            description=deploy.description,
+            substeps=results,
+        )
+
     @staticmethod
     def _determine_outcome(result: FallibleProcessResult) -> _DeployStepOutcome:
         return _DeployStepOutcome.SUCCESS if result.exit_code == 0 else _DeployStepOutcome.FAILURE
@@ -243,7 +257,11 @@ class _DeployStepResult(EngineAwareReturnType):
                 )
                 prep = "to"
             else:
-                status = "failed"
+                status = (
+                    "failed"
+                    if self.outcome == _DeployStepOutcome.FAILURE
+                    else "failed dependencies"
+                )
                 prep = "for"
 
             if self.description:
@@ -264,6 +282,10 @@ class _DeployStepResult(EngineAwareReturnType):
 
 
 class _DeployStepResults(Collection[_DeployStepResult]):
+    @memoized_property
+    def exit_code(self) -> int:
+        return max(result.exit_code for result in self)
+
     @property
     def closure(self) -> Iterator[_DeployStepResult]:
         for result in self:
@@ -289,19 +311,14 @@ async def _run_deploy_process(deploy: DeployProcess) -> _DeployStepResult:
     publish_results: Iterable[_DeployStepResult] = []
     if deploy.publish_dependencies:
         publish_processes = await _publish_processes_for_targets(deploy.publish_dependencies)
-        publish_results = await MultiGet(
-            Get(_DeployStepResult, PublishPackages, process) for process in publish_processes
-        )
-        exit_code = max(result.exit_code for result in publish_results)
-        if exit_code > 0:
-            return _DeployStepResult(
-                exit_code=exit_code,
-                action=_DeployStepAction.PUBLISH_PACKAGE,
-                outcome=_DeployStepOutcome.FAILED_DEPENDENCIES,
-                names=(deploy.name,),
-                description=deploy.description,
-                substeps=publish_results,
+        publish_results = _DeployStepResults(
+            await MultiGet(
+                Get(_DeployStepResult, PublishPackages, process) for process in publish_processes
             )
+        )
+
+        if publish_results.exit_code != 0:
+            return _DeployStepResult.failed_dependencies(deploy, publish_results)
 
     if deploy.process:
         # TODO cheating here, but only by invoking the underly process I can run this in a `@rule`
@@ -333,10 +350,9 @@ async def _deploy_target_dependencies(
 @rule
 async def _deploy_coarsened_target(request: _DeployTargetRequest) -> _DeployStepResult:
     dependency_results = await Get(_DeployStepResults, _DeployTargetDependencies(request.target))
-    exit_code = max(result.exit_code for result in dependency_results)
-    if exit_code > 0:
+    if dependency_results.exit_code != 0:
         return _DeployStepResult(
-            exit_code=exit_code,
+            exit_code=dependency_results.exit_code,
             action=_DeployStepAction.DEPLOYMENT,
             outcome=_DeployStepOutcome.FAILED_DEPENDENCIES,
             substeps=dependency_results,
@@ -350,15 +366,16 @@ async def _deploy_coarsened_target(request: _DeployTargetRequest) -> _DeployStep
         for field_set in field_sets_per_target.field_sets
     )
 
-    deploy_results = await MultiGet(
-        Get(_DeployStepResult, DeployProcess, process) for process in deploy_processes
+    deploy_results = _DeployStepResults(
+        await MultiGet(
+            Get(_DeployStepResult, DeployProcess, process) for process in deploy_processes
+        )
     )
 
     all_results = [*dependency_results, *deploy_results]
-    exit_code = max(result.exit_code for result in deploy_results)
-    if exit_code > 0:
+    if deploy_results.exit_code > 0:
         return _DeployStepResult(
-            exit_code=exit_code,
+            exit_code=deploy_results.exit_code,
             action=_DeployStepAction.DEPLOYMENT,
             outcome=_DeployStepOutcome.FAILURE,
             substeps=tuple(all_results),
@@ -393,9 +410,7 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
         )
     )
 
-    exit_code = max(result.exit_code for result in results)
     outputs: list[str] = []
-
     for step in results.closure:
         if step.outcome == _DeployStepOutcome.SKIPPED:
             sigil = console.sigil_skipped()
@@ -415,7 +430,7 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
     for line in outputs:
         console.print_stderr(line)
 
-    return Deploy(exit_code)
+    return Deploy(results.exit_code)
 
 
 def rules():
