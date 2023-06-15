@@ -30,7 +30,7 @@ from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, cast
 
 import chevron
-from pants_release.common import die
+from common import die
 from readme_api import DocRef, ReadmeAPI
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
