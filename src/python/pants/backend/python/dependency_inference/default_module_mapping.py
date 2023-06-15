@@ -78,7 +78,7 @@ DEFAULT_MODULE_MAPPING = {
     "django-model-utils": ("model_utils",),
     "django-ninja": ("ninja",),
     "django-ninja-extra": ("ninja_extra",),
-    "django-postgres-extra": ["psqlextra"],
+    "django-postgres-extra": ("psqlextra",),
     "django-safedelete": ("safedelete",),
     "django-simple-history": ("simple_history",),
     "django-storages": ("storages",),
