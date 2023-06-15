@@ -76,7 +76,7 @@ _T = TypeVar("_T")
 
 @dataclass(frozen=True)
 class per_platform(Generic[_T]):
-    """An object containing differing homogeneous platform-dependent values.
+    """An object containing differing homogenous platform-dependent values.
 
     The values should be evaluated for the execution environment, and not the host environment
     (I.e. it should be evaluated in a `rule` which requests `Platform`).
@@ -111,7 +111,7 @@ class per_platform(Generic[_T]):
         ...
     ```
 
-    NOTE: Support for this object should be heavily weighed, as it would be innaproriate to use in
+    NOTE: Support for this object should be heavily weighed, as it would be inappropriate to use in
     certain contexts (such as the `source` field in a `foo_source` target, where the intent is to
     support differing source files based on platform. The result would be that dependency inference
     (and therefore the dependencies field) wouldn't be knowable on the host, which is not something

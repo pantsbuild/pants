@@ -11,7 +11,7 @@ from itertools import chain
 from typing import Iterator
 
 #
-# Note: This file is used as an pex entry point in the execution sandbox.
+# Note: This file is used as a pex entry point in the execution sandbox.
 #
 
 

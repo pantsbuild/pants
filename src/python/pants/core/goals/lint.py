@@ -324,7 +324,7 @@ async def _get_partitions_by_request_type(
     file_partitioners: Iterable[type[_FilePartitioner]],
     subsystem: _MultiToolGoalSubsystem,
     specs: Specs,
-    # NB: Because the rule parser code will collect `Get`s from caller's scope, these allows the
+    # NB: Because the rule parser code will collect `Get`s from caller's scope, these allow the
     # caller to customize the specific `Get`.
     make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
     make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],

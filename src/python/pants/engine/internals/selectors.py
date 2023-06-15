@@ -550,7 +550,7 @@ async def MultiGet(
             return repr(arg)
         return repr(arg)
 
-    likely_args_exlicitly_passed = tuple(
+    likely_args_explicitly_passed = tuple(
         reversed(
             [
                 render_arg(arg)
@@ -558,12 +558,12 @@ async def MultiGet(
             ]
         )
     )
-    if any(arg is None for arg in likely_args_exlicitly_passed):
+    if any(arg is None for arg in likely_args_explicitly_passed):
         raise ValueError(
             softwrap(
                 f"""
                 Unexpected MultiGet None arguments: {', '.join(
-                    map(str, likely_args_exlicitly_passed)
+                    map(str, likely_args_explicitly_passed)
                 )}
 
                 When constructing a MultiGet from individual Gets, all leading arguments must be
@@ -575,7 +575,7 @@ async def MultiGet(
     raise TypeError(
         softwrap(
             f"""
-            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_exlicitly_passed))}
+            Unexpected MultiGet argument types: {', '.join(map(str, likely_args_explicitly_passed))}
 
             A MultiGet can be constructed in two ways:
               1. MultiGet(Iterable[Get[T]]) -> Tuple[T]

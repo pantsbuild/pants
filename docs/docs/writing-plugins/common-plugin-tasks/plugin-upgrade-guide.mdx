@@ -32,7 +32,7 @@ async def my_rule_lazy() -> MyOutput:
 
 The lazy API is useful, for example, when you only want to `Get` that output type inside an `if` branch.
 
-We added syntax in 2.17 to now use `Get(OutputType)`, whereas before you had to do `Get(OutputType, OutputTypeRequest)` or (as of 2.15) `Get(OutputType, {})`. So, these `OutputTypeRequest` types are now redudent and deprecated in favor of simply using `Get(OutputType)`.
+We added syntax in 2.17 to now use `Get(OutputType)`, whereas before you had to do `Get(OutputType, OutputTypeRequest)` or (as of 2.15) `Get(OutputType, {})`. So, these `OutputTypeRequest` types are now redundant and deprecated in favor of simply using `Get(OutputType)`.
 
 ### `EnvironmentBehavior.UNMIGRATED` is no longer available
 
@@ -99,7 +99,7 @@ Instead of the `name` class attribute, `Lint<Targets|Files>Request` and `FmtTarg
 
 #### 2. Your tool subsystem should have a `skip` option.
 
-Although not explictly not required by the engine to function correctly, `mypy` will complain if the subsystem type provided to `tool_subsystem` doesn't have a `skip: SkipOption` option registered.
+Although not explicitly not required by the engine to function correctly, `mypy` will complain if the subsystem type provided to `tool_subsystem` doesn't have a `skip: SkipOption` option registered.
 
 Otherwise, you can `# type: ignore[assignment]` on your `tool_subsystem` declaration.
 

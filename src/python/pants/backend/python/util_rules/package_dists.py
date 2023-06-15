@@ -974,7 +974,7 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         or tgt.get(SourcesField).can_generate(ResourceSourceField, union_membership)
         # We also check for generating sources so that dependencies on `python_sources(sources=[])`
         # is included. Those won't generate any `python_source` targets, but still can be
-        # dependended upon.
+        # depended upon.
         or tgt.has_field(PythonGeneratingSourcesBase)
     )
 

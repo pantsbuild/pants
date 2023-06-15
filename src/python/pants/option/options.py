@@ -287,7 +287,7 @@ class Options:
           2) The entire ScopeInfo is deprecated (as in the case of deprecated SubsystemDependencies),
              meaning that the options live in one location.
 
-        In the first case, this method has the sideeffect of merging options values from deprecated
+        In the first case, this method has the side-effect of merging options values from deprecated
         scopes into the given values.
         """
         si = self.known_scope_to_info[scope]

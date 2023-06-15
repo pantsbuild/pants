@@ -67,7 +67,7 @@ class EngineAwareReturnType(ABC):
         """Allows a return type to be conditionally marked uncacheable.
 
         An uncacheable value is recomputed in each Session: this can be useful if the level or
-        message should be rendered as sideeffects in each Session.
+        message should be rendered as side-effects in each Session.
         """
         return True
 

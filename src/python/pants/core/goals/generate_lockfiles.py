@@ -546,7 +546,7 @@ async def generate_lockfiles_goal(
     )
 
     # Execute the actual lockfile generation in each request's environment.
-    # Currently, since resolves specify a single filename for output, we pick a resonable
+    # Currently, since resolves specify a single filename for output, we pick a reasonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
     all_requests: Iterator[GenerateLockfile] = itertools.chain(

@@ -17,7 +17,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 @dataclass(frozen=True)
 class GenerateAssemblySymabisRequest:
-    """Generate a `symabis` file with metadata about the assemnbly files for consumption by Go
+    """Generate a `symabis` file with metadata about the assembly files for consumption by Go
     compiler.
 
     See https://github.com/bazelbuild/rules_go/issues/1893.

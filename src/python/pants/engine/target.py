@@ -198,7 +198,7 @@ class FieldDefaults:
 
     TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
     subsystem requirements, and so e.g. `JvmResolveField` and `PythonResolveField` have methods
-    which compute the true value of the field given a subsytem argument. Consumers need to
+    which compute the true value of the field given a subsystem argument. Consumers need to
     be type aware, and `@rules` cannot have dynamic requirements.
 
     Additionally, `__defaults__` should mean that computed default Field values should become
@@ -693,7 +693,7 @@ class Targets(Collection[Target]):
 # FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
 # use `FilteredTargets` still have filtering applied.
 class FilteredTargets(Collection[Target]):
-    """A heterogenous collection of Target instances that have been filtered with the global options
+    """A heterogeneous collection of Target instances that have been filtered with the global options
     `--tag` and `--exclude-target-regexp`.
 
     Outside of the extra filtering, this type is identical to `Targets`, including its handling of
@@ -788,7 +788,7 @@ class AlwaysTraverseDeps(ShouldTraverseDepsPredicate):
 
 class CoarsenedTarget(EngineAwareParameter):
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
-        """A set of Targets which cyclicly reach one another, and are thus indivisible.
+        """A set of Targets which cyclically reach one another, and are thus indivisible.
 
         Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
         recursive portion.

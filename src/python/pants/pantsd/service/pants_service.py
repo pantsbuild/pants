@@ -234,7 +234,7 @@ class PantsServices:
     def are_all_alive(self) -> bool:
         """Return true if all services threads are still alive, and false if any have died.
 
-        This method does not have sideeffects: if one service thread has died, the rest should be
+        This method does not have side-effects: if one service thread has died, the rest should be
         killed and joined via `self.shutdown()`.
         """
         for service, service_thread in self._service_threads.items():

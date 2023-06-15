@@ -307,7 +307,7 @@ See [Setting a repository name](./tagging-docker-images.mdx#setting-a-repository
 The calculated hash value _may_ change between stable versions of Pants for the otherwise same input sources.
 :::
 
-## Retrieving the tags of an packaged image
+## Retrieving the tags of a packaged image
 
 When a docker image is packaged, metadata about the resulting image is output to a JSON file artefact. This includes the image ID, as well as the full names that the image was tagged with. This file is written in the same manner as outputs of other packageable targets and available for later steps (for example, a test with `runtime_package_dependencies` including the docker image target) or in `dist/` after `pants package`. By default, this is available at `path.to.target/target_name.docker-info.json`.
 

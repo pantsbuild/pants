@@ -6,7 +6,7 @@ Plugins implement the publish protocol that provides this goal with the processe
 publish the artifacts.
 
 The publish protocol consists of defining two union members and one rule, returning the processes to
-run. See the doc for the corresponding classses in this module for details on the classes to define.
+run. See the doc for the corresponding classes in this module for details on the classes to define.
 
 Example rule:
 

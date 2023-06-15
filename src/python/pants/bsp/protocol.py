@@ -66,7 +66,7 @@ def _make_error_future(exc: Exception) -> Future:
 class BSPConnection:
     _INITIALIZE_METHOD_NAME = "build/initialize"
     _SHUTDOWN_METHOD_NAME = "build/shutdown"
-    _EXIT_NOTIFCATION_NAME = "build/exit"
+    _EXIT_NOTIFICATION_NAME = "build/exit"
 
     def __init__(
         self,
@@ -103,7 +103,7 @@ class BSPConnection:
         _logger.info(f"_send_outbound_message: msg={msg}")
         self._outbound.write(msg)
 
-    # TODO: Figure out how to run this on the `Endpoint`'s thread pool by returing a callable. For now, we
+    # TODO: Figure out how to run this on the `Endpoint`'s thread pool by returning a callable. For now, we
     # need to return errors as futures given that `Endpoint` only handles exceptions returned that way versus using a try ... except block.
     def _handle_inbound_message(self, *, method_name: str, params: Any):
         # If the connection is not yet initialized and this is not the initialization request, BSP requires
@@ -129,7 +129,7 @@ class BSPConnection:
             # Return no-op success for the `build/shutdown` method. This doesn't actually cause the server to
             # exit. That will occur once the client sends the `build/exit` notification.
             return None
-        elif method_name == self._EXIT_NOTIFCATION_NAME:
+        elif method_name == self._EXIT_NOTIFICATION_NAME:
             # The `build/exit` notification directs the BSP server to immediately exit.
             # The read-dispatch loop will exit once it notices that the inbound handle is closed. So close the
             # inbound handle (and outbound handle for completeness) and then return to the dispatch loop

@@ -208,7 +208,7 @@ class PutativeTarget:
     def realias(self, new_alias: str | None) -> PutativeTarget:
         """A copy of this object with the alias replaced to the given alias.
 
-        Returns this object if the alias is None or is identical to this objects existing alias.
+        Returns this object if the alias is None or is identical to this object's existing alias.
         """
         return (
             self

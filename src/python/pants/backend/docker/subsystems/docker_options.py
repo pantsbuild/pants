@@ -106,7 +106,7 @@ class DockerOptions(Subsystem):
             Configure the default repository name used in the Docker image tag.
 
             The value is formatted and may reference these variables (in addition to the normal
-            placeheolders derived from the Dockerfile and build args etc):
+            placeholders derived from the Dockerfile and build args etc):
 
             {bullet_list(["name", "directory", "parent_directory", "target_repository"])}
 
