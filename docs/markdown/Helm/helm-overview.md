@@ -257,7 +257,7 @@ tests:
 
 ### Snapshot testing
 
-Using unit test snapshots is fully supported by Pants as test snapshots are just resources as shown in the previous section.
+Unit test snapshots are supported by Pants by wrapping the snapshots in resources targets, as shown in the previous section.
 
 Since managing snapshots by hand is quite tedious, Pants provides some utilities to manage them in a simpler way. To generate or update the snapshots, use Pants's `generate-snapshots` goal:
 
