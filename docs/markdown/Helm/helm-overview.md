@@ -259,7 +259,7 @@ tests:
 
 Using unit test snapshots is fully supported by Pants as test snapshots are just resources as shown in the previous section.
 
-However, since managing snapshots by hand is quite tedious, Pants gives some utilities to manage them in a simpler way. To automate the update of the snapshots use Pants' `generate-snapshots` goal which we can use to generate the snapshot files:
+Since managing snapshots by hand is quite tedious, Pants provides some utilities to manage them in a simpler way. To generate or update the snapshots, use Pants's `generate-snapshots` goal:
 
 ```
 pants --filter-target-type='helm_unittest_test' generate-snapshots ::
