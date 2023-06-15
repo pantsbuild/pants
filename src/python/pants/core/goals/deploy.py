@@ -142,7 +142,10 @@ class _DeployTargetRequest(EngineAwareParameter):
     dependent: Address | None = None
 
     def debug_hint(self) -> str:
-        return self.target.representative.address.spec
+        result = self.target.representative.address.spec
+        if self.dependent:
+            result += f" from {self.dependent}"
+        return result
 
 
 class _DeployTargetRequests(Collection[_DeployTargetRequest]):
@@ -361,7 +364,11 @@ async def _deploy_target_dependencies(
         return us.spec_path == them.spec_path and us.target_name == them.target_name
 
     return _DeployTargetRequests(
-        [_DeployTargetRequest(dep) for dep in request.target.dependencies if not should_ignore(dep)]
+        [
+            _DeployTargetRequest(dep, dependent=request.target.representative.address)
+            for dep in request.target.dependencies
+            if not should_ignore(dep)
+        ]
     )
 
 
