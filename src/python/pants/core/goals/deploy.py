@@ -3,27 +3,32 @@
 
 from __future__ import annotations
 
-import asyncio
+import dataclasses
 import logging
 from abc import ABCMeta
-from collections import defaultdict, deque
 from dataclasses import dataclass
+from enum import Enum, unique
 from itertools import chain
-from typing import Iterable, Iterator, Set, Tuple
+from typing import Iterable, Iterator
 
 from pants.core.goals.package import PackageFieldSet
-from pants.core.goals.publish import PublishFieldSet, PublishProcesses, PublishProcessesRequest
-from pants.engine.addresses import Address, Addresses
+from pants.core.goals.publish import (
+    PublishFieldSet,
+    PublishPackages,
+    PublishProcesses,
+    PublishProcessesRequest,
+)
+from pants.engine.addresses import Addresses
+from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     CoarsenedTarget,
     CoarsenedTargets,
-    Dependencies,
-    DependenciesRequest,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -31,12 +36,10 @@ from pants.engine.target import (
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
 )
 from pants.engine.unions import union
-from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import OrderedSet
+from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
 
@@ -137,10 +140,208 @@ async def _publish_processes_for_targets(targets: Iterable[Target]) -> PublishPr
 class _DeployTargetRequest:
     target: CoarsenedTarget
 
-class _DeployTargetStepResult:
-    pass
 
-async def _deploy_coarsened_target(request: _DeployTargetRequest) -> _DeployTargetStepResult:
+@dataclass(frozen=True)
+class _DeployTargetDependencies:
+    target: CoarsenedTarget
+
+
+class _DeployStepAction(Enum):
+    PUBLISH_PACKAGE = 0
+    DEPLOYMENT = 1
+
+
+@unique
+class _DeployStepOutcome(Enum):
+    SKIPPED = 0
+    SUCCESS = 1
+    FAILURE = 2
+    FAILED_DEPENDENCIES = 3
+
+
+@dataclass(frozen=True)
+class _DeployStepResult(EngineAwareReturnType):
+    exit_code: int
+    action: _DeployStepAction
+    outcome: _DeployStepOutcome
+
+    names: tuple[str, ...] = ()
+    description: str | None = dataclasses.field(default=None, compare=False)
+    substeps: tuple[_DeployStepResult, ...] = ()
+
+    @classmethod
+    def from_publish_process_result(
+        cls,
+        result: FallibleProcessResult,
+        publish: PublishPackages,
+    ) -> _DeployStepResult:
+        return _DeployStepResult(
+            exit_code=result.exit_code,
+            outcome=_DeployStepResult._determine_outcome(result),
+            action=_DeployStepAction.PUBLISH_PACKAGE,
+            names=publish.names,
+            description=publish.description,
+        )
+
+    @classmethod
+    def from_deploy_process_result(
+        cls,
+        result: FallibleProcessResult,
+        deploy: DeployProcess,
+        substeps: Iterable[_DeployStepResult] | None = None,
+    ) -> _DeployStepResult:
+        return _DeployStepResult(
+            exit_code=result.exit_code,
+            outcome=_DeployStepResult._determine_outcome(result),
+            action=_DeployStepAction.DEPLOYMENT,
+            names=(deploy.name,),
+            description=deploy.description,
+            substeps=tuple(substeps or []),
+        )
+
+    @staticmethod
+    def _determine_outcome(result: FallibleProcessResult) -> _DeployStepOutcome:
+        return _DeployStepOutcome.SUCCESS if result.exit_code == 0 else _DeployStepOutcome.FAILURE
+
+    @classmethod
+    def skipped(
+        cls,
+        *,
+        action: _DeployStepAction,
+        names: Iterable[str] | None = None,
+        description: str | None = None,
+        substeps: Iterable[_DeployStepResult] | None = None,
+    ) -> _DeployStepResult:
+        return _DeployStepResult(
+            exit_code=0,
+            outcome=_DeployStepOutcome.SKIPPED,
+            action=action,
+            names=tuple(names or []),
+            description=description,
+            substeps=tuple(substeps or []),
+        )
+
+    def level(self) -> LogLevel | None:
+        return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
+
+    def message(self) -> str | None:
+        if self.output:
+            return "\n".join(self.output) + "\n\n"
+
+        return None
+
+    @memoized_property
+    def output(self) -> tuple[str, ...]:
+        if self.outcome == _DeployStepOutcome.SKIPPED:
+            status = "skipped"
+            if self.description:
+                status += f" {self.description}"
+        else:
+            if self.outcome == _DeployStepOutcome.SUCCESS:
+                status = (
+                    "published" if self.action == _DeployStepAction.PUBLISH_PACKAGE else "deployed"
+                )
+                prep = "to"
+            else:
+                status = "failed"
+                prep = "for"
+
+            if self.description:
+                status += f" {prep} {self.description}"
+
+        result = []
+        for name in self.names:
+            result.append(f"{name} {status}")
+
+        return tuple(result)
+
+    @property
+    def closure(self) -> Iterator[_DeployStepResult]:
+        for substep in self.substeps:
+            yield from substep.closure
+
+        yield self
+
+
+class _DeployStepResults(Collection[_DeployStepResult]):
+    @property
+    def closure(self) -> Iterator[_DeployStepResult]:
+        for result in self:
+            yield from result.closure
+
+
+@rule
+async def _run_publish_process(publish: PublishPackages) -> _DeployStepResult:
+    if publish.process:
+        # TODO cheating here, but only by invoking the underly process I can run this in a `@rule`
+        result = await Get(FallibleProcessResult, Process, publish.process.process)
+        return _DeployStepResult.from_publish_process_result(result, publish)
+
+    return _DeployStepResult.skipped(
+        action=_DeployStepAction.PUBLISH_PACKAGE,
+        names=publish.names,
+        description=publish.description,
+    )
+
+
+@rule
+async def _run_deploy_process(deploy: DeployProcess) -> _DeployStepResult:
+    publish_results: Iterable[_DeployStepResult] = []
+    if deploy.publish_dependencies:
+        publish_processes = await _publish_processes_for_targets(deploy.publish_dependencies)
+        publish_results = await MultiGet(
+            Get(_DeployStepResult, PublishPackages, process) for process in publish_processes
+        )
+        exit_code = max(result.exit_code for result in publish_results)
+        if exit_code > 0:
+            return _DeployStepResult(
+                exit_code=exit_code,
+                action=_DeployStepAction.PUBLISH_PACKAGE,
+                outcome=_DeployStepOutcome.FAILED_DEPENDENCIES,
+                names=(deploy.name,),
+                description=deploy.description,
+                substeps=publish_results,
+            )
+
+    if deploy.process:
+        # TODO cheating here, but only by invoking the underly process I can run this in a `@rule`
+        result = await Get(FallibleProcessResult, Process, deploy.process.process)
+        return _DeployStepResult.from_deploy_process_result(
+            result,
+            deploy,
+            substeps=publish_results,
+        )
+
+    return _DeployStepResult.skipped(
+        action=_DeployStepAction.DEPLOYMENT,
+        names=(deploy.name,),
+        description=deploy.description,
+        substeps=publish_results,
+    )
+
+
+@rule
+async def _deploy_target_dependencies(
+    request: _DeployTargetDependencies,
+) -> _DeployStepResults:
+    results = await MultiGet(
+        Get(_DeployStepResult, _DeployTargetRequest(tgt)) for tgt in request.target.dependencies
+    )
+    return _DeployStepResults(results)
+
+
+@rule
+async def _deploy_coarsened_target(request: _DeployTargetRequest) -> _DeployStepResult:
+    dependency_results = await Get(_DeployStepResults, _DeployTargetDependencies(request.target))
+    exit_code = max(result.exit_code for result in dependency_results)
+    if exit_code > 0:
+        return _DeployStepResult(
+            exit_code=exit_code,
+            action=_DeployStepAction.DEPLOYMENT,
+            outcome=_DeployStepOutcome.FAILED_DEPENDENCIES,
+            substeps=dependency_results,
+        )
+
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(DeployFieldSet, request.target.members)
     )
@@ -149,181 +350,26 @@ async def _deploy_coarsened_target(request: _DeployTargetRequest) -> _DeployTarg
         for field_set in field_sets_per_target.field_sets
     )
 
-    publish_dependencies = chain.from_iterable([proc.publish_dependencies for proc in deploy_processes])
-    publish_processes = await _publish_processes_for_targets(publish_dependencies)
-    if publish_processes:
-        publish_results = await Effect()
-    
-
-@dataclass(frozen=True)
-class _FallibleProcResult:
-    exit_code: int
-    outputs: tuple[str, ...]
-
-
-async def _invoke_process(
-    console: Console,
-    process: InteractiveProcess | None,
-    *,
-    names: Iterable[str],
-    success_status: str,
-    description: str | None = None,
-) -> _FallibleProcResult:
-    outputs = []
-
-    if not process:
-        sigil = console.sigil_skipped()
-        status = "skipped"
-        if description:
-            status += f" {description}"
-        for name in names:
-            outputs.append(f"{sigil} {name} {status}.")
-        return _FallibleProcResult(0, tuple(outputs))
-
-    res = await Effect(InteractiveProcessResult, InteractiveProcess, process)
-    if res.exit_code == 0:
-        sigil = console.sigil_succeeded()
-        status = success_status
-        prep = "to"
-    else:
-        sigil = console.sigil_failed()
-        status = "failed"
-        prep = "for"
-
-    if description:
-        status += f" {prep} {description}"
-
-    for name in names:
-        outputs.append(f"{sigil} {name} {status}")
-
-    return _FallibleProcResult(res.exit_code, tuple(outputs))
-
-
-@dataclass(frozen=True)
-class _DeployGraphNode:
-    target: Target
-    field_set: DeployFieldSet
-    process: DeployProcess
-
-    @property
-    def address(self) -> Address:
-        return self.field_set.address
-
-
-@dataclass(frozen=True)
-class _DeployStep:
-    nodes: tuple[_DeployGraphNode, ...]
-
-
-@dataclass(frozen=True)
-class _DeployGraph:
-    dependents: FrozenDict[Address, Tuple[_DeployGraphNode, ...]]
-    roots: Tuple[_DeployGraphNode, ...]
-
-    @property
-    def steps(self) -> Iterator[_DeployStep]:
-        visited = set()
-        queue = deque([self.roots])
-        while queue:
-            nodes = queue.popleft()
-            non_visitied = {node for node in nodes if node.address not in visited}
-            if not non_visitied:
-                continue
-
-            visited.update([node.address for node in non_visitied])
-            yield _DeployStep(tuple(non_visitied))
-
-            next_nodes: Set[_DeployGraphNode] = set()
-            for node in non_visitied:
-                next_nodes.update(self.dependents.get(node.address, ()))
-            queue.extend([tuple(next_nodes)])
-
-    @property
-    def publish_dependencies(self) -> set[Target]:
-        return {
-            tgt
-            for step in self.steps
-            for node in step.nodes
-            for tgt in node.process.publish_dependencies
-        }
-
-
-async def _build_deploy_graph(addresses: Iterable[Address]) -> _DeployGraph:
-    mapping: dict[Address, set[_DeployGraphNode]] = defaultdict(set)
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
-    field_sets_per_target = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(DeployFieldSet, transitive_targets.closure)
+    deploy_results = await MultiGet(
+        Get(_DeployStepResult, DeployProcess, process) for process in deploy_processes
     )
 
-    deployable_targets = [
-        (tgt, field_sets[0])
-        for tgt, field_sets in zip(transitive_targets.closure, field_sets_per_target.collection)
-        if field_sets
-    ]
-    deploy_procs = await MultiGet(
-        Get(DeployProcess, DeployFieldSet, field_set) for _, field_set in deployable_targets
+    all_results = [*dependency_results, *deploy_results]
+    exit_code = max(result.exit_code for result in deploy_results)
+    if exit_code > 0:
+        return _DeployStepResult(
+            exit_code=exit_code,
+            action=_DeployStepAction.DEPLOYMENT,
+            outcome=_DeployStepOutcome.FAILURE,
+            substeps=tuple(all_results),
+        )
+
+    return _DeployStepResult(
+        exit_code=0,
+        action=_DeployStepAction.DEPLOYMENT,
+        outcome=_DeployStepOutcome.SUCCESS,
+        substeps=tuple(all_results),
     )
-    graph_nodes = [
-        _DeployGraphNode(tgt, fs, proc) for (tgt, fs), proc in zip(deployable_targets, deploy_procs)
-    ]
-
-    dependencies_per_target = await MultiGet(
-        Get(Addresses, DependenciesRequest(node.target.get(Dependencies))) for node in graph_nodes
-    )
-
-    roots: OrderedSet[_DeployGraphNode] = OrderedSet()
-    for node, dependencies in zip(graph_nodes, dependencies_per_target):
-        if not dependencies:
-            # The roots of the graph are those who have no dependencies
-            roots.add(node)
-            continue
-
-        for dependency in dependencies:
-            mapping[dependency].add(node)
-
-    return _DeployGraph(
-        roots=tuple(roots),
-        dependents=FrozenDict({addr: tuple(nodes) for addr, nodes in mapping.items()}),
-    )
-
-
-async def _publish_packages(targets: Iterable[Target], console: Console) -> _FallibleProcResult:
-    publish_processes = await _publish_processes_for_targets(targets)
-    proc_results = await asyncio.gather(
-        *[
-            _invoke_process(
-                console,
-                publish.process,
-                names=publish.names,
-                description=publish.description,
-                success_status="published",
-            )
-            for publish in publish_processes
-        ]
-    )
-
-    exit_code = max(result.exit_code for result in proc_results)
-    outputs = chain.from_iterable([result.outputs for result in proc_results])
-    return _FallibleProcResult(exit_code, tuple(outputs))
-
-
-async def _run_deploy_step(step: _DeployStep, console: Console) -> _FallibleProcResult:
-    proc_results = await asyncio.gather(
-        *[
-            _invoke_process(
-                console,
-                node.process.process,
-                names=[node.process.name],
-                description=node.process.description,
-                success_status="deployed",
-            )
-            for node in step.nodes
-        ]
-    )
-
-    exit_code = max(result.exit_code for result in proc_results)
-    outputs = chain.from_iterable([result.outputs for result in proc_results])
-    return _FallibleProcResult(exit_code, tuple(outputs))
 
 
 @goal_rule
@@ -337,29 +383,29 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
         ),
     )
 
-    coarsened_targets = await Get(CoarsenedTargets, Addresses([tgt.address for tgt in target_roots_to_deploy_field_sets.targets]))
-
-
-    deployment_graph = await _build_deploy_graph(
-        [tgt.address for tgt in target_roots_to_deploy_field_sets.targets]
+    coarsened_targets = await Get(
+        CoarsenedTargets,
+        Addresses([tgt.address for tgt in target_roots_to_deploy_field_sets.targets]),
+    )
+    results = _DeployStepResults(
+        await MultiGet(
+            Get(_DeployStepResult, _DeployTargetRequest(tgt)) for tgt in coarsened_targets
+        )
     )
 
-    exit_code = 0
+    exit_code = max(result.exit_code for result in results)
     outputs: list[str] = []
 
-    publish_dependencies = deployment_graph.publish_dependencies
-    if publish_dependencies:
-        result = await _publish_packages(publish_dependencies, console)
-        exit_code = result.exit_code
-        outputs = list(result.outputs)
+    for step in results.closure:
+        if step.outcome == _DeployStepOutcome.SKIPPED:
+            sigil = console.sigil_skipped()
+        elif step.outcome == _DeployStepOutcome.SUCCESS:
+            sigil = console.sigil_succeeded()
+        else:
+            sigil = console.sigil_failed()
 
-    for step in deployment_graph.steps:
-        if exit_code != 0:
-            break
-
-        deploy_result = await _run_deploy_step(step, console)
-        exit_code = deploy_result.exit_code
-        outputs.extend(deploy_result.outputs)
+        for out in step.output:
+            outputs.append(f"{sigil} {out}")
 
     console.print_stderr("")
     if not outputs:
