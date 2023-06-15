@@ -265,7 +265,7 @@ Since managing snapshots by hand is quite tedious, Pants provides some utilities
 pants --filter-target-type='helm_unittest_test' generate-snapshots ::
 ```
 
-That would generate the test snapshots for those tests that require it with older snapshots being overwritten and newer ones being created.
+This will generate test snapshots for tests that require them, with older snapshots being overwritten by newer ones.
 
 If new `__snapshot__` folders have been created we recommend to run again the `tailor` goal and Pants would recognise those new folders and create `resource` targets as appropriate.
 
