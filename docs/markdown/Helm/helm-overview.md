@@ -63,7 +63,7 @@ Created src/helm/example/BUILD:
   - Add helm_chart target example
 ```
 
-If your workspace contains any Helm unit tests with snapshots (under an `__snapshot__` folder), `tailor` will identify those files are being part of your tests and will also create `helm_unittest_tests` and `resources` targets. See "Snapshot testing" below for more info.
+If your workspace contains any Helm unit tests with snapshots (under a `__snapshot__` folder), `tailor` will identify those files as test snapshots and will create `helm_unittest_tests` and `resources` targets. See "Snapshot testing" below for more info.
 
 Basic operations
 ----------------
