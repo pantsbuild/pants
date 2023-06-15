@@ -473,19 +473,3 @@ def test_partition_into_major_minor_versions(constraints: list[str], expected: l
     assert InterpreterConstraints(constraints).partition_into_major_minor_versions(
         ["2.7", "3.6", "3.7", "3.8", "3.9", "3.10"]
     ) == tuple(expected)
-
-
-@pytest.mark.parametrize(
-    "constraints,expected",
-    (
-        (["==2.7.*"], [(2, 7)]),
-        ([">=3.7"], [(3, 7), (3, 8), (3, 9), (3, 10)]),
-        (["==2.7", "==3.6.5"], [(2, 7), (3, 6)]),
-    ),
-)
-def test_partition_into_major_minor_ints(
-    constraints: list[str], expected: list[tuple[int, int]]
-) -> None:
-    assert InterpreterConstraints(constraints).partition_into_major_minor_ints(
-        ["2.7", "3.6", "3.7", "3.8", "3.9", "3.10"]
-    ) == tuple(expected)
