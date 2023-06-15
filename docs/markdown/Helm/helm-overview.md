@@ -267,7 +267,7 @@ pants --filter-target-type='helm_unittest_test' generate-snapshots ::
 
 This will generate test snapshots for tests that require them, with older snapshots being overwritten by newer ones.
 
-If new `__snapshot__` folders have been created we recommend to run again the `tailor` goal and Pants would recognise those new folders and create `resource` targets as appropriate.
+If new `__snapshot__` folders are created we recommend running the `tailor` goal, so that Pants can detect these new folders and create `resource` targets as appropriate.
 
 ### Timeouts
 
