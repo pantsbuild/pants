@@ -393,7 +393,8 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
                 """
               docker_environment(
                 name="python_38",
-                image="python:3.8",
+                image="python:3.8-buster@sha256:bc4b9fb034a871b285bea5418cedfcaa9d2ab5590fb5fb6f0c42aaebb2e2c911",
+                platform="linux_x86_64",
                 python_bootstrap_search_path=["<PATH>"],
               )
 
