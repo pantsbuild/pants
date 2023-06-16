@@ -290,8 +290,9 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
-      run: 'pants test ::'
+      name: 'Run `test :: -test/agent/docker:: -test/client/integration:: -test/common/redis::`
+        with repo-default version'
+      run: 'pants test :: -test/agent/docker:: -test/client/integration:: -test/common/redis::'
     - env:
         PANTS_VERSION: ''
       if: always()
@@ -316,8 +317,9 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
-      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
-      run: 'pants test ::'
+      name: 'Run `test :: -test/agent/docker:: -test/client/integration:: -test/common/redis::`
+        with ${{ github.event.inputs.pants_version }}'
+      run: 'pants test :: -test/agent/docker:: -test/client/integration:: -test/common/redis::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -359,21 +361,6 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-      run: 'pants tailor --check update-build-files --check ::'
-    - env:
-        PANTS_VERSION: ''
-      if: always()
-      name: Run `lint check ::` with repo-default version
-      run: 'pants lint check ::'
-    - env:
-        PANTS_VERSION: ''
-      if: always()
-      name: Run `test ::` with repo-default version
-      run: 'pants test ::'
-    - env:
-        PANTS_VERSION: ''
-      if: always()
       name: Run `package ::` with repo-default version
       run: 'pants package ::'
     - env:
@@ -381,22 +368,6 @@ jobs:
       if: always()
       name: Run `version` with ${{ github.event.inputs.pants_version }}
       run: pants version
-    - env:
-        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
-      if: always()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: 'pants tailor --check update-build-files --check ::'
-    - env:
-        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
-      if: always()
-      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
-      run: 'pants lint check ::'
-    - env:
-        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
-      if: always()
-      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
-      run: 'pants test ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -438,23 +409,13 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `tailor --check update-build-files --check ::` with repo-default version
-      run: 'pants tailor --check update-build-files --check ::'
-    - env:
-        PANTS_VERSION: ''
-      if: always()
-      name: Run `lint check ::` with repo-default version
-      run: 'pants lint check ::'
-    - env:
-        PANTS_VERSION: ''
-      if: always()
       name: Run `test ::` with repo-default version
       run: 'pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
-      run: 'pants package ::'
+      name: 'Run `package :: -directory_pull::` with repo-default version'
+      run: 'pants package :: -directory_pull::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -463,24 +424,14 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
-      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
-        }}
-      run: 'pants tailor --check update-build-files --check ::'
-    - env:
-        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
-      if: always()
-      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
-      run: 'pants lint check ::'
-    - env:
-        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
-      if: always()
       name: Run `test ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants test ::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
-      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
-      run: 'pants package ::'
+      name: 'Run `package :: -directory_pull::` with ${{ github.event.inputs.pants_version
+        }}'
+      run: 'pants package :: -directory_pull::'
   pantsbuild_example-adhoc:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'

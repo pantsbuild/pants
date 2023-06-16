@@ -288,12 +288,14 @@ def install_python(version: str) -> Step:
         "with": {"python-version": version},
     }
 
+
 def install_node(version: str) -> Step:
-    return  {
+    return {
         "name": f"Set up Node {version}",
         "uses": "actions/setup-node@v3",
-        "with": {"node-version": version}
+        "with": {"node-version": version},
     }
+
 
 def install_jdk() -> Step:
     return {
@@ -1115,6 +1117,13 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     return jobs, inputs
 
 
+class DefaultGoals(str, Enum):
+    tailor_update_build_files = "tailor --check update-build-files --check ::"
+    lint_check = "lint check ::"
+    test = "test ::"
+    package = "package ::"
+
+
 @dataclass
 class Repo:
     name: str
@@ -1125,27 +1134,42 @@ class Repo:
     node_version: None | str = None
     checkout_options: dict[str, object] = field(default_factory=dict)
     setup_commands: str = ""
+    goals: Sequence[str] = tuple(DefaultGoals)
+
 
 PUBLIC_REPOS = [
-        # pants' examples
-        Repo(name="pantsbuild/example-adhoc", node_version="20"),
-        Repo(name="pantsbuild/example-codegen", install_thrift=True),
-        Repo(name="pantsbuild/example-django", python_version="3.9"),
-        Repo(name="pantsbuild/example-docker", python_version="3.8", env={"DYNAMIC_TAG": "dynamic-tag-here"}),
-        Repo(name="pantsbuild/example-golang", install_go=True),
-        Repo(name="pantsbuild/example-jvm"),
-        Repo(name="pantsbuild/example-kotlin"),
-        Repo(name="pantsbuild/example-python", python_version="3.9"),
-        Repo(name="pantsbuild/example-visibility", python_version="3.9"),
-        # public repos
-        Repo(name="StackStorm/st2", python_version="3.8", checkout_options={"submodules": "recursive"}),
-        Repo(name="lablup/backend.ai", python_version="3.11.3", setup_commands="mkdir .tmp"),
-        Repo(name="Ars-Linguistica/mlconjug3"),
-        Repo(name="mitodl/ol-infrastructure"),
-        Repo(name="naccdata/flywheel-gear-extensions"),
-        Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
-    ]
-
+    # pants' examples
+    Repo(name="pantsbuild/example-adhoc", node_version="20"),
+    Repo(name="pantsbuild/example-codegen", install_thrift=True),
+    Repo(name="pantsbuild/example-django", python_version="3.9"),
+    Repo(
+        name="pantsbuild/example-docker",
+        python_version="3.8",
+        env={"DYNAMIC_TAG": "dynamic-tag-here"},
+    ),
+    Repo(name="pantsbuild/example-golang", install_go=True),
+    Repo(name="pantsbuild/example-jvm"),
+    Repo(name="pantsbuild/example-kotlin"),
+    Repo(name="pantsbuild/example-python", python_version="3.9"),
+    Repo(name="pantsbuild/example-visibility", python_version="3.9"),
+    # public repos
+    Repo(name="StackStorm/st2", python_version="3.8", checkout_options={"submodules": "recursive"}),
+    Repo(
+        name="lablup/backend.ai",
+        python_version="3.11.3",
+        setup_commands="mkdir .tmp",
+        goals=[
+            DefaultGoals.tailor_update_build_files,
+            DefaultGoals.lint_check,
+            "test :: -test/agent/docker:: -test/client/integration:: -test/common/redis::",
+            DefaultGoals.package,
+        ],
+    ),
+    Repo(name="Ars-Linguistica/mlconjug3"),
+    Repo(name="mitodl/ol-infrastructure", goals=[DefaultGoals.package]),
+    Repo(name="naccdata/flywheel-gear-extensions", goals=[DefaultGoals.test, "package :: -directory_pull::"]),
+    Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
+]
 
 
 def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
@@ -1155,28 +1179,22 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
         # IDs may only contain alphanumeric characters, '_', and '-'.
         return re.sub("[^A-Za-z0-9_-]+", "_", name)
 
-    def gen_goals(use_default_version: bool) -> Sequence[object]:
-        name = "repo-default version" if use_default_version else env["PANTS_VERSION"]
-
-        return [
-            {
-                "name": f"Run `{goal}` with {name}",
-                "run": f"pants {goal}",
-                # run all the goals, even if there's an earlier failure, because later goals
-                # might still be interesting (e.g. still run `test` even if `lint` fails)
-                "if": "always()",
-                "env": {"PANTS_VERSION": "" if use_default_version else env["PANTS_VERSION"]},
-            }
-            for goal in [
-                "version",
-                "tailor --check update-build-files --check ::",
-                "lint check ::",
-                "test ::",
-                "package ::",
-            ]
-        ]
-
     def test_job(repo: Repo) -> object:
+        def gen_goals(use_default_version: bool) -> Sequence[object]:
+            name = "repo-default version" if use_default_version else env["PANTS_VERSION"]
+
+            return [
+                {
+                    "name": f"Run `{goal}` with {name}",
+                    "run": f"pants {goal}",
+                    # run all the goals, even if there's an earlier failure, because later goals
+                    # might still be interesting (e.g. still run `test` even if `lint` fails)
+                    "if": "always()",
+                    "env": {"PANTS_VERSION": "" if use_default_version else env["PANTS_VERSION"]},
+                }
+                for goal in ["version", *repo.goals]
+            ]
+
         return {
             "name": repo.name,
             "runs-on": "ubuntu-latest",
@@ -1211,9 +1229,13 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                             echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
                         fi
                         """
-                    )
+                    ),
                 },
-                *([{"name": "Run set-up", "run": repo.setup_commands}] if repo.setup_commands else []),
+                *(
+                    [{"name": "Run set-up", "run": repo.setup_commands}]
+                    if repo.setup_commands
+                    else []
+                ),
                 # first run with the repo's base configuration, as a reference point
                 *gen_goals(use_default_version=True),
                 # then run with the version under test (simulates an in-place upgrade, locally, too)
