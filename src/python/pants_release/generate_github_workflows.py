@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent  # noqa: PNT20
@@ -167,7 +167,11 @@ def ensure_category_label() -> Sequence[Step]:
 
 
 def checkout(
-    *, fetch_depth: int = 10, containerized: bool = False, ref: str | None = None
+    *,
+    fetch_depth: int = 10,
+    containerized: bool = False,
+    ref: str | None = None,
+    **extra_opts: object,
 ) -> Sequence[Step]:
     """Get prior commits and the commit message."""
     fetch_depth_opt: dict[str, Any] = {"fetch-depth": fetch_depth}
@@ -181,6 +185,7 @@ def checkout(
             "with": {
                 **fetch_depth_opt,
                 **({"ref": ref} if ref else {}),
+                **extra_opts,
             },
         },
     ]
@@ -1101,6 +1106,107 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     return jobs, inputs
 
 
+@dataclass
+class Repo:
+    name: str
+    python_version: str = "3.10"
+    env: dict[str, str] = field(default_factory=dict)
+    install_go: bool = False
+    install_thrift: bool = False
+    checkout_options: dict[str, object] = field(default_factory=dict)
+    setup_commands: str = ""
+
+
+def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
+    inputs, env = workflow_dispatch_inputs([WorkflowInput("PANTS_VERSION", "string")])
+
+    def gen_goals(use_default_version: bool) -> Sequence[object]:
+        name = "repo-default version" if use_default_version else env["PANTS_VERSION"]
+
+        return [
+            {
+                "name": f"Run `{goal}` with {name}",
+                "run": f"pants {goal}",
+                # run all the goals, even if there's an earlier failure, because later goals
+                # might still be interesting (e.g. still run `test` even if `lint` fails)
+                "if": "always()",
+                "env": {"PANTS_VERSION": "" if use_default_version else env["PANTS_VERSION"]},
+            }
+            for goal in [
+                "version",
+                "tailor --check update-build-files --check ::",
+                "lint check ::",
+                "test ::",
+                "package ::",
+            ]
+        ]
+
+    def test_job(repo: Repo) -> object:
+        return {
+            "runs-on": "ubuntu-latest",
+            "env": {
+                **repo.env,
+                "PANTS_REMOTE_CACHE_READ": "false",
+                "PANTS_REMOTE_CACHE_WRITE": "false",
+            },
+            "steps": [
+                *checkout(repository=repo.name, **repo.checkout_options),
+                *([install_go()] if repo.install_go else []),
+                *([download_apache_thrift()] if repo.install_thrift else []),
+                {
+                    "name": "Pants on",
+                    "run": dedent(
+                        # FIXME: save the script somewhere
+                        """
+                        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
+                        echo "$HOME/bin" | tee -a $GITHUB_PATH
+                        """
+                    ),
+                },
+                {
+                    # the pants.ci.toml convention is strong, so check for it dynamically rather
+                    # than force each repo to mark it specifically
+                    "name": "Check for pants.ci.toml",
+                    "run": dedent(
+                        """
+                        if [[ -f pants.ci.toml ]]; then
+                            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
+                        fi
+                        """
+                    )
+                },
+                *([{"name": "Run set-up", "run": repo.setup_commands}] if repo.setup_commands else []),
+                # first run with the repo's base configuration, as a reference point
+                *gen_goals(use_default_version=True),
+                # then run with the version under test (simulates an in-place upgrade, locally, too)
+                *gen_goals(use_default_version=False),
+            ],
+        }
+
+    repositories = [
+        # pants' examples
+        Repo(name="pantsbuild/example-python"),
+        Repo(name="pantsbuild/example-visibility"),
+        Repo(name="pantsbuild/example-django"),
+        Repo(name="pantsbuild/example-adhoc"),
+        Repo(name="pantsbuild/example-jvm"),
+        Repo(name="pantsbuild/example-golang", install_go=True),
+        Repo(name="pantsbuild/example-kotlin"),
+        Repo(name="pantsbuild/example-docker", env={"DYNAMIC_TAG": "dynamic-tag-here"}),
+        Repo(name="pantsbuild/example-codegen"),
+        # public repos (just from a basic search for path:pants.toml on github)
+        Repo(name="StackStorm/st2", checkout_options={"submodules": "recursive"}),
+        Repo(name="lablup/backend.ai", python_version="3.11.3", setup_commands="mkdir .tmp"),
+        Repo(name="Ars-Linguistica/mlconjug3"),
+        Repo(name="mitodl/ol-infrastructure"),
+        Repo(name="naccdata/flywheel-gear-extensions"),
+        Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
+    ]
+
+    jobs = {repo.name: test_job(repo) for repo in repositories}
+    return jobs, inputs
+
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -1260,11 +1366,22 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
+    public_repos_jobs, public_repos_inputs = public_repos_jobs_and_inputs()
+    public_repos_yaml = yaml.dump(
+        {
+            "name": "Public repository tests",
+            "on": {"workflow_dispatch": {"inputs": public_repos_inputs}},
+            "jobs": public_repos_jobs,
+        },
+        Dumper=NoAliasDumper,
+    )
+
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",
+        Path(".github/workflows/public_repos.yaml"): f"{HEADER}\n\n{public_repos_yaml}",
     }
 
 

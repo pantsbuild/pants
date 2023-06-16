@@ -1,110 +1,1127 @@
-name: Public repos
-"on":
-  push:
+# GENERATED, DO NOT EDIT!
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
+
 
 jobs:
-  test:
-    strategy:
-      # run each one to completion
-      fail-fast: false
-      matrix:
-        repository:
-          # pants' examples
-          - pantsbuild/example-python
-          - pantsbuild/example-visibility
-          - pantsbuild/example-django
-          - pantsbuild/example-adhoc
-          - pantsbuild/example-jvm
-          - pantsbuild/example-golang
-          - pantsbuild/example-kotlin
-          - pantsbuild/example-docker
-          - pantsbuild/example-codegen
-          # public repos (just from a basic search for path:pants.toml on github)
-          - StackStorm/st2
-          - lablup/backend.ai
-          - Ars-Linguistica/mlconjug3
-          - mitodl/ol-infrastructure
-          - naccdata/flywheel-gear-extensions
-          - OpenSaMD/OpenSaMD
-        pants_version:
-          # repo's default version
-          - ""
-          # try latest/future versions
-          - 2.15.0
-          - 2.16.0rc4
-          - 2.17.0a1
-          - 2.18.0.dev0
-
-    runs-on: ubuntu-22.04
+  Ars-Linguistica/mlconjug3:
     env:
-      PANTS_VERSION: ${{ matrix.pants_version }}
-      # for example-docker:
-      DYNAMIC_TAG: dynamic-tag-here
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
     steps:
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v4
-        with:
-          # Specific constraints:
-          # OpenSaMD/OpenSaMD: 3.9.15
-          # lablub/backend.ai: 3.11.3
-          python-version: |
-            3.7
-            3.8
-            3.9.15
-            3.10
-            3.11.3
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: Ars-Linguistica/mlconjug3
+    - name: Pants on
+      run: '
 
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19.5
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
 
-      # for example-adhoc
-      - if: runner.os == 'Linux'
-        name: Download Apache `thrift` binary (Linux)
-        run: 'mkdir -p "${HOME}/.thrift"
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
 
-          curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  OpenSaMD/OpenSaMD:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: OpenSaMD/OpenSaMD
+    - name: Pants on
+      run: '
 
-          chmod +x "${HOME}/.thrift/thrift"
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
 
-          echo "${HOME}/.thrift" >> $GITHUB_PATH
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
 
-          '
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  StackStorm/st2:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: StackStorm/st2
+        submodules: recursive
+    - name: Pants on
+      run: '
 
-      - name: "Pants on"
-        run: |
-          # FIXME: save the script somewhere
-          curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
-          echo "$HOME/bin" | tee -a $GITHUB_PATH
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
 
-      - name: "Check out"
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ matrix.repository }}
-          # for StackStorm/st2
-          submodules: recursive
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
 
-      - run: |
-          if [[ -f pants.ci.toml ]]; then
-            echo "PANTS_CONFIG_FILES=pants.ci.toml" | tee -a $GITHUB_ENV
-          fi
-          # for lablup/backend.ai
-          mkdir .tmp
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  lablup/backend.ai:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: lablup/backend.ai
+    - name: Pants on
+      run: '
 
-      - run: |
-          pants version
-      # several repos don't some of these checks, but `if: always()`
-      # to walk through all of them
-      - run: |
-          pants tailor --check update-build-files --check ::
-        if: always()
-      - run: |
-          pants lint check ::
-        if: always()
-      - run: |
-          pants test ::
-        if: always()
-      - run: |
-          pants package ::
-        if: always()
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - name: Run set-up
+      run: mkdir .tmp
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  mitodl/ol-infrastructure:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: mitodl/ol-infrastructure
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  naccdata/flywheel-gear-extensions:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: naccdata/flywheel-gear-extensions
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-adhoc:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-adhoc
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-codegen:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-codegen
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-django:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-django
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-docker:
+    env:
+      DYNAMIC_TAG: dynamic-tag-here
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-docker
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-golang:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-golang
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-jvm:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-jvm
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-kotlin:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-kotlin
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-python:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-python
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+  pantsbuild/example-visibility:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/example-visibility
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `version` with repo-default version
+      run: pants version
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `lint check ::` with repo-default version
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `test ::` with repo-default version
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: always()
+      name: Run `package ::` with repo-default version
+      run: 'pants package ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: 'pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: always()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: 'pants package ::'
+name: Public repository tests
+'on':
+  workflow_dispatch:
+    inputs:
+      pants_version:
+        required: true
+        type: string
