@@ -1139,7 +1139,16 @@ class Repo:
 
 PUBLIC_REPOS = [
     # pants' examples
-    Repo(name="pantsbuild/example-adhoc", node_version="20"),
+    Repo(
+        name="pantsbuild/example-adhoc",
+        node_version="20",
+        goals=[
+            # TODO: https://github.com/pantsbuild/pants/issues/14492 means pants can't find the
+            # `setup-node`-installed node, so we have to exclude `package ::`
+            DefaultGoals.lint_check,
+            DefaultGoals.test,
+        ],
+    ),
     Repo(name="pantsbuild/example-codegen", install_thrift=True),
     Repo(name="pantsbuild/example-django", python_version="3.9"),
     Repo(
@@ -1153,7 +1162,19 @@ PUBLIC_REPOS = [
     Repo(name="pantsbuild/example-python", python_version="3.9"),
     Repo(name="pantsbuild/example-visibility", python_version="3.9"),
     # public repos
-    Repo(name="StackStorm/st2", python_version="3.8", checkout_options={"submodules": "recursive"}),
+    Repo(
+        name="StackStorm/st2",
+        python_version="3.8",
+        checkout_options={"submodules": "recursive"},
+        setup_commands=dedent(
+            # https://docs.stackstorm.com/development/sources.html
+            """
+            apt-get install gcc git make realpath screen libffi-dev libssl-dev python3.8-dev libldap2-dev libsasl2-dev
+            apt-get install mongodb mongodb-server
+            apt-get install rabbitmq-server
+            """
+        ),
+    ),
     Repo(
         name="lablup/backend.ai",
         python_version="3.11.3",
@@ -1161,13 +1182,16 @@ PUBLIC_REPOS = [
         goals=[
             DefaultGoals.tailor_update_build_files,
             DefaultGoals.lint_check,
-            "test :: -test/agent/docker:: -test/client/integration:: -test/common/redis::",
+            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::",
             DefaultGoals.package,
         ],
     ),
     Repo(name="Ars-Linguistica/mlconjug3"),
     Repo(name="mitodl/ol-infrastructure", goals=[DefaultGoals.package]),
-    Repo(name="naccdata/flywheel-gear-extensions", goals=[DefaultGoals.test, "package :: -directory_pull::"]),
+    Repo(
+        name="naccdata/flywheel-gear-extensions",
+        goals=[DefaultGoals.test, "package :: -directory_pull::"],
+    ),
     Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
 ]
 
@@ -1203,6 +1227,9 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 "PANTS_REMOTE_CACHE_READ": "false",
                 "PANTS_REMOTE_CACHE_WRITE": "false",
             },
+            # we're running untrusted code, so this token shouldn't be able to do anything. We also
+            # need to be sure we don't add any secrets to the job
+            "permissions": {},
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
                 install_python(repo.python_version),
