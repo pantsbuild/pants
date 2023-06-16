@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -1120,6 +1121,10 @@ class Repo:
 def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     inputs, env = workflow_dispatch_inputs([WorkflowInput("PANTS_VERSION", "string")])
 
+    def sanitize_name(name: str) -> str:
+        # IDs may only contain alphanumeric characters, '_', and '-'.
+        return re.sub("[^A-Za-z0-9_-]+", "_", name)
+
     def gen_goals(use_default_version: bool) -> Sequence[object]:
         name = "repo-default version" if use_default_version else env["PANTS_VERSION"]
 
@@ -1143,6 +1148,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
     def test_job(repo: Repo) -> object:
         return {
+            "name": repo.name,
             "runs-on": "ubuntu-latest",
             "env": {
                 **repo.env,
@@ -1203,7 +1209,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
         Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
     ]
 
-    jobs = {repo.name: test_job(repo) for repo in repositories}
+    jobs = {sanitize_name(repo.name): test_job(repo) for repo in repositories}
     return jobs, inputs
 
 

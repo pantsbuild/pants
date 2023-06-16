@@ -4,10 +4,11 @@
 
 
 jobs:
-  Ars-Linguistica/mlconjug3:
+  Ars-Linguistica_mlconjug3:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: Ars-Linguistica/mlconjug3
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -78,10 +79,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  OpenSaMD/OpenSaMD:
+  OpenSaMD_OpenSaMD:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: OpenSaMD/OpenSaMD
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -152,10 +154,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  StackStorm/st2:
+  StackStorm_st2:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: StackStorm/st2
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -227,10 +230,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  lablup/backend.ai:
+  lablup_backend_ai:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: lablup/backend.ai
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -303,10 +307,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  mitodl/ol-infrastructure:
+  mitodl_ol-infrastructure:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: mitodl/ol-infrastructure
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -377,10 +382,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  naccdata/flywheel-gear-extensions:
+  naccdata_flywheel-gear-extensions:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: naccdata/flywheel-gear-extensions
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -451,10 +457,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-adhoc:
+  pantsbuild_example-adhoc:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-adhoc
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -525,10 +532,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-codegen:
+  pantsbuild_example-codegen:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-codegen
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -599,10 +607,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-django:
+  pantsbuild_example-django:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-django
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -673,11 +682,12 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-docker:
+  pantsbuild_example-docker:
     env:
       DYNAMIC_TAG: dynamic-tag-here
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-docker
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -748,10 +758,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-golang:
+  pantsbuild_example-golang:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-golang
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -759,6 +770,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-golang
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
     - name: Pants on
       run: '
 
@@ -822,10 +837,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-jvm:
+  pantsbuild_example-jvm:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-jvm
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -896,10 +912,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-kotlin:
+  pantsbuild_example-kotlin:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-kotlin
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -970,10 +987,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-python:
+  pantsbuild_example-python:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-python
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -1044,10 +1062,11 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: 'pants package ::'
-  pantsbuild/example-visibility:
+  pantsbuild_example-visibility:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/example-visibility
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
