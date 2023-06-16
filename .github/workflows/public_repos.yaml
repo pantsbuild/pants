@@ -16,6 +16,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: Ars-Linguistica/mlconjug3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
     - name: Pants on
       run: '
 
@@ -91,6 +95,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: OpenSaMD/OpenSaMD
+    - name: Set up Python 3.9.15
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.9.15
     - name: Pants on
       run: '
 
@@ -167,6 +175,10 @@ jobs:
         fetch-depth: 10
         repository: StackStorm/st2
         submodules: recursive
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
     - name: Pants on
       run: '
 
@@ -242,6 +254,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: lablup/backend.ai
+    - name: Set up Python 3.11.3
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11.3
     - name: Pants on
       run: '
 
@@ -319,6 +335,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: mitodl/ol-infrastructure
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
     - name: Pants on
       run: '
 
@@ -394,6 +414,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: naccdata/flywheel-gear-extensions
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
     - name: Pants on
       run: '
 
@@ -469,6 +493,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-adhoc
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
     - name: Pants on
       run: '
 
@@ -544,6 +572,22 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-codegen
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "${HOME}/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
+        -o "${HOME}/.thrift/thrift"
+
+        chmod +x "${HOME}/.thrift/thrift"
+
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
+
+        '
     - name: Pants on
       run: '
 
@@ -619,6 +663,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-django
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
     - name: Pants on
       run: '
 
@@ -695,6 +743,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-docker
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
     - name: Pants on
       run: '
 
@@ -770,6 +822,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-golang
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -849,6 +905,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-jvm
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
     - name: Pants on
       run: '
 
@@ -924,6 +984,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-kotlin
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
     - name: Pants on
       run: '
 
@@ -999,6 +1063,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-python
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
     - name: Pants on
       run: '
 
@@ -1074,6 +1142,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: pantsbuild/example-visibility
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
     - name: Pants on
       run: '
 

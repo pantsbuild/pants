@@ -256,6 +256,13 @@ def launch_bazel_remote() -> Sequence[Step]:
     ]
 
 
+def setup_python(version: str) -> Step:
+    return {
+        "name": f"Set up Python {version}",
+        "uses": "actions/setup-python@v4",
+        "with": {"python-version": version},
+    }
+
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
@@ -473,13 +480,7 @@ class Helper:
         # We pre-install Python on our self-hosted platforms.
         # We must set it up on Github-hosted platforms.
         if self.platform in GITHUB_HOSTED:
-            ret.append(
-                {
-                    "name": f"Set up Python {PYTHON_VERSION}",
-                    "uses": "actions/setup-python@v4",
-                    "with": {"python-version": PYTHON_VERSION},
-                }
-            )
+            ret.append(setup_python(PYTHON_VERSION))
         return ret
 
     def expose_all_pythons(self) -> Sequence[Step]:
@@ -1117,6 +1118,27 @@ class Repo:
     checkout_options: dict[str, object] = field(default_factory=dict)
     setup_commands: str = ""
 
+PUBLIC_REPOS = [
+        # pants' examples
+        Repo(name="pantsbuild/example-adhoc"),
+        Repo(name="pantsbuild/example-codegen", install_thrift=True),
+        Repo(name="pantsbuild/example-django", python_version="3.9"),
+        Repo(name="pantsbuild/example-docker", python_version="3.8", env={"DYNAMIC_TAG": "dynamic-tag-here"}),
+        Repo(name="pantsbuild/example-golang", install_go=True),
+        Repo(name="pantsbuild/example-jvm"),
+        Repo(name="pantsbuild/example-kotlin"),
+        Repo(name="pantsbuild/example-python", python_version="3.9"),
+        Repo(name="pantsbuild/example-visibility", python_version="3.9"),
+        # public repos
+        Repo(name="StackStorm/st2", python_version="3.9", checkout_options={"submodules": "recursive"}),
+        Repo(name="lablup/backend.ai", python_version="3.11.3", setup_commands="mkdir .tmp"),
+        Repo(name="Ars-Linguistica/mlconjug3"),
+        Repo(name="mitodl/ol-infrastructure"),
+        Repo(name="naccdata/flywheel-gear-extensions"),
+        Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
+    ]
+
+
 
 def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     inputs, env = workflow_dispatch_inputs([WorkflowInput("PANTS_VERSION", "string")])
@@ -1157,6 +1179,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             },
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
+                setup_python(repo.python_version),
                 *([install_go()] if repo.install_go else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
                 {
@@ -1189,27 +1212,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             ],
         }
 
-    repositories = [
-        # pants' examples
-        Repo(name="pantsbuild/example-python"),
-        Repo(name="pantsbuild/example-visibility"),
-        Repo(name="pantsbuild/example-django"),
-        Repo(name="pantsbuild/example-adhoc"),
-        Repo(name="pantsbuild/example-jvm"),
-        Repo(name="pantsbuild/example-golang", install_go=True),
-        Repo(name="pantsbuild/example-kotlin"),
-        Repo(name="pantsbuild/example-docker", env={"DYNAMIC_TAG": "dynamic-tag-here"}),
-        Repo(name="pantsbuild/example-codegen"),
-        # public repos (just from a basic search for path:pants.toml on github)
-        Repo(name="StackStorm/st2", checkout_options={"submodules": "recursive"}),
-        Repo(name="lablup/backend.ai", python_version="3.11.3", setup_commands="mkdir .tmp"),
-        Repo(name="Ars-Linguistica/mlconjug3"),
-        Repo(name="mitodl/ol-infrastructure"),
-        Repo(name="naccdata/flywheel-gear-extensions"),
-        Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
-    ]
-
-    jobs = {sanitize_name(repo.name): test_job(repo) for repo in repositories}
+    jobs = {sanitize_name(repo.name): test_job(repo) for repo in PUBLIC_REPOS}
     return jobs, inputs
 
 
