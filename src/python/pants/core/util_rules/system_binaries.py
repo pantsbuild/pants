@@ -15,6 +15,7 @@ from typing import Iterable, Mapping, Sequence
 
 from typing_extensions import Self
 
+from pants.base.deprecated import warn_or_error
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.core.util_rules.environments import EnvironmentTarget
@@ -280,26 +281,6 @@ class UnzipBinary(BinaryPath):
         # Note that the `output_dir` does not need to already exist.
         # The caller should validate that it's a valid `.zip` file.
         return (self.path, archive_path, "-d", extract_path)
-
-
-@dataclass(frozen=True)
-class GunzipBinary:
-    python: PythonBinary
-
-    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
-        archive_name = os.path.basename(archive_path)
-        dest_file_name = os.path.splitext(archive_name)[0]
-        dest_path = os.path.join(extract_path, dest_file_name)
-        script = dedent(
-            f"""
-            import gzip
-            import shutil
-            with gzip.GzipFile(filename={archive_path!r}, mode="rb") as source:
-                with open({dest_path!r}, "wb") as dest:
-                    shutil.copyfileobj(source, dest)
-            """
-        )
-        return (self.python.path, "-c", script)
 
 
 @dataclass(frozen=True)
@@ -576,6 +557,13 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
 
 @rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
 async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
+    warn_or_error(
+        # TODO(Joshua Cannon): removal at 2.18.0.dev2
+        removal_version="2.18.0.dev2",
+        entity="Requesting `PythonBinary`",
+        hint="Use the `PythonBuildStandalone` type instead (be sure to provide the `immutable_input_digests` to any applicable process).",
+    )
+
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
     # for maximum compatibility with internal scripts.
     interpreter_search_paths = python_bootstrap.interpreter_search_paths
@@ -668,11 +656,6 @@ async def find_unzip() -> UnzipBinary:
         request, rationale="download the tools Pants needs to run"
     )
     return UnzipBinary(first_path.path, first_path.fingerprint)
-
-
-@rule
-def find_gunzip(python: PythonBinary) -> GunzipBinary:
-    return GunzipBinary(python)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)

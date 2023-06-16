@@ -7,12 +7,16 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
+from pants.base.deprecated import warn_or_error
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
+    AsyncFieldMixin,
     BoolField,
     Dependencies,
     DescriptionField,
@@ -34,7 +38,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
-from pants.util.strutil import help_text
+from pants.util.strutil import help_text, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 logger = logging.getLogger(__name__)
@@ -385,6 +389,39 @@ def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets
 # -----------------------------------------------------------------------------------------------
 
 
+class HelmDeploymentChartField(StringField, AsyncFieldMixin):
+    alias = "chart"
+    # TODO Will be made required in next release
+    required = False
+    help = help_text(
+        f"""
+        The address of the `{HelmChartTarget.alias}` or `{HelmArtifactTarget.alias}`
+        that will be used for this deployment.
+        """
+    )
+
+    def to_address_input(self) -> AddressInput | None:
+        if self.value:
+            return AddressInput.parse(
+                self.value,
+                relative_to=self.address.spec_path,
+                description_of_origin=f"the `{self.alias}` field in the `{HelmDeploymentTarget.alias}` target {self.address}",
+            )
+
+        warn_or_error(
+            "2.19.0.dev0",
+            "chart address in `dependencies`",
+            softwrap(
+                f"""
+                You should specify the chart address in the new `{self.alias}` field in
+                {HelmDeploymentTarget.alias}. In future versions this will be mandatory.
+                """
+            ),
+            start_version="2.18.0.dev1",
+        )
+        return None
+
+
 class HelmDeploymentReleaseNameField(StringField):
     alias = "release_name"
     help = "Name of the release used in the deployment. If not set, the target name will be used instead."
@@ -408,6 +445,7 @@ class HelmDeploymentSkipCrdsField(BoolField):
 class HelmDeploymentSourcesField(MultipleSourcesField):
     default = ("*.yaml", "*.yml")
     expected_file_extensions = (".yaml", ".yml")
+    default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
     help = "Helm configuration files for a given deployment."
 
 
@@ -489,6 +527,7 @@ class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        HelmDeploymentChartField,
         HelmDeploymentReleaseNameField,
         HelmDeploymentDependenciesField,
         HelmDeploymentSourcesField,
@@ -511,6 +550,7 @@ class HelmDeploymentFieldSet(FieldSet):
         HelmDeploymentSourcesField,
     )
 
+    chart: HelmDeploymentChartField
     description: DescriptionField
     release_name: HelmDeploymentReleaseNameField
     namespace: HelmDeploymentNamespaceField

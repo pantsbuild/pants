@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import EntryPoint
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.rules import collect_rules
@@ -15,14 +15,12 @@ class DebugPy(PythonToolBase):
     name = options_scope
     help = "An implementation of the Debug Adapter Protocol for Python (https://github.com/microsoft/debugpy)."
 
-    default_version = "debugpy>=1.6.5,<1.7"
     default_main = EntryPoint("debugpy")
-    default_requirements = [default_version]
+    default_requirements = ["debugpy>=1.6.5,<1.7"]
 
     register_interpreter_constraints = True
 
     default_lockfile_resource = ("pants.backend.python.subsystems", "debugpy.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
     args = ArgsListOption(example="--log-to-stderr")
 

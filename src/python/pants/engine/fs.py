@@ -325,7 +325,6 @@ class SnapshotDiff:
 
 
 def rules():
-    # Keep in sync with `intrinsics.rs`.
     return (
         QueryRule(Digest, (CreateDigest,)),
         QueryRule(Digest, (PathGlobs,)),

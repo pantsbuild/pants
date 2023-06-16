@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import importlib.resources
 import re
 from textwrap import dedent
 
@@ -46,6 +45,7 @@ from pants.testutil.python_interpreter_selection import (
     skip_unless_python39_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.util.resources import read_sibling_resource
 
 
 @pytest.fixture
@@ -232,11 +232,9 @@ def test_thirdparty_dependency(rule_runner: PythonRuleRunner) -> None:
 
 
 def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
-    # NB: We install `django-stubs` both with `[mypy].extra_requirements` and
-    # `[mypy].extra_type_stubs`. This awkwardness is because its used both as a plugin and
-    # type stubs.
     rule_runner.write_files(
         {
+            "mypy.lock": read_sibling_resource(__name__, "mypy_with_django_stubs.lock"),
             f"{PACKAGE}/settings.py": dedent(
                 """\
                 from django.urls import URLPattern
@@ -255,7 +253,15 @@ def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
                 assert "42" == text.slugify(42)
                 """
             ),
-            f"{PACKAGE}/BUILD": "python_sources()",
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_sources()
+
+                python_requirement(
+                    name="reqs", requirements=["django==3.2.19", "django-stubs==1.8.0"]
+                )
+                """
+            ),
             "mypy.ini": dedent(
                 """\
                 [mypy]
@@ -275,90 +281,13 @@ def test_thirdparty_plugin(rule_runner: PythonRuleRunner) -> None:
             rule_runner.get_target(Address(PACKAGE, relative_file_path="settings.py")),
         ],
         extra_args=[
-            "--mypy-extra-requirements=django-stubs==1.8.0",
-            "--mypy-extra-type-stubs=django-stubs==1.8.0",
-            "--mypy-version=mypy==0.812",
-            "--mypy-lockfile=<none>",
+            "--python-resolves={'mypy':'mypy.lock'}",
+            "--mypy-install-from-resolve=mypy",
         ],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/app.py:4" in result[0].stdout
-
-
-def test_extra_type_stubs_lockfile(rule_runner: PythonRuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            f"{PACKAGE}/app.py": dedent(
-                """\
-                from pkg_resources import Requirement
-
-                assert Requirement(123) == 123
-                """
-            ),
-            f"{PACKAGE}/BUILD": "python_sources()",
-            "stubs.lock": dedent(
-                """
-                {
-                  "allow_builds": true,
-                  "allow_prereleases": false,
-                  "allow_wheels": true,
-                  "build_isolation": true,
-                  "constraints": [],
-                  "locked_resolves": [
-                    {
-                      "locked_requirements": [
-                        {
-                          "artifacts": [
-                            {
-                              "algorithm": "sha256",
-                              "hash": "f568830d82b48783a0df00646bc84effeddb4886bf0f19708fbbadeb552b6ece",
-                              "url": "https://files.pythonhosted.org/packages/ff/62/7de9f8c8378e46ec7dc68257cd9577c65d2c0b3dd4abc31ae92e97fa98e8/types_setuptools-63.4.0-py3-none-any.whl"
-                            }
-                          ],
-                          "project_name": "types-setuptools",
-                          "requires_dists": [],
-                          "requires_python": null,
-                          "version": "63.4"
-                        }
-                      ],
-                      "platform_tag": null
-                    }
-                  ],
-                  "path_mappings": {},
-                  "pex_version": "2.1.103",
-                  "prefer_older_binary": false,
-                  "requirements": [
-                    "types-setuptools"
-                  ],
-                  "requires_python": [
-                    "==3.9.*"
-                  ],
-                  "resolver_version": "pip-2020-resolver",
-                  "style": "universal",
-                  "target_systems": [
-                    "linux",
-                    "mac"
-                  ],
-                  "transitive": true,
-                  "use_pep517": null
-                }
-                """
-            ),
-        }
-    )
-    result = run_mypy(
-        rule_runner,
-        [rule_runner.get_target(Address(PACKAGE, relative_file_path="app.py"))],
-        extra_args=[
-            "--mypy-extra-type-stubs==types-setuptools",
-            "--mypy-extra-type-stubs-lockfile=stubs.lock",
-            "--python-invalid-lockfile-behavior=ignore",
-        ],
-    )
-    assert len(result) == 1
-    assert result[0].exit_code == 1
-    assert f"{PACKAGE}/app.py:3" in result[0].stdout
 
 
 def test_transitive_dependencies(rule_runner: PythonRuleRunner) -> None:
@@ -413,9 +342,7 @@ def test_works_with_python27(rule_runner: PythonRuleRunner) -> None:
     """
     rule_runner.write_files(
         {
-            "older_mypy_for_testing.lock": importlib.resources.read_text(
-                __name__.rpartition(".")[0], "older_mypy_for_testing.lock"
-            ),
+            "mypy.lock": read_sibling_resource(__name__, "older_mypy_for_testing.lock"),
             "BUILD": dedent(
                 """\
                 # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
@@ -449,8 +376,10 @@ def test_works_with_python27(rule_runner: PythonRuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [tgt],
-        # --py2 support requires mypy < 0.980.
-        extra_args=["--mypy-version=mypy==0.961", "--mypy-lockfile=older_mypy_for_testing.lock"],
+        extra_args=[
+            "--python-resolves={'mypy':'mypy.lock'}",
+            "--mypy-install-from-resolve=mypy",
+        ],
     )
     assert len(result) == 1
     assert result[0].exit_code == 1
@@ -516,9 +445,7 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     """
     rule_runner.write_files(
         {
-            "older_mypy_for_testing.lock": importlib.resources.read_text(
-                __name__.rpartition(".")[0], "older_mypy_for_testing.lock"
-            ),
+            "mypy.lock": read_sibling_resource(__name__, "older_mypy_for_testing.lock"),
             f"{PACKAGE}/py2/__init__.py": dedent(
                 """\
                 def add(x, y):
@@ -554,8 +481,10 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     result = run_mypy(
         rule_runner,
         [py2_tgt, py3_tgt],
-        # --py2 support requires mypy < 0.980.
-        extra_args=["--mypy-version=mypy==0.961", "--mypy-lockfile=older_mypy_for_testing.lock"],
+        extra_args=[
+            "--python-resolves={'mypy':'mypy.lock'}",
+            "--mypy-install-from-resolve=mypy",
+        ],
     )
     assert len(result) == 2
     py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
@@ -629,15 +558,18 @@ def test_mypy_shadows_requirements(rule_runner: PythonRuleRunner) -> None:
     """
     rule_runner.write_files(
         {
+            "mypy.lock": read_sibling_resource(__name__, "mypy_shadowing_typed_ast.lock"),
             "BUILD": "python_requirement(name='ta', requirements=['typed-ast==1.4.1'])",
             f"{PACKAGE}/f.py": "import typed_ast",
             f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(
-        rule_runner, tgt, extra_args=["--mypy-version=mypy==0.782", "--mypy-lockfile=<none>"]
-    )
+    extra_args = [
+        "--python-resolves={'mypy':'mypy.lock'}",
+        "--mypy-install-from-resolve=mypy",
+    ]
+    assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
 def test_source_plugin(rule_runner: PythonRuleRunner) -> None:
@@ -672,9 +604,10 @@ def test_source_plugin(rule_runner: PythonRuleRunner) -> None:
     )
     rule_runner.write_files(
         {
+            "mypy.lock": read_sibling_resource(__name__, "mypy_with_more_itertools.lock"),
             "BUILD": dedent(
-                f"""\
-                python_requirement(name='mypy', requirements=['{MyPy.default_version}'])
+                """\
+                python_requirement(name='mypy', requirements=['mypy==1.1.1'])
                 python_requirement(name="more-itertools", requirements=["more-itertools==8.4.0"])
                 """
             ),
@@ -726,8 +659,9 @@ def test_source_plugin(rule_runner: PythonRuleRunner) -> None:
             rule_runner,
             [tgt],
             extra_args=[
+                "--python-resolves={'mypy':'mypy.lock'}",
                 "--mypy-source-plugins=['pants-plugins/plugins']",
-                "--mypy-lockfile=<none>",
+                "--mypy-install-from-resolve=mypy",
                 "--source-root-patterns=['pants-plugins', 'src/py']",
             ],
         )

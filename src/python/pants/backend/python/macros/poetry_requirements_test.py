@@ -113,20 +113,20 @@ def assert_equal_requirements(actual: str | None, expected: str) -> None:
 
 
 def test_add_markers() -> None:
-    attr_mark = PyprojectAttr({"markers": "platform_python_implementation == 'CPython'"})
+    attr_mark = PyprojectAttr(markers="platform_python_implementation == 'CPython'")
     assert_equal_requirements(
         add_markers("foo==1.0.0", attr_mark, "somepath"),
         "foo==1.0.0;(platform_python_implementation == 'CPython')",
     )
 
     attr_mark_adv = PyprojectAttr(
-        {"markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'"}
+        markers="platform_python_implementation == 'CPython' or sys_platform == 'win32'"
     )
     assert_equal_requirements(
         add_markers("foo==1.0.0", attr_mark_adv, "somepath"),
         "foo==1.0.0;(platform_python_implementation == 'CPython' or sys_platform == 'win32')",
     )
-    attr_basic_both = PyprojectAttr({"python": "3.6"})
+    attr_basic_both = PyprojectAttr(python="3.6")
     attr_basic_both.update(attr_mark)
 
     assert_equal_requirements(
@@ -134,7 +134,7 @@ def test_add_markers() -> None:
         "foo==1.0.0;(platform_python_implementation == 'CPython') and (python_version == '3.6')",
     )
     attr_adv_py_both = PyprojectAttr(
-        {"python": "^3.6", "markers": "platform_python_implementation == 'CPython'"}
+        python="^3.6", markers="platform_python_implementation == 'CPython'"
     )
     assert_equal_requirements(
         add_markers("foo==1.0.0", attr_adv_py_both, "somepath"),
@@ -147,10 +147,8 @@ def test_add_markers() -> None:
     )
 
     attr_adv_both = PyprojectAttr(
-        {
-            "python": "^3.6",
-            "markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'",
-        }
+        python="^3.6",
+        markers="platform_python_implementation == 'CPython' or sys_platform == 'win32'",
     )
     assert_equal_requirements(
         add_markers("foo==1.0.0", attr_adv_both, "somepath"),
@@ -183,19 +181,17 @@ def empty_pyproject_toml() -> PyProjectToml:
 def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
     # The case where we have both extras and path/url are tested in
     # test_handle_path/url respectively.
-    attr = PyprojectAttr({"version": "1.0.0", "extras": ["extra1"]})
+    attr = PyprojectAttr(version="1.0.0", extras=["extra1"])
     assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
 
-    attr_git = PyprojectAttr(
-        {"git": "https://github.com/requests/requests.git", "extras": ["extra1"]}
-    )
+    attr_git = PyprojectAttr(git="https://github.com/requests/requests.git", extras=["extra1"])
     assert (
         handle_dict_attr("requests", attr_git, empty_pyproject_toml)
         == "requests[extra1] @ git+https://github.com/requests/requests.git"
     )
 
     assert handle_dict_attr("requests", attr, empty_pyproject_toml) == "requests[extra1] ==1.0.0"
-    attr_multi = PyprojectAttr({"version": "1.0.0", "extras": ["extra1", "extra2", "extra3"]})
+    attr_multi = PyprojectAttr(version="1.0.0", extras=["extra1", "extra2", "extra3"])
     assert (
         handle_dict_attr("requests", attr_multi, empty_pyproject_toml)
         == "requests[extra1,extra2,extra3] ==1.0.0"
@@ -204,7 +200,7 @@ def test_handle_extras(empty_pyproject_toml: PyProjectToml) -> None:
 
 def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
     def assert_git(extra_opts: PyprojectAttr, suffix: str) -> None:
-        attr = PyprojectAttr({"git": "https://github.com/requests/requests.git"})
+        attr = PyprojectAttr(git="https://github.com/requests/requests.git")
         attr.update(extra_opts)
         assert_equal_requirements(
             handle_dict_attr("requests", attr, empty_pyproject_toml),
@@ -212,23 +208,21 @@ def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
         )
 
     assert_git({}, "")
-    assert_git(PyprojectAttr({"branch": "main"}), "@main")
-    assert_git(PyprojectAttr({"tag": "v1.1.1"}), "@v1.1.1")
-    assert_git(PyprojectAttr({"rev": "1a2b3c4d"}), "#1a2b3c4d")
+    assert_git(PyprojectAttr(branch="main"), "@main")
+    assert_git(PyprojectAttr(tag="v1.1.1"), "@v1.1.1")
+    assert_git(PyprojectAttr(rev="1a2b3c4d"), "#1a2b3c4d")
     assert_git(
         PyprojectAttr(
-            {
-                "branch": "main",
-                "markers": "platform_python_implementation == 'CPython'",
-                "python": "3.6",
-            }
+            branch="main",
+            markers="platform_python_implementation == 'CPython'",
+            python="3.6",
         ),
         "@main ;(platform_python_implementation == 'CPython') and (python_version == '3.6')",
     )
 
 
 def test_handle_git_ssh(empty_pyproject_toml: PyProjectToml) -> None:
-    attr = PyprojectAttr({"git": "git@github.com:requests/requests.git"})
+    attr = PyprojectAttr(git="git@github.com:requests/requests.git")
     assert (
         handle_dict_attr("requests", attr, empty_pyproject_toml)
         == "requests @ git+ssh://git@github.com/requests/requests.git"
@@ -262,10 +256,10 @@ def test_handle_path_arg(tmp_path: Path) -> None:
     internal_project = build_root / "my_py_proj"
     internal_project.mkdir()
 
-    file_attr = PyprojectAttr({"path": "../../my_py_proj.whl"})
-    file_attr_mark = PyprojectAttr({"path": "../../my_py_proj.whl", "markers": "os_name=='darwin'"})
-    file_attr_extras = PyprojectAttr({"path": "../../my_py_proj.whl", "extras": ["extra1"]})
-    dir_attr = PyprojectAttr({"path": "../../my_py_proj"})
+    file_attr = PyprojectAttr(path="../../my_py_proj.whl")
+    file_attr_mark = PyprojectAttr(path="../../my_py_proj.whl", markers="os_name=='darwin'")
+    file_attr_extras = PyprojectAttr(path="../../my_py_proj.whl", extras=["extra1"])
+    dir_attr = PyprojectAttr(path="../../my_py_proj")
 
     assert_equal_requirements(
         handle_dict_attr("my_py_proj", file_attr, one_pyproject_toml),
@@ -296,20 +290,20 @@ def test_handle_path_arg(tmp_path: Path) -> None:
 
 
 def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
-    attr = PyprojectAttr({"url": "https://my-site.com/mydep.whl"})
+    attr = PyprojectAttr(url="https://my-site.com/mydep.whl")
     assert_equal_requirements(
         handle_dict_attr("my_py_proj", attr, empty_pyproject_toml),
         "my_py_proj @ https://my-site.com/mydep.whl",
     )
 
-    attr_with_extra = PyprojectAttr({"extras": ["extra1"]})
+    attr_with_extra = PyprojectAttr(extras=["extra1"])
     attr_with_extra.update(attr)
     assert_equal_requirements(
         handle_dict_attr("my_py_proj", attr_with_extra, empty_pyproject_toml),
         "my_py_proj[extra1] @ https://my-site.com/mydep.whl",
     )
 
-    attr_with_mark = PyprojectAttr({"markers": "os_name=='darwin'"})
+    attr_with_mark = PyprojectAttr(markers="os_name=='darwin'")
     attr_with_mark.update(attr)
     assert_equal_requirements(
         handle_dict_attr("my_py_proj", attr_with_mark, empty_pyproject_toml),
@@ -318,13 +312,13 @@ def test_handle_url_arg(empty_pyproject_toml: PyProjectToml) -> None:
 
 
 def test_version_only(empty_pyproject_toml: PyProjectToml) -> None:
-    attr = PyprojectAttr({"version": "1.2.3"})
+    attr = PyprojectAttr(version="1.2.3")
     assert handle_dict_attr("foo", attr, empty_pyproject_toml) == "foo ==1.2.3"
 
 
 def test_py_constraints(empty_pyproject_toml: PyProjectToml) -> None:
     def assert_py_constraints(py_req: str, suffix: str) -> None:
-        attr = PyprojectAttr({"version": "1.2.3", "python": py_req})
+        attr = PyprojectAttr(version="1.2.3", python=py_req)
         assert_equal_requirements(
             handle_dict_attr("foo", attr, empty_pyproject_toml), f"foo ==1.2.3;{suffix}"
         )

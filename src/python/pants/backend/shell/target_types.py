@@ -354,8 +354,6 @@ class SkipShellCommandTestsField(BoolField):
 
 class ShellCommandTarget(Target):
     alias = "shell_command"
-    deprecated_alias = "experimental_shell_command"
-    deprecated_alias_removal_version = "2.18.0.dev0"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandOutputDependenciesField,
@@ -400,8 +398,6 @@ class ShellCommandTarget(Target):
 
 class ShellCommandRunTarget(Target):
     alias = "run_shell_command"
-    deprecated_alias = "experimental_run_shell_command"
-    deprecated_alias_removal_version = "2.18.0.dev0"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandExecutionDependenciesField,

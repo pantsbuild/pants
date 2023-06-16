@@ -80,6 +80,7 @@ async def package_python_google_cloud_function(
             handler=field_set.handler,
             output_path=field_set.output_path,
             include_requirements=True,
+            include_sources=True,
             reexported_handler_module=PythonGoogleCloudFunctionHandlerField.reexported_handler_module,
             log_only_reexported_handler_func=True,
         ),
