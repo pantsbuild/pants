@@ -35,7 +35,7 @@ class PantsRunner:
     args: List[str]
     env: Mapping[str, str]
 
-    # This could be a bootstrap option, but it's preferable to keep these very limited to make it
+    # This could be a bootstrap option, but it is preferable to keep these very limited to make it
     # easier to make the daemon the default use case. Once the daemon lifecycle is stable enough we
     # should be able to avoid needing to kill it at all.
     def will_terminate_pantsd(self) -> bool:
@@ -57,9 +57,9 @@ class PantsRunner:
 
     @staticmethod
     def scrub_pythonpath() -> None:
-        # Do not propagate any PYTHONPATH that happens to have been set in our environment
+        # Don't propagate any PYTHONPATH that happens to have been set in our environment
         # to our subprocesses.
-        # Note that don't warn (but still scrub) if RUNNING_PANTS_FROM_SOURCES is set. This allows
+        # NB: We don't warn (but we still scrub) if RUNNING_PANTS_FROM_SOURCES is set. This allows
         # scripts that run pants directly from sources, and therefore must set PYTHONPATH, to mute
         # this warning.
         pythonpath = os.environ.pop("PYTHONPATH", None)

@@ -515,7 +515,7 @@ class Target:
         grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
         `SourcesField`, you may need to hydrate the value.).
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags`
+        This works with subclasses of `Field`. For example, if you subclass `Tags`
         to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
         `tgt.get(CustomTags)` will return the same `CustomTags` instance.
 
@@ -550,7 +550,7 @@ class Target:
     def has_field(self, field: Type[Field]) -> bool:
         """Check that this target has registered the requested field.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
         custom subclass `CustomTags`, both `tgt.has_field(Tags)` and
         `python_tgt.has_field(CustomTags)` will return True.
         """
@@ -560,7 +560,7 @@ class Target:
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         """Check that this target has registered all of the requested fields.
 
-        This works with subclasses of `Field`s. For example, if you subclass `Tags` to define a
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
         custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
         `python_tgt.has_fields([CustomTags])` will return True.
         """
@@ -946,7 +946,7 @@ class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
 
     Resolve the transitive targets with `await Get(TransitiveTargets,
-    TransitiveTargetsRequest([addr1, addr2])`.
+    TransitiveTargetsRequest([addr1, addr2]))`.
     """
 
     roots: Tuple[Address, ...]
@@ -1369,7 +1369,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
-    You can optionally set implement the classmethod `opt_out` so that targets have a
+    You can optionally implement the classmethod `opt_out` so that targets have a
     mechanism to not match with the FieldSet even if they have the `required_fields` registered.
 
     For example:
@@ -1385,7 +1385,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
             def opt_out(cls, tgt: Target) -> bool:
                 return tgt.get(MaybeSkipFortranTestsField).value
 
-    This field set may then created from a `Target` through the `is_applicable()` and `create()`
+    This field set may then be created from a `Target` through the `is_applicable()` and `create()`
     class methods:
 
         field_sets = [
@@ -2021,7 +2021,7 @@ class SourcesField(AsyncFieldMixin, Field):
     - `default_glob_match_error_behavior` -- Advanced option, should very rarely be used. Override
         glob match error behavior when using the default value. If setting this to
         `GlobMatchErrorBehavior.ignore`, make sure you have other validation in place in case the
-        default glob doesn't match any files if required, to alert the user appropriately.
+        default glob doesn't match any files, if required, to alert the user appropriately.
     """
 
     expected_file_extensions: ClassVar[tuple[str, ...] | None] = None
@@ -2785,7 +2785,7 @@ class DependenciesRuleApplicationRequest:
 
 @dataclass(frozen=True)
 class DependenciesRuleApplication:
-    """Maps all dependencies to their respective dependency rule application of a origin target
+    """Maps all dependencies to their respective dependency rule application of an origin target
     address.
 
     The `applications` will be empty and the `address` `None` if there is no dependency rule

@@ -67,7 +67,7 @@ class EngineAwareReturnType(ABC):
         """Allows a return type to be conditionally marked uncacheable.
 
         An uncacheable value is recomputed in each Session: this can be useful if the level or
-        message should be rendered as side-effects in each Session.
+        message should be rendered as side effects in each Session.
         """
         return True
 
@@ -93,9 +93,9 @@ class SideEffecting(ABC):
     """Marks a class as providing side-effecting APIs, which are handled specially in @rules.
 
     Implementers of SideEffecting classes should ensure that `def side_effected` is called before
-    the class causes side-effects.
+    the class causes side effects.
 
-    Note that logging is _not_ considered to be a side-effect, but other types of output to stdio
+    Note that logging is _not_ considered to be a side effect, but other types of output to stdio
     are.
     """
 

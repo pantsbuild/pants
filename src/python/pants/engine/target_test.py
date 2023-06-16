@@ -326,7 +326,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     # that still works where the original target was expected.
     #
     # However, this means that we must ensure `Target.get()` and `Target.has_fields()` will work
-    # with subclasses of the original `Field`s.
+    # with subclasses of the original `Field`.
 
     class CustomFortranExtensions(FortranExtensions):
         banned_extensions = ("FortranBannedExt",)
@@ -526,7 +526,7 @@ def test_coarsened_target_closure() -> None:
 
 
 def test_generated_targets_address_validation() -> None:
-    """Ensure that all addresses are well formed."""
+    """Ensure that all addresses are well-formed."""
 
     class MockTarget(Target):
         alias = "tgt"

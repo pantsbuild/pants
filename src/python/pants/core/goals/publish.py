@@ -124,7 +124,7 @@ class PublishPackages:
     The `names` should list all artifacts being published by the `process` command.
 
     The `process` may be `None`, indicating that it will not be published. This will be logged as
-    `skipped`. If the process returns a non zero exit code, it will be logged as `failed`.
+    `skipped`. If the process returns a non-zero exit code, it will be logged as `failed`.
 
     The `description` may be a reason explaining why the publish was skipped, or identifying which
     repository the artifacts are published to.

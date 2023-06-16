@@ -106,7 +106,7 @@ class FixResult(EngineAwareReturnType):
                     snapshot_diff.changed_files,
                     snapshot_diff.their_unique_files,  # added files
                     snapshot_diff.our_unique_files,  # removed files
-                    # NB: there is no rename detection, so a renames will list
+                    # NB: there is no rename detection, so a rename will list
                     # both the old filename (removed) and the new filename (added).
                 )
             )

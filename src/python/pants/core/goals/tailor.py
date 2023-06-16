@@ -106,7 +106,7 @@ class PutativeTarget:
     name: str
     type_alias: str
 
-    # The sources that triggered creating of this putative target.
+    # The sources that triggered creating this putative target.
     # The putative target will own these sources, but may also glob over other sources.
     # If the putative target does not have a `sources` field, then this value must be the
     # empty tuple.

@@ -250,7 +250,7 @@ class BinaryShimsRequest:
 
 @dataclass(frozen=True)
 class BinaryShims:
-    """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
+    """The shims created for a BinaryShimsRequest are placed in `bin_directory` of the `digest`.
 
     The purpose of these shims is so that a Process may be executed with `immutable_input_digests`
     provided to the `Process`, and `path_component` included in its `PATH` environment variable.

@@ -131,10 +131,10 @@ class RequestedUserResolveNames(Collection[str]):
 
 
 class PackageVersion(Protocol):
-    """Protocol for backend specific implementations, to support language ecosystem specific version
+    """Protocol for backend specific implementations, to support language-ecosystem-specific version
     formats and sort rules.
 
-    May support the `int` properties `major`, `minor` and `micro` to color diff based on semantic
+    May support the `int` properties `major`, `minor`, and `micro` to color diff based on semantic
     step taken.
     """
 
