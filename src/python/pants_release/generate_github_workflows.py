@@ -291,7 +291,7 @@ def install_python(version: str) -> Step:
 def install_node(version: str) -> Step:
     return  {
         "name": f"Set up Node {version}",
-        "uses:": "actions/setup-node@v3",
+        "uses": "actions/setup-node@v3",
         "with": {"node-version": version}
     }
 
