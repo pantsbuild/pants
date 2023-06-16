@@ -339,16 +339,23 @@ class RuntimePlatforms:
     complete_platforms: CompletePlatforms = CompletePlatforms()
 
 
-async def _infer_from_ics(
-    request: RuntimePlatformsRequest, python_setup: PythonSetup
-) -> tuple[int, int]:
+async def _infer_from_ics(request: RuntimePlatformsRequest) -> tuple[int, int]:
     ics = await Get(InterpreterConstraints, InterpreterConstraintsRequest([request.address]))
 
-    # (slight) future proofing: use the overall Pants interpreter universe, rather than the FaaS
-    # platform's known runtimes, it's more likely that the ICs cover exactly one version in future,
-    # and thus ease Pants upgrades (e.g. at the time of writing, '>=3.10' currently only covers one
-    # version supported by AWS Lambda (3.10), but will cover more when AWS adds support for 3.11)
-
+    # Future proofing: use naive non-universe-based IC requirement matching to determine if the
+    # requirements cover exactly (and all patch versions of) one major.minor interpreter
+    # version.
+    #
+    # Either reasonable option for a universe (`PythonSetup.interpreter_universe` or the FaaS's
+    # known runtimes) can and will be expanded during a Pants upgrade: for instance, at the time of
+    # writing, Pants only supports up to 3.11 but might soon add support for 3.12, or AWS Lambda
+    # (and pants.backend.awslambda.python's known runtimes) only supports up to 3.10 but might soon
+    # add support for 3.11.
+    #
+    # When this happens, some ranges (like `>=3.11`, if using `PythonSetup.interpreter_universe`)
+    # will go from covering one major.minor interpreter version to covering more than one, and thus
+    # inference starts breaking during the upgrade, requiring the user to do distracting changes
+    # without deprecations/warnings to help.
     major_minor = ics.major_minor_version_when_single_and_entire()
     if major_minor is not None:
         return major_minor
@@ -374,9 +381,7 @@ async def _infer_from_ics(
 
 
 @rule
-async def infer_runtime_platforms(
-    request: RuntimePlatformsRequest, python_setup: PythonSetup
-) -> RuntimePlatforms:
+async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePlatforms:
     if request.complete_platforms.value is not None:
         # explicit complete platforms wins:
         complete_platforms = await Get(
@@ -389,7 +394,7 @@ async def infer_runtime_platforms(
     version = request.runtime.to_interpreter_version()
     if version is None:
         # if there's not a specified version, let's try to infer it from the interpreter constraints
-        version = await _infer_from_ics(request, python_setup)
+        version = await _infer_from_ics(request)
 
     try:
         file_name = next(
