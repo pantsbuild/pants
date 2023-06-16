@@ -256,13 +256,6 @@ def launch_bazel_remote() -> Sequence[Step]:
     ]
 
 
-def setup_python(version: str) -> Step:
-    return {
-        "name": f"Set up Python {version}",
-        "uses": "actions/setup-python@v4",
-        "with": {"python-version": version},
-    }
-
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
@@ -287,6 +280,20 @@ def install_rustup() -> Step:
         ),
     }
 
+
+def install_python(version: str) -> Step:
+    return {
+        "name": f"Set up Python {version}",
+        "uses": "actions/setup-python@v4",
+        "with": {"python-version": version},
+    }
+
+def install_node(version: str) -> Step:
+    return  {
+        "name": f"Set up Node {version}",
+        "uses:": "actions/setup-node@v3",
+        "with": {"node-version": version}
+    }
 
 def install_jdk() -> Step:
     return {
@@ -480,7 +487,7 @@ class Helper:
         # We pre-install Python on our self-hosted platforms.
         # We must set it up on Github-hosted platforms.
         if self.platform in GITHUB_HOSTED:
-            ret.append(setup_python(PYTHON_VERSION))
+            ret.append(install_python(PYTHON_VERSION))
         return ret
 
     def expose_all_pythons(self) -> Sequence[Step]:
@@ -1115,12 +1122,13 @@ class Repo:
     env: dict[str, str] = field(default_factory=dict)
     install_go: bool = False
     install_thrift: bool = False
+    node_version: None | str = None
     checkout_options: dict[str, object] = field(default_factory=dict)
     setup_commands: str = ""
 
 PUBLIC_REPOS = [
         # pants' examples
-        Repo(name="pantsbuild/example-adhoc"),
+        Repo(name="pantsbuild/example-adhoc", node_version="20"),
         Repo(name="pantsbuild/example-codegen", install_thrift=True),
         Repo(name="pantsbuild/example-django", python_version="3.9"),
         Repo(name="pantsbuild/example-docker", python_version="3.8", env={"DYNAMIC_TAG": "dynamic-tag-here"}),
@@ -1130,7 +1138,7 @@ PUBLIC_REPOS = [
         Repo(name="pantsbuild/example-python", python_version="3.9"),
         Repo(name="pantsbuild/example-visibility", python_version="3.9"),
         # public repos
-        Repo(name="StackStorm/st2", python_version="3.9", checkout_options={"submodules": "recursive"}),
+        Repo(name="StackStorm/st2", python_version="3.8", checkout_options={"submodules": "recursive"}),
         Repo(name="lablup/backend.ai", python_version="3.11.3", setup_commands="mkdir .tmp"),
         Repo(name="Ars-Linguistica/mlconjug3"),
         Repo(name="mitodl/ol-infrastructure"),
@@ -1179,8 +1187,9 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             },
             "steps": [
                 *checkout(repository=repo.name, **repo.checkout_options),
-                setup_python(repo.python_version),
+                install_python(repo.python_version),
                 *([install_go()] if repo.install_go else []),
+                *([install_node(repo.node_version)] if repo.node_version else []),
                 *([download_apache_thrift()] if repo.install_thrift else []),
                 {
                     "name": "Pants on",
