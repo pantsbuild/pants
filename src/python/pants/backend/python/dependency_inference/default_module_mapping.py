@@ -239,7 +239,7 @@ DEFAULT_MODULE_MAPPING = {
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
     "tensorboard": ("torch.utils.tensorboard",),
-    "UnleashClient": ("unleashclient",),
+    "unleashclient": ("UnleashClient",),
     "websocket-client": ("websocket",),
 }
 
