@@ -429,7 +429,7 @@ class HelmDeploymentReleaseNameField(StringField):
     help = "Name of the release used in the deployment. If not set, the target name will be used instead."
 
 
-class HelmDeploymentNamespaceField(StringField, AsyncFieldMixin):
+class HelmDeploymentNamespaceField(StringField):
     alias = "namespace"
     help = help_text("""Kubernetes namespace for the given deployment.""")
 
