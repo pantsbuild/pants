@@ -1188,8 +1188,11 @@ name: Public repository tests
     inputs:
       extra_env:
         default: ''
+        description: 'Any extra environment variables to set when running with the
+          new version of pants. For example: `PANTS_FOO_BAR=1 PANTS_BAZ_QUX=abc`'
         required: false
         type: string
       pants_version:
+        description: A released version of Pants. For example, `2.16.0`, `2.18.0.dev1`
         required: true
         type: string

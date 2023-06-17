@@ -929,6 +929,7 @@ class WorkflowInput:
     name: str
     type_str: str
     default: str | int | None = None
+    description: None | str = None
 
 
 def workflow_dispatch_inputs(
@@ -939,6 +940,7 @@ def workflow_dispatch_inputs(
         wi.name.lower(): {
             "required": (wi.default is None),
             "type": wi.type_str,
+            **({} if wi.description is None else {"description": wi.description}),
             **({} if wi.default is None else {"default": wi.default}),
         }
         for wi in workflow_inputs
@@ -1197,15 +1199,26 @@ PUBLIC_REPOS = [
 
 
 def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
-    inputs, env = workflow_dispatch_inputs([
-        WorkflowInput("PANTS_VERSION", "string"),
-        # extra environment variables to pass when running the version under test,
-        # e.g. `PANTS_SOME_SUBSYSTEM_SOME_SETTING=abc`.  NB. we use it in a way that's vulnerable to
-        # shell injection (there's no validation that it uses A=1 B=2 syntax, it can easily contain
-        # more commands), but this whole workflow is "run untrusted code as a service", so Pants
-        # maintainers injecting things is the least of our worries
-        WorkflowInput("EXTRA_ENV", "string", default="")
-    ])
+    inputs, env = workflow_dispatch_inputs(
+        [
+            WorkflowInput(
+                "PANTS_VERSION",
+                "string",
+                description="A released version of Pants. For example, `2.16.0`, `2.18.0.dev1`",
+            ),
+            # extra environment variables to pass when running the version under test,
+            # e.g. `PANTS_SOME_SUBSYSTEM_SOME_SETTING=abc`.  NB. we use it in a way that's vulnerable to
+            # shell injection (there's no validation that it uses A=1 B=2 syntax, it can easily contain
+            # more commands), but this whole workflow is "run untrusted code as a service", so Pants
+            # maintainers injecting things is the least of our worries
+            WorkflowInput(
+                "EXTRA_ENV",
+                "string",
+                default="",
+                description="Any extra environment variables to set when running with the new version of pants. For example: `PANTS_FOO_BAR=1 PANTS_BAZ_QUX=abc`",
+            ),
+        ]
+    )
 
     def sanitize_name(name: str) -> str:
         # IDs may only contain alphanumeric characters, '_', and '-'.
