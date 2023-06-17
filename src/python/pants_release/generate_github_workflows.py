@@ -1164,6 +1164,28 @@ PUBLIC_REPOS = [
     Repo(name="pantsbuild/example-python", python_version="3.9"),
     Repo(name="pantsbuild/example-visibility", python_version="3.9"),
     # public repos
+    Repo(name="Ars-Linguistica/mlconjug3"),
+    Repo(name="fucina/treb"),
+    Repo(name="ghandic/jsf"),
+    Repo(name="komprenilo/liga", python_version="3.9"),
+    Repo(
+        name="lablup/backend.ai",
+        python_version="3.11.3",
+        setup_commands="mkdir .tmp",
+        goals=[
+            DefaultGoals.tailor_update_build_files,
+            DefaultGoals.lint_check,
+            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::",
+            DefaultGoals.package,
+        ],
+    ),
+    Repo(name="mitodl/ol-infrastructure", goals=[DefaultGoals.package]),
+    Repo(name="mitodl/ol-django", goals=[DefaultGoals.test, DefaultGoals.package]),
+    Repo(
+        name="naccdata/flywheel-gear-extensions",
+        goals=[DefaultGoals.test, "package :: -directory_pull::"],
+    ),
+    Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
     Repo(
         name="StackStorm/st2",
         python_version="3.8",
@@ -1185,24 +1207,6 @@ PUBLIC_REPOS = [
             DefaultGoals.package,
         ],
     ),
-    Repo(
-        name="lablup/backend.ai",
-        python_version="3.11.3",
-        setup_commands="mkdir .tmp",
-        goals=[
-            DefaultGoals.tailor_update_build_files,
-            DefaultGoals.lint_check,
-            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::",
-            DefaultGoals.package,
-        ],
-    ),
-    Repo(name="Ars-Linguistica/mlconjug3"),
-    Repo(name="mitodl/ol-infrastructure", goals=[DefaultGoals.package]),
-    Repo(
-        name="naccdata/flywheel-gear-extensions",
-        goals=[DefaultGoals.test, "package :: -directory_pull::"],
-    ),
-    Repo(name="OpenSaMD/OpenSaMD", python_version="3.9.15"),
 ]
 
 
