@@ -1169,9 +1169,9 @@ PUBLIC_REPOS = [
         setup_commands=dedent(
             # https://docs.stackstorm.com/development/sources.html
             """
-            apt-get install gcc git make realpath screen libffi-dev libssl-dev python3.8-dev libldap2-dev libsasl2-dev
-            apt-get install mongodb mongodb-server
-            apt-get install rabbitmq-server
+            sudo apt-get install gcc git make realpath screen libffi-dev libssl-dev python3.8-dev libldap2-dev libsasl2-dev
+            sudo apt-get install mongodb mongodb-server
+            sudo apt-get install rabbitmq-server
             """
         ),
     ),
@@ -1197,7 +1197,15 @@ PUBLIC_REPOS = [
 
 
 def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
-    inputs, env = workflow_dispatch_inputs([WorkflowInput("PANTS_VERSION", "string")])
+    inputs, env = workflow_dispatch_inputs([
+        WorkflowInput("PANTS_VERSION", "string"),
+        # extra environment variables to pass when running the version under test,
+        # e.g. `PANTS_SOME_SUBSYSTEM_SOME_SETTING=abc`.  NB. we use it in a way that's vulnerable to
+        # shell injection (there's no validation that it uses A=1 B=2 syntax, it can easily contain
+        # more commands), but this whole workflow is "run untrusted code as a service", so Pants
+        # maintainers injecting things is the least of our worries
+        WorkflowInput("EXTRA_ENV", "string", default="")
+    ])
 
     def sanitize_name(name: str) -> str:
         # IDs may only contain alphanumeric characters, '_', and '-'.
@@ -1205,16 +1213,24 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
     def test_job(repo: Repo) -> object:
         def gen_goals(use_default_version: bool) -> Sequence[object]:
-            name = "repo-default version" if use_default_version else env["PANTS_VERSION"]
+            if use_default_version:
+                name = "repo-default version"
+                version = ""
+                env_prefix = ""
+            else:
+                name = version = env["PANTS_VERSION"]
+                env_prefix = env["EXTRA_ENV"]
 
             return [
                 {
                     "name": f"Run `{goal}` with {name}",
-                    "run": f"pants {goal}",
+                    # injecting the input string as just prefices is easier than turning it into
+                    # arguments for `env`
+                    "run": f"{env_prefix} pants {goal}",
                     # run all the goals, even if there's an earlier failure, because later goals
                     # might still be interesting (e.g. still run `test` even if `lint` fails)
                     "if": "always()",
-                    "env": {"PANTS_VERSION": "" if use_default_version else env["PANTS_VERSION"]},
+                    "env": {"PANTS_VERSION": version},
                 }
                 for goal in ["version", *repo.goals]
             ]
