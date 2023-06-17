@@ -24,6 +24,15 @@ class DockerRegistryOptionsNotFoundError(DockerRegistryError):
         )
 
 
+class DockerRegistryAddressCollisionError(DockerRegistryError):
+    def __init__(self, first, second):
+        message = f"Registry addresses must be unique: {first.alias}, {second.alias}. "
+        "Check that each registry in [docker] configuration has a unique "
+        "`address` field."
+
+        super().__init__(message)
+
+
 @dataclass(frozen=True)
 class DockerRegistryOptions:
     address: str
@@ -49,6 +58,9 @@ class DockerRegistryOptions:
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:
+        if self.address in registries:
+            collision = registries[self.address]
+            raise DockerRegistryAddressCollisionError(collision, self)
         registries[self.address] = self
         if self.alias:
             registries[f"@{self.alias}"] = self
