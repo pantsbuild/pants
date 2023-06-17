@@ -1171,7 +1171,7 @@ PUBLIC_REPOS = [
         setup_commands=dedent(
             # https://docs.stackstorm.com/development/sources.html
             """
-            sudo apt-get install gcc git make realpath screen libffi-dev libssl-dev python3.8-dev libldap2-dev libsasl2-dev
+            sudo apt-get install gcc git make screen libffi-dev libssl-dev python3.8-dev libldap2-dev libsasl2-dev
             sudo apt-get install mongodb mongodb-server
             sudo apt-get install rabbitmq-server
             """
@@ -1204,7 +1204,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             WorkflowInput(
                 "PANTS_VERSION",
                 "string",
-                description="A released version of Pants. For example, `2.16.0`, `2.18.0.dev1`",
+                description="Pants version (for example, `2.16.0`, `2.18.0.dev1`)",
             ),
             # extra environment variables to pass when running the version under test,
             # e.g. `PANTS_SOME_SUBSYSTEM_SOME_SETTING=abc`.  NB. we use it in a way that's vulnerable to
@@ -1215,7 +1215,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 "EXTRA_ENV",
                 "string",
                 default="",
-                description="Any extra environment variables to set when running with the new version of pants. For example: `PANTS_FOO_BAR=1 PANTS_BAZ_QUX=abc`",
+                description="Extra environment variables (for example: `PANTS_FOO_BAR=1 PANTS_BAZ_QUX=abc`)",
             ),
         ]
     )
