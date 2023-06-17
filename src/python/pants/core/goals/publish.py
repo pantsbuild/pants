@@ -285,18 +285,18 @@ async def run_publish(
     # before printing the results.
     for line in results:
         console.print_stderr(line)
-    for p in processes:
-        for pkg in p:
-            print(pkg.process)
 
-    # merged_digest = await Get(Digest, MergeDigests(pkg.process.process.input_digest for pkg in p for p in processes))
-    # all_relpaths = [
-    #     artifact.relpath for pkg in packages for artifact in pkg.artifacts if artifact.relpath
-    # ]
+    published_packages = chain.from_iterable(process.packages for process in chain.from_iterable(processes))
+    merged_digest = await Get(Digest, MergeDigests(
+        package.digest for package in published_packages
+    ))
+    all_relpaths = [
+        artifact.relpath for pkg in published_packages for artifact in pkg.artifacts if artifact.relpath
+    ]
 
-    # workspace.write_digest(
-    #     merged_digest, path_prefix=str(dist.relpath), clear_paths=all_relpaths
-    # )
+    workspace.write_digest(
+        merged_digest, path_prefix=str(dist.relpath), clear_paths=all_relpaths
+    )
 
     # Log structured output
     output_data = json.dumps(outputs, cls=_PublishJsonEncoder, indent=2, sort_keys=True)
