@@ -81,6 +81,10 @@ from pants.engine.target import COMMON_TARGET_FIELDS, Target, TargetGenerator
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
 
+class NfpmPackageTarget(Target):
+    pass
+
+
 APK_FIELDS = (
     NfpmPackageNameField,
     NfpmArchField,
@@ -100,7 +104,7 @@ APK_FIELDS = (
 )
 
 
-class NfpmApkPackage(Target):
+class NfpmApkPackage(NfpmPackageTarget):
     alias = "nfpm_apk_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,  # tags, description
@@ -142,7 +146,7 @@ ARCHLINUX_FIELDS = (
 )
 
 
-class NfpmArchlinuxPackage(Target):
+class NfpmArchlinuxPackage(NfpmPackageTarget):
     alias = "nfpm_archlinux_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -192,7 +196,7 @@ DEB_FIELDS = (
 )
 
 
-class NfpmDebPackage(Target):
+class NfpmDebPackage(NfpmPackageTarget):
     alias = "nfpm_deb_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -242,7 +246,7 @@ RPM_FIELDS = (
 )
 
 
-class NfpmRpmPackage(Target):
+class NfpmRpmPackage(NfpmPackageTarget):
     alias = "nfpm_rpm_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
