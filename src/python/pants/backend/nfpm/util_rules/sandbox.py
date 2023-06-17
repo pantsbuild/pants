@@ -13,9 +13,16 @@ from pants.backend.nfpm.fields.contents import (
 )
 from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES, NfpmPackageFieldSet
 from pants.backend.nfpm.target_types import NfpmContentFile, NfpmPackageTarget
-from pants.core.goals.package import PackageFieldSet
-from pants.engine.rules import collect_rules
-from pants.engine.target import Target, TransitiveTargets
+from pants.core.goals.package import PackageFieldSet, BuiltPackage, EnvironmentAwarePackageRequest
+from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import (
+    Target,
+    TransitiveTargets,
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
+)
 from pants.engine.unions import UnionMembership
 
 
@@ -51,6 +58,12 @@ class _NfpmSortedDeps:
             elif tgt.has_field(NfpmContentDstField):
                 # an NfpmContentFile DOES need something in the sandbox
                 nfpm_content_targets.append(cast(tgt, NfpmContentFile))
+                # TODO: sort these into
+                #       - relocations (source+src)
+                #       - files (source only)
+                #         these should be hydrated as Files (along with all the remaining_targets)
+                #       - validations (src only => pull from dependencies)
+                #         these are used to ensure src exists in the sandbox_digest
                 continue
 
             # This bool serves as a "continue" for the outer "for tgt" loop.
@@ -83,6 +96,47 @@ class _NfpmSortedDeps:
             package_targets=tuple(package_targets),
             remaining_targets=tuple(remaining_targets),
         )
+
+
+class NfpmPackagingSandboxRequest:
+    field_set: NfpmPackageFieldSet
+    transitive_targets: TransitiveTargets
+
+
+@dataclass(frozen=True)
+class NfpmPackagingSandbox:
+    digest: Digest
+
+
+@rule
+async def populate_nfpm_packaging_sandbox(
+    request: NfpmPackagingSandboxRequest, union_membership: UnionMembership
+) -> NfpmPackagingSandbox:
+    deps = _NfpmSortedDeps.sort(request.field_set, request.transitive_targets, union_membership)
+
+    # Build packages for deps that are Packages
+    package_field_sets_per_target = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, deps.package_targets)
+    )
+    packages = await MultiGet(
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in package_field_sets_per_target.field_sets
+    )
+
+    # hydrate any other source files
+
+    # Modify the sources snapshot to handle relocations
+
+    sandbox_digest = await Get(
+        Digest,
+        MergeDigests(
+            [
+                *(package.digest for package in packages),
+            ]
+        ),
+    )
+
+    return NfpmPackagingSandbox(sandbox_digest)
 
 
 def rules():
