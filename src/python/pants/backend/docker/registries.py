@@ -28,7 +28,7 @@ class DockerRegistryAddressCollisionError(DockerRegistryError):
     def __init__(self, first, second):
         message = (
             f"Registry addresses must be unique: {first.alias}, {second.alias}. "
-            "Ensure that each registry in [docker] configuration has a unique "
+            "Ensure that each registry in `[docker]` configuration has a unique "
             "`address` field."
         )
 
