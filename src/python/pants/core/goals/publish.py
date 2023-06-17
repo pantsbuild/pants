@@ -25,15 +25,17 @@ import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar
+from typing import ClassVar, Generic, Sequence, Type, TypeVar
 
 from typing_extensions import final
 
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
+from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
+from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
@@ -130,7 +132,8 @@ class PublishPackages:
     repository the artifacts are published to.
     """
 
-    names: tuple[str, ...]
+    names: Sequence[str]
+    packages: Sequence[BuiltPackage]
     process: InteractiveProcess | None = None
     description: str | None = None
     data: PublishOutputData = field(default_factory=PublishOutputData)
@@ -185,7 +188,8 @@ class Publish(Goal):
 
 @goal_rule
 async def run_publish(
-    console: Console, publish: PublishSubsystem, local_environment: ChosenLocalEnvironmentName
+        console: Console, publish: PublishSubsystem, local_environment: ChosenLocalEnvironmentName,
+        workspace: Workspace, dist: DistDir
 ) -> Publish:
     target_roots_to_package_field_sets, target_roots_to_publish_field_sets = await MultiGet(
         Get(
@@ -281,6 +285,18 @@ async def run_publish(
     # before printing the results.
     for line in results:
         console.print_stderr(line)
+    for p in processes:
+        for pkg in p:
+            print(pkg.process)
+
+    # merged_digest = await Get(Digest, MergeDigests(pkg.process.process.input_digest for pkg in p for p in processes))
+    # all_relpaths = [
+    #     artifact.relpath for pkg in packages for artifact in pkg.artifacts if artifact.relpath
+    # ]
+
+    # workspace.write_digest(
+    #     merged_digest, path_prefix=str(dist.relpath), clear_paths=all_relpaths
+    # )
 
     # Log structured output
     output_data = json.dumps(outputs, cls=_PublishJsonEncoder, indent=2, sort_keys=True)
