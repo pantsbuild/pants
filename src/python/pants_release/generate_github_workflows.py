@@ -1170,12 +1170,20 @@ PUBLIC_REPOS = [
         checkout_options={"submodules": "recursive"},
         setup_commands=dedent(
             # https://docs.stackstorm.com/development/sources.html
+            # TODO: install mongo like this doesn't work, see https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-ubuntu/
             """
             sudo apt-get install gcc git make screen libffi-dev libssl-dev python3.8-dev libldap2-dev libsasl2-dev
-            sudo apt-get install mongodb mongodb-server
+            # sudo apt-get install mongodb mongodb-server
             sudo apt-get install rabbitmq-server
             """
         ),
+        goals=[
+            DefaultGoals.tailor_update_build_files,
+            DefaultGoals.lint_check,
+            # TODO: seems like only st2client tests don't depend on mongo
+            "test st2client::",
+            DefaultGoals.package,
+        ],
     ),
     Repo(
         name="lablup/backend.ai",
