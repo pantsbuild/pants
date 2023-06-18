@@ -22,9 +22,12 @@ from pants.core.util_rules.config_files import rules as config_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.process import Process
+from pants.testutil.digest_util import dummy_digest
 from pants.testutil.process_util import process_assertion
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+
+EXPECTED_DIGEST = dummy_digest("my-package")
 
 
 @pytest.fixture
@@ -103,6 +106,7 @@ def assert_package(
     expect_names: tuple[str, ...],
     expect_description: str,
     expect_process: Callable[[Process], None] | None,
+    expect_packages: tuple[BuiltPackage] | None = None,
 ) -> None:
     assert package.names == expect_names
     assert package.description == expect_description
@@ -111,6 +115,8 @@ def assert_package(
         expect_process(package.process.process)
     else:
         assert package.process is None
+    if expect_packages:
+        assert package.packages == expect_packages
 
 
 def test_twine_upload(rule_runner, packages) -> None:
@@ -137,6 +143,7 @@ def test_twine_upload(rule_runner, packages) -> None:
             ),
             env=FrozenDict({"TWINE_USERNAME": "whoareyou", "TWINE_PASSWORD": "secret"}),
         ),
+        expect_packages=packages,
     )
     assert_package(
         result[1],
@@ -157,6 +164,7 @@ def test_twine_upload(rule_runner, packages) -> None:
             ),
             env=FrozenDict({"TWINE_USERNAME": "whoami"}),
         ),
+        expect_packages=packages,
     )
 
 
@@ -173,6 +181,7 @@ def test_skip_twine(rule_runner, packages) -> None:
         ),
         expect_description="(by `skip_twine` on src:dist)",
         expect_process=None,
+        expect_packages=packages,
     )
 
     # Skip twine globally from config option.

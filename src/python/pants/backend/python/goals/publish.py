@@ -158,10 +158,7 @@ async def twine_upload(
     if skip:
         return PublishProcesses(
             [
-                PublishPackages(
-                    names=dists,
-                    description=skip,
-                ),
+                PublishPackages(names=dists, description=skip, packages=request.packages),
             ]
         )
 
@@ -205,6 +202,7 @@ async def twine_upload(
             process=InteractiveProcess.from_process(process),
             description=process.description,
             data=PublishOutputData({"repository": process.description}),
+            packages=request.packages,
         )
         for process in processes
     )

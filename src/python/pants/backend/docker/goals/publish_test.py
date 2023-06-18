@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from typing import Callable, Sequence, cast
 
 import pytest
@@ -23,6 +22,7 @@ from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.engine.addresses import Address
 from pants.engine.internals.native_engine import Digest
 from pants.engine.process import Process
+from pants.testutil.digest_util import dummy_digest
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.process_util import process_assertion
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -54,10 +54,6 @@ def rule_runner() -> RuleRunner:
     )
     return rule_runner
 
-
-def dummy_digest(value: str) -> Digest:
-    hex_digest = hashlib.sha256(value.encode("utf8")).hexdigest()
-    return Digest(hex_digest, 0)
 
 
 def build(tgt: DockerImageTarget, options: DockerOptions, imageDigest: Digest):
