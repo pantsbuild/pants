@@ -29,7 +29,7 @@ mod context;
 mod entry;
 mod node;
 
-use crate::entry::{Entry, Generation, RunToken};
+use crate::entry::{Entry, Generation, RunToken, ResetStateAction};
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -226,7 +226,7 @@ impl<N: Node> InnerGraph<N> {
   fn clear(&mut self) {
     for eid in self.nodes.values() {
       if let Some(entry) = self.pg.node_weight_mut(*eid) {
-        entry.clear(true);
+        entry.clear(ResetStateAction::DirtyPrevious);
       }
     }
   }
@@ -287,7 +287,7 @@ impl<N: Node> InnerGraph<N> {
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
       if let Some(entry) = self.pg.node_weight_mut(*id) {
-        entry.clear(false);
+        entry.clear(ResetStateAction::JustReset);
       }
     }
     self.pg.retain_edges(|pg, edge| {
@@ -414,7 +414,7 @@ impl<N: Node> InnerGraph<N> {
 
     for id in unreacheable_ids.iter() {
       if let Some(entry) = self.entry_for_id_mut(*id) {
-        entry.clear_mem();
+        entry.clear(entry::ResetStateAction::ClearMemory)
       }
     }
   }
