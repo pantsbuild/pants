@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, cast
+import hashlib
+from typing import Callable, Sequence, cast
 
 import pytest
 
@@ -20,7 +21,7 @@ from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import PublishPackages, PublishProcesses
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.internals.native_engine import Digest
 from pants.engine.process import Process
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.process_util import process_assertion
@@ -54,7 +55,12 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def build(tgt: DockerImageTarget, options: DockerOptions):
+def dummy_digest(value: str) -> Digest:
+    hex_digest = hashlib.sha256(value.encode("utf8")).hexdigest()
+    return Digest(hex_digest, 0)
+
+
+def build(tgt: DockerImageTarget, options: DockerOptions, imageDigest: Digest):
     fs = DockerPackageFieldSet.create(tgt)
     image_refs = fs.image_refs(
         options.default_repository,
@@ -63,7 +69,7 @@ def build(tgt: DockerImageTarget, options: DockerOptions):
     )
     return (
         BuiltPackage(
-            EMPTY_DIGEST,
+            imageDigest,
             (
                 BuiltDockerImage.create(
                     "sha256:made-up",
@@ -84,7 +90,7 @@ def run_publish(
     docker_options = create_subsystem(DockerOptions, **opts)
     tgt = cast(DockerImageTarget, rule_runner.get_target(address))
     fs = PublishDockerImageFieldSet.create(tgt)
-    packages = build(tgt, docker_options)
+    packages = build(tgt, docker_options, dummy_digest(tgt.address.spec_path))
     result = rule_runner.request(PublishProcesses, [fs._request(packages)])
     docker = rule_runner.request(DockerBinary, [])
     return result, docker
@@ -95,6 +101,7 @@ def assert_publish(
     expect_names: tuple[str, ...],
     expect_description: str | None,
     expect_process: Callable[[Process], None] | None,
+    expect_digests: Sequence[Digest] | None = None,
 ) -> None:
     assert publish.names == expect_names
     assert publish.description == expect_description
@@ -103,6 +110,10 @@ def assert_publish(
         expect_process(publish.process.process)
     else:
         assert publish.process is None
+
+    if expect_digests:
+        assert len(expect_digests) == len(publish.packages)
+        assert set(expect_digests) == set(pkg.digest for pkg in publish.packages)
 
 
 def test_docker_skip_push(rule_runner: RuleRunner) -> None:
@@ -113,6 +124,7 @@ def test_docker_skip_push(rule_runner: RuleRunner) -> None:
         ("skip-test/skip-test:latest",),
         "(by `skip_push` on src/skip-test:skip-test)",
         None,
+        expect_digests=[dummy_digest("src/skip-test")],
     )
 
 
@@ -124,6 +136,7 @@ def test_docker_push_images(rule_runner: RuleRunner) -> None:
         ("default/default:latest",),
         None,
         process_assertion(argv=(docker.path, "push", "default/default:latest")),
+        expect_digests=[dummy_digest("src/default")],
     )
 
 
@@ -198,12 +211,14 @@ def test_docker_skip_push_registries(rule_runner: RuleRunner) -> None:
                 "inhouse1.registry/registries/registries:latest",
             )
         ),
+        expect_digests=[dummy_digest("src/registries")],
     )
     assert_publish(
         result[1],
         ("inhouse2.registry/registries/registries:latest",),
         "(by `skip_push` on registry @inhouse2)",
         None,
+        expect_digests=[dummy_digest("src/registries")],
     )
 
 
@@ -227,4 +242,5 @@ def test_docker_push_env(rule_runner: RuleRunner) -> None:
             ),
             env=FrozenDict({"DOCKER_CONFIG": "/etc/docker/custom-config"}),
         ),
+        expect_digests=[dummy_digest("src/default")],
     )

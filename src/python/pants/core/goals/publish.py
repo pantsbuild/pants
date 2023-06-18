@@ -25,7 +25,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Sequence, Type, TypeVar
+from typing import ClassVar, Generic, Type, TypeVar
 
 from typing_extensions import final
 
@@ -132,8 +132,8 @@ class PublishPackages:
     repository the artifacts are published to.
     """
 
-    names: Sequence[str]
-    packages: Sequence[BuiltPackage]
+    names: tuple[str, ...]
+    packages: tuple[BuiltPackage, ...]
     process: InteractiveProcess | None = None
     description: str | None = None
     data: PublishOutputData = field(default_factory=PublishOutputData)
