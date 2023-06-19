@@ -63,6 +63,8 @@ Created src/helm/example/BUILD:
   - Add helm_chart target example
 ```
 
+If your workspace contains any Helm unit tests (under a `tests` folder), Pants will also idenfity them and create `helm_unittest_tests` targets for them. Additionally, if your unit tests also have snapshots (under a `tests/__snapshot__` folder), `tailor` will identify those files as test snapshots and will create `resources` targets for them. See "Snapshot testing" below for more info.
+
 Basic operations
 ----------------
 
@@ -252,6 +254,20 @@ tests:
 > Other file-centric targets are also supported, just be aware that `file` and `files` targets are
 > not affected by the source roots setting. When using `relocated_files`, the files will be relative
 > to the value set in the `dest` field.
+
+### Snapshot testing
+
+Unit test snapshots are supported by Pants by wrapping the snapshots in resources targets, as shown in the previous section. Snapshot resources will be automatically inferred as dependencies of the tests where they reside, so there is no need to add a explicit `dependencies` relationship in your `helm_unittest_tests` targets.
+
+Since managing snapshots by hand is quite tedious, Pants provides some utilities to manage them in a simpler way. To generate or update the snapshots, use Pants's `generate-snapshots` goal:
+
+```
+pants generate-snapshots ::
+```
+
+This will generate test snapshots for tests that require them, with out-of-date snapshots being overwritten by newer ones.
+
+If new `__snapshot__` folders are created after running the `generate-snapshots` target, we recommend running the `tailor` goal again so that Pants can detect these new folders and create `resources` targets as appropriate.
 
 ### Timeouts
 

@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
 
-include!(concat!(env!("OUT_DIR"), "/constants.rs"));
-include!(concat!(env!("OUT_DIR"), "/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/python/constants.rs"));
+include!(concat!(env!("OUT_DIR"), "/python/visitor.rs"));
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use serde_derive::{Deserialize, Serialize};
@@ -93,37 +93,6 @@ impl ImportCollector<'_> {
     let mut cursor = tree.walk();
 
     self.walk(&mut cursor);
-  }
-
-  fn walk(&mut self, cursor: &mut tree_sitter::TreeCursor) {
-    loop {
-      let node = cursor.node();
-      let children_behavior = self.visit(node);
-
-      if children_behavior == ChildBehavior::Visit && cursor.goto_first_child() {
-        continue;
-      }
-      // NB: Could post_visit(node) here
-
-      if cursor.goto_next_sibling() {
-        continue;
-      }
-
-      let mut at_root = false;
-      while !at_root {
-        if cursor.goto_parent() {
-          // NB: Could post_visit(cursor.node()) here
-          if cursor.goto_next_sibling() {
-            break;
-          }
-        } else {
-          at_root = true
-        }
-      }
-      if at_root {
-        break;
-      }
-    }
   }
 
   fn code_at(&self, range: tree_sitter::Range) -> &str {

@@ -305,14 +305,16 @@ async def setup_render_helm_deployment_process(
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
 
+    # Calculate values that may depend on the interpolation context
     interpolation_context = await _build_interpolation_context(helm_subsystem)
+    is_render_cmd = request.cmd == HelmDeploymentCmd.RENDER
 
     release_name = (
         request.field_set.release_name.value
         or request.field_set.address.target_name.replace("_", "-")
     )
-    inline_values = request.field_set.format_values(
-        interpolation_context, ignore_missing=request.cmd == HelmDeploymentCmd.RENDER
+    inline_values = request.field_set.values.format_with(
+        interpolation_context, ignore_missing=is_render_cmd
     )
 
     def maybe_escape_string_value(value: str) -> str:
@@ -328,6 +330,11 @@ async def setup_render_helm_deployment_process(
         if request.post_renderer
         else ProcessCacheScope.SUCCESSFUL
     )
+
+    extra_args = list(request.extra_argv)
+    if "--create-namespace" not in extra_args and request.field_set.create_namespace.value:
+        extra_args.append("--create-namespace")
+
     process = HelmProcess(
         argv=[
             request.cmd.value,
@@ -343,7 +350,6 @@ async def setup_render_helm_deployment_process(
                 if request.field_set.namespace.value
                 else ()
             ),
-            *(("--create-namespace",) if request.field_set.create_namespace.value else ()),
             *(("--skip-crds",) if request.field_set.skip_crds.value else ()),
             *(("--no-hooks",) if request.field_set.no_hooks.value else ()),
             *(("--output-dir", output_dir) if output_dir else ()),
@@ -362,7 +368,7 @@ async def setup_render_helm_deployment_process(
                 if inline_values
                 else ()
             ),
-            *request.extra_argv,
+            *extra_args,
         ],
         extra_env=env,
         extra_immutable_input_digests=immutable_input_digests,
