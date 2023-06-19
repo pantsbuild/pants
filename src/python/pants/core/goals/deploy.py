@@ -361,7 +361,7 @@ async def _deploy_target_dependencies(
     def should_ignore(dep: CoarsenedTarget) -> bool:
         us = request.target.representative.address
         them = dep.representative.address
-        return us.spec_path == them.spec_path and us.target_name == them.target_name
+        return us == them
 
     return _DeployTargetRequests(
         [
