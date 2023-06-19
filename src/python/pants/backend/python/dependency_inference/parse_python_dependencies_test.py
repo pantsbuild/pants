@@ -284,6 +284,10 @@ def test_with_contextlib_suppress(rule_runner: RuleRunner) -> None:
             except ImportError:
                 import weak3_1
             import weak3_2
+
+        # Ensure that we still inspect with clauses for assets
+        with open("data/subdir1/a.json") as f:
+            pass
         """
     )
 
@@ -302,6 +306,7 @@ def test_with_contextlib_suppress(rule_runner: RuleRunner) -> None:
             "weak3_1": ImpInfo(lineno=28, weak=True),
             "weak3_2": ImpInfo(lineno=29, weak=True),
         },
+        expected_assets=["data/subdir1/a.json"],
     )
 
 

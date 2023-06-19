@@ -153,7 +153,7 @@ class GeneralDependencyVisitor(DependencyVisitorBase):
             return False
 
         call = context_expr
-        # contextlib.suppress(ImportError)
+        # for `contextlib.suppress(ImportError)`
         if isinstance(call.func, ast.Attribute):
             attr = call.func
             if isinstance(attr.value, ast.Name):
@@ -162,22 +162,24 @@ class GeneralDependencyVisitor(DependencyVisitorBase):
                 args = call.args
             else:
                 return False
-        # suppress(ImportError)
+        # for `suppress(ImportError)`
         elif isinstance(call.func, ast.Name):
             is_suppress = call.func.id == "suppress"
             args = call.args
         else:
             return False
 
-        import sys
-
-        print(f"is_suppress {is_suppress}", file=sys.stderr)
         has_importerror = any(isinstance(arg, ast.Name) and arg.id == "ImportError" for arg in args)
         return is_suppress and has_importerror
 
     def visit_With(self, node: ast.With):
         """Explore `with` nodes for weakening imports wrapped in
         `contextlib.suppress(ImportError)`"""
+
+        # remember to visit the withitems themselves
+        # for ex detecting imports in `with open("/foo/bar") as f`
+        for withitem in node.items:
+            self.visit(withitem)
 
         is_suppressing = any(self._is_with_contexlib_suppress(withitem) for withitem in node.items)
         if is_suppressing:

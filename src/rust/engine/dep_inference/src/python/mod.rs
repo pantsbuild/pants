@@ -275,6 +275,12 @@ impl Visitor for ImportCollector<'_> {
       .named_children(&mut with_clause.walk())
       .any(|x| self.withitem_is_with_contextlib_suppress(x));
 
+    // remember to visit the withitems themselves
+    // for ex detecting imports in `with open("/foo/bar") as f`
+    for child in with_clause.named_children(&mut with_clause.walk()) {
+      self.walk(&mut child.walk());
+    }
+
     let body_node = node.child_by_field_name("body").unwrap();
     let body: Vec<_> = body_node.named_children(&mut body_node.walk()).collect();
 

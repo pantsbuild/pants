@@ -500,6 +500,7 @@ fn contextlib_suppress_weak_imports() {
     &["weak0", "weak1", "weak2"],
   );
   // Ensure we aren't affected by weirdness in tree-sitter
+  // where in the viewer the second import wasn't assigned the correct parent
   assert_imports_strong_weak(
     r"
     with suppress(ImportError):
@@ -509,6 +510,16 @@ fn contextlib_suppress_weak_imports() {
     &[],
     &["weak0", "weak1"],
   );
+  // Ensure that we still traverse withitems
+  let withitems_open = r"
+    with (
+        open('/dev/null') as f0,
+        open('data/subdir1/a.json') as f1,
+    ):
+        pass
+    ";
+  assert_imports_strong_weak(withitems_open, &[], &[]);
+  assert_strings(withitems_open, &["/dev/null", "data/subdir1/a.json"])
 }
 
 fn assert_strings(code: &str, strings: &[&str]) {
