@@ -26,10 +26,12 @@ class DockerRegistryOptionsNotFoundError(DockerRegistryError):
 
 class DockerRegistryAddressCollisionError(DockerRegistryError):
     def __init__(self, first, second):
-        message = (
-            f"Registry addresses must be unique: {first.alias}, {second.alias}. "
-            "Ensure that each registry in `[docker]` configuration has a unique "
-            "`address` field."
+        message = softwrap(
+            f"""
+            Duplicated docker registry address for aliases: {first.alias}, {second.alias}.
+            
+            Each registry `address` in `[docker].registries` must be unique.
+            """
         )
 
         super().__init__(message)
