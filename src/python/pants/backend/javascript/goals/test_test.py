@@ -17,6 +17,7 @@ from pants.backend.javascript.target_types import (
     JSTestBatchCompatibilityTagField,
     JSTestExtraEnvVarsField,
 )
+from pants.build_graph.address import Address
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 
 
@@ -34,13 +35,13 @@ def given_field_set(
 
 
 def test_batches_are_seperated_on_owning_packages() -> None:
-    field_set_1 = given_field_set(sentinel.address_1, batch_compatibility_tag="default")
-    field_set_2 = given_field_set(sentinel.address_2, batch_compatibility_tag="default")
+    field_set_1 = given_field_set(Address("1"), batch_compatibility_tag="default")
+    field_set_2 = given_field_set(Address("2"), batch_compatibility_tag="default")
 
     request = JSTestRequest.PartitionRequest(field_sets=(field_set_1, field_set_2))
 
     def mocked_owning_node_package(r: OwningNodePackageRequest) -> Any:
-        if r.address == sentinel.address_1:
+        if r.address == Address("1"):
             return OwningNodePackage(sentinel.owning_package_1)
         else:
             return OwningNodePackage(sentinel.owning_package_2)
@@ -60,20 +61,20 @@ def test_batches_are_seperated_on_owning_packages() -> None:
     "field_set_1, field_set_2",
     [
         pytest.param(
-            given_field_set(sentinel.address_1, batch_compatibility_tag="1"),
-            given_field_set(sentinel.address_2, batch_compatibility_tag="2"),
+            given_field_set(Address("1"), batch_compatibility_tag="1"),
+            given_field_set(Address("2"), batch_compatibility_tag="2"),
             id="compatibility_tag",
         ),
         pytest.param(
-            given_field_set(sentinel.address_1, batch_compatibility_tag="default"),
+            given_field_set(Address("1"), batch_compatibility_tag="default"),
             given_field_set(
-                sentinel.address_2, batch_compatibility_tag="default", env_vars=("NODE_ENV=dev",)
+                Address("2"), batch_compatibility_tag="default", env_vars=("NODE_ENV=dev",)
             ),
             id="extra_env_vars",
         ),
         pytest.param(
-            given_field_set(sentinel.address_1, batch_compatibility_tag=None),
-            given_field_set(sentinel.address_2, batch_compatibility_tag=None),
+            given_field_set(Address("1"), batch_compatibility_tag=None),
+            given_field_set(Address("2"), batch_compatibility_tag=None),
             id="no_compatibility_tag",
         ),
     ],
@@ -96,9 +97,9 @@ def test_batches_are_seperated_on_metadata(field_set_1: Mock, field_set_2: Mock)
 
 
 def test_batches_are_the_same_for_same_compat_and_package() -> None:
-    field_set_1 = given_field_set(sentinel.address_1, batch_compatibility_tag="default")
+    field_set_1 = given_field_set(Address("1"), batch_compatibility_tag="default")
 
-    field_set_2 = given_field_set(sentinel.address_2, batch_compatibility_tag="default")
+    field_set_2 = given_field_set(Address("2"), batch_compatibility_tag="default")
     request = JSTestRequest.PartitionRequest(field_sets=(field_set_1, field_set_2))
 
     def mocked_owning_node_package(_: OwningNodePackageRequest) -> Any:

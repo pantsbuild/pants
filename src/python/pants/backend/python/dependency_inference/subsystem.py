@@ -127,7 +127,7 @@ class PythonInferSubsystem(Subsystem):
         help=softwrap(
             """
             Infer dependencies on targets' entry points, e.g. `pex_binary`'s
-            `entry_point` field, `python_awslambda`'s `handler` field and
+            `entry_point` field, `python_aws_lambda_function`'s `handler` field and
             `python_distribution`'s `entry_points` field.
             """
         ),
@@ -192,7 +192,7 @@ class PythonInferSubsystem(Subsystem):
     )
 
     use_rust_parser = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             f"""
             Use the new Rust-based, multithreaded, in-process dependency parser.
@@ -205,16 +205,16 @@ class PythonInferSubsystem(Subsystem):
             while hot-cache had no difference. Additionally, Pants can now infer dependencies from
             Python scripts with syntax errors.
 
-            However, since this parser is completely different it has the potential of introducing
-            differences in dependency inference. Although the Pants suite of tests only identified
-            differences when using the `# pants: no-infer-dep` pragma, and string-based
-            imports/assets, Out of an abundance of caution, this is behind a feature flag that will
-            eventually be on-by-default then removed.
+            After leaving this defaulted to disabled for a release cycle, Pants 2.18 started
+            defaulting to enabling this.
 
-            It is recommended that you run `{bin_name()} peek :: > before.json` and then
-            `{bin_name()} --python-infer-use-rust-parser peek :: > after.json` and compare the two
-            results. If all looks good, set `use_rust_parser` in `[python-infer]` in `pants.toml`.
-            If you think there's a bug please file an issue: https://github.com/pantsbuild/pants/issues/new/choose.
+            If you think the new behaviour is causing problems, it is recommended that you run
+            `{bin_name()} peek :: > before.json` and then
+            `{bin_name()} --python-infer-use-rust-parser=False peek :: > after.json` and compare the
+            two results.
+
+            If you think there is a bug and need to disable it, please file an issue:
+            https://github.com/pantsbuild/pants/issues/new/choose.
             """
         ),
     )

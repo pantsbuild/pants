@@ -10,45 +10,59 @@ from pants.backend.awslambda.python.target_types import (
     PythonAWSLambda,
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaIncludeRequirements,
+    PythonAwsLambdaIncludeSources,
+    PythonAWSLambdaLayer,
+    PythonAwsLambdaLayerDependenciesField,
     PythonAwsLambdaRuntime,
 )
+from pants.backend.python.subsystems.lambdex import Lambdex, LambdexLayout
 from pants.backend.python.util_rules.faas import (
     BuildLambdexRequest,
     BuildPythonFaaSRequest,
     PythonFaaSCompletePlatforms,
-    PythonFaaSLayout,
-    PythonFaaSLayoutField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import InvalidTargetException
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonAwsLambdaFieldSet(PackageFieldSet):
-    required_fields = (PythonAwsLambdaHandlerField,)
-
-    handler: PythonAwsLambdaHandlerField
+class _BaseFieldSet(PackageFieldSet):
     include_requirements: PythonAwsLambdaIncludeRequirements
     runtime: PythonAwsLambdaRuntime
     complete_platforms: PythonFaaSCompletePlatforms
     output_path: OutputPathField
     environment: EnvironmentField
-    layout: PythonFaaSLayoutField
 
 
-@rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
-async def package_python_awslambda(
+@dataclass(frozen=True)
+class PythonAwsLambdaFieldSet(_BaseFieldSet):
+    required_fields = (PythonAwsLambdaHandlerField,)
+
+    handler: PythonAwsLambdaHandlerField
+
+
+@dataclass(frozen=True)
+class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
+    required_fields = (PythonAwsLambdaLayerDependenciesField,)
+
+    dependencies: PythonAwsLambdaLayerDependenciesField
+    include_sources: PythonAwsLambdaIncludeSources
+
+
+@rule(desc="Create Python AWS Lambda Function", level=LogLevel.DEBUG)
+async def package_python_aws_lambda_function(
     field_set: PythonAwsLambdaFieldSet,
+    lambdex: Lambdex,
 ) -> BuiltPackage:
-    layout = PythonFaaSLayout(field_set.layout.value)
-
-    if layout is PythonFaaSLayout.LAMBDEX:
+    if lambdex.layout is LambdexLayout.LAMBDEX:
         return await Get(
             BuiltPackage,
             BuildLambdexRequest(
@@ -75,13 +89,54 @@ async def package_python_awslambda(
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
             handler=field_set.handler,
-            layout=layout,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
-            # This doesn't matter (just needs to be fixed), but is the default name used by the AWS
-            # console when creating a Python lambda, so is as good as any
-            # https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html
-            reexported_handler_module="lambda_function",
+            include_sources=True,
+            reexported_handler_module=PythonAwsLambdaHandlerField.reexported_handler_module,
+        ),
+    )
+
+
+@rule(desc="Create Python AWS Lambda Layer", level=LogLevel.DEBUG)
+async def package_python_aws_lambda_layer(
+    field_set: PythonAwsLambdaLayerFieldSet,
+    lambdex: Lambdex,
+) -> BuiltPackage:
+    if lambdex.layout is LambdexLayout.LAMBDEX:
+        raise InvalidTargetException(
+            softwrap(
+                f"""
+                the `{PythonAWSLambdaLayer.alias}` target {field_set.address} cannot be used with
+                the old Lambdex layout (`[lambdex].layout = \"{LambdexLayout.LAMBDEX.value}\"` in
+                `pants.toml`), set that to `{LambdexLayout.ZIP.value}` or remove this target
+                """
+            )
+        )
+
+    return await Get(
+        BuiltPackage,
+        BuildPythonFaaSRequest(
+            address=field_set.address,
+            target_name=PythonAWSLambdaLayer.alias,
+            complete_platforms=field_set.complete_platforms,
+            runtime=field_set.runtime,
+            output_path=field_set.output_path,
+            include_requirements=field_set.include_requirements.value,
+            include_sources=field_set.include_sources.value,
+            # See
+            # https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
+            #
+            # Runtime | Path
+            # ...
+            # Python  | `python`
+            #         | `python/lib/python3.10/site-packages`
+            # ...
+            #
+            # The one independent on the runtime-version is more convenient:
+            prefix_in_artifact="python",
+            # a layer doesn't have a handler, just pulls in things via `dependencies`
+            handler=None,
+            reexported_handler_module=None,
         ),
     )
 

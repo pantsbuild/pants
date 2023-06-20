@@ -105,7 +105,7 @@ class TargetNotExported(SetupPyError):
     """Indicates a target that was expected to be exported is not."""
 
 
-class InvalidEntryPoint(SetupPyError):
+class InvalidEntryPoint(SetupPyError, InvalidFieldException):
     """Indicates that a specified binary entry point was invalid."""
 
 

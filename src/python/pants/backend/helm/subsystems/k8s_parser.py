@@ -10,10 +10,7 @@ from pathlib import PurePath
 from typing import Any
 
 from pants.backend.helm.utils.yaml import YamlPath
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -34,14 +31,12 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-k8s-parser"
     help = "Analyses K8S manifests rendered by Helm."
 
-    default_version = "hikaru==0.11.0b"
     default_requirements = ["hikaru>=0.11.0b,<1"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]
 
     default_lockfile_resource = (_HELM_K8S_PARSER_PACKAGE, "k8s_parser.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)

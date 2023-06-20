@@ -6,7 +6,6 @@ import itertools
 import json
 import logging
 import os.path
-import re
 from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
@@ -88,6 +87,7 @@ class NodeBuildScript(NodeScript):
     output_directories: tuple[str, ...] = ()
     output_files: tuple[str, ...] = ()
     extra_caches: tuple[str, ...] = ()
+    extra_env_vars: tuple[str, ...] = ()
 
     alias: ClassVar[str] = "node_build_script"
 
@@ -98,6 +98,7 @@ class NodeBuildScript(NodeScript):
         output_directories: Iterable[str] = (),
         output_files: Iterable[str] = (),
         extra_caches: Iterable[str] = (),
+        extra_env_vars: Iterable[str] = (),
     ) -> NodeBuildScript:
         """A build script, mapped from the `scripts` section of a package.json file.
 
@@ -110,6 +111,7 @@ class NodeBuildScript(NodeScript):
             output_directories=tuple(output_directories),
             output_files=tuple(output_files),
             extra_caches=tuple(extra_caches),
+            extra_env_vars=tuple(extra_env_vars),
         )
 
 
@@ -410,6 +412,20 @@ class NodeBuildScriptOutputDirectoriesField(StringSequenceField):
     )
 
 
+class NodeBuildScriptExtraEnvVarsField(StringSequenceField):
+    alias = "extra_env_vars"
+    required = False
+    default = ()
+    help = help_text(
+        """
+        Additional environment variables to include in environment when running a build script process.
+
+        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+        `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        """
+    )
+
+
 class NodeBuildScriptExtraCaches(StringSequenceField):
     alias = "extra_caches"
     required = False
@@ -452,6 +468,7 @@ class NodeBuildScriptTarget(Target):
         NodeBuildScriptOutputFilesField,
         NodeBuildScriptSourcesField,
         NodeBuildScriptExtraCaches,
+        NodeBuildScriptExtraEnvVarsField,
         NodePackageDependenciesField,
         OutputPathField,
     )
@@ -470,44 +487,8 @@ class NodeBuildScriptTarget(Target):
 class PackageJsonImports:
     """https://nodejs.org/api/packages.html#subpath-imports."""
 
-    imports: FrozenDict[re.Pattern[str], tuple[str, ...]]
+    imports: FrozenDict[str, tuple[str, ...]]
     root_dir: str
-
-    def replacements(self, import_string: str) -> tuple[str, ...]:
-        def replace_matching_pattern(
-            pattern: re.Pattern[str], subpath: str, string: str
-        ) -> str | None:
-            match = pattern.match(string)
-            if match:
-                replacement = subpath
-                for group in match.groups():
-                    replacement = replacement.replace("*", group, 1)
-                if "*" in replacement:
-                    _logger.warning(
-                        softwrap(
-                            f"""
-                            package.json#imports pattern '{pattern.pattern}' matched '{string}',
-                            but the resulting subpath '{subpath}' string replacements '*'
-                            did not match.
-
-                            Inference will not behave correctly for import '{string}'.
-                            """
-                        )
-                    )
-                    return None
-                return "".join((replacement, string[match.endpos :]))
-            return None
-
-        return tuple(
-            filter(
-                None,
-                (
-                    replace_matching_pattern(pattern, subpath, import_string)
-                    for pattern, subpaths in self.imports.items()
-                    for subpath in subpaths
-                ),
-            )
-        )
 
     @classmethod
     def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonImports:
@@ -517,13 +498,9 @@ class PackageJsonImports:
         )
 
     @staticmethod
-    def _to_import_pattern(string: str) -> re.Pattern[str]:
-        return re.compile(r"^" + re.escape(string).replace(r"\*", "(.*)"))
-
-    @staticmethod
     def _import_from_package_json(
         pkg_json: PackageJson,
-    ) -> FrozenDict[re.Pattern[str], tuple[str, ...]]:
+    ) -> FrozenDict[str, tuple[str, ...]]:
         imports: Mapping[str, Any] | None = pkg_json.content.get("imports")
 
         def get_subpaths(value: str | Mapping[str, Any]) -> Iterable[str]:
@@ -536,10 +513,7 @@ class PackageJsonImports:
         if not imports:
             return FrozenDict()
         return FrozenDict(
-            {
-                PackageJsonImports._to_import_pattern(key): tuple(sorted(get_subpaths(subpath)))
-                for key, subpath in imports.items()
-            }
+            {key: tuple(sorted(get_subpaths(subpath))) for key, subpath in imports.items()}
         )
 
 
@@ -923,6 +897,7 @@ async def generate_node_package_targets(
                         NodeBuildScriptEntryPointField.alias: build_script.entry_point,
                         NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
                         NodeBuildScriptOutputFilesField.alias: build_script.output_files,
+                        NodeBuildScriptExtraEnvVarsField.alias: build_script.extra_env_vars,
                         NodeBuildScriptExtraCaches.alias: build_script.extra_caches,
                         NodePackageDependenciesField.alias: [
                             file_tgt.address.spec,

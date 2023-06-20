@@ -16,6 +16,7 @@ from pants.backend.javascript.package_json import (
     NodeBuildScript,
     NodeBuildScriptEntryPointField,
     NodeBuildScriptExtraCaches,
+    NodeBuildScriptExtraEnvVarsField,
     NodeBuildScriptOutputDirectoriesField,
     NodeBuildScriptOutputFilesField,
     NodeBuildScriptSourcesField,
@@ -32,6 +33,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import ResourceSourceField
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
@@ -66,6 +68,7 @@ class NodeBuildScriptPackageFieldSet(PackageFieldSet):
     output_directories: NodeBuildScriptOutputDirectoriesField
     output_files: NodeBuildScriptOutputFilesField
     extra_caches: NodeBuildScriptExtraCaches
+    extra_env_vars: NodeBuildScriptExtraEnvVarsField
 
 
 @dataclass(frozen=True)
@@ -128,6 +131,7 @@ class NodeBuildScriptRequest:
     output_directories: tuple[str, ...]
     script_name: str
     extra_caches: tuple[str, ...]
+    extra_env_vars: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if not (self.output_directories or self.output_files):
@@ -154,6 +158,7 @@ class NodeBuildScriptRequest:
             or (),
             script_name=req.protocol_target[NodeBuildScriptEntryPointField].value,
             extra_caches=req.protocol_target[NodeBuildScriptExtraCaches].value or (),
+            extra_env_vars=req.protocol_target[NodeBuildScriptExtraEnvVarsField].value or (),
         )
 
     @classmethod
@@ -164,6 +169,7 @@ class NodeBuildScriptRequest:
             output_directories=req.output_directories.value or (),
             script_name=req.script_name.value,
             extra_caches=req.extra_caches.value or (),
+            extra_env_vars=req.extra_env_vars.value or (),
         )
 
     def get_paths(self) -> Iterable[str]:
@@ -180,12 +186,14 @@ async def run_node_build_script(req: NodeBuildScriptRequest) -> NodeBuildScriptR
     output_dirs = req.output_directories
     script_name = req.script_name
     extra_caches = req.extra_caches
+    extra_env_vars = req.extra_env_vars
 
     def cache_name(cache_path: str) -> str:
         parts = (installation.project_env.package_dir(), script_name, cache_path)
         return "_".join(_NOT_ALPHANUMERIC.sub("_", part) for part in parts if part)
 
     args = ("run", script_name)
+    target_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
     result = await Get(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
@@ -204,6 +212,7 @@ async def run_node_build_script(req: NodeBuildScriptRequest) -> NodeBuildScriptR
             per_package_caches=FrozenDict(
                 {cache_name(extra_cache): extra_cache for extra_cache in extra_caches or ()}
             ),
+            extra_env=target_env_vars,
         ),
     )
 

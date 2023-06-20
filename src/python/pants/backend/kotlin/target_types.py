@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -186,6 +187,15 @@ class KotlincPluginArtifactField(StringField, AsyncFieldMixin):
     required = True
     value: str
     help = "The address of a `jvm_artifact` that defines a plugin for `kotlinc`."
+
+    def to_address_input(self) -> AddressInput:
+        return AddressInput.parse(
+            self.value,
+            relative_to=self.address.spec_path,
+            description_of_origin=(
+                f"the `{self.alias}` field in the `{KotlincPluginTarget.alias}` target {self.address}"
+            ),
+        )
 
 
 class KotlincPluginIdField(StringField):

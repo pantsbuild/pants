@@ -10,7 +10,6 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
-from pants.base.deprecated import warn_or_error
 from pants.base.specs import FileGlobSpec, RawSpecs
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -25,16 +24,6 @@ from pants.engine.target import (
 )
 from pants.util.frozendict import FrozenDict
 from pants.util.resources import read_resource
-
-
-@dataclass(frozen=True)
-class DjangoAppsRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(DjangoApps, DjangoAppsRequest)",
-            "Instead, simply use `Get(DjangoApps)` or put `DjangoApps` in the rule signature",
-        )
 
 
 @dataclass(frozen=True)
@@ -131,11 +120,6 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
             ),
         )
         django_apps = django_apps.add_from_json(process_result.stdout or b"{}")
-    return django_apps
-
-
-@rule
-def django_apps_from_request(_: DjangoAppsRequest, django_apps: DjangoApps) -> DjangoApps:
     return django_apps
 
 
