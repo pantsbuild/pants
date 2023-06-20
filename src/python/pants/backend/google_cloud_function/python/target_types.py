@@ -18,13 +18,7 @@ from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules
-from pants.engine.target import (
-    COMMON_TARGET_FIELDS,
-    InvalidFieldException,
-    InvalidTargetException,
-    StringField,
-    Target,
-)
+from pants.engine.target import COMMON_TARGET_FIELDS, InvalidFieldException, StringField, Target
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text, softwrap
 
@@ -90,6 +84,10 @@ class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
 
+    @classmethod
+    def from_interpreter_version(cls, py_major: int, py_minor) -> str:
+        return f"python{py_major}{py_minor}"
+
 
 class GoogleCloudFunctionTypes(Enum):
     EVENT = "event"
@@ -136,16 +134,6 @@ class PythonGoogleCloudFunction(Target):
 
         runtime_alias = self[PythonGoogleCloudFunctionRuntime].alias
         complete_platforms_alias = self[PexCompletePlatformsField].alias
-
-        if not (has_runtime or has_complete_platforms):
-            raise InvalidTargetException(
-                softwrap(
-                    f"""
-                    The `{self.alias}` target {self.address} must specify either a
-                    `{runtime_alias}` or `{complete_platforms_alias}`.
-                    """
-                )
-            )
 
         if has_runtime and has_complete_platforms:
             warn_or_error(

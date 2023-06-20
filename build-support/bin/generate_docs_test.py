@@ -1,10 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import textwrap
 
 import pytest
-from generate_docs import DocUrlRewriter, TitleFinder, find_doc_urls, get_doc_slug, value_strs_iter
+from generate_docs import DocUrlRewriter, find_doc_urls, get_doc_slug, value_strs_iter
 
 from pants.util.docutil import doc_url
 
@@ -39,24 +38,6 @@ def test_find_doc_urls() -> None:
         f"See {doc_url('foo-bar')} and {doc_url('baz3')}",  # Multiple urls in string.
     ]
     assert find_doc_urls(strs) == {doc_url(slug) for slug in ["foo-bar", "baz3", "qux"]}
-
-
-def test_get_title_from_page_content():
-    page_content = textwrap.dedent(
-        """
-      <!DOCTYPE html><html ng-app="hub" lang="en" style="" class=" useReactApp  ">
-      <head>
-      <script src="blahblah"></script>
-      <meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge">
-      <title ng-bind="pageTitle">Welcome to Pants!</title>
-      <meta name="description" content="Documentation for the Pants v2 build system.">
-      </head>
-      <body>Welcome to Pants, the ergonomic build system!</body>
-    """
-    )
-    title_finder = TitleFinder()
-    title_finder.feed(page_content)
-    assert title_finder.title == "Welcome to Pants!"
 
 
 def test_doc_url_rewriter():

@@ -25,6 +25,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Berkay Öztürk
 + Bill Farner
 + Billy "Hyun Joon" Seol
++ Blaž Šnuderl
 + Borja Lorente
 + Brandon Milton
 + Brian Larson
@@ -203,6 +204,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Michael Glass
 + Michal Bryc
 + Mike Cripps
++ Mike Geeves
 + Mike Lindsey
 + Mike Solomon
 + Misho Krastev

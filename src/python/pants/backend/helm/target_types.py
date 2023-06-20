@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Mapping
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import deprecated, warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
@@ -38,6 +39,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
+from pants.util.memo import memoized_method
 from pants.util.strutil import help_text, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
@@ -274,7 +276,7 @@ def all_helm_unittest_test_targets(all_targets: AllTargets) -> AllHelmUnitTestTe
 
 
 class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
-    default = ("*_test.yaml",)
+    default = ("*_test.yaml", "*_test.yml")
     expected_file_extensions = (
         ".yaml",
         ".yml",
@@ -429,7 +431,7 @@ class HelmDeploymentReleaseNameField(StringField):
 
 class HelmDeploymentNamespaceField(StringField):
     alias = "namespace"
-    help = "Kubernetes namespace for the given deployment."
+    help = help_text("""Kubernetes namespace for the given deployment.""")
 
 
 class HelmDeploymentDependenciesField(Dependencies):
@@ -449,7 +451,7 @@ class HelmDeploymentSourcesField(MultipleSourcesField):
     help = "Helm configuration files for a given deployment."
 
 
-class HelmDeploymentValuesField(DictStringToStringField):
+class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
     alias = "values"
     required = False
     help = help_text(
@@ -472,7 +474,7 @@ class HelmDeploymentValuesField(DictStringToStringField):
         ```
         helm_deployment(
             values={
-                "configmap.deployedAt": "{env.DEPLOY_TIME}",
+                "configmap.deployedAt": f"{env('DEPLOY_TIME')}",
             },
         )
         ```
@@ -482,11 +484,55 @@ class HelmDeploymentValuesField(DictStringToStringField):
         """
     )
 
+    @memoized_method
+    @deprecated("2.19.0.dev0", start_version="2.18.0.dev0")
+    def format_with(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> dict[str, str]:
+        source = InterpolationContext.TextSource(
+            self.address,
+            target_alias=HelmDeploymentTarget.alias,
+            field_alias=HelmDeploymentValuesField.alias,
+        )
+
+        def format_value(text: str) -> str | None:
+            try:
+                return interpolation_context.format(
+                    text,
+                    source=source,
+                )
+            except InterpolationError as err:
+                if ignore_missing:
+                    return None
+                raise err
+
+        result = {}
+        default_curr_value: dict[str, str] = {}
+        current_value: Mapping[str, str] = self.value or default_curr_value
+        for key, value in current_value.items():
+            formatted_value = format_value(value)
+            if formatted_value is not None:
+                result[key] = formatted_value
+
+        if result != current_value:
+            warn_or_error(
+                "2.19.0.dev0",
+                "Using the {env.VAR_NAME} interpolation syntax",
+                "Use the new `f\"prefix-{env('VAR_NAME')}\" syntax for interpolating values from environment variables.",
+                start_version="2.18.0.dev0",
+            )
+
+        return result
+
 
 class HelmDeploymentCreateNamespaceField(BoolField):
     alias = "create_namespace"
     default = False
     help = "If true, the namespace will be created if it doesn't exist."
+
+    removal_version = "2.19.0.dev0"
+    # TODO This causes and error in the parser as it believes it is using it as the `removal_version` attribute.
+    # removal_hint = "Use the passthrough argument `--create-namespace` instead."
 
 
 class HelmDeploymentNoHooksField(BoolField):
@@ -563,33 +609,13 @@ class HelmDeploymentFieldSet(FieldSet):
     post_renderers: HelmDeploymentPostRenderersField
     enable_dns: HelmDeploymentEnableDNSField
 
+    @deprecated(
+        "2.19.0.dev0", "Use `field_set.values.format_with()` instead.", start_version="2.18.0.dev0"
+    )
     def format_values(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
     ) -> dict[str, str]:
-        source = InterpolationContext.TextSource(
-            self.address,
-            target_alias=HelmDeploymentTarget.alias,
-            field_alias=HelmDeploymentValuesField.alias,
-        )
-
-        def format_value(text: str) -> str | None:
-            try:
-                return interpolation_context.format(
-                    text,
-                    source=source,
-                )
-            except InterpolationError as err:
-                if ignore_missing:
-                    return None
-                raise err
-
-        result = {}
-        for key, value in (self.values.value or {}).items():
-            formatted_value = format_value(value)
-            if formatted_value is not None:
-                result[key] = formatted_value
-
-        return result
+        return self.values.format_with(interpolation_context, ignore_missing=ignore_missing)
 
 
 class AllHelmDeploymentTargets(Targets):
