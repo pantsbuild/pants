@@ -396,8 +396,8 @@ class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, Strin
     default = None
     help = help_text(
         """
-        Sets the networking mode for the run commands during build. 
-        Supported standard values are: bridge, host, none, and container:<name|id>. 
+        Sets the networking mode for the run commands during build.
+        Supported standard values are: bridge, host, none, and container:<name|id>.
         Any other value is taken as a custom network's name to which the container should connect to.
         """
     )
