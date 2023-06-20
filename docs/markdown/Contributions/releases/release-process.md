@@ -87,9 +87,9 @@ Update the release page in `src/python/pants/notes` for this release series, e.g
 
 Run `git fetch --all --tags` to be sure you have the latest release tags available locally.
 
-From the `main` branch, run `./pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions.
+From the `main` branch, run `./pants run src/python/pants_release/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions.
 
-This will generate the sections to copy into the release notes. Delete any empty sections. Do not paste the `Internal` section into the notes file. Instead, paste into a comment on the prep PR.
+This will update the release notes file, for you to tweak and commit. The script also prints an `Internal` section to paste into a comment on the prep PR.
 
 You are encouraged to fix typos and tweak change descriptions for clarity to users. Ensure that there is exactly one blank line between descriptions, headers etc.
 

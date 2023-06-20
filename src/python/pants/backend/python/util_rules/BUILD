@@ -7,7 +7,7 @@ python_sources(
     },
 )
 
-resource(name="complete_platform_faas-test", source="complete_platform_faas-test.json")
+resources(name="complete_platform_faas-test", sources=["complete_platform_faas-test*.json"])
 python_tests(
     name="tests",
     overrides={

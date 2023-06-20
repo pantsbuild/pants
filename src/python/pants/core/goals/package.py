@@ -201,7 +201,7 @@ class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
         object.__setattr__(self, "package_field_set_types", union_membership.get(PackageFieldSet))
         object.__setattr__(self, "roots", FrozenOrderedSet(roots))
         object.__setattr__(self, "always_traverse_roots", always_traverse_roots)
-        self.__post_init__()
+        super().__init__()
 
     def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
         if isinstance(field, SpecialCasedDependencies):
@@ -213,7 +213,6 @@ class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
                 # False means do not traverse dependencies of this target
                 return False
         return True
-
 
 
 def rules():
