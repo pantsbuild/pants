@@ -112,6 +112,7 @@ DEFAULT_MODULE_MAPPING = {
     "jack-client": ("jack",),
     "kafka-python": ("kafka",),
     "lark-parser": ("lark",),
+    "launchdarkly-server-sdk": ("ldclient"),
     "mail-parser": ("mailparser",),
     "mysql-connector-python": ("mysql.connector",),
     "opencv-python": ("cv2",),
