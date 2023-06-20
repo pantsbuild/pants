@@ -348,7 +348,8 @@ class DockerBuildOptionFieldValueMixin(Field):
 
     @final
     def options(self) -> Iterator[str]:
-        yield f"{self.docker_build_option}={self.value}"
+        if self.value is not None:
+            yield f"{self.docker_build_option.lstrip('build_')}={self.value}"
 
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
@@ -390,6 +391,19 @@ class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
     docker_build_option = "--squash"
 
 
+class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, StringField):
+    alias = "build_network"
+    default = None
+    help = help_text(
+        """
+        Sets the networking mode for the run commands during build. 
+        Supported standard values are: bridge, host, none, and container:<name|id>. 
+        Any other value is taken as a custom network's name to which the container should connect to.
+        """
+    )
+    docker_build_option = "--network"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -409,6 +423,7 @@ class DockerImageTarget(Target):
         DockerImageTargetStageField,
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
+        DockerImageBuildNetworkOptionField,
         OutputPathField,
         RestartableField,
     )
