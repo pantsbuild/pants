@@ -19,7 +19,7 @@ class PreambleSubsystem(Subsystem):
 
         This is useful for things such as copyright headers or shebang lines.
 
-        Pants substitutes the following identifiers (following Python's string.Template substitutions):
+        Pants substitutes the following identifiers (following Python's `string.Template` substitutions):
         - $year: The current year (only used when actually writing the year to the file).
         """
     )
