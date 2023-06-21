@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from itertools import chain
 
 from pants.backend.helm.check.kubeconform.extra_fields import (
     KubeconformFieldSet,
@@ -36,6 +37,23 @@ class KubeconformDeploymentFieldSet(HelmDeploymentFieldSet, KubeconformFieldSet)
     pass
 
 
+_KUBECONFORM_CACHE_FOLDER = "__kubeconform_cache"
+
+
+@dataclass(frozen=True)
+class KubeconformSetup:
+    binary: DownloadedExternalTool
+
+    @property
+    def append_only_caches(self) -> dict[str, str]:
+        return {"kubeconform": _KUBECONFORM_CACHE_FOLDER}
+
+
+@dataclass(frozen=True)
+class KubeconformSetupRequest:
+    platform: Platform
+
+
 class KubeconformCheckDeploymentRequest(CheckRequest):
     field_set_type = KubeconformDeploymentFieldSet
     tool_name = KubeconformSubsystem.name
@@ -43,8 +61,18 @@ class KubeconformCheckDeploymentRequest(CheckRequest):
 
 @dataclass(frozen=True)
 class RunKubeconformOnKubeManifestRequest:
-    binary: DownloadedExternalTool
+    setup: KubeconformSetup
     field_set: KubeconformDeploymentFieldSet
+
+
+@rule
+async def setup_kube_conform(
+    request: KubeconformSetupRequest, kubeconform: KubeconformSubsystem
+) -> KubeconformSetup:
+    downloaded_tool = await Get(
+        DownloadedExternalTool, ExternalToolRequest, kubeconform.get_request(request.platform)
+    )
+    return KubeconformSetup(downloaded_tool)
 
 
 @rule
@@ -70,20 +98,27 @@ async def run_kubeconform_on_file(
     )
 
     tool_relpath = "__kubeconform"
-    immutable_input_digests = {tool_relpath: request.binary.digest}
+    immutable_input_digests = {tool_relpath: request.setup.binary.digest}
 
     result = await Get(
         FallibleProcessResult,
         Process(
             argv=[
-                os.path.join(tool_relpath, request.binary.exe),
-                "-summary",
+                os.path.join(tool_relpath, request.setup.binary.exe),
+                "-cache",
+                _KUBECONFORM_CACHE_FOLDER,
+                *(("-summary",) if kubeconform.summary else ()),
+                *(("-verbose",) if kubeconform.verbose else ()),
+                *chain.from_iterable(
+                    ("-schema-location", schema) for schema in kubeconform.schema_locations
+                ),
                 "-output",
                 kubeconform.output_type.value,
                 *(rendered_chart.snapshot.files),
             ],
             immutable_input_digests=immutable_input_digests,
             input_digest=rendered_chart.snapshot.digest,
+            append_only_caches=request.setup.append_only_caches,
             description=f"Validating Kubernetes manifests for {request.field_set.address}",
             level=LogLevel.DEBUG,
             cache_scope=ProcessCacheScope.SUCCESSFUL,
@@ -113,14 +148,11 @@ async def run_check_deployment(
     kubeconform: KubeconformSubsystem,
     platform: Platform,
 ) -> CheckResults:
-    downloaded_tool = await Get(
-        DownloadedExternalTool, ExternalToolRequest, kubeconform.get_request(platform)
-    )
-
+    setup = await Get(KubeconformSetup, KubeconformSetupRequest(platform))
     check_results = await MultiGet(
         Get(
             CheckResult,
-            RunKubeconformOnKubeManifestRequest(downloaded_tool, field_set),
+            RunKubeconformOnKubeManifestRequest(setup, field_set),
         )
         for field_set in request.field_sets
     )

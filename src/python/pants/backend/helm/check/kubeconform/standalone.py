@@ -7,7 +7,7 @@ from enum import Enum
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import EnumOption, SkipOption
+from pants.option.option_types import BoolOption, EnumOption, SkipOption, StrListOption
 
 
 class KubeconformOutput(Enum):
@@ -40,9 +40,16 @@ class KubeconformSubsystem(TemplatedExternalTool):
 
     skip = SkipOption("check")
 
-    output_type = EnumOption(
-        "--output-type", default=KubeconformOutput.PLAIN, help="Output type used by `kubeconform`."
+    schema_locations = StrListOption(
+        default=["default"],
+        help="List of schema locations to use to validate the resources.",
+        advanced=True,
     )
+    output_type = EnumOption(
+        default=KubeconformOutput.PLAIN, help="Output type used by `kubeconform`."
+    )
+    summary = BoolOption(default=False, help="Set to true to only output check summary.")
+    verbose = BoolOption(default=False, help="Set to true to increase output verbosity.")
 
     def generate_exe(self, _: Platform) -> str:
         return "./kubeconform"

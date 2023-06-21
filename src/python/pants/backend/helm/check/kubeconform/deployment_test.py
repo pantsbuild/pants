@@ -116,7 +116,8 @@ def test_valid_deployment_without_postrenderer(rule_runner: RuleRunner) -> None:
 
     source_root_patterns = ("/src/*",)
     rule_runner.set_options(
-        [f"--source-root-patterns={repr(source_root_patterns)}"], env_inherit=PYTHON_BOOTSTRAP_ENV
+        [f"--source-root-patterns={repr(source_root_patterns)}", "--kubeconform-summary"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
     target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
