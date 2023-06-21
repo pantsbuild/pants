@@ -349,7 +349,7 @@ class DockerBuildOptionFieldValueMixin(Field):
     @final
     def options(self) -> Iterator[str]:
         if self.value is not None:
-            yield f"{self.docker_build_option.lstrip('build_')}={self.value}"
+            yield f"{self.docker_build_option}={self.value}"
 
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
