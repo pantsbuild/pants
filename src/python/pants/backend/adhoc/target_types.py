@@ -218,10 +218,10 @@ class AdhocToolOutputRootDirField(StringField):
 
         Values are relative to the build root, except in the following cases:
 
-        * `.` specifies the location of the `BUILD` file.
-        * Values beginning with `./` are relative to the location of the `BUILD` file.
-        * `/` or the empty string specifies the build root.
-        * Values beginning with `/` are also relative to the build root.
+          * `.` specifies the location of the `BUILD` file.
+          * Values beginning with `./` are relative to the location of the `BUILD` file.
+          * `/` or the empty string specifies the build root.
+          * Values beginning with `/` are also relative to the build root.
         """
     )
 

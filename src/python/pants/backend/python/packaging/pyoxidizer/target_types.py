@@ -60,7 +60,7 @@ class PyOxidizerEntryPointField(StringField):
         This represents the content of PyOxidizer's `python_config.run_module` and leaving this
         field empty will create a REPL binary.
 
-        It is specified with the full module declared: 'path.to.module'.
+        It is specified with the full module declared: `'path.to.module'`.
 
         This field is passed into the PyOxidizer config as-is, and does not undergo validation
         checking.
