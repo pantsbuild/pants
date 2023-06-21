@@ -299,7 +299,7 @@ def deploy_to_s3(
     *,
     scope: str | None = None,
 ) -> Step:
-    run = "./src/python/pants_release/deploy_to_s3.py"
+    run = "./pants run src/python/pants_release/deploy_to_s3.py"
     if scope:
         run = f"{run} --scope {scope}"
     return {
