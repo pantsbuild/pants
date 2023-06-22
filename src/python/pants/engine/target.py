@@ -2998,6 +2998,7 @@ def generate_file_based_overrides_field_help_message(
                 {example}
                 """
             ),
+            "",
             softwrap(
                 f"""
                 File paths and globs are relative to the BUILD file's directory. Every overridden file is
