@@ -7,7 +7,7 @@ from enum import Enum
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import BoolOption, EnumOption, SkipOption, StrListOption
+from pants.option.option_types import BoolOption, EnumOption, IntOption, SkipOption, StrListOption
 
 
 class KubeconformOutput(Enum):
@@ -40,6 +40,11 @@ class KubeconformSubsystem(TemplatedExternalTool):
 
     skip = SkipOption("check")
 
+    concurrency = IntOption(
+        default=None,
+        help="Number of workers used by Kubeconform to validate resources.",
+        advanced=True,
+    )
     schema_locations = StrListOption(
         default=["default"],
         help="List of schema locations to use to validate the resources.",

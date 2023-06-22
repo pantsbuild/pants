@@ -270,6 +270,19 @@ K8S_CRD_FILE = dedent(
   """
 )
 
+K8S_CUSTOM_RESOURCE_FILE = dedent(
+    """\
+    apiVersion: myplatforms.contoso.com/v1alpha1
+    kind: MyPlatform
+    metadata:
+      name: cr_foo
+    spec:
+      appId: foo
+      language: python
+      environmentType: test
+    """
+)
+
 HELM_TEMPLATE_HELPERS_FILE = dedent(
     """\
   {{- define "fullname" -}}

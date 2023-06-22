@@ -6,15 +6,15 @@ from __future__ import annotations
 from abc import ABCMeta
 from dataclasses import dataclass
 
-from pants.engine.target import BoolField, FieldSet, Target
+from pants.engine.target import BoolField, FieldSet, StringSequenceField, Target, TriBoolField
 from pants.util.docutil import bin_name
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class KubeconformSkipField(BoolField):
     alias = "skip_kubeconform"
     default = False
-    help = softwrap(
+    help = help_text(
         f"""
         If set to true, do not run any kubeconform checking in this Helm target when running
         `{bin_name()} check`.
@@ -22,9 +22,27 @@ class KubeconformSkipField(BoolField):
     )
 
 
+class KubeconformIgnoreSourcesField(StringSequenceField):
+    alias = "kubeconform_ignore_sources"
+    help = help_text("""Regular expression patterns specifying paths to ignore.""")
+
+
+class KubeconformIgnoreMissingSchemasField(TriBoolField):
+    alias = "kubeconform_ignore_missing_schemas"
+    help = help_text("""Whether to fail if there are missing schemas for custom resources.""")
+
+
+class KubeconformSkipKindsField(StringSequenceField):
+    alias = "kubeconform_skip_kinds"
+    help = help_text("List of kinds or GVKs to ignore.")
+
+
 @dataclass(frozen=True)
 class KubeconformFieldSet(FieldSet, metaclass=ABCMeta):
     skip: KubeconformSkipField
+    ignore_sources: KubeconformIgnoreSourcesField
+    ignore_missing_schemas: KubeconformIgnoreMissingSchemasField
+    skip_kinds: KubeconformSkipKindsField
 
     @classmethod
     def opt_out(cls, target: Target) -> bool:
