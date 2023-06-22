@@ -9,19 +9,6 @@ from pants_release.git import git
 from pants.util.strutil import softwrap
 
 
-def get_new_contributors() -> list[str]:
-    cur_version_sha, prev_version_sha = git(
-        "log", "-2", "--pretty=format:%h", "src/python/pants/VERSION"
-    ).splitlines(keepends=False)
-    return [
-        line[3:]
-        for line in git(
-            "diff", f"{prev_version_sha}..{cur_version_sha}", "CONTRIBUTORS.md"
-        ).splitlines(keepends=False)
-        if line.startswith("++ ")
-    ]
-
-
 def announcement_text() -> str:
     version = Path("src/python/pants/VERSION").read_text().strip()
     cur_version_sha, prev_version_sha = git(
@@ -44,7 +31,7 @@ def announcement_text() -> str:
         To upgrade, set pants_version="{version}" in the [GLOBAL] section of your pants.toml.
         """
     )
-    if "dev" in version:
+    if "dev" in version or "a" in version:
         announcement += "\n\nThanks to all the contributors to this release:\n\n"
         for contributor in all_contributors:
             announcement += contributor
