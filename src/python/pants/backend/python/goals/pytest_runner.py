@@ -29,8 +29,9 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadataV2,
     PythonLockfileMetadataV3,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import Pex, PexRequest, ReqStrings, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -217,7 +218,8 @@ def _count_pytest_tests(contents: DigestContents) -> int:
 async def validate_pytest_cov_included(_pytest: PyTest):
     if _pytest.requirements:
         # We'll only be using this subset of the lockfile.
-        requirements = {PipRequirement.parse(req) for req in _pytest.requirements}
+        req_strings = (await Get(ReqStrings, PexRequirements(_pytest.requirements))).req_strings
+        requirements = {PipRequirement.parse(req_string) for req_string in req_strings}
     else:
         # We'll be using the entire lockfile.
         lockfile_metadata = await get_lockfile_metadata(_pytest)
