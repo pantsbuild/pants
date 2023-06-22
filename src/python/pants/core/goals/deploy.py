@@ -358,16 +358,10 @@ async def _run_deploy_process(deploy: DeployProcess) -> _DeployStepResult:
 async def _deploy_target_dependencies(
     request: _DeployTargetDependenciesRequest,
 ) -> _DeployTargetRequests:
-    def should_ignore(dep: CoarsenedTarget) -> bool:
-        us = request.target.representative.address
-        them = dep.representative.address
-        return us == them
-
     return _DeployTargetRequests(
         [
             _DeployTargetRequest(dep, dependent=request.target.representative.address)
             for dep in request.target.dependencies
-            if not should_ignore(dep)
         ]
     )
 
