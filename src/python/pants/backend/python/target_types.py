@@ -174,7 +174,7 @@ class PythonRunGoalUseSandboxField(TriBoolField):
 
         The latter mode is similar to creating, activating, and using a virtual environment when
         running your files. It may also be necessary if the source being run writes files into the
-        repo and computes their location relative to the executed files. Django's makemigrations
+        repo and computes their location relative to the executed files. Django's `makemigrations`
         command is an example of such a process.
         """
     )
@@ -302,7 +302,7 @@ class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         """
         Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a module.
 
-        You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a
+        You can specify a full module like `'path.to.module'` and `'path.to.module:func'`, or use a
         shorthand to specify a file name, using the same syntax as the `sources` field:
 
           1) `'app.py'`, Pants will convert into the module `path.to.app`;
@@ -1371,20 +1371,20 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
 
         Specify as a nested dictionary, with a dictionary for each type of entry point,
         e.g. `console_scripts` vs. `gui_scripts`. Each dictionary maps the entry point name to
-        either a setuptools entry point ("path.to.module:func") or a Pants target address to a
-        pex_binary target.
+        either a setuptools entry point (`"path.to.module:func"`) or a Pants target address to a
+        `pex_binary` target.
 
-            Example:
+        Example:
 
-                entry_points={{
-                  "console_scripts": {{
-                    "my-script": "project.app:main",
-                    "another-script": "project/subdir:pex_binary_tgt"
-                  }}
-                }}
+            entry_points={{
+              "console_scripts": {{
+                "my-script": "project.app:main",
+                "another-script": "project/subdir:pex_binary_tgt"
+              }}
+            }}
 
         Note that Pants will assume that any value that either starts with `:` or has `/` in it,
-        is a target address to a pex_binary target. Otherwise, it will assume it's a setuptools
+        is a target address to a `pex_binary` target. Otherwise, it will assume it's a setuptools
         entry point as defined by
         https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use
         `//` as a prefix for target addresses if you need to disambiguate.
@@ -1543,7 +1543,7 @@ class GenerateSetupField(TriBoolField):
         """
         Whether to generate setup information for this distribution, based on analyzing
         sources and dependencies. Set to False to use existing setup information, such as
-        existing setup.py, setup.cfg, pyproject.toml files or similar.
+        existing `setup.py`, `setup.cfg`, `pyproject.toml` files or similar.
         """
     )
 
@@ -1554,7 +1554,7 @@ class LongDescriptionPathField(StringField):
 
     help = help_text(
         """
-        Path to a file that will be used to fill the long_description field in setup.py.
+        Path to a file that will be used to fill the `long_description` field in `setup.py`.
 
         Path is relative to the build root.
 
@@ -1648,7 +1648,7 @@ class VersionTemplateField(StringField):
         """
         Generate the version data using this format string, which takes a version format kwarg.
 
-        E.g., 'version = "{version}"'
+        E.g., `'version = "{version}"'`
         """
     )
 
