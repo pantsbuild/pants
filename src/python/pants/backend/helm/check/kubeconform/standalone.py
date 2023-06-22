@@ -3,19 +3,21 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, unique
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.option_types import BoolOption, EnumOption, IntOption, SkipOption, StrListOption
 
 
+@unique
 class KubeconformOutput(Enum):
     """The report format used for the unit tests."""
 
-    PLAIN = "text"
+    TEXT = "text"
     JSON = "json"
     TAP = "tap"
+    JUNIT = "junit"
 
 
 class KubeconformSubsystem(TemplatedExternalTool):
@@ -51,7 +53,7 @@ class KubeconformSubsystem(TemplatedExternalTool):
         advanced=True,
     )
     output_type = EnumOption(
-        default=KubeconformOutput.PLAIN, help="Output type used by `kubeconform`."
+        default=KubeconformOutput.TEXT, help="Output type used by `kubeconform`."
     )
     summary = BoolOption(default=False, help="Set to true to only output check summary.")
     verbose = BoolOption(default=False, help="Set to true to increase output verbosity.")
