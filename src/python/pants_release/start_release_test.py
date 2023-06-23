@@ -7,7 +7,7 @@ import datetime
 
 import pytest
 from packaging.version import Version
-from pants_release.changelog import Category, Entry, ReleaseInfo, format_notes, splice
+from pants_release.start_release import Category, Entry, ReleaseInfo, format_notes, splice
 
 
 @pytest.mark.parametrize(
