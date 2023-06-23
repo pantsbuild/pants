@@ -1239,7 +1239,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     def test_job(repo: Repo) -> object:
         def gen_goals(use_default_version: bool) -> Sequence[object]:
             if use_default_version:
-                name = "repo-default version"
+                name = "repo-default version (baseline)"
                 version = ""
                 env_prefix = ""
             else:
@@ -1309,7 +1309,8 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 # FIXME: scie-pants issue
                 {
                     "name": "Kill pantsd",
-                    "run": "pkill -f pantsd"
+                    "run": "pkill -f pantsd",
+                    "if": "always()",
                 },
                 # then run with the version under test (simulates an in-place upgrade, locally, too)
                 *gen_goals(use_default_version=False),

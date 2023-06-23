@@ -36,29 +36,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -119,29 +121,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -214,29 +218,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test st2client::` with repo-default version
+      name: Run `test st2client::` with repo-default version (baseline)
       run: ' pants test st2client::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -297,29 +303,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -380,29 +388,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -463,29 +473,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -548,30 +560,32 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::`
-        with repo-default version'
+        with repo-default version (baseline)'
       run: ' pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -634,19 +648,20 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -695,14 +710,15 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -746,19 +762,20 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: 'Run `package :: -directory_pull::` with repo-default version'
+      name: 'Run `package :: -directory_pull::` with repo-default version (baseline)'
       run: ' pants package :: -directory_pull::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -812,19 +829,20 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -885,29 +903,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -968,29 +988,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -1052,29 +1074,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -1139,29 +1163,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -1222,29 +1248,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -1305,29 +1333,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -1388,29 +1418,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
@@ -1471,29 +1503,31 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `version` with repo-default version
+      name: Run `version` with repo-default version (baseline)
       run: ' pants version'
     - env:
         PANTS_VERSION: ''
       if: always()
       name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
       run: ' pants tailor --check update-build-files --check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `lint check ::` with repo-default version
+      name: Run `lint check ::` with repo-default version (baseline)
       run: ' pants lint check ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `test ::` with repo-default version
+      name: Run `test ::` with repo-default version (baseline)
       run: ' pants test ::'
     - env:
         PANTS_VERSION: ''
       if: always()
-      name: Run `package ::` with repo-default version
+      name: Run `package ::` with repo-default version (baseline)
       run: ' pants package ::'
-    - name: Kill pantsd
+    - if: always()
+      name: Kill pantsd
       run: pkill -f pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
