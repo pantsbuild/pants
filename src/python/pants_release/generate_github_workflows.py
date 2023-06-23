@@ -1306,9 +1306,10 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 ),
                 # first run with the repo's base configuration, as a reference point
                 *gen_goals(use_default_version=True),
+                # FIXME: scie-pants issue
                 {
                     "name": "Kill pantsd",
-                    "run": "pkill -lf pantsd"
+                    "run": "pkill -f pantsd"
                 },
                 # then run with the version under test (simulates an in-place upgrade, locally, too)
                 *gen_goals(use_default_version=False),
