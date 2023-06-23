@@ -1134,7 +1134,7 @@ class Repo:
     install_go: bool = False
     install_thrift: bool = False
     node_version: None | str = None
-    checkout_options: dict[str, object] = field(default_factory=dict)
+    checkout_options: dict[str, Any] = field(default_factory=dict)
     setup_commands: str = ""
     goals: Sequence[str] = tuple(DefaultGoals)
 
@@ -1283,14 +1283,15 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any], str]:
                 for goal in ["version", *repo.goals]
             ]
 
+        job_env: dict[str, str] = {
+            **repo.env,
+            "PANTS_REMOTE_CACHE_READ": "false",
+            "PANTS_REMOTE_CACHE_WRITE": "false",
+        }
         return {
             "name": repo.name,
             "runs-on": "ubuntu-latest",
-            "env": {
-                **repo.env,
-                "PANTS_REMOTE_CACHE_READ": "false",
-                "PANTS_REMOTE_CACHE_WRITE": "false",
-            },
+            "env": job_env,
             # we're running untrusted code, so this token shouldn't be able to do anything. We also
             # need to be sure we don't add any secrets to the job
             "permissions": {},
