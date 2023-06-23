@@ -26,7 +26,7 @@ from xml.etree import ElementTree
 
 import requests
 from packaging.version import Version
-from pants_release.common import banner, die, green
+from pants_release.common import VERSION_PATH, banner, die, green
 from pants_release.git import git, git_rev_parse
 from pants_release.reversion import reversion
 
@@ -387,8 +387,7 @@ class _Constants:
             "--date=format:%Y%m%d%H%M",
             self._head_sha,
         )
-        self.pants_version_file = Path("src/python/pants/VERSION")
-        self.pants_stable_version = self.pants_version_file.read_text().strip()
+        self.pants_stable_version = VERSION_PATH.read_text().strip()
 
     @property
     def binary_base_url(self) -> str:
@@ -456,12 +455,12 @@ def get_pgp_program_name() -> str:
 @contextmanager
 def set_pants_version(version: str) -> Iterator[None]:
     """Temporarily rewrite the VERSION file."""
-    original_content = CONSTANTS.pants_version_file.read_text()
-    CONSTANTS.pants_version_file.write_text(version)
+    original_content = VERSION_PATH.read_text()
+    VERSION_PATH.write_text(version)
     try:
         yield
     finally:
-        CONSTANTS.pants_version_file.write_text(original_content)
+        VERSION_PATH.write_text(original_content)
 
 
 def is_cross_platform(wheel_paths: Iterable[Path]) -> bool:

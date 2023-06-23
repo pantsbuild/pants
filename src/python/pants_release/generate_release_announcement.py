@@ -1,18 +1,17 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path
 
-from pants_release.common import sorted_contributors
+from pants_release.common import VERSION_PATH, sorted_contributors
 from pants_release.git import git
 
 from pants.util.strutil import softwrap
 
 
 def announcement_text() -> str:
-    version = Path("src/python/pants/VERSION").read_text().strip()
+    version = VERSION_PATH.read_text().strip()
     cur_version_sha, prev_version_sha = git(
-        "log", "-2", "--pretty=format:%h", "src/python/pants/VERSION"
+        "log", "-2", "--pretty=format:%h", str(VERSION_PATH)
     ).splitlines(keepends=False)
     git_range = f"{prev_version_sha}..{cur_version_sha}"
     all_contributors = sorted_contributors(git_range)

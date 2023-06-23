@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import subprocess
 import time
+from pathlib import Path
 from typing import NoReturn
+
+VERSION_PATH = Path("src/python/pants/VERSION")
 
 _SCRIPT_START_TIME = time.time()
 
