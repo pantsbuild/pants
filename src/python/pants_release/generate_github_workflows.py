@@ -1165,9 +1165,22 @@ PUBLIC_REPOS = [
     Repo(name="pantsbuild/example-visibility", python_version="3.9"),
     # public repos
     Repo(name="Ars-Linguistica/mlconjug3"),
-    Repo(name="fucina/treb"),
-    Repo(name="ghandic/jsf"),
-    Repo(name="komprenilo/liga", python_version="3.9"),
+    Repo(
+        name="fucina/treb",
+        goals=[
+            DefaultGoals.lint_check,
+            DefaultGoals.test,
+            DefaultGoals.package,
+        ],
+    ),
+    Repo(
+        name="ghandic/jsf",
+        goals=[
+            DefaultGoals.test,
+            DefaultGoals.package,
+        ],
+    ),
+    Repo(name="komprenilo/liga", python_version="3.9", goals=[DefaultGoals.package]),
     Repo(
         name="lablup/backend.ai",
         python_version="3.11.3",
@@ -1180,7 +1193,11 @@ PUBLIC_REPOS = [
         ],
     ),
     Repo(name="mitodl/ol-infrastructure", goals=[DefaultGoals.package]),
-    Repo(name="mitodl/ol-django", goals=[DefaultGoals.test, DefaultGoals.package]),
+    Repo(
+        name="mitodl/ol-django",
+        setup_commands="sudo apt-get install pkg-config libxml2-dev libxmlsec1-dev libxmlsec1-openssl",
+        goals=[DefaultGoals.test, DefaultGoals.package],
+    ),
     Repo(
         name="naccdata/flywheel-gear-extensions",
         goals=[DefaultGoals.test, "package :: -directory_pull::"],
