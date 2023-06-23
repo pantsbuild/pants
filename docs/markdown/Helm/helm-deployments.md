@@ -34,11 +34,23 @@ name: example
 version: 0.1.0
 ```
 ```python src/deployment/BUILD
-helm_deployment(name="dev", sources=["common-values.yaml", "dev-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  sources=["common-values.yaml", "dev-override.yaml"]
+)
 
-helm_deployment(name="stage", sources=["common-values.yaml", "stage-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(
+  name="stage",
+  chart="//src/chart",
+  sources=["common-values.yaml", "stage-override.yaml"]
+)
 
-helm_deployment(name="prod", sources=["common-values.yaml", "prod-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(
+  name="prod",
+  chart="//src/chart",
+  sources=["common-values.yaml", "prod-override.yaml"]
+)
 ```
 ```yaml src/deployment/common-values.yaml
 # Default values common to all deployments
@@ -63,8 +75,8 @@ env:
 
 There are quite a few things to notice in the previous example:
 
-* The `helm_deployment` target requires you to explicitly define as a dependency which chart to use.
-* We have three different deployments that using configuration files with the specified chart.
+* The `helm_deployment` target requires you to explicitly set the `chart` field to specify which chart to use.
+* We have three different deployments using different sets of configuration files with the same chart.
 * One of those value files (`common-values.yaml`) provides with default values that are common to all deployments.
 * Each deployment uses an additional `xxx-override.yaml` file with values that are specific to the given deployment.
 
@@ -112,7 +124,7 @@ spec:
 ```
 ```python src/deployment/BUILD
 # Overrides the `image` value for the chart using the target address for the first-party docker image.
-helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
+helm_deployment(chart="src/chart", values={"image": "src/docker:docker"})
 ```
 
 > 📘 Docker image references VS Pants' target addresses
@@ -140,7 +152,7 @@ Value files
 It's very common that Helm deployments use a series of files providing with values that customise the given chart. When using deployments that may have more than one YAML file as the source of configuration values, the Helm backend needs to sort the file names in a way that is consistent across different machines, as the order in which those files are passed to the Helm command is relevant. The final order depends on the same order in which those files are specified in the `sources` field of the `helm_deployment` target. For example, given the following `BUILD` file:
 
 ```python src/deployment/BUILD
-helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "second.yaml", "last.yaml"])
+helm_deployment(name="dev", chart="//src/chart", sources=["first.yaml", "second.yaml", "last.yaml"])
 ```
 
 This will result in the Helm command receiving the value files as in that exact order.
@@ -159,7 +171,11 @@ src/deployment/last.yaml
 And also the following `helm_deployment` target definition:
 
 ```python src/deployment/BUILD
-helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"])
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"]
+)
 ```
 
 In this case, the final ordering of the files would be as follows:
@@ -185,7 +201,7 @@ Inline values are defined as a key-value dictionary, like in the following examp
 ```python src/deployment/BUILD
 helm_deployment(
   name="dev",
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   values={
     "nameOverride": "my_custom_name",
     "image.pullPolicy": "Always",
@@ -193,34 +209,47 @@ helm_deployment(
 )
 ```
 
-### Using dynamic values
+Using dynamic values
+--------------------
 
-Inline values also support interpolation of environment variables. Since Pants runs all processes in a hermetic sandbox, to be able to use environment variables you must first tell Pants what variables to make available to the Helm process using the `[helm].extra_env_vars` option. Consider the following example:
+Pants has support for value interpolation in your BUILD files and you can make use of it when defining some of the values of your `helm_deployment`. This is not exclusive to the Helm backend but it's illustrated here to showcase how it could be leveraged to inject environment variables into your charts.
+
+Consider the following example:
 
 ```python src/deployment/BUILD
 helm_deployment(
   name="dev",
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   values={
-    "configmap.deployedAt": "{env.DEPLOY_TIME}",
+    "configmap.deployedAt": f"{env('DEPLOY_TIME')}",
   },
 )
 ```
-```toml pants.toml
-[helm]
-extra_env_vars = ["DEPLOY_TIME"]
-```
 
-Now you can launch a deployment using the following command:
+In the previous example, Pants will use the value of the `DEPLOY_TIME` environment variable in your inline values, which will be then forwarded to your chart. Now you can launch a deployment using the following command:
 
 ```
 DEPLOY_TIME=$(date) pants experimental-deploy src/deployment:dev
 ```
 
+This isn't restricted to just the `values` field and it can be used in others like shown in the following example:
+
+```python src/deployment/BUILD
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  release=f"{env('ORGANIZATION_ID')}-dev",
+  namespace=f"product-{env('NAMESPACE_SUFFIX')}"
+)
+```
+
+As shown above, now the `release` and `namespace` fields are calculated at deploy-time by Pants and, as in the previous example, they will be forwarded to the Helm chart accordingly.
+
+
 > 🚧 Ensuring repeatable deployments
 > 
 > You should always favor using static values (or value files) VS dynamic values in your deployments. Using interpolated environment variables in your deployments can render your deployments non-repetable anymore if those values can affect the behaviour of the system deployed, or what gets deployed (i.e. Docker image addresses).
-> Dynamic values are supported to give the option of passing some info or metadata to the software being deployed (i.e. deploy time, commit hash, etc) or some less harmful settings of a deployment (i.e. replica count. etc). Be careful when chossing the values that are going to be calculated dynamically.
+> Be careful when chossing the values that are going to be calculated dynamically.
 
 Third party chart artifacts
 ---------------------------
@@ -240,7 +269,7 @@ helm_artifact(
 ```python src/deploy/BUILD
 helm_deployment(
   name="main",
-  dependencies=["//3rdparty/helm/jetstack:cert-manager"],
+  chart="//3rdparty/helm/jetstack:cert-manager",
   values={
     "installCRDs": "true"
   },
@@ -284,7 +313,7 @@ run_shell_command(
 )
 
 helm_deployment(
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   post_renderers=[":vals"],
 )
 ```

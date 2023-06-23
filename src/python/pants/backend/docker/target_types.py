@@ -282,8 +282,9 @@ class DockerImageBuildSecretsOptionField(
         Secret files to expose to the build (only if BuildKit enabled).
 
         Secrets may use absolute paths, or paths relative to your build root, or the BUILD file
-        if prefixed with `./`. The id should be valid as used by the Docker build `--secret`
-        option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
+        if prefixed with `./`. Paths to your home directory will be automatically expanded.
+        The id should be valid as used by the Docker build `--secret` option.
+        See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
         information.
 
         Example:
@@ -292,6 +293,7 @@ class DockerImageBuildSecretsOptionField(
                 secrets={
                     "mysecret": "/var/secrets/some-secret",
                     "repo-secret": "src/proj/secrets/some-secret",
+                    "home-dir-secret": "~/.config/some-secret",
                     "target-secret": "./secrets/some-secret",
                 }
             )
@@ -308,8 +310,9 @@ class DockerImageBuildSecretsOptionField(
             full_path = os.path.join(
                 get_buildroot(),
                 self.address.spec_path if re.match(r"\.{1,2}/", path) else "",
-                path,
+                os.path.expanduser(path),
             )
+
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
 
@@ -345,7 +348,8 @@ class DockerBuildOptionFieldValueMixin(Field):
 
     @final
     def options(self) -> Iterator[str]:
-        yield f"{self.docker_build_option}={self.value}"
+        if self.value is not None:
+            yield f"{self.docker_build_option}={self.value}"
 
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
@@ -387,6 +391,19 @@ class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
     docker_build_option = "--squash"
 
 
+class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, StringField):
+    alias = "build_network"
+    default = None
+    help = help_text(
+        """
+        Sets the networking mode for the run commands during build.
+        Supported standard values are: bridge, host, none, and container:<name|id>.
+        Any other value is taken as a custom network's name to which the container should connect to.
+        """
+    )
+    docker_build_option = "--network"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -406,6 +423,7 @@ class DockerImageTarget(Target):
         DockerImageTargetStageField,
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
+        DockerImageBuildNetworkOptionField,
         OutputPathField,
         RestartableField,
     )

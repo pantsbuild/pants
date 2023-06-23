@@ -47,7 +47,7 @@ class ScalaPBSubsystem(JvmToolBase):
 
             For example, to invoke the fs2-grpc protoc plugin, the following option would work:
             `--scalapb-jvm-plugins=fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1`.
-            (Note: you would also need to set --scalapb-runtime-dependencies appropriately
+            (Note: you would also need to set `--scalapb-runtime-dependencies` appropriately
             to include the applicable runtime libraries for your chosen protoc plugins.)
             """
         ),

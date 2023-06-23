@@ -26,6 +26,7 @@ from pants.engine.target import GeneratedSources, HydratedSources, HydrateSource
 from pants.source.source_root import NoSourceRootError
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.resources import read_sibling_resource
 
 GRPC_PROTO_STANZA = """
 syntax = "proto3";
@@ -319,6 +320,9 @@ def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
         {
             "src/protobuf/dir1/f.proto": dedent(GRPC_PROTO_STANZA),
             "src/protobuf/dir1/BUILD": "protobuf_sources(grpc=True)",
+            "mypy-protobuf.lock": read_sibling_resource(
+                __name__, "test_grpc_pre_v2_mypy_plugin.lock"
+            ),
         }
     )
     assert_files_generated(
@@ -327,9 +331,8 @@ def test_grpc_pre_v2_mypy_plugin(rule_runner: RuleRunner) -> None:
         source_roots=["src/protobuf"],
         extra_args=[
             "--python-protobuf-mypy-plugin",
-            "--mypy-protobuf-version=mypy-protobuf==1.24",
-            "--mypy-protobuf-extra-requirements=six==1.16.0",
-            "--mypy-protobuf-lockfile=<none>",
+            "--python-resolves={'mypy-protobuf':'mypy-protobuf.lock'}",
+            "--mypy-protobuf-install-from-resolve=mypy-protobuf",
         ],
         expected_files=[
             "src/protobuf/dir1/f_pb2.py",

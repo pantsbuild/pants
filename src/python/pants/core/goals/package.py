@@ -7,10 +7,12 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -18,11 +20,15 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
+    Dependencies,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
+    ShouldTraverseDepsPredicate,
+    SpecialCasedDependencies,
     StringField,
+    Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
@@ -30,6 +36,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
@@ -176,6 +183,36 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
             if msg:
                 logger.info("\n".join(msg))
     return Package(exit_code=0)
+
+
+@dataclass(frozen=True)
+class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
+    package_field_set_types: FrozenOrderedSet[PackageFieldSet]
+    roots: FrozenOrderedSet[Address]
+    always_traverse_roots: bool = True  # traverse roots even if they are package targets
+
+    def __init__(
+        self,
+        *,
+        union_membership: UnionMembership,
+        roots: Iterable[Address],
+        always_traverse_roots: bool = True,
+    ) -> None:
+        object.__setattr__(self, "package_field_set_types", union_membership.get(PackageFieldSet))
+        object.__setattr__(self, "roots", FrozenOrderedSet(roots))
+        object.__setattr__(self, "always_traverse_roots", always_traverse_roots)
+        super().__init__()
+
+    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
+        if isinstance(field, SpecialCasedDependencies):
+            return False
+        if self.always_traverse_roots and target.address in self.roots:
+            return True
+        for field_set_type in self.package_field_set_types:
+            if field_set_type.is_applicable(target):
+                # False means do not traverse dependencies of this target
+                return False
+        return True
 
 
 def rules():

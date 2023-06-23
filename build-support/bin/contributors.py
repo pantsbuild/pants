@@ -7,6 +7,8 @@ import argparse
 import subprocess
 from pathlib import Path
 
+from pants_release.common import sorted_contributors
+
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate contributor list")
@@ -22,29 +24,15 @@ def main() -> None:
         tag = args.since
         if not tag_exists(tag):
             tag = f"release_{tag}"
-        print("  " + "\n  ".join(sorted_contributors(range=f"{tag}..HEAD")))
+        print("  " + "\n  ".join(sorted_contributors(git_range=f"{tag}..HEAD")))
     else:
         update_contributors_md()
-
-
-def sorted_contributors(range: str) -> list[str]:
-    contributors = set(
-        subprocess.run(
-            ["git", "log", "--use-mailmap", "--format=format:%aN", range],
-            stdout=subprocess.PIPE,
-            check=True,
-        )
-        .stdout.decode()
-        .splitlines()
-    )
-    contributors -= {"dependabot[bot]"}
-    return sorted(contributors)
 
 
 def update_contributors_md() -> None:
     Path("CONTRIBUTORS.md").write_text(
         "Created by running `./pants run build-support/bin/contributors.py`.\n\n+ "
-        + "\n+ ".join(sorted_contributors(range="HEAD"))
+        + "\n+ ".join(sorted_contributors(git_range="HEAD"))
         + "\n"
     )
 

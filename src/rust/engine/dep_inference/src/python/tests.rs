@@ -40,6 +40,7 @@ fn simple_imports() {
   assert_imports("import a.b", &["a.b"]);
   assert_imports("import a as x", &["a"]);
   assert_imports("from a import b", &["a.b"]);
+  assert_imports("from a import *", &["a"]);
   assert_imports("from a.b import c", &["a.b.c"]);
   assert_imports("from a.b import c.d", &["a.b.c.d"]);
   assert_imports("from a.b import c, d, e", &["a.b.c", "a.b.d", "a.b.e"]);
@@ -78,12 +79,19 @@ from a.b import (
 
   assert_imports("from . import b", &[".b"]);
   assert_imports("from .a import b", &[".a.b"]);
+  assert_imports("from .. import b", &["..b"]);
   assert_imports("from ..a import b", &["..a.b"]);
   assert_imports("from ..a import b.c", &["..a.b.c"]);
+  assert_imports("from ... import b.c", &["...b.c"]);
   assert_imports("from ...a import b.c", &["...a.b.c"]);
   assert_imports("from ....a import b.c", &["....a.b.c"]);
   assert_imports("from ....a import b, c", &["....a.b", "....a.c"]);
   assert_imports("from ....a import b as d, c", &["....a.b", "....a.c"]);
+
+  assert_imports("from .a import *", &[".a"]);
+  assert_imports("from . import *", &["."]);
+  assert_imports("from ..a import *", &["..a"]);
+  assert_imports("from .. import *", &[".."]);
 
   assert_imports(
     "class X: def method(): if True: while True: class Y: def f(): import a",
@@ -101,6 +109,7 @@ fn pragma_ignore() {
   assert_imports("import a.b  # pants: no-infer-dep", &[]);
   assert_imports("import a.b as d  # pants: no-infer-dep", &[]);
   assert_imports("from a import b  # pants: no-infer-dep", &[]);
+  assert_imports("from a import *  # pants: no-infer-dep", &[]);
   assert_imports("from a import b, c  # pants: no-infer-dep", &[]);
   assert_imports("from a import b, c as d  # pants: no-infer-dep", &[]);
   assert_imports(
@@ -178,6 +187,12 @@ fn pragma_ignore() {
         as \
         dd,  # pants: no-infer-dep
     )",
+    &[],
+  );
+  assert_imports(
+    r"
+    from a.b import \
+        *  # pants: no-infer-dep",
     &[],
   );
 }
@@ -487,8 +502,13 @@ fn assert_relative_imports(filename: &str, code: &str, resolved_imports: &[&str]
 fn relative_imports_resolution() {
   let filename = "foo/bar/baz.py";
   assert_relative_imports(filename, "from . import b", &["foo.bar.b"]);
+  assert_relative_imports(filename, "from . import *", &["foo.bar"]);
   assert_relative_imports(filename, "from .a import b", &["foo.bar.a.b"]);
+  assert_relative_imports(filename, "from .a import *", &["foo.bar.a"]);
+  assert_relative_imports(filename, "from .. import b", &["foo.b"]);
+  assert_relative_imports(filename, "from .. import *", &["foo"]);
   assert_relative_imports(filename, "from ..a import b", &["foo.a.b"]);
+  assert_relative_imports(filename, "from .. import b.c", &["foo.b.c"]);
   assert_relative_imports(filename, "from ..a import b.c", &["foo.a.b.c"]);
 
   let filename = "bingo/bango/bongo/himom.py";
@@ -496,9 +516,11 @@ fn relative_imports_resolution() {
   assert_relative_imports(filename, "from .a import b", &["bingo.bango.bongo.a.b"]);
   assert_relative_imports(filename, "from ..a import b", &["bingo.bango.a.b"]);
   assert_relative_imports(filename, "from ..a import b.c", &["bingo.bango.a.b.c"]);
+  assert_relative_imports(filename, "from ... import b.c", &["bingo.b.c"]);
   assert_relative_imports(filename, "from ...a import b.c", &["bingo.a.b.c"]);
 
   // Left unchanged, since we blew through the top, let Pants error using this string as a message
+  assert_relative_imports(filename, "from .... import b.c", &["....b.c"]);
   assert_relative_imports(filename, "from ....a import b.c", &["....a.b.c"]);
   assert_relative_imports(filename, "from ....a import b, c", &["....a.b", "....a.c"]);
   assert_relative_imports(
@@ -514,13 +536,22 @@ fn syntax_errors_and_other_fun() {
 
   assert_imports("imprt a", &[]);
   assert_imports("form a import b", &["b"]);
-  assert_imports("import .b", &[]);
+  assert_imports("import .b", &["."]);
   assert_imports("import a....b", &["a....b"]);
   assert_imports("import a.", &[]);
+  assert_imports("import *", &[]);
   assert_imports("from a import", &[]);
+  assert_imports("from a import;", &["a."]);
+  assert_imports("from a import ()", &["a."]);
   assert_imports("from a imp x", &[]);
   assert_imports("from from import a as .as", &[]);
   assert_imports("from a import ......g", &["a.g"]);
+  assert_imports("from a. import b", &[]);
+  assert_imports("from a as c import b as d", &["a.b"]);
+  assert_imports("from a import *, b", &["a"]);
+  assert_imports("from a import b, *", &["a.b"]);
+  assert_imports("from a import (*)", &[]);
+  assert_imports("from * import b", &["b"]);
   assert_imports("try:...\nexcept:import a", &["a"]);
   assert_imports("try:...\nexcept 1:import a", &["a"]);
   assert_imports("try:...\nexcept x=1:import a", &["a"]);

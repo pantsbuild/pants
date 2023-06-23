@@ -31,9 +31,9 @@ echo "* Checking linters, formatters, and headers"
 $_PANTS_PRE_COMMIT_BINARY --changed-since="${MERGE_BASE}" lint ||
   die "If there were formatting errors, run \`$_PANTS_PRE_COMMIT_BINARY --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
-if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
+if git diff "${MERGE_BASE}" --name-only | grep src/python/pants_release/generate_github_workflows.py > /dev/null; then
   echo "* Checking GitHub workflows generation"
-  $_PANTS_PRE_COMMIT_BINARY run build-support/bin/generate_github_workflows.py -- --check
+  $_PANTS_PRE_COMMIT_BINARY run src/python/pants_release/generate_github_workflows.py -- --check
 fi
 
 echo "* Checking __init__.py files"

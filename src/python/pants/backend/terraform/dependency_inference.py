@@ -6,10 +6,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Tuple
 
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex import rules as pex_rules
@@ -41,13 +38,11 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"
     help = "Used to parse Terraform modules to infer their dependencies."
 
-    default_version = "python-hcl2==4.3.0"
     default_requirements = ["python-hcl2>=3.0.5,<5"]
 
     register_interpreter_constraints = True
 
     default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
-# To change, edit `build-support/bin/generate_github_workflows.py` and run:
-#   ./pants run build-support/bin/generate_github_workflows.py
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
 
 
 jobs:
@@ -41,30 +41,26 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-Linux-ARM64
-        path: .pants.d/pants.log
+        name: logs-wheels-Linux-ARM64
+        path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -101,33 +97,29 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-wheels-Linux-x86_64
+        path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -150,7 +142,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.69.0-*
+        path: '~/.rustup/toolchains/1.70.0-*
 
           ~/.rustup/update-hashes
 
@@ -163,11 +155,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -175,22 +162,23 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macOS10-15-x86_64
-        path: .pants.d/pants.log
+        name: logs-wheels-macOS10-15-x86_64
+        path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -213,7 +201,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.69.0-*
+        path: '~/.rustup/toolchains/1.70.0-*
 
           ~/.rustup/update-hashes
 
@@ -226,11 +214,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -238,22 +221,23 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macOS11-ARM64
-        path: .pants.d/pants.log
+        name: logs-wheels-macOS11-ARM64
+        path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   determine_ref:
     if: github.repository_owner == 'pantsbuild'
@@ -285,28 +269,17 @@ jobs:
       uses: actions/checkout@v3
       with:
         ref: ${{ needs.determine_ref.outputs.build-ref }}
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-    - name: Tell Pants to use Python 3.9
-      run: 'echo "PY=python3.9" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==3.9.*'']" >> $GITHUB_ENV
-
-        '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - env:
         MODE: debug
-        USE_PY39: 'true'
       name: Fetch and stabilize wheels
-      run: ./build-support/bin/release.sh fetch-and-stabilize --dest=dest/pypi_release
+      run: ./pants run src/python/pants_release/release.py -- fetch-and-stabilize
+        --dest=dest/pypi_release
     - name: Create Release -> Commit Mapping
       run: 'tag="${{ needs.determine_ref.outputs.build-ref }}"
 
@@ -330,7 +303,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3
-      run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
+      run: ./pants run src/python/pants_release/deploy_to_s3.py --scope tags/pantsbuild.pants
 name: Release
 'on':
   push:

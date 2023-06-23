@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "engine"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 # NOTE: See `src/rust/engine/.cargo/config` for `--cfg` flags enabled for these crates.
@@ -60,7 +60,7 @@ members = [
   "tryfuture",
   "ui",
   "watch",
-  "workunit_store"
+  "workunit_store",
 ]
 
 # These are the packages which are built/tested when no special selector flags are passed to cargo.
@@ -104,7 +104,7 @@ default-members = [
   "tryfuture",
   "ui",
   "watch",
-  "workunit_store"
+  "workunit_store",
 ]
 
 [lib]
@@ -129,7 +129,10 @@ cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features = [
+  "internment",
+  "smallvec",
+] }
 dep_inference = { path = "dep_inference" }
 derivative = "2.2"
 async-oncecell = "0.2"
@@ -154,17 +157,15 @@ num_enum = "0.5"
 parking_lot = "0.12"
 petgraph = "0.6"
 process_execution = { path = "process_execution" }
-# TODO: Change to ^0.18.4 once https://github.com/PyO3/pyo3/pull/3142 is released
-pyo3 =  { git = "https://github.com/PyO3/pyo3.git", rev = "c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32" }
+pyo3 = "0.19"
 rand = "0.8"
-# See https://github.com/PyO3/pyo3/issues/3151
-syn = "1.0.85"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-smallvec = { version = "1", features=["union"] }
+smallvec = { version = "1", features = ["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
+serde = "1.0.160"
 serde_json = "1.0"
 task_executor = { path = "task_executor" }
 tempfile = "3.5.0"
@@ -175,7 +176,7 @@ tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
-url = "2.3"
+url = "2.4"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 remote = { path = "process_execution/remote" }

@@ -517,7 +517,7 @@ impl Address {
   }
 
   #[getter]
-  fn is_generated_target(&self) -> bool {
+  pub fn is_generated_target(&self) -> bool {
     self.generated_name.is_some() || self.is_file_target()
   }
 

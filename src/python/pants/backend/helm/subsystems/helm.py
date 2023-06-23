@@ -23,6 +23,7 @@ from pants.util.strutil import bullet_list, help_text, softwrap
 _VALID_PASSTHROUGH_FLAGS = [
     "--atomic",
     "--cleanup-on-fail",
+    "--create-namespace",
     "--debug",
     "--dry-run",
     "--force",
@@ -138,6 +139,18 @@ class HelmSubsystem(TemplatedExternalTool):
         default=True,
         help="If true, add `helm_chart` targets with the `tailor` goal.",
         advanced=True,
+        removal_hint="Use `[helm].tailor_charts` instead.",
+        removal_version="2.19.0.dev0",
+    )
+    tailor_charts = BoolOption(
+        default=None,
+        help="If true, add `helm_chart` targets with the `tailor` goal.",
+        advanced=True,
+    )
+    tailor_unittests = BoolOption(
+        default=True,
+        help="If true, add `helm_unittest_tests` targets with the `tailor` goal.",
+        advanced=True,
     )
 
     args = ArgsListOption(
@@ -150,11 +163,11 @@ class HelmSubsystem(TemplatedExternalTool):
             Only a subset of Helm arguments are considered valid as passthrough arguments as most of them
             have equivalents in the form of fields of the different target types.
 
-            The list of valid arguments is as folows:
+            The list of valid arguments is as follows:
 
             {bullet_list([*_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
 
-            Before attempting to use passthrough arguments, check the refence of each of the available target types
+            Before attempting to use passthrough arguments, check the reference of each of the available target types
             to see what fields are accepted in each of them.
             """
         ),
