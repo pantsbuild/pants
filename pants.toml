@@ -49,6 +49,7 @@ plugins = [
 pantsd_invalidation_globs.add = [
   "!*_test.py",
   "!BUILD",
+  "!src/python/pants_release/**",
   # NB: The `target` directory is ignored via `pants_ignore` below.
   "src/rust/engine/**/*.rs",
   "src/rust/engine/**/*.toml",

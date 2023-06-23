@@ -114,11 +114,11 @@ class ExternalToolOptionsMixin:
 
         Each element is a pipe-separated string of `version|platform|sha256|length`, where:
 
-            - `version` is the version string
-            - `platform` is one of [{','.join(Platform.__members__.keys())}],
-            - `sha256` is the 64-character hex representation of the expected sha256
+          - `version` is the version string
+          - `platform` is one of `[{','.join(Platform.__members__.keys())}]`
+          - `sha256` is the 64-character hex representation of the expected sha256
             digest of the download file, as emitted by `shasum -a 256`
-            - `length` is the expected length of the download file in bytes, as emitted by
+          - `length` is the expected length of the download file in bytes, as emitted by
             `wc -c`
 
         E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
@@ -297,8 +297,8 @@ class TemplatedExternalToolOptionsMixin(ExternalToolOptionsMixin):
             `file:/this/is/absolute`, possibly by
             [templating the buildroot in a config file]({doc_url('options#config-file-entries')})).
 
-            Use `{{version}}` to have the value from --version substituted, and `{{platform}}` to
-            have a value from --url-platform-mapping substituted in, depending on the
+            Use `{{version}}` to have the value from `--version` substituted, and `{{platform}}` to
+            have a value from `--url-platform-mapping` substituted in, depending on the
             current platform. For example,
             https://github.com/.../protoc-{{version}}-{{platform}}.zip.
             """
@@ -314,12 +314,12 @@ class TemplatedExternalToolOptionsMixin(ExternalToolOptionsMixin):
             A dictionary mapping platforms to strings to be used when generating the URL
             to download the tool.
 
-            In --url-template, anytime the `{platform}` string is used, Pants will determine the
+            In `--url-template`, anytime the `{platform}` string is used, Pants will determine the
             current platform, and substitute `{platform}` with the respective value from your dictionary.
 
             For example, if you define `{"macos_x86_64": "apple-darwin", "linux_x86_64": "unknown-linux"}`,
             and run Pants on Linux with an intel architecture, then `{platform}` will be substituted
-            in the --url-template option with unknown-linux.
+            in the `--url-template` option with `unknown-linux`.
             """
         ),
     )

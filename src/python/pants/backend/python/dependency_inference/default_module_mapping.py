@@ -78,6 +78,7 @@ DEFAULT_MODULE_MAPPING = {
     "django-model-utils": ("model_utils",),
     "django-ninja": ("ninja",),
     "django-ninja-extra": ("ninja_extra",),
+    "django-postgres-extra": ("psqlextra",),
     "django-safedelete": ("safedelete",),
     "django-simple-history": ("simple_history",),
     "django-storages": ("storages",),
@@ -111,6 +112,7 @@ DEFAULT_MODULE_MAPPING = {
     "jack-client": ("jack",),
     "kafka-python": ("kafka",),
     "lark-parser": ("lark",),
+    "launchdarkly-server-sdk": ("ldclient",),
     "mail-parser": ("mailparser",),
     "mysql-connector-python": ("mysql.connector",),
     "opencv-python": ("cv2",),
@@ -238,6 +240,7 @@ DEFAULT_MODULE_MAPPING = {
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
     "tensorboard": ("torch.utils.tensorboard",),
+    "unleashclient": ("UnleashClient",),
     "websocket-client": ("websocket",),
 }
 

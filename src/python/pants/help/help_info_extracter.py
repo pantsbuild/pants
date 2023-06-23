@@ -22,6 +22,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
     cast,
     get_type_hints,
@@ -44,6 +45,8 @@ from pants.option.parser import OptionValueHistory, Parser
 from pants.option.scope import ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
 from pants.util.strutil import first_paragraph, strval
+
+T = TypeVar("T")
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -418,6 +421,7 @@ class AllHelpInfo:
     name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
     name_to_backend_help_info: LazyFrozenDict[str, BackendHelpInfo]
     name_to_build_file_info: LazyFrozenDict[str, BuildFileSymbolHelpInfo]
+    env_var_to_help_info: LazyFrozenDict[str, OptionHelpInfo]
 
     def non_deprecated_option_scope_help_infos(self):
         for oshi in self.scope_to_help_info.values():
@@ -520,12 +524,23 @@ class HelpInfoExtracter:
 
             return load
 
+        def lazily(value: T) -> Callable[[], T]:
+            return lambda: value
+
         known_scope_infos = sorted(options.known_scope_to_info.values(), key=lambda x: x.scope)
         scope_to_help_info = LazyFrozenDict(
             {
                 scope_info.scope: option_scope_help_info_loader_for(scope_info)
                 for scope_info in known_scope_infos
                 if not scope_info.scope.startswith("_")
+            }
+        )
+
+        env_var_to_help_info = LazyFrozenDict(
+            {
+                ohi.env_var: lazily(ohi)
+                for oshi in scope_to_help_info.values()
+                for ohi in chain(oshi.basic, oshi.advanced, oshi.deprecated)
             }
         )
 
@@ -559,6 +574,7 @@ class HelpInfoExtracter:
             name_to_api_type_info=cls.get_api_type_infos(build_configuration, union_membership),
             name_to_backend_help_info=cls.get_backend_help_info(options),
             name_to_build_file_info=cls.get_build_file_info(build_symbols),
+            env_var_to_help_info=env_var_to_help_info,
         )
 
     @staticmethod
