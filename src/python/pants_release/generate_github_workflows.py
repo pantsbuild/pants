@@ -1227,7 +1227,7 @@ PUBLIC_REPOS = [
 ]
 
 
-def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
+def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any], str]:
     inputs, env = workflow_dispatch_inputs(
         [
             WorkflowInput(
@@ -1335,7 +1335,8 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
         }
 
     jobs = {sanitize_name(repo.name): test_job(repo) for repo in PUBLIC_REPOS}
-    return jobs, inputs
+    run_name = f"Public repos test: version {env['PANTS_VERSION']} {env['EXTRA_ENV']}"
+    return jobs, inputs, run_name
 
 
 # ----------------------------------------------------------------------
@@ -1497,10 +1498,11 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
-    public_repos_jobs, public_repos_inputs = public_repos_jobs_and_inputs()
+    public_repos_jobs, public_repos_inputs, public_repos_run_name = public_repos_jobs_and_inputs()
     public_repos_yaml = yaml.dump(
         {
-            "name": "Public repository tests",
+            "name": "Public repos tests",
+            "run-name": public_repos_run_name,
             "on": {"workflow_dispatch": {"inputs": public_repos_inputs}},
             "jobs": public_repos_jobs,
         },

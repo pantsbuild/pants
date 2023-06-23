@@ -1489,7 +1489,7 @@ jobs:
       if: always()
       name: Run `package ::` with ${{ github.event.inputs.pants_version }}
       run: '${{ github.event.inputs.extra_env }} pants package ::'
-name: Public repository tests
+name: Public repos tests
 'on':
   workflow_dispatch:
     inputs:
@@ -1502,3 +1502,5 @@ name: Public repository tests
         description: Pants version (for example, `2.16.0`, `2.18.0.dev1`)
         required: true
         type: string
+run-name: 'Public repos test: version ${{ github.event.inputs.pants_version }} ${{
+  github.event.inputs.extra_env }}'
