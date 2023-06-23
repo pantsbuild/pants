@@ -16,10 +16,30 @@ from pathlib import Path
 
 import requests
 from packaging.version import Version
-from pants_release.common import VERSION_PATH, sorted_contributors
-from pants_release.git import git, git_fetch
+from pants_release.common import CONTRIBUTORS_PATH, VERSION_PATH, sorted_contributors
+from pants_release.git import git, git_fetch, github_pr_create
+
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+BASE_PR_BODY = softwrap(
+    """
+    This PR is release preparation. Please read over the release notes and make adjustments for
+    clarity for users, such as:
+
+    - shuffle miscategorised items to a better category (including completely uncategorised items)
+
+    - fix or improve poor titles, like "fix bug", so they are more accurate or descriptive (check to
+      see if the PR title is better).
+
+    - fix typos
+
+    Once satisfied, approve and merge, as normal.
+
+    ---
+    """
+)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -29,6 +49,11 @@ def create_parser() -> argparse.ArgumentParser:
         required=True,
         type=Version,
         help="The version for the new release, e.g. `2.0.0.dev1` or `2.0.0rc2`.",
+    )
+    parser.add_argument(
+        "--release-manager",
+        required=True,
+        help="The GitHub username of the person managing this release",
     )
     return parser
 
@@ -72,8 +97,6 @@ class Category(Enum):
     Internal = "internal"
 
     def heading(self):
-        if self == Category.Internal:
-            return "Internal (put these in a PR comment for review, not the release notes)"
         return " ".join(
             re.sub(r"([A-Z][a-z]+)", r" \1", re.sub(r"([A-Z]+)", r" \1", self.name)).split()
         )
@@ -213,7 +236,7 @@ def update_changelog(release_info: ReleaseInfo) -> Formatted:
 
 def update_contributors(release_info: ReleaseInfo) -> None:
     if release_info.branch == "main":
-        Path("CONTRIBUTORS.md").write_text(
+        CONTRIBUTORS_PATH.write_text(
             "Created as part of the release process.\n\n+ "
             + "\n+ ".join(sorted_contributors(git_range="HEAD"))
             + "\n"
@@ -225,6 +248,25 @@ def update_version(release_info: ReleaseInfo) -> None:
         VERSION_PATH.write_text(f"{release_info.version}\n")
 
 
+def commit_and_pr(release_info: ReleaseInfo, formatted: Formatted, release_manager: str) -> None:
+    title = f"Prepare {release_info.version}"
+    branch = f"automation/release/{release_info.version}"
+
+    git("checkout", "-b", branch)
+    git("add", str(VERSION_PATH), str(CONTRIBUTORS_PATH), str(release_info.notes_file_name()))
+    git("commit", "-m", title)
+    git("push", "origin", "HEAD")
+
+    github_pr_create(
+        base="main",
+        head=branch,
+        title=title,
+        body="\n\n".join([BASE_PR_BODY, formatted.internal]),
+        assignee=release_manager,
+        labels=["automation:release-prep"],
+    )
+
+
 def main() -> None:
     args = create_parser().parse_args()
     release_info = ReleaseInfo.determine(args.new)
@@ -232,8 +274,7 @@ def main() -> None:
     formatted = update_changelog(release_info)
     update_contributors(release_info)
     update_version(release_info)
-
-    print(f"\nCommit {release_info.notes_file_name()} and create a PR.\n\n{formatted.internal}")
+    commit_and_pr(release_info, formatted, args.release_manager)
 
 
 if __name__ == "__main__":

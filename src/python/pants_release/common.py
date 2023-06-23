@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import NoReturn
 
 VERSION_PATH = Path("src/python/pants/VERSION")
+CONTRIBUTORS_PATH = Path("CONTRIBUTORS.md")
 
 _SCRIPT_START_TIME = time.time()
 
