@@ -1271,7 +1271,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any], str]:
                     "run": f"{env_prefix} pants {goal}",
                     # run all the goals, even if there's an earlier failure, because later goals
                     # might still be interesting (e.g. still run `test` even if `lint` fails)
-                    "if": "always()",
+                    "if": "success() || failure()",
                     "env": {"PANTS_VERSION": version},
                 }
                 for goal in ["version", *repo.goals]
@@ -1327,7 +1327,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any], str]:
                 {
                     "name": "Kill pantsd",
                     "run": "pkill -f pantsd",
-                    "if": "always()",
+                    "if": "success() || failure()",
                 },
                 # then run with the version under test (simulates an in-place upgrade, locally, too)
                 *gen_goals(use_default_version=False),
