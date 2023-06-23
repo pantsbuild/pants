@@ -24,12 +24,6 @@ logger = logging.getLogger(__name__)
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Prepare the changelog for a release.")
     parser.add_argument(
-        "--prior",
-        required=True,
-        type=Version,
-        help="The version of the prior release, e.g. `2.0.0.dev0` or `2.0.0rc1`.",
-    )
-    parser.add_argument(
         "--new",
         required=True,
         type=Version,
@@ -60,8 +54,10 @@ class ReleaseInfo:
         return Path(f"src/python/pants/notes/{self.slug}.md")
 
 
-def relevant_shas(prior: Version, release_ref: str) -> list[str]:
-    prior_tag = f"release_{prior}"
+def relevant_shas(release_ref: str) -> list[str]:
+    # infer the changes since the most recent previous release on this branch
+    prior_tag = git("describe", "--tags", "--abbrev=0", release_ref)
+    print(f"Found prior tag: {prior_tag}", file=sys.stderr)
     return git("log", "--format=format:%H", release_ref, f"^{prior_tag}").splitlines()
 
 
@@ -208,7 +204,7 @@ def main() -> None:
     release_info = ReleaseInfo.determine(args.new)
     branch_sha = git_fetch(release_info.branch)
     date = datetime.date.today()
-    entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, branch_sha)]
+    entries = [prepare_sha(sha) for sha in relevant_shas(branch_sha)]
 
     formatted = format_notes(release_info, entries, date)
     splice_into_file(release_info, formatted)
