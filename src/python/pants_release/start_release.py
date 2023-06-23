@@ -16,7 +16,7 @@ from pathlib import Path
 
 import requests
 from packaging.version import Version
-from pants_release.common import VERSION_PATH
+from pants_release.common import VERSION_PATH, sorted_contributors
 from pants_release.git import git, git_fetch
 
 logger = logging.getLogger(__name__)
@@ -211,6 +211,15 @@ def update_changelog(release_info: ReleaseInfo) -> Formatted:
     return formatted
 
 
+def update_contributors(release_info: ReleaseInfo) -> None:
+    if release_info.branch == "main":
+        Path("CONTRIBUTORS.md").write_text(
+            "Created as part of the release process.\n\n+ "
+            + "\n+ ".join(sorted_contributors(git_range="HEAD"))
+            + "\n"
+        )
+
+
 def update_version(release_info: ReleaseInfo) -> None:
     if release_info.branch == "main":
         VERSION_PATH.write_text(f"{release_info.version}\n")
@@ -221,6 +230,7 @@ def main() -> None:
     release_info = ReleaseInfo.determine(args.new)
 
     formatted = update_changelog(release_info)
+    update_contributors(release_info)
     update_version(release_info)
 
     print(f"\nCommit {release_info.notes_file_name()} and create a PR.\n\n{formatted.internal}")
