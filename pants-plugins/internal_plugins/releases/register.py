@@ -181,11 +181,7 @@ async def check_default_tools(
                     SessionValues(
                         {
                             OptionsBootstrapper: OptionsBootstrapper(
-                                tuple(),
-                                ("./pants",),
-                                args,
-                                Config(tuple()),
-                                CliAlias(),
+                                tuple(), ("./pants",), args, Config(tuple()), CliAlias()
                             )
                         }
                     ),

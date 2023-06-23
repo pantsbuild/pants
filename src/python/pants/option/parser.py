@@ -139,10 +139,6 @@ class Parser:
         return self._scope
 
     @property
-    def known_args(self) -> frozenset[str]:
-        return frozenset(self._known_args)
-
-    @property
     def known_scoped_args(self) -> frozenset[str]:
         prefix = f"{self.scope}-" if self.scope != GLOBAL_SCOPE else ""
         return frozenset(f"--{prefix}{arg.lstrip('--')}" for arg in self._known_args)

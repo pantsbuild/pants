@@ -123,7 +123,7 @@ class CliAlias:
         for scope_name, args in known_flags.items():
             for alias in self.definitions.keys():
                 if alias in args:
-                    scope_name = scope_name if scope_name != "" else "global"
+                    scope_name = scope_name or "global"
                     raise CliAliasInvalidError(
                         softwrap(
                             f"""
