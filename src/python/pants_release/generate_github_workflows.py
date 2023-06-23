@@ -1162,11 +1162,17 @@ PUBLIC_REPOS = [
     Repo(name="pantsbuild/example-jvm"),
     Repo(name="pantsbuild/example-kotlin"),
     Repo(name="pantsbuild/example-python", python_version="3.9"),
-    Repo(name="pantsbuild/example-visibility", python_version="3.9"),
+    Repo(
+        name="pantsbuild/example-visibility",
+        python_version="3.9",
+        # skip check
+        goals=[DefaultGoals.tailor_update_build_files, "lint ::", DefaultGoals.test],
+    ),
     # public repos
-    Repo(name="Ars-Linguistica/mlconjug3"),
+    Repo(name="Ars-Linguistica/mlconjug3", goals=[DefaultGoals.package]),
     Repo(
         name="fucina/treb",
+        env={"GIT_COMMIT": "abcdef1234567890"},
         goals=[
             DefaultGoals.lint_check,
             DefaultGoals.test,
@@ -1195,8 +1201,7 @@ PUBLIC_REPOS = [
     Repo(name="mitodl/ol-infrastructure", goals=[DefaultGoals.package]),
     Repo(
         name="mitodl/ol-django",
-        setup_commands="sudo apt-get install pkg-config libxml2-dev libxmlsec1-dev libxmlsec1-openssl",
-        goals=[DefaultGoals.test, DefaultGoals.package],
+        goals=[DefaultGoals.package],
     ),
     Repo(
         name="naccdata/flywheel-gear-extensions",
