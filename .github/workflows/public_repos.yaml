@@ -58,6 +58,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -139,6 +141,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -232,6 +236,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -313,6 +319,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -394,6 +402,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -475,6 +485,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -559,6 +571,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -632,6 +646,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -686,6 +702,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -740,6 +758,8 @@ jobs:
       if: always()
       name: 'Run `package :: -directory_pull::` with repo-default version'
       run: ' pants package :: -directory_pull::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -804,6 +824,8 @@ jobs:
       if: always()
       name: Run `test ::` with repo-default version
       run: ' pants test ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -885,6 +907,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -966,6 +990,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -1048,6 +1074,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -1133,6 +1161,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -1214,6 +1244,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -1295,6 +1327,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -1376,6 +1410,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
@@ -1457,6 +1493,8 @@ jobs:
       if: always()
       name: Run `package ::` with repo-default version
       run: ' pants package ::'
+    - name: Kill pantsd
+      run: pkill -lf pantsd
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: always()
