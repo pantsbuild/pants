@@ -55,6 +55,10 @@ def create_parser() -> argparse.ArgumentParser:
         required=True,
         help="The GitHub username of the person managing this release",
     )
+    parser.add_argument(
+        "--log-level",
+        default="WARNING",
+    )
     return parser
 
 
@@ -269,6 +273,8 @@ def commit_and_pr(release_info: ReleaseInfo, formatted: Formatted, release_manag
 
 def main() -> None:
     args = create_parser().parse_args()
+    logging.basicConfig(level=args.log_level)
+
     release_info = ReleaseInfo.determine(args.new)
 
     formatted = update_changelog(release_info)
@@ -278,5 +284,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARNING)
     main()
