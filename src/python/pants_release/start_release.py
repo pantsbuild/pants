@@ -200,14 +200,7 @@ def splice_into_file(release_info: ReleaseInfo, formatted: Formatted) -> None:
     file_name.write_text(splice(existing_contents, formatted.external))
 
 
-def bump_version_if_required(release_info: ReleaseInfo) -> None:
-    if release_info.branch == "main":
-        VERSION_PATH.write_text(f"{release_info.version}\n")
-
-
-def main() -> None:
-    args = create_parser().parse_args()
-    release_info = ReleaseInfo.determine(args.new)
+def update_changelog(release_info: ReleaseInfo) -> Formatted:
     branch_sha = git_fetch(release_info.branch)
     date = datetime.date.today()
     entries = [prepare_sha(sha) for sha in relevant_shas(branch_sha)]
@@ -215,7 +208,20 @@ def main() -> None:
     formatted = format_notes(release_info, entries, date)
     splice_into_file(release_info, formatted)
 
-    bump_version_if_required(release_info)
+    return formatted
+
+
+def update_version(release_info: ReleaseInfo) -> None:
+    if release_info.branch == "main":
+        VERSION_PATH.write_text(f"{release_info.version}\n")
+
+
+def main() -> None:
+    args = create_parser().parse_args()
+    release_info = ReleaseInfo.determine(args.new)
+
+    formatted = update_changelog(release_info)
+    update_version(release_info)
 
     print(f"\nCommit {release_info.notes_file_name()} and create a PR.\n\n{formatted.internal}")
 
