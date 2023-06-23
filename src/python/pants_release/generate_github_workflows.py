@@ -1201,6 +1201,7 @@ PUBLIC_REPOS = [
     Repo(name="mitodl/ol-infrastructure", goals=[DefaultGoals.package]),
     Repo(
         name="mitodl/ol-django",
+        setup_commands="sudo apt-get install pkg-config libxml2-dev libxmlsec1-dev libxmlsec1-openssl",
         goals=[DefaultGoals.package],
     ),
     Repo(
