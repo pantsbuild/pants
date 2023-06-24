@@ -411,12 +411,12 @@ Documentation
 -------------
 
 User documentation uploaded to the [Pantsbuild web docs site](https://www.pantsbuild.org/docs) consists of two sections:
-* the reference docs that are generated from docstrings in the source code
+* the reference docs that are generated from help strings in the source code
 * the guides that are generated from the `docs/` directory's Markdown files.
 
 ### Reference docs
 
-Not every docstring will make it to the website: currently only docstrings for global options, goals, subsystems, and targets are published. Please be extra vigilant when writing these and remember that docstrings are going to be rendered as Markdown. 
+Not every help string will make it to the website: currently only help strings for global options, goals, subsystems, and targets are published. Please be extra vigilant when writing these and remember that they are going to be rendered as Markdown. 
 
 It may be helpful to consider the following:
 
@@ -427,9 +427,9 @@ It may be helpful to consider the following:
 * to create a codeblock, use 4 space indentation (no need for triple backticks) and add one empty line between the code block and the text
 * make sure to use backticks to highlight config sections, command-line arguments, target names, and inline code examples.    
 
-It may be difficult to confirm the accuracy of text formatting in plain Python, so you may want to generate the relevant Markdown files to be able to preview them to confirm your docstrings are rendered as expected. The docstrings can be converted into Markdown files for visual inspection using a custom build script.
+It may be difficult to confirm the accuracy of text formatting in plain Python, so you may want to generate the relevant Markdown files to be able to preview them to confirm your help strings are rendered as expected. They can be converted into Markdown files for visual inspection using a custom build script.
 
-You can run these commands to convert docstrings to Markdown files for the `main` and your local feature branch to identify the changed files and then preview only the relevant files to confirm the rendering makes sense.
+You can run these commands to convert help strings to Markdown files for the `main` and your local feature branches to identify the changed files and then preview only the relevant files to confirm the rendering makes sense.
 
 ```text
 $ git checkout main
