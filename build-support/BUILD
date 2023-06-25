@@ -4,7 +4,7 @@
 shell_sources(sources=["*.sh", "pants_venv"])
 
 resources(
-    name='common_script',
+    name="common_script",
     sources=["common.sh"],
 )
 

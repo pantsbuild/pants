@@ -79,7 +79,7 @@ def test_determine_python(create_test_script):
         pyenv_shim = hack_pyenv_exe_dir / "pythonhack-pyenv"
         pyenv_shim.write_text(
             dedent(
-                f"""#!/usr/bin/env bash
+                """#!/usr/bin/env bash
         echo >&2 'pyenv: pythonhack-pyenv: command not found'
         """
             )
