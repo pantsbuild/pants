@@ -33,7 +33,7 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
-from pants.option.option_types import BoolOption, StrListOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 
 logger = logging.getLogger(__name__)
 
@@ -48,38 +48,37 @@ class SystemBinariesSubsystem(Subsystem):
     options_scope = "system-binaries"
     help = "System binaries related settings."
 
-    _SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
+    _SEARCH_PATHS = (
+        "/usr/bin",
+        "/bin",
+        "/usr/local/bin",
+        "/opt/homebrew/bin",
+        "/nix/var/nix/profiles/default/bin",
+        "/run/current-system/sw/bin",
+    )
+    _SEARCH_PATH = ":".join(_SEARCH_PATHS)
 
-    _system_binary_paths = StrListOption(
-        default=[*_SEARCH_PATHS],
-        help="Paths to search for system binaries.",
+    prepend_path = StrOption(
+        default=None, help=f"PATH to prepend to the default path. ({_SEARCH_PATH})"
     )
 
-    _ENV_PATH: str
-
-    use_environment_path = BoolOption(
-        default=False,
-        help="Search the current environment's PATH for binaries before system-binary-paths.",
+    default_path = StrOption(
+        default=_SEARCH_PATH,
+        help="Paths to search for system binaries. Overrides default path.",
     )
 
-    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
-        env_vars_used_by_options = ("PATH",)
-        executable_search_paths_help = softwrap(
-            """
-            The PATH value that will be used to find system binaries.
-            """
-        )
+    # use_environment_path = BoolOption(
+    #     default=False,
+    #     help="Search the current environment's PATH for binaries before system-binary-paths.",
+    # )
 
     @property
     def system_binary_paths(self) -> SearchPath:  # tuple[str, ...]:
-        if self.use_environment_path:
-            # Can't get this to work. I figure it's because self.EnvironmentAware isn't the same one the rules use... sighhh
-            path = self.EnvironmentAware._options_env.get("PATH")
-            if path:
-                return SearchPath(path.split(os.pathsep))
-
-        # path unset falls through, maybe it should error?
-        return SearchPath(self._system_binary_paths)
+        paths = [path for path in self.default_path.split(":")]
+        if self.prepend_path:
+            prepended = self.prepend_path.split(":")
+            return SearchPath([*prepended, *paths])
+        return SearchPath(paths)
 
 
 @dataclass(frozen=True)

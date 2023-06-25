@@ -22,7 +22,8 @@ from pants.core.util_rules.adhoc_process_support import (
     ResolveExecutionDependenciesRequest,
 )
 from pants.core.util_rules.system_binaries import (
-    SEARCH_PATHS,
+    SearchPath,
+    SystemBinariesSubsystem,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
@@ -58,13 +59,11 @@ class SystemBinaryFieldSet(RunFieldSet):
 async def _find_binary(
     address: Address,
     binary_name: str,
-    extra_search_paths: Iterable[str],
+    search_paths: SearchPath,
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
 ) -> BinaryPath:
-    search_paths = tuple(extra_search_paths) + SEARCH_PATHS
-
     binaries = await Get(
         BinaryPaths,
         BinaryPathRequest(
@@ -128,14 +127,18 @@ async def _find_binary(
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_system_binary_run_request(field_set: SystemBinaryFieldSet) -> RunRequest:
+async def create_system_binary_run_request(
+    field_set: SystemBinaryFieldSet, system_binaries: SystemBinariesSubsystem
+) -> RunRequest:
     assert field_set.name.value is not None
     extra_search_paths = field_set.extra_search_paths.value or ()
+
+    search_paths = SearchPath((*extra_search_paths, *system_binaries.system_binary_paths))
 
     path = await _find_binary(
         field_set.address,
         field_set.name.value,
-        extra_search_paths,
+        search_paths,
         field_set.fingerprint_pattern.value,
         field_set.fingerprint_argv.value,
         field_set.fingerprint_dependencies.value,
