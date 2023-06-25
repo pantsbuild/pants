@@ -16,9 +16,13 @@ from typing import Iterable, Mapping, Sequence
 from typing_extensions import Self
 
 from pants.base.deprecated import warn_or_error
+from pants.option.subsystem import Subsystem
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.util_rules.environments import (
+    _EnvironmentSensitiveOptionFieldMixin,
+    EnvironmentTarget,
+)
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
@@ -31,6 +35,8 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
+from python.pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
+from python.pants.option.option_types import BoolOption, StrListOption
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +46,30 @@ logger = logging.getLogger(__name__)
 
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
 SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
+
+
+class SystemBinariesSubsystem(Subsystem):
+    options_scope = "system-binaries"
+    help = "System binaries related settings."
+
+    _system_binary_paths = StrListOption(
+        default=[*SEARCH_PATHS],
+        help="Paths to search for system binaries.",
+    )
+
+    use_environment_path = BoolOption(
+        default=False,
+        help="Search the current environment's PATH for binaries before system-binary-paths.",
+    )
+
+    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
+        pass
+
+    @property
+    def system_binary_paths(self) -> tuple[str, ...]:
+        if self.use_environment_path:
+            return (*self.EnvironmentAware.executable_search_path, *self._system_binary_paths)
+        return self._system_binary_paths
 
 
 @dataclass(frozen=True)
@@ -444,7 +474,9 @@ def _create_shim(bash: str, binary: str) -> bytes:
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
-async def get_bash() -> BashBinary:
+async def get_bash(system_binaries: SystemBinariesSubsystem) -> BashBinary:
+    search_path = system_binaries.search_path()
+
     request = BinaryPathRequest(
         binary_name="bash",
         search_path=BashBinary.DEFAULT_SEARCH_PATH,
@@ -458,7 +490,11 @@ async def get_bash() -> BashBinary:
 
 
 @rule
-async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget) -> BinaryPaths:
+async def find_binary(
+    request: BinaryPathRequest,
+    env_target: EnvironmentTarget,
+    # system_binaries: SystemBinariesSubsystem,
+) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths
     # of the request we are servicing.
