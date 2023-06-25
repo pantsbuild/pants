@@ -19,10 +19,7 @@ from pants.base.deprecated import warn_or_error
 from pants.option.subsystem import Subsystem
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
-from pants.core.util_rules.environments import (
-    _EnvironmentSensitiveOptionFieldMixin,
-    EnvironmentTarget,
-)
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
@@ -45,15 +42,16 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------------------------------
 
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
-SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
 
 class SystemBinariesSubsystem(Subsystem):
     options_scope = "system-binaries"
     help = "System binaries related settings."
 
+    _SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
+
     _system_binary_paths = StrListOption(
-        default=[*SEARCH_PATHS],
+        default=[*_SEARCH_PATHS],
         help="Paths to search for system binaries.",
     )
 
@@ -66,10 +64,12 @@ class SystemBinariesSubsystem(Subsystem):
         pass
 
     @property
-    def system_binary_paths(self) -> tuple[str, ...]:
+    def system_binary_paths(self) -> DeduplicatedCollection[str]:  # tuple[str, ...]:
         if self.use_environment_path:
-            return (*self.EnvironmentAware.executable_search_path, *self._system_binary_paths)
-        return self._system_binary_paths
+            return SearchPath(
+                *self.EnvironmentAware.executable_search_path, *self._system_binary_paths
+            )
+        return SearchPath(self._system_binary_paths)
 
 
 @dataclass(frozen=True)
@@ -475,11 +475,11 @@ def _create_shim(bash: str, binary: str) -> bytes:
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
 async def get_bash(system_binaries: SystemBinariesSubsystem) -> BashBinary:
-    search_path = system_binaries.search_path()
+    search_path = system_binaries.system_binary_paths
 
     request = BinaryPathRequest(
         binary_name="bash",
-        search_path=BashBinary.DEFAULT_SEARCH_PATH,
+        search_path=search_path,
         test=BinaryPathTest(args=["--version"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
