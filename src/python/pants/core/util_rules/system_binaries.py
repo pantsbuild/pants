@@ -61,7 +61,11 @@ class SystemBinariesSubsystem(Subsystem):
     )
 
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
-        pass
+        executable_search_paths_help = softwrap(
+            """
+            The PATH value that will be used to find system binaries.
+            """
+        )
 
     @property
     def system_binary_paths(self) -> DeduplicatedCollection[str]:  # tuple[str, ...]:
