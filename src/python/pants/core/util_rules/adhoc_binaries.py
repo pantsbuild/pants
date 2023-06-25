@@ -10,7 +10,7 @@ from textwrap import dedent  # noqa: PNT20
 
 from pants.core.subsystems.python_bootstrap import PythonBootstrapSubsystem  # noqa: PNT20
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.core.util_rules.system_binaries import SEARCH_PATHS, TarBinary
+from pants.core.util_rules.system_binaries import SystemBinariesSubsystem, TarBinary
 from pants.engine.fs import DownloadFile
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.selectors import Get
@@ -66,6 +66,7 @@ async def download_python_binary(
     platform: Platform,
     tar_binary: TarBinary,
     python_bootstrap: PythonBootstrapSubsystem,
+    system_binaries: SystemBinariesSubsystem,
 ) -> _PythonBuildStandaloneBinary:
     url, fingerprint, bytelen = python_bootstrap.internal_python_build_standalone_info[
         platform.value
@@ -88,7 +89,7 @@ async def download_python_binary(
         Process(
             argv=[tar_binary.path, "-xvf", filename],
             input_digest=python_archive,
-            env={"PATH": os.pathsep.join(SEARCH_PATHS)},
+            env={"PATH": os.pathsep.join(system_binaries.system_binary_paths)},
             description="Extract Python",
             level=LogLevel.DEBUG,
             output_directories=("python",),

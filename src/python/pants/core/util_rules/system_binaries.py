@@ -32,8 +32,8 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
-from python.pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
-from python.pants.option.option_types import BoolOption, StrListOption
+from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
+from pants.option.option_types import BoolOption, StrListOption
 
 logger = logging.getLogger(__name__)
 
