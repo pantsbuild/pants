@@ -55,7 +55,7 @@ function determine_python() {
   version="${_PANTS_SOURCE_PY_VERSION:-3.9}"
   interpreter_path="$(command -v "python${version}")"
   if [[ -z "${interpreter_path}" ]]; then
-    log "pants: Failed to find a Python ${version} interpreter" && return 1
+    log "pants: Failed to find a Python ${version} interpreter.\nYou may explicitly select a Python interpreter path by setting \$PY" && return 1
   fi
   # Check if the Python version is installed via Pyenv but not activated.
   if [[ "$("${interpreter_path}" --version 2>&1 > /dev/null)" == "pyenv: python${version}"* ]]; then

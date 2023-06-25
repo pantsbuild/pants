@@ -71,7 +71,7 @@ def test_determine_python(create_test_script):
     assert result.returncode == 1
     assert (
         result.stderr.decode().rstrip("\n")
-        == "pants: Failed to find a Python version-should-not-exist interpreter"
+        == "pants: Failed to find a Python version-should-not-exist interpreter.\nYou may explicitly select a Python interpreter path by setting $PY"
     )
 
     with tempfile.TemporaryDirectory() as td:
