@@ -55,12 +55,15 @@ class SystemBinariesSubsystem(Subsystem):
         help="Paths to search for system binaries.",
     )
 
+    _ENV_PATH: str
+
     use_environment_path = BoolOption(
         default=False,
         help="Search the current environment's PATH for binaries before system-binary-paths.",
     )
 
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
+        env_vars_used_by_options = ("PATH",)
         executable_search_paths_help = softwrap(
             """
             The PATH value that will be used to find system binaries.
@@ -68,11 +71,14 @@ class SystemBinariesSubsystem(Subsystem):
         )
 
     @property
-    def system_binary_paths(self) -> DeduplicatedCollection[str]:  # tuple[str, ...]:
+    def system_binary_paths(self) -> SearchPath:  # tuple[str, ...]:
         if self.use_environment_path:
-            return SearchPath(
-                *self.EnvironmentAware.executable_search_path, *self._system_binary_paths
-            )
+            # Can't get this to work. I figure it's because self.EnvironmentAware isn't the same one the rules use... sighhh
+            path = self.EnvironmentAware._options_env.get("PATH")
+            if path:
+                return SearchPath(path.split(os.pathsep))
+
+        # path unset falls through, maybe it should error?
         return SearchPath(self._system_binary_paths)
 
 
