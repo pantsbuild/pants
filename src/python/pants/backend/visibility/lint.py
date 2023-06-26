@@ -13,6 +13,7 @@ from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
     DependenciesRuleApplication,
@@ -39,7 +40,13 @@ async def check_visibility_rule_violations(
     request: EnforceVisibilityRules.Batch, platform: Platform, run_id: RunId
 ) -> LintResult:
     all_dependencies = await MultiGet(
-        Get(Addresses, DependenciesRequest(field_set.dependencies, include_special_cased_deps=True))
+        Get(
+            Addresses,
+            DependenciesRequest(
+                field_set.dependencies,
+                should_traverse_deps_predicate=AlwaysTraverseDeps(),
+            ),
+        )
         for field_set in request.elements
     )
     all_dependencies_rule_action = await MultiGet(

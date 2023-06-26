@@ -281,7 +281,16 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
     assert "assets:resources" not in caplog.text
 
 
-def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("ics", "runtime"),
+    [
+        pytest.param(["==3.7.*"], None, id="runtime inferred from ICs"),
+        pytest.param(None, "python3.7", id="runtime explicitly set"),
+    ],
+)
+def test_create_hello_world_lambda(
+    ics: list[str] | None, runtime: None | str, rule_runner: PythonRuleRunner
+) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -293,20 +302,20 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             "src/python/foo/bar/BUILD": dedent(
-                """
+                f"""
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
-                python_sources()
+                python_sources(interpreter_constraints={ics!r})
 
                 python_aws_lambda_function(
                     name='lambda',
                     handler='foo.bar.hello_world:handler',
-                    runtime="python3.7",
+                    runtime={runtime!r},
                 )
                 python_aws_lambda_function(
                     name='slimlambda',
                     include_requirements=False,
                     handler='foo.bar.hello_world:handler',
-                    runtime="python3.7",
+                    runtime={runtime!r},
                 )
                 """
             ),
@@ -316,7 +325,10 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=("    Handler: lambda_function.handler",),
+        expected_extra_log_lines=(
+            "    Runtime: python3.7",
+            "    Handler: lambda_function.handler",
+        ),
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
 
@@ -331,7 +343,10 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=("    Handler: lambda_function.handler",),
+        expected_extra_log_lines=(
+            "    Runtime: python3.7",
+            "    Handler: lambda_function.handler",
+        ),
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
 
@@ -379,7 +394,7 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=(),
+        expected_extra_log_lines=("    Runtime: python3.7",),
         layer=True,
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
@@ -394,7 +409,7 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=(),
+        expected_extra_log_lines=("    Runtime: python3.7",),
         layer=True,
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
@@ -413,11 +428,11 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
         {"BUILD": "python_aws_lambda_layer(name='lambda', runtime='python3.7')"}
     )
     with pytest.raises(
-        ExecutionError, match="The 'dependencies' field in target //:lambda must be defined"
+        ExecutionError, match="The `dependencies` field in target //:lambda must be defined"
     ):
         create_python_awslambda(
             rule_runner,
             Address("", target_name="lambda"),
-            expected_extra_log_lines=(),
+            expected_extra_log_lines=("    Runtime: python3.7",),
             layer=True,
         )

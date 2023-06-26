@@ -512,7 +512,8 @@ def _maybe_warn_deprecated_secondary_owner_semantics(
 
     if problematic_target_specs:
         warn_or_error(
-            removal_version="2.18.0.dev1",
+            # TODO(Joshua Cannon): removal at 2.18.0.dev3
+            removal_version="2.18.0.dev3",
             entity=softwrap(
                 """
                 indirectly referring to a target by using a corresponding file argument, when the

@@ -14,6 +14,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
     Targets,
@@ -114,13 +115,18 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
     destination = to_tgts.expect_single()
 
     transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([root.address], include_special_cased_deps=True)
+        TransitiveTargets,
+        TransitiveTargetsRequest(
+            [root.address], should_traverse_deps_predicate=AlwaysTraverseDeps()
+        ),
     )
 
     adjacent_targets_per_target = await MultiGet(
         Get(
             Targets,
-            DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
+            DependenciesRequest(
+                tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
+            ),
         )
         for tgt in transitive_targets.closure
     )

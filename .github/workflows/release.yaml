@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
-# To change, edit `build-support/bin/generate_github_workflows.py` and run:
-#   ./pants run build-support/bin/generate_github_workflows.py
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
 
 
 jobs:
@@ -44,9 +44,9 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
-        ./pants run build-support/bin/release.py -- build-wheels
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
         '
     - continue-on-error: true
@@ -54,13 +54,13 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-Linux-ARM64
-        path: .pants.d/pants.log
+        name: logs-wheels-Linux-ARM64
+        path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -103,9 +103,9 @@ jobs:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
-        ./pants run build-support/bin/release.py -- build-wheels
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
         '
     - continue-on-error: true
@@ -113,13 +113,13 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-Linux-x86_64
-        path: .pants.d/pants.log
+        name: logs-wheels-Linux-x86_64
+        path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -142,7 +142,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.69.0-*
+        path: '~/.rustup/toolchains/1.70.0-*
 
           ~/.rustup/update-hashes
 
@@ -162,9 +162,9 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
-        ./pants run build-support/bin/release.py -- build-wheels
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
         '
     - continue-on-error: true
@@ -172,13 +172,13 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macOS10-15-x86_64
-        path: .pants.d/pants.log
+        name: logs-wheels-macOS10-15-x86_64
+        path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -201,7 +201,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.69.0-*
+        path: '~/.rustup/toolchains/1.70.0-*
 
           ~/.rustup/update-hashes
 
@@ -221,9 +221,9 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
+      run: './pants run src/python/pants_release/release.py -- build-local-pex
 
-        ./pants run build-support/bin/release.py -- build-wheels
+        ./pants run src/python/pants_release/release.py -- build-wheels
 
         '
     - continue-on-error: true
@@ -231,13 +231,13 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-wheels-macOS11-ARM64
-        path: .pants.d/pants.log
+        name: logs-wheels-macOS11-ARM64
+        path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   determine_ref:
     if: github.repository_owner == 'pantsbuild'
@@ -278,7 +278,8 @@ jobs:
     - env:
         MODE: debug
       name: Fetch and stabilize wheels
-      run: ./pants run build-support/bin/release.py -- fetch-and-stabilize --dest=dest/pypi_release
+      run: ./pants run src/python/pants_release/release.py -- fetch-and-stabilize
+        --dest=dest/pypi_release
     - name: Create Release -> Commit Mapping
       run: 'tag="${{ needs.determine_ref.outputs.build-ref }}"
 
@@ -302,7 +303,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3
-      run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
+      run: ./pants run src/python/pants_release/deploy_to_s3.py --scope tags/pantsbuild.pants
 name: Release
 'on':
   push:

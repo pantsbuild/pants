@@ -129,7 +129,7 @@ mod tests {
 
   async fn read_mock_files(input: Vec<PathBuf>, posix_fs: &Arc<PosixFS>) -> Vec<Stat> {
     input
-      .into_iter()
+      .iter()
       .map(|p| posix_fs.stat_sync(p).unwrap().unwrap())
       .collect()
   }

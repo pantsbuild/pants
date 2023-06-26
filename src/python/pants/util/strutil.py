@@ -260,6 +260,9 @@ def softwrap(text: str) -> str:
             (If your indented line needs to be continued due to it being longer than the suggested
             width, use trailing backlashes to line-continue the line. Because we squash multiple
             spaces, this will "just work".)
+
+    To keep the numbered or bullet lists indented without converting to a code block,
+    make sure to use 2 spaces (and not 4).
     """
     if not text:
         return text

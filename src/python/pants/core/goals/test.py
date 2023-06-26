@@ -11,6 +11,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
 
+from pants.base.deprecated import deprecated
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -64,7 +65,7 @@ from pants.option.option_types import BoolOption, EnumOption, IntOption, StrList
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized
+from pants.util.memo import memoized, memoized_property
 from pants.util.meta import classproperty
 from pants.util.strutil import help_text, softwrap
 
@@ -76,9 +77,9 @@ class TestResult(EngineAwareReturnType):
     # A None exit_code indicates a backend that performs its own test discovery/selection
     # (rather than delegating that to the underlying test tool), and discovered no tests.
     exit_code: int | None
-    stdout: str
+    stdout_bytes: bytes
     stdout_digest: FileDigest
-    stderr: str
+    stderr_bytes: bytes
     stderr_digest: FileDigest
     addresses: tuple[Address, ...]
     output_setting: ShowOutput
@@ -105,8 +106,8 @@ class TestResult(EngineAwareReturnType):
         """Used when we do test discovery ourselves, and we didn't find any."""
         return TestResult(
             exit_code=None,
-            stdout="",
-            stderr="",
+            stdout_bytes=b"",
+            stderr_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=(address,),
@@ -121,8 +122,8 @@ class TestResult(EngineAwareReturnType):
         """Used when we do test discovery ourselves, and we didn't find any."""
         return TestResult(
             exit_code=None,
-            stdout="",
-            stderr="",
+            stdout_bytes=b"",
+            stderr_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=tuple(field_set.address for field_set in batch.elements),
@@ -144,9 +145,9 @@ class TestResult(EngineAwareReturnType):
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
-            stdout=process_result.stdout.decode(),
+            stdout_bytes=process_result.stdout,
             stdout_digest=process_result.stdout_digest,
-            stderr=process_result.stderr.decode(),
+            stderr_bytes=process_result.stderr,
             stderr_digest=process_result.stderr_digest,
             addresses=(address,),
             output_setting=output_setting,
@@ -170,9 +171,9 @@ class TestResult(EngineAwareReturnType):
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
-            stdout=process_result.stdout.decode(),
+            stdout_bytes=process_result.stdout,
             stdout_digest=process_result.stdout_digest,
-            stderr=process_result.stderr.decode(),
+            stderr_bytes=process_result.stderr,
             stderr_digest=process_result.stderr_digest,
             addresses=tuple(field_set.address for field_set in batch.elements),
             output_setting=output_setting,
@@ -183,6 +184,20 @@ class TestResult(EngineAwareReturnType):
             log_extra_output=log_extra_output,
             partition_description=batch.partition_metadata.description,
         )
+
+    @memoized_property
+    @deprecated(
+        removal_version="2.19.0.dev0", hint="Use `TestResult.stdout_bytes` instead of `stdout`."
+    )
+    def stdout(self) -> str:
+        return self.stdout_bytes.decode(errors="replace")
+
+    @memoized_property
+    @deprecated(
+        removal_version="2.19.0.dev0", hint="Use `TestResult.stderr_bytes` instead of `stderr`."
+    )
+    def stderr(self) -> str:
+        return self.stderr_bytes.decode(errors="replace")
 
     @property
     def description(self) -> str:
@@ -236,10 +251,10 @@ class TestResult(EngineAwareReturnType):
         ):
             return message
         output = ""
-        if self.stdout:
-            output += f"\n{self.stdout}"
-        if self.stderr:
-            output += f"\n{self.stderr}"
+        if self.stdout_bytes:
+            output += f"\n{self.stdout_bytes.decode(errors='replace')}"
+        if self.stderr_bytes:
+            output += f"\n{self.stderr_bytes.decode(errors='replace')}"
         if output:
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
@@ -521,7 +536,7 @@ class TestSubsystem(GoalSubsystem):
             The interactive process used will be immediately blocked waiting for a client before
             continuing.
 
-            This option implies --debug.
+            This option implies `--debug`.
             """
         ),
     )
@@ -546,7 +561,7 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
-    report = BoolOption(default=False, advanced=True, help="Write test reports to --report-dir.")
+    report = BoolOption(default=False, advanced=True, help="Write test reports to `--report-dir`.")
     default_report_path = str(PurePath("{distdir}", "test", "reports"))
     _report_dir = StrOption(
         default=default_report_path,
@@ -565,7 +580,7 @@ class TestSubsystem(GoalSubsystem):
             discarded.
 
             Useful for splitting large numbers of test files across multiple machines in CI.
-            For example, you can run three shards with --shard=0/3, --shard=1/3, --shard=2/3.
+            For example, you can run three shards with `--shard=0/3`, `--shard=1/3`, `--shard=2/3`.
 
             Note that the shards are roughly equal in size as measured by number of files.
             No attempt is made to consider the size of different files, the time they have
@@ -613,13 +628,13 @@ class TestSubsystem(GoalSubsystem):
             and then this may be further divided into smaller batches, based on this option.
             This is done:
 
-                1. to avoid OS argument length limits (in processes which don't support argument files)
-                2. to support more stable cache keys than would be possible if all files were operated \
-                    on in a single batch
-                3. to allow for parallelism in test runners which don't have internal \
-                    parallelism, or -- if they do support internal parallelism -- to improve scheduling \
-                    behavior when multiple processes are competing for cores and so internal parallelism \
-                    cannot be used perfectly
+              1. to avoid OS argument length limits (in processes which don't support argument files)
+              2. to support more stable cache keys than would be possible if all files were operated \
+                 on in a single batch
+              3. to allow for parallelism in test runners which don't have internal \
+                 parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+                 behavior when multiple processes are competing for cores and so internal parallelism \
+                 cannot be used perfectly
 
             In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
             and so this value is only a "target" max batch size (rather than an exact value).

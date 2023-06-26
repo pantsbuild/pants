@@ -12,9 +12,11 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
+    PythonFaaSKnownRuntime,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
@@ -24,7 +26,6 @@ from pants.engine.target import (
     BoolField,
     Field,
     InvalidFieldException,
-    InvalidTargetException,
     Target,
 )
 from pants.util.docutil import doc_url
@@ -93,11 +94,21 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         The identifier of the AWS Lambda runtime to target (pythonX.Y).
         See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
 
-        In general you'll want to define either a `runtime` or one `complete_platforms` but not
-        both. Specifying a `runtime` is simpler, but less accurate. If you have issues either
+        N.B.: only one of this and `complete_platforms` can be set. If `runtime` is set, a default complete
+        platform is chosen, if one is known for that runtime. If you have issues either
         packaging the AWS Lambda PEX or running it as a deployed AWS Lambda function, you should try
-        using `complete_platforms` instead.
+        using an explicit `complete_platforms` instead.
         """
+    )
+
+    # https://gallery.ecr.aws/lambda/python
+    known_runtimes_docker_repo = "public.ecr.aws/lambda/python"
+    known_runtimes = (
+        PythonFaaSKnownRuntime(3, 6, "3.6"),
+        PythonFaaSKnownRuntime(3, 7, "3.7"),
+        PythonFaaSKnownRuntime(3, 8, "3.8-x86_64"),
+        PythonFaaSKnownRuntime(3, 9, "3.9-x86_64"),
+        PythonFaaSKnownRuntime(3, 10, "3.10-x86_64"),
     )
 
     @classmethod
@@ -123,6 +134,10 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
 
+    @classmethod
+    def from_interpreter_version(cls, py_major: int, py_minor: int) -> str:
+        return f"python{py_major}.{py_minor}"
+
 
 class PythonAwsLambdaLayerDependenciesField(PythonFaaSDependencies):
     required = True
@@ -140,15 +155,24 @@ class _AWSLambdaBaseTarget(Target):
     )
 
     def validate(self) -> None:
-        if self[PythonAwsLambdaRuntime].value is None and not self[PexCompletePlatformsField].value:
-            raise InvalidTargetException(
+        has_runtime = self[PythonAwsLambdaRuntime].value is not None
+        has_complete_platforms = self[PexCompletePlatformsField].value is not None
+
+        runtime_alias = self[PythonAwsLambdaRuntime].alias
+        complete_platforms_alias = self[PexCompletePlatformsField].alias
+
+        if has_runtime and has_complete_platforms:
+            warn_or_error(
+                "2.19.0.dev0",
+                f"using both `{runtime_alias}` and `{complete_platforms_alias}` in the `{self.alias}` target {self.address}",
                 softwrap(
                     f"""
-                    The `{self.alias}` target {self.address} must specify either a
-                    `{self[PythonAwsLambdaRuntime].alias}` or
-                    `{self[PexCompletePlatformsField].alias}` or both.
+                    The `{complete_platforms_alias}` now takes precedence over the `{runtime_alias}` field, if
+                    it is set. Remove the `{runtime_alias}` field to only use the `{complete_platforms_alias}`
+                    value, or remove the `{complete_platforms_alias}` field to use the default platform
+                    implied by `{runtime_alias}`.
                     """
-                )
+                ),
             )
 
 

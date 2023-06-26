@@ -10,13 +10,29 @@ from textwrap import dedent
 import pytest
 
 from pants.core.goals import package
-from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, Package, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    Package,
+    PackageFieldSet,
+    TraverseIfNotPackageTarget,
+)
+from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import rule
-from pants.engine.target import StringField, Target
-from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    StringField,
+    Target,
+    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class MockTypeField(StringField):
@@ -52,9 +68,13 @@ class MockTypeField(StringField):
         raise ValueError(f"don't understand {self.value}")
 
 
+class MockDependenciesField(Dependencies):
+    pass
+
+
 class MockTarget(Target):
     alias = "mock"
-    core_fields = (MockTypeField,)
+    core_fields = (MockTypeField, MockDependenciesField)
 
 
 @dataclass(frozen=True)
@@ -81,6 +101,8 @@ def rule_runner() -> RuleRunner:
             *package.rules(),
             package_mock_target,
             UnionRule(PackageFieldSet, MockPackageFieldSet),
+            QueryRule(Targets, [DependenciesRequest]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[MockTarget],
     )
@@ -185,3 +207,48 @@ def test_package_replace_existing(
         assert set((dist_base / "x").iterdir()) == {a, b}
         assert a.read_text() == "directory: a"
         assert b.read_text() == "directory: b"
+
+
+def test_transitive_targets_without_traversing_packages(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                mock(name='w', type='single_file')
+                mock(name='x', type='single_file')
+                mock(name='y', type='single_file', dependencies=[':w', ':x'])
+                mock(name='z', type='single_file', dependencies=[':y'])
+                """
+            )
+        }
+    )
+    w = rule_runner.get_target(Address("src", target_name="w"))
+    x = rule_runner.get_target(Address("src", target_name="x"))
+    y = rule_runner.get_target(Address("src", target_name="y"))
+    z = rule_runner.get_target(Address("src", target_name="z"))
+
+    direct_deps = rule_runner.request(Targets, [DependenciesRequest(z[MockDependenciesField])])
+    assert direct_deps == Targets([y])
+
+    union_membership = rule_runner.request(UnionMembership, ())
+    transitive_targets = rule_runner.request(
+        TransitiveTargets,
+        [
+            TransitiveTargetsRequest(
+                [z.address],
+                should_traverse_deps_predicate=TraverseIfNotPackageTarget(
+                    roots=[z.address],
+                    union_membership=union_membership,
+                ),
+            )
+        ],
+    )
+    assert transitive_targets.roots == (z,)
+    # deps: z -> y -> x,w
+    # z should not see w or x as a transitive dep because y is also a package.
+    assert w not in transitive_targets.dependencies
+    assert x not in transitive_targets.dependencies
+    assert w not in transitive_targets.closure
+    assert x not in transitive_targets.closure
+    assert transitive_targets.dependencies == FrozenOrderedSet([y])
+    assert transitive_targets.closure == FrozenOrderedSet([z, y])

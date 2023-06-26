@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "process_execution"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -16,7 +16,9 @@ bytes = "1.2"
 cache = { path = "../cache" }
 derivative = "2.2"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["log"] }
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features = [
+  "log",
+] }
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures = "0.3"
