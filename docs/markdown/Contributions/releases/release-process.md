@@ -81,59 +81,34 @@ The process may fail in two ways:
 - The cherry-picking process failed, and tagged the PR with `auto-cherry-picking-failed`: follow the instructions in the comment on the pull request. (This likely means there's merge conflicts that require manual resolution.)
 - the cherry-pick didn't (yet) run: trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
 
-### 1. Prepare the changelog
+### 1. Start the release
 
-Update the release page in `src/python/pants/notes` for this release series, e.g. update `src/python/pants/notes/2.9.x.md`.
+From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username` with the relevant version and your own GitHub username.
 
-Run `git fetch --all --tags` to be sure you have the latest release tags available locally.
+This will create a pull request that:
 
-From the `main` branch, run `./pants run src/python/pants_release/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions.
-
-This will update the release notes file, for you to tweak and commit. The script also prints an `Internal` section to paste into a comment on the prep PR.
-
-You are encouraged to fix typos and tweak change descriptions for clarity to users. Ensure that there is exactly one blank line between descriptions, headers etc.
+1. updates release notes (remember to check over the changes and follow the instructions in the PR to make any updates)
+2. updates contributors
+3. bumps the `VERSION` on `main`, if appropriate
 
 > 🚧 Reminder: always do this against the `main` branch
-> 
+>
 > Even if you are preparing notes for a release candidate, always prepare the notes in a branch based on `main` and, later, target your PR to merge with `main`.
 
-> 📘 See any weird PR titles?
-> 
-> Sometimes, committers accidentally use the wrong title when squashing and merging because GitHub pulls the title from the commit title when there is only one commit. 
-> 
-> If you see a vague or strange title like "fix bug", open the original PR to see if the PR title is more descriptive. If it is, please use the more descriptive title instead.
 
-### 2. Update `CONTRIBUTORS.md`
+### 2. Merge the pull request
 
-Run `./pants run build-support/bin/contributors.py`
-
-Take note of any new contributors since the last release so that you can give a shoutout in the announcement email.
-
-If this is a stable release, then you can use `git diff` to find all new contributors since the previous stable release, to give them all a shoutout in the stable release email. E.g.,
-
-```
-git diff release_2.8.0..release_2.9.0 CONTRIBUTORS.md
-```
-
-### 3. `dev` and `a0` - bump the `VERSION`
-
-Change `src/python/pants/VERSION` to the new release, e.g. `2.12.0.dev0`. If you encounter an `a0` version on `main`, then the next release will be for a new release series (i.e. you'll bump from `2.12.0a0` to `2.13.0.dev0`).
-
-### 4. Post the prep to GitHub
-
-Open a pull request on GitHub to merge into `main`. Post the PR to the `#development` in Slack.  
-
-Merge once approved and green.
+Post the PR to the `#development` in Slack. Merge once approved and green.
 
 > 🚧 Watch out for any recently landed PRs
-> 
-> From the time you put up your release prep until you hit "merge", be careful that no one merges any commits into main. 
-> 
+>
+> From the time you put up your release prep until you hit "merge", be careful that no one merges any commits into main.
+>
 > If they do—and you're doing a `dev` or `a0` release—you should merge `main` into your PR and update the changelog with their changes. It's okay if the changes were internal only, but any public changes must be added to the changelog.
-> 
+>
 > Once you click "merge", it is safe for people to merge changes again.
 
-### 5a. `a0` - create a new Git branch
+### 3a. `a0` - create a new Git branch
 
 For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running the below. Make sure you are on your release commit before doing this.
 
@@ -142,7 +117,7 @@ $ git checkout -b 2.9.x
 $ git push upstream 2.9.x
 ```
 
-### 5b. release candidates - cherry-pick and bump the VERSION
+### 3b. release candidates - cherry-pick and bump the VERSION
 
 1. Checkout from `main` into the release branch, e.g. `2.9.x`.
 2. Cherry-pick the release prep using `git cherry-pick <sha>`.
