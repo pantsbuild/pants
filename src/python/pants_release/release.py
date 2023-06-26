@@ -25,9 +25,10 @@ from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
 import requests
-from common import banner, die, green
 from packaging.version import Version
-from reversion import reversion
+from pants_release.common import banner, die, green
+from pants_release.git import git, git_rev_parse
+from pants_release.reversion import reversion
 
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
@@ -65,10 +66,6 @@ _known_packages = [
     "pantsbuild.pants.contrib.thrifty",
     "pantsbuild.pants.testinfra",
 ]
-
-_expected_owners = {"benjyw", "John.Sirois", "stuhood"}
-
-_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi", "kaos"}
 
 
 # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
@@ -382,28 +379,13 @@ PACKAGES = sorted({PANTS_PKG, TESTUTIL_PKG})
 
 class _Constants:
     def __init__(self) -> None:
-        self._head_sha = (
-            subprocess.run(
-                ["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE, check=True
-            )
-            .stdout.decode()
-            .strip()
-        )
-        self._head_committer_date = (
-            subprocess.run(
-                [
-                    "git",
-                    "show",
-                    "--no-patch",
-                    "--format=%cd",
-                    "--date=format:%Y%m%d%H%M",
-                    self._head_sha,
-                ],
-                stdout=subprocess.PIPE,
-                check=True,
-            )
-            .stdout.decode()
-            .strip()
+        self._head_sha = git_rev_parse("HEAD")
+        self._head_committer_date = git(
+            "show",
+            "--no-patch",
+            "--format=%cd",
+            "--date=format:%Y%m%d%H%M",
+            self._head_sha,
         )
         self.pants_version_file = Path("src/python/pants/VERSION")
         self.pants_stable_version = self.pants_version_file.read_text().strip()
@@ -459,33 +441,15 @@ def get_pypi_config(section: str, option: str) -> str:
 
 
 def get_git_branch() -> str:
-    return (
-        subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], stdout=subprocess.PIPE, check=True
-        )
-        .stdout.decode()
-        .strip()
-    )
+    return git_rev_parse("HEAD", abbrev_ref=True)
 
 
 def get_pgp_key_id() -> str:
-    return (
-        subprocess.run(
-            ["git", "config", "--get", "user.signingkey"], stdout=subprocess.PIPE, check=False
-        )
-        .stdout.decode()
-        .strip()
-    )
+    return git("config", "--get", "user.signingkey", check=False)
 
 
 def get_pgp_program_name() -> str:
-    configured_name = (
-        subprocess.run(
-            ["git", "config", "--get", "gpg.program"], stdout=subprocess.PIPE, check=False
-        )
-        .stdout.decode()
-        .strip()
-    )
+    configured_name = git("config", "--get", "gpg.program", check=False)
     return configured_name or "gpg"
 
 
@@ -824,14 +788,6 @@ def build_pex(fetch: bool) -> None:
         dest = stable_dest
     green(f"Built {dest}")
 
-    # We filter out Pants options like `PANTS_CONFIG_FILES` and disable certain internal backends.
-    env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
-    env.update(DISABLED_BACKENDS_CONFIG)
-    # NB: Set `--concurrent` so that if this script is running under `pantsd`, the validation
-    # won't kill it.
-    subprocess.run([dest, "--concurrent", "--version"], env=env, check=True)
-    green(f"Validated {dest}")
-
 
 # -----------------------------------------------------------------------------------------------
 # Fetch and stabilize the versions of wheels for publishing
@@ -871,11 +827,7 @@ def tag_release() -> None:
 
 def check_clean_git_branch() -> None:
     banner("Checking for a clean Git branch")
-    git_status = (
-        subprocess.run(["git", "status", "--porcelain"], stdout=subprocess.PIPE, check=True)
-        .stdout.decode()
-        .strip()
-    )
+    git_status = git("status", "--porcelain")
     if git_status:
         die(
             softwrap(
@@ -939,21 +891,16 @@ def reversion_prebuilt_wheels(dest_dir: str) -> None:
 
 def run_tag_release() -> None:
     tag_name = f"release_{CONSTANTS.pants_stable_version}"
-    subprocess.run(
-        [
-            "git",
-            "tag",
-            "-f",
-            f"--local-user={get_pgp_key_id()}",
-            "-m",
-            f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
-            tag_name,
-        ],
-        check=True,
+    git(
+        "tag",
+        "-f",
+        f"--local-user={get_pgp_key_id()}",
+        "-m",
+        f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
+        tag_name,
+        capture_stdout=False,
     )
-    subprocess.run(
-        ["git", "push", "-f", "git@github.com:pantsbuild/pants.git", tag_name], check=True
-    )
+    git("push", "-f", "git@github.com:pantsbuild/pants.git", tag_name, capture_stdout=False)
 
 
 def upload_wheels_via_twine() -> None:
@@ -961,9 +908,6 @@ def upload_wheels_via_twine() -> None:
         [
             str(CONSTANTS.twine_venv_dir / "bin/twine"),
             "upload",
-            "--sign",
-            f"--sign-with={get_pgp_program_name()}",
-            f"--identity={get_pgp_key_id()}",
             "--skip-existing",  # Makes the upload idempotent.
             str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
         ],

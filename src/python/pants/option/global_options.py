@@ -728,7 +728,7 @@ class BootstrapOptions:
         help=softwrap(
             """
             Display the target where a log message originates in that log message's output.
-            This can be helpful when paired with --log-levels-by-target.
+            This can be helpful when paired with `--log-levels-by-target`.
             """
         ),
     )
@@ -740,7 +740,7 @@ class BootstrapOptions:
             Set a more specific logging level for one or more logging targets. The names of
             logging targets are specified in log strings when the --show-log-target option is set.
             The logging levels are one of: "error", "warn", "info", "debug", "trace".
-            All logging targets not specified here use the global log level set with --level. For example,
+            All logging targets not specified here use the global log level set with `--level`. For example,
             you can set `--log-levels-by-target='{"workunit_store": "info", "pants.engine.rules": "warn"}'`.
             """
         ),
@@ -1745,7 +1745,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
             Pants itself may add additional platform properties.
 
-            If you are using the remote_environment target mechanism, set this value as a field
+            If you are using the `remote_environment` target mechanism, set this value as a field
             on the target instead. This option will be ignored.
             """
         ),

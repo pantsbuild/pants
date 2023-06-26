@@ -75,8 +75,8 @@ class PythonSetup(Subsystem):
             These constraints are used as the default value for the `interpreter_constraints`
             field of Python targets.
 
-            Specify with requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with
-            version >=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple
+            Specify with requirement syntax, e.g. `'CPython>=2.7,<3'` (A CPython interpreter with
+            version >=2.7 AND version <3) or `'PyPy'` (A pypy interpreter of any version). Multiple
             constraint strings will be ORed together.
             """
         ),
@@ -132,7 +132,7 @@ class PythonSetup(Subsystem):
             `[isort].interpreter_constraints` to tell Pants which interpreters your code
             actually uses. See {doc_url('python-interpreter-compatibility')}.
 
-            All elements must be the minor and major Python version, e.g. '2.7' or '3.10'. Do
+            All elements must be the minor and major Python version, e.g. `'2.7'` or `'3.10'`. Do
             not include the patch version.
             """
         ),
@@ -257,8 +257,8 @@ class PythonSetup(Subsystem):
 
             Pants will validate that the interpreter constraints of your code using a
             resolve are compatible with that resolve's own constraints. For example, if your
-            code is set to use ['==3.9.*'] via the `interpreter_constraints` field, but it's
-            using a resolve whose interpreter constraints are set to ['==3.7.*'], then
+            code is set to use `['==3.9.*']` via the `interpreter_constraints` field, but it's
+            using a resolve whose interpreter constraints are set to `['==3.7.*']`, then
             Pants will error explaining the incompatibility.
 
             The keys must be defined as resolves in `[python].resolves`.
@@ -465,7 +465,7 @@ class PythonSetup(Subsystem):
             """
             Whether to allow resolution of manylinux wheels when resolving requirements for
             foreign linux platforms. The value should be a manylinux platform upper bound,
-            e.g.: 'manylinux2010', or else the string 'no' to disallow.
+            e.g. `'manylinux2010'`, or else the string `'no'` to disallow.
             """
         ),
         advanced=True,
@@ -539,9 +539,9 @@ class PythonSetup(Subsystem):
         default=False,
         help=softwrap(
             """
-            If set, and if running on MacOS Big Sur, use macosx_10_16 as the platform
-            when building wheels. Otherwise, the default of macosx_11_0 will be used.
-            This may be required for pip to be able to install the resulting distribution
+            If set, and if running on macOS Big Sur, use `macosx_10_16` as the platform
+            when building wheels. Otherwise, the default of `macosx_11_0` will be used.
+            This may be required for `pip` to be able to install the resulting distribution
             on Big Sur.
             """
         ),
