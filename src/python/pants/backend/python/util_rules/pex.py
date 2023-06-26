@@ -1147,6 +1147,9 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
     append_only_caches = (
         request.pex.python.append_only_caches if request.pex.python else FrozenDict({})
     )
+    immutable_input_digests = (
+        request.pex.python.immutable_input_digests if request.pex.python else FrozenDict({})
+    )
     return Process(
         argv,
         description=request.description,
@@ -1160,7 +1163,10 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
             **complete_pex_env.append_only_caches,
             **append_only_caches,
         },
-        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
+        immutable_input_digests={
+            **pex_environment.bootstrap_python.immutable_input_digests,
+            **immutable_input_digests,
+        },
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,
