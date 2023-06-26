@@ -70,7 +70,7 @@ def test_format_notes_internal() -> None:
     assert (
         formatted.internal
         == """\
-### Internal (put these in a PR comment for review, not the release notes)
+### Internal
 
 some entry"""
     )
