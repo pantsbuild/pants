@@ -83,7 +83,7 @@ Addresses are used in the `dependencies` field to depend on other targets. Addre
 
 > 📘 Use `//:tgt` for the root of your repository
 >
-> Addressed defined in the `BUILD` file at the root of your repository are prefixed with `//`, e.g. `//:my_tgt`.
+> Addresses defined in the `BUILD` file at the root of your repository are prefixed with `//`, e.g. `//:my_tgt`.
 
 `source` and `sources` field
 ============================
