@@ -40,6 +40,7 @@ from pants.engine.target import (
     CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
+    DepsTraversalBehavior,
     ExplicitlyProvidedDependencies,
     Field,
     FieldDefaultFactoryRequest,
@@ -420,8 +421,12 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
     assert direct_deps == Targets([d1, d2, d3, d4])
 
     class SkipDepsTagOrTraverse(ShouldTraverseDepsPredicate):
-        def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
-            return "skip_deps" not in (target[Tags].value or [])
+        def __call__(
+            self, target: Target, field: Dependencies | SpecialCasedDependencies
+        ) -> DepsTraversalBehavior:
+            if "skip_deps" in (target[Tags].value or []):
+                return DepsTraversalBehavior.EXCLUDE
+            return DepsTraversalBehavior.INCLUDE
 
     predicate = SkipDepsTagOrTraverse()
     # Assert the class is frozen even though it was not decorated with @dataclass(frozen=True)
