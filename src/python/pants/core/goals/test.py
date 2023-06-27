@@ -864,7 +864,13 @@ async def run_tests(
         ),
     )
 
+    contexts = await MultiGet(
+        Get(TestContext, Target, target)
+        for target in targets_to_valid_field_sets.mapping.keys()
+    )
+
     request_types = union_membership.get(TestRequest)
+    ## Bungle contexts in here???
     test_batches = await _get_test_batches(
         request_types,
         targets_to_valid_field_sets,
