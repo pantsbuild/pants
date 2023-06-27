@@ -545,7 +545,7 @@ async def create_pex_from_targets(
                 should_traverse_deps_predicate=TraverseIfNotPackageTarget(
                     roots=request.addresses,
                     union_membership=union_membership,
-                )
+                ),
             ),
         )
         sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
