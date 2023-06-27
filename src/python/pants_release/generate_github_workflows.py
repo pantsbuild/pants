@@ -1128,15 +1128,64 @@ class DefaultGoals(str, Enum):
 
 @dataclass
 class Repo:
+    """A specification for an external public repository to run pants' testing against.
+
+    Each repository is tested in two configurations:
+
+    1. using the repository's default configuration (pants version, no additional settings), as a baseline
+
+    2. overriding the pants version and potentially setting additional `PANTS_...` environment
+       variable settings (both specified as workflow inputs)
+
+    The second is the interesting test, to validate whether a particular version/configuration of
+    Pants runs against this repository. The first/baseline is to make it obvious if the behaviour
+    _changes_, to avoid trying to analyse problems that already exist upstream.
+    """
+
     name: str
+    """
+    `user/repo`, referring to `https://github.com/user/repo`. (This can be expanded to other services, if required.)
+    """
+
     python_version: str = "3.10"
+    """
+    The Python version to install system-wide for user code to use.
+    """
+
     env: dict[str, str] = field(default_factory=dict)
+    """
+    Any extra environment variables to provide to all pants steps
+    """
+
     install_go: bool = False
+    """
+    Whether to install Go system-wide
+    """
+
     install_thrift: bool = False
+    """
+    Whether to install Thrift system-wide
+    """
+
     node_version: None | str = None
+    """
+    Whether to install Node/NPM system-wide, and which version if so
+    """
+
     checkout_options: dict[str, Any] = field(default_factory=dict)
+    """
+    Any additional options to provide to actions/checkout
+    """
+
     setup_commands: str = ""
+    """
+    Any additional set-up commands to run before pants (e.g. `sudo apt install ...`)
+    """
+
     goals: Sequence[str] = tuple(DefaultGoals)
+    """
+    Which pants goals to run, e.g. `goals=["test some/dir::"]` would only run `pants test some/dir::`
+    """
 
 
 PUBLIC_REPOS = [
@@ -1233,7 +1282,17 @@ PUBLIC_REPOS = [
 ]
 
 
-def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any], str]:
+@dataclass
+class PublicReposOutput:
+    jobs: Jobs
+    inputs: dict[str, Any]
+    run_name: str
+
+
+def public_repos() -> PublicReposOutput:
+    """ Run tests against public repositories, to validate new versions of Pants. See `Repo` for
+    more details.
+    """
     inputs, env = workflow_dispatch_inputs(
         [
             WorkflowInput(
@@ -1343,7 +1402,7 @@ def public_repos_jobs_and_inputs() -> tuple[Jobs, dict[str, Any], str]:
 
     jobs = {sanitize_name(repo.name): test_job(repo) for repo in PUBLIC_REPOS}
     run_name = f"Public repos test: version {env['PANTS_VERSION']} {env['EXTRA_ENV']}"
-    return jobs, inputs, run_name
+    return PublicReposOutput(jobs=jobs, inputs=inputs, run_name=run_name)
 
 
 # ----------------------------------------------------------------------
@@ -1505,13 +1564,13 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
-    public_repos_jobs, public_repos_inputs, public_repos_run_name = public_repos_jobs_and_inputs()
+    public_repos_output = public_repos()
     public_repos_yaml = yaml.dump(
         {
             "name": "Public repos tests",
-            "run-name": public_repos_run_name,
-            "on": {"workflow_dispatch": {"inputs": public_repos_inputs}},
-            "jobs": public_repos_jobs,
+            "run-name": public_repos_output.run_name,
+            "on": {"workflow_dispatch": {"inputs": public_repos_output.inputs}},
+            "jobs": public_repos_output.jobs,
         },
         Dumper=NoAliasDumper,
     )
