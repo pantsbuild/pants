@@ -718,10 +718,10 @@ class TestsBatchCompatibilityTagField(StringField, metaclass=ABCMeta):
         `{target_name}`, then the two targets are explicitly compatible and _may_ run in the same
         test runner process. Compatible tests may not end up in the same test runner batch if:
 
-            * There are "too many" compatible tests in a partition, as determined by the \
-                `[test].batch_size` config parameter, or
-            * Compatible tests have some incompatibility in Pants metadata (i.e. different \
-                `resolve`s or `extra_env_vars`).
+          * There are "too many" compatible tests in a partition, as determined by the \
+            `[test].batch_size` config parameter, or
+          * Compatible tests have some incompatibility in Pants metadata (i.e. different \
+            `resolve`s or `extra_env_vars`).
 
         When tests with the same `batch_compatibility_tag` have incompatibilities in some other
         Pants metadata, they will be automatically split into separate batches. This way you can

@@ -101,9 +101,9 @@ class PythonGoogleCloudFunctionType(StringField):
     valid_choices = GoogleCloudFunctionTypes
     help = help_text(
         """
-        The trigger type of the cloud function. Can either be 'event' or 'http'.
+        The trigger type of the cloud function. Can either be `'event'` or `'http'`.
         See https://cloud.google.com/functions/docs/concepts/python-runtime for reference to
-        --trigger-http.
+        `--trigger-http`.
         """
     )
 

@@ -2563,7 +2563,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     help = help_text(
         f"""
         Addresses to other targets that this target depends on, e.g.
-        ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
+        `['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django']`.
 
         This augments any dependencies inferred by Pants, such as by analyzing your imports. Use
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
@@ -3064,9 +3064,11 @@ def generate_file_based_overrides_field_help_message(
                 field names to the overridden value.
 
                 For example:
+
+                {example}
                 """
             ),
-            example,
+            "",
             softwrap(
                 f"""
                 File paths and globs are relative to the BUILD file's directory. Every overridden file is

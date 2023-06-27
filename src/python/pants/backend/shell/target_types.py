@@ -270,7 +270,7 @@ class ShellCommandCommandField(StringField):
         """
         Shell command to execute.
 
-        The command is executed as 'bash -c <command>' by default. If you want to invoke a binary
+        The command is executed as `'bash -c <command>'` by default. If you want to invoke a binary
         use `exec -a $0 <binary> <args>` as the command so that the binary gets the correct `argv[0]`
         set.
         """
@@ -345,7 +345,7 @@ class ShellCommandToolsField(StringSequenceField):
 
         Only the tools explicitly provided will be available on the search PATH,
         and these tools must be found on the paths provided by
-        [shell-setup].executable_search_paths (which defaults to the system PATH).
+        `[shell-setup].executable_search_paths` (which defaults to the system PATH).
         """
     )
 
