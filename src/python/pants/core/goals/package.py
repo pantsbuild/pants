@@ -188,7 +188,7 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
 
 @dataclass(frozen=True)
 class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
-    """This predicate stops dep traversal at any package targets.
+    """This predicate stops dep traversal after package targets.
 
     When traversing deps, such as when collecting a list of transitive deps,
     this predicate effectively turns any package targets into graph leaf nodes.
