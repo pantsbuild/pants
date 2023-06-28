@@ -15,6 +15,7 @@ mod import_pattern;
 
 include!(concat!(env!("OUT_DIR"), "/javascript/constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/javascript/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/javascript_impl_hash.rs"));
 
 #[derive(Serialize, Deserialize)]
 pub struct ParsedJavascriptDependencies {

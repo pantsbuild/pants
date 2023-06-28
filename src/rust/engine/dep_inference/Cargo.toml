@@ -9,6 +9,10 @@ publish = false
 tree-sitter = "0.20.10"
 tree-sitter-python = "0.20.2"
 tree-sitter-javascript = "0.20.0"
+checksums = "0.9.1"
+sha2 = "0.10.7"
+walkdir = "2.3.3"
+hex = "0.4.3"
 
 [dependencies]
 fnv = "1.0.5"

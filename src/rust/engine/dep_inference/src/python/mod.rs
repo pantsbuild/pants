@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 include!(concat!(env!("OUT_DIR"), "/python/constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/python/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/python_impl_hash.rs"));
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use serde_derive::{Deserialize, Serialize};
