@@ -558,4 +558,3 @@ fn syntax_errors_and_other_fun() {
   assert_imports("try:...\nexcept (x=1):import a", &["a"]);
   assert_imports("foo()", &[]);
 }
-//comment
