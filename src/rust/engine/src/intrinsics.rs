@@ -771,7 +771,12 @@ struct PreparedInferenceRequest {
 }
 
 impl PreparedInferenceRequest {
-  pub async fn prepare(args: Vec<Value>, store: &Store, backend: &str, impl_hash: &str) -> NodeResult<Self> {
+  pub async fn prepare(
+    args: Vec<Value>,
+    store: &Store,
+    backend: &str,
+    impl_hash: &str,
+  ) -> NodeResult<Self> {
     let PyNativeDependenciesRequest {
       directory_digest,
       metadata,
