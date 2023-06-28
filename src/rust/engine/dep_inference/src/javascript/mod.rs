@@ -9,9 +9,10 @@ use tree_sitter::{Node, Parser};
 use protos::gen::pants::cache::JavascriptInferenceMetadata;
 
 use crate::javascript::import_pattern::imports_from_patterns;
-use crate::util::normalize_path;
+use crate::javascript::util::normalize_path;
 
 mod import_pattern;
+mod util;
 
 include!(concat!(env!("OUT_DIR"), "/javascript/constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/javascript/visitor.rs"));

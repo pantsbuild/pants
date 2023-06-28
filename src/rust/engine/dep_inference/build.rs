@@ -142,7 +142,7 @@ pub trait Visitor {
     if language.node_kind_is_named(id) {
       let kind = language.node_kind_for_id(id).unwrap();
       file
-        .write_all(format!("      {id} =>   self.visit_{kind}(node),\n").as_bytes())
+        .write_all(format!("    {id} =>   self.visit_{kind}(node),\n").as_bytes())
         .unwrap();
     }
   }
@@ -164,7 +164,7 @@ fn gen_impl_hash_file(name: &'static str, source_dir: &Path, impl_dir: &Path, ou
     .chain(WalkDir::new(source_dir).into_iter())
     .flatten()
   {
-    if entry.file_type().is_file() {
+    if entry.file_type().is_file() && entry.path().file_name().unwrap() != "tests.rs" {
       let mut reader = std::fs::File::open(entry.path()).expect("Failed to open file");
       let _ = std::io::copy(&mut reader, &mut hasher).expect("Failed to copy bytes");
     }
