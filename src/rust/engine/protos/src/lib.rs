@@ -65,3 +65,5 @@ mod verification;
 pub use crate::verification::verify_directory_canonical;
 #[cfg(test)]
 mod verification_tests;
+
+mod hashing;

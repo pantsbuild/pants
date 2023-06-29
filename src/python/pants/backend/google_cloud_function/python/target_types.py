@@ -13,19 +13,14 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules
-from pants.engine.target import (
-    COMMON_TARGET_FIELDS,
-    InvalidFieldException,
-    InvalidTargetException,
-    StringField,
-    Target,
-)
+from pants.engine.target import COMMON_TARGET_FIELDS, InvalidFieldException, StringField, Target
 from pants.util.docutil import doc_url
-from pants.util.strutil import help_text
+from pants.util.strutil import help_text, softwrap
 
 
 class PythonGoogleCloudFunctionHandlerField(PythonFaaSHandlerField):
@@ -89,6 +84,10 @@ class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
 
+    @classmethod
+    def from_interpreter_version(cls, py_major: int, py_minor) -> str:
+        return f"python{py_major}{py_minor}"
+
 
 class GoogleCloudFunctionTypes(Enum):
     EVENT = "event"
@@ -101,9 +100,9 @@ class PythonGoogleCloudFunctionType(StringField):
     valid_choices = GoogleCloudFunctionTypes
     help = help_text(
         """
-        The trigger type of the cloud function. Can either be 'event' or 'http'.
+        The trigger type of the cloud function. Can either be `'event'` or `'http'`.
         See https://cloud.google.com/functions/docs/concepts/python-runtime for reference to
-        --trigger-http.
+        `--trigger-http`.
         """
     )
 
@@ -130,14 +129,24 @@ class PythonGoogleCloudFunction(Target):
     )
 
     def validate(self) -> None:
-        if (
-            self[PythonGoogleCloudFunctionRuntime].value is None
-            and not self[PexCompletePlatformsField].value
-        ):
-            raise InvalidTargetException(
-                f"The `{self.alias}` target {self.address} must specify either a "
-                f"`{self[PythonGoogleCloudFunctionRuntime].alias}` or "
-                f"`{self[PexCompletePlatformsField].alias}` or both."
+        has_runtime = self[PythonGoogleCloudFunctionRuntime].value is not None
+        has_complete_platforms = self[PexCompletePlatformsField].value is not None
+
+        runtime_alias = self[PythonGoogleCloudFunctionRuntime].alias
+        complete_platforms_alias = self[PexCompletePlatformsField].alias
+
+        if has_runtime and has_complete_platforms:
+            warn_or_error(
+                "2.19.0.dev0",
+                f"using both `{runtime_alias}` and `{complete_platforms_alias}` in the `{self.alias}` target {self.address}",
+                softwrap(
+                    f"""
+                    The `{complete_platforms_alias}` now takes precedence over the `{runtime_alias}` field, if
+                    it is set. Remove the `{runtime_alias}` field to only use the `{complete_platforms_alias}`
+                    value, or remove the `{complete_platforms_alias}` field to use the default platform
+                    implied by `{runtime_alias}`.
+                    """
+                ),
             )
 
 

@@ -1,5 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -28,6 +30,7 @@ class PexVenvRequest:
 
     platforms: PexPlatforms = PexPlatforms()
     complete_platforms: CompletePlatforms = CompletePlatforms()
+    prefix: None | str = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +76,7 @@ async def pex_venv(request: PexVenvRequest) -> PexVenv:
                 f"--dest-dir={dest_dir}",
                 f"--pex-repository={request.pex.name}",
                 f"--layout={request.layout.value}",
+                *((f"--prefix={request.prefix}",) if request.prefix is not None else ()),
                 # NB. Specifying more than one of these args doesn't make sense for `venv
                 # create`. Incorrect usage will be surfaced as a subprocess failure.
                 *request.platforms.generate_pex_arg_list(),

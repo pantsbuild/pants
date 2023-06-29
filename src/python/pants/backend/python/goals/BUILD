@@ -3,6 +3,8 @@
 
 python_sources()
 
+resource(name="test_lockfile", source="pytest_extra_output_test.lock")
+
 python_test_utils(name="test_utils")
 
 python_tests(
@@ -21,6 +23,7 @@ python_tests(
             "timeout": 120,
         },
         "pytest_runner_integration_test.py": {
+            "dependencies": [":test_lockfile"],
             "tags": ["platform_specific_behavior"],
             "timeout": 600,
         },

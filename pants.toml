@@ -35,12 +35,13 @@ backend_packages.add = [
   "pants.backend.experimental.tools.workunit_logger",
   "pants.backend.experimental.visibility",
   "pants.backend.tools.preamble",
+  "pants.backend.tools.taplo",
   "pants.explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
 plugins = [
-  "hdrhistogram",  # For use with `--stats-log`.
+  "hdrhistogram", # For use with `--stats-log`.
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -48,6 +49,7 @@ plugins = [
 pantsd_invalidation_globs.add = [
   "!*_test.py",
   "!BUILD",
+  "!src/python/pants_release/**",
   # NB: The `target` directory is ignored via `pants_ignore` below.
   "src/rust/engine/**/*.rs",
   "src/rust/engine/**/*.toml",
@@ -64,6 +66,8 @@ pants_ignore.add = [
   "!/pants.pex",
   # Ignore node modules for docs processing tools
   "/docs/node_modules",
+  # We have Pants stuff in here
+  "!.github/",
 ]
 
 build_ignore.add = [
@@ -87,9 +91,8 @@ enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [cli.alias]
-all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
-
+--all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 
 [source]
 root_patterns = [
@@ -116,9 +119,7 @@ build_file_header = """\
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """
-ignore_paths = [
-  "build-support/migration-support/BUILD",
-]
+ignore_paths = ["build-support/migration-support/BUILD"]
 ignore_adding_targets = [
   "src/python/pants:__main__",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
@@ -154,7 +155,6 @@ pytest = "3rdparty/python/pytest.lock"
 [python-infer]
 assets = true
 unowned_dependency_behavior = "error"
-use_rust_parser = true
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
@@ -173,7 +173,7 @@ args = ["--external-sources"]
 args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
-args = ["--no-header"]
+args = ["--no-header", "-vv"]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
 requirements = ["//3rdparty/python:pytest"]
@@ -281,3 +281,4 @@ master = "src/python/pants/notes/master.rst"
 "2.15.x" = "src/python/pants/notes/2.15.x.md"
 "2.16.x" = "src/python/pants/notes/2.16.x.md"
 "2.17.x" = "src/python/pants/notes/2.17.x.md"
+"2.18.x" = "src/python/pants/notes/2.18.x.md"

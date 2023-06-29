@@ -16,9 +16,6 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
-from pants.backend.python.util_rules.pex_requirements import (  # noqa: F401
-    GeneratePythonToolLockfileSentinel as GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ResolvePexConfig,

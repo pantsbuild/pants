@@ -9,7 +9,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, cast
+from typing import Any
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout
@@ -32,12 +32,11 @@ from pants.core.goals.export import (
     PostProcessingCommand,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption, EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
 
@@ -54,32 +53,6 @@ class _ExportVenvForResolveRequest(EngineAwareParameter):
     resolve: str
 
 
-@union(in_scope_types=[EnvironmentName])
-class ExportPythonToolSentinel:
-    """Python tools use this as an entry point to say how to export their tool virtualenv.
-
-    Each tool should subclass `ExportPythonToolSentinel` and set up a rule that goes from
-    the subclass -> `ExportPythonTool`. Register a union rule for the `ExportPythonToolSentinel`
-    subclass.
-
-    If the tool is in `pantsbuild/pants`, update `export_integration_test.py`.
-    """
-
-
-@dataclass(frozen=True)
-class ExportPythonTool(EngineAwareParameter):
-    """How to export a particular Python tool.
-
-    If `pex_request=None`, the tool will be skipped.
-    """
-
-    resolve_name: str
-    pex_request: PexRequest | None
-
-    def debug_hint(self) -> str | None:
-        return self.resolve_name
-
-
 class PythonResolveExportFormat(Enum):
     """How to export Python resolves."""
 
@@ -93,11 +66,11 @@ class ExportPluginOptions:
         help=softwrap(
             """\
             Export Python resolves using this format. Options are:
-              - mutable_virtualenv: Export a standalone mutable virtualenv that you can
+              - `mutable_virtualenv`: Export a standalone mutable virtualenv that you can
                 further modify.
-              - symlinked_immutable_virtualenv: Export a symlink into a cached Python virtualenv.
+              - `symlinked_immutable_virtualenv`: Export a symlink into a cached Python virtualenv.
                 This virtualenv will have no pip binary, and will be immutable. Any attempt to
-                modify it will corrupt the cache!  It may, however, take significantly less time
+                modify it will corrupt the cache! It may, however, take significantly less time
                 to export than a standalone, mutable virtualenv.
             """
         ),
@@ -346,75 +319,41 @@ async def export_virtualenv_for_resolve(
     request: _ExportVenvForResolveRequest,
     python_setup: PythonSetup,
     export_subsys: ExportSubsystem,
-    union_membership: UnionMembership,
 ) -> MaybeExportResult:
-    editable_local_dists_digest: Digest | None = None
     resolve = request.resolve
     lockfile_path = python_setup.resolves.get(resolve)
-    if lockfile_path:
-        # It's a user resolve.
-        lockfile = Lockfile(
-            url=lockfile_path,
-            url_description_of_origin=f"the resolve `{resolve}`",
-            resolve_name=resolve,
-        )
+    if not lockfile_path:
+        raise ExportError(f"No resolve named {resolve} found in [python_setup].resolves.")
+    lockfile = Lockfile(
+        url=lockfile_path,
+        url_description_of_origin=f"the resolve `{resolve}`",
+        resolve_name=resolve,
+    )
 
-        interpreter_constraints = InterpreterConstraints(
-            python_setup.resolves_to_interpreter_constraints.get(
-                request.resolve, python_setup.interpreter_constraints
-            )
+    interpreter_constraints = InterpreterConstraints(
+        python_setup.resolves_to_interpreter_constraints.get(
+            request.resolve, python_setup.interpreter_constraints
         )
+    )
 
-        if resolve in export_subsys.options.py_editable_in_resolve:
-            editable_local_dists = await Get(
-                EditableLocalDists, EditableLocalDistsRequest(resolve=resolve)
-            )
-            editable_local_dists_digest = editable_local_dists.optional_digest
-        else:
-            editable_local_dists_digest = None
-
-        pex_request = PexRequest(
-            description=f"Build pex for resolve `{resolve}`",
-            output_filename=f"{path_safe(resolve)}.pex",
-            internal_only=True,
-            requirements=EntireLockfile(lockfile),
-            sources=editable_local_dists_digest,
-            interpreter_constraints=interpreter_constraints,
-            # Packed layout should lead to the best performance in this use case.
-            layout=PexLayout.PACKED,
+    if resolve in export_subsys.options.py_editable_in_resolve:
+        editable_local_dists = await Get(
+            EditableLocalDists, EditableLocalDistsRequest(resolve=resolve)
         )
+        editable_local_dists_digest = editable_local_dists.optional_digest
     else:
-        # It's a tool resolve.
-        # TODO: Can we simplify tool lockfiles to be more uniform with user lockfiles?
-        #  It's unclear if we will need the ExportPythonToolSentinel runaround once we
-        #  remove the older export codepath below. It would be nice to be able to go from
-        #  resolve name -> EntireLockfile, regardless of whether the resolve happened to be
-        #  a user lockfile or a tool lockfile. Currently we have to get all the ExportPythonTools
-        #  and then check for the resolve name.  But this is OK for now, as it lets us
-        #  move towards deprecating that other codepath.
-        tool_export_types = cast(
-            "Iterable[type[ExportPythonToolSentinel]]",
-            union_membership.get(ExportPythonToolSentinel),
-        )
-        all_export_tool_requests = await MultiGet(
-            Get(ExportPythonTool, ExportPythonToolSentinel, tool_export_type())
-            for tool_export_type in tool_export_types
-        )
-        export_tool_request = next(
-            (etr for etr in all_export_tool_requests if etr.resolve_name == resolve), None
-        )
-        if not export_tool_request:
-            # No such Python resolve or tool, but it may be a resolve for a different language/backend,
-            # so we let the core export goal sort out whether it's an error or not.
-            return MaybeExportResult(None)
-        if not export_tool_request.pex_request:
-            raise ExportError(
-                f"Requested an export of `{resolve}` but that tool's exports were disabled with "
-                f"the `export=false` option. The per-tool `export=false` options will soon be "
-                f"deprecated anyway, so we recommend removing `export=false` from your config file "
-                f"and switching to using `--resolve`."
-            )
-        pex_request = export_tool_request.pex_request
+        editable_local_dists_digest = None
+
+    pex_request = PexRequest(
+        description=f"Build pex for resolve `{resolve}`",
+        output_filename=f"{path_safe(resolve)}.pex",
+        internal_only=True,
+        requirements=EntireLockfile(lockfile),
+        sources=editable_local_dists_digest,
+        interpreter_constraints=interpreter_constraints,
+        # Packed layout should lead to the best performance in this use case.
+        layout=PexLayout.PACKED,
+    )
 
     dest_prefix = os.path.join("python", "virtualenvs")
     export_result = await Get(
@@ -428,26 +367,6 @@ async def export_virtualenv_for_resolve(
         ),
     )
     return MaybeExportResult(export_result)
-
-
-@rule
-async def export_tool(request: ExportPythonTool) -> ExportResult:
-    assert request.pex_request is not None
-
-    export_result = await Get(
-        ExportResult,
-        VenvExportRequest(
-            request.pex_request,
-            # TODO: It seems unnecessary to qualify with "tools", since the tool resolve names don't collide
-            #  with user resolve names.  We should get rid of this via a deprecation cycle.
-            os.path.join("python", "virtualenvs", "tools"),
-            request.resolve_name,
-            # TODO: It is pretty ad-hoc that we do add the interpreter version for resolves but not for tools.
-            #  We should pick one and deprecate the other.
-            qualify_path_with_python_version=False,
-        ),
-    )
-    return export_result
 
 
 @rule

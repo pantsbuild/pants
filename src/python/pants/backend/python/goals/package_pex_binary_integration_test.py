@@ -63,9 +63,7 @@ def rule_runner() -> PythonRuleRunner:
         ],
         objects={"python_artifact": PythonArtifact},
     )
-    rule_runner.set_options(
-        ["--python-infer-use-rust-parser"], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
-    )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
 
 
@@ -105,7 +103,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     assert not caplog.records
     result = rule_runner.request(BuiltPackage, [field_set])
     assert caplog.records
-    assert f"The `pex_binary` target {tgt.address} transitively depends on" in caplog.text
+    assert f"The target {tgt.address} (`pex_binary`) transitively depends on" in caplog.text
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text

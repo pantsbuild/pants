@@ -115,7 +115,7 @@ def test_field_and_target_eq() -> None:
     assert hash(field) == hash(other)
 
     # Ensure the field is frozen.
-    with pytest.raises(FrozenInstanceError):
+    with pytest.raises(AttributeError):
         field.value = "foo"
 
     tgt = FortranTarget({"version": "dev0"}, addr)
@@ -445,7 +445,7 @@ def test_async_field_mixin() -> None:
     assert hash(field) != hash(other)
 
     # Ensure it's still frozen.
-    with pytest.raises(FrozenInstanceError):
+    with pytest.raises(AttributeError):
         field.value = 11
 
     # Ensure that subclasses are not equal.
@@ -1510,6 +1510,6 @@ def test_generate_file_based_overrides_field_help_message() -> None:
         }
         """,
     )
-    assert "example:\n    overrides={\n" in message
+    assert "example:\n\n    overrides={\n" in message
     assert '\n        "bar.proto"' in message
     assert "\n    }\n\nFile" in message

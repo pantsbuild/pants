@@ -7,7 +7,7 @@ import re
 from glob import glob
 from typing import Iterable
 
-from common import die
+from pants_release.common import die
 
 
 def main() -> None:

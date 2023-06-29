@@ -202,10 +202,12 @@ Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(Process
 >     options_scope = "black"
 >     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 >
->     default_version = "black==19.10b0"
->     default_extra_requirements = ["setuptools"]
 >     default_main = ConsoleScript("black")
->     default_interpreter_constraints = ["CPython>=3.6"]
+>     
+>     register_interpreter_constraints = True
+>     default_interpreter_constraints = ["CPython>=3.8,<3.9"]
+> 
+>     default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
 >
 >     config = StrOption(
 >         default=None,
@@ -214,8 +216,8 @@ Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(Process
 >     )
 > ```
 >
-> You must define the class properties `options_scope`, `default_version`, and `default_main`. You
-> can optionally define `default_extra_requirements` and `default_interpreter_constraints`.
+> You must define the class properties `options_scope` and `default_main`, and a
+> default lockfile at the location referenced by default_lockfile_resource.
 >
 > Then, you can set up your `Pex` like this:
 >
