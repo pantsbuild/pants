@@ -303,7 +303,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3
-      run: ./pants run src/python/pants_release/deploy_to_s3.py --scope tags/pantsbuild.pants
+      run: ./pants run src/python/pants_release/deploy_to_s3.py -- --scope tags/pantsbuild.pants
 name: Release
 'on':
   push:
