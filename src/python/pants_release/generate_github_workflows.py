@@ -1276,13 +1276,12 @@ def main() -> None:
         for path, content in generated_yaml.items():
             if path.read_text() != content:
                 die(
-                    dedent(
-                        f"""\
-                        Error: Generated path mismatched: {path}
-                        To re-generate, run: `./pants run build-support/bin/{
-                            os.path.basename(__file__)
-                        }`
-                        """
+                    os.linesep.join(
+                        (
+                            f"Error: Generated path mismatched: {path}",
+                            "To re-generate, run: `./pants run pants run src/python/pants_release/"
+                            "generate_github_workflows.py`"
+                        )
                     )
                 )
     else:
