@@ -1279,7 +1279,7 @@ def main() -> None:
                     os.linesep.join(
                         (
                             f"Error: Generated path mismatched: {path}",
-                            "To re-generate, run: `./pants run pants run src/python/pants_release/"
+                            "To re-generate, run: `./pants run src/python/pants_release/"
                             "generate_github_workflows.py`"
                         )
                     )
