@@ -12,7 +12,7 @@ from collections import defaultdict
 from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import CodeRemovedError
 from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
@@ -488,7 +488,7 @@ class AmbiguousImplementationsException(Exception):
 
 
 # NB: Remove when SecondaryOwnerMixin is removed
-def _maybe_warn_deprecated_secondary_owner_semantics(
+def _maybe_error_secondary_owner_semantics(
     addresses_from_nonfile_specs: Addresses,
     owners_from_filespecs: Owners,
     matched_addresses: collections.abc.Set[Address],
@@ -511,22 +511,16 @@ def _maybe_warn_deprecated_secondary_owner_semantics(
     }
 
     if problematic_target_specs:
-        warn_or_error(
-            # TODO(Joshua Cannon): removal at 2.18.0.dev3
-            removal_version="2.18.0.dev3",
-            entity=softwrap(
-                """
-                indirectly referring to a target by using a corresponding file argument, when the
-                target owning the file isn't applicable
-                """
-            ),
-            hint=softwrap(
+        raise CodeRemovedError(
+            softwrap(
                 f"""
-                Refer to the following targets by their addresses:
+                Support for indirectly referring to a target by using a corresponding file argument,
+                when the target owning the file isn't applicable was removed in version 2.18.0.dev3.
 
+                Refer to the following targets by their addresses:
                 {bullet_list(sorted(problematic_target_specs))}
                 """
-            ),
+            )
         )
 
 
@@ -580,7 +574,7 @@ async def find_valid_field_sets_for_target_roots(
 
     # NB: Remove when SecondaryOwnerMixin is removed
     if targets_to_applicable_field_sets:
-        _maybe_warn_deprecated_secondary_owner_semantics(
+        _maybe_error_secondary_owner_semantics(
             # NB: All of these should be memoized, so it's not inappropriate to request simply for warning sake.
             *(
                 await MultiGet(
