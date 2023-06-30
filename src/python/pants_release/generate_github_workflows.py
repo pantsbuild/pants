@@ -569,7 +569,8 @@ class Helper:
                 f"""\
                 export S3_DST={s3_dst}
                 echo "Uploading test reports to ${{S3_DST}}"
-                ./src/python/pants_release/copy_to_s3.py \
+                ./pants run ./src/python/pants_release/copy_to_s3.py \
+                  -- \
                   --src-prefix=dist/test/reports \
                   --dst-prefix=${{S3_DST}} \
                   --path=""

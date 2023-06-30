@@ -672,13 +672,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-ARM64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-ARM64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -762,13 +759,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -852,13 +846,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -942,13 +933,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1032,13 +1020,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1122,13 +1107,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1212,13 +1194,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1302,13 +1281,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1392,13 +1368,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1482,13 +1455,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1572,13 +1542,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/Linux-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -1630,13 +1597,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: always()
       name: Upload test reports
-      run: 'export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS11-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\//_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}
-
-        echo "Uploading test reports to ${S3_DST}"
-
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
-
-        '
+      run: "export S3_DST=s3://logs.pantsbuild.org/test/reports/macOS11-x86_64/$(git show --no-patch --format=%cd --date=format:%Y-%m-%d)/${GITHUB_REF_NAME//\\\
+        //_}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_JOB}\necho \"Uploading test reports to ${S3_DST}\"\n./pants run\
+        \ ./src/python/pants_release/copy_to_s3.py \\\n  -- \\\n  --src-prefix=dist/test/reports \\\n  --dst-prefix=${S3_DST}\
+        \ \\\n  --path=\"\"\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
