@@ -1280,7 +1280,7 @@ def main() -> None:
                         (
                             f"Error: Generated path mismatched: {path}",
                             "To re-generate, run: `./pants run src/python/pants_release/"
-                            "generate_github_workflows.py`"
+                            "generate_github_workflows.py`",
                         )
                     )
                 )
