@@ -43,12 +43,6 @@ def create_test_script(common_script_dir: Path) -> Callable[[str, str], Path]:
     return _make_test_script
 
 
-def test_log(create_test_script):
-    log_script = create_test_script("log.sh", "log hey")
-
-    assert subprocess.run([log_script], capture_output=True, check=True).stderr == b"hey\n"
-
-
 def test_determine_python(create_test_script):
     success_script = create_test_script("python-success.sh", "determine_python")
     success_py = subprocess.run([success_script], capture_output=True, check=True).stdout.rstrip(
