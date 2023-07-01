@@ -350,6 +350,18 @@ class DockerBuildOptionFieldValueMixin(Field):
             yield f"{self.docker_build_option}={self.value}"
 
 
+class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
+    """Inherit this mixin class to provide options in the form of `--flag=value1,value2` to `docker
+    build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}={','.join(list(self.value))}"
+
+
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
     alias = "pull"
     default = False
@@ -402,6 +414,19 @@ class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, Strin
     docker_build_option = "--network"
 
 
+class DockerImageBuildPlatformOptionField(
+    DockerBuildOptionFieldMultiValueMixin, StringSequenceField
+):
+    alias = "build_platform"
+    default = None
+    help = help_text(
+        """
+        Set the target platform(s) for the build.
+        """
+    )
+    docker_build_option = "--platform"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -422,6 +447,7 @@ class DockerImageTarget(Target):
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
         DockerImageBuildNetworkOptionField,
+        DockerImageBuildPlatformOptionField,
         OutputPathField,
         RestartableField,
     )
