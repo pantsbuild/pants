@@ -1124,14 +1124,16 @@ def test_secondary_owner_warning(caplog) -> None:
     assert "Refer to the following targets" not in caplog.text
     assert not result.mapping
 
-    run_rule([FileLiteralSpec("a.ft")])
-    assert len(caplog.records) == 1
-    assert "Refer to the following targets by their addresses:\n\n  * //:secondary1" in caplog.text
+    with pytest.raises(ExecutionError) as exc:
+        run_rule([FileLiteralSpec("a.ft")])
+    assert len(caplog.records) == 0
+    assert "Refer to the following targets by their addresses:\n  * //:secondary1" in str(exc.value)
 
-    run_rule([FileLiteralSpec("a.ft"), AddressLiteralSpec("", "secondary1")])
-    assert len(caplog.records) == 1
-    assert "secondary1" not in caplog.text
-    assert "secondary2" in caplog.text
+    with pytest.raises(ExecutionError) as exc:
+        run_rule([FileLiteralSpec("a.ft"), AddressLiteralSpec("", "secondary1")])
+    assert len(caplog.records) == 0
+    assert "secondary1" not in str(exc.value)
+    assert "secondary2" in str(exc.value)
 
     result = run_rule([RecursiveGlobSpec("")])
     assert len(caplog.records) == 0

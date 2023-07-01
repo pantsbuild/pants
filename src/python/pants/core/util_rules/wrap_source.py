@@ -108,7 +108,7 @@ def wrap_source_rule_and_target(
             + ", ".join(ext for ext in source_field_type.expected_file_extensions if ext)
         )
     else:
-        outputs_help = "If `outputs` is not specified, all files from `inputs` will be matched"
+        outputs_help = "If `outputs` is not specified, all files from `inputs` will be matched."
 
     class ActivateWrapSourceTargetField(ActivateWrapSourceTargetFieldBase):
         pass

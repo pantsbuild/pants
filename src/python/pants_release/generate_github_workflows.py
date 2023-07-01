@@ -301,7 +301,7 @@ def deploy_to_s3(
 ) -> Step:
     run = "./pants run src/python/pants_release/deploy_to_s3.py"
     if scope:
-        run = f"{run} --scope {scope}"
+        run = f"{run} -- --scope {scope}"
     return {
         "name": name,
         "run": run,
@@ -569,7 +569,8 @@ class Helper:
                 f"""\
                 export S3_DST={s3_dst}
                 echo "Uploading test reports to ${{S3_DST}}"
-                ./src/python/pants_release/copy_to_s3.py \
+                ./pants run ./src/python/pants_release/copy_to_s3.py \
+                  -- \
                   --src-prefix=dist/test/reports \
                   --dst-prefix=${{S3_DST}} \
                   --path=""
@@ -1275,13 +1276,12 @@ def main() -> None:
         for path, content in generated_yaml.items():
             if path.read_text() != content:
                 die(
-                    dedent(
-                        f"""\
-                        Error: Generated path mismatched: {path}
-                        To re-generate, run: `./pants run build-support/bin/{
-                            os.path.basename(__file__)
-                        }`
-                        """
+                    os.linesep.join(
+                        (
+                            f"Error: Generated path mismatched: {path}",
+                            "To re-generate, run: `./pants run src/python/pants_release/"
+                            "generate_github_workflows.py`",
+                        )
                     )
                 )
     else:

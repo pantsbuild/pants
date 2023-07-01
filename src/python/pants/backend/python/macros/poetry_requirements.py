@@ -433,7 +433,7 @@ class PoetryRequirementsSourceField(SingleSourceField):
 
 class PoetryRequirementsTargetGenerator(TargetGenerator):
     alias = "poetry_requirements"
-    help = "Generate a `python_requirement` for each entry in a Poetry pyproject.toml."
+    help = "Generate a `python_requirement` for each entry in a Poetry `pyproject.toml`."
     generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
     core_fields = (

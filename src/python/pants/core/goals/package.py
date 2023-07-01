@@ -21,6 +21,7 @@ from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
     Dependencies,
+    DepsTraversalBehavior,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -187,9 +188,19 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
 
 @dataclass(frozen=True)
 class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
+    """This predicate stops dep traversal after package targets.
+
+    When traversing deps, such as when collecting a list of transitive deps,
+    this predicate effectively turns any package targets into graph leaf nodes.
+    The package targets are included, but the deps of package targets are not.
+
+    Also, this excludes dependencies from any SpecialCasedDependencies fields,
+    which mirrors the behavior of the default predicate: TraverseIfDependenciesField.
+    """
+
     package_field_set_types: FrozenOrderedSet[PackageFieldSet]
     roots: FrozenOrderedSet[Address]
-    always_traverse_roots: bool = True  # traverse roots even if they are package targets
+    always_traverse_roots: bool  # traverse roots even if they are package targets
 
     def __init__(
         self,
@@ -203,16 +214,18 @@ class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
         object.__setattr__(self, "always_traverse_roots", always_traverse_roots)
         super().__init__()
 
-    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
         if isinstance(field, SpecialCasedDependencies):
-            return False
+            return DepsTraversalBehavior.EXCLUDE
         if self.always_traverse_roots and target.address in self.roots:
-            return True
-        for field_set_type in self.package_field_set_types:
-            if field_set_type.is_applicable(target):
-                # False means do not traverse dependencies of this target
-                return False
-        return True
+            return DepsTraversalBehavior.INCLUDE
+        if any(
+            field_set_type.is_applicable(target) for field_set_type in self.package_field_set_types
+        ):
+            return DepsTraversalBehavior.EXCLUDE
+        return DepsTraversalBehavior.INCLUDE
 
 
 def rules():
