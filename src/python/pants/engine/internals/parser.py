@@ -488,6 +488,8 @@ class _UnrecognizedSymbol:
     values.
     """
 
+    _type_description = "unrecognized symbol"
+
     def __init__(self, name: str) -> None:
         self.name = name
         self.args: tuple[Any, ...] = ()

@@ -159,7 +159,8 @@ def test_unrecognized_symbol_during_bootstrap_issue_19156(
         alias = "field"
 
     err = re.escape(
-        f"The 'field' field in target // must be a string, but was `{raw_field!r}` with type `_UnrecognizedSymbol`."
+        f"The 'field' field in target // must be a string, but was `{raw_field!r}` "
+        "which is an unrecognized symbol."
     )
     with pytest.raises(InvalidFieldException, match=err):
         TestField(raw_field, Address(""))
