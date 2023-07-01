@@ -421,7 +421,9 @@ class Parser:
             exec(code, global_symbols)
         except NameError as e:
             frame = traceback.extract_tb(e.__traceback__, limit=-1)[0]
-            msg = e.args[0][0].upper() + e.args[0][1:]
+            msg = (  # Capitalise first letter of NameError message.
+                e.args[0][0].upper() + e.args[0][1:]
+            )
             location = f":{frame.name}" if frame.name != "<module>" else ""
             original = f"{frame.filename}:{frame.lineno}{location}: {msg}"
             help_str = softwrap(
