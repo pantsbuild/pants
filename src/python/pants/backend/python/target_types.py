@@ -74,6 +74,7 @@ from pants.option.subsystem import Subsystem
 from pants.source.filespec import Filespec
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.frozendict import FrozenDict
+from pants.util.requirements import load_requirements
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
@@ -1316,16 +1317,8 @@ class PythonRequirementTarget(Target):
 
 
 def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequirement]:
-    """Parse all `PipRequirement` objects from a requirements.txt-style file.
-
-    This will safely ignore any options starting with `--` and will ignore comments. Any pip-style
-    VCS requirements will fail, with a helpful error message describing how to use PEP 440.
-    """
-    for i, line in enumerate(content.splitlines(), start=1):
-        line, _, _ = line.partition("--")
-        line = line.strip().rstrip("\\")
-        if not line or line.startswith(("#", "-")):
-            continue
+    """Parse all `PipRequirement` objects from a requirements.txt-style file."""
+    for line, i in load_requirements(content):
         yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i}")
 
 
