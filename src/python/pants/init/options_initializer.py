@@ -85,7 +85,7 @@ def _collect_backends_requirements(backends: List[str]) -> List[str]:
 
         if backend_package_spec.origin is None:
             logger.warning(
-                f"Skipping requirements for backend: '{backend_package}'. A __init__.py file is probably missing"
+                f"Can not check requirements for backend: '{backend_package}'. A __init__.py file is probably missing."
             )
             continue
 
