@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import pytest
 
-from pants.backend.python.pip_requirement import PipRequirement
+from pants.util.pip_requirement import PipRequirement
 
 
 def test_parse_simple() -> None:

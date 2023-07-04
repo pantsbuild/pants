@@ -15,13 +15,8 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.macros.common_requirements_rule import _generate_requirements
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import (
-    PythonRequirementResolveField,
-    PythonRequirementTarget,
-    parse_requirements_file,
-)
+from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementTarget
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -32,6 +27,8 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
+from pants.util.pip_requirement import PipRequirement
+from pants.util.requirements import parse_requirements_file
 from pants.util.strutil import help_text, softwrap
 
 

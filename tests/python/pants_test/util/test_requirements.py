@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from textwrap import dedent
 
-from pants.util.requirements import load_requirements
+from pants.util.pip_requirement import PipRequirement
+from pants.util.requirements import parse_requirements_file
 
 
-def test_load_requirements() -> None:
+def test_parse_requirements_file() -> None:
     content = dedent(
         r"""\
         # Comment.
@@ -21,11 +22,11 @@ def test_load_requirements() -> None:
         wheel==1.2.3 --hash=sha256:dd20743f36b93cbb8724f4d2ccd970dce8b6e6e823a13aa7e5751bb4e674c20b
         """
     )
-    assert list(load_requirements(content)) == [
-        ("ansicolors>=1.18.0", 5),
-        ('Django==3.2; python_version > "3"', 6),
-        ("Un-Normalized-PROJECT", 7),
-        ("pip@ git+https://github.com/pypa/pip.git", 8),
-        ('setuptools==54.1.2; python_version >= "3.6"', 9),
-        ("wheel==1.2.3", 12),
-    ]
+    assert set(parse_requirements_file(content, rel_path="foo.txt")) == {
+        PipRequirement.parse("ansicolors>=1.18.0"),
+        PipRequirement.parse("Django==3.2 ; python_version>'3'"),
+        PipRequirement.parse("Un-Normalized-PROJECT"),
+        PipRequirement.parse("pip@ git+https://github.com/pypa/pip.git"),
+        PipRequirement.parse("setuptools==54.1.2; python_version >= '3.6'"),
+        PipRequirement.parse("wheel==1.2.3"),
+    }

@@ -30,7 +30,7 @@ from pants.option.errors import UnknownFlagsError
 from pants.option.global_options import DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.util.requirements import load_requirements
+from pants.util.requirements import parse_requirements_file
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def _collect_backends_requirements(backends: List[str]) -> List[str]:
         )
         if requirements_txt_file_path.exists():
             content = requirements_txt_file_path.read_text()
-            backend_package_requirements = [r[0] for r in load_requirements(content)]
+            backend_package_requirements = [str(r) for r in parse_requirements_file(content)]
             requirements.extend(backend_package_requirements)
 
     return requirements

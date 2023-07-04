@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from typing import Iterator
 
-from pkg_resources import Requirement
+from pants.util.pip_requirement import PipRequirement
 
 
-def load_requirements(content: str) -> Iterator[tuple[str, int]]:
-    """Loads all lines from a requirements.txt-style file.
+def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequirement]:
+    """Parse all `PipRequirement` objects from a requirements.txt-style file.
 
     This will safely ignore any options starting with `--` and will ignore comments. Any pip-style
     VCS requirements will fail, with a helpful error message describing how to use PEP 440.
@@ -17,4 +17,4 @@ def load_requirements(content: str) -> Iterator[tuple[str, int]]:
         if not line or line.startswith(("#", "-")):
             continue
 
-        yield str(Requirement.parse(line)), i
+        yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i}")
