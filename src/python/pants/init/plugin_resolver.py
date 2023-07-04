@@ -129,7 +129,7 @@ class PluginResolver:
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironmentVars,
-        requirements: List[str] = None,
+        requirements: Iterable[str] = None,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
         request = PluginsRequest(
