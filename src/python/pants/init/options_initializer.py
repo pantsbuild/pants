@@ -94,7 +94,10 @@ def _collect_backends_requirements(backends: List[str]) -> List[str]:
         )
         if requirements_txt_file_path.exists():
             content = requirements_txt_file_path.read_text()
-            backend_package_requirements = [str(r) for r in parse_requirements_file(content)]
+            backend_package_requirements = [
+                str(r)
+                for r in parse_requirements_file(content, rel_path=str(requirements_txt_file_path))
+            ]
             requirements.extend(backend_package_requirements)
 
     return requirements
