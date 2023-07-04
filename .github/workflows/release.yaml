@@ -300,6 +300,20 @@ jobs:
         password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
         skip-existing: true
     - env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      name: Announce to Slack
+      uses: slackapi/slack-github-action@v1.23.0
+      with:
+        channel-id: C18RRR4JK
+        payload: '{"blocks": [{"type": "section", "text": {"type": "mrkdwn", "text":
+          "Pants 2.18.0.dev3 is now available!\n\nTo upgrade, set pants_version=\"2.18.0.dev3\"
+          in the [GLOBAL] section of your pants.toml.\n\nThanks to all the contributors
+          to this release:\n\nAlexey Tereshenkov\nBen Limmer\nBenjy Weinberger\nDaniel
+          Goldman\nJacob Floyd\nJohn Sirois\nJoshua Cannon\nMarcus Lim\nRaph Estrada\nRhys
+          Madigan\nTom Solberg\n\nAnd a special shoutout to these first-time contributors:\n\nBen
+          Limmer\nRaph Estrada\n\nWelcome to the Pants community! We appreciate your
+          contributions, and look forward to more."}}]}'
+    - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3

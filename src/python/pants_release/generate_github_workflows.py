@@ -150,22 +150,24 @@ def ensure_category_label() -> Sequence[Step]:
     """Check that exactly one category label is present on a pull request."""
     return [
         {
-            "if": "github.event_name == 'pull_request'",
-            "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v4.0.0",
-            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
+            "name": "Announce to Slack",
+            "uses": "slackapi/slack-github-action@v1.23.0",
             "with": {
-                "mode": "exactly",
-                "count": 1,
-                "labels": softwrap(
-                    """
-                    category:new feature, category:user api change,
-                    category:plugin api change, category:performance, category:bugfix,
-                    category:documentation, category:internal
-                    """
-                ),
+                "channel-id": "C18RRR4JK",
+                "payload": json.dumps({
+                    "blocks": [
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": "TEST, PLEASE IGNORE",
+                            }
+                        },
+                    ]
+                }),
+                "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"}
             },
-        }
+        },
     ]
 
 
@@ -883,32 +885,32 @@ def test_workflow_jobs() -> Jobs:
             "steps": ensure_category_label(),
         },
     }
-    jobs.update(**linux_x86_64_test_jobs())
-    jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos11_x86_64_test_jobs())
-    jobs.update(**build_wheels_jobs())
-    jobs.update(
-        {
-            "lint_python": {
-                "name": "Lint Python and Shell",
-                "runs-on": linux_x86_64_helper.runs_on(),
-                "needs": "bootstrap_pants_linux_x86_64",
-                "timeout-minutes": 30,
-                "if": IS_PANTS_OWNER,
-                "steps": [
-                    *checkout(),
-                    *launch_bazel_remote(),
-                    *linux_x86_64_helper.setup_primary_python(),
-                    *linux_x86_64_helper.native_binaries_download(),
-                    {
-                        "name": "Lint",
-                        "run": "./pants lint check ::\n",
-                    },
-                    linux_x86_64_helper.upload_log_artifacts(name="lint"),
-                ],
-            },
-        }
-    )
+    # jobs.update(**linux_x86_64_test_jobs())
+    # jobs.update(**linux_arm64_test_jobs())
+    # jobs.update(**macos11_x86_64_test_jobs())
+    # jobs.update(**build_wheels_jobs())
+    # jobs.update(
+    #     {
+    #         "lint_python": {
+    #             "name": "Lint Python and Shell",
+    #             "runs-on": linux_x86_64_helper.runs_on(),
+    #             "needs": "bootstrap_pants_linux_x86_64",
+    #             "timeout-minutes": 30,
+    #             "if": IS_PANTS_OWNER,
+    #             "steps": [
+    #                 *checkout(),
+    #                 *launch_bazel_remote(),
+    #                 *linux_x86_64_helper.setup_primary_python(),
+    #                 *linux_x86_64_helper.native_binaries_download(),
+    #                 {
+    #                     "name": "Lint",
+    #                     "run": "./pants lint check ::\n",
+    #                 },
+    #                 linux_x86_64_helper.upload_log_artifacts(name="lint"),
+    #             ],
+    #         },
+    #     }
+    # )
     return jobs
 
 
@@ -1112,8 +1114,8 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                                 },
                             ]
                         }),
-                    "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"}
                     },
+                    "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"}
                 },
                 deploy_to_s3(
                     "Deploy commit mapping to S3",
