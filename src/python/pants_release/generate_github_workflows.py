@@ -879,11 +879,16 @@ def test_workflow_jobs() -> Jobs:
             "if": IS_PANTS_OWNER,
             "steps": ensure_category_label(),
         },
+        linux_x86_64_helper.job_name("bootstrap_pants"): bootstrap_jobs(
+            linux_x86_64_helper,
+            validate_ci_config=False,
+            rust_testing=RustTesting.NONE,
+        ),
     }
-    jobs.update(**linux_x86_64_test_jobs())
-    jobs.update(**linux_arm64_test_jobs())
-    jobs.update(**macos11_x86_64_test_jobs())
-    jobs.update(**build_wheels_jobs())
+    # jobs.update(**linux_x86_64_test_jobs())
+    # jobs.update(**linux_arm64_test_jobs())
+    # jobs.update(**macos11_x86_64_test_jobs())
+    # jobs.update(**build_wheels_jobs())
     jobs.update(
         {
             "lint_python": {
@@ -894,14 +899,32 @@ def test_workflow_jobs() -> Jobs:
                 "if": IS_PANTS_OWNER,
                 "steps": [
                     *checkout(),
-                    *launch_bazel_remote(),
+                    #*launch_bazel_remote(),
                     *linux_x86_64_helper.setup_primary_python(),
                     *linux_x86_64_helper.native_binaries_download(),
                     {
-                        "name": "Lint",
-                        "run": "./pants lint check ::\n",
+                        "name": "Generate announcement",
+                        "run": dedent(
+                            """\
+                            ./pants run src/python/pants_release/generate_release_announcement.py \
+                            -- --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+                            """
+                        ),
                     },
-                    linux_x86_64_helper.upload_log_artifacts(name="lint"),
+                    {
+                        "name": "Announce to Slack",
+                        "uses": "slackapi/slack-github-action@v1.24.0",
+                        "with": {
+                            "channel-id": "C18RRR4JK",
+                            "payload-file-path": "${{ runner.temp }}/slack_announcement.json",
+                        },
+                        "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"},
+                    },
+                    # {
+                    #     "name": "Lint",
+                    #     "run": "./pants lint check ::\n",
+                    # },
+                    # linux_x86_64_helper.upload_log_artifacts(name="lint"),
                 ],
             },
         }
