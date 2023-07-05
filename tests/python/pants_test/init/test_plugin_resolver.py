@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Dict, List, Sequence
+from typing import Dict, Iterable, Sequence
 
 import pytest
 from pex.interpreter import PythonInterpreter
@@ -128,7 +128,7 @@ def plugin_resolution(
     interpreter: PythonInterpreter | None = None,
     chroot: str | None = None,
     plugins: Sequence[Plugin] = (),
-    requirements: List[str] = None,
+    requirements: Iterable[str] = (),
     sdist: bool = True,
     working_set_entries: Sequence[Distribution] = (),
     use_pypi: bool = False,
@@ -181,7 +181,7 @@ def plugin_resolution(
                 _create_artifact(plugin.name, version, plugin.install_requires)
             env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
 
-            for requirement in requirements or []:
+            for requirement in tuple(requirements):
                 r = Requirement.parse(requirement)
                 _create_artifact(r.key, r.specs[0][1], [])
 

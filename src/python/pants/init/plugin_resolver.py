@@ -41,7 +41,7 @@ class PluginsRequest:
     # (i.e., onto the `sys.path`), then these should be the current contents of the working_set.
     constraints: tuple[Requirement, ...]
     # Backend requirements to resolve
-    requirements: tuple[Requirement, ...]
+    requirements: tuple[str, ...]
 
 
 class ResolvedPluginDistributions(DeduplicatedCollection[str]):
@@ -129,13 +129,13 @@ class PluginResolver:
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironmentVars,
-        requirements: Iterable[str] = None,
+        requirements: Iterable[str] = (),
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
         request = PluginsRequest(
             self._interpreter_constraints,
             tuple(dist.as_requirement() for dist in self._working_set),
-            tuple(requirements or []),
+            tuple(requirements),
         )
 
         for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env, request):
