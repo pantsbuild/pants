@@ -59,6 +59,11 @@ def create_parser() -> argparse.ArgumentParser:
         "--log-level",
         default="WARNING",
     )
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="Publish the changes: create a branch, commit, push, and create a pull request",
+    )
     return parser
 
 
@@ -303,7 +308,14 @@ def main() -> None:
     formatted = update_changelog(release_info)
     update_contributors(release_info)
     update_version(release_info)
-    commit_and_pr(release_info, formatted, args.release_manager)
+
+    if args.publish:
+        commit_and_pr(release_info, formatted, args.release_manager)
+    else:
+        print(
+            f"When you create a pull request, include this in the description:\n\n{formatted.internal}",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":
