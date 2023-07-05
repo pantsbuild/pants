@@ -158,9 +158,10 @@ def run_pants_with_workdir_without_waiting(
                     env[h] = value
     else:
         env = os.environ.copy()
+
+    env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
     if extra_env:
         env.update(extra_env)
-    env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
 
     # Pants command that was called from the test shouldn't have a parent.
     if "PANTS_PARENT_BUILD_ID" in env:

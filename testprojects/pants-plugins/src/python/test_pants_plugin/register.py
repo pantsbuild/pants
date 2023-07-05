@@ -5,7 +5,6 @@ import os
 
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import collect_rules, goal_rule
-from pants.option.custom_types import file_option
 from pants.option.option_types import FileOption
 
 
@@ -39,3 +38,6 @@ def rules():
 
 if os.environ.get("_RAISE_EXCEPTION_ON_IMPORT", False):
     raise Exception("exception during import!")
+
+if os.environ.get("_IMPORT_REQUIREMENT", False):
+    import pydash

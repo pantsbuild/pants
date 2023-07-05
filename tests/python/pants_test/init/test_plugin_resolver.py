@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Dict, Sequence
+from typing import Dict, Iterable, Sequence
 
 import pytest
 from pex.interpreter import PythonInterpreter
@@ -128,6 +128,7 @@ def plugin_resolution(
     interpreter: PythonInterpreter | None = None,
     chroot: str | None = None,
     plugins: Sequence[Plugin] = (),
+    requirements: Iterable[str] = (),
     sdist: bool = True,
     working_set_entries: Sequence[Distribution] = (),
     use_pypi: bool = False,
@@ -150,31 +151,39 @@ def plugin_resolution(
 
     with provide_chroot(chroot) as (root_dir, create_artifacts):
         env: Dict[str, str] = {}
-        repo_dir = None
+        repo_dir = os.path.join(root_dir, "repo")
+
+        def _create_artifact(name, version, install_requires):
+            if create_artifacts:
+                setup_py_args = ["sdist" if sdist else "bdist_wheel", "--dist-dir", "dist/"]
+                _run_setup_py(
+                    rule_runner,
+                    name,
+                    artifact_interpreter_constraints,
+                    version,
+                    install_requires,
+                    setup_py_args,
+                    repo_dir,
+                )
+
+        env.update(
+            PANTS_PYTHON_REPOS_REPOS=f"['file://{repo_dir}']",
+            PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
+        )
+        if not use_pypi:
+            env.update(PANTS_PYTHON_REPOS_INDEXES="[]")
+
         if plugins:
-            repo_dir = os.path.join(root_dir, "repo")
-            env.update(
-                PANTS_PYTHON_REPOS_REPOS=f"['file://{repo_dir}']",
-                PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
-            )
-            if not use_pypi:
-                env.update(PANTS_PYTHON_REPOS_INDEXES="[]")
             plugin_list = []
             for plugin in plugins:
                 version = plugin.version
                 plugin_list.append(f"{plugin.name}=={version}" if version else plugin.name)
-                if create_artifacts:
-                    setup_py_args = ["sdist" if sdist else "bdist_wheel", "--dist-dir", "dist/"]
-                    _run_setup_py(
-                        rule_runner,
-                        plugin.name,
-                        artifact_interpreter_constraints,
-                        version,
-                        plugin.install_requires,
-                        setup_py_args,
-                        repo_dir,
-                    )
+                _create_artifact(plugin.name, version, plugin.install_requires)
             env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
+
+            for requirement in tuple(requirements):
+                r = Requirement.parse(requirement)
+                _create_artifact(r.key, r.specs[0][1], [])
 
         configpath = os.path.join(root_dir, "pants.toml")
         if create_artifacts:
@@ -194,10 +203,7 @@ def plugin_resolution(
         plugin_resolver = PluginResolver(
             bootstrap_scheduler, interpreter_constraints, input_working_set
         )
-        working_set = plugin_resolver.resolve(
-            options_bootstrapper,
-            complete_env,
-        )
+        working_set = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
         for dist in working_set:
             assert (
                 Path(os.path.realpath(cache_dir)) in Path(os.path.realpath(dist.location)).parents
@@ -221,7 +227,10 @@ def test_plugins_bdist(rule_runner: RuleRunner) -> None:
 
 def _do_test_plugins(rule_runner: RuleRunner, sdist: bool) -> None:
     with plugin_resolution(
-        rule_runner, plugins=[Plugin("jake", "1.2.3"), Plugin("jane")], sdist=sdist
+        rule_runner,
+        plugins=[Plugin("jake", "1.2.3"), Plugin("jane")],
+        sdist=sdist,
+        requirements=["lib==4.5.6"],
     ) as (
         working_set,
         _,
