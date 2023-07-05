@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import datetime
+from textwrap import dedent
 
 import pytest
 from packaging.version import Version
@@ -77,29 +78,131 @@ some entry"""
 
 
 @pytest.mark.parametrize(
-    ("existing_contents", "expected"),
+    ("existing_lines", "expected_lines"),
     [
         pytest.param(
-            "# 2.1234.x Release series\n",
-            "# 2.1234.x Release series\n\nNEW SECTION\n",
+            """\
+            # 2.1234.x Release series
+            """,
+            """\
+            # 2.1234.x Release series
+
+            NEW SECTION
+            """,
             id="defaults to end of file",
         ),
         pytest.param(
-            "# 2.1234.x Release series\n\n## 2.1234.5678rc9\nEXISTING1## 2.1234.0.dev0\nEXISTING2",
-            "# 2.1234.x Release series\n\nNEW SECTION\n\n## 2.1234.5678rc9\nEXISTING1## 2.1234.0.dev0\nEXISTING2",
+            """\
+            # 2.1234.x Release series
+
+            ## 2.1234.5678rc9
+
+            EXISTING1
+
+            ## 2.1234.0.dev0
+
+            EXISTING2
+            """,
+            """\
+            # 2.1234.x Release series
+
+            NEW SECTION
+
+            ## 2.1234.5678rc9
+
+            EXISTING1
+
+            ## 2.1234.0.dev0
+
+            EXISTING2
+            """,
             id="finds the first release-like section",
         ),
         pytest.param(
-            "# 2.1234.x Release series\n\n## What's new\n\n---\n\n## 2.1234.5678rc9\nEXISTING1",
-            "# 2.1234.x Release series\n\n## What's new\n\n---\n\nNEW SECTION\n\n## 2.1234.5678rc9\nEXISTING1",
+            """\
+            # 2.1234.x Release series
+
+            ## 2.1234.56 (date)
+
+            EXISTING
+            """,
+            """\
+            # 2.1234.x Release series
+
+            NEW SECTION
+            """,
+            id="replaces matching version at end of file",
+        ),
+        pytest.param(
+            """\
+            # 2.1234.x Release series
+
+            ## 2.1234.56 (date)
+
+            EXISTING1
+
+            ## 2.1234.56rc7
+
+            EXISTING2
+            """,
+            """\
+            # 2.1234.x Release series
+
+            NEW SECTION
+
+            ## 2.1234.56rc7
+
+            EXISTING2
+            """,
+            id="replaces matching version in middle of file",
+        ),
+        pytest.param(
+            """\
+            # 2.1234.x Release series
+
+            ## What's new
+
+            ---
+
+            ## 2.1234.5678rc9
+
+            EXISTING1
+            """,
+            """\
+            # 2.1234.x Release series
+
+            ## What's new
+
+            ---
+
+            NEW SECTION
+
+            ## 2.1234.5678rc9
+
+            EXISTING1
+            """,
             id="ignores 'What's new'",
         ),
         pytest.param(
-            "# 2.1234.x Release series\n\n### 2.1234\nEXISTING\n",
-            "# 2.1234.x Release series\n\n### 2.1234\nEXISTING\n\nNEW SECTION\n",
+            """\
+            # 2.1234.x Release series
+
+            ### 2.1234
+            EXISTING
+            """,
+            """\
+            # 2.1234.x Release series
+
+            ### 2.1234
+            EXISTING
+
+            NEW SECTION
+            """,
             id="ignores unexpected heading depth",
         ),
     ],
 )
-def test_splice(existing_contents: str, expected: str) -> None:
-    assert splice(existing_contents, "NEW SECTION") == expected
+def test_splice(existing_lines: str, expected_lines: str) -> None:
+    existing = dedent(existing_lines)
+    expected = dedent(expected_lines)
+    assert splice("2.1234.56", existing, "NEW SECTION") == expected

@@ -206,14 +206,37 @@ def format_notes(release_info: ReleaseInfo, entries: list[Entry], date: datetime
     return Formatted(external=external, internal=internal)
 
 
-def splice(existing_contents: str, new_section: str) -> str:
-    # Find the first `## 2.minor...` heading, to be able to insert immediately before it, or the end
-    # of file, if not such section exists
+def splice(version: str, existing_contents: str, new_section: str) -> str:
+    # Find an existing section for this version, if one exists, to be able to replace it wholesale
+    # (NB. we only look at the version number, not the date, for deciding whether the section
+    # matches)
     try:
-        index = existing_contents.index("\n## 2.")
+        index_matching = existing_contents.index(f"\n## {version} ")
+        search_from_index = index_matching + 1
     except ValueError:
-        index = len(existing_contents)
-    return "".join([existing_contents[:index], "\n", new_section, "\n", existing_contents[index:]])
+        index_matching = None
+        search_from_index = 0
+
+    # Find the next `## 2.minor...` heading, which would be the previous version, to be able to
+    # insert/replace the right section, or the end of file, if not such section exists
+    try:
+        index_previous = existing_contents.index("\n## 2.", search_from_index)
+    except ValueError:
+        index_previous = len(existing_contents)
+
+    if index_matching is None:
+        # if there was no existing section, we're just inserting at that index
+        index_matching = index_previous
+
+    return "".join(
+        [
+            existing_contents[:index_matching],
+            "\n",
+            new_section,
+            "\n",
+            existing_contents[index_previous:],
+        ]
+    )
 
 
 def splice_into_file(release_info: ReleaseInfo, formatted: Formatted) -> None:
@@ -224,7 +247,7 @@ def splice_into_file(release_info: ReleaseInfo, formatted: Formatted) -> None:
         # default content if the file doesn't exist yet
         existing_contents = f"# {release_info.slug} Release Series\n"
 
-    file_name.write_text(splice(existing_contents, formatted.external))
+    file_name.write_text(splice(str(release_info.version), existing_contents, formatted.external))
 
 
 def update_changelog(release_info: ReleaseInfo) -> Formatted:
