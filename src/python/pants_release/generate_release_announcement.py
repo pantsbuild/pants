@@ -1,6 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import argparse
+import json
 from pathlib import Path
 
 from pants_release.common import sorted_contributors
@@ -50,5 +51,33 @@ def announcement_text() -> str:
     return announcement
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--channel",
+        required=True,
+        choices=["slack", "email"],
+        help="Which channel to generate the announcement for.",
+    )
+    options = parser.parse_args()
+    if options.channel == "slack":
+        announcement = json.dumps(
+            {
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": announcement_text(),
+                        },
+                    },
+                ]
+            }
+        )
+    else:
+        announcement = announcement_text()
+    print(announcement)
+
+
 if __name__ == "__main__":
-    print(announcement_text())
+    main()

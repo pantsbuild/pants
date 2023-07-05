@@ -1091,6 +1091,24 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         "skip-existing": True,
                     },
                 },
+                {
+                    "name": "Generate announcement",
+                    "run": dedent(
+                        """\
+                        ./pants run src/python/pants_release/generate_release_announcement.py \
+                        -- --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+                        """
+                    ),
+                },
+                {
+                    "name": "Announce to Slack",
+                    "uses": "slackapi/slack-github-action@v1.24.0",
+                    "with": {
+                        "channel-id": "C18RRR4JK",
+                        "payload-file-path": "${{ runner.temp }}/slack_announcement.json",
+                    },
+                    "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"},
+                },
                 deploy_to_s3(
                     "Deploy commit mapping to S3",
                     scope="tags/pantsbuild.pants",
