@@ -1290,8 +1290,9 @@ class PublicReposOutput:
 
 
 def public_repos() -> PublicReposOutput:
-    """ Run tests against public repositories, to validate new versions of Pants. See `Repo` for
-    more details.
+    """Run tests against public repositories, to validate new versions of Pants.
+
+    See `Repo` for more details.
     """
     inputs, env = workflow_dispatch_inputs(
         [
