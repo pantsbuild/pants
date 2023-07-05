@@ -160,8 +160,9 @@ pub trait Visitor {
 fn gen_impl_hash_file(name: &'static str, source_dir: &Path, impl_dir: &Path, out_dir: &Path) {
   let mut hasher = Sha256::default();
   for entry in WalkDir::new(impl_dir)
+    .sort_by_file_name()
     .into_iter()
-    .chain(WalkDir::new(source_dir).into_iter())
+    .chain(WalkDir::new(source_dir).sort_by_file_name().into_iter())
     .flatten()
   {
     if entry.file_type().is_file() && entry.path().file_name().unwrap() != "tests.rs" {
@@ -169,6 +170,9 @@ fn gen_impl_hash_file(name: &'static str, source_dir: &Path, impl_dir: &Path, ou
       let _ = std::io::copy(&mut reader, &mut hasher).expect("Failed to copy bytes");
     }
   }
+  hasher
+    .write_all(env::var("CARGO_PKG_VERSION").unwrap().as_bytes())
+    .unwrap();
   let hash_bytes = &hasher.finalize();
   let hash = hex::encode(hash_bytes);
   let mut file = std::fs::File::create(out_dir.join(format!("{name}_impl_hash.rs"))).unwrap();

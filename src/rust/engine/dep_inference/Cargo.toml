@@ -1,4 +1,5 @@
 [package]
+# NB:
 version = "0.0.1"
 edition = "2021"
 name = "dep_inference"
@@ -6,20 +7,23 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [build-dependencies]
+sha2 = "0.10"
+walkdir = "2"
+hex = "0.4.3"
+
+# NB: If a change to these versions requires cache busting, bump this package's version
 tree-sitter = "0.20.10"
 tree-sitter-python = "0.20.2"
 tree-sitter-javascript = "0.20.0"
-checksums = "0.9.1"
-sha2 = "0.10.7"
-walkdir = "2.3.3"
-hex = "0.4.3"
 
 [dependencies]
 fnv = "1.0.5"
 protos = { path = "../protos" }
 serde = "1.0.136"
 serde_derive = "1.0"
+itertools = "0.10.0"
+
+# NB: If a change to these versions requires cache busting, bump this package's version
 tree-sitter = "0.20.10"
 tree-sitter-python = "0.20.2"
 tree-sitter-javascript = "0.20.0"
-itertools = "0.10.0"
