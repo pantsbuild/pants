@@ -7,7 +7,7 @@ import logging
 import site
 import sys
 from dataclasses import dataclass
-from typing import List, Optional, cast
+from typing import Optional, cast, Iterable
 
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
