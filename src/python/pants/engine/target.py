@@ -1592,10 +1592,7 @@ class InvalidFieldTypeException(InvalidFieldException):
         expected_type: str,
         description_of_origin: str | None = None,
     ) -> None:
-        if hasattr(raw_value, "_type_description"):
-            raw_type = f"which is an {raw_value._type_description}"  # type: ignore[union-attr]
-        else:
-            raw_type = f"with type `{type(raw_value).__name__}`"
+        raw_type = f"with type `{type(raw_value).__name__}`"
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
             f"`{repr(raw_value)}` {raw_type}.",

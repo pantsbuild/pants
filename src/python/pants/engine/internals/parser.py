@@ -488,8 +488,6 @@ class _UnrecognizedSymbol:
     values.
     """
 
-    _type_description = "unrecognized symbol"
-
     def __init__(self, name: str) -> None:
         self.name = name
         self.args: tuple[Any, ...] = ()
@@ -513,3 +511,7 @@ class _UnrecognizedSymbol:
         kwargs = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
         signature = ", ".join(s for s in (args, kwargs) if s)
         return f"{self.name}({signature})"
+
+
+# Customize the type name presented by the InvalidFieldTypeException.
+_UnrecognizedSymbol.__name__ = "<unrecognized symbol>"
