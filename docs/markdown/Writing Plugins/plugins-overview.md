@@ -77,7 +77,7 @@ You can depend on third-party dependencies in your in-repo plugin by adding a `r
 the plugin `register.py` module:
 
 ```
-ansicolors==1.18.0"
+ansicolors==1.18.0
 ```
 
 Or, although less recommended, you can add them to the `plugins` option:
