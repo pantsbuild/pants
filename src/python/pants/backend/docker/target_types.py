@@ -271,6 +271,23 @@ class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictSt
             yield f"{label}={value_formatter(value)}"
 
 
+class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStringToStringField):
+    alias = "extra_build_hosts"
+    help = help_text(
+        f"""
+        Extra hosts entries to be added to a container's `/etc/hosts` file.
+
+        #TODO:
+        Use `[docker].build_hosts` to set default host entries for all images.
+        """
+    )
+    docker_build_option = "--add-host"
+
+    def option_values(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+        for label, value in (self.value or {}).items():
+            yield f"{label}:{value_formatter(value)}"
+
+
 class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
@@ -440,6 +457,7 @@ class DockerImageTarget(Target):
         DockerImageRegistriesField,
         DockerImageRepositoryField,
         DockerImageBuildImageLabelsOptionField,
+        DockerImageBuildImageExtraHostsField,
         DockerImageBuildSecretsOptionField,
         DockerImageBuildSSHOptionField,
         DockerImageSkipPushField,

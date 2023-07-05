@@ -1010,6 +1010,43 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  extra_build_hosts={"docker": "10.180.0.1", "docker2": "10.180.0.2"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--add-host",
+            "docker:10.180.0.1",
+            "--add-host",
+            "docker2:10.180.0.2",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
 def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
