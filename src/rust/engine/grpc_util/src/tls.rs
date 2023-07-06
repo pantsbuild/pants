@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rustls::{ClientConfig, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError};
 use webpki::DNSNameRef;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Config {
   pub root_ca_certs: Option<Vec<u8>>,
   pub mtls: Option<MtlsConfig>,
@@ -79,6 +79,7 @@ impl TryFrom<Config> for ClientConfig {
   }
 }
 
+#[derive(Clone)]
 pub struct MtlsConfig {
   /// PEM bytes of the private key used for MTLS.
   pub key: Vec<u8>,
@@ -86,6 +87,7 @@ pub struct MtlsConfig {
   pub cert_chain: Vec<u8>,
 }
 
+#[derive(Clone)]
 pub enum CertificateCheck {
   Enabled,
   DangerouslyDisabled,

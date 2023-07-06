@@ -11,7 +11,7 @@ use testutil::data::{TestData, TestDirectory};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use workunit_store::WorkunitStore;
 
-use crate::remote::ByteStore;
+use crate::remote::{ByteStore, RemoteOptions};
 use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
 use crate::MEGABYTES;
 
@@ -184,22 +184,37 @@ async fn write_file_one_chunk() {
   assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
 }
 
+fn remote_options(
+  cas_address: String,
+  chunk_size_bytes: usize,
+  batch_api_size_limit: usize,
+) -> RemoteOptions {
+  RemoteOptions {
+    cas_address,
+    instance_name: None,
+    tls_config: tls::Config::default(),
+    headers: BTreeMap::new(),
+    chunk_size_bytes,
+    rpc_timeout: Duration::from_secs(5),
+    rpc_retries: 1,
+    rpc_concurrency_limit: 256,
+    capabilities_cell_opt: None,
+    batch_api_size_limit,
+  }
+}
+
 #[tokio::test]
 async fn write_file_multiple_chunks() {
   let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   let store = ByteStore::new(
-    &cas.address(),
     None,
-    tls::Config::default(),
-    BTreeMap::new(),
-    10 * 1024,
-    Duration::from_secs(5),
-    1,
-    256,
-    None,
-    0, // disable batch API, force streaming API
+    remote_options(
+      cas.address(),
+      10 * 1024,
+      0, // disable batch API, force streaming API
+    ),
   )
   .unwrap();
 
@@ -264,16 +279,12 @@ async fn write_file_errors() {
 async fn write_connection_error() {
   let _ = WorkunitStore::setup_for_tests();
   let store = ByteStore::new(
-    "http://doesnotexist.example",
     None,
-    tls::Config::default(),
-    BTreeMap::new(),
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    1,
-    256,
-    None,
-    super::tests::STORE_BATCH_API_SIZE_LIMIT,
+    remote_options(
+      "http://doesnotexist.example".to_owned(),
+      10 * 1024 * 1024,
+      super::tests::STORE_BATCH_API_SIZE_LIMIT,
+    ),
   )
   .unwrap();
   let error = store
@@ -336,16 +347,12 @@ async fn list_missing_digests_error() {
 
 fn new_byte_store(cas: &StubCAS) -> ByteStore {
   ByteStore::new(
-    &cas.address(),
     None,
-    tls::Config::default(),
-    BTreeMap::new(),
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-    256,
-    None,
-    super::tests::STORE_BATCH_API_SIZE_LIMIT,
+    remote_options(
+      cas.address(),
+      10 * MEGABYTES,
+      super::tests::STORE_BATCH_API_SIZE_LIMIT,
+    ),
   )
   .unwrap()
 }

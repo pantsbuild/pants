@@ -41,6 +41,21 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
   fn chunk_size_bytes(&self) -> usize;
 }
 
+// TODO: Consider providing `impl Default`, similar to `super::LocalOptions`.
+#[derive(Clone)]
+pub struct RemoteOptions {
+  pub cas_address: String,
+  pub instance_name: Option<String>,
+  pub headers: BTreeMap<String, String>,
+  pub tls_config: grpc_util::tls::Config,
+  pub chunk_size_bytes: usize,
+  pub rpc_timeout: Duration,
+  pub rpc_retries: usize,
+  pub rpc_concurrency_limit: usize,
+  pub capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
+  pub batch_api_size_limit: usize,
+}
+
 #[derive(Clone)]
 pub struct ByteStore {
   instance_name: Option<String>,
@@ -77,32 +92,8 @@ impl LoadDestination for Vec<u8> {
 }
 
 impl ByteStore {
-  // TODO: Consider extracting these options to a struct with `impl Default`, similar to
-  // `super::LocalOptions`.
-  pub fn new(
-    cas_address: &str,
-    instance_name: Option<String>,
-    tls_config: grpc_util::tls::Config,
-    headers: BTreeMap<String, String>,
-    chunk_size_bytes: usize,
-    rpc_timeout: Duration,
-    rpc_retries: usize,
-    rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-    batch_api_size_limit: usize,
-  ) -> Result<ByteStore, String> {
-    let provider = Arc::new(reapi::Provider::new(
-      cas_address,
-      instance_name.clone(),
-      tls_config,
-      headers,
-      chunk_size_bytes,
-      rpc_timeout,
-      rpc_retries,
-      rpc_concurrency_limit,
-      capabilities_cell_opt,
-      batch_api_size_limit,
-    )?);
+  pub fn new(instance_name: Option<String>, options: RemoteOptions) -> Result<ByteStore, String> {
+    let provider = Arc::new(reapi::Provider::new(options)?);
     Ok(ByteStore {
       instance_name,
       provider,
