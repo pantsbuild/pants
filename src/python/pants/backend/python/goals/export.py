@@ -66,11 +66,11 @@ class ExportPluginOptions:
         help=softwrap(
             """\
             Export Python resolves using this format. Options are:
-              - mutable_virtualenv: Export a standalone mutable virtualenv that you can
+              - `mutable_virtualenv`: Export a standalone mutable virtualenv that you can
                 further modify.
-              - symlinked_immutable_virtualenv: Export a symlink into a cached Python virtualenv.
+              - `symlinked_immutable_virtualenv`: Export a symlink into a cached Python virtualenv.
                 This virtualenv will have no pip binary, and will be immutable. Any attempt to
-                modify it will corrupt the cache!  It may, however, take significantly less time
+                modify it will corrupt the cache! It may, however, take significantly less time
                 to export than a standalone, mutable virtualenv.
             """
         ),

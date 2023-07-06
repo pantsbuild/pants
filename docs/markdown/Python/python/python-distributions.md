@@ -199,7 +199,7 @@ The generated `setup.py` will have its `install_requires` set to include the 3rd
 > 
 > When a `python_distribution` depends on another `python_distribution`, Pants will add it to the `install_requires` value in the generated `setup.py`. 
 > 
-> By default, Pants will use exact requirements for first-party dependencies, like `other_dist==1.0.1`. You can set `first_party_depenency_version_scheme` in the `[setup-py-generation]` scope to `'compatible'` to use `~=` instead of `==`, and `any` to leave off the version.
+> By default, Pants will use exact requirements for first-party dependencies, like `other_dist==1.0.1`. You can set `first_party_dependency_version_scheme` in the `[setup-py-generation]` scope to `'compatible'` to use `~=` instead of `==`, and `any` to leave off the version.
 > 
 > For example:
 > 

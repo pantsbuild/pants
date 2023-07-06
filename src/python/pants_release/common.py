@@ -1,24 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""Utils for scripts to interface with the outside world.
-
-NB: We intentionally only use the standard library here, rather than using
-Pants code and/or 3rd-party dependencies like `colors`, to ensure that all
-scripts that import this file may still be invoked directly, rather than having
-to run via `./pants run`.
-
-We want to allow direct invocation of scripts for these reasons:
-1) Consistency with how we invoke Bash scripts, which notably may _not_ be ran via `./pants run`.
-2) More ergonomic command line arguments, e.g. `./src/python/pants_release/generate_github_workflows.py [args]`,
-   rather than `./pants run src/python/pants_release:generate_github_workflows -- [args]`.
-3) Avoid undesired dependencies on Pants for certain scripts.
-
-Callers of this file, however, are free to dogfood Pants as they'd like, and any script
-may be called via `./pants run` instead of direct invocation if desired.
-"""
 from __future__ import annotations
 
+import subprocess
 import time
 from typing import NoReturn
 
@@ -47,3 +32,17 @@ def elapsed_time() -> tuple[int, int]:
     now = time.time()
     elapsed_seconds = int(now - _SCRIPT_START_TIME)
     return elapsed_seconds // 60, elapsed_seconds % 60
+
+
+def sorted_contributors(git_range: str) -> list[str]:
+    contributors = set(
+        subprocess.run(
+            ["git", "log", "--use-mailmap", "--format=format:%aN", git_range],
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+        .stdout.decode()
+        .splitlines()
+    )
+    contributors -= {"dependabot[bot]"}
+    return sorted(contributors)

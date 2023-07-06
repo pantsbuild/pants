@@ -23,13 +23,13 @@ from pants.backend.python.macros.poetry_requirements import (
     parse_single_dependency,
     parse_str_version,
 )
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 # ---------------------------------------------------------------------------------

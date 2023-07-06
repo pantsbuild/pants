@@ -536,7 +536,7 @@ class TestSubsystem(GoalSubsystem):
             The interactive process used will be immediately blocked waiting for a client before
             continuing.
 
-            This option implies --debug.
+            This option implies `--debug`.
             """
         ),
     )
@@ -561,7 +561,7 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
-    report = BoolOption(default=False, advanced=True, help="Write test reports to --report-dir.")
+    report = BoolOption(default=False, advanced=True, help="Write test reports to `--report-dir`.")
     default_report_path = str(PurePath("{distdir}", "test", "reports"))
     _report_dir = StrOption(
         default=default_report_path,
@@ -580,7 +580,7 @@ class TestSubsystem(GoalSubsystem):
             discarded.
 
             Useful for splitting large numbers of test files across multiple machines in CI.
-            For example, you can run three shards with --shard=0/3, --shard=1/3, --shard=2/3.
+            For example, you can run three shards with `--shard=0/3`, `--shard=1/3`, `--shard=2/3`.
 
             Note that the shards are roughly equal in size as measured by number of files.
             No attempt is made to consider the size of different files, the time they have
@@ -628,13 +628,13 @@ class TestSubsystem(GoalSubsystem):
             and then this may be further divided into smaller batches, based on this option.
             This is done:
 
-                1. to avoid OS argument length limits (in processes which don't support argument files)
-                2. to support more stable cache keys than would be possible if all files were operated \
-                    on in a single batch
-                3. to allow for parallelism in test runners which don't have internal \
-                    parallelism, or -- if they do support internal parallelism -- to improve scheduling \
-                    behavior when multiple processes are competing for cores and so internal parallelism \
-                    cannot be used perfectly
+              1. to avoid OS argument length limits (in processes which don't support argument files)
+              2. to support more stable cache keys than would be possible if all files were operated \
+                 on in a single batch
+              3. to allow for parallelism in test runners which don't have internal \
+                 parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+                 behavior when multiple processes are competing for cores and so internal parallelism \
+                 cannot be used perfectly
 
             In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
             and so this value is only a "target" max batch size (rather than an exact value).
@@ -733,10 +733,10 @@ class TestsBatchCompatibilityTagField(StringField, metaclass=ABCMeta):
         `{target_name}`, then the two targets are explicitly compatible and _may_ run in the same
         test runner process. Compatible tests may not end up in the same test runner batch if:
 
-            * There are "too many" compatible tests in a partition, as determined by the \
-                `[test].batch_size` config parameter, or
-            * Compatible tests have some incompatibility in Pants metadata (i.e. different \
-                `resolve`s or `extra_env_vars`).
+          * There are "too many" compatible tests in a partition, as determined by the \
+            `[test].batch_size` config parameter, or
+          * Compatible tests have some incompatibility in Pants metadata (i.e. different \
+            `resolve`s or `extra_env_vars`).
 
         When tests with the same `batch_compatibility_tag` have incompatibilities in some other
         Pants metadata, they will be automatically split into separate batches. This way you can

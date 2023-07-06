@@ -214,14 +214,15 @@ class AdhocToolOutputRootDirField(StringField):
     alias: ClassVar[str] = "root_output_directory"
     default = "/"
     help = help_text(
-        """Adjusts the location of files output by this target, when consumed as a dependency.
+        """
+        Adjusts the location of files output by this target, when consumed as a dependency.
 
         Values are relative to the build root, except in the following cases:
 
-        * `.` specifies the location of the `BUILD` file.
-        * Values beginning with `./` are relative to the location of the `BUILD` file.
-        * `/` or the empty string specifies the build root.
-        * Values beginning with `/` are also relative to the build root.
+          * `.` specifies the location of the `BUILD` file.
+          * Values beginning with `./` are relative to the location of the `BUILD` file.
+          * `/` or the empty string specifies the build root.
+          * Values beginning with `/` are also relative to the build root.
         """
     )
 
