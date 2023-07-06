@@ -3,9 +3,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::time::Duration;
 
-use bytes::Bytes;
 use grpc_util::tls;
-use hashing::Digest;
 use mock::StubCAS;
 use testutil::data::TestData;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
@@ -19,12 +17,11 @@ use crate::MEGABYTES;
 async fn loads_file() {
   let testdata = TestData::roland();
   let cas = new_cas(10);
+  let store = new_byte_store(&cas);
 
   assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest())
-      .await
-      .unwrap(),
-    Some(testdata.bytes())
+    store.load_bytes(testdata.digest()).await,
+    Ok(Some(testdata.bytes()))
   );
 }
 
@@ -38,6 +35,7 @@ async fn loads_huge_file_via_temp_file() {
     .chunk_size_bytes(MEGABYTES)
     .file(&testdata)
     .build();
+  let store = new_byte_store(&cas);
 
   let file = tokio::task::spawn_blocking(tempfile::tempfile)
     .await
@@ -45,7 +43,7 @@ async fn loads_huge_file_via_temp_file() {
     .unwrap();
   let file = tokio::fs::File::from_std(file);
 
-  let mut file = new_byte_store(&cas)
+  let mut file = store
     .load_file(testdata.digest(), file)
     .await
     .unwrap()
@@ -63,9 +61,10 @@ async fn loads_huge_file_via_temp_file() {
 async fn missing_file() {
   let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
+  let store = new_byte_store(&cas);
 
   assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), TestData::roland().digest()).await,
+    store.load_bytes(TestData::roland().digest()).await,
     Ok(None)
   );
 }
@@ -74,14 +73,9 @@ async fn missing_file() {
 async fn load_file_grpc_error() {
   let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::cas_always_errors();
+  let store = new_byte_store(&cas);
 
-  let error = load_file_bytes(&new_byte_store(&cas), TestData::roland().digest())
-    .await
-    .expect_err("Want error");
-  assert!(
-    error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {error}"
-  )
+  assert_error(store.load_bytes(TestData::roland().digest()).await);
 }
 
 #[tokio::test]
@@ -97,39 +91,13 @@ async fn write_file_one_chunk() {
   assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
 }
 
-fn remote_options(
-  cas_address: String,
-  chunk_size_bytes: usize,
-  batch_api_size_limit: usize,
-) -> RemoteOptions {
-  RemoteOptions {
-    cas_address,
-    instance_name: None,
-    tls_config: tls::Config::default(),
-    headers: BTreeMap::new(),
-    chunk_size_bytes,
-    rpc_timeout: Duration::from_secs(5),
-    rpc_retries: 1,
-    rpc_concurrency_limit: 256,
-    capabilities_cell_opt: None,
-    batch_api_size_limit,
-  }
-}
-
 #[tokio::test]
 async fn write_file_errors() {
   let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::cas_always_errors();
 
   let store = new_byte_store(&cas);
-  let error = store
-    .store_bytes(TestData::roland().bytes())
-    .await
-    .expect_err("Want error");
-  assert!(
-    error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {error}"
-  );
+  assert_error(store.store_bytes(TestData::roland().bytes()).await)
 }
 
 #[tokio::test]
@@ -170,28 +138,36 @@ async fn list_missing_digests_error() {
 
   let store = new_byte_store(&cas);
 
-  let error = store
-    .list_missing_digests(vec![TestData::roland().digest()])
-    .await
-    .expect_err("Want error");
-  assert!(
-    error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {error}"
-  );
+  assert_error(
+    store
+      .list_missing_digests(vec![TestData::roland().digest()])
+      .await,
+  )
 }
 
 fn new_byte_store(cas: &StubCAS) -> ByteStore {
   ByteStore::new(
     None,
-    remote_options(
-      cas.address(),
-      10 * MEGABYTES,
-      super::tests::STORE_BATCH_API_SIZE_LIMIT,
-    ),
+    RemoteOptions {
+      cas_address: cas.address(),
+      instance_name: None,
+      tls_config: tls::Config::default(),
+      headers: BTreeMap::new(),
+      chunk_size_bytes: 10 * MEGABYTES,
+      rpc_timeout: Duration::from_secs(5),
+      rpc_retries: 1,
+      rpc_concurrency_limit: 256,
+      capabilities_cell_opt: None,
+      batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    },
   )
   .unwrap()
 }
 
-async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  store.load_bytes(digest).await
+fn assert_error<T: std::fmt::Debug>(result: Result<T, String>) {
+  let error = result.expect_err("Want error");
+  assert!(
+    error.contains("StubCAS is configured to always fail"),
+    "Bad error message, got: {error}"
+  );
 }
