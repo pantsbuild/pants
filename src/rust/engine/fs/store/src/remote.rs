@@ -20,6 +20,8 @@ use workunit_store::{in_workunit, ObservationMetric};
 use crate::StoreError;
 
 mod reapi;
+#[cfg(test)]
+mod reapi_tests;
 
 pub type ByteSource = Arc<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
 
