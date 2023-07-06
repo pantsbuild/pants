@@ -82,9 +82,12 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     alias: ClassVar[str] = "output_dependencies"
 
     help = help_text(
-        lambda: """
+        lambda: f"""
         Any dependencies that need to be present (as transitive dependencies) whenever the outputs
         of this target are consumed (including as dependencies).
+
+        See also `{AdhocToolExecutionDependenciesField.alias}` and
+        `{AdhocToolRunnableDependenciesField.alias}`.
         """
     )
 
@@ -106,6 +109,9 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
 
         If this field is specified, dependencies from `{AdhocToolOutputDependenciesField.alias}`
         will not be added to the execution sandbox.
+
+        See also `{AdhocToolOutputDependenciesField.alias}` and
+        `{AdhocToolRunnableDependenciesField.alias}`.
         """
     )
 
@@ -117,7 +123,7 @@ class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
 
     help = help_text(
         lambda: f"""
-        The execution dependencies for this command.
+        The runnable dependencies for this command.
 
         Dependencies specified here are those required to exist on the `PATH` to make the command
         complete successfully (interpreters specified in a `#!` command, etc). Note that these
