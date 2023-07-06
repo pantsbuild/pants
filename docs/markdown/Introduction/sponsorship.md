@@ -2,7 +2,7 @@
 title: "Sponsoring Pants"
 slug: "sponsorship"
 excerpt: "How to support the Pants project financially."
-hidden: true
+hidden: false
 createdAt: "2023-07-05T18:06:00.000Z"
 ---
 
@@ -18,6 +18,8 @@ Corporate Sponsorship
 =====================
 
 Corporate sponsorships are formal agreements with the Pants Build organization. Sponsors receive regular access to project maintainers, privileged support channels, and listings and acknowledgements on our website.
+
+To inquire about corporate sponsorship, please reach out to Benjy Weinberger on [Slack](doc:getting-help#slack).
 
 The corporate sponsorship tiers are:
 
