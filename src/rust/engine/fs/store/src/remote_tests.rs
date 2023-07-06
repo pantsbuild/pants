@@ -14,7 +14,7 @@ use crate::remote::{ByteSource, ByteStore, ByteStoreProvider, LoadDestination};
 use crate::MEGABYTES;
 
 #[tokio::test]
-async fn loads_file() {
+async fn load_bytes_existing() {
   let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
   let store = new_byte_store(&testdata);
@@ -26,7 +26,7 @@ async fn loads_file() {
 }
 
 #[tokio::test]
-async fn loads_huge_file_via_temp_file() {
+async fn load_file_existing() {
   // 5MB of data
   let testdata = TestData::new(&"12345".repeat(MEGABYTES));
 
@@ -54,7 +54,7 @@ async fn loads_huge_file_via_temp_file() {
 }
 
 #[tokio::test]
-async fn missing_file() {
+async fn load_bytes_missing() {
   let _ = WorkunitStore::setup_for_tests();
   let (store, _) = empty_byte_store();
 
@@ -65,7 +65,7 @@ async fn missing_file() {
 }
 
 #[tokio::test]
-async fn load_file_grpc_error() {
+async fn load_bytes_provider_error() {
   let _ = WorkunitStore::setup_for_tests();
   let store = byte_store_always_error_provider();
 
@@ -73,7 +73,7 @@ async fn load_file_grpc_error() {
 }
 
 #[tokio::test]
-async fn write_file_one_chunk() {
+async fn store_bytes() {
   let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
 
@@ -85,7 +85,7 @@ async fn write_file_one_chunk() {
 }
 
 #[tokio::test]
-async fn write_file_errors() {
+async fn store_bytes_provider_error() {
   let _ = WorkunitStore::setup_for_tests();
   let store = byte_store_always_error_provider();
   assert_error(store.store_bytes(TestData::roland().bytes()).await)
@@ -120,7 +120,7 @@ async fn list_missing_digests_some_missing() {
 }
 
 #[tokio::test]
-async fn list_missing_digests_error() {
+async fn list_missing_digests_provider_error() {
   let _ = WorkunitStore::setup_for_tests();
   let store = byte_store_always_error_provider();
 
