@@ -90,6 +90,9 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
         To enable legacy use cases, if `{AdhocToolExecutionDependenciesField.alias}` is `None`,
         these dependencies will be materialized in the execution sandbox. This behavior is
         deprecated, and will be removed in version 2.17.0.dev0.
+
+        See also `{AdhocToolExecutionDependenciesField.alias}` and
+        `{AdhocToolRunnableDependenciesField.alias}`.
         """
     )
 
@@ -111,6 +114,9 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
 
         If this field is specified, dependencies from `{AdhocToolOutputDependenciesField.alias}`
         will not be added to the execution sandbox.
+
+        See also `{AdhocToolOutputDependenciesField.alias}` and
+        `{AdhocToolRunnableDependenciesField.alias}`.
         """
     )
 
@@ -122,7 +128,7 @@ class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
 
     help = help_text(
         lambda: f"""
-        The execution dependencies for this command.
+        The runnable dependencies for this command.
 
         Dependencies specified here are those required to exist on the `PATH` to make the command
         complete successfully (interpreters specified in a `#!` command, etc). Note that these
