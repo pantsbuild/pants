@@ -1,6 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
 use std::sync::Arc;
 
 use bytes::Bytes;
@@ -26,34 +27,6 @@ async fn load_bytes_existing() {
 }
 
 #[tokio::test]
-async fn load_file_existing() {
-  // 5MB of data
-  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
-
-  let _ = WorkunitStore::setup_for_tests();
-  let store = new_byte_store(&testdata);
-
-  let file = tokio::task::spawn_blocking(tempfile::tempfile)
-    .await
-    .unwrap()
-    .unwrap();
-  let file = tokio::fs::File::from_std(file);
-
-  let mut file = store
-    .load_file(testdata.digest(), file)
-    .await
-    .unwrap()
-    .unwrap();
-  file.rewind().await.unwrap();
-
-  let mut buf = String::new();
-  file.read_to_string(&mut buf).await.unwrap();
-  assert_eq!(buf.len(), testdata.len());
-  // (assert_eq! means failures unhelpfully print a 5MB string)
-  assert!(buf == testdata.string());
-}
-
-#[tokio::test]
 async fn load_bytes_missing() {
   let _ = WorkunitStore::setup_for_tests();
   let (store, _) = empty_byte_store();
@@ -73,6 +46,46 @@ async fn load_bytes_provider_error() {
 }
 
 #[tokio::test]
+async fn load_file_existing() {
+  // 5MB of data
+  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
+
+  let _ = WorkunitStore::setup_for_tests();
+  let store = new_byte_store(&testdata);
+
+  let file = mk_tempfile().await;
+
+  let file = store
+    .load_file(testdata.digest(), file)
+    .await
+    .unwrap()
+    .unwrap();
+
+  assert_file_contents(file, &testdata.string()).await;
+}
+
+#[tokio::test]
+async fn load_file_missing() {
+  let _ = WorkunitStore::setup_for_tests();
+  let (store, _) = empty_byte_store();
+
+  let file = mk_tempfile().await;
+
+  let result = store.load_file(TestData::roland().digest(), file).await;
+  assert!(result.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn load_file_provider_error() {
+  let _ = WorkunitStore::setup_for_tests();
+  let store = byte_store_always_error_provider();
+
+  let file = mk_tempfile().await;
+
+  assert_error(store.load_file(TestData::roland().digest(), file).await);
+}
+
+#[tokio::test]
 async fn store_bytes() {
   let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
@@ -89,6 +102,47 @@ async fn store_bytes_provider_error() {
   let _ = WorkunitStore::setup_for_tests();
   let store = byte_store_always_error_provider();
   assert_error(store.store_bytes(TestData::roland().bytes()).await)
+}
+
+#[tokio::test]
+async fn store_buffered() {
+  let _ = WorkunitStore::setup_for_tests();
+
+  let testdata = TestData::roland();
+  let bytes = testdata.bytes();
+
+  let (store, provider) = empty_byte_store();
+  assert_eq!(
+    store
+      .store_buffered(testdata.digest(), move |mut file| async move {
+        file.write_all(&bytes).unwrap();
+        Ok(())
+      })
+      .await,
+    Ok(())
+  );
+
+  let blobs = provider.blobs.lock();
+  assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
+}
+
+#[tokio::test]
+async fn store_buffered_provider_error() {
+  let _ = WorkunitStore::setup_for_tests();
+
+  let testdata = TestData::roland();
+  let bytes = testdata.bytes();
+
+  let store = byte_store_always_error_provider();
+  assert_error(
+    store
+      .store_buffered(testdata.digest(), move |mut file| async move {
+        file.write_all(&bytes).unwrap();
+        Ok(())
+      })
+      .await
+      .map_err(|e| e.to_string()),
+  );
 }
 
 #[tokio::test]
@@ -143,6 +197,24 @@ fn empty_byte_store() -> (ByteStore, Arc<TestProvider>) {
 }
 fn byte_store_always_error_provider() -> ByteStore {
   ByteStore::new(None, AlwaysErrorProvider::new())
+}
+
+async fn mk_tempfile() -> tokio::fs::File {
+  let file = tokio::task::spawn_blocking(tempfile::tempfile)
+    .await
+    .unwrap()
+    .unwrap();
+  tokio::fs::File::from_std(file)
+}
+
+async fn assert_file_contents(mut file: tokio::fs::File, expected: &str) {
+  file.rewind().await.unwrap();
+
+  let mut buf = String::new();
+  file.read_to_string(&mut buf).await.unwrap();
+  assert_eq!(buf.len(), expected.len());
+  // (assert_eq! means failures unhelpfully print a potentially-huge string)
+  assert!(buf == expected);
 }
 
 fn assert_error<T: std::fmt::Debug>(result: Result<T, String>) {
