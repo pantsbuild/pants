@@ -1,18 +1,69 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Write;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
+use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use testutil::data::TestData;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
-use crate::remote::{ByteSource, ByteStore, ByteStoreProvider, LoadDestination};
+use crate::remote::{ByteSource, ByteStore, ByteStoreProvider, LoadDestination, RemoteOptions};
+use crate::tests::new_cas;
 use crate::MEGABYTES;
+
+#[tokio::test]
+async fn smoke_test_from_options_reapi_provider() {
+  // run through the various methods using a 'real' provider (REAPI
+  // talking to a stubbed CAS), as a double-check that the test
+  // provider is plausible
+  let roland = TestData::roland();
+  let empty = TestData::empty();
+
+  let cas = new_cas(10);
+
+  let store = ByteStore::from_options(RemoteOptions {
+    cas_address: cas.address(),
+    instance_name: None,
+    tls_config: tls::Config::default(),
+    headers: BTreeMap::new(),
+    chunk_size_bytes: 10 * MEGABYTES,
+    rpc_timeout: Duration::from_secs(5),
+    rpc_retries: 1,
+    rpc_concurrency_limit: 256,
+    capabilities_cell_opt: None,
+    batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+  })
+  .unwrap();
+
+  let mut missing_set = HashSet::new();
+  missing_set.insert(empty.digest());
+
+  // only roland is in the CAS:
+  assert_eq!(
+    store.load_bytes(roland.digest()).await,
+    Ok(Some(roland.bytes()))
+  );
+  assert_eq!(store.load_bytes(empty.digest()).await, Ok(None));
+  assert_eq!(
+    store
+      .list_missing_digests(vec![roland.digest(), empty.digest()])
+      .await,
+    Ok(missing_set)
+  );
+
+  // insert empty:
+  assert_eq!(store.store_bytes(empty.bytes()).await, Ok(()));
+  assert_eq!(
+    store.load_bytes(empty.digest()).await,
+    Ok(Some(empty.bytes()))
+  );
+}
 
 #[tokio::test]
 async fn load_bytes_existing() {
