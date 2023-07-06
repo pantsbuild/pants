@@ -146,21 +146,18 @@ async fn list_missing_digests_error() {
 }
 
 fn new_byte_store(cas: &StubCAS) -> ByteStore {
-  ByteStore::new(
-    None,
-    RemoteOptions {
-      cas_address: cas.address(),
-      instance_name: None,
-      tls_config: tls::Config::default(),
-      headers: BTreeMap::new(),
-      chunk_size_bytes: 10 * MEGABYTES,
-      rpc_timeout: Duration::from_secs(5),
-      rpc_retries: 1,
-      rpc_concurrency_limit: 256,
-      capabilities_cell_opt: None,
-      batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
-    },
-  )
+  ByteStore::from_options(RemoteOptions {
+    cas_address: cas.address(),
+    instance_name: None,
+    tls_config: tls::Config::default(),
+    headers: BTreeMap::new(),
+    chunk_size_bytes: 10 * MEGABYTES,
+    rpc_timeout: Duration::from_secs(5),
+    rpc_retries: 1,
+    rpc_concurrency_limit: 256,
+    capabilities_cell_opt: None,
+    batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+  })
   .unwrap()
 }
 

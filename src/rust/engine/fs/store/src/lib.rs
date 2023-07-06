@@ -376,8 +376,7 @@ impl Store {
   pub fn into_with_remote(self, remote_options: RemoteOptions) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
-      remote: Some(RemoteStore::new(remote::ByteStore::new(
-        remote_options.instance_name.clone(),
+      remote: Some(RemoteStore::new(remote::ByteStore::from_options(
         remote_options,
       )?)),
       immutable_inputs_base: self.immutable_inputs_base,

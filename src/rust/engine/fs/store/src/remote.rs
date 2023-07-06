@@ -94,12 +94,20 @@ impl LoadDestination for Vec<u8> {
 }
 
 impl ByteStore {
-  pub fn new(instance_name: Option<String>, options: RemoteOptions) -> Result<ByteStore, String> {
-    let provider = Arc::new(reapi::Provider::new(options)?);
-    Ok(ByteStore {
+  pub fn new(
+    instance_name: Option<String>,
+    provider: Arc<dyn ByteStoreProvider + 'static>,
+  ) -> ByteStore {
+    ByteStore {
       instance_name,
       provider,
-    })
+    }
+  }
+
+  pub fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
+    let instance_name = options.instance_name.clone();
+    let provider = Arc::new(reapi::Provider::new(options)?);
+    Ok(ByteStore::new(instance_name, provider))
   }
 
   pub(crate) fn chunk_size_bytes(&self) -> usize {
