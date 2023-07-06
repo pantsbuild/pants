@@ -40,6 +40,7 @@ from pants.engine.target import (
 from pants.engine.unions import union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -436,6 +437,22 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
         CoarsenedTargets,
         Addresses([tgt.address for tgt in target_roots_to_deploy_field_sets.targets]),
     )
+    # Validate that there aren't any dependency cycles among the targets
+    for ct in coarsened_targets.coarsened_closure():
+        if len(ct.members) > 1:
+            raise Exception(
+                softwrap(
+                    f"""
+                Found dependency cycle between the following targets:
+
+                {bullet_list([tgt.address.spec for tgt in ct.members])}
+
+                Deployable targets can not have dependency cylces between them. Please, clear the cycle
+                before proceeding again.
+                """
+                )
+            )
+
     results = _DeployStepResults(
         await MultiGet(
             Get(_DeployStepResult, _DeployTargetRequest(tgt)) for tgt in coarsened_targets
