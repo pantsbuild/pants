@@ -108,4 +108,4 @@ def test_registries_must_be_unique() -> None:
             }
         )
 
-    assert e.match("Registry addresses must be unique: reg1, reg2.")
+    assert e.match("Duplicated docker registry address for aliases: reg1, reg2.")
