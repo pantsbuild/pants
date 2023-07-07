@@ -2,338 +2,353 @@
 # To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
 #   ./pants run src/python/pants_release/generate_github_workflows.py
 
+
 jobs:
   build_wheels_linux_arm64:
     container:
       image: ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf
     env:
-      PANTS_REMOTE_CACHE_READ: "false"
-      PANTS_REMOTE_CACHE_WRITE: "false"
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
     name: Build wheels (Linux-ARM64)
     needs:
-      - release_info
+    - release_info
     runs-on:
-      - self-hosted
-      - Linux
-      - ARM64
+    - self-hosted
+    - Linux
+    - ARM64
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 10
-          ref: ${{ needs.release_info.outputs.build-ref }}
-      - name: Configure Git
-        run: git config --global safe.directory "$GITHUB_WORKSPACE"
-      - name: Install rustup
-        run:
-          'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-          -v -y --default-toolchain none
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Configure Git
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
+    - name: Install rustup
+      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
+        -v -y --default-toolchain none
 
-          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
-          '
-      - name: Expose Pythons
-        run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+        '
+    - name: Expose Pythons
+      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
 
-          echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
 
-          echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
-          '
-      - env:
-          PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
-        name: Build wheels
-        run:
-          "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.release_info.outputs.is-release\
-          \ }}\" == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\
-          \n./pants run src/python/pants_release/release.py -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\
-          \n./pants run src/python/pants_release/release.py -- build-wheels\n"
-      - continue-on-error: true
-        if: always()
-        name: Upload pants.log
-        uses: actions/upload-artifact@v3
-        with:
-          name: logs-wheels-Linux-ARM64
-          path: .pants.d/*.log
-      - env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        name: Deploy wheels to S3
-        run: ./pants run src/python/pants_release/deploy_to_s3.py
-      - name: Upload built artifacts to release
-        run: "rm -rf dist/gh_upload/wheels
+        '
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+      name: Build wheels
+      run: "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.release_info.outputs.is-release\
+        \ }}\" == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\
+        \n./pants run src/python/pants_release/release.py -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\
+        \n./pants run src/python/pants_release/release.py -- build-wheels\n"
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-wheels-Linux-ARM64
+        path: .pants.d/*.log
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
+    - name: Upload built artifacts to release
+      run: 'rm -rf dist/gh_upload/wheels
 
-          gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
+        gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
 
-          "
+        '
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
       image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
-      PANTS_REMOTE_CACHE_READ: "false"
-      PANTS_REMOTE_CACHE_WRITE: "false"
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
     name: Build wheels (Linux-x86_64)
     needs:
-      - release_info
+    - release_info
     runs-on:
-      - ubuntu-20.04
+    - ubuntu-20.04
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 10
-          ref: ${{ needs.release_info.outputs.build-ref }}
-      - name: Configure Git
-        run: git config --global safe.directory "$GITHUB_WORKSPACE"
-      - name: Install rustup
-        run:
-          'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-          -v -y --default-toolchain none
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Configure Git
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
+    - name: Install rustup
+      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
+        -v -y --default-toolchain none
 
-          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
-          '
-      - name: Expose Pythons
-        run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+        '
+    - name: Expose Pythons
+      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
 
-          echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
 
-          echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
-          '
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19.5
-      - env: {}
-        name: Build wheels
-        run:
-          "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.release_info.outputs.is-release\
-          \ }}\" == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\
-          \n./pants run src/python/pants_release/release.py -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\
-          \n./pants run src/python/pants_release/release.py -- build-wheels\n"
-      - continue-on-error: true
-        if: always()
-        name: Upload pants.log
-        uses: actions/upload-artifact@v3
-        with:
-          name: logs-wheels-Linux-x86_64
-          path: .pants.d/*.log
-      - env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        name: Deploy wheels to S3
-        run: ./pants run src/python/pants_release/deploy_to_s3.py
-      - name: Upload built artifacts to release
-        run: "rm -rf dist/gh_upload/wheels
+        '
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - env: {}
+      name: Build wheels
+      run: "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.release_info.outputs.is-release\
+        \ }}\" == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\
+        \n./pants run src/python/pants_release/release.py -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\
+        \n./pants run src/python/pants_release/release.py -- build-wheels\n"
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-wheels-Linux-x86_64
+        path: .pants.d/*.log
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
+    - name: Upload built artifacts to release
+      run: 'rm -rf dist/gh_upload/wheels
 
-          gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
+        gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
 
-          "
+        '
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
-      PANTS_REMOTE_CACHE_READ: "false"
-      PANTS_REMOTE_CACHE_WRITE: "false"
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
     name: Build wheels (macOS10-15-x86_64)
     needs:
-      - release_info
+    - release_info
     runs-on:
-      - self-hosted
-      - macOS-10.15-X64
+    - self-hosted
+    - macOS-10.15-X64
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 10
-          ref: ${{ needs.release_info.outputs.build-ref }}
-      - name: Cache Rust toolchain
-        uses: actions/cache@v3
-        with:
-          key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-          path: "~/.rustup/toolchains/1.70.0-*
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.70.0-*
 
-            ~/.rustup/update-hashes
+          ~/.rustup/update-hashes
 
-            ~/.rustup/settings.toml
+          ~/.rustup/settings.toml
 
-            "
-      - name: Cache Cargo
-        uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
-        with:
-          cache-bin: "false"
-          shared-key: engine
-          workspaces: src/rust/engine
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19.5
-      - env:
-          ARCHFLAGS: -arch x86_64
-        name: Build wheels
-        run:
-          "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.release_info.outputs.is-release\
-          \ }}\" == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\
-          \n./pants run src/python/pants_release/release.py -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\
-          \n./pants run src/python/pants_release/release.py -- build-wheels\n"
-      - continue-on-error: true
-        if: always()
-        name: Upload pants.log
-        uses: actions/upload-artifact@v3
-        with:
-          name: logs-wheels-macOS10-15-x86_64
-          path: .pants.d/*.log
-      - env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        name: Deploy wheels to S3
-        run: ./pants run src/python/pants_release/deploy_to_s3.py
-      - name: Upload built artifacts to release
-        run: "rm -rf dist/gh_upload/wheels
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - env:
+        ARCHFLAGS: -arch x86_64
+      name: Build wheels
+      run: "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.release_info.outputs.is-release\
+        \ }}\" == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\
+        \n./pants run src/python/pants_release/release.py -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\
+        \n./pants run src/python/pants_release/release.py -- build-wheels\n"
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-wheels-macOS10-15-x86_64
+        path: .pants.d/*.log
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
+    - name: Upload built artifacts to release
+      run: 'rm -rf dist/gh_upload/wheels
 
-          gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
+        gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
 
-          "
+        '
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
-      PANTS_REMOTE_CACHE_READ: "false"
-      PANTS_REMOTE_CACHE_WRITE: "false"
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
     name: Build wheels (macOS11-ARM64)
     needs:
-      - release_info
+    - release_info
     runs-on:
-      - self-hosted
-      - macOS-11-ARM64
+    - self-hosted
+    - macOS-11-ARM64
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 10
-          ref: ${{ needs.release_info.outputs.build-ref }}
-      - name: Cache Rust toolchain
-        uses: actions/cache@v3
-        with:
-          key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-          path: "~/.rustup/toolchains/1.70.0-*
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.70.0-*
 
-            ~/.rustup/update-hashes
+          ~/.rustup/update-hashes
 
-            ~/.rustup/settings.toml
-
-            "
-      - name: Cache Cargo
-        uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
-        with:
-          cache-bin: "false"
-          shared-key: engine
-          workspaces: src/rust/engine
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19.5
-      - env:
-          ARCHFLAGS: -arch arm64
-        name: Build wheels
-        run:
-          "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.release_info.outputs.is-release\
-          \ }}\" == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\
-          \n./pants run src/python/pants_release/release.py -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\
-          \n./pants run src/python/pants_release/release.py -- build-wheels\n"
-      - continue-on-error: true
-        if: always()
-        name: Upload pants.log
-        uses: actions/upload-artifact@v3
-        with:
-          name: logs-wheels-macOS11-ARM64
-          path: .pants.d/*.log
-      - env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        name: Deploy wheels to S3
-        run: ./pants run src/python/pants_release/deploy_to_s3.py
-      - name: Upload built artifacts to release
-        run: "rm -rf dist/gh_upload/wheels
-
-          gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
-
-          "
-    timeout-minutes: 90
-  publish:
-    if:
-      github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release
-      == 'true'
-    needs:
-      - build_wheels_linux_x86_64
-      - build_wheels_linux_arm64
-      - build_wheels_macos10_15_x86_64
-      - build_wheels_macos11_arm64
-      - release_info
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Pants at Release Tag
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.release_info.outputs.build-ref }}
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
-      - name: Expose Pythons
-        uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-      - env:
-          MODE: debug
-        name: Fetch and stabilize wheels
-        run:
-          ./pants run src/python/pants_release/release.py -- fetch-and-stabilize
-          --dest=dest/pypi_release
-      - name: Create Release -> Commit Mapping
-        run: 'tag="${{ needs.release_info.outputs.build-ref }}"
-
-          commit="$(git rev-parse ${tag}^{commit})"
-
-
-          echo "Recording tag ${tag} is of commit ${commit}"
-
-          mkdir -p dist/deploy/tags/pantsbuild.pants
-
-          echo "${commit}" > "dist/deploy/tags/pantsbuild.pants/${tag}"
+          ~/.rustup/settings.toml
 
           '
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dest/pypi_release
-          password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
-          skip-existing: true
-      - name: Generate announcement
-        run:
-          "./pants run src/python/pants_release/generate_release_announcement.py                         --
-          --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19.5
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build wheels
+      run: "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.release_info.outputs.is-release\
+        \ }}\" == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\
+        \n./pants run src/python/pants_release/release.py -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\
+        \n./pants run src/python/pants_release/release.py -- build-wheels\n"
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: logs-wheels-macOS11-ARM64
+        path: .pants.d/*.log
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./pants run src/python/pants_release/deploy_to_s3.py
+    - name: Upload built artifacts to release
+      run: 'rm -rf dist/gh_upload/wheels
 
-          "
-      - env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-        name: Announce to Slack
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          channel-id: C18RRR4JK
-          payload-file-path: ${{ runner.temp }}/slack_announcement.json
-      - env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        name: Deploy commit mapping to S3
-        run: ./pants run src/python/pants_release/deploy_to_s3.py -- --scope tags/pantsbuild.pants
+        gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
+
+        '
+    timeout-minutes: 90
+  publish:
+    if: github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release
+      == 'true'
+    needs:
+    - build_wheels_linux_x86_64
+    - build_wheels_linux_arm64
+    - build_wheels_macos10_15_x86_64
+    - build_wheels_macos11_arm64
+    - release_info
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Pants at Release Tag
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - env:
+        MODE: debug
+      name: Fetch and stabilize wheels
+      run: ./pants run src/python/pants_release/release.py -- fetch-and-stabilize
+        --dest=dest/pypi_release
+    - name: Create Release -> Commit Mapping
+      run: 'tag="${{ needs.release_info.outputs.build-ref }}"
+
+        commit="$(git rev-parse ${tag}^{commit})"
+
+
+        echo "Recording tag ${tag} is of commit ${commit}"
+
+        mkdir -p dist/deploy/tags/pantsbuild.pants
+
+        echo "${commit}" > "dist/deploy/tags/pantsbuild.pants/${tag}"
+
+        '
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: dest/pypi_release
+        password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
+        skip-existing: true
+    - name: Generate announcement
+      run: './pants run src/python/pants_release/generate_release_announcement.py                         --
+        --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+
+        '
+    - env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      name: Announce to Slack
+      uses: slackapi/slack-github-action@v1.24.0
+      with:
+        channel-id: C18RRR4JK
+        payload-file-path: ${{ runner.temp }}/slack_announcement.json
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy commit mapping to S3
+      run: ./pants run src/python/pants_release/deploy_to_s3.py -- --scope tags/pantsbuild.pants
+  release_info:
+    if: github.repository_owner == 'pantsbuild'
+    name: Determine the ref to build
+    outputs:
+      build-ref: ${{ steps.get_info.outputs.build-ref }}
+      is-release: ${{ steps.get_info.outputs.is-release }}
+    runs-on: ubuntu-latest
+    steps:
+    - env:
+        REF: ${{ github.event.inputs.ref }}
+      id: get_info
+      name: Determine ref to build
+      run: "if [[ -n \"$REF\" ]]; then\n    ref=\"$REF\"\nelse\n    ref=\"${GITHUB_REF#refs/tags/}\"\
+        \nfi\necho \"build-ref=${ref}\" >> $GITHUB_OUTPUT\nif [[ \"${ref}\" =~ ^release_.+$\
+        \ ]]; then\n    echo \"is-release=true\" >> $GITHUB_OUTPUT\nfi\n"
+    - name: Make GitHub Release
+      run: "GH_RELEASE_ARGS=()\nif [[ \"${{ steps.get_info.outputs.is-release }}\"\
+        \ == \"true\" ]]; then\n    GH_RELEASE_ARGS+=(--title \"${{ steps.get_info.outputs.build-ref\
+        \ }}\")\n    RELEASE_TAG=\"${{ steps.get_info.outputs.build-ref }}\"\n   \
+        \ if [[ ${RELEASE_TAG#release_} =~ [[:alpha:]] ]]; then\n        GH_RELEASE_ARGS+=(--prerelease)\n\
+        \    fi\nelse\n    GH_RELEASE_ARGS+=(--title \"dev_${{ steps.get_info.outputs.build-ref\
+        \ }}\")\n    GH_RELEASE_ARGS+=(--prerelease)\nfi\n\ngh release create \"${{\
+        \ steps.get_info.outputs.build-ref }}\" \"${GH_RELEASE_ARGS[@]}\"\n"
 name: Release
-"on":
+'on':
   push:
     tags:
-      - release_*
+    - release_*
   workflow_dispatch:
     inputs:
       ref:
