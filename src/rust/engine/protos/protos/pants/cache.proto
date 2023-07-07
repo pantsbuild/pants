@@ -22,6 +22,7 @@ message DependencyInferenceRequest {
   oneof metadata {
     JavascriptInferenceMetadata js = 2;
   }
+  string impl_hash = 3;
 }
 
 
