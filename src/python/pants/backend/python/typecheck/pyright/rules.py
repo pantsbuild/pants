@@ -26,7 +26,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.partition import (
     _partition_by_interpreter_constraints_and_resolve,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -41,7 +41,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -194,6 +194,16 @@ async def pyright_typecheck_partition(
         ),
     )
 
+    # Force the requirements venv to materialize always by running a no-op.
+    await Get(
+        ProcessResult,
+        VenvPexProcess(
+            requirements_venv_pex,
+            description="Force venv to materialize",
+            argv=["-c", "''"],
+        ),
+    )
+
     # Patch the config file to use the venv directory from the requirements pex,
     # and add source roots to the `extraPaths` key in the config file.
     patched_config_digest = await _patch_config_file(
@@ -212,6 +222,7 @@ async def pyright_typecheck_partition(
     )
 
     complete_pex_env = pex_environment.in_workspace()
+
     process = await Get(
         Process,
         NodeJSToolRequest,
