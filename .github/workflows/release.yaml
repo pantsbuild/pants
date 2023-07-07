@@ -337,13 +337,14 @@ jobs:
         \nfi\necho \"build-ref=${ref}\" >> $GITHUB_OUTPUT\nif [[ \"${ref}\" =~ ^release_.+$\
         \ ]]; then\n    echo \"is-release=true\" >> $GITHUB_OUTPUT\nfi\n"
     - name: Make GitHub Release
-      run: "GH_RELEASE_ARGS=()\nif [[ \"${{ steps.get_info.outputs.is-release }}\"\
-        \ == \"true\" ]]; then\n    GH_RELEASE_ARGS+=(--title \"${{ steps.get_info.outputs.build-ref\
+      run: "GH_RELEASE_ARGS=(\"--notes\" \"\")\nif [[ \"${{ steps.get_info.outputs.is-release\
+        \ }}\" == \"true\" ]]; then\n    GH_RELEASE_ARGS+=(\"--title\" \"${{ steps.get_info.outputs.build-ref\
         \ }}\")\n    RELEASE_TAG=\"${{ steps.get_info.outputs.build-ref }}\"\n   \
-        \ if [[ ${RELEASE_TAG#release_} =~ [[:alpha:]] ]]; then\n        GH_RELEASE_ARGS+=(--prerelease)\n\
-        \    fi\nelse\n    GH_RELEASE_ARGS+=(--title \"dev_${{ steps.get_info.outputs.build-ref\
-        \ }}\")\n    GH_RELEASE_ARGS+=(--prerelease)\nfi\n\ngh release create \"${{\
-        \ steps.get_info.outputs.build-ref }}\" \"${GH_RELEASE_ARGS[@]}\"\n"
+        \ if [[ ${RELEASE_TAG#release_} =~ [[:alpha:]] ]]; then\n        GH_RELEASE_ARGS+=(\"\
+        --prerelease\")\n    fi\nelse\n    GH_RELEASE_ARGS+=(\"--title\" \"dev_${{\
+        \ steps.get_info.outputs.build-ref }}\")\n    GH_RELEASE_ARGS+=(\"--prerelease\"\
+        )\nfi\n\ngh release create \"${{ steps.get_info.outputs.build-ref }}\" \"\
+        ${GH_RELEASE_ARGS[@]}\" || true\n"
 name: Release
 'on':
   push:

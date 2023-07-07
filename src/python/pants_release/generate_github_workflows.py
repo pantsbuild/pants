@@ -1075,19 +1075,19 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "name": "Make GitHub Release",
                     "run": dedent(
                         """\
-                        GH_RELEASE_ARGS=()
+                        GH_RELEASE_ARGS=("--notes" "")
                         if [[ "${{ steps.get_info.outputs.is-release }}" == "true" ]]; then
-                            GH_RELEASE_ARGS+=(--title "${{ steps.get_info.outputs.build-ref }}")
+                            GH_RELEASE_ARGS+=("--title" "${{ steps.get_info.outputs.build-ref }}")
                             RELEASE_TAG="${{ steps.get_info.outputs.build-ref }}"
                             if [[ ${RELEASE_TAG#release_} =~ [[:alpha:]] ]]; then
-                                GH_RELEASE_ARGS+=(--prerelease)
+                                GH_RELEASE_ARGS+=("--prerelease")
                             fi
                         else
-                            GH_RELEASE_ARGS+=(--title "dev_${{ steps.get_info.outputs.build-ref }}")
-                            GH_RELEASE_ARGS+=(--prerelease)
+                            GH_RELEASE_ARGS+=("--title" "dev_${{ steps.get_info.outputs.build-ref }}")
+                            GH_RELEASE_ARGS+=("--prerelease")
                         fi
 
-                        gh release create "${{ steps.get_info.outputs.build-ref }}" "${GH_RELEASE_ARGS[@]}"
+                        gh release create "${{ steps.get_info.outputs.build-ref }}" "${GH_RELEASE_ARGS[@]}" || true
                         """
                     ),
                 },
