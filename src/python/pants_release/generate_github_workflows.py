@@ -522,7 +522,7 @@ class Helper:
         cmd = dedent(
             """\
             BUILD_LOCAL_PEX_ARGS=("--dest" "dist/gh_upload")
-            if [[ "${{ needs.determine_ref.outputs.is-release }}" == "true" ]]; then
+            if [[ "${{ needs.release_info.outputs.is-release }}" == "true" ]]; then
                 BUILD_LOCAL_PEX_ARGS+=("--stable")
             fi
 
@@ -861,7 +861,7 @@ def build_wheels_job(
                             "run": dedent(
                                 """\
                                 rm -rf dist/gh_upload/wheels
-                                gh release upload --clobber ${{ needs.determine_ref.outputs.build-ref }} dist/gh_upload/*
+                                gh release upload --clobber ${{ needs.release_info.outputs.build-ref }} dist/gh_upload/*
                                 """
                             ),
                         }
@@ -1025,11 +1025,11 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     pypi_release_dir = "dest/pypi_release"
     helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
-        needs=["determine_ref"], for_deploy_ref=gha_expr("needs.determine_ref.outputs.build-ref")
+        needs=["release_info"], for_deploy_ref=gha_expr("needs.release_info.outputs.build-ref")
     )
     wheels_job_names = tuple(wheels_jobs.keys())
     jobs = {
-        "determine_ref": {
+        "release_info": {
             "name": "Determine the ref to build",
             "runs-on": "ubuntu-latest",
             "if": IS_PANTS_OWNER,
@@ -1037,7 +1037,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Determine ref to build",
                     "env": env,
-                    "id": "determine_ref",
+                    "id": "get_info",
                     "run": dedent(
                         """\
                         if [[ -n "$REF" ]]; then
@@ -1052,22 +1052,42 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         """
                     ),
                 },
+                {
+                    "name": "Make GitHub Release",
+                    "run": dedent(
+                        """\
+                        GH_RELEASE_ARGS=()
+                        if [[ "${{ steps.get_info.outputs.is-release }}" == "true" ]]; then
+                            GH_RELEASE_ARGS+=(--title "${{ steps.get_info.outputs.build-ref }}")
+                            RELEASE_TAG="${{ steps.get_info.outputs.build-ref }}"
+                            if [[ ${RELEASE_TAG#release_} =~ [[:alpha:]] ]]; then
+                                GH_RELEASE_ARGS+=(--prerelease)
+                            fi
+                        else
+                            GH_RELEASE_ARGS+=(--title "dev_${{ steps.get_info.outputs.build-ref }}")
+                            GH_RELEASE_ARGS+=(--prerelease)
+                        fi
+
+                        gh release create "${{ steps.get_info.outputs.build-ref }}" "${GH_RELEASE_ARGS[@]}"
+                        """
+                    ),
+                },
             ],
             "outputs": {
-                "build-ref": gha_expr("steps.determine_ref.outputs.build-ref"),
-                "is-release": gha_expr("steps.determine_ref.outputs.is-release"),
+                "build-ref": gha_expr("steps.get_info.outputs.build-ref"),
+                "is-release": gha_expr("steps.get_info.outputs.is-release"),
             },
         },
         **wheels_jobs,
         "publish": {
             "runs-on": "ubuntu-latest",
-            "needs": [*wheels_job_names, "determine_ref"],
-            "if": f"{IS_PANTS_OWNER} && needs.determine_ref.outputs.is-release == 'true'",
+            "needs": [*wheels_job_names, "release_info"],
+            "if": f"{IS_PANTS_OWNER} && needs.release_info.outputs.is-release == 'true'",
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
                     "uses": "actions/checkout@v3",
-                    "with": {"ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}"},
+                    "with": {"ref": f"{gha_expr('needs.release_info.outputs.build-ref')}"},
                 },
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
@@ -1088,7 +1108,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
                     "run": dedent(
                         f"""\
-                        tag="{gha_expr("needs.determine_ref.outputs.build-ref")}"
+                        tag="{gha_expr("needs.release_info.outputs.build-ref")}"
                         commit="$(git rev-parse ${{tag}}^{{commit}})"
 
                         echo "Recording tag ${{tag}} is of commit ${{commit}}"
