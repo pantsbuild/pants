@@ -518,14 +518,15 @@ class Helper:
             self.native_binaries_upload(),
         ]
 
-    def build_wheels(self) -> list[Step]:
+    def build_pex_and_wheels(self) -> list[Step]:
         cmd = dedent(
-            # Note that the build-local-pex run is just for smoke-testing that pex
-            # builds work, and it must come *before* the build-wheels runs, since
-            # it cleans out `dist/deploy`, which the build-wheels runs populate for
-            # later attention by deploy_to_s3.py.
             """\
-            ./pants run src/python/pants_release/release.py -- build-local-pex
+            BUILD_LOCAL_PEX_ARGS=("--dest" "dist/gh_upload")
+            if [[ "${{ needs.determine_ref.outputs.is-release }}" == "true" ]]; then
+                BUILD_LOCAL_PEX_ARGS+=("--stable")
+            fi
+
+            ./pants run src/python/pants_release/release.py -- build-local-pex "${BUILD_LOCAL_PEX_ARGS[@]}"
             ./pants run src/python/pants_release/release.py -- build-wheels
             """
         )
@@ -850,9 +851,24 @@ def build_wheels_job(
             "steps": [
                 *initial_steps,
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
-                *helper.build_wheels(),
+                *helper.build_pex_and_wheels(),
                 helper.upload_log_artifacts(name="wheels"),
                 *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
+                *(
+                    [
+                        {
+                            "name": "Upload built artifacts to release",
+                            "run": dedent(
+                                """\
+                                rm -rf dist/gh_upload/wheels
+                                gh release upload --clobber ${{ needs.determine_ref.outputs.build-ref }} dist/gh_upload/*
+                                """
+                            ),
+                        }
+                    ]
+                    if for_deploy_ref
+                    else []
+                ),
             ],
         },
     }

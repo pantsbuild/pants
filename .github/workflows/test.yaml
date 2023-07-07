@@ -315,11 +315,9 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.determine_ref.outputs.is-release }}\"\
+        \ == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\n./pants run src/python/pants_release/release.py\
+        \ -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\n./pants run src/python/pants_release/release.py -- build-wheels\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -369,11 +367,9 @@ jobs:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.determine_ref.outputs.is-release }}\"\
+        \ == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\n./pants run src/python/pants_release/release.py\
+        \ -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\n./pants run src/python/pants_release/release.py -- build-wheels\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -424,11 +420,9 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.determine_ref.outputs.is-release }}\"\
+        \ == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\n./pants run src/python/pants_release/release.py\
+        \ -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\n./pants run src/python/pants_release/release.py -- build-wheels\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -479,11 +473,9 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: "BUILD_LOCAL_PEX_ARGS=(\"--dest\" \"dist/gh_upload\")\nif [[ \"${{ needs.determine_ref.outputs.is-release }}\"\
+        \ == \"true\" ]]; then\n    BUILD_LOCAL_PEX_ARGS+=(\"--stable\")\nfi\n\n./pants run src/python/pants_release/release.py\
+        \ -- build-local-pex \"${BUILD_LOCAL_PEX_ARGS[@]}\"\n./pants run src/python/pants_release/release.py -- build-wheels\n"
     - continue-on-error: true
       if: always()
       name: Upload pants.log
