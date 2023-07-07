@@ -168,6 +168,7 @@ def assert_build(
         opts.setdefault("default_context_root", "")
         opts.setdefault("build_args", [])
         opts.setdefault("build_target_stage", None)
+        opts.setdefault("build_hosts", None)
         opts.setdefault("build_verbose", False)
         opts.setdefault("env_vars", [])
 
@@ -1011,6 +1012,12 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
 
 
 def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_HOSTS": '{"global": "9.9.9.9"}',
+        },
+    )
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
@@ -1028,6 +1035,8 @@ def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--add-host",
+            "global:9.9.9.9",
             "--add-host",
             "docker:10.180.0.1",
             "--add-host",
