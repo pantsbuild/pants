@@ -25,8 +25,10 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use sha2::{Digest, Sha256};
 use std::{collections::HashSet, io::Write, path::Path};
 use std::{env, fs};
+use walkdir::WalkDir;
 
 fn gen_constants_file(language: &tree_sitter::Language, out_dir: &Path) {
   let mut file = std::fs::File::create(out_dir.join("constants.rs")).unwrap();
@@ -140,7 +142,7 @@ pub trait Visitor {
     if language.node_kind_is_named(id) {
       let kind = language.node_kind_for_id(id).unwrap();
       file
-        .write_all(format!("      {id} => self.visit_{kind}(node),\n").as_bytes())
+        .write_all(format!("    {id} =>   self.visit_{kind}(node),\n").as_bytes())
         .unwrap();
     }
   }
@@ -155,23 +157,69 @@ pub trait Visitor {
     .unwrap();
 }
 
+fn gen_impl_hash_file(name: &'static str, source_dir: &Path, impl_dir: &Path, out_dir: &Path) {
+  let mut hasher = Sha256::default();
+  for entry in WalkDir::new(impl_dir)
+    .sort_by_file_name()
+    .into_iter()
+    .chain(WalkDir::new(source_dir).sort_by_file_name().into_iter())
+    .flatten()
+  {
+    if entry.file_type().is_file() && entry.path().file_name().unwrap() != "tests.rs" {
+      let mut reader = std::fs::File::open(entry.path()).expect("Failed to open file");
+      let _ = std::io::copy(&mut reader, &mut hasher).expect("Failed to copy bytes");
+    }
+  }
+  hasher
+    .write_all(env::var("CARGO_PKG_VERSION").unwrap().as_bytes())
+    .unwrap();
+  let hash_bytes = &hasher.finalize();
+  let hash = hex::encode(hash_bytes);
+  let mut file = std::fs::File::create(out_dir.join(format!("{name}_impl_hash.rs"))).unwrap();
+  file
+    .write_all(format!("pub const IMPL_HASH: &str = {hash:?};").as_bytes())
+    .unwrap();
+  if env::var_os("PANTS_PRINT_IMPL_HASHES") == Some("1".into()) {
+    println!("cargo:warning={name} hash impl hash: {hash}");
+  }
+}
+
 fn gen_files_for_language(
   language: tree_sitter::Language,
   name: &'static str,
+  source_dir: &Path,
   out_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
   let subdir = out_dir.join(name);
   fs::create_dir_all(&subdir)?;
   gen_constants_file(&language, subdir.as_path());
   gen_visitor_file(&language, subdir.as_path());
+
+  // NB: This MUST be last in the list
+  let source_subdir = source_dir.join(name);
+  gen_impl_hash_file(name, source_subdir.as_path(), subdir.as_path(), out_dir);
   Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let source_dir = env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env var not set.");
+  let source_dir = Path::new(&source_dir).join("src");
   let out_dir = env::var_os("OUT_DIR").expect("OUT_DIR env var not set.");
   let out_dir = Path::new(&out_dir);
-  gen_files_for_language(tree_sitter_python::language(), "python", out_dir)?;
-  gen_files_for_language(tree_sitter_javascript::language(), "javascript", out_dir)?;
-  println!("cargo:rerun-if-env-changed=build.rs");
+  gen_files_for_language(
+    tree_sitter_python::language(),
+    "python",
+    &source_dir,
+    out_dir,
+  )?;
+  gen_files_for_language(
+    tree_sitter_javascript::language(),
+    "javascript",
+    &source_dir,
+    out_dir,
+  )?;
+  println!("cargo:rerun-if-env-changed=PANTS_PRINT_IMPL_HASHES");
+  println!("cargo:rerun-if-changed=build.rs");
+  println!("cargo:rerun-if-changed=src");
   Ok(())
 }

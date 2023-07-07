@@ -729,13 +729,16 @@ name = "dep_inference"
 version = "0.0.1"
 dependencies = [
  "fnv",
+ "hex",
  "itertools",
  "protos",
  "serde",
  "serde_derive",
+ "sha2",
  "tree-sitter",
  "tree-sitter-javascript",
  "tree-sitter-python",
+ "walkdir",
 ]
 
 [[package]]
