@@ -120,6 +120,30 @@ async fn load_grpc_error() {
   )
 }
 
+#[tokio::test]
+async fn load_existing_wrong_digest_error() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::builder()
+    .unverified_content(
+      TestData::roland().fingerprint(),
+      Bytes::from_static(b"not roland"),
+    )
+    .build();
+
+  let provider = new_provider(&cas);
+  let mut destination = Vec::new();
+
+  let error = provider
+    .load(testdata.digest(), &mut destination)
+    .await
+    .expect_err("Want error");
+
+  assert!(
+    error.contains("Remote CAS gave wrong digest"),
+    "Bad error message, got: {error}"
+  )
+}
+
 fn assert_cas_store(
   cas: &StubCAS,
   fingerprint: Fingerprint,
