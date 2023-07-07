@@ -736,7 +736,7 @@ def build_pex(dest: str, stable: bool) -> None:
     build_3rdparty_wheels(wheels_dir / "3rdparty")
 
     if stable:
-        reversion_prebuilt_wheels(dest_dir, pants_wheels_dir)
+        reversion_prebuilt_wheels(str(dest_dir), pants_wheels_dir)
     else:
         for whl in pants_wheels_dir.glob("*.whl"):
             whl.rename(dest_dir / whl.name)
