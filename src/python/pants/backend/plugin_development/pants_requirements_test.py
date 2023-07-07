@@ -2,9 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.plugin_development import pants_requirements
-from pants.backend.plugin_development.pants_requirements import (
-    PantsRequirementsTargetGenerator,
-)
+from pants.backend.plugin_development.pants_requirements import PantsRequirementsTargetGenerator
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementResolveField,
@@ -13,8 +11,6 @@ from pants.backend.python.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.pip_requirement import PipRequirement
-
 
 
 def test_target_generator() -> None:
@@ -52,11 +48,15 @@ def test_target_generator() -> None:
     )
     assert pants_req[PythonRequirementModulesField].value == ("pants",)
     assert testutil_req[PythonRequirementModulesField].value == ("pants.testutil",)
-    assert pants_req[PythonRequirementsField].value == (
-        PipRequirement.parse(f"pantsbuild.pants{determine_version()}"),
+    assert len(pants_req[PythonRequirementsField].value) == 4
+    assert all(
+        req.project_name == "pantsbuild.pants" and "pantsbuild.pants-" in req.url
+        for req in pants_req[PythonRequirementsField].value
     )
-    assert testutil_req[PythonRequirementsField].value == (
-        PipRequirement.parse(f"pantsbuild.pants.testutil{determine_version()}"),
+    assert len(testutil_req[PythonRequirementsField].value) == 4
+    assert all(
+        req.project_name == "pantsbuild.pants.testutil" and "pantsbuild.pants.testutil-" in req.url
+        for req in testutil_req[PythonRequirementsField].value
     )
     for t in (pants_req, testutil_req):
         assert not t[PythonRequirementResolveField].value

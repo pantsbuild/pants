@@ -31,7 +31,7 @@ class PantsRequirementsTestutilField(BoolField):
 class PantsRequirementsTargetGenerator(TargetGenerator):
     alias = "pants_requirements"
     help = help_text(
-        f"""
+        """
         Generate `python_requirement` targets for Pants itself to use with Pants plugins.
 
         This is useful when writing plugins so that you can build and test your
@@ -71,20 +71,20 @@ def generate_from_pants_requirements(
         return PythonRequirementTarget(
             {
                 PythonRequirementsField.alias: (
-                    f"https://github.com/pantsbuild/pants/releases/download/release_{PANTS_SEMVER}/{dist}-{PANTS_SEMVER}-cp{py}-cp{py}-{plat_tag}_x86_64.whl ; {' and '.join(markers)}"
+                    f"{dist} @ https://github.com/pantsbuild/pants/releases/download/release_{PANTS_SEMVER}/{dist}-{PANTS_SEMVER}-cp{py}-cp{py}-{plat_tag}_x86_64.whl ; {' and '.join(markers)}"
                     for plat_tag, markers in [
                         (
                             "manylinux2014",
-                            ('sys_platform = "linux"', 'platform_machine == "x86_64"'),
+                            ('sys_platform == "linux"', 'platform_machine == "x86_64"'),
                         ),
                         (
                             "manylinux2014",
-                            ('sys_platform = "linux"', 'platform_machine == "aarch64"'),
+                            ('sys_platform == "linux"', 'platform_machine == "aarch64"'),
                         ),
                         (
                             "macosx_10_15",
                             (
-                                'sys_platform = "darwin"',
+                                'sys_platform == "darwin"',
                                 'platform_machine == "x86_64"',
                                 'platform_release == "10.15"',
                             ),
@@ -92,7 +92,7 @@ def generate_from_pants_requirements(
                         (
                             "macosx_11_0",
                             (
-                                'sys_platform = "darwin"',
+                                'sys_platform == "darwin"',
                                 'platform_machine == "arm64"',
                                 'platform_release == "11.0"',
                             ),
