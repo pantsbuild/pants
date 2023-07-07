@@ -673,18 +673,16 @@ class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
 
         Example:
 
-        ```
-        duplicate_policy=[
-            duplicate_rule(pattern="^META-INF/services", action="concat_text"),
-            duplicate_rule(pattern="^reference\\.conf", action="concat_text"),
-            duplicate_rule(pattern="^org/apache/commons", action="throw"),
-        ]
-        ```
+            duplicate_policy=[
+                duplicate_rule(pattern="^META-INF/services", action="concat_text"),
+                duplicate_rule(pattern="^reference\\.conf", action="concat_text"),
+                duplicate_rule(pattern="^org/apache/commons", action="throw"),
+            ]
 
         Where:
 
         * The `pattern` field is treated as a regular expression
-        * The `action` field must be one of {list(DeployJarDuplicateRule.valid_actions)}.
+        * The `action` field must be one of `{list(DeployJarDuplicateRule.valid_actions)}`.
 
         Note that the order in which the rules are listed is relevant.
         """
@@ -769,7 +767,7 @@ class JvmWarDependenciesField(Dependencies):
 class JvmWarDescriptorAddressField(SingleSourceField):
     alias = "descriptor"
     default = "web.xml"
-    help = "Path to a file containing the descriptor (i.e., web.xml) for this WAR file. Defaults to `web.xml`."
+    help = "Path to a file containing the descriptor (i.e., `web.xml`) for this WAR file. Defaults to `web.xml`."
 
 
 class JvmWarContentField(SpecialCasedDependencies):

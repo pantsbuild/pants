@@ -714,6 +714,19 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
+class DepsTraversalBehavior(Enum):
+    """The return value for ShouldTraverseDepsPredicate.
+
+    NB: This only indicates whether to traverse the deps of a target;
+    It does not control the inclusion of the target itself (though that
+    might be added in the future). By the time the predicate is called,
+    the target itself was already included.
+    """
+
+    INCLUDE = "include"
+    EXCLUDE = "exclude"
+
+
 @dataclass(frozen=True)
 class ShouldTraverseDepsPredicate(metaclass=ABCMeta):
     """This callable determines whether to traverse through deps of a given Target + Field.
@@ -733,15 +746,17 @@ class ShouldTraverseDepsPredicate(metaclass=ABCMeta):
     # That is extremely important because two predicates with different implementations but the same data
     # (or no data) need to have different hashes and compare unequal.
     _callable: Callable[
-        [Any, Target, Dependencies | SpecialCasedDependencies], bool
+        [Any, Target, Dependencies | SpecialCasedDependencies], DepsTraversalBehavior
     ] = dataclasses.field(init=False, repr=False)
 
     def __post_init__(self):
         object.__setattr__(self, "_callable", type(self).__call__)
 
     @abstractmethod
-    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
-        """If this predicate returns false, then the target's field's deps will be ignored."""
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        """This predicate decides when to INCLUDE or EXCLUDE the target's field's deps."""
 
 
 class TraverseIfDependenciesField(ShouldTraverseDepsPredicate):
@@ -751,8 +766,12 @@ class TraverseIfDependenciesField(ShouldTraverseDepsPredicate):
     subclasses of Dependencies.
     """
 
-    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
-        return isinstance(field, Dependencies)
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        if isinstance(field, Dependencies):
+            return DepsTraversalBehavior.INCLUDE
+        return DepsTraversalBehavior.EXCLUDE
 
 
 class AlwaysTraverseDeps(ShouldTraverseDepsPredicate):
@@ -761,8 +780,10 @@ class AlwaysTraverseDeps(ShouldTraverseDepsPredicate):
     This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
     """
 
-    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
-        return True
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        return DepsTraversalBehavior.INCLUDE
 
 
 class CoarsenedTarget(EngineAwareParameter):
@@ -2484,7 +2505,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     help = help_text(
         f"""
         Addresses to other targets that this target depends on, e.g.
-        ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
+        `['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django']`.
 
         This augments any dependencies inferred by Pants, such as by analyzing your imports. Use
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
@@ -2994,9 +3015,11 @@ def generate_file_based_overrides_field_help_message(
                 field names to the overridden value.
 
                 For example:
+
+                {example}
                 """
             ),
-            example,
+            "",
             softwrap(
                 f"""
                 File paths and globs are relative to the BUILD file's directory. Every overridden file is

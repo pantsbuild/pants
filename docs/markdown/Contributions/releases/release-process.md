@@ -299,6 +299,17 @@ For the first stable release in the series, first, write a blog post to summariz
 >
 > _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_
 
+Step 7: Run release testing on public repositories
+--------------------------------------------------
+
+Manually trigger a run of the [public repositories testing workflow](https://github.com/pantsbuild/pants/actions/workflows/public_repos.yaml), specifying the version just published as the "Pants version".
+
+This workflow checks out various open-source repositories that use Pants and runs the given version of Pants against them, to try to validate if they can upgrade smoothly or if there's any (obvious) bugs. The workflow runs the repositories in two configurations: first with the repo's default configuration as a baseline, and then with the specified Pants version (and any additional options).
+
+Once the workflow finishes, look through any failures and determine if there's any interesting/unknown problems, ensuring there's issues filed (and tagged with the appropriate milestone) for them. For instance, a custom plugin that is broken by a plugin API change is okay, but other sorts of breakage might not be.  If there's a failure during the baseline, a similar failure during the real (non-baseline) test can be ignored, as it likely means the repository in question is broken.
+
+Alternatively, after starting the workflow, post the link to the in-progress run in `#development` in Slack, so that someone can come back to it when it does finish.
+
 When Things Go Wrong
 --------------------
 

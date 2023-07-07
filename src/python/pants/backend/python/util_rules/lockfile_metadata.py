@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, Set, cast
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.lockfile_metadata import (
     LockfileMetadata,
@@ -16,6 +15,7 @@ from pants.core.util_rules.lockfile_metadata import (
     _get_metadata,
     lockfile_metadata_registrar,
 )
+from pants.util.pip_requirement import PipRequirement
 
 _python_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.PYTHON)
 

@@ -668,7 +668,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -758,7 +758,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -848,7 +848,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -938,7 +938,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1028,7 +1028,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1118,7 +1118,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1208,7 +1208,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1298,7 +1298,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1388,7 +1388,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1478,7 +1478,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1568,7 +1568,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1626,7 +1626,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true

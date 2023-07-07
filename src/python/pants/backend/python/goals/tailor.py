@@ -24,7 +24,6 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
-    parse_requirements_file,
 )
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
@@ -43,6 +42,7 @@ from pants.source.filespec import FilespecMatcher
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
+from pants.util.requirements import parse_requirements_file
 
 logger = logging.getLogger(__name__)
 
