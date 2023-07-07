@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 import shlex
+from abc import ABCMeta
 from dataclasses import dataclass
 from itertools import chain
 
@@ -13,7 +14,7 @@ from pants.backend.helm.check.kubeconform.extra_fields import KubeconformFieldSe
 from pants.backend.helm.check.kubeconform.subsystem import KubeconformSubsystem
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.util_rules.renderer import RenderedHelmFiles
-from pants.core.goals.check import CheckResult
+from pants.core.goals.check import CheckRequest, CheckResult
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, Digest, FileEntry
@@ -24,6 +25,10 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+
+class KubeconformCheckRequest(CheckRequest, metaclass=ABCMeta):
+    tool_name = KubeconformSubsystem.name
 
 
 @dataclass(frozen=True)

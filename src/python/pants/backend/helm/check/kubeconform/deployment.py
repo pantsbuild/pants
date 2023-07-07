@@ -7,7 +7,10 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.check.kubeconform import common, extra_fields
-from pants.backend.helm.check.kubeconform.common import RunKubeconformRequest
+from pants.backend.helm.check.kubeconform.common import (
+    KubeconformCheckRequest,
+    RunKubeconformRequest,
+)
 from pants.backend.helm.check.kubeconform.extra_fields import KubeconformFieldSet
 from pants.backend.helm.check.kubeconform.subsystem import KubeconformSubsystem
 from pants.backend.helm.dependency_inference import deployment as infer_deployment
@@ -32,9 +35,8 @@ class KubeconformDeploymentFieldSet(HelmDeploymentFieldSet, KubeconformFieldSet)
     pass
 
 
-class KubeconformCheckDeploymentRequest(CheckRequest):
+class KubeconformCheckDeploymentRequest(KubeconformCheckRequest):
     field_set_type = KubeconformDeploymentFieldSet
-    tool_name = KubeconformSubsystem.name
 
 
 @rule

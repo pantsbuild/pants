@@ -98,6 +98,7 @@ def test_skip_check(rule_runner: RuleRunner) -> None:
     checked = run_check(rule_runner, addr)
 
     assert checked.exit_code == 0
+    assert checked.checker_name == "kubeconform"
     assert len(checked.results) == 1
     assert checked.results[0].partition_description == addr.spec
     assert not checked.results[0].stdout
@@ -115,6 +116,7 @@ def test_valid_deployment(rule_runner: RuleRunner) -> None:
     checked = run_check(rule_runner, addr)
 
     assert checked.exit_code == 0
+    assert checked.checker_name == "kubeconform"
     assert len(checked.results) == 1
     assert checked.results[0].partition_description == addr.spec
     assert (

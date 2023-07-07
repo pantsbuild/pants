@@ -6,7 +6,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.helm.check.kubeconform import common, extra_fields
-from pants.backend.helm.check.kubeconform.common import RunKubeconformRequest
+from pants.backend.helm.check.kubeconform.common import (
+    KubeconformCheckRequest,
+    RunKubeconformRequest,
+)
 from pants.backend.helm.check.kubeconform.extra_fields import KubeconformFieldSet
 from pants.backend.helm.check.kubeconform.subsystem import KubeconformSubsystem
 from pants.backend.helm.target_types import HelmChartFieldSet
@@ -22,9 +25,8 @@ class KubeconformChartFieldSet(HelmChartFieldSet, KubeconformFieldSet):
     pass
 
 
-class KubeconformCheckChartRequest(CheckRequest):
+class KubeconformCheckChartRequest(KubeconformCheckRequest):
     field_set_type = KubeconformChartFieldSet
-    tool_name = KubeconformSubsystem.name
 
 
 @rule
