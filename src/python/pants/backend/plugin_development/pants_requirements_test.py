@@ -1,13 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import pytest
-from packaging.version import Version
-
 from pants.backend.plugin_development import pants_requirements
 from pants.backend.plugin_development.pants_requirements import (
     PantsRequirementsTargetGenerator,
-    determine_version,
 )
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
@@ -19,18 +15,6 @@ from pants.engine.internals.graph import _TargetParametrizations, _TargetParamet
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.pip_requirement import PipRequirement
 
-
-@pytest.mark.parametrize(
-    "pants_version,expected",
-    (
-        ("2.4.0.dev1", "==2.4.0.dev1"),
-        ("2.4.0rc1", ">=2.4.0a0,<2.5"),
-        ("2.4.0", ">=2.4.0a0,<2.5"),
-    ),
-)
-def test_determine_version(monkeypatch, pants_version: str, expected: str) -> None:
-    monkeypatch.setattr(pants_requirements, "PANTS_SEMVER", Version(pants_version))
-    assert determine_version() == expected
 
 
 def test_target_generator() -> None:
