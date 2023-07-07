@@ -12,6 +12,7 @@ from pants.engine.target import (
     BoolField,
     Field,
     FieldSet,
+    StringField,
     StringSequenceField,
     Target,
     TriBoolField,
@@ -41,9 +42,24 @@ class KubeconformIgnoreMissingSchemasField(TriBoolField):
     help = help_text("""Whether to fail if there are missing schemas for custom resources.""")
 
 
+class KubeconformStrictField(TriBoolField):
+    alias = "kubeconform_strict"
+    help = help_text("Run Kubeconform in strict mode.")
+
+
 class KubeconformSkipKindsField(StringSequenceField):
     alias = "kubeconform_skip_kinds"
     help = help_text("List of kinds or GVKs to ignore.")
+
+
+class KubeconformRejectKindsField(StringSequenceField):
+    alias = "kubeconform_reject_kinds"
+    help = help_text("List of kinds or GVKs to reject.")
+
+
+class KubeconformKubernetesVersionField(StringField):
+    alias = "kubeconform_kubernetes_version"
+    help = help_text("Kubernetes version to use for the validation.")
 
 
 @dataclass(frozen=True)
@@ -51,7 +67,10 @@ class KubeconformFieldSet(FieldSet, metaclass=ABCMeta):
     skip: KubeconformSkipField
     ignore_sources: KubeconformIgnoreSourcesField
     ignore_missing_schemas: KubeconformIgnoreMissingSchemasField
+    strict: KubeconformStrictField
+    reject_kinds: KubeconformRejectKindsField
     skip_kinds: KubeconformSkipKindsField
+    kubernetes_version: KubeconformKubernetesVersionField
 
     @classmethod
     def opt_out(cls, target: Target) -> bool:
@@ -64,6 +83,9 @@ _KUBECONFORM_COMMON_FIELD_TYPES: list[Type[Field]] = [
     KubeconformIgnoreSourcesField,
     KubeconformIgnoreMissingSchemasField,
     KubeconformSkipKindsField,
+    KubeconformRejectKindsField,
+    KubeconformStrictField,
+    KubeconformKubernetesVersionField,
 ]
 
 

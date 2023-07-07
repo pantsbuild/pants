@@ -111,6 +111,54 @@ def test_valid_chart(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_valid_chart_strict(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            **__COMMON_TEST_FILES,
+            "src/mychart/BUILD": "helm_chart(kubeconform_strict=True)",
+        }
+    )
+
+    addr = Address("src/mychart")
+    checked = run_check(rule_runner, addr)
+
+    assert checked.exit_code == 0
+    assert len(checked.results) == 1
+    assert checked.results[0].partition_description == addr.spec
+    assert (
+        checked.results[0].stdout
+        == "Summary: 2 resources found in 2 files - Valid: 2, Invalid: 0, Errors: 0, Skipped: 0\n"
+    )
+
+
+def test_invalid_chart_rejecting_kinds(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            **__COMMON_TEST_FILES,
+            "src/mychart/BUILD": dedent(
+                """\
+                helm_chart(kubeconform_reject_kinds=["Pod"])
+                """
+            ),
+        }
+    )
+
+    addr = Address("src/mychart")
+    checked = run_check(rule_runner, addr)
+
+    expected_result = dedent(
+        """\
+        mychart/templates/pod.yaml - Pod mychart failed validation: prohibited resource kind Pod
+        Summary: 2 resources found in 2 files - Valid: 1, Invalid: 0, Errors: 1, Skipped: 0
+        """
+    )
+
+    assert checked.exit_code == 1
+    assert len(checked.results) == 1
+    assert checked.results[0].partition_description == addr.spec
+    assert checked.results[0].stdout == expected_result
+
+
 def test_invalid_chart(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

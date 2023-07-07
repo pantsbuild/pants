@@ -84,6 +84,7 @@ async def run_kubeconform(
                 *(("-debug",) if debug_requested else ()),
                 *(("-summary",) if kubeconform.summary else ()),
                 *(("-verbose",) if kubeconform.verbose else ()),
+                *(("-strict",) if request.field_set.strict.value else ()),
                 *(
                     ("-ignore-missing-schemas",)
                     if request.field_set.ignore_missing_schemas.value
@@ -95,6 +96,16 @@ async def run_kubeconform(
                 *chain.from_iterable(
                     ("-schema-location", shlex.quote(schema))
                     for schema in kubeconform.schema_locations
+                ),
+                *(
+                    ("-kubernetes-version", request.field_set.kubernetes_version.value)
+                    if request.field_set.kubernetes_version.value
+                    else ()
+                ),
+                *(
+                    ("-reject", ",".join(request.field_set.reject_kinds.value))
+                    if request.field_set.reject_kinds.value
+                    else ()
                 ),
                 *(
                     ("-skip", ",".join(request.field_set.skip_kinds.value))
