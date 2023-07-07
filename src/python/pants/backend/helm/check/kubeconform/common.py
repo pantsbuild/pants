@@ -32,17 +32,18 @@ class RunKubeconformRequest:
     rendered_files: RenderedHelmFiles
 
 
-_KUBECONFORM_CACHE_FOLDER = "__kubeconform_cache"
-
-
 @dataclass(frozen=True)
 class KubeconformSetup:
     binary: DownloadedExternalTool
     env: FrozenDict[str, str]
 
     @property
+    def cache_dir(self) -> str:
+        return "__kubeconform_cache"
+
+    @property
     def append_only_caches(self) -> dict[str, str]:
-        return {"kubeconform": _KUBECONFORM_CACHE_FOLDER}
+        return {"kubeconform": self.cache_dir}
 
 
 @rule
@@ -78,7 +79,7 @@ async def run_kubeconform(
             argv=[
                 os.path.join(tool_relpath, setup.binary.exe),
                 "-cache",
-                _KUBECONFORM_CACHE_FOLDER,
+                setup.cache_dir,
                 *(("-n", str(kubeconform.concurrency)) if kubeconform.concurrency else ()),
                 *(("-debug",) if debug_requested else ()),
                 *(("-summary",) if kubeconform.summary else ()),
