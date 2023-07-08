@@ -8,6 +8,7 @@ from typing import Any, Iterator
 
 from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 ALL_DEFAULT_REGISTRIES = "<all default registries>"
 
@@ -29,7 +30,6 @@ class DockerRegistryAddressCollisionError(DockerRegistryError):
         message = softwrap(
             f"""
             Duplicated docker registry address for aliases: {first.alias}, {second.alias}.
-            
             Each registry `address` in `[docker].registries` must be unique.
             """
         )
