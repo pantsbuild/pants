@@ -128,6 +128,8 @@ The dependency `src/a/main.py` -> `src/b/lib.py` would consult the `__dependenci
 
 When declaring your rules, you not only provide the rules for the current directory, but also set the default rules for all the subdirectories as well. When overriding such default rules in a child BUILD file, there is a `extend=True` kwarg you may use if you want the default rules to still apply after the ones declared in the current BUILD file.
 
+Note: Any rule globs using the declaration path anchoring mode that is inherited using `extend=True` will be anchored to the path of the current BUILD file, not the original one where the rule was extended from.
+
 ```python
 # src/BUILD
 # given some parent rules:
@@ -305,8 +307,10 @@ The glob prefix specifies which "anchoring mode" to use, and are:
   Example: `//src/python/**` will match all files from the `src/python/` tree.
 
 - `/` - Anchor the glob to the declaration path.
-  This is the path of the BUILD file where the rule is declared, using one of the rules keywords (i.e. `__dependencies_rules__` or `__dependents_rules__`)
+  This is the path of the BUILD file where the rule is declared or extended to, using one of the rules keywords (i.e. `__dependencies_rules__` or `__dependents_rules__`)
   Example: in `src/python/BUILD` there is a rule `/proj/**` which will match all files from the `src/python/proj/` tree.
+
+  Note: When a rule is extended (using `extend=True` in a rules keyword), it is treated as declared in that new BUILD with the `extend=True` argument.
 
 - `.` - Anchor the glob to the invocation path.
   This is the file path of the target for which the rule will apply for. Relative paths are supported, so `../../cousin/path` is valid.
