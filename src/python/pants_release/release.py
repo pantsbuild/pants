@@ -721,8 +721,7 @@ def build_pex(dest: str, stable: bool) -> None:
         f"--python={sys.executable}",
     ]
     uname = os.uname()
-    py = f"cp{major}{minor}"
-    pex_name = f"pants.{py}-{uname.sysname.lower()}_{os.uname().machine.lower()}.pex"
+    pex_name = f"pants.cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}.pex"
     banner(f"Building {pex_name} by building wheels.")
 
     dest_dir = Path(dest)
