@@ -181,11 +181,17 @@ __dependencies_rules__(
 
 The selector and rule share a common syntax (refered to as a __target rule spec__), that is a dictionary value with properties describing what targets it applies to. Together, this pair of selector(s) and rules is called a __rule set__. A rule set may have multiple selectors wrapped in a list/tuple and the rules may be spread out or grouped in any fashion. Grouping rules like this makes it easier to re-use/insert rules from macros or similar.
 
+> 📘 An empty selector (`{}` or `""`) will never match anything and is as such pointless and will result in an error.
+>
+> For every dependency link, only a single set of rules will ever be applied. The first rule set
+> with a matching selector will be the only one used and any remaining rule sets are never
+> consulted.
+
 The __target rule spec__ has four properties: `type`, `name`, `tags`, and `path`. From the above example, when determining which rule set to apply for the dependencies of `src/a/main.py` Pants will look for the first selector for `src/a/BUILD` that satisifies the properties `type=python_sources`, `tags=["apps"]`, and `path=src/a/main.py`. The selection is based on exclusion so only when there is a property value and it doesn't match the target's property it will move on to the next selector; the lack of a property will be considered to match anything. Consequently an empty target spec would match all targets, but this is disallowed and will raise an error if used because it is conceptually not very clear when reading the rules.
 
 The values of a __target rule spec__ supports wildcard patterns (or globs) in order to have a single selector match multiple different targets, as described in [glob syntax](doc:targets#glob-syntax). When listing multiple values for the `tags` property, the target must have all of them in order to match. Spread the tags over multiple selectors in order to switch from _AND_ to _OR_ as required. The target `type` to match against will be that of the type used in the BUILD file, as the path (and target address) may refer to a generated target it is the target generators type that will be used during the selector matching process.
 
-The selectors are matched against the target in the order they are defined in the BUILD file, and the first rule set with a selector that is a match will be selected. The rules from the selected rule set is then matched in order against the path of the **target on the other end** of the dependency link. This is worth reading again; Using the above example again, the rules defined in `src/a/BUILD` will be matched against `src/b/lib.py` while the `path` selector will be matched against `src/a/main.py`.
+The selectors are matched against the target in the order they are defined in the BUILD file, and the first rule set with a selector that is a match will be selected. The rules from the selected rule set is then matched in order against the path of the **target on the other end** of the dependency link. This is worth reading again; Using the above example, the rules defined in `src/a/BUILD` will be matched against `src/b/lib.py` while the `path` selector will be matched against `src/a/main.py`.
 
 Providing some example rule sets for the above example (see [rule actions](doc:targets#rule-actions) on how to mark a rule as "allow" or "deny"):
 
@@ -201,7 +207,7 @@ __dependencies_rules__(
 
   # We need another rule set, in case we have non-python sources in here, to avoid fall-through.
   # Sticking in a generic catch-all allow-all rule.
-  ({}, "*"),
+  ("*", "*"),
 )
 
 
@@ -228,7 +234,7 @@ __dependents_rules__(
 
   # We need another rule set, in case we have non-python sources in here, to avoid fall-through.
   # Sticking in a generic catch-all allow-all rule.
-  ({}, "*"),
+  ("*", "*"),
 )
 ```
 
