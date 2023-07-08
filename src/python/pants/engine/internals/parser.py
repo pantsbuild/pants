@@ -401,7 +401,7 @@ class Parser:
                         raise
                     defined_symbols.add(bad_symbol)
 
-                    global_symbols[bad_symbol] = _unrecognized_symbol_func
+                    global_symbols[bad_symbol] = _UnrecognizedSymbol(bad_symbol)
                     self._parse_state.reset(
                         filepath=filepath,
                         is_bootstrap=is_bootstrap,
@@ -485,6 +485,38 @@ def _extract_symbol_from_name_error(err: NameError) -> str:
     return result.group(1)
 
 
-def _unrecognized_symbol_func(**kwargs):
-    """Allows us to not choke on unrecognized symbols, including when they're called as
-    functions."""
+class _UnrecognizedSymbol:
+    """Allows us to not choke on unrecognized symbols, including when they're called as functions.
+
+    During bootstrap macros are not loaded and if used in field values to environment targets (which
+    are parsed during the bootstrap phase) those fields will get instances of this class as field
+    values.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.args: tuple[Any, ...] = ()
+        self.kwargs: dict[str, Any] = {}
+
+    def __call__(self, *args, **kwargs) -> _UnrecognizedSymbol:
+        self.args = args
+        self.kwargs = kwargs
+        return self
+
+    def __eq__(self, other) -> bool:
+        return (
+            isinstance(other, _UnrecognizedSymbol)
+            and other.name == self.name
+            and other.args == self.args
+            and other.kwargs == self.kwargs
+        )
+
+    def __repr__(self) -> str:
+        args = ", ".join(map(repr, self.args))
+        kwargs = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
+        signature = ", ".join(s for s in (args, kwargs) if s)
+        return f"{self.name}({signature})"
+
+
+# Customize the type name presented by the InvalidFieldTypeException.
+_UnrecognizedSymbol.__name__ = "<unrecognized symbol>"
