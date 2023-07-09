@@ -33,6 +33,7 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TfSec, platform: Platfor
         Process(
             argv=[
                 downloaded_tfsec.exe,
+                *tfsec.args,
             ],
             input_digest=input_digest,
             description="Run tfsec",

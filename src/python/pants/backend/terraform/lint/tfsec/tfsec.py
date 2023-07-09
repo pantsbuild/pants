@@ -8,7 +8,7 @@ from pants.core.goals.lint import LintTargetsRequest
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.platform import Platform
-from pants.option.option_types import SkipOption
+from pants.option.option_types import ArgsListOption, SkipOption
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class TfSec(ExternalTool):
     ]
 
     skip = SkipOption("lint")
+    args = ArgsListOption(example="--minimum-severity MEDIUM")
 
     def generate_url(self, plat: Platform) -> str:
         plat_str = {
