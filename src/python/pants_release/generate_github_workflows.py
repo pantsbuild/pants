@@ -1040,7 +1040,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Determine ref to build",
                     "env": env,
-                    "id": "release_info",
+                    "id": "get_info",
                     "run": dedent(
                         """\
                         if [[ -n "$REF" ]]; then
@@ -1055,10 +1055,34 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         """
                     ),
                 },
+                {
+                    "name": "Make GitHub Release",
+                    "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
+                    "run": dedent(
+                        """\
+                        GH_RELEASE_ARGS=("--notes" "")
+                        if [[ "${{ steps.get_info.outputs.is-release }}" == "true" ]]; then
+                            GH_RELEASE_ARGS+=("--title" "${{ steps.get_info.outputs.build-ref }}")
+                            RELEASE_TAG="${{ steps.get_info.outputs.build-ref }}"
+                            if [[ ${RELEASE_TAG#release_} =~ [[:alpha:]] ]]; then
+                                GH_RELEASE_ARGS+=("--prerelease")
+                            fi
+                        else
+                            GH_RELEASE_ARGS+=("--title" "dev_${{ steps.get_info.outputs.build-ref }}")
+                            GH_RELEASE_ARGS+=("--prerelease")
+                        fi
+
+                        # NB: This could be a re-run of a release, in the event a job/step failed.
+                        if ! gh release view ${{ steps.get_info.outputs.build-ref }} ; then
+                            gh release create "${{ steps.get_info.outputs.build-ref }}" "${GH_RELEASE_ARGS[@]}"
+                        fi
+                        """
+                    ),
+                },
             ],
             "outputs": {
-                "build-ref": gha_expr("steps.release_info.outputs.build-ref"),
-                "is-release": gha_expr("steps.release_info.outputs.is-release"),
+                "build-ref": gha_expr("steps.get_info.outputs.build-ref"),
+                "is-release": gha_expr("steps.get_info.outputs.is-release"),
             },
         },
         **wheels_jobs,
