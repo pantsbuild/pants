@@ -1028,11 +1028,11 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     pypi_release_dir = "dest/pypi_release"
     helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
-        needs=["determine_ref"], for_deploy_ref=gha_expr("needs.determine_ref.outputs.build-ref")
+        needs=["release_info"], for_deploy_ref=gha_expr("needs.release_info.outputs.build-ref")
     )
     wheels_job_names = tuple(wheels_jobs.keys())
     jobs = {
-        "determine_ref": {
+        "release_info": {
             "name": "Determine the ref to build",
             "runs-on": "ubuntu-latest",
             "if": IS_PANTS_OWNER,
@@ -1040,7 +1040,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Determine ref to build",
                     "env": env,
-                    "id": "determine_ref",
+                    "id": "release_info",
                     "run": dedent(
                         """\
                         if [[ -n "$REF" ]]; then
@@ -1057,15 +1057,15 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
             ],
             "outputs": {
-                "build-ref": gha_expr("steps.determine_ref.outputs.build-ref"),
-                "is-release": gha_expr("steps.determine_ref.outputs.is-release"),
+                "build-ref": gha_expr("steps.release_info.outputs.build-ref"),
+                "is-release": gha_expr("steps.release_info.outputs.is-release"),
             },
         },
         **wheels_jobs,
         "publish": {
             "runs-on": "ubuntu-latest",
-            "needs": [*wheels_job_names, "determine_ref"],
-            "if": f"{IS_PANTS_OWNER} && needs.determine_ref.outputs.is-release == 'true'",
+            "needs": [*wheels_job_names, "release_info"],
+            "if": f"{IS_PANTS_OWNER} && needs.release_info.outputs.is-release == 'true'",
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
@@ -1074,7 +1074,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         # N.B.: We need the last few edits to VERSION. Instead of guessing, just
                         # clone the repo, we're not so big as to need to optimize this.
                         "fetch-depth": "0",
-                        "ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}",
+                        "ref": f"{gha_expr('needs.release_info.outputs.build-ref')}",
                     },
                 },
                 *helper.setup_primary_python(),
@@ -1096,7 +1096,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
                     "run": dedent(
                         f"""\
-                        tag="{gha_expr("needs.determine_ref.outputs.build-ref")}"
+                        tag="{gha_expr("needs.release_info.outputs.build-ref")}"
                         commit="$(git rev-parse ${{tag}}^{{commit}})"
 
                         echo "Recording tag ${{tag}} is of commit ${{commit}}"
