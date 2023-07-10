@@ -8,7 +8,7 @@ createdAt: "2023-07-07T10:32:00.000Z"
 Overwiew
 --------
 
-The Helm backend has opt-in support for using [Kubeconform](https://github.com/yannh/kubeconform) as a validation for both Helm charts and deployments. This gives the extra confidence that the templates defined in the different charts are conformant to a Kubernetes version or specification, plus the addtional benefit of ensuring that their final version (when used in deployments) also meets that criteria.
+The Helm backend has opt-in support for using [Kubeconform](https://github.com/yannh/kubeconform) as a validation tool for both Helm charts and deployments. This gives the extra confidence that the templates defined in the different charts are conformant to a Kubernetes version or specification, plus the addtional benefit of ensuring that their final version (when used in deployments) also meets that criteria.
 
 To enable the usage of Kubeconform, first we need to activate the relevant backend in `pants.toml`:
 
@@ -25,7 +25,7 @@ This will enable the `kubeconform` subsystem in our workspace and enrich our `he
 
 > 📘 Extra documentation on `kubeconform`
 > 
-> Enabling the backend will add the `kubeconform` subsystem in our workspace and enrich our `helm_chart` and `helm_deployment` with common fields that can be used to fine tune Kubeconform's behaviour in each of our targets. Please run `pants help kubeconform` as well as `pants help helm_chart`/`pants helm helm_deployment` after enabling the backend to consult the different configuration settings.
+> Enabling the backend will add the `kubeconform` subsystem in our workspace and enrich our `helm_chart` and `helm_deployment` with common fields that can be used to fine tune Kubeconform's behaviour in each of our targets. Please run `pants help kubeconform` as well as `pants help helm_chart`/`pants help helm_deployment` after enabling the backend to consult the different configuration settings.
 
 Validating charts and deployments
 ---------------------------------
