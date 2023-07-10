@@ -327,10 +327,10 @@ jobs:
         --title\" \"$RELEASE_TAG\")\nif [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then\n\
         \    GH_RELEASE_ARGS+=(\"--prerelease\")\nelse\n    STABLE_RELEASE_TAGS=$(gh\
         \ api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name\
-        \ | sub(\"^release_\"; \"\")')\n    LATEST_TAG=$(echo \"$STABLE_RELEASE_TAGS\
-        \ $RELEASE_TAG\" | tr ' ' '\\n' | sort --version-sort | tail -n 1)\n    if\
-        \ [[ $RELEASE_TAG == $LATEST_TAG ]]; then\n        GH_RELEASE_ARGS+=(\"--latest\"\
-        )\n    fi\nfi\n\ngh release create \"$RELEASE_TAG\" \"${GH_RELEASE_ARGS[@]}\"\
+        \ | sub(\"^release_\"; \"\") | select(test(\"^[0-9.]+$\"))')\n    LATEST_TAG=$(echo\
+        \ \"$STABLE_RELEASE_TAGS $RELEASE_TAG\" | tr ' ' '\\n' | sort --version-sort\
+        \ | tail -n 1)\n    if [[ $RELEASE_TAG == $LATEST_TAG ]]; then\n        GH_RELEASE_ARGS+=(\"\
+        --latest\")\n    fi\nfi\n\ngh release create \"$RELEASE_TAG\" \"${GH_RELEASE_ARGS[@]}\"\
         \n"
 name: Release
 'on':

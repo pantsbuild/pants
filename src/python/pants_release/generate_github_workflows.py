@@ -1073,7 +1073,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
                             GH_RELEASE_ARGS+=("--prerelease")
                         else
-                            STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "")')
+                            STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
                             LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\\n' | sort --version-sort | tail -n 1)
                             if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
                                 GH_RELEASE_ARGS+=("--latest")
