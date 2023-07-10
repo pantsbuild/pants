@@ -1060,22 +1060,27 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
                     "run": dedent(
                         """\
-                        GH_RELEASE_ARGS=("--notes" "")
-                        if [[ "${{ steps.get_info.outputs.is-release }}" == "true" ]]; then
-                            GH_RELEASE_ARGS+=("--title" "${{ steps.get_info.outputs.build-ref }}")
-                            RELEASE_TAG="${{ steps.get_info.outputs.build-ref }}"
-                            if [[ ${RELEASE_TAG#release_} =~ [[:alpha:]] ]]; then
-                                GH_RELEASE_ARGS+=("--prerelease")
-                            fi
-                        else
-                            GH_RELEASE_ARGS+=("--title" "dev_${{ steps.get_info.outputs.build-ref }}")
-                            GH_RELEASE_ARGS+=("--prerelease")
-                        fi
+                        RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
+                        RELEASE_VERSION="${RELEASE_TAG#release_}"
 
                         # NB: This could be a re-run of a release, in the event a job/step failed.
-                        if ! gh release view ${{ steps.get_info.outputs.build-ref }} ; then
-                            gh release create "${{ steps.get_info.outputs.build-ref }}" "${GH_RELEASE_ARGS[@]}"
+                        if gh release view $RELEASE_TAG ; then
+                            exit 0
                         fi
+
+                        GH_RELEASE_ARGS=("--notes" "")
+                        GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
+                        if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
+                            GH_RELEASE_ARGS+=("--prerelease")
+                        else
+                            STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "")')
+                            LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\n' | sort --version-sort | tail -n 1)
+                            if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
+                                GH_RELEASE_ARGS+=("--latest")
+                            fi
+                        fi
+
+                        gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}"
                         """
                     ),
                 },

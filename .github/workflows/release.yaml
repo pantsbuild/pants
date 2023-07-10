@@ -320,16 +320,24 @@ jobs:
     - if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
         == 'true'
       name: Make GitHub Release
-      run: "GH_RELEASE_ARGS=(\"--notes\" \"\")\nif [[ \"${{ steps.get_info.outputs.is-release\
-        \ }}\" == \"true\" ]]; then\n    GH_RELEASE_ARGS+=(\"--title\" \"${{ steps.get_info.outputs.build-ref\
-        \ }}\")\n    RELEASE_TAG=\"${{ steps.get_info.outputs.build-ref }}\"\n   \
-        \ if [[ ${RELEASE_TAG#release_} =~ [[:alpha:]] ]]; then\n        GH_RELEASE_ARGS+=(\"\
-        --prerelease\")\n    fi\nelse\n    GH_RELEASE_ARGS+=(\"--title\" \"dev_${{\
-        \ steps.get_info.outputs.build-ref }}\")\n    GH_RELEASE_ARGS+=(\"--prerelease\"\
-        )\nfi\n\n# NB: This could be a re-run of a release, in the event a job/step\
-        \ failed.\nif ! gh release view ${{ steps.get_info.outputs.build-ref }} ;\
-        \ then\n    gh release create \"${{ steps.get_info.outputs.build-ref }}\"\
-        \ \"${GH_RELEASE_ARGS[@]}\"\nfi\n"
+      run: "                        RELEASE_TAG=${{ steps.get_info.outputs.build-ref\
+        \ }}\n                        RELEASE_VERSION=\"${RELEASE_TAG#release_}\"\n\
+        \n                        # NB: This could be a re-run of a release, in the\
+        \ event a job/step failed.\n                        if gh release view $RELEASE_TAG\
+        \ ; then\n                            exit 0\n                        fi\n\
+        \n                        GH_RELEASE_ARGS=(\"--notes\" \"\")\n           \
+        \             GH_RELEASE_ARGS+=(\"--title\" \"$RELEASE_TAG\")\n          \
+        \              if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then\n          \
+        \                  GH_RELEASE_ARGS+=(\"--prerelease\")\n                 \
+        \       else\n                            STABLE_RELEASE_TAGS=$(gh api -X\
+        \ GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name |\
+        \ sub(\"^release_\"; \"\")')\n                            LATEST_TAG=$(echo\
+        \ \"$STABLE_RELEASE_TAGS $RELEASE_TAG\" | tr ' ' '\n' | sort --version-sort\
+        \ | tail -n 1)\n                            if [[ $RELEASE_TAG == $LATEST_TAG\
+        \ ]]; then\n                                GH_RELEASE_ARGS+=(\"--latest\"\
+        )\n                            fi\n                        fi\n\n        \
+        \                gh release create \"$RELEASE_TAG\" \"${GH_RELEASE_ARGS[@]}\"\
+        \n"
 name: Release
 'on':
   push:
