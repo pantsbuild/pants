@@ -61,6 +61,11 @@ _orgs = (
         "https://files.readme.io/8497e9c-doctrine-small.png",
     ),
     Org(
+        "Embark Studios",
+        "https://www.embark-studios.com/",
+        "https://files.readme.io/6ed9278-embark-small.png",
+    ),
+    Org(
         "ESL Gaming",
         "https://about.eslgaming.com/",
         "https://files.readme.io/b63d33d-esl-small.png",

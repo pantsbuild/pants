@@ -1592,9 +1592,10 @@ class InvalidFieldTypeException(InvalidFieldException):
         expected_type: str,
         description_of_origin: str | None = None,
     ) -> None:
+        raw_type = f"with type `{type(raw_value).__name__}`"
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
-            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`.",
+            f"`{repr(raw_value)}` {raw_type}.",
             description_of_origin=description_of_origin,
         )
 
