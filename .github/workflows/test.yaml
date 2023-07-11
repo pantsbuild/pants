@@ -315,11 +315,7 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -327,6 +323,10 @@ jobs:
       with:
         name: logs-wheels-Linux-ARM64
         path: .pants.d/*.log
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -369,11 +369,7 @@ jobs:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -381,6 +377,9 @@ jobs:
       with:
         name: logs-wheels-Linux-x86_64
         path: .pants.d/*.log
+    - env: {}
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -424,11 +423,7 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -436,6 +431,10 @@ jobs:
       with:
         name: logs-wheels-macOS10-15-x86_64
         path: .pants.d/*.log
+    - env:
+        ARCHFLAGS: -arch x86_64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -479,11 +478,7 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -491,6 +486,10 @@ jobs:
       with:
         name: logs-wheels-macOS11-ARM64
         path: .pants.d/*.log
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     timeout-minutes: 90
   check_labels:
     if: github.repository_owner == 'pantsbuild'

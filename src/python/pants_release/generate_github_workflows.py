@@ -534,25 +534,6 @@ class Helper:
             self.native_binaries_upload(),
         ]
 
-    def build_wheels(self) -> list[Step]:
-        cmd = dedent(
-            # Note that the build-local-pex run is just for smoke-testing that pex
-            # builds work, and it must come *before* the build-wheels runs, since
-            # it cleans out `dist/deploy`, which the build-wheels runs populate for
-            # later attention by deploy_to_s3.py.
-            """\
-            ./pants run src/python/pants_release/release.py -- build-local-pex
-            ./pants run src/python/pants_release/release.py -- build-wheels
-            """
-        )
-
-        return [
-            {
-                "name": "Build wheels",
-                "run": cmd,
-                "env": self.platform_env(),
-            },
-        ]
 
     def upload_log_artifacts(self, name: str) -> Step:
         return {
@@ -867,9 +848,31 @@ def build_wheels_job(
             "steps": [
                 *initial_steps,
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
-                *helper.build_wheels(),
+                {
+                    "name": "Build wheels",
+                    "run": "./pants run src/python/pants_release/release.py -- build-wheels",
+                    "env": helper.platform_env(),
+                },
                 helper.upload_log_artifacts(name="wheels"),
                 *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
+                {
+                        "name": "Build Pants PEX",
+                        "run": "./pants package src/python/pants:pants-pex",
+                        "env": helper.platform_env(),
+                    },
+                *([
+                    {
+                        "name": "Upload Pants PEX",
+                        "if": "needs.release_info.outputs.is-release == 'true'",
+                        "run": dedent(
+                            """\
+                            LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
+                            mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
+                            gh release upload --no-clobber ${{ needs.release_info.outputs.build-ref }} dist/src.python.pants/pants.$LOCAL_TAG.pex
+                            """
+                        )
+                    }
+                ] if for_deploy_ref else []),
             ],
         },
     }
