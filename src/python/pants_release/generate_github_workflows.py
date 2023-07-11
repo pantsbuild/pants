@@ -1170,7 +1170,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 ),
                 {
                     "name": "Publish GitHub Release",
-                    "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
                     "run": "gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false",
                 },
             ],

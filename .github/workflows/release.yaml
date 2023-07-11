@@ -302,9 +302,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py -- --scope tags/pantsbuild.pants
-    - if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
-        == 'true'
-      name: Publish GitHub Release
+    - name: Publish GitHub Release
       run: gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
   release_info:
     if: github.repository_owner == 'pantsbuild'
