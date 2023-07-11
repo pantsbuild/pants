@@ -1098,6 +1098,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "runs-on": "ubuntu-latest",
             "needs": [*wheels_job_names, "release_info"],
             "if": f"{IS_PANTS_OWNER} && needs.release_info.outputs.is-release == 'true'",
+            "env": {
+                # This job does not actually build anything
+                "MODE": "debug",
+            },
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
@@ -1114,10 +1118,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Fetch and stabilize wheels",
                     "run": f"./pants run src/python/pants_release/release.py -- fetch-and-stabilize --dest={pypi_release_dir}",
-                    "env": {
-                        # This step does not actually build anything: only download wheels from S3.
-                        "MODE": "debug",
-                    },
                 },
                 {
                     "name": "Create Release -> Commit Mapping",
@@ -1171,7 +1171,12 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Publish GitHub Release",
                     "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
-                    "run": "gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false",
+                    "run": dedent(
+                        f"""\
+                        gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}
+                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false
+                        """
+                    ),
                 },
             ],
         },

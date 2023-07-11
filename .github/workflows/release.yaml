@@ -240,6 +240,8 @@ jobs:
       run: ./pants run src/python/pants_release/deploy_to_s3.py
     timeout-minutes: 90
   publish:
+    env:
+      MODE: debug
     if: github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release
       == 'true'
     needs:
@@ -261,9 +263,7 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - env:
-        MODE: debug
-      name: Fetch and stabilize wheels
+    - name: Fetch and stabilize wheels
       run: ./pants run src/python/pants_release/release.py -- fetch-and-stabilize
         --dest=dest/pypi_release
     - name: Create Release -> Commit Mapping
@@ -305,7 +305,11 @@ jobs:
     - if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
         == 'true'
       name: Publish GitHub Release
-      run: gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
+      run: 'gh release upload ${{ needs.release_info.outputs.build-ref }} dest/pypi_release
+
+        gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
+
+        '
   release_info:
     if: github.repository_owner == 'pantsbuild'
     name: Determine the ref to build
