@@ -32,7 +32,7 @@ from pants_release.reversion import reversion
 
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
-from pants.util.strutil import softwrap, strip_prefix
+from pants.util.strutil import softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -497,35 +497,6 @@ def create_twine_venv() -> None:
         shutil.rmtree(CONSTANTS.twine_venv_dir)
     bin_dir = create_venv(CONSTANTS.twine_venv_dir)
     subprocess.run([bin_dir / "pip", "install", "--quiet", "twine"], check=True)
-
-
-@contextmanager
-def download_pex_bin() -> Iterator[Path]:
-    """Download PEX and return the path to the binary."""
-    try:
-        pex_version = next(
-            strip_prefix(ln, "pex==").rstrip()
-            for ln in Path("3rdparty/python/requirements.txt").read_text().splitlines()
-            if ln.startswith("pex==")
-        )
-    except (FileNotFoundError, StopIteration) as exc:
-        die(
-            softwrap(
-                f"""
-                Could not find a requirement starting with `pex==` in
-                3rdparty/python/requirements.txt: {repr(exc)}
-                """
-            )
-        )
-
-    with temporary_dir() as tempdir:
-        resp = requests.get(
-            f"https://github.com/pantsbuild/pex/releases/download/v{pex_version}/pex"
-        )
-        resp.raise_for_status()
-        result = Path(tempdir, "pex")
-        result.write_bytes(resp.content)
-        yield result
 
 
 # -----------------------------------------------------------------------------------------------

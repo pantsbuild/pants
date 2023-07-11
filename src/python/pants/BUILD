@@ -45,7 +45,9 @@ pex_binary(
     dependencies=[":pants-packaged"],
     script="pants",
     execution_mode="venv",
+    shebang="/usr/bin/env python",
     strip_pex_env=False,
+    layout="zipapp",
 )
 
 # NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building
