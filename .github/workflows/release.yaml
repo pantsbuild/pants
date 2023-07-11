@@ -302,6 +302,10 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py -- --scope tags/pantsbuild.pants
+    - if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
+        == 'true'
+      name: Publish GitHub Release
+      run: gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
   release_info:
     if: github.repository_owner == 'pantsbuild'
     name: Determine the ref to build
@@ -325,13 +329,14 @@ jobs:
         \ the event a job/step failed.\nif gh release view $RELEASE_TAG ; then\n \
         \   exit 0\nfi\n\nGH_RELEASE_ARGS=(\"--notes\" \"\")\nGH_RELEASE_ARGS+=(\"\
         --title\" \"$RELEASE_TAG\")\nif [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then\n\
-        \    GH_RELEASE_ARGS+=(\"--prerelease\")\nelse\n    STABLE_RELEASE_TAGS=$(gh\
-        \ api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name\
-        \ | sub(\"^release_\"; \"\") | select(test(\"^[0-9.]+$\"))')\n    LATEST_TAG=$(echo\
-        \ \"$STABLE_RELEASE_TAGS $RELEASE_TAG\" | tr ' ' '\\n' | sort --version-sort\
-        \ | tail -n 1)\n    if [[ $RELEASE_TAG == $LATEST_TAG ]]; then\n        GH_RELEASE_ARGS+=(\"\
-        --latest\")\n    fi\nfi\n\ngh release create \"$RELEASE_TAG\" \"${GH_RELEASE_ARGS[@]}\"\
-        \n"
+        \    GH_RELEASE_ARGS+=(\"--prerelease\")\n    GH_RELEASE_ARGS+=(\"--latest=false\"\
+        )\nelse\n    STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases\
+        \ --jq '.[].tag_name | sub(\"^release_\"; \"\") | select(test(\"^[0-9.]+$\"\
+        ))')\n    LATEST_TAG=$(echo \"$STABLE_RELEASE_TAGS $RELEASE_TAG\" | tr ' '\
+        \ '\\n' | sort --version-sort | tail -n 1)\n    if [[ $RELEASE_TAG == $LATEST_TAG\
+        \ ]]; then\n        GH_RELEASE_ARGS+=(\"--latest=true\")\n    else\n     \
+        \   GH_RELEASE_ARGS+=(\"--latest=false\")\n    fi\nfi\n\ngh release create\
+        \ \"$RELEASE_TAG\" \"${GH_RELEASE_ARGS[@]}\" --draft\n"
 name: Release
 'on':
   push:

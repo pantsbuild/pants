@@ -1072,15 +1072,18 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
                         if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
                             GH_RELEASE_ARGS+=("--prerelease")
+                            GH_RELEASE_ARGS+=("--latest=false")
                         else
                             STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
                             LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\\n' | sort --version-sort | tail -n 1)
                             if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
-                                GH_RELEASE_ARGS+=("--latest")
+                                GH_RELEASE_ARGS+=("--latest=true")
+                            else
+                                GH_RELEASE_ARGS+=("--latest=false")
                             fi
                         fi
 
-                        gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}"
+                        gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}" --draft
                         """
                     ),
                 },
@@ -1165,6 +1168,11 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "Deploy commit mapping to S3",
                     scope="tags/pantsbuild.pants",
                 ),
+                {
+                    "name": "Publish GitHub Release",
+                    "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
+                    "run": "gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false",
+                },
             ],
         },
     }
