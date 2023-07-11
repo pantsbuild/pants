@@ -171,6 +171,28 @@ def test_unrecognized_symbol_during_bootstrap_issue_19156(
         TestField(raw_field, Address(""))
 
 
+def test_unknown_target_for_defaults_during_bootstrap_issue_19445(
+    defaults_parser_state: BuildFileDefaultsParserState,
+) -> None:
+    parser = Parser(
+        build_root="",
+        registered_target_types=RegisteredTargetTypes({}),
+        union_membership=UnionMembership({}),
+        object_aliases=BuildFileAliases(),
+        ignore_unrecognized_symbols=True,
+    )
+    parser.parse(
+        "BUILD",
+        "__defaults__({'type_1': dict(), type_2: dict()})",
+        BuildFilePreludeSymbols.create({}, ()),
+        EnvironmentVars({}),
+        True,
+        defaults_parser_state,
+        dependents_rules=None,
+        dependencies_rules=None,
+    )
+
+
 @pytest.mark.parametrize("symbol", ["a", "bad", "BAD", "a___b_c", "a231", "áç"])
 def test_extract_symbol_from_name_error(symbol: str) -> None:
     assert _extract_symbol_from_name_error(NameError(f"name '{symbol}' is not defined")) == symbol
