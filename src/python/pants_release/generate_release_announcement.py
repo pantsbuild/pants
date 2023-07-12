@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import argparse
 import json
-from pathlib import Path
 
 from pants_release.common import VERSION_PATH, sorted_contributors
 from pants_release.git import git
