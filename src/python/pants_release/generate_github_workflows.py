@@ -1070,7 +1070,12 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Checkout Pants at Release Tag",
                     "uses": "actions/checkout@v3",
-                    "with": {"ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}"},
+                    "with": {
+                        # N.B.: We need the last few edits to VERSION. Instead of guessing, just
+                        # clone the repo, we're not so big as to need to optimize this.
+                        "fetch-depth": "0",
+                        "ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}",
+                    },
                 },
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
