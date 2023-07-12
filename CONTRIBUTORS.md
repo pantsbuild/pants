@@ -21,6 +21,7 @@ Created as part of the release process.
 + Baptiste Gentholz
 + Bardur Arantsson
 + Bastian Wegge
++ Ben Limmer
 + Benjy Weinberger
 + Berkay Öztürk
 + Bill Farner
@@ -238,6 +239,7 @@ Created as part of the release process.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Raph Estrada
 + Raúl Cuza
 + Rhuan Barreto
 + Rhys Madigan

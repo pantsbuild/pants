@@ -10,14 +10,12 @@ from typing import Iterable, Mapping
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PexLayout,
     PythonRequirementsField,
     PythonResolveField,
-    parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
@@ -62,6 +60,8 @@ from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.pip_requirement import PipRequirement
+from pants.util.requirements import parse_requirements_file
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)

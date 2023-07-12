@@ -69,6 +69,10 @@ Check for updates to the `pants` script
 
 Run `curl -L -o pants https://pantsbuild.github.io/setup/pants` to check if there have been any changes, e.g. adding support for running Pants with new Python interpreters.
 
+> 🚧 Consider migrating to the new `pants` binary
+> 
+> The `pants` script is deprecated. The new `pants` binary has many improvements over the script, including an embedded Python runtime. The [installation page](doc:installation) has more details on how to migrate.
+
 Find any bugs or issues?
 ------------------------
 

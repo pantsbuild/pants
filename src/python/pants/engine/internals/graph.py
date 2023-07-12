@@ -46,6 +46,7 @@ from pants.engine.target import (
     CoarsenedTargetsRequest,
     Dependencies,
     DependenciesRequest,
+    DepsTraversalBehavior,
     ExplicitlyProvidedDependencies,
     ExplicitlyProvidedDependenciesRequest,
     Field,
@@ -1322,7 +1323,7 @@ async def resolve_dependencies(
     # This predicate allows the dep graph to ignore dependencies of selected targets
     # including any explicit deps and any inferred deps.
     # For example, to avoid traversing the deps of package targets.
-    if not request.should_traverse_deps_predicate(tgt, request.field):
+    if request.should_traverse_deps_predicate(tgt, request.field) == DepsTraversalBehavior.EXCLUDE:
         return Addresses([])
 
     try:
@@ -1412,7 +1413,7 @@ async def resolve_dependencies(
         field
         for field in tgt.field_values.values()
         if isinstance(field, SpecialCasedDependencies)
-        and request.should_traverse_deps_predicate(tgt, field)
+        and request.should_traverse_deps_predicate(tgt, field) == DepsTraversalBehavior.INCLUDE
     )
     # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
     special_cased = await MultiGet(
