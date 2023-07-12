@@ -206,7 +206,7 @@ class TargetGlob:
         tags: tuple[str, ...] | None,
     ) -> TargetGlob:
         return cls(
-            type_=Glob.create(str(type_)) if type_ else None,
+            type_=Glob.create(type_) if type_ else None,
             path=PathGlob.parse(path, base) if path else None,
             name=Glob.create(name) if name else None,
             tags=tuple(Glob.create(tag) for tag in tags) if tags else None,
@@ -225,9 +225,9 @@ class TargetGlob:
             raise ValueError(f"Target spec must not be empty. {spec!r}")
 
         return cls.create(  # type: ignore[call-arg]
-            type_=spec_dict.get("type"),
-            name=spec_dict.get("name"),
-            path=spec_dict.get("path"),
+            type_=str(spec_dict["type"]) if "type" in spec_dict else None,
+            name=str(spec_dict["name"]) if "name" in spec_dict else None,
+            path=str(spec_dict["path"]) if "path" in spec_dict else None,
             base=base,
             tags=cls._parse_tags(spec_dict.get("tags")),
         )
