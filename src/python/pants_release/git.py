@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 import subprocess
 
+import github
+from pants_release.common import die, green
+
 logger = logging.getLogger(__name__)
 
-MAIN_REPO = "https://github.com/pantsbuild/pants"
+MAIN_REPO_SLUG = "pantsbuild/pants"
+MAIN_REPO = f"https://github.com/{MAIN_REPO_SLUG}"
+
+GH_TOKEN_VAR_NAME = "GH_TOKEN"
 
 
 def _run(
@@ -45,3 +52,22 @@ def git_fetch(rev: str) -> str:
     """Fetch rev (e.g. branch or a SHA) from the upstream repository and return its SHA."""
     git("fetch", MAIN_REPO, rev)
     return git_rev_parse("FETCH_HEAD")
+
+
+def github_repo() -> github.Repository.Repository:
+    token = os.environ.get(GH_TOKEN_VAR_NAME)
+    if not token:
+        die(
+            f"Failed to find credentials in {GH_TOKEN_VAR_NAME} env var, please set this and try again"
+        )
+
+    try:
+        gh = github.Github(auth=github.Auth.Token(token))
+        user = gh.get_user()
+        repo = gh.get_repo(MAIN_REPO_SLUG)
+    except Exception as e:
+        die(f"Failed to get Github info; is your token valid? {e}")
+    else:
+        green(f"Operating on Github as: @{user.login}")
+
+    return repo
