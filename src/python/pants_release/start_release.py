@@ -17,7 +17,7 @@ from pathlib import Path
 import requests
 from packaging.version import Version
 from pants_release.common import CONTRIBUTORS_PATH, VERSION_PATH, sorted_contributors
-from pants_release.git import git, git_fetch, github_pr_create
+from pants_release.git import git, git_fetch
 
 from pants.util.strutil import softwrap
 
@@ -288,15 +288,6 @@ def commit_and_pr(release_info: ReleaseInfo, formatted: Formatted, release_manag
     git("add", str(VERSION_PATH), str(CONTRIBUTORS_PATH), str(release_info.notes_file_name()))
     git("commit", "-m", title)
     git("push", "origin", "HEAD")
-
-    github_pr_create(
-        base="main",
-        head=branch,
-        title=title,
-        body="\n\n".join([BASE_PR_BODY, formatted.internal]),
-        assignee=release_manager,
-        labels=["automation:release-prep"],
-    )
 
 
 def main() -> None:
