@@ -310,7 +310,7 @@ jobs:
         '
   release_info:
     if: github.repository_owner == 'pantsbuild'
-    name: Determine the ref to build
+    name: Create draft release and output info
     outputs:
       build-ref: ${{ steps.get_info.outputs.build-ref }}
       is-release: ${{ steps.get_info.outputs.is-release }}
