@@ -1028,19 +1028,19 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     pypi_release_dir = "dest/pypi_release"
     helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
-        needs=["determine_ref"], for_deploy_ref=gha_expr("needs.determine_ref.outputs.build-ref")
+        needs=["release_info"], for_deploy_ref=gha_expr("needs.release_info.outputs.build-ref")
     )
     wheels_job_names = tuple(wheels_jobs.keys())
     jobs = {
-        "determine_ref": {
-            "name": "Determine the ref to build",
+        "release_info": {
+            "name": "Create draft release and output info",
             "runs-on": "ubuntu-latest",
             "if": IS_PANTS_OWNER,
             "steps": [
                 {
                     "name": "Determine ref to build",
                     "env": env,
-                    "id": "determine_ref",
+                    "id": "get_info",
                     "run": dedent(
                         """\
                         if [[ -n "$REF" ]]; then
@@ -1055,17 +1055,49 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         """
                     ),
                 },
+                {
+                    "name": "Make GitHub Release",
+                    "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
+                    "run": dedent(
+                        """\
+                        RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
+                        RELEASE_VERSION="${RELEASE_TAG#release_}"
+
+                        # NB: This could be a re-run of a release, in the event a job/step failed.
+                        if gh release view $RELEASE_TAG ; then
+                            exit 0
+                        fi
+
+                        GH_RELEASE_ARGS=("--notes" "")
+                        GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
+                        if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
+                            GH_RELEASE_ARGS+=("--prerelease")
+                            GH_RELEASE_ARGS+=("--latest=false")
+                        else
+                            STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
+                            LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\\n' | sort --version-sort | tail -n 1)
+                            if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
+                                GH_RELEASE_ARGS+=("--latest=true")
+                            else
+                                GH_RELEASE_ARGS+=("--latest=false")
+                            fi
+                        fi
+
+                        gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}" --draft
+                        """
+                    ),
+                },
             ],
             "outputs": {
-                "build-ref": gha_expr("steps.determine_ref.outputs.build-ref"),
-                "is-release": gha_expr("steps.determine_ref.outputs.is-release"),
+                "build-ref": gha_expr("steps.get_info.outputs.build-ref"),
+                "is-release": gha_expr("steps.get_info.outputs.is-release"),
             },
         },
         **wheels_jobs,
         "publish": {
             "runs-on": "ubuntu-latest",
-            "needs": [*wheels_job_names, "determine_ref"],
-            "if": f"{IS_PANTS_OWNER} && needs.determine_ref.outputs.is-release == 'true'",
+            "needs": [*wheels_job_names, "release_info"],
+            "if": f"{IS_PANTS_OWNER} && needs.release_info.outputs.is-release == 'true'",
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
@@ -1074,7 +1106,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         # N.B.: We need the last few edits to VERSION. Instead of guessing, just
                         # clone the repo, we're not so big as to need to optimize this.
                         "fetch-depth": "0",
-                        "ref": f"{gha_expr('needs.determine_ref.outputs.build-ref')}",
+                        "ref": f"{gha_expr('needs.release_info.outputs.build-ref')}",
                     },
                 },
                 *helper.setup_primary_python(),
@@ -1096,7 +1128,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
                     "run": dedent(
                         f"""\
-                        tag="{gha_expr("needs.determine_ref.outputs.build-ref")}"
+                        tag="{gha_expr("needs.release_info.outputs.build-ref")}"
                         commit="$(git rev-parse ${{tag}}^{{commit}})"
 
                         echo "Recording tag ${{tag}} is of commit ${{commit}}"
@@ -1136,6 +1168,15 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "Deploy commit mapping to S3",
                     scope="tags/pantsbuild.pants",
                 ),
+                {
+                    "name": "Publish GitHub Release",
+                    "run": dedent(
+                        f"""\
+                        gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}
+                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false
+                        """
+                    ),
+                },
             ],
         },
     }

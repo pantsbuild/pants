@@ -207,9 +207,7 @@ PANTS_PEX_RELEASE=STABLE ./pants run src/python/pants_release/release.py -- buil
 
 Then:
 
-- Go to <https://github.com/pantsbuild/pants/tags>, find your release's tag and click `Create release from tag`.
-- If this is not the latest stable release, deselect "Set as the latest release".
-- If this is not a stable release, select "Set as a pre-release".
+- Go to <https://github.com/pantsbuild/pants/releases>, find your release.
 - Attach the PEX located at `dist/pex.pants.<version>.pex`.
 - Click "Publish release"
 
