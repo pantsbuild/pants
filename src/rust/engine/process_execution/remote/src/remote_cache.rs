@@ -63,6 +63,19 @@ pub struct RemoteCacheProviderOptions {
   pub rpc_timeout: Duration,
 }
 
+pub struct RemoteCacheRunnerOptions {
+  pub inner: Arc<dyn process_execution::CommandRunner>,
+  pub instance_name: Option<String>,
+  pub process_cache_namespace: Option<String>,
+  pub executor: task_executor::Executor,
+  pub store: Store,
+  pub cache_read: bool,
+  pub cache_write: bool,
+  pub warnings_behavior: RemoteCacheWarningsBehavior,
+  pub cache_content_behavior: CacheContentBehavior,
+  pub append_only_caches_base_path: Option<String>,
+}
+
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
 ///
@@ -90,17 +103,19 @@ pub struct CommandRunner {
 
 impl CommandRunner {
   pub fn new(
-    inner: Arc<dyn process_execution::CommandRunner>,
-    instance_name: Option<String>,
+    RemoteCacheRunnerOptions {
+      inner,
+      instance_name,
+      process_cache_namespace,
+      executor,
+      store,
+      cache_read,
+      cache_write,
+      warnings_behavior,
+      cache_content_behavior,
+      append_only_caches_base_path,
+    }: RemoteCacheRunnerOptions,
     provider_options: RemoteCacheProviderOptions,
-    process_cache_namespace: Option<String>,
-    executor: task_executor::Executor,
-    store: Store,
-    cache_read: bool,
-    cache_write: bool,
-    warnings_behavior: RemoteCacheWarningsBehavior,
-    cache_content_behavior: CacheContentBehavior,
-    append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
     let provider = Arc::new(reapi::Provider::new(provider_options)?);
 

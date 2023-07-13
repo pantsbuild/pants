@@ -21,7 +21,9 @@ use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::ensure_action_stored_locally;
-use crate::remote_cache::{RemoteCacheProviderOptions, RemoteCacheWarningsBehavior};
+use crate::remote_cache::{
+  RemoteCacheProviderOptions, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
+};
 use process_execution::{
   make_execute_request, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
@@ -147,8 +149,18 @@ fn create_cached_runner(
 ) -> Box<dyn CommandRunnerTrait> {
   Box::new(
     crate::remote_cache::CommandRunner::new(
-      local.into(),
-      None,
+      RemoteCacheRunnerOptions {
+        inner: local.into(),
+        instance_name: None,
+        process_cache_namespace: None,
+        executor: store_setup.executor.clone(),
+        store: store_setup.store.clone(),
+        cache_read: true,
+        cache_write: true,
+        warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
+        cache_content_behavior,
+        append_only_caches_base_path: None,
+      },
       RemoteCacheProviderOptions {
         instance_name: None,
         action_cache_address: store_setup.cas.address(),
@@ -157,14 +169,6 @@ fn create_cached_runner(
         concurrency_limit: 256,
         rpc_timeout: CACHE_READ_TIMEOUT,
       },
-      None,
-      store_setup.executor.clone(),
-      store_setup.store.clone(),
-      true,
-      true,
-      RemoteCacheWarningsBehavior::FirstOnly,
-      cache_content_behavior,
-      None,
     )
     .expect("caching command runner"),
   )
@@ -735,8 +739,18 @@ async fn make_action_result_basic() {
   let mock_command_runner = Arc::new(MockCommandRunner);
   let cas = StubCAS::builder().build();
   let runner = crate::remote_cache::CommandRunner::new(
-    mock_command_runner.clone(),
-    None,
+    RemoteCacheRunnerOptions {
+      inner: mock_command_runner.clone(),
+      instance_name: None,
+      process_cache_namespace: None,
+      executor: executor.clone(),
+      store: store.clone(),
+      cache_read: true,
+      cache_write: true,
+      warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
+      cache_content_behavior: CacheContentBehavior::Defer,
+      append_only_caches_base_path: None,
+    },
     RemoteCacheProviderOptions {
       instance_name: None,
       action_cache_address: cas.address(),
@@ -745,14 +759,6 @@ async fn make_action_result_basic() {
       concurrency_limit: 256,
       rpc_timeout: CACHE_READ_TIMEOUT,
     },
-    None,
-    executor.clone(),
-    store.clone(),
-    true,
-    true,
-    RemoteCacheWarningsBehavior::FirstOnly,
-    CacheContentBehavior::Defer,
-    None,
   )
   .expect("caching command runner");
 
