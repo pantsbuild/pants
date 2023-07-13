@@ -27,6 +27,8 @@ use process_execution::{
 use process_execution::{make_execute_request, EntireExecuteRequest};
 
 mod reapi;
+#[cfg(test)]
+mod reapi_tests;
 
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
