@@ -852,13 +852,13 @@ def build_wheels_job(
                     "run": "./pants run src/python/pants_release/release.py -- build-wheels",
                     "env": helper.platform_env(),
                 },
-                helper.upload_log_artifacts(name="wheels"),
-                *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
                 {
                     "name": "Build Pants PEX",
                     "run": "./pants package src/python/pants:pants-pex",
                     "env": helper.platform_env(),
                 },
+                helper.upload_log_artifacts(name="wheels-and-pex"),
+                *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
                 *(
                     [
                         {
