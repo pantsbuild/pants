@@ -317,7 +317,7 @@ async fn main() {
 
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
-          remote::remote_cache::CommandRunner::new(
+          remote::remote_cache::CommandRunner::from_provider_options(
             RemoteCacheRunnerOptions {
               inner: Arc::new(remote_runner),
               instance_name: process_metadata.instance_name.clone(),

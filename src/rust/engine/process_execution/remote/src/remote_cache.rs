@@ -39,7 +39,7 @@ pub enum RemoteCacheWarningsBehavior {
 /// This `ActionCacheProvider` trait captures the operations required to be able to cache command
 /// executions remotely.
 #[async_trait]
-trait ActionCacheProvider: Sync + Send + 'static {
+pub trait ActionCacheProvider: Sync + Send + 'static {
   async fn update_action_result(
     &self,
     action_digest: Digest,
@@ -115,11 +115,9 @@ impl CommandRunner {
       cache_content_behavior,
       append_only_caches_base_path,
     }: RemoteCacheRunnerOptions,
-    provider_options: RemoteCacheProviderOptions,
-  ) -> Result<Self, String> {
-    let provider = Arc::new(reapi::Provider::new(provider_options)?);
-
-    Ok(CommandRunner {
+    provider: Arc<dyn ActionCacheProvider + 'static>,
+  ) -> Self {
+    CommandRunner {
       inner,
       instance_name,
       process_cache_namespace,
@@ -133,7 +131,16 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
-    })
+    }
+  }
+
+  pub fn from_provider_options(
+    runner_options: RemoteCacheRunnerOptions,
+    provider_options: RemoteCacheProviderOptions,
+  ) -> Result<Self, String> {
+    let provider = Arc::new(reapi::Provider::new(provider_options)?);
+
+    Ok(Self::new(runner_options, provider))
   }
 
   /// Create a REAPI `Tree` protobuf for an output directory by traversing down from a Pants

@@ -325,7 +325,7 @@ impl Core {
     local_cache_write: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
     if remote_cache_read || remote_cache_write {
-      runner = Arc::new(remote_cache::CommandRunner::new(
+      runner = Arc::new(remote_cache::CommandRunner::from_provider_options(
         RemoteCacheRunnerOptions {
           inner: runner,
           instance_name: instance_name.clone(),
