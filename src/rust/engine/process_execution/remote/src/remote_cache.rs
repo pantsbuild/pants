@@ -53,6 +53,16 @@ trait ActionCacheProvider: Sync + Send + 'static {
   ) -> Result<Option<ActionResult>, String>;
 }
 
+#[derive(Clone)]
+pub struct RemoteCacheProviderOptions {
+  pub instance_name: Option<String>,
+  pub action_cache_address: String,
+  pub root_ca_certs: Option<Vec<u8>>,
+  pub headers: BTreeMap<String, String>,
+  pub concurrency_limit: usize,
+  pub rpc_timeout: Duration,
+}
+
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
 ///
@@ -82,28 +92,17 @@ impl CommandRunner {
   pub fn new(
     inner: Arc<dyn process_execution::CommandRunner>,
     instance_name: Option<String>,
+    provider_options: RemoteCacheProviderOptions,
     process_cache_namespace: Option<String>,
     executor: task_executor::Executor,
     store: Store,
-    action_cache_address: &str,
-    root_ca_certs: Option<Vec<u8>>,
-    headers: BTreeMap<String, String>,
     cache_read: bool,
     cache_write: bool,
     warnings_behavior: RemoteCacheWarningsBehavior,
     cache_content_behavior: CacheContentBehavior,
-    concurrency_limit: usize,
-    rpc_timeout: Duration,
     append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
-    let provider = Arc::new(reapi::Provider::new(
-      instance_name.clone(),
-      action_cache_address,
-      root_ca_certs,
-      headers,
-      concurrency_limit,
-      rpc_timeout,
-    )?);
+    let provider = Arc::new(reapi::Provider::new(provider_options)?);
 
     Ok(CommandRunner {
       inner,

@@ -21,7 +21,7 @@ use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::ensure_action_stored_locally;
-use crate::remote_cache::RemoteCacheWarningsBehavior;
+use crate::remote_cache::{RemoteCacheProviderOptions, RemoteCacheWarningsBehavior};
 use process_execution::{
   make_execute_request, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
@@ -149,18 +149,21 @@ fn create_cached_runner(
     crate::remote_cache::CommandRunner::new(
       local.into(),
       None,
+      RemoteCacheProviderOptions {
+        instance_name: None,
+        action_cache_address: store_setup.cas.address(),
+        root_ca_certs: None,
+        headers: BTreeMap::default(),
+        concurrency_limit: 256,
+        rpc_timeout: CACHE_READ_TIMEOUT,
+      },
       None,
       store_setup.executor.clone(),
       store_setup.store.clone(),
-      &store_setup.cas.address(),
-      None,
-      BTreeMap::default(),
       true,
       true,
       RemoteCacheWarningsBehavior::FirstOnly,
       cache_content_behavior,
-      256,
-      CACHE_READ_TIMEOUT,
       None,
     )
     .expect("caching command runner"),
@@ -734,18 +737,21 @@ async fn make_action_result_basic() {
   let runner = crate::remote_cache::CommandRunner::new(
     mock_command_runner.clone(),
     None,
+    RemoteCacheProviderOptions {
+      instance_name: None,
+      action_cache_address: cas.address(),
+      root_ca_certs: None,
+      headers: BTreeMap::default(),
+      concurrency_limit: 256,
+      rpc_timeout: CACHE_READ_TIMEOUT,
+    },
     None,
     executor.clone(),
     store.clone(),
-    &cas.address(),
-    None,
-    BTreeMap::default(),
     true,
     true,
     RemoteCacheWarningsBehavior::FirstOnly,
     CacheContentBehavior::Defer,
-    256,
-    CACHE_READ_TIMEOUT,
     None,
   )
   .expect("caching command runner");

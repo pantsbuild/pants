@@ -33,7 +33,7 @@ use process_execution::{
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
-use remote::remote_cache::RemoteCacheWarningsBehavior;
+use remote::remote_cache::{RemoteCacheProviderOptions, RemoteCacheWarningsBehavior};
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
 use store::{self, ImmutableInputs, RemoteOptions, Store};
@@ -325,19 +325,22 @@ impl Core {
     if remote_cache_read || remote_cache_write {
       runner = Arc::new(remote_cache::CommandRunner::new(
         runner,
-        instance_name,
+        instance_name.clone(),
+        RemoteCacheProviderOptions {
+          instance_name,
+          action_cache_address: remoting_opts.store_address.clone().unwrap(),
+          root_ca_certs: root_ca_certs.clone(),
+          headers: remoting_opts.store_headers.clone(),
+          concurrency_limit: remoting_opts.cache_rpc_concurrency,
+          rpc_timeout: remoting_opts.cache_rpc_timeout,
+        },
         process_cache_namespace.clone(),
         executor.clone(),
         full_store.clone(),
-        remoting_opts.store_address.as_ref().unwrap(),
-        root_ca_certs.clone(),
-        remoting_opts.store_headers.clone(),
         remote_cache_read,
         remote_cache_write,
         remoting_opts.cache_warnings_behavior,
         remoting_opts.cache_content_behavior,
-        remoting_opts.cache_rpc_concurrency,
-        remoting_opts.cache_rpc_timeout,
         remoting_opts.append_only_caches_base_path.clone(),
       )?);
     }
