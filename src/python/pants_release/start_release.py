@@ -18,7 +18,7 @@ import github
 import requests
 from packaging.version import Version
 from pants_release.common import CONTRIBUTORS_PATH, VERSION_PATH, sorted_contributors
-from pants_release.git import GH_TOKEN_VAR_NAME, git, git_fetch, github_repo
+from pants_release.git import git, git_fetch, github_repo
 
 from pants.util.strutil import softwrap
 
@@ -61,7 +61,12 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--publish",
         action="store_true",
-        help=f"Publish the changes: create a branch, commit, push, and create a pull request. Set `{GH_TOKEN_VAR_NAME}` env var to an access token.",
+        help=softwrap(
+            """
+            Publish the changes: create a branch, commit, push, and create a pull request. Ensure
+            `gh` (https://cli.github.com) is installed and authenticated.
+            """
+        ),
     )
     return parser
 

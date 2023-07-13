@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 import logging
-import os
 import shlex
 import subprocess
 
 import github
 from pants_release.common import die, green
 
+from pants.util.strutil import softwrap
+
 logger = logging.getLogger(__name__)
 
 MAIN_REPO_SLUG = "pantsbuild/pants"
 MAIN_REPO = f"https://github.com/{MAIN_REPO_SLUG}"
-
-GH_TOKEN_VAR_NAME = "GH_TOKEN"
 
 
 def _run(
@@ -23,6 +22,7 @@ def _run(
     args: tuple[None | str, ...],
     check: bool,
     capture_stdout: bool,
+    log_stdout: bool = True,
 ) -> str:
     cmd = [exe, *(a for a in args if a is not None)]
     logger.info("running: %s", shlex.join(cmd))
@@ -33,7 +33,9 @@ def _run(
         text=True,
     )
     stdout = "" if result.stdout is None else result.stdout.strip()
-    logger.debug("returncode: %s, stdout: %s", result.returncode, stdout)
+    logger.debug(
+        "returncode: %s, stdout: %s", result.returncode, stdout if log_stdout else "<redacted>"
+    )
     return stdout
 
 
@@ -55,10 +57,17 @@ def git_fetch(rev: str) -> str:
 
 
 def github_repo() -> github.Repository.Repository:
-    token = os.environ.get(GH_TOKEN_VAR_NAME)
+    # Borrow the token from `gh`: `gh auth login` is far more convenient for interactive use, and
+    # setting `GH_TOKEN=...` env var works well for scripting use
+    token = _run("gh", ("auth", "token"), check=False, capture_stdout=True, log_stdout=False)
     if not token:
         die(
-            f"Failed to find credentials in {GH_TOKEN_VAR_NAME} env var, please set this and try again"
+            softwrap(
+                """
+                Failed to find credentials via `gh auth token`; is https://cli.github.com installed
+                and authenticated? Auth with `gh auth login` or by setting `GH_TOKEN=...` env var.
+                """
+            )
         )
 
     try:

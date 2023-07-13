@@ -83,24 +83,22 @@ The process may fail in two ways:
 
 ### 1. Start the release
 
-From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username` with the relevant version and your own GitHub username.
+From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
 
-This will:
+This will create a pull request that:
 
-1. update release notes (remember to check over the changes and follow the instructions in the PR to make any updates)
-2. update contributors
-3. bump the `VERSION` on `main`, if appropriate
-4. print an `Internal` section to paste into a comment on the prep PR.
+1. updates release notes (remember to check over the changes and follow the instructions in the PR to make any updates)
+2. updates contributors
+3. bumps the `VERSION` on `main`, if appropriate
 
 > 🚧 Reminder: always do this against the `main` branch
 >
 > Even if you are preparing notes for a release candidate, always prepare the notes in a branch based on `main` and, later, target your PR to merge with `main`.
 
-### 2. Post the prep to GitHub
 
-Commit the changes, and open a pull request on GitHub to merge into `main`. Post the PR to the `#development` in Slack.
+### 2. Merge the pull request
 
-Merge once approved and green.
+Post the PR to the `#development` in Slack. Merge once approved and green.
 
 > 🚧 Watch out for any recently landed PRs
 >
