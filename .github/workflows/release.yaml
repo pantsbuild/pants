@@ -44,23 +44,34 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-Linux-ARM64
+        name: logs-wheels-and-pex-Linux-ARM64
         path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload Pants PEX
+      run: 'LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
+        sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f''cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}'')")
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+        gh release upload --no-clobber ${{ needs.release_info.outputs.build-ref }}
+        dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+        '
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -103,23 +114,33 @@ jobs:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env: {}
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-Linux-x86_64
+        name: logs-wheels-and-pex-Linux-x86_64
         path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload Pants PEX
+      run: 'LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
+        sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f''cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}'')")
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+        gh release upload --no-clobber ${{ needs.release_info.outputs.build-ref }}
+        dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+        '
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -162,23 +183,34 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch x86_64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-macOS10-15-x86_64
+        name: logs-wheels-and-pex-macOS10-15-x86_64
         path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload Pants PEX
+      run: 'LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
+        sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f''cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}'')")
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+        gh release upload --no-clobber ${{ needs.release_info.outputs.build-ref }}
+        dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+        '
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -221,23 +253,34 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-macOS11-ARM64
+        name: logs-wheels-and-pex-macOS11-ARM64
         path: .pants.d/*.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload Pants PEX
+      run: 'LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
+        sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f''cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}'')")
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+        gh release upload --no-clobber ${{ needs.release_info.outputs.build-ref }}
+        dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+        '
     timeout-minutes: 90
   publish:
     if: github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release
