@@ -13,3 +13,6 @@ env_vars.add = [
   # machines. See: https://github.com/giampaolo/psutil/issues/1832
   "ARCHFLAGS",
 ]
+
+[stats]
+log = true
