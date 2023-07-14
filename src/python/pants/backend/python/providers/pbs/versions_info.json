@@ -1,0 +1,573 @@
+{
+  "pythons": {
+    "3.10.0": {
+      "macos_arm64": {
+        "sha256": "2822887b58ef8bd588d69f9ee51ff9e914ee6fd88171db2c310ef17bbd4dd988",
+        "size": 41744667,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20211012/cpython-3.10.0-aarch64-apple-darwin-install_only-20211011T1926.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "5f38c3a15807ef8cb135b808d3b0dc4c39be4e10bdb7e5c6cf5d4421a0cd60b4",
+        "size": 53386729,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20211012/cpython-3.10.0-x86_64-unknown-linux-gnu-install_only-20211011T1926.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "e8ec990e6b36ac253b7184ca2134d50113ae289e8da94b8aea74e957bc28849e",
+        "size": 42040092,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20211012/cpython-3.10.0-x86_64-apple-darwin-install_only-20211011T1926.tar.gz"
+      }
+    },
+    "3.10.11": {
+      "linux_arm64": {
+        "sha256": "c7573fdb00239f86b22ea0e8e926ca881d24fde5e5890851339911d76110bc35",
+        "size": 24243246,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230507/cpython-3.10.11%2B20230507-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "8348bc3c2311f94ec63751fb71bd0108174be1c4def002773cf519ee1506f96f",
+        "size": 17074991,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230507/cpython-3.10.11%2B20230507-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "c5bcaac91bc80bfc29cf510669ecad12d506035ecb3ad85ef213416d54aecd79",
+        "size": 26689876,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230507/cpython-3.10.11%2B20230507-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "bd3fc6e4da6f4033ebf19d66704e73b0804c22641ddae10bbe347c48f82374ad",
+        "size": 17354339,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230507/cpython-3.10.11%2B20230507-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.10.2": {
+      "linux_arm64": {
+        "sha256": "8f351a8cc348bb45c0f95b8634c8345ec6e749e483384188ad865b7428342703",
+        "size": 88747017,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220227/cpython-3.10.2%2B20220227-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "8b47597b4bc4875f1aa8ba15e1707e92ad9ce532e6888e2693a05c6f7ae0b406",
+        "size": 42233640,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220222/cpython-3.10.2-aarch64-apple-darwin-install_only-20220220T1113.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "4c91b15291dd2c40b5d7d65ebc2cce3811f7390e2165600cd29b9c148ad5b06d",
+        "size": 53219764,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220222/cpython-3.10.2-x86_64-unknown-linux-gnu-install_only-20220220T1113.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "7f113996fb479d227b4fb94ba477098b1fa729f6a21a6552827a74faba72788b",
+        "size": 42498499,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220222/cpython-3.10.2-x86_64-apple-darwin-install_only-20220220T1113.tar.gz"
+      }
+    },
+    "3.10.3": {
+      "linux_arm64": {
+        "sha256": "f52ee68c13c4f9356eb78a5305d3178af2cb90c38a8ce8ce9990a7cf6ff06144",
+        "size": 89386559,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.10.3%2B20220318-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "db46dadfccc407aa1f66ed607eefbf12f781e343adcb1edee0a3883d081292ce",
+        "size": 43030480,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.10.3%2B20220318-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "b9989411bed71ba4867538c991f20b55f549dd9131905733f0df9f3fde81ad1d",
+        "size": 54110057,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.10.3%2B20220318-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "ec2e90b6a589db7ef9f74358b1436558167629f9e4d725c8150496f9cb08a9d4",
+        "size": 43289051,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.10.3%2B20220318-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.10.4": {
+      "linux_arm64": {
+        "sha256": "d8098c0c54546637e7516f93b13403b11f9db285def8d7abd825c31407a13d7e",
+        "size": 89194558,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220502/cpython-3.10.4%2B20220502-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "2c99983d1e83e4b6e7411ed9334019f193fba626344a50c36fba6c25d4de78a2",
+        "size": 42900401,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220502/cpython-3.10.4%2B20220502-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "f6f871e53a7b1469c13f9bd7920ad98c4589e549acad8e5a1e14760fff3dd5c9",
+        "size": 54091940,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220502/cpython-3.10.4%2B20220502-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "f2711eaffff3477826a401d09a013c6802f11c04c63ab3686aa72664f1216a05",
+        "size": 43153224,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220502/cpython-3.10.4%2B20220502-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.10.5": {
+      "linux_arm64": {
+        "sha256": "012fa37c12d2647d76d004dc003302563864d2f1cd0731b71eeafad63d28b3f0",
+        "size": 89356775,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220630/cpython-3.10.5%2B20220630-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "19d1aa4a6d9ddb0094fc36961b129de9abe1673bce66c86cd97b582795c496a8",
+        "size": 43000441,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220630/cpython-3.10.5%2B20220630-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "460f87a389be28c953c24c6f942f172f9ce7f331367b4daf89cb450baedd51d7",
+        "size": 54207014,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220630/cpython-3.10.5%2B20220630-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "eca0584397d9a3ef6f7bb32b0476318b01c89b7b0a031ef97a0dcaa5ba5127a8",
+        "size": 43257698,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220630/cpython-3.10.5%2B20220630-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.10.6": {
+      "linux_arm64": {
+        "sha256": "81625f5c97f61e2e3d7e9f62c484b1aa5311f21bd6545451714b949a29da5435",
+        "size": 24921808,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220802/cpython-3.10.6%2B20220802-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "efaf66acdb9a4eb33d57702607d2e667b1a319d58c167a43c96896b97419b8b7",
+        "size": 17138410,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220802/cpython-3.10.6%2B20220802-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "55aa2190d28dcfdf414d96dc5dcea9fe048fadcd583dc3981fec020869826111",
+        "size": 27536682,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220802/cpython-3.10.6%2B20220802-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "7718411adf3ea1480f3f018a643eb0550282aefe39e5ecb3f363a4a566a9398c",
+        "size": 17544359,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220802/cpython-3.10.6%2B20220802-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.10.7": {
+      "linux_arm64": {
+        "sha256": "dfeec186a62a6068259d90e8d77e7d30eaf9c2b4ae7b205ff8caab7cb21f277c",
+        "size": 24938179,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.10.7%2B20221002-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "70f6ca1da8e6fce832ad0b7f9fdaba0b84ba0ac0a4c626127acb6d49df4b8f91",
+        "size": 17142891,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.10.7%2B20221002-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "c12c9ad2b2c75464541d897c0528013adecd8be5b30acf4411f7759729841711",
+        "size": 27546579,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.10.7%2B20221002-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "6101f580434544d28d5590543029a7c6bdf07efa4bcdb5e4cbedb3cd83241922",
+        "size": 17554388,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.10.7%2B20221002-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.10.8": {
+      "linux_arm64": {
+        "sha256": "33170bef18c811906b738be530f934640491b065bf16c4d276c6515321918132",
+        "size": 24947106,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.10.8%2B20221106-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "d52b03817bd245d28e0a8b2f715716cd0fcd112820ccff745636932c76afa20a",
+        "size": 17150191,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.10.8%2B20221106-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "6c8db44ae0e18e320320bbaaafd2d69cde8bfea171ae2d651b7993d1396260b7",
+        "size": 27555856,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.10.8%2B20221106-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "525b79c7ce5de90ab66bd07b0ac1008bafa147ddc8a41bef15ffb7c9c1e9e7c5",
+        "size": 17560650,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.10.8%2B20221106-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.10.9": {
+      "linux_arm64": {
+        "sha256": "4dfed493a8e6f5a797cd171b270c7c7152d8e8492ca60c1c582b68403e5ecd78",
+        "size": 24961415,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.10.9%2B20221220-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "e9a7a69a153621b5e9f930c81478f06819dd5bc0edec20212c3392851b8803e1",
+        "size": 17182797,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.10.9%2B20221220-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "5eabd117850cf92280569db874f3548d90048abc8ce55c315aeefd69d2ad6e44",
+        "size": 27579433,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.10.9%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "861aa2cc40d0e01ff570b75dec180bfe4709b98bd0cfa3f5135799c2cb2a2228",
+        "size": 17580272,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.10.9%2B20221220-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.11.1": {
+      "linux_arm64": {
+        "sha256": "debf15783bdcb5530504f533d33fda75a7b905cec5361ae8f33da5ba6599f8b4",
+        "size": 25579178,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.11.1%2B20230116-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "4918cdf1cab742a90f85318f88b8122aeaa2d04705803c7b6e78e81a3dd40f80",
+        "size": 18024309,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.11.1%2B20230116-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "02a551fefab3750effd0e156c25446547c238688a32fabde2995c941c03a6423",
+        "size": 29321007,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.11.1%2B20230116-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "20a4203d069dc9b710f70b09e7da2ce6f473d6b1110f9535fb6f4c469ed54733",
+        "size": 18042424,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.11.1%2B20230116-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.11.3": {
+      "linux_arm64": {
+        "sha256": "8190accbbbbcf7620f1ff6d668e4dd090c639665d11188ce864b62554d40e5ab",
+        "size": 25301609,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230507/cpython-3.11.3%2B20230507-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "09e412506a8d63edbb6901742b54da9aa7faf120b8dbdce56c57b303fc892c86",
+        "size": 17585902,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230507/cpython-3.11.3%2B20230507-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "da50b87d1ec42b3cb577dfd22a3655e43a53150f4f98a4bfb40757c9d7839ab5",
+        "size": 28906807,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230507/cpython-3.11.3%2B20230507-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "f710b8d60621308149c100d5175fec39274ed0b9c99645484fd93d1716ef4310",
+        "size": 17912223,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20230507/cpython-3.11.3%2B20230507-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.8.12": {
+      "macos_arm64": {
+        "sha256": "f9a3cbb81e0463d6615125964762d133387d561b226a30199f5b039b20f1d944",
+        "size": 40042198,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220227/cpython-3.8.12%2B20220227-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "5be9c6d61e238b90dfd94755051c0d3a2d8023ebffdb4b0fa4e8fedd09a6cab6",
+        "size": 49945411,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220227/cpython-3.8.12%2B20220227-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "f323fbc558035c13a85ce2267d0fad9e89282268ecb810e364fff1d0a079d525",
+        "size": 40287093,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220227/cpython-3.8.12%2B20220227-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.8.13": {
+      "linux_arm64": {
+        "sha256": "8dc7814bf3425bbf78c6e6e5a6529ded6ae463fa6a4b79c025b343bae4fd955a",
+        "size": 25074929,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220802/cpython-3.8.13%2B20220802-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "baa8ea669d2ecb521a98bb5a53891fc367b810ab4845bcf6ba07dabe202c2481",
+        "size": 40629957,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.8.13%2B20220318-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "e566beec8d2ed9efd44f0170662efea0ddb302be2e5bb83bd8c39a361985c32f",
+        "size": 50552822,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.8.13%2B20220318-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "26bd9c838d2d65ef7ffda8f9f265f8a75af60ff80ad782e29c3779542ba7ceef",
+        "size": 40895520,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.8.13%2B20220318-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.8.14": {
+      "linux_arm64": {
+        "sha256": "c45e42deee43e3ebc4ca5b019c37d8ae25fb5b5f1ba5f602098a81b99d2bc804",
+        "size": 25070295,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.8.14%2B20221002-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "6c17f6dcda59de5d8eee922ef7eede403a540dae05423ef2c2a042d8d4f22467",
+        "size": 17594484,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.8.14%2B20221002-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "4eb53bce831bf52682067579c09ccaccb6524dd44bd4b8047454c69b4817f4f0",
+        "size": 26912560,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.8.14%2B20221002-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "3ed4db8d0308c584196d97c629058ea69bbd8b7f9a034cf8c2c701ebb286c091",
+        "size": 17976638,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.8.14%2B20221002-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.8.15": {
+      "linux_arm64": {
+        "sha256": "886ab33ced13c84bf59ce8ff79eba6448365bfcafea1bf415bd1d75e21b690aa",
+        "size": 25080793,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.8.15%2B20221106-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "1e0a92d1a4f5e6d4a99f86b1cbf9773d703fe7fd032590f3e9c285c7a5eeb00a",
+        "size": 17603392,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.8.15%2B20221106-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "e47edfb2ceaf43fc699e20c179ec428b6f3e497cf8e2dcd8e9c936d4b96b1e56",
+        "size": 26922922,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.8.15%2B20221106-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "70b57f28c2b5e1e3dd89f0d30edd5bc414e8b20195766cf328e1b26bed7890e1",
+        "size": 17985182,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.8.15%2B20221106-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.8.16": {
+      "linux_arm64": {
+        "sha256": "f5f30a21b915d21d99e0b0847ba323a58930f619b43d525923e674b7dc1d4816",
+        "size": 25106134,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.8.16%2B20221220-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "a71280128ef05311affb8196a8d80571e48952a50093907ffcad33d886d04736",
+        "size": 17620428,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.8.16%2B20221220-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "04115eb3a7d134511dc65a95c9afde8f6683ee031c8e8634ea048b0539461432",
+        "size": 26933018,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.8.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "2916eea6b522d5b755ba2e328527019015597751e0f32c27d73c7d618b61f6b1",
+        "size": 17984565,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.8.16%2B20221220-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.9.10": {
+      "linux_arm64": {
+        "sha256": "12dd1f125762f47975990ec744532a1cf3db74ad60f4dfb476ca42deb7f78ca4",
+        "size": 85992370,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220227/cpython-3.9.10%2B20220227-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "225739560e540b5f273d685cd7d309d8b0ce544f8e65d005a9dd138fd9733107",
+        "size": 40717357,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220222/cpython-3.9.10-aarch64-apple-darwin-install_only-20220220T1113.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "240eea9668325ac6fea0d9217f7256e9dad82e3355a9bdd2df6dd13e81374e3b",
+        "size": 51212517,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220222/cpython-3.9.10-x86_64-unknown-linux-gnu-install_only-20220220T1113.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "3c5ab97b7eaf9f1c60c00401ab887ac48ead92cccfce5b6c4711cef813fef827",
+        "size": 40940697,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220222/cpython-3.9.10-x86_64-apple-darwin-install_only-20220220T1113.tar.gz"
+      }
+    },
+    "3.9.11": {
+      "linux_arm64": {
+        "sha256": "0e50f099409c5e651b5fddd16124af1d830d11653e786a93c28e5b8f8aa470c4",
+        "size": 86614999,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.9.11%2B20220318-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "cf92a28f98c8d884df0937bf19d5f1a40caa25a6a211a237b7e9b592b2b71c2b",
+        "size": 41570037,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.9.11%2B20220318-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "0429d5ceb095d5e24c292bf1a39208b88ae236a680ef8fa3e1830e3a1a7e8882",
+        "size": 52181358,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.9.11%2B20220318-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "43889d1a424c84fb155e1619f062adb6984fbde80b6043611790f22bcbeec300",
+        "size": 41767821,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220318/cpython-3.9.11%2B20220318-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.9.12": {
+      "linux_arm64": {
+        "sha256": "2ee1426c181e65133e57dc55c6a685cb1fb5e63ef02d684b8a667d5c031c4203",
+        "size": 86402456,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220502/cpython-3.9.12%2B20220502-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "8dee06c07cc6429df34b6abe091a4684a86f7cec76f5d1ccc1c3ce2bd11168df",
+        "size": 41443679,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220502/cpython-3.9.12%2B20220502-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "ccca12f698b3b810d79c52f007078f520d588232a36bc12ede944ec3ea417816",
+        "size": 52175226,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220502/cpython-3.9.12%2B20220502-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "2453ba7f76b3df3310353b48c881d6cff622ba06e30d2b6ae91588b2bc9e481a",
+        "size": 41592297,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220502/cpython-3.9.12%2B20220502-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.9.13": {
+      "linux_arm64": {
+        "sha256": "ed67f24078e12d961bc6cbf72cfab5d3f5d79ff392d3fee8958d2c97d45fd7b3",
+        "size": 86521667,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220528/cpython-3.9.13%2B20220528-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "8f27a9dbd2fa7a26b46dc43b25dcdf41108ad4dd74eab917b803109f7bd0f2a5",
+        "size": 41547868,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220528/cpython-3.9.13%2B20220528-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "b9fcb0c114518cc0f1fb1347c997de5aff5b18465110e26e106ab9cda74f959e",
+        "size": 52272943,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220528/cpython-3.9.13%2B20220528-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "28cb1a22cd5af9034f97095b4b4d04866d106e179b321aace55fb55413e214f3",
+        "size": 41687411,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20220528/cpython-3.9.13%2B20220528-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.9.14": {
+      "linux_arm64": {
+        "sha256": "fe538201559ca37f44cd5f66c42a65fe7272cb4f1f63edd698b6f306771db1e9",
+        "size": 24525886,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.9.14%2B20221002-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "e38df7f230979ce6c53a5bafb3a81287838e5f3892c40cd1b98a0c961c444713",
+        "size": 16734921,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.9.14%2B20221002-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "e63d0c00a499e0202ba7a0f53ce69fca6d30237af39af9bc3c76bce6c7bf14d7",
+        "size": 26761725,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.9.14%2B20221002-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "b7d3a1f4b57e9350571ccee49c82f503133de0d113a2dbaebc8ccf108fb3fe1b",
+        "size": 17138819,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.9.14%2B20221002-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.9.15": {
+      "linux_arm64": {
+        "sha256": "52a8c0a67fb919f80962d992da1bddb511cdf92faf382701ce7673e10a8ff98f",
+        "size": 24524876,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.9.15%2B20221106-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "64dc7e1013481c9864152c3dd806c41144c79d5e9cd3140e185c6a5060bdc9ab",
+        "size": 16748283,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.9.15%2B20221106-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "cdc3a4cfddcd63b6cebdd75b14970e02d8ef0ac5be4d350e57ab5df56c19e85e",
+        "size": 26765574,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.9.15%2B20221106-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "f2bcade6fc976c472f18f2b3204d67202d43ae55cf6f9e670f95e488f780da08",
+        "size": 17148635,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221106/cpython-3.9.15%2B20221106-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.9.16": {
+      "linux_arm64": {
+        "sha256": "75f3d10ae8933e17bf27e8572466ff8a1e7792f521d33acba578cc8a25d82e0b",
+        "size": 24540128,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-aarch64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_arm64": {
+        "sha256": "73bad3a610a0ff14166fbd5045cd186084bd2ce99edd2c6327054509e790b9ab",
+        "size": 16765350,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-aarch64-apple-darwin-install_only.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "f885f3d011ab08e4d9521a7ae2662e9e0073acc0305a1178984b5a1cf057309a",
+        "size": 26767987,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-unknown-linux-gnu-install_only.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "69331e93656b179fcbfec0d506dfca11d899fe5dced990b28915e41755ce215c",
+        "size": 17151321,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20221220/cpython-3.9.16%2B20221220-x86_64-apple-darwin-install_only.tar.gz"
+      }
+    },
+    "3.9.6": {
+      "macos_arm64": {
+        "sha256": "d11109ba3fe4943e21e195fe4d5fbeff8a5452efcee7035542815bc0e54434d5",
+        "size": 40156472,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20210724/cpython-3.9.6-aarch64-apple-darwin-install_only-20210724T1424.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "a5e1f952a50a3a660922a7b558911d56c4d046078c67a83ec048f81ee4d3b8bd",
+        "size": 51505407,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20210724/cpython-3.9.6-x86_64-unknown-linux-gnu-install_only-20210724T1424.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "f503b62231833ae3b64a3cf77f45b471e5ffcc0af1381ed1010f9a57e874619a",
+        "size": 40391040,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20210724/cpython-3.9.6-x86_64-apple-darwin-install_only-20210724T1424.tar.gz"
+      }
+    },
+    "3.9.7": {
+      "macos_arm64": {
+        "sha256": "213d64f08f82184c9ad398537becf9b341ee85b1c406cfb2b4cbcb78cdb27a2c",
+        "size": 40292425,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20211012/cpython-3.9.7-aarch64-apple-darwin-install_only-20211011T1926.tar.gz"
+      },
+      "linux_x86_64": {
+        "sha256": "ad5e7a21b0bd7e6f0d8301c91b52aa38c3fdfe0c38ae69d7621f23fbf414916d",
+        "size": 51653754,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20211012/cpython-3.9.7-x86_64-unknown-linux-gnu-install_only-20211011T1926.tar.gz"
+      },
+      "macos_x86_64": {
+        "sha256": "43cb1a83919f49b1ce95e42f9c461d8a9fb00ff3957bebef9cffe61a5f362377",
+        "size": 40512442,
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20211012/cpython-3.9.7-x86_64-apple-darwin-install_only-20211011T1926.tar.gz"
+      }
+    }
+  },
+  "scraped_releases": [
+    "20210724",
+    "20211012",
+    "20211017",
+    "20220222",
+    "20220227",
+    "20220318",
+    "20220502",
+    "20220528",
+    "20220630",
+    "20220802",
+    "20221002",
+    "20221106",
+    "20221220",
+    "20230116",
+    "20230507"
+  ]
+}
