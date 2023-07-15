@@ -771,7 +771,12 @@ struct PreparedInferenceRequest {
 }
 
 impl PreparedInferenceRequest {
-  pub async fn prepare(args: Vec<Value>, store: &Store, backend: &str) -> NodeResult<Self> {
+  pub async fn prepare(
+    args: Vec<Value>,
+    store: &Store,
+    backend: &str,
+    impl_hash: &str,
+  ) -> NodeResult<Self> {
     let PyNativeDependenciesRequest {
       directory_digest,
       metadata,
@@ -785,6 +790,7 @@ impl PreparedInferenceRequest {
       inner: DependencyInferenceRequest {
         input_file_digest: Some(digest.into()),
         metadata,
+        impl_hash: impl_hash.to_string(),
       },
     })
   }
@@ -839,7 +845,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
     let core = &context.core;
     let store = core.store();
     let prepared_inference_request =
-      PreparedInferenceRequest::prepare(args, &store, "Python").await?;
+      PreparedInferenceRequest::prepare(args, &store, "Python", python::IMPL_HASH).await?;
     in_workunit!(
       "parse_python_dependencies",
       Level::Debug,
@@ -883,7 +889,7 @@ fn parse_javascript_deps(
     let core = &context.core;
     let store = core.store();
     let prepared_inference_request =
-      PreparedInferenceRequest::prepare(args, &store, "Javascript").await?;
+      PreparedInferenceRequest::prepare(args, &store, "Javascript", javascript::IMPL_HASH).await?;
 
     in_workunit!(
       "parse_javascript_dependencies",

@@ -217,14 +217,13 @@ To resolve:
 1. (Ensure your git working directory is clean)
 2. Run the following script to reproduce the merge-conflicts:
     \`\`\`bash
-    git checkout https://github.com/pantsbuild/pants main \\
-      && git pull \\
+    git fetch https://github.com/pantsbuild/pants main \\
       && git fetch https://github.com/pantsbuild/pants 2.16.x \\
       && git checkout -b cherry-pick-19214-to-2.16.x FETCH_HEAD \\
       && git cherry-pick 1234ABCD
     \`\`\`
 3. Fix the merge conflicts and commit the changes
-4. Run \`build-support/cherry_pick/make_pr.sh -- "19214" "2.16.x"\`
+4. Run \`build-support/cherry_pick/make_pr.sh "19214" "2.16.x"\`
 
 Please note that I cannot re-run CI if a job fails. Please work with your PR approver(s) to re-run CI if necessary.
 
