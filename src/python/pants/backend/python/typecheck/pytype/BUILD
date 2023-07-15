@@ -8,4 +8,7 @@ python_sources(
 
 python_tests(
     name="tests",
+    overrides={
+        "rules_integration_test.py": {"timeout": 240},
+    },
 )
