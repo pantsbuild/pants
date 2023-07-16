@@ -274,9 +274,8 @@ def update_changelog(release_info: ReleaseInfo) -> Formatted:
 def update_contributors(release_info: ReleaseInfo) -> None:
     if release_info.branch == "main":
         CONTRIBUTORS_PATH.write_text(
-            "Created as part of the release process.\n\n+ "
-            + "\n+ ".join(sorted_contributors(git_range="HEAD"))
-            + "\n"
+            "Created as part of the release process.\n\n"
+            + "".join(f"+ {c}\n" for c in sorted_contributors(git_range="HEAD"))
         )
 
 
