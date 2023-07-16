@@ -864,6 +864,7 @@ def build_wheels_job(
                         {
                             "name": "Upload Pants PEX",
                             "if": "needs.release_info.outputs.is-release == 'true'",
+                            "env": {"GH_TOKEN": "${{ github.token }}"},
                             "run": dedent(
                                 """\
                                 LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
@@ -1064,6 +1065,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Make GitHub Release",
                     "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
+                    "env": {"GH_TOKEN": "${{ github.token }}"},
                     "run": dedent(
                         """\
                         RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
@@ -1176,6 +1178,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 ),
                 {
                     "name": "Publish GitHub Release",
+                    "env": {"GH_TOKEN": "${{ github.token }}"},
                     "run": dedent(
                         f"""\
                         gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}

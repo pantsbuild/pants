@@ -61,7 +61,9 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
-    - if: needs.release_info.outputs.is-release == 'true'
+    - env:
+        GH_TOKEN: ${{ github.token }}
+      if: needs.release_info.outputs.is-release == 'true'
       name: Upload Pants PEX
       run: 'LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
         sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f''cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}'')")
@@ -130,7 +132,9 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
-    - if: needs.release_info.outputs.is-release == 'true'
+    - env:
+        GH_TOKEN: ${{ github.token }}
+      if: needs.release_info.outputs.is-release == 'true'
       name: Upload Pants PEX
       run: 'LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
         sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f''cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}'')")
@@ -200,7 +204,9 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
-    - if: needs.release_info.outputs.is-release == 'true'
+    - env:
+        GH_TOKEN: ${{ github.token }}
+      if: needs.release_info.outputs.is-release == 'true'
       name: Upload Pants PEX
       run: 'LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
         sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f''cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}'')")
@@ -270,7 +276,9 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
-    - if: needs.release_info.outputs.is-release == 'true'
+    - env:
+        GH_TOKEN: ${{ github.token }}
+      if: needs.release_info.outputs.is-release == 'true'
       name: Upload Pants PEX
       run: 'LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import
         sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f''cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}'')")
@@ -345,7 +353,9 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py -- --scope tags/pantsbuild.pants
-    - name: Publish GitHub Release
+    - env:
+        GH_TOKEN: ${{ github.token }}
+      name: Publish GitHub Release
       run: 'gh release upload ${{ needs.release_info.outputs.build-ref }} dest/pypi_release
 
         gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
@@ -366,7 +376,9 @@ jobs:
       run: "if [[ -n \"$REF\" ]]; then\n    ref=\"$REF\"\nelse\n    ref=\"${GITHUB_REF#refs/tags/}\"\
         \nfi\necho \"build-ref=${ref}\" >> $GITHUB_OUTPUT\nif [[ \"${ref}\" =~ ^release_.+$\
         \ ]]; then\n    echo \"is-release=true\" >> $GITHUB_OUTPUT\nfi\n"
-    - if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
+    - env:
+        GH_TOKEN: ${{ github.token }}
+      if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
         == 'true'
       name: Make GitHub Release
       run: "RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}\nRELEASE_VERSION=\"\
