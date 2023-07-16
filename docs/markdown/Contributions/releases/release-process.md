@@ -171,22 +171,8 @@ Then, run:
 
 This will tag the release with your PGP key, and push the tag to origin, which will kick off a [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) to build the wheels and publish them to PyPI.
 
-Step 4: Release a Pants PEX
----------------------------
 
-After the [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) for your tag has completed, you should additionally build and publish the "universal" PEX to Github.
-
-```bash
-PANTS_PEX_RELEASE=STABLE ./pants run src/python/pants_release/release.py -- build-universal-pex
-```
-
-Then:
-
-- Go to <https://github.com/pantsbuild/pants/releases>, find your release.
-- Attach the PEX located at `dist/pex.pants.<version>.pex`.
-- Click "Publish release"
-
-Step 5: Test the release
+Step 4: Test the release
 ------------------------
 
 Run this script as a basic smoke test:
@@ -197,7 +183,7 @@ Run this script as a basic smoke test:
 
 You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm the changelog is correct on the "Project description" page and that the `macOS` and `manylinux` wheels show up in the "Download files" page. 
 
-Step 6: Announce the change
+Step 5: Announce the change
 ---------------------------
 
 Announce the release to:

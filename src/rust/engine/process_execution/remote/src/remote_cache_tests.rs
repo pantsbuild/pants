@@ -16,7 +16,7 @@ use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use store::Store;
+use store::{RemoteOptions, Store};
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
@@ -105,18 +105,18 @@ impl StoreSetup {
     let store_dir = store_temp_dir.path().join("store_dir");
     let store = Store::local_only(executor.clone(), store_dir)
       .unwrap()
-      .into_with_remote(
-        &cas.address(),
-        None,
-        tls::Config::default(),
-        BTreeMap::new(),
-        10 * 1024 * 1024,
-        Duration::from_secs(1),
-        1,
-        256,
-        None,
-        4 * 1024 * 1024,
-      )
+      .into_with_remote(RemoteOptions {
+        cas_address: cas.address(),
+        instance_name: None,
+        tls_config: tls::Config::default(),
+        headers: BTreeMap::new(),
+        chunk_size_bytes: 10 * 1024 * 1024,
+        rpc_timeout: Duration::from_secs(1),
+        rpc_retries: 1,
+        rpc_concurrency_limit: 256,
+        capabilities_cell_opt: None,
+        batch_api_size_limit: 4 * 1024 * 1024,
+      })
       .unwrap();
     Self {
       store,

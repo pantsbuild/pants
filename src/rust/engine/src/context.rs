@@ -36,7 +36,7 @@ use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, Store};
+use store::{self, ImmutableInputs, RemoteOptions, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
@@ -159,21 +159,22 @@ impl Core {
       local_store_options.into(),
     )?;
     if enable_remote {
-      let remote_store_address = remote_store_address
+      let cas_address = remote_store_address
         .as_ref()
-        .ok_or("Remote store required, but none configured")?;
-      local_only.into_with_remote(
-        remote_store_address,
-        remoting_opts.instance_name.clone(),
-        grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
-        remoting_opts.store_headers.clone(),
-        remoting_opts.store_chunk_bytes,
-        remoting_opts.store_rpc_timeout,
-        remoting_opts.store_rpc_retries,
-        remoting_opts.store_rpc_concurrency,
+        .ok_or("Remote store required, but none configured")?
+        .clone();
+      local_only.into_with_remote(RemoteOptions {
+        cas_address,
+        instance_name: remoting_opts.instance_name.clone(),
+        tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
+        headers: remoting_opts.store_headers.clone(),
+        chunk_size_bytes: remoting_opts.store_chunk_bytes,
+        rpc_timeout: remoting_opts.store_rpc_timeout,
+        rpc_retries: remoting_opts.store_rpc_retries,
+        rpc_concurrency_limit: remoting_opts.store_rpc_concurrency,
         capabilities_cell_opt,
-        remoting_opts.store_batch_api_size_limit,
-      )
+        batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
+      })
     } else {
       Ok(local_only)
     }

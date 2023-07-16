@@ -44,7 +44,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
-use store::{ImmutableInputs, Store};
+use store::{ImmutableInputs, RemoteOptions, Store};
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(Clone, Debug, Default)]
@@ -251,18 +251,19 @@ async fn main() {
         );
       }
 
-      local_only_store.into_with_remote(
-        cas_server,
-        args.remote_instance_name.clone(),
-        grpc_util::tls::Config::new_without_mtls(root_ca_certs),
+      local_only_store.into_with_remote(RemoteOptions {
+        cas_address: cas_server.to_owned(),
+        instance_name: args.remote_instance_name.clone(),
+        tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs),
         headers,
-        args.upload_chunk_bytes,
-        Duration::from_secs(30),
-        args.store_rpc_retries,
-        args.store_rpc_concurrency,
-        None,
-        args.store_batch_api_size_limit,
-      )
+        chunk_size_bytes: args.upload_chunk_bytes,
+        rpc_timeout: Duration::from_secs(30),
+        rpc_retries: args.store_rpc_retries,
+        rpc_concurrency_limit: args.store_rpc_concurrency,
+
+        capabilities_cell_opt: None,
+        batch_api_size_limit: args.store_batch_api_size_limit,
+      })
     }
     (None, None) => Ok(local_only_store),
     _ => panic!("Can't specify --server without --cas-server"),
