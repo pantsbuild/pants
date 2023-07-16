@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import StrListOption
-from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
@@ -37,10 +36,6 @@ class ScalaPBSubsystem(JvmToolBase):
         "pants.backend.codegen.protobuf.scala",
         "scalapbc.default.lockfile.txt",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)
 
     _jvm_plugins = StrListOption(
         help=softwrap(
@@ -52,7 +47,7 @@ class ScalaPBSubsystem(JvmToolBase):
 
             For example, to invoke the fs2-grpc protoc plugin, the following option would work:
             `--scalapb-jvm-plugins=fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1`.
-            (Note: you would also need to set --scalapb-runtime-dependencies appropriately
+            (Note: you would also need to set `--scalapb-runtime-dependencies` appropriately
             to include the applicable runtime libraries for your chosen protoc plugins.)
             """
         ),

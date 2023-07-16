@@ -1,30 +1,26 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-# -*- coding: utf-8 -*-
 
-# NB: This must be compatible with Python 2.7 and 3.5+.
-# NB: Expects a json file at "./apps.json" mapping Django app labels to their package paths.
 # NB: An easy way to debug this is to invoke it directly on a file.
 #   E.g.
-#   $ PYTHONPATH=src/python VISITOR_CLASSNAMES=pants.backend.python.framework.django.scripts\
-#     .dependency_visitor.DjangoDependencyVisitor \
-#     python src/python/pants/backend/python/dependency_inference/scripts/main.py FILE
+#   $ python src/python/pants/backend/python/framework/django/scripts/dependency_visitor.py FILE
 
-from __future__ import print_function, unicode_literals
 
 import ast
 import json
-
-from pants.backend.python.dependency_inference.scripts.dependency_visitor_base import (
-    DependencyVisitorBase,
-)
+import sys
 
 
-class DjangoDependencyVisitor(DependencyVisitorBase):
-    def __init__(self, *args, **kwargs):
-        super(DjangoDependencyVisitor, self).__init__(*args, **kwargs)
-        with open("apps.json", "r") as fp:
-            self._apps = json.load(fp)
+class DjangoDependencyVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.info = set()
+
+    @staticmethod
+    def maybe_str(node):
+        if sys.version_info[0:2] < (3, 8):
+            return node.s if isinstance(node, ast.Str) else None
+        else:
+            return node.value if isinstance(node, ast.Constant) else None
 
     def visit_ClassDef(self, node):
         # Detect `class Migration(migrations.Migration):`
@@ -47,9 +43,25 @@ class DjangoDependencyVisitor(DependencyVisitorBase):
                             app = self.maybe_str(elt.elts[0])
                             migration = self.maybe_str(elt.elts[1])
                             if app is not None and migration is not None:
-                                pkg = self._apps.get(app)
-                                if pkg:
-                                    module = "{}.migrations.{}".format(pkg, migration)
-                                    self.add_weak_import(module, elt.lineno)
+                                self.info.add((app, migration))
 
         self.generic_visit(node)
+
+
+def main(filename):
+    with open(filename, "rb") as f:
+        content = f.read()
+    try:
+        tree = ast.parse(content, filename=filename)
+    except SyntaxError:
+        return
+
+    visitor = DjangoDependencyVisitor()
+    visitor.visit(tree)
+    # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
+    buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
+    buffer.write(json.dumps(sorted(visitor.info)).encode("utf8"))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])

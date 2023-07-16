@@ -33,20 +33,25 @@ Examples
 Pytest version and plugins
 --------------------------
 
-To change the Pytest version, set the `version` option in the `[pytest]` scope.
-
-To install any [plugins](https://docs.pytest.org/en/latest/plugins.html), add the pip requirement string to `extra_requirements` in the `[pytest]` scope, like this:
+To change the Pytest version, set the `install_from_resolve` option in the `[pytest]` scope. You may also add [plugins](https://docs.pytest.org/en/latest/plugins.html) including the plugins in the resolve:
 
 ```toml pants.toml
+[python.resolves]
+pytest = "3rdparty/python/pytest-lock.txt"
+
 [pytest]
-version = "pytest>=5.4"
-extra_requirements.add = [
-  "pytest-django>=3.9.0,<4",
-  "pytest-rerunfailures==9.0",
-]
+install_from_resolve = "pytest"
 ```
 
-If you change either `version` or `extra_requirements`, Pants's default lockfile for Pytest will not work. Either set the `lockfile` option to a custom path or `"<none>"` to opt out. See [Third-party dependencies](doc:python-third-party-dependencies#tool-lockfiles).
+Then, add a `requirements.txt` file specifying the version of `pytest` and other plugins:
+
+```Text pytest-requirements.txt
+pytest>=5.4
+pytest-django>=3.9.0,<4
+pytest-rerunfailures==9.0
+```
+
+Finally, generate the relevant lockfile with `pants generate-lockfiles --resolve=pytest`. For more information, see [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).
 
 Alternatively, if you only want to install the plugin for certain tests, you can add the plugin to the `dependencies` field of your `python_test` / `python_tests` target. See [Third-party dependencies](doc:python-third-party-dependencies) for how to install Python dependencies. For example:
 
@@ -444,7 +449,7 @@ You can include the result of `pants package` in your test through the `runtime_
 
 This allows you to test your packaging pipeline by simply running `pants test ::`, without needing custom integration test scripts.
 
-To depend on a built package, use the `runtime_package_dependencies` field on the `python_test` / `python_tests` target, which is a list of addresses to targets that can be built with `pants package`, such as `pex_binary`, `python_awslambda`, and `archive` targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix (set by the `output_path` field).
+To depend on a built package, use the `runtime_package_dependencies` field on the `python_test` / `python_tests` target, which is a list of addresses to targets that can be built with `pants package`, such as `pex_binary`, `python_aws_lambda_function`, and `archive` targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix (set by the `output_path` field).
 
 For example:
 
@@ -524,7 +529,7 @@ Coverage will report data on any files encountered during the tests. You can fil
 > By default, coverage.py will only report on files encountered during the tests' run. This means
 > that your coverage score may be misleading; even with a score of 100%, you may have files
 > without any tests.
-> 
+>
 > Instead, you can set `global_report = true`:
 >
 > ```toml pants.toml

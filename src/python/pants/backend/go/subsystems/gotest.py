@@ -49,11 +49,12 @@ class GoTestSubsystem(Subsystem):
         default=GoCoverMode.SET,
         help=softwrap(
             """\
-            Coverage mode to use when running Go tests with coverage analysis enabled via --test-use-coverage.
-            Valid values are `set`, `count`, and `atomic`:\n
-            * `set`: bool: does this statement run?\n
-            * `count`: int: how many times does this statement run?\n
-            * `atomic`: int: count, but correct in multithreaded tests; significantly more expensive.\n
+            Coverage mode to use when running Go tests with coverage analysis enabled via `--test-use-coverage`.
+            Valid values are `set`, `count`, and `atomic`:
+
+              * `set`: bool: does this statement run?
+              * `count`: int: how many times does this statement run?
+              * `atomic`: int: count, but correct in multithreaded tests; significantly more expensive.
             """
         ),
     )
@@ -67,17 +68,14 @@ class GoTestSubsystem(Subsystem):
 
             Replacements:
 
-            - `{distdir}` is replaced with the Pants `distdir`.
-
-            - `{target_spec}` is replaced with the address of the applicable `go_package` target with `/`
-            characters replaced with dots (`.`).
-
-            - `{import_path}` is replaced with the applicable package's import path. Subdirectories will be made
-            for any path components separated by `/` characters.
-
-            - `{import_path_escaped}` is replaced with the applicable package's import path but with
-            slashes converted to underscores. This is deprecated and only exists to support behavior from
-            earlier versions.
+              - `{distdir}` is replaced with the Pants `distdir`.
+              - `{target_spec}` is replaced with the address of the applicable `go_package` target with `/`
+              characters replaced with dots (`.`).
+              - `{import_path}` is replaced with the applicable package's import path. Subdirectories will be made
+              for any path components separated by `/` characters.
+              - `{import_path_escaped}` is replaced with the applicable package's import path but with
+              slashes converted to underscores. This is deprecated and only exists to support behavior from
+              earlier versions.
             """
         ),
     )

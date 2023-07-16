@@ -31,7 +31,7 @@ Set the class method `is_applicable()` to determine whether your implementation 
 In this example, we will always use our custom implementation:
 
 ```python
-from pants.backend.python.goals.setup_py import SetupKwargsRequest
+from pants.backend.python.util_rules.package_dists import SetupKwargsRequest
 from pants.engine.target import Target
 
 class CustomSetupKwargsRequest(SetupKwargsRequest):
@@ -115,7 +115,7 @@ Your rule should return `SetupKwargs`, which takes two arguments: `kwargs: dict[
 For example, this will simply hardcode a kwarg:
 
 ```python
-from pants.backend.python.goals.setup_py import SetupKwargs
+from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.rules import rule
 
 @rule
@@ -139,7 +139,7 @@ Then, run `pants package path/to:python_distribution` and inspect the generated 
 Often, you will want to read from a file in your project to set kwargs like `version` or `long_description`. Use `await Get(DigestContents, PathGlobs)` to do this (see [File system](doc:rules-api-file-system)):
 
 ```python
-from pants.backend.python.goals.setup_py import SetupKwargs
+from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import rule
 
@@ -179,7 +179,7 @@ python_distribution(
 ```python
 import os.path
 
-from pants.backend.python.goals.setup_py import SetupKwargs
+from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import rule
 

@@ -8,13 +8,13 @@ from pants.backend.python.util_rules.pex import PythonProvider
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.goals.run import RunRequest
+from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     TemplatedExternalTool,
 )
 from pants.core.util_rules.external_tool import rules as external_tools_rules
-from pants.core.util_rules.system_binaries import PythonBinary
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
@@ -23,10 +23,11 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.util.docutil import bin_name
+from pants.option.option_types import StrListOption
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
-from pants.util.strutil import softwrap
+from pants.util.strutil import softwrap, stable_hash
 
 PYENV_NAMED_CACHE = ".pyenv"
 PYENV_APPEND_ONLY_CACHES = FrozenDict({"pyenv": PYENV_NAMED_CACHE})
@@ -36,7 +37,7 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
     options_scope = "pyenv-python-provider"
     name = "pyenv"
     help = softwrap(
-        f"""
+        """
         A subsystem for Pants-provided Python leveraging pyenv (https://github.com/pyenv/pyenv).
 
         Enabling this subsystem will switch Pants from trying to find an appropriate Python on your
@@ -56,20 +57,33 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
         By default, the subsystem does not pass any optimization flags to the Python compilation
         process. Doing so would increase the time it takes to install a single Python by about an
         order of magnitude (E.g. ~2.5 minutes to ~26 minutes).
-
-        If you wish to customize the pyenv installation of a Python, a synthetic target is exposed
-        at the root of your repo which is runnable. This target can be run with the relevant
-        environment variables set to enable optimizations. You will need to wipe the specific
-        version directory if Python was already installed. Example:
-
-            sudo rm -rf <named_caches_dir>/pyenv/versions/<specific_version>
-            # env vars from https://github.com/pyenv/pyenv/blob/master/plugins/python-build/README.md#building-for-maximum-performance
-            PYTHON_CONFIGURE_OPTS='--enable-optimizations --with-lto' {bin_name()} run :pants-pyenv-install -- 3.10
         """
     )
 
     default_version = "2.3.13"
     default_url_template = "https://github.com/pyenv/pyenv/archive/refs/tags/v{version}.tar.gz"
+
+    class EnvironmentAware:
+        installation_extra_env_vars = StrListOption(
+            help=softwrap(
+                """
+                Additional environment variables to include when running `pyenv install`.
+
+                Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+                `ENV_VAR` to copy the value of a variable in Pants's own environment.
+
+                This is especially useful if you want to use an optimized Python (E.g. setting
+                `PYTHON_CONFIGURE_OPTS='--enable-optimizations --with-lto'` and
+                `PYTHON_CFLAGS='-march=native -mtune=native'`) or need custom compiler flags.
+
+                Note that changes to this option result in a different fingerprint for the installed
+                Python, and therefore will cause a full re-install if changed.
+
+                See https://github.com/pyenv/pyenv/blob/master/plugins/python-build/README.md#special-environment-variables
+                for supported env vars.
+                """
+            ),
+        )
 
     @classproperty
     def default_known_versions(cls):
@@ -104,13 +118,19 @@ class PyenvInstallInfoRequest:
 async def get_pyenv_install_info(
     _: PyenvInstallInfoRequest,
     pyenv_subsystem: PyenvPythonProviderSubsystem,
+    pyenv_env_aware: PyenvPythonProviderSubsystem.EnvironmentAware,
     platform: Platform,
-    python_binary: PythonBinary,
+    bootstrap_python: PythonBuildStandaloneBinary,
 ) -> RunRequest:
     env_vars, pyenv = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
+        Get(
+            EnvironmentVars,
+            EnvironmentVarsRequest(("PATH",) + pyenv_env_aware.installation_extra_env_vars),
+        ),
         Get(DownloadedExternalTool, ExternalToolRequest, pyenv_subsystem.get_request(platform)),
     )
+    installation_env_vars = {key: name for key, name in env_vars.items() if key != "PATH"}
+    installation_fingerprint = stable_hash(installation_env_vars)
     install_script_digest = await Get(
         Digest,
         CreateDigest(
@@ -123,11 +143,11 @@ async def get_pyenv_install_info(
                         f"""\
                         #!/usr/bin/env bash
                         set -e
-                        export PYENV_ROOT=$(readlink {PYENV_NAMED_CACHE})
+                        export PYENV_ROOT=$(readlink {PYENV_NAMED_CACHE})/{installation_fingerprint}
                         DEST="$PYENV_ROOT"/versions/$1
                         if [ ! -f "$DEST"/DONE ]; then
                             mkdir -p "$DEST" 2>/dev/null || true
-                            {python_binary.path} install_python_shim.py $1
+                            {bootstrap_python.path} install_python_shim.py $1
                         fi
                         echo "$DEST"/bin/python
                         """
@@ -140,23 +160,31 @@ async def get_pyenv_install_info(
                         f"""\
                         import fcntl
                         import pathlib
+                        import shutil
                         import subprocess
                         import sys
 
-                        PYENV_ROOT = pathlib.Path("{PYENV_NAMED_CACHE}").resolve()
+                        PYENV_ROOT = pathlib.Path("{PYENV_NAMED_CACHE}", "{installation_fingerprint}").resolve()
                         SPECIFIC_VERSION = sys.argv[1]
                         SPECIFIC_VERSION_PATH = PYENV_ROOT / "versions" / SPECIFIC_VERSION
+
+                        # NB: We put the "DONE" file inside the specific version destination so that
+                        # users can wipe the directory clean and expect Pants to re-install that version.
                         DONEFILE_PATH = SPECIFIC_VERSION_PATH / "DONE"
-                        DONEFILE_LOCK_PATH = SPECIFIC_VERSION_PATH / "DONE.lock"
-                        DONEFILE_LOCK_FD = DONEFILE_LOCK_PATH.open(mode="w")
 
                         def main():
                             if DONEFILE_PATH.exists():
                                 return
-                            fcntl.lockf(DONEFILE_LOCK_FD, fcntl.LOCK_EX)
+
+                            lockfile_fd = SPECIFIC_VERSION_PATH.with_suffix(".lock").open(mode="w")
+                            fcntl.lockf(lockfile_fd, fcntl.LOCK_EX)
                             # Use double-checked locking to ensure that we really need to do the work
                             if DONEFILE_PATH.exists():
                                 return
+
+                            # If a previous install failed this directory may exist in an intermediate
+                            # state, and pyenv may choke trying to install into it, so we remove it.
+                            shutil.rmtree(SPECIFIC_VERSION_PATH, ignore_errors=True)
 
                             subprocess.run(["{pyenv.exe}", "install", SPECIFIC_VERSION], check=True)
                             # Removing write perms helps ensure users aren't accidentally modifying
@@ -182,7 +210,9 @@ async def get_pyenv_install_info(
         extra_env={
             "PATH": env_vars.get("PATH", ""),
             "TMPDIR": "{chroot}/tmpdir",
+            **installation_env_vars,
         },
+        immutable_input_digests=bootstrap_python.immutable_input_digests,
         append_only_caches=PYENV_APPEND_ONLY_CACHES,
     )
 
@@ -239,6 +269,7 @@ async def get_python(
         ProcessResult,
         Process(
             pyenv_install.args + (specific_python,),
+            level=LogLevel.DEBUG,
             input_digest=pyenv_install.digest,
             description=f"Install Python {python_to_use}",
             append_only_caches=pyenv_install.append_only_caches,

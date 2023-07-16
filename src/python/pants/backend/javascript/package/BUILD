@@ -6,11 +6,9 @@ python_sources()
 python_tests(
     name="test",
     overrides={
-        "rules_integration_test.py": dict(
-            dependencies=[":package_lock_json"],
-        ),
+        "rules_integration_test.py": dict(dependencies=[":lockfiles"], timeout=120),
     },
 )
 
 # The package.json file is inlined in ./rules_integration_tests.py
-resource(name="package_lock_json", source="package-lock.json")
+resources(name="lockfiles", sources=["package-lock.json", "pnpm-lock.yaml", "yarn.lock"])

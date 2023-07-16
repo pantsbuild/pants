@@ -8,9 +8,6 @@ python_requirements(
         "python-gnupg": ["gnupg"],
         "node-semver": ["nodesemver"],
     },
-    overrides={
-        "humbug": {"dependencies": ["#setuptools"]},
-    },
 )
 
 python_requirements(

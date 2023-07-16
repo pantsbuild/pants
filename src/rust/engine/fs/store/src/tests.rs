@@ -22,7 +22,8 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
 use crate::{
-  EntryType, FileContent, Snapshot, Store, StoreError, StoreFileByDigest, UploadSummary, MEGABYTES,
+  EntryType, FileContent, RemoteOptions, Snapshot, Store, StoreError, StoreFileByDigest,
+  UploadSummary, MEGABYTES,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -92,24 +93,35 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
   Store::local_only(task_executor::Executor::new(), dir).expect("Error creating local store")
 }
 
+fn remote_options(
+  cas_address: String,
+  instance_name: Option<String>,
+  headers: BTreeMap<String, String>,
+) -> RemoteOptions {
+  RemoteOptions {
+    cas_address,
+    instance_name,
+    tls_config: tls::Config::default(),
+    headers,
+    chunk_size_bytes: 10 * MEGABYTES,
+    rpc_timeout: Duration::from_secs(1),
+    rpc_retries: 1,
+    rpc_concurrency_limit: 256,
+    capabilities_cell_opt: None,
+    batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
+  }
+}
 ///
 /// Create a new store with a remote CAS.
 ///
 fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
   Store::local_only(task_executor::Executor::new(), dir)
     .unwrap()
-    .into_with_remote(
-      cas_address,
+    .into_with_remote(remote_options(
+      cas_address.to_owned(),
       None,
-      tls::Config::default(),
       BTreeMap::new(),
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    ))
     .unwrap()
 }
 
@@ -939,18 +951,11 @@ async fn instance_name_upload() {
 
   let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
+    .into_with_remote(remote_options(
+      cas.address(),
       Some("dark-tower".to_owned()),
-      tls::Config::default(),
       BTreeMap::new(),
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    ))
     .unwrap();
 
   store_with_remote
@@ -970,18 +975,11 @@ async fn instance_name_download() {
 
   let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
+    .into_with_remote(remote_options(
+      cas.address(),
       Some("dark-tower".to_owned()),
-      tls::Config::default(),
       BTreeMap::new(),
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    ))
     .unwrap();
 
   assert_eq!(
@@ -1021,18 +1019,7 @@ async fn auth_upload() {
   headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
   let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      headers,
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options(cas.address(), None, headers))
     .unwrap();
 
   store_with_remote
@@ -1054,18 +1041,7 @@ async fn auth_download() {
   headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
   let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      headers,
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options(cas.address(), None, headers))
     .unwrap();
 
   assert_eq!(

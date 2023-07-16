@@ -43,7 +43,7 @@ from pants.util.contextutil import temporary_dir
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *nodejs.rules(),
             *source_files.rules(),
@@ -55,35 +55,60 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JSSourcesGeneratorTarget],
     )
-
-
-def test_npx_process(rule_runner: RuleRunner):
-    result = rule_runner.request(
-        ProcessResult,
-        [
-            nodejs.NodeJSToolProcess.npx(
-                npm_package="",
-                args=("--version",),
-                description="Testing NpxProcess",
-            )
-        ],
-    )
-
-    assert result.stdout.strip() == b"8.5.5"
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def test_npm_process(rule_runner: RuleRunner):
+    rule_runner.set_options(["--nodejs-package-managers={'npm': '8.5.5'}"], env_inherit={"PATH"})
+    result = rule_runner.request(
+        ProcessResult,
+        [nodejs.NodeJSToolProcess.npm(args=("--version",), description="Testing NpmProcess")],
+    )
+
+    assert result.stdout.strip() == b"8.5.5"
+
+
+def test_npm_process_with_different_version(rule_runner: RuleRunner):
+    rule_runner.set_options(["--nodejs-package-managers={'npm': '7.20.0'}"], env_inherit={"PATH"})
+    result = rule_runner.request(
+        ProcessResult,
+        [nodejs.NodeJSToolProcess.npm(args=("--version",), description="Testing NpmProcess")],
+    )
+
+    assert result.stdout.strip() == b"7.20.0"
+
+
+def test_pnpm_process(rule_runner: RuleRunner):
     result = rule_runner.request(
         ProcessResult,
         [
-            nodejs.NodeJSToolProcess.npm(
+            nodejs.NodeJSToolProcess(
+                tool="pnpm",
+                tool_version="7.5.0",
                 args=("--version",),
-                description="Testing NpmProcess",
+                description="Testing pnpm process",
             )
         ],
     )
 
-    assert result.stdout.strip() == b"8.5.5"
+    assert result.stdout.strip() == b"7.5.0"
+
+
+def test_yarn_process(rule_runner: RuleRunner):
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            nodejs.NodeJSToolProcess(
+                tool="yarn",
+                tool_version="1.22.19",
+                args=("--version",),
+                description="Testing yarn process",
+            )
+        ],
+    )
+
+    assert result.stdout.strip() == b"1.22.19"
 
 
 def given_known_version(version: str) -> str:

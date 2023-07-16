@@ -21,6 +21,12 @@ Alternatively, on macOS you can also use homebrew to install `pants`:
 brew install pantsbuild/tap/pants
 ```
 
+You can also use the [`bin`](https://github.com/marcosnils/bin) tool to install `pants`:
+
+```
+bin i github.com/pantsbuild/scie-pants ~/.local/bin/pants
+```
+
 `pants` is a launcher binary that delegates to the underlying version of Pants in each repo. This allows you to have multiple repos, each using an independent version of Pants.
 
 - If you run `pants` in a repo that is already configured to use Pants, it will read the repo's Pants version from the `pants.toml` config file, install that version if necessary, and then run it.
@@ -46,6 +52,8 @@ To use an unreleased build of Pants from the [pantsbuild/pants](https://github.c
 ```
 PANTS_SHA=8553e8cbc5a1d9da3f84dcfc5e7bf3139847fb5f pants --version
 ```
+
+If a particular SHA does not have built wheels, you can either wait for [the next release from the relevant branch](doc:release-strategy), ping a maintainer [in Slack](doc:getting-help), or file a Github issue mentioning the SHA that you would like to test.
 
 Running Pants from sources
 --------------------------

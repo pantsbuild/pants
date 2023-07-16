@@ -10,10 +10,7 @@ from pathlib import PurePath
 from typing import Any
 
 from pants.backend.helm.utils.yaml import YamlPath
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -21,7 +18,6 @@ from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnTyp
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
@@ -35,19 +31,12 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-k8s-parser"
     help = "Analyses K8S manifests rendered by Helm."
 
-    default_version = "hikaru==0.11.0b"
     default_requirements = ["hikaru>=0.11.0b,<1"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]
 
-    register_lockfile = True
     default_lockfile_resource = (_HELM_K8S_PARSER_PACKAGE, "k8s_parser.lock")
-    default_lockfile_path = (
-        f"src/python/{_HELM_K8S_PARSER_PACKAGE.replace('.', '/')}/k8s_parser.lock"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)

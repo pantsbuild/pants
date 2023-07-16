@@ -954,13 +954,13 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--pull=False",
             "--secret",
             "id=system-secret,src=/var/run/secrets/mysecret",
             "--secret",
             f"id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
             "--secret",
             f"id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
-            "--pull=False",
             "--tag",
             "img1:latest",
             "--file",
@@ -993,8 +993,42 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
+            "--pull=False",
             "--ssh",
             "default",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  build_network="host",
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--network=host",
             "--pull=False",
             "--tag",
             "img1:latest",

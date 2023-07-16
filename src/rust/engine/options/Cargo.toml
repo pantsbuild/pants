@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "options"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -12,4 +12,4 @@ shellexpand = "2.1"
 toml = "0.5"
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.5.0"

@@ -8,8 +8,6 @@ use std::time::Duration;
 use bollard::Docker;
 use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use maplit::hashset;
-use spectral::assert_that;
-use spectral::string::StrAssertions;
 use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
@@ -605,9 +603,9 @@ async fn timeout() {
   assert_eq!(result.original.exit_code, -15);
   let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
-  assert_that(&stdout).contains("Calculating...");
-  assert_that(&stderr).contains("Exceeded timeout");
-  assert_that(&stderr).contains("sleepy-cat");
+  assert!(&stdout.contains("Calculating..."));
+  assert!(&stderr.contains("Exceeded timeout"));
+  assert!(&stderr.contains("sleepy-cat"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]

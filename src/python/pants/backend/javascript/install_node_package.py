@@ -24,12 +24,13 @@ from pants.backend.javascript.target_types import JSSourceField
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     SourcesField,
+    Target,
     TransitiveTargets,
     TransitiveTargetsRequest,
     targets_with_sources_types,
@@ -53,6 +54,10 @@ class InstalledNodePackage:
 
     def join_relative_workspace_directory(self, path: str) -> str:
         return os.path.join(self.project_env.relative_workspace_directory(), path)
+
+    @property
+    def target(self) -> Target:
+        return self.project_env.ensure_target()
 
 
 @dataclass(frozen=True)
@@ -109,17 +114,16 @@ async def install_node_packages_for_address(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
             project_env,
-            ("clean-install",),
+            project_env.project.immutable_install_args,
             description=f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
             input_digest=install_input_digest,
             output_directories=tuple(project_env.node_modules_directories),
         ),
     )
+    node_modules = await Get(Digest, AddPrefix(install_result.output_digest, project_env.root_dir))
     return InstalledNodePackage(
         project_env,
-        digest=await Get(
-            Digest, MergeDigests([install_input_digest, install_result.output_digest])
-        ),
+        digest=await Get(Digest, MergeDigests([install_input_digest, node_modules])),
     )
 
 
@@ -128,7 +132,9 @@ async def add_sources_to_installed_node_package(
     req: InstalledNodePackageRequest,
 ) -> InstalledNodePackageWithSource:
     installation = await Get(InstalledNodePackage, InstalledNodePackageRequest, req)
-    transitive_tgts = await Get(TransitiveTargets, TransitiveTargetsRequest([req.address]))
+    transitive_tgts = await Get(
+        TransitiveTargets, TransitiveTargetsRequest([installation.target.address])
+    )
 
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.dependencies if tgt.has_field(SourcesField)),

@@ -13,7 +13,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import package_pex_binary, pytest_runner, setup_py
+from pants.backend.python.goals import package_dists, package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
 from pants.backend.python.goals.pytest_runner import (
     PytestPluginSetup,
@@ -51,14 +51,16 @@ from pants.engine.unions import UnionRule
 from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
-    skip_unless_python27_and_python3_present,
+    skip_unless_python37_and_python39_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule, mock_console
+from pants.util.resources import read_sibling_resource
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             build_runtime_package_dependencies,
             create_or_update_coverage_config,
@@ -71,7 +73,7 @@ def rule_runner() -> RuleRunner:
             get_filtered_environment,
             *target_types_rules.rules(),
             *local_dists.rules(),
-            *setup_py.rules(),
+            *package_dists.rules(),
             *package.rules(),
             QueryRule(Partitions, (PyTestRequest.PartitionRequest,)),
             QueryRule(TestResult, (PyTestRequest.Batch,)),
@@ -102,7 +104,7 @@ GOOD_TEST = dedent(
 
 
 def _configure_pytest_runner(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     *,
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
@@ -117,7 +119,7 @@ def _configure_pytest_runner(
 
 
 def _get_pytest_batch(
-    rule_runner: RuleRunner, test_targets: Iterable[Target]
+    rule_runner: PythonRuleRunner, test_targets: Iterable[Target]
 ) -> PyTestRequest.Batch[PythonTestFieldSet, TestMetadata]:
     field_sets = tuple(PythonTestFieldSet.create(tgt) for tgt in test_targets)
     partitions = rule_runner.request(Partitions, [PyTestRequest.PartitionRequest(field_sets)])
@@ -126,7 +128,7 @@ def _get_pytest_batch(
 
 
 def run_pytest(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     test_targets: Iterable[Target],
     *,
     extra_args: list[str] | None = None,
@@ -158,7 +160,7 @@ def run_pytest(
 
 
 def run_pytest_noninteractive(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     test_target: Target,
     *,
     extra_args: list[str] | None = None,
@@ -169,7 +171,7 @@ def run_pytest_noninteractive(
 
 
 def run_pytest_interactive(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     test_target: Target,
     *,
     extra_args: list[str] | None = None,
@@ -188,7 +190,7 @@ def run_pytest_interactive(
     "major_minor_interpreter",
     all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
-def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
     )
@@ -203,7 +205,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
@@ -221,7 +223,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/tests.py F" in result.stdout
 
 
-def test_dependencies(rule_runner: RuleRunner) -> None:
+def test_dependencies(rule_runner: PythonRuleRunner) -> None:
     """Ensure direct and transitive dependencies work."""
     rule_runner.write_files(
         {
@@ -279,46 +281,41 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
 
-@skip_unless_python27_and_python3_present
-def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
+@skip_unless_python37_and_python39_present
+def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
                 """\
                 def test() -> None:
-                  pass
+                  y = (x := 5)
                 """
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_tests(name='py2', interpreter_constraints=['==2.7.*'])
-                python_tests(name='py3', interpreter_constraints=['>=3.6.0'])
+                python_tests(name='py37', interpreter_constraints=['==3.7.*'])
+                python_tests(name='py39', interpreter_constraints=['==3.9.*'])
                 """
             ),
         }
     )
-    extra_args = [
-        "--pytest-version=pytest>=4.6.6,<4.7",
-        "--pytest-extra-requirements=[]",
-        "--pytest-lockfile=<none>",
-    ]
 
-    py2_tgt = rule_runner.get_target(
-        Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
+    py37_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py37", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py2_tgt], extra_args=extra_args, test_debug_adapter=False)
+    result = run_pytest(rule_runner, [py37_tgt], test_debug_adapter=False)
     assert result.exit_code == 2
     assert "SyntaxError: invalid syntax" in result.stdout
 
-    py3_tgt = rule_runner.get_target(
-        Address(PACKAGE, target_name="py3", relative_file_path="tests.py")
+    py39_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py39", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py3_tgt], extra_args=extra_args, test_debug_adapter=False)
+    result = run_pytest(rule_runner, [py39_tgt], test_debug_adapter=False)
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
 
-def test_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
@@ -340,7 +337,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
 
 
-def test_xdist_enabled_noninteractive(rule_runner: RuleRunner) -> None:
+def test_xdist_enabled_noninteractive(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
@@ -362,7 +359,7 @@ def test_xdist_enabled_noninteractive(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_xdist_enabled_but_disabled_for_target(rule_runner: RuleRunner) -> None:
+def test_xdist_enabled_but_disabled_for_target(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
@@ -384,7 +381,7 @@ def test_xdist_enabled_but_disabled_for_target(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_xdist_enabled_interactive(rule_runner: RuleRunner) -> None:
+def test_xdist_enabled_interactive(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/tests.py": dedent(
@@ -410,7 +407,9 @@ def test_xdist_enabled_interactive(rule_runner: RuleRunner) -> None:
     "config_path,extra_args",
     (["pytest.ini", []], ["custom_config.ini", ["--pytest-config=custom_config.ini"]]),
 )
-def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
+def test_config_file(
+    rule_runner: PythonRuleRunner, config_path: str, extra_args: list[str]
+) -> None:
     rule_runner.write_files(
         {
             config_path: dedent(
@@ -434,7 +433,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     assert "All good!" in result.stdout and "Captured" not in result.stdout
 
 
-def test_force(rule_runner: RuleRunner) -> None:
+def test_force(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
     )
@@ -454,9 +453,15 @@ def test_force(rule_runner: RuleRunner) -> None:
     assert result_one is result_two
 
 
-def test_extra_output(rule_runner: RuleRunner) -> None:
+def test_extra_output(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
-        {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
+        {
+            f"{PACKAGE}/tests.py": GOOD_TEST,
+            f"{PACKAGE}/BUILD": "python_tests()",
+            # The test lockfile provides pytest-html and also setuptools, which it requires
+            # because it does not use PEP 517.
+            "pytest.lock": read_sibling_resource(__name__, "pytest_extra_output_test.lock"),
+        }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(
@@ -464,10 +469,8 @@ def test_extra_output(rule_runner: RuleRunner) -> None:
         [tgt],
         extra_args=[
             "--pytest-args='--html=extra-output/report.html'",
-            "--pytest-extra-requirements=pytest-html==3.1",
-            # pytest-html requires setuptools to be installed because it does not use PEP 517.
-            "--pytest-extra-requirements=setuptools",
-            "--pytest-lockfile=<none>",
+            "--python-resolves={'pytest':'pytest.lock'}",
+            "--pytest-install-from-resolve=pytest",
         ],
     )
     assert result.exit_code == 0
@@ -478,7 +481,7 @@ def test_extra_output(rule_runner: RuleRunner) -> None:
     assert {"assets/style.css", "report.html"} == paths
 
 
-def test_coverage(rule_runner: RuleRunner) -> None:
+def test_coverage(rule_runner: PythonRuleRunner) -> None:
     # Note that we test that rewriting the pyproject.toml doesn't cause a collision
     # between the two code paths by which we pick up that file (coverage and pytest).
     rule_runner.write_files(
@@ -495,7 +498,7 @@ def test_coverage(rule_runner: RuleRunner) -> None:
     assert result.coverage_data is not None
 
 
-def test_conftest_dependency_injection(rule_runner: RuleRunner) -> None:
+def test_conftest_dependency_injection(rule_runner: PythonRuleRunner) -> None:
     # See `test_skip_tests` for a test that we properly skip running on conftest.py.
     rule_runner.write_files(
         {
@@ -516,7 +519,7 @@ def test_conftest_dependency_injection(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/tests.py In conftest!\n." in result.stdout
 
 
-def test_execution_slot_variable(rule_runner: RuleRunner) -> None:
+def test_execution_slot_variable(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/test_concurrency_slot.py": dedent(
@@ -539,7 +542,7 @@ def test_execution_slot_variable(rule_runner: RuleRunner) -> None:
     assert re.search(r"Value of slot is \d+", result.stdout)
 
 
-def test_extra_env_vars(rule_runner: RuleRunner) -> None:
+def test_extra_env_vars(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/test_extra_env_vars.py": dedent(
@@ -583,7 +586,7 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_pytest_addopts_test_extra_env(rule_runner: RuleRunner) -> None:
+def test_pytest_addopts_test_extra_env(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/test_pytest_addopts_test_extra_env.py": dedent(
@@ -615,7 +618,7 @@ def test_pytest_addopts_test_extra_env(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_pytest_addopts_field_set_extra_env(rule_runner: RuleRunner) -> None:
+def test_pytest_addopts_field_set_extra_env(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/test_pytest_addopts_field_set_extra_env.py": dedent(
@@ -677,10 +680,10 @@ async def unused_plugin(_: UnusedPlugin) -> PytestPluginSetup:
     return PytestPluginSetup(digest=digest)
 
 
-def test_setup_plugins_and_runtime_package_dependency(rule_runner: RuleRunner) -> None:
+def test_setup_plugins_and_runtime_package_dependency(rule_runner: PythonRuleRunner) -> None:
     # We test both the generic `PytestPluginSetup` mechanism and our `runtime_package_dependencies`
     # feature in the same test to confirm multiple plugins can be used on the same target.
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *rule_runner.rules,
             used_plugin,
@@ -726,7 +729,7 @@ def test_setup_plugins_and_runtime_package_dependency(rule_runner: RuleRunner) -
     assert result.exit_code == 0
 
 
-def test_local_dists(rule_runner: RuleRunner) -> None:
+def test_local_dists(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/foo/bar.py": "BAR = 'LOCAL DIST'",
@@ -771,7 +774,7 @@ def test_local_dists(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-def test_skip_tests(rule_runner: RuleRunner) -> None:
+def test_skip_tests(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "test_skip_me.py": "",
@@ -793,7 +796,7 @@ def test_skip_tests(rule_runner: RuleRunner) -> None:
     assert is_applicable("t2", "test_foo.py")
 
 
-def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
+def test_debug_adaptor_request_argv(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/test_foo.py": "",
@@ -874,7 +877,7 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
     ),
 )
 def test_partition(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     root_build_contents: str,
     package_build_contents: str,
     expected_partitions: list[list[str]],
@@ -926,7 +929,7 @@ def test_partition(
     "major_minor_interpreter",
     all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
-def test_batched_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_batched_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/test_1.py": GOOD_TEST,
@@ -949,7 +952,7 @@ def test_batched_passing(rule_runner: RuleRunner, major_minor_interpreter: str) 
     assert f"{PACKAGE}/test_2.py ." in result.stdout
 
 
-def test_batched_failing(rule_runner: RuleRunner) -> None:
+def test_batched_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/test_1.py": GOOD_TEST,

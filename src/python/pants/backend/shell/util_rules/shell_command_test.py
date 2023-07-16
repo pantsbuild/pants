@@ -502,39 +502,43 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
     )
 
 
-def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("workdir", "expected_boot"),
+    [
+        (None, "cd src; "),
+        (".", "cd src; "),
+        ("/", ""),
+        ("src/with space'n quote", """cd 'src/with space'\"'\"'n quote'; """),
+        ("./with space'n quote", """cd 'src/with space'\"'\"'n quote'; """),
+    ],
+)
+def test_run_shell_command_request(
+    rule_runner: RuleRunner, workdir: None | str, expected_boot: str
+) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
-                """\
+                f"""\
                 run_shell_command(
                   name="test",
                   command="some cmd string",
-                )
-
-                run_shell_command(
-                  name="cd-test",
-                  command="some cmd string",
-                  workdir="src/with space'n quote",
+                  workdir={workdir!r},
                 )
                 """
             ),
         }
     )
 
-    def assert_run_args(target: str, args: tuple[str, ...]) -> None:
-        tgt = rule_runner.get_target(Address("src", target_name=target))
-        run = RunShellCommand.create(tgt)
-        request = rule_runner.request(RunRequest, [run])
-        assert len(args) == len(request.args)
-        for arg, request_arg in zip(args, request.args):
-            arg in request_arg
+    args = ("bash", "-c", expected_boot + "some cmd string", "pants run src:test --")
 
-    assert_run_args("test", ("bash", "-c", "some cmd string", "src:test"))
-    assert_run_args(
-        "cd-test",
-        ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string", "src:cd-test"),
-    )
+    tgt = rule_runner.get_target(Address("src", target_name="test"))
+    run = RunShellCommand.create(tgt)
+    request = rule_runner.request(RunRequest, [run])
+    assert len(args) == len(request.args)
+    # handle the binary name specially, because the path may differ
+    assert args[0] in request.args[0]
+    for arg, request_arg in zip(args[1:], request.args[1:]):
+        assert arg == request_arg
 
 
 @pytest.mark.parametrize(
@@ -788,4 +792,48 @@ def test_env_vars(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src", target_name="envvars"),
         expected_contents={"out.log": f"{envvar_value}\n"},
+    )
+
+
+_DEFAULT = object()
+
+
+@pytest.mark.parametrize(
+    ("workdir", "expected_dir"),
+    [
+        ("src", "/src"),
+        (".", "/src"),
+        ("./", "/src"),
+        ("./dst", "/src/dst"),
+        ("/", ""),
+        ("", ""),
+        ("/src", "/src"),
+        ("/dst", "/dst"),
+        (None, "/src"),
+    ],
+)
+def test_working_directory_special_values(
+    rule_runner: RuleRunner, workdir: str | None, expected_dir: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+                shell_command(
+                  name="workdir",
+                  tools=['sed'],
+                  command='echo $PWD | sed s@^{{chroot}}@@ > out.log',
+                  workdir={workdir!r},
+                  output_files=["out.log"],
+                  root_output_directory=".",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="workdir"),
+        expected_contents={"out.log": f"{expected_dir}\n"},
     )

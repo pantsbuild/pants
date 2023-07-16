@@ -201,7 +201,7 @@ def test_generate_lockfile_without_python_backend() -> None:
     run_pants(
         [
             "--backend-packages=pants.backend.docker",
-            "--dockerfile-parser-lockfile=dp.lock",
+            "--python-resolves={'dockerfile-parser':'dp.lock'}",
             "generate-lockfiles",
             "--resolve=dockerfile-parser",
         ]

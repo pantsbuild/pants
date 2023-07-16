@@ -234,10 +234,8 @@ async def get_optional_source_roots(
     }
     dirs.update(file_to_dir.values())
 
-    dir_to_root: dict[PurePath, OptionalSourceRoot] = {}
-    for d in dirs:
-        root = await Get(OptionalSourceRoot, SourceRootRequest(d))  # noqa: PNT30: requires triage
-        dir_to_root[d] = root
+    roots = await MultiGet(Get(OptionalSourceRoot, SourceRootRequest(d)) for d in dirs)
+    dir_to_root = dict(zip(dirs, roots))
 
     path_to_optional_root: dict[PurePath, OptionalSourceRoot] = {}
     for d in source_roots_request.dirs:

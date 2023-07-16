@@ -15,7 +15,7 @@ from pants.core.goals.multi_tool_goal_helper import (
     BatchSizeOption,
     OnlyOption,
     SkippableSubsystem,
-    determine_specified_tool_names,
+    determine_specified_tool_ids,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -63,7 +63,7 @@ class LintResult(EngineAwareReturnType):
     @classmethod
     def create(
         cls,
-        request: LintRequest.Batch,
+        request: AbstractLintRequest.Batch,
         process_result: FallibleProcessResult,
         *,
         strip_chroot_path: bool = False,
@@ -113,7 +113,7 @@ class LintResult(EngineAwareReturnType):
 
 
 @union
-class LintRequest:
+class AbstractLintRequest:
     """Base class for plugin types wanting to be run as part of `lint`.
 
     Plugins should define a new type which subclasses either `LintTargetsRequest` (to lint targets)
@@ -170,6 +170,12 @@ class LintRequest:
 
     @classproperty
     def tool_name(cls) -> str:
+        """The user-facing "name" of the tool."""
+        return cls.tool_subsystem.options_scope
+
+    @classproperty
+    def tool_id(cls) -> str:
+        """The "id" of the tool, used in tool selection (Eg --only=<id>)."""
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
@@ -183,11 +189,11 @@ class LintRequest:
 
     @classmethod
     def _get_rules(cls) -> Iterable:
-        yield UnionRule(LintRequest, cls)
-        yield UnionRule(LintRequest.Batch, cls.Batch)
+        yield UnionRule(AbstractLintRequest, cls)
+        yield UnionRule(AbstractLintRequest.Batch, cls.Batch)
 
 
-class LintTargetsRequest(LintRequest):
+class LintTargetsRequest(AbstractLintRequest):
     """The entry point for linters that operate on targets."""
 
     field_set_type: ClassVar[type[FieldSet]]
@@ -203,7 +209,7 @@ class LintTargetsRequest(LintRequest):
         yield UnionRule(LintTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class LintFilesRequest(LintRequest, EngineAwareParameter):
+class LintFilesRequest(AbstractLintRequest, EngineAwareParameter):
     """The entry point for linters that do not use targets."""
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
@@ -234,7 +240,7 @@ class LintSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return LintRequest in union_membership
+        return AbstractLintRequest in union_membership
 
     only = OnlyOption("linter", "flake8", "shellcheck")
     skip_formatters = BoolOption(
@@ -305,7 +311,7 @@ def _get_error_code(results: Sequence[LintResult]) -> int:
     return 0
 
 
-_CoreRequestType = TypeVar("_CoreRequestType", bound=LintRequest)
+_CoreRequestType = TypeVar("_CoreRequestType", bound=AbstractLintRequest)
 _TargetPartitioner = TypeVar("_TargetPartitioner", bound=LintTargetsRequest.PartitionRequest)
 _FilePartitioner = TypeVar("_FilePartitioner", bound=LintFilesRequest.PartitionRequest)
 
@@ -326,16 +332,14 @@ async def _get_partitions_by_request_type(
     make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
     make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
-    specified_names = determine_specified_tool_names(
+    specified_ids = determine_specified_tool_ids(
         subsystem.name,
         subsystem.only,
         core_request_types,
     )
 
     filtered_core_request_types = [
-        request_type
-        for request_type in core_request_types
-        if request_type.tool_name in specified_names
+        request_type for request_type in core_request_types if request_type.tool_id in specified_ids
     ]
     if not filtered_core_request_types:
         return {}
@@ -365,7 +369,7 @@ async def _get_partitions_by_request_type(
 
     await _warn_on_non_local_environments(targets, f"the {subsystem.name} goal")
 
-    def partition_request_get(request_type: type[LintRequest]) -> Get[Partitions]:
+    def partition_request_get(request_type: type[AbstractLintRequest]) -> Get[Partitions]:
         partition_request_type: type = getattr(request_type, "PartitionRequest")
         if partition_request_type in target_partitioners:
             partition_targets_type = cast(LintTargetsRequest, request_type)
@@ -404,7 +408,7 @@ async def lint(
     union_membership: UnionMembership,
     dist_dir: DistDir,
 ) -> Lint:
-    lint_request_types = union_membership.get(LintRequest)
+    lint_request_types = union_membership.get(AbstractLintRequest)
     target_partitioners = union_membership.get(LintTargetsRequest.PartitionRequest)
     file_partitioners = union_membership.get(LintFilesRequest.PartitionRequest)
 
@@ -426,12 +430,10 @@ async def lint(
     if not partitions_by_request_type:
         return Lint(exit_code=0)
 
-    def batch_by_size(
-        iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
-    ) -> Iterator[tuple[_T, ...]]:
+    def batch_by_size(iterable: Iterable[_T]) -> Iterator[tuple[_T, ...]]:
         batches = partition_sequentially(
             iterable,
-            key=key,
+            key=lambda x: str(x.address) if isinstance(x, FieldSet) else str(x),
             size_target=lint_subsystem.batch_size,
             size_max=4 * lint_subsystem.batch_size,
         )
@@ -456,7 +458,7 @@ async def lint(
     )
     snapshots_iter = iter(formatter_snapshots)
 
-    batches: Iterable[LintRequest.Batch] = [
+    batches: Iterable[AbstractLintRequest.Batch] = [
         request_type.Batch(
             request_type.tool_name,
             elements,
@@ -468,7 +470,7 @@ async def lint(
     ]
 
     all_batch_results = await MultiGet(
-        Get(LintResult, LintRequest.Batch, request) for request in batches
+        Get(LintResult, AbstractLintRequest.Batch, request) for request in batches
     )
 
     core_request_types_by_batch_type = {

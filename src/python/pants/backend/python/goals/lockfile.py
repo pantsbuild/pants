@@ -9,16 +9,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
-from pants.backend.python.util_rules.pex_requirements import (  # noqa: F401
-    GeneratePythonToolLockfileSentinel as GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ResolvePexConfig,
@@ -45,6 +41,7 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.pip_requirement import PipRequirement
 
 
 @dataclass(frozen=True)
@@ -275,6 +272,7 @@ async def python_lockfile_synthetic_targets(
         (os.path.dirname(lockfile), os.path.basename(lockfile), name)
         for name, lockfile in python_setup.resolves.items()
     ]
+
     return SyntheticAddressMaps.for_targets_request(
         request,
         [
@@ -282,7 +280,10 @@ async def python_lockfile_synthetic_targets(
                 os.path.join(spec_path, "BUILD.python-lockfiles"),
                 tuple(
                     TargetAdaptor(
-                        "_lockfiles", name=synthetic_lockfile_target_name(name), sources=[lockfile]
+                        "_lockfiles",
+                        name=synthetic_lockfile_target_name(name),
+                        sources=[lockfile],
+                        __description_of_origin__=f"the [python].resolves option {name!r}",
                     )
                     for _, lockfile, name in lockfiles
                 ),

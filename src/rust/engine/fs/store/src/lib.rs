@@ -37,12 +37,12 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::fs::Permissions as FSPermissions;
 use std::future::Future;
-use std::io::{self, Write};
+use std::io::Write;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
@@ -64,7 +64,7 @@ use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
-use remexec::{ServerCapabilities, Tree};
+use remexec::Tree;
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 #[cfg(target_os = "macos")]
@@ -84,6 +84,7 @@ mod local;
 pub mod local_tests;
 
 mod remote;
+pub use remote::RemoteOptions;
 #[cfg(test)]
 mod remote_tests;
 
@@ -140,12 +141,6 @@ impl Display for StoreError {
 impl From<String> for StoreError {
   fn from(err: String) -> Self {
     Self::Unclassified(err)
-  }
-}
-
-impl From<io::Error> for StoreError {
-  fn from(err: io::Error) -> Self {
-    Self::Unclassified(err.to_string())
   }
 }
 
@@ -378,32 +373,11 @@ impl Store {
   /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
   /// attempt to back-fill its local storage from the remote storage.
   ///
-  pub fn into_with_remote(
-    self,
-    cas_address: &str,
-    instance_name: Option<String>,
-    tls_config: grpc_util::tls::Config,
-    headers: BTreeMap<String, String>,
-    chunk_size_bytes: usize,
-    upload_timeout: Duration,
-    rpc_retries: usize,
-    rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-    batch_api_size_limit: usize,
-  ) -> Result<Store, String> {
+  pub fn into_with_remote(self, remote_options: RemoteOptions) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
-      remote: Some(RemoteStore::new(remote::ByteStore::new(
-        cas_address,
-        instance_name,
-        tls_config,
-        headers,
-        chunk_size_bytes,
-        upload_timeout,
-        rpc_retries,
-        rpc_concurrency_limit,
-        capabilities_cell_opt,
-        batch_api_size_limit,
+      remote: Some(RemoteStore::new(remote::ByteStore::from_options(
+        remote_options,
       )?)),
       immutable_inputs_base: self.immutable_inputs_base,
     })
@@ -807,9 +781,7 @@ impl Store {
           ingested_digests.keys().cloned().collect()
         } else {
           remote
-            .list_missing_digests(
-              remote.find_missing_blobs_request(ingested_digests.keys().cloned()),
-            )
+            .list_missing_digests(ingested_digests.keys().cloned())
             .await?
         };
 
@@ -964,10 +936,7 @@ impl Store {
     } else {
       return Ok(false);
     };
-    let missing = remote
-      .store
-      .list_missing_digests(remote.store.find_missing_blobs_request(missing_locally))
-      .await?;
+    let missing = remote.store.list_missing_digests(missing_locally).await?;
 
     Ok(missing.is_empty())
   }
@@ -1448,7 +1417,28 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    symlink(target, destination).await?;
+    // Overwriting a symlink, even with another symlink, fails if it exists. This can occur when
+    // materializing to a fixed directory like dist/. To avoid pessimising the more common case (no
+    // overwrite, e.g. materializing to a temp dir), only remove after noticing a failure.
+    //
+    // NB. #17758, #18849: this is a work-around for inaccurate management of the contents of dist/.
+    for first in [true, false] {
+      match symlink(&target, &destination).await {
+        Ok(()) => break,
+        Err(e) if first && e.kind() == std::io::ErrorKind::AlreadyExists => {
+          tokio::fs::remove_dir_all(&destination).await.map_err(|e| {
+            format!(
+              "Failed to remove existing item at {} when creating symlink to {target} there: {e}",
+              destination.display()
+            )
+          })?
+        }
+        Err(e) => Err(format!(
+          "Failed to create symlink to {target} at {}: {e}",
+          destination.display()
+        ))?,
+      }
+    }
     Ok(())
   }
 
@@ -1464,9 +1454,19 @@ impl Store {
     // It also has the benefit of playing nicely with Docker for macOS file virtualization: see
     // #18162.
     #[cfg(target_os = "macos")]
-    copy(target, destination).await?;
+    copy(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to copy from {target} to {}: {e}",
+        destination.display()
+      )
+    })?;
     #[cfg(not(target_os = "macos"))]
-    hard_link(target, destination).await?;
+    hard_link(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to create hardlink to {target} at {}: {e}",
+        destination.display()
+      )
+    })?;
     Ok(())
   }
 

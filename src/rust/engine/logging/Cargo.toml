@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "logging"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -15,7 +15,7 @@ num_enum = "0.5"
 parking_lot = "0.12"
 regex = "1"
 stdio = { path = "../stdio" }
-tokio = { version = "1.21" }
+tokio = { version = "1.28" }
 uuid = { version = "1.1", features = ["v4"] }
 
 [build-dependencies]

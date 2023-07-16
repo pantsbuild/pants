@@ -20,7 +20,7 @@ use parking_lot::Mutex;
 use sharded_lmdb::ShardedLmdb;
 use std::os::unix::fs::PermissionsExt;
 use task_executor::Executor;
-use tempfile::NamedTempFile;
+use tempfile::Builder;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use workunit_store::ObservationMetric;
 
@@ -230,7 +230,9 @@ impl ShardedFSDB {
           .executor
           .spawn_blocking(
             move || {
-              NamedTempFile::new_in(dest_path2.parent().unwrap())
+              Builder::new()
+                .suffix(".tmp")
+                .tempfile_in(dest_path2.parent().unwrap())
                 .map_err(|e| format!("Failed to create temp file: {e}"))
             },
             |e| Err(format!("temp file creation task failed: {e}")),
@@ -246,10 +248,17 @@ impl ShardedFSDB {
               .shutdown()
               .await
               .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
-
             tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
               .await
               .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
+            // NB: Syncing metadata to disk ensures the `hard_link` we do later has the opportunity
+            // to succeed. Otherwise, if later when we try to `hard_link` the metadata isn't
+            // persisted to disk, we'll get `No such file or directory`.
+            // See https://github.com/pantsbuild/pants/pull/18768
+            tokio_file
+              .sync_all()
+              .await
+              .map_err(|e| format!("Failed to sync {tmp_path:?}: {e}"))?;
             tokio::fs::rename(tmp_path.clone(), dest_path.clone())
               .await
               .map_err(|e| format!("Error while renaming: {e}."))?;
@@ -308,6 +317,7 @@ impl UnderlyingByteStore for ShardedFSDB {
   }
 
   async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let _ = self.dest_initializer.lock().remove(&fingerprint);
     Ok(
       tokio::fs::remove_file(self.get_path(fingerprint))
         .await
@@ -417,6 +427,10 @@ impl UnderlyingByteStore for ShardedFSDB {
                   format!("Error iterating dir {:?}: {e}", shard.path().file_name())
                 })?;
                 let path = large_file.path();
+                if path.extension().is_some() {
+                  continue; // NB: This is a tempfile
+                }
+
                 let hash = path.file_name().unwrap().to_str().unwrap();
                 let (length, mtime) = large_file
                   .metadata()

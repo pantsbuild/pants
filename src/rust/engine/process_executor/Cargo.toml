@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "process_executor"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -20,6 +20,6 @@ prost = "0.9"
 shlex = "1.1.0"
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
-tokio = { version = "1.21", features = ["rt-multi-thread", "macros"] }
-workunit_store = { path = "../workunit_store"}
-remote = { path = "../process_execution/remote"}
+tokio = { version = "1.28", features = ["rt-multi-thread", "macros"] }
+workunit_store = { path = "../workunit_store" }
+remote = { path = "../process_execution/remote" }

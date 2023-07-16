@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import dataclasses
 import itertools
 import logging
@@ -11,6 +12,7 @@ from collections import defaultdict
 from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
+from pants.base.deprecated import CodeRemovedError
 from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
@@ -62,7 +64,7 @@ from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -82,11 +84,12 @@ async def _determine_literal_addresses_from_raw_specs(
         Get(
             Address,
             AddressInput(
+                str(spec),
                 spec.path_component,
-                spec.target_component,
-                generated_component=spec.generated_component,
-                parameters=spec.parameters,
                 description_of_origin=description_of_origin,
+                target_component=spec.target_component,
+                generated_component=spec.generated_component,
+                parameters=dict(spec.parameters),
             ),
         )
         for spec in literal_specs
@@ -224,7 +227,7 @@ async def addresses_from_raw_specs_without_file_owners(
 @rule(_masked_types=[EnvironmentName])
 async def addresses_from_raw_specs_with_only_file_owners(
     specs: RawSpecsWithOnlyFileOwners,
-) -> Addresses:
+) -> Owners:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
         Get(Paths, PathGlobs, specs.path_globs_for_spec(spec)) for spec in specs.all_specs()
@@ -239,6 +242,11 @@ async def addresses_from_raw_specs_with_only_file_owners(
             match_if_owning_build_file_included_in_sources=False,
         ),
     )
+    return owners
+
+
+@rule(_masked_types=[EnvironmentName])
+async def addresses_from_owners(owners: Owners) -> Addresses:
     return Addresses(sorted(owners))
 
 
@@ -402,7 +410,7 @@ class NoApplicableTargetsException(Exception):
         # command only works if at least one of the targets has a SourcesField field.
         #
         # NB: Even with the "secondary owners" mechanism - used by target types like `pex_binary`
-        # and `python_awslambda` to still work with file args - those targets will not show the
+        # and `python_aws_lambda_function` to still work with file args - those targets will not show the
         # associated files when using filedeps.
         filedeps_goal_works = any(
             tgt.class_has_field(SourcesField, union_membership) for tgt in applicable_target_types
@@ -479,6 +487,43 @@ class AmbiguousImplementationsException(Exception):
         )
 
 
+# NB: Remove when SecondaryOwnerMixin is removed
+def _maybe_error_secondary_owner_semantics(
+    addresses_from_nonfile_specs: Addresses,
+    owners_from_filespecs: Owners,
+    matched_addresses: collections.abc.Set[Address],
+):
+    """Warn about deprecated semantics of implicitly referring to a target through "Secondary
+    Ownership".
+
+    E.g. If there's a `pex_binary` whose entry point is `foo.py`, using `foo.py` as a spec to mean
+    "package the pex binary" is deprecated, and the caller should specify the binary directly.
+
+    This shouldn't warn if both the primary and secondary owner are in the specs (which is common
+    with specs like `::` or `dir:`).
+    """
+    problematic_target_specs = {
+        address.spec
+        for address in matched_addresses
+        if address in owners_from_filespecs
+        and not owners_from_filespecs[address]
+        and address not in addresses_from_nonfile_specs
+    }
+
+    if problematic_target_specs:
+        raise CodeRemovedError(
+            softwrap(
+                f"""
+                Support for indirectly referring to a target by using a corresponding file argument,
+                when the target owning the file isn't applicable was removed in version 2.18.0.dev3.
+
+                Refer to the following targets by their addresses:
+                {bullet_list(sorted(problematic_target_specs))}
+                """
+            )
+        )
+
+
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
@@ -526,6 +571,27 @@ async def find_valid_field_sets_for_target_roots(
             and not empty_ok
         ):
             logger.warning(str(no_applicable_exception))
+
+    # NB: Remove when SecondaryOwnerMixin is removed
+    if targets_to_applicable_field_sets:
+        _maybe_error_secondary_owner_semantics(
+            # NB: All of these should be memoized, so it's not inappropriate to request simply for warning sake.
+            *(
+                await MultiGet(
+                    Get(
+                        Addresses,
+                        RawSpecsWithoutFileOwners,
+                        RawSpecsWithoutFileOwners.from_raw_specs(specs.includes),
+                    ),
+                    Get(
+                        Owners,
+                        RawSpecsWithOnlyFileOwners,
+                        RawSpecsWithOnlyFileOwners.from_raw_specs(specs.includes),
+                    ),
+                )
+            ),
+            {tgt.address for tgt in targets_to_applicable_field_sets},
+        )
 
     if request.num_shards > 0:
         sharded_targets_to_applicable_field_sets = {

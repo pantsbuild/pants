@@ -28,36 +28,7 @@ See <https://docs.github.com/en/github/authenticating-to-github/telling-git-abou
 
 Note: the last step is required on macOS.
 
-### 4. Create a PyPI account
-
-[pypi.org/account/register](https://pypi.org/account/register).
-
-Please enable two-factor authentication under "Account Settings".
-
-Generate an API token under "Account Settings" for all projects. Copy the token for the last step.
-
-### 5. Get added to pantsbuild.pants PyPI
-
-You can ask any of the current Owners to add you as a maintainer.
-
-### 6. Configure `~/.pypirc`
-
-Fill in with your PyPI token by running:
-
-```bash
-$ cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
-[pypi]
-username: __token__
-password: <fill me in>
-
-[server-login]
-username: __token__
-password: <fill me in>
-
-EOF
-```
-
-### 7. Authenticate with the Github API
+### 4. Authenticate with the Github API
 
 Ensure that you have a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) for your Github account in your `.netrc` file.
 
@@ -99,23 +70,16 @@ If there are things that must be removed, you can either:
 2. Remove it yourself, either in the release prep or as a precursor PR.
 3. Bump the removal date back by one dev release.
 
-### 0c. Release candidates - cherry-pick relevant changes
+### 0c. Release candidates - Check for cherry-picks
 
-Cherry-pick all changes labeled `needs-cherrypick` with the relevant milestone for the stable branch, e.g. the milestone `2.9.x`. 
+There's many instances of landing a change in `main` and then wanting it to also apply to older releases. This is indicated by the `needs-cherrypick` label on a pull request. There's automation that attempts to automatically cherry-pick those changes back to the relevant branches.
 
-These pull requests must have been merged into main first, so they will already be closed.
+This automation may not always succeed, so [check for any pending cherry-picks](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick+is%3Aclosed), and find the relevant ones by looking at the milestone: for instance, if doing a release for 2.16, the relevant cherry-picks are those for milestone `2.16.x` or earlier.
 
-To cherry-pick, for example, from 2.9.x:
+The process may fail in two ways:
 
-1. `git fetch https://github.com/pantsbuild/pants 2.9.x`
-2. `git checkout -b <new-branch-name> FETCH_HEAD`
-3. Find the commit SHA by running `git log main` or looking in GitHub: <https://github.com/pantsbuild/pants/commits/main>.
-4. `git cherry-pick <sha>`, using the SHA from the previous step.
-5. Open a pull request to merge into the release branch, e.g. `2.9.x`.
-
-Do not push directly to the release branch. All changes should be added through a pull request.
-
-After a commit has been cherry-picked, remove the `needs-cherrypick` label and remove it from the release milestone.
+- The cherry-picking process failed, and tagged the PR with `auto-cherry-picking-failed`: follow the instructions in the comment on the pull request. (This likely means there's merge conflicts that require manual resolution.)
+- the cherry-pick didn't (yet) run: trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
 
 ### 1. Prepare the changelog
 
@@ -123,9 +87,9 @@ Update the release page in `src/python/pants/notes` for this release series, e.g
 
 Run `git fetch --all --tags` to be sure you have the latest release tags available locally.
 
-From the `main` branch, run `pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
+From the `main` branch, run `./pants run src/python/pants_release/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions.
 
-This will generate the sections to copy into the release notes. Delete any empty sections. Do not paste the `Internal` section into the notes file. Instead, paste into a comment on the prep PR.
+This will update the release notes file, for you to tweak and commit. The script also prints an `Internal` section to paste into a comment on the prep PR.
 
 You are encouraged to fix typos and tweak change descriptions for clarity to users. Ensure that there is exactly one blank line between descriptions, headers etc.
 
@@ -141,7 +105,7 @@ You are encouraged to fix typos and tweak change descriptions for clarity to use
 
 ### 2. Update `CONTRIBUTORS.md`
 
-Run `pants run build-support/bin/contributors.py`
+Run `./pants run build-support/bin/contributors.py`
 
 Take note of any new contributors since the last release so that you can give a shoutout in the announcement email.
 
@@ -201,7 +165,7 @@ On the relevant release branch, run `npx rdme docs docs/markdown --version v<pan
 
 ### Regenerate the references
 
-Still on the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
+Still on the relevant release branch, run `./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 
 ### `stable` releases - Update the default docsite
 
@@ -213,15 +177,10 @@ Also, update the [Changelog](doc:changelog)'s "highlights" column with a link to
 > 
 > Ping someone in the `#maintainers-confidential` channel in Slack to be added. Alternatively, you can "Suggest edits" in the top right corner.
 
-Step 3: Wait for CI to build the wheels
+Step 3: Tag the release to build wheels
 ---------------------------------------
 
-Once you have merged the `VERSION` bump—which will be on `main` for `dev` and `a0` releases and the release branch for release candidates—CI will start building the wheels you need to finish the release.
-
-Head to <https://github.com/pantsbuild/pants/actions> and find your relevant build. You need the "Build wheels and fs_util" jobs to pass.
-
-Step 4: Run `release.sh`
-------------------------
+Once you have merged the `VERSION` bump — which will be on `main` for `dev` and `a0` releases and the release branch for release candidates — you should tag the release commit to trigger wheel building and PyPI publishing.
 
 First, ensure that you are on your release branch at your version bump commit.
 
@@ -232,31 +191,24 @@ First, ensure that you are on your release branch at your version bump commit.
 Then, run:
 
 ```bash
-./build-support/bin/release.sh publish
+./pants run src/python/pants_release/release.py -- tag-release
 ```
 
-This will first download the pre-built wheels built in CI and will publish them to PyPI. About 2-3 minutes in, the script will prompt you for your PGP password.
+This will tag the release with your PGP key, and push the tag to origin, which will kick off a [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) to build the wheels and publish them to PyPI.
 
-We also release a Pants Pex via GitHub releases. Run this:
 
-```bash
-PANTS_PEX_RELEASE=STABLE ./build-support/bin/release.sh build-universal-pex
-```
-
-Then go to <https://github.com/pantsbuild/pants/tags>, find your release's tag, click `Edit tag`, and upload the PEX located at `dist/pex.pants.<version>.pex`.
-
-Step 5: Test the release
+Step 4: Test the release
 ------------------------
 
 Run this script as a basic smoke test:
 
 ```bash
-./build-support/bin/release.sh test-release
+./pants run src/python/pants_release/release.py -- test-release
 ```
 
 You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm the changelog is correct on the "Project description" page and that the `macOS` and `manylinux` wheels show up in the "Download files" page. 
 
-Step 6: Announce the change
+Step 5: Announce the change
 ---------------------------
 
 Announce the release to:
@@ -274,7 +226,7 @@ pants run ./build-support/bin/contributors.py -- -s <tag>
 
 > ❗️ Update the links in these templates!
 > 
-> When copy pasting these templates, please always check that all versions match the relevant release. When adding a link, use "Test this link" to ensure that it loads properly.
+> When copy-pasting these templates, please always check that all versions match the relevant release. When adding a link, use "Test this link" to ensure that it loads properly.
 
 #### Dev release
 
@@ -347,6 +299,17 @@ For the first stable release in the series, first, write a blog post to summariz
 >
 > _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_
 
+Step 7: Run release testing on public repositories
+--------------------------------------------------
+
+Manually trigger a run of the [public repositories testing workflow](https://github.com/pantsbuild/pants/actions/workflows/public_repos.yaml), specifying the version just published as the "Pants version".
+
+This workflow checks out various open-source repositories that use Pants and runs the given version of Pants against them, to try to validate if they can upgrade smoothly or if there's any (obvious) bugs. The workflow runs the repositories in two configurations: first with the repo's default configuration as a baseline, and then with the specified Pants version (and any additional options).
+
+Once the workflow finishes, look through any failures and determine if there's any interesting/unknown problems, ensuring there's issues filed (and tagged with the appropriate milestone) for them. For instance, a custom plugin that is broken by a plugin API change is okay, but other sorts of breakage might not be.  If there's a failure during the baseline, a similar failure during the real (non-baseline) test can be ignored, as it likely means the repository in question is broken.
+
+Alternatively, after starting the workflow, post the link to the in-progress run in `#development` in Slack, so that someone can come back to it when it does finish.
+
 When Things Go Wrong
 --------------------
 
@@ -373,7 +336,7 @@ pushing a file mapping the release tag to the commit it tags out to
 fixed by running the following in an environment where you have both `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` of an account that has permissions to push to the Pantsbuild S3 bucket:
 ```
-pants run build-support/bin/backfill_s3_release_tag_mappings.py -- \
+pants run src/python/pants_release/backfill_s3_release_tag_mappings.py -- \
    --aws-cli-symlink-path $HOME/bin
 ```
 If this sounds mysterious or new to you, you probably don't have such an account and should ask for

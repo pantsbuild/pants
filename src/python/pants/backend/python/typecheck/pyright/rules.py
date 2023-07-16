@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass, replace
 from typing import Iterable
 
 import toml
 
-from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
+from pants.backend.javascript.subsystems import nodejs_tool
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -212,13 +214,12 @@ async def pyright_typecheck_partition(
     complete_pex_env = pex_environment.in_workspace()
     process = await Get(
         Process,
-        NodeJSToolProcess,
-        NodeJSToolProcess.npx(
-            npm_package=pyright.version,
+        NodeJSToolRequest,
+        pyright.request(
             args=(
                 f"--venv-path={complete_pex_env.pex_root}",  # Used with `venv` in config
                 *pyright.args,  # User-added arguments
-                *root_sources.snapshot.files,
+                *(os.path.join("{chroot}", file) for file in root_sources.snapshot.files),
             ),
             input_digest=input_digest,
             description=f"Run Pyright on {pluralize(len(root_sources.snapshot.files), 'file')}.",
@@ -291,5 +292,6 @@ def rules() -> Iterable[Rule | UnionRule]:
         *collect_rules(),
         *config_files.rules(),
         *pex_from_targets.rules(),
+        *nodejs_tool.rules(),
         UnionRule(CheckRequest, PyrightRequest),
     )

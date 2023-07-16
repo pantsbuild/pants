@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "process_execution"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -16,7 +16,9 @@ bytes = "1.2"
 cache = { path = "../cache" }
 derivative = "2.2"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["log"] }
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features = [
+  "log",
+] }
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures = "0.3"
@@ -29,9 +31,9 @@ sha2 = "0.10"
 shell-quote = "0.3.0"
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
-tempfile = "3"
+tempfile = "3.5.0"
 concrete_time = { path = "../concrete_time" }
-tokio = { version = "1.21", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.28", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.23"
 tokio-util = { version = "0.7", features = ["codec"] }
 uname = "0.1.1"
@@ -57,7 +59,6 @@ maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
 parking_lot = "0.12"
 sharded_lmdb = { path = "../sharded_lmdb" }
-spectral = "0.6.0"
-tempfile = "3"
+tempfile = "3.5.0"
 testutil = { path = "../testutil" }
-tokio = { version = "1.21", features = ["macros"] }
+tokio = { version = "1.28", features = ["macros"] }

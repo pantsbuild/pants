@@ -11,7 +11,12 @@ import pytest
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.goals import test
-from pants.backend.javascript.goals.test import JSCoverageData, JSTestFieldSet, JSTestRequest
+from pants.backend.javascript.goals.test import (
+    JSCoverageData,
+    JSTestFieldSet,
+    JSTestRequest,
+    TestMetadata,
+)
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import (
     JSSourcesGeneratorTarget,
@@ -21,11 +26,17 @@ from pants.backend.javascript.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.engine.rules import QueryRule
+from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
 
 
+@pytest.fixture(params=["npm", "pnpm", "yarn"])
+def package_manager(request) -> str:
+    return cast(str, request.param)
+
+
 @pytest.fixture
-def rule_runner() -> RuleRunner:
+def rule_runner(package_manager: str) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *test.rules(),
@@ -40,7 +51,34 @@ def rule_runner() -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
+    rule_runner.set_options([f"--nodejs-package-manager={package_manager}"], env_inherit={"PATH"})
     return rule_runner
+
+
+_LOCKFILE_FILE_NAMES = {
+    "pnpm": "pnpm-lock.yaml",
+    "npm": "package-lock.json",
+    "yarn": "yarn.lock",
+}
+
+
+def _find_lockfile_resource(package_manager: str, resource_dir: str) -> dict[str, str]:
+    for file in (Path(__file__).parent / resource_dir).iterdir():
+        if _LOCKFILE_FILE_NAMES.get(package_manager) == file.name:
+            return {file.name: file.read_text()}
+    raise AssertionError(
+        f"No lockfile for {package_manager} set up in test resouces directory {resource_dir}."
+    )
+
+
+@pytest.fixture
+def jest_lockfile(package_manager: str) -> dict[str, str]:
+    return _find_lockfile_resource(package_manager, "jest_resources")
+
+
+@pytest.fixture
+def mocha_lockfile(package_manager: str) -> dict[str, str]:
+    return _find_lockfile_resource(package_manager, "mocha_resources")
 
 
 _SOURCE_TO_TEST = textwrap.dedent(
@@ -66,7 +104,7 @@ def given_package_json(*, test_script: dict[str, str], runner: dict[str, str]) -
 
 
 @pytest.mark.parametrize(
-    "test_script,package_json_target",
+    "test_script, package_json_target",
     [
         pytest.param(
             {"test": "NODE_OPTIONS=--experimental-vm-modules jest"}, "package_json()", id="default"
@@ -83,7 +121,10 @@ def given_package_json(*, test_script: dict[str, str], runner: dict[str, str]) -
     ],
 )
 def test_jest_tests_are_successful(
-    rule_runner: RuleRunner, test_script: dict[str, str], package_json_target: str
+    rule_runner: RuleRunner,
+    test_script: dict[str, str],
+    package_json_target: str,
+    jest_lockfile: dict[str, str],
 ) -> None:
     rule_runner.write_files(
         {
@@ -91,9 +132,7 @@ def test_jest_tests_are_successful(
             "foo/package.json": given_package_json(
                 test_script=test_script, runner={"jest": "^29.5"}
             ),
-            "foo/package-lock.json": (
-                Path(__file__).parent / "jest_resources/package-lock.json"
-            ).read_text(),
+            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
             "foo/src/index.mjs": _SOURCE_TO_TEST,
             "foo/src/tests/BUILD": "javascript_tests(name='tests')",
@@ -115,23 +154,76 @@ def test_jest_tests_are_successful(
         }
     )
     tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.js"))
-    result = rule_runner.request(
-        TestResult, [JSTestRequest.Batch("", (JSTestFieldSet.create(tgt),), None)]
-    )
+    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
     assert "Test Suites: 1 passed, 1 total" in result.stderr
     assert result.exit_code == 0
 
 
-def test_mocha_tests_are_successful(rule_runner: RuleRunner) -> None:
+def test_batched_jest_tests_are_successful(
+    rule_runner: RuleRunner, jest_lockfile: dict[str, str]
+) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "package_json()",
+            "foo/package.json": given_package_json(
+                test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
+                runner={"jest": "^29.5"},
+            ),
+            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
+            "foo/src/BUILD": "javascript_sources()",
+            "foo/src/index.mjs": _SOURCE_TO_TEST,
+            "foo/src/tests/BUILD": "javascript_tests(name='tests', batch_compatibility_tag='default')",
+            "foo/src/tests/index.test.js": textwrap.dedent(
+                """\
+                /**
+                 * @jest-environment node
+                 */
+
+                import { expect } from "@jest/globals"
+
+                import { add } from "../index.mjs"
+
+                test('adds 1 + 2 to equal 3', () => {
+                    expect(add(1, 2)).toBe(3);
+                });
+                """
+            ),
+            "foo/src/tests/another.test.js": textwrap.dedent(
+                """\
+                /**
+                 * @jest-environment node
+                 */
+
+                import { expect } from "@jest/globals"
+
+                import { add } from "../index.mjs"
+
+                test('adds 2 + 3 to equal 5', () => {
+                    expect(add(2, 3)).toBe(5);
+                });
+                """
+            ),
+        }
+    )
+    tgt_1 = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.js"))
+    tgt_2 = rule_runner.get_target(Address("foo/src/tests", relative_file_path="another.test.js"))
+    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt_1, tgt_2, package=package)])
+    assert "Test Suites: 2 passed, 2 total" in result.stderr
+    assert result.exit_code == 0
+
+
+def test_mocha_tests_are_successful(
+    mocha_lockfile: dict[str, str], rule_runner: RuleRunner
+) -> None:
     rule_runner.write_files(
         {
             "foo/BUILD": "package_json()",
             "foo/package.json": given_package_json(
                 test_script={"test": "mocha"}, runner={"mocha": "^10.2.0"}
             ),
-            "foo/package-lock.json": (
-                Path(__file__).parent / "mocha_resources/package-lock.json"
-            ).read_text(),
+            **{f"foo/{key}": value for key, value in mocha_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
             "foo/src/index.mjs": _SOURCE_TO_TEST,
             "foo/src/tests/BUILD": "javascript_tests(name='tests')",
@@ -149,15 +241,19 @@ def test_mocha_tests_are_successful(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.mjs"))
-    result = rule_runner.request(
-        TestResult, [JSTestRequest.Batch("", (JSTestFieldSet.create(tgt),), None)]
-    )
+    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
     assert "1 passing" in result.stdout
     assert result.exit_code == 0
 
 
-def test_jest_test_with_coverage_reporting(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(args=["--test-use-coverage", "True"])
+def test_jest_test_with_coverage_reporting(
+    package_manager: str, rule_runner: RuleRunner, jest_lockfile: dict[str, str]
+) -> None:
+    rule_runner.set_options(
+        args=[f"--nodejs-package-manager={package_manager}", "--test-use-coverage", "True"],
+        env_inherit={"PATH"},
+    )
     rule_runner.write_files(
         {
             "foo/BUILD": textwrap.dedent(
@@ -176,9 +272,7 @@ def test_jest_test_with_coverage_reporting(rule_runner: RuleRunner) -> None:
                 test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
                 runner={"jest": "^29.5"},
             ),
-            "foo/package-lock.json": (
-                Path(__file__).parent / "jest_resources/package-lock.json"
-            ).read_text(),
+            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
             "foo/src/BUILD": "javascript_sources()",
             "foo/src/index.mjs": _SOURCE_TO_TEST,
             "foo/src/tests/BUILD": "javascript_tests(name='tests')",
@@ -200,10 +294,17 @@ def test_jest_test_with_coverage_reporting(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.js"))
-    result = rule_runner.request(
-        TestResult, [JSTestRequest.Batch("", (JSTestFieldSet.create(tgt),), None)]
-    )
+    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
     assert result.coverage_data
 
     rule_runner.write_digest(cast(JSCoverageData, result.coverage_data).snapshot.digest)
     assert Path(rule_runner.build_root, ".coverage/clover.xml").exists()
+
+
+def given_request_for(*js_test: Target, package: Target) -> JSTestRequest.Batch:
+    return JSTestRequest.Batch(
+        "",
+        tuple(JSTestFieldSet.create(tgt) for tgt in js_test),
+        TestMetadata(tuple(), package),
+    )

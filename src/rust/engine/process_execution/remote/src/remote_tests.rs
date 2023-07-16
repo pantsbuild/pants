@@ -14,9 +14,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::Operation;
 use remexec::{execution_stage::Value as ExecutionStageValue, ExecutedActionMetadata};
-use spectral::prelude::*;
-use spectral::{assert_that, string::StrAssertions};
-use store::{SnapshotOps, Store, StoreError};
+use store::{RemoteOptions, SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
@@ -1224,8 +1222,8 @@ async fn server_rejecting_execute_request_gives_error() {
   let error = run_command_remote(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
-  assert_that(&error.to_string()).contains("InvalidArgument");
-  assert_that(&error.to_string()).contains("Did not expect this request");
+  assert!(&error.to_string().contains("InvalidArgument"));
+  assert!(&error.to_string().contains("Did not expect this request"));
 }
 
 #[tokio::test]
@@ -1259,6 +1257,21 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   assert!(result.stdout().contains("user timeout"));
 }
 
+fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteOptions {
+  RemoteOptions {
+    cas_address: cas.address(),
+    instance_name: None,
+    tls_config: tls::Config::default(),
+    headers: BTreeMap::new(),
+    chunk_size_bytes: 10 * 1024 * 1024,
+    rpc_timeout: Duration::from_secs(1),
+    rpc_retries: 1,
+    rpc_concurrency_limit: STORE_CONCURRENCY_LIMIT,
+    capabilities_cell_opt: None,
+    batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
+  }
+}
+
 #[tokio::test]
 async fn sends_headers() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
@@ -1268,18 +1281,7 @@ async fn sends_headers() {
   let store_dir = TempDir::new().unwrap();
   let store = Store::local_only(runtime.clone(), store_dir)
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      BTreeMap::new(),
-      10 * 1024 * 1024,
-      Duration::from_secs(1),
-      1,
-      STORE_CONCURRENCY_LIMIT,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options_for_cas(&cas))
     .unwrap();
 
   let execute_request = echo_foo_request();
@@ -1343,7 +1345,7 @@ async fn sends_headers() {
     .iter()
     .map(|received_message| received_message.headers.clone())
     .collect();
-  assert_that!(message_headers).has_length(1);
+  assert_eq!(message_headers.len(), 1);
   for headers in message_headers {
     {
       let want_key = "google.devtools.remoteexecution.v1test.requestmetadata-bin";
@@ -1432,18 +1434,7 @@ async fn ensure_inline_stdio_is_stored() {
   let cas = mock::StubCAS::empty();
   let store = Store::local_only(runtime.clone(), store_dir_path)
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      BTreeMap::new(),
-      10 * 1024 * 1024,
-      Duration::from_secs(1),
-      1,
-      STORE_CONCURRENCY_LIMIT,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options_for_cas(&cas))
     .unwrap();
 
   let test_stdout = TestData::roland();
@@ -1785,18 +1776,7 @@ async fn execute_missing_file_uploads_if_known() {
     .build();
   let store = Store::local_only(runtime.clone(), store_dir)
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      BTreeMap::new(),
-      10 * 1024 * 1024,
-      Duration::from_secs(1),
-      1,
-      STORE_CONCURRENCY_LIMIT,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options_for_cas(&cas))
     .unwrap();
 
   let roland = TestData::roland();
@@ -1902,18 +1882,7 @@ async fn execute_missing_file_errors_if_unknown() {
   let runtime = task_executor::Executor::new();
   let store = Store::local_only(runtime.clone(), store_dir)
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      BTreeMap::new(),
-      10 * 1024 * 1024,
-      Duration::from_secs(1),
-      1,
-      STORE_CONCURRENCY_LIMIT,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options_for_cas(&cas))
     .unwrap();
 
   let runner = CommandRunner::new(
@@ -2676,18 +2645,7 @@ async fn run_command_remote_in_workunit(
 fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Executor) -> Store {
   Store::local_only(executor, store_dir)
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      BTreeMap::new(),
-      10 * 1024 * 1024,
-      Duration::from_secs(1),
-      1,
-      STORE_CONCURRENCY_LIMIT,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options_for_cas(&cas))
     .unwrap()
 }
 

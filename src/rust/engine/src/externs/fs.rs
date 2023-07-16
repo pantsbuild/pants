@@ -157,15 +157,10 @@ pub struct PySnapshot(pub Snapshot);
 #[pymethods]
 impl PySnapshot {
   #[classmethod]
-  fn _unsafe_create(
-    _cls: &PyType,
-    py_digest: PyDigest,
-    files: Vec<String>,
-    dirs: Vec<String>,
-  ) -> PyResult<Self> {
-    let snapshot =
-      unsafe { Snapshot::create_for_testing_ffi(py_digest.0.as_digest(), files, dirs) };
-    Ok(Self(snapshot.map_err(PyException::new_err)?))
+  fn create_for_testing(_cls: &PyType, files: Vec<String>, dirs: Vec<String>) -> PyResult<Self> {
+    Ok(Self(
+      Snapshot::create_for_testing(files, dirs).map_err(PyException::new_err)?,
+    ))
   }
 
   fn __hash__(&self) -> u64 {

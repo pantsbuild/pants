@@ -1,5 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -39,7 +41,7 @@ async def access_aws_credentials() -> AWSCredentials:
                 To do that add an entry to `[GLOBAL].plugins` of a pip-resolvable package to download from PyPI.
                 (E.g. `botocore == 1.29.39`). Note that the `botocore` package from PyPI at the time
                 of writing is >70MB, so an alternate package providing the `botocore` modules may be
-                advisable.
+                advisable (such as [`botocore-a-la-carte`](https://pypi.org/project/botocore-a-la-carte/)).
                 """
             )
         )
@@ -62,7 +64,7 @@ class S3DownloadFile:
 
 @rule
 async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredentials) -> Digest:
-    from botocore import auth, exceptions  # pants: no-infer-dep
+    from botocore import auth, compat, exceptions  # pants: no-infer-dep
 
     # NB: The URL for auth is expected to be in path-style
     path_style_url = "https://s3"
@@ -72,9 +74,10 @@ async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredenti
     if request.query:
         path_style_url += f"?{request.query}"
 
+    headers = compat.HTTPHeaders()
     http_request = SimpleNamespace(
         url=path_style_url,
-        headers={},
+        headers=headers,
         method="GET",
         auth_path=None,
     )

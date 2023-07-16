@@ -15,10 +15,7 @@ from typing import Any, Iterable, Mapping
 import yaml
 
 from pants.backend.helm.utils.yaml import FrozenYamlIndex
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -31,7 +28,6 @@ from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest, Targets
-from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -46,22 +42,15 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-post-renderer"
     help = "Used perform modifications to the final output produced by Helm charts when they've been fully rendered."
 
-    default_version = "yamlpath>=3.7.0,<4"
-    default_extra_requirements = [
-        "ruamel.yaml>=0.15.96,!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21"
+    default_requirements = [
+        "yamlpath>=3.6.0,<4",
+        "ruamel.yaml>=0.15.96,!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21",
     ]
-    default_requirements = ["yamlpath>=3.6.0,<4", *default_extra_requirements]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]
 
-    register_lockfile = True
     default_lockfile_resource = (_HELM_POSTRENDERER_PACKAGE, "post_renderer.lock")
-    default_lockfile_path = (
-        f"src/python/{_HELM_POSTRENDERER_PACKAGE.replace('.', '/')}/post_renderer.lock"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 _HELM_POST_RENDERER_TOOL = "__pants_helm_post_renderer.py"

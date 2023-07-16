@@ -11,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, Iterable, Iterator, NamedTuple, NewType, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -40,14 +40,15 @@ from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRe
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     AllUnexpandedTargets,
     CoarsenedTarget,
     CoarsenedTargets,
     CoarsenedTargetsRequest,
     Dependencies,
     DependenciesRequest,
+    DepsTraversalBehavior,
     ExplicitlyProvidedDependencies,
+    ExplicitlyProvidedDependenciesRequest,
     Field,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
@@ -192,7 +193,10 @@ async def _determine_target_adaptor_and_type(
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(
-            target_adaptor.type_alias, registered_target_types, req.address
+            target_adaptor.type_alias,
+            registered_target_types,
+            req.address,
+            target_adaptor.description_of_origin,
         )
     if (
         target_type.deprecated_alias is not None
@@ -303,6 +307,7 @@ async def resolve_generator_target_requests(
         req.address,
         name_explicitly_set=target_adaptor.name_explicitly_set,
         union_membership=union_membership,
+        description_of_origin=target_adaptor.description_of_origin,
     )
     overrides = await _target_generator_overrides(base_generator, unmatched_build_file_globs)
     return ResolvedTargetGeneratorRequests(
@@ -373,6 +378,7 @@ def _target_parametrizations(
                     parameterized_address,
                     name_explicitly_set=target_adaptor.name_explicitly_set,
                     union_membership=union_membership,
+                    description_of_origin=target_adaptor.description_of_origin,
                 ),
             )
             for parameterized_address, parameterized_fields in (first, *rest)
@@ -385,6 +391,7 @@ def _target_parametrizations(
             address,
             name_explicitly_set=target_adaptor.name_explicitly_set,
             union_membership=union_membership,
+            description_of_origin=target_adaptor.description_of_origin,
         )
         for field_type in target.field_types:
             if (
@@ -441,6 +448,7 @@ def _parametrized_target_generators_with_templates(
                 address,
                 name_explicitly_set=target_adaptor.name is not None,
                 union_membership=union_membership,
+                description_of_origin=target_adaptor.description_of_origin,
             ),
             template,
         )
@@ -514,6 +522,7 @@ async def resolve_target_for_bootstrapping(
         name_explicitly_set=target_adaptor.name_explicitly_set,
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
+        description_of_origin=target_adaptor.description_of_origin,
     )
     return WrappedTargetForBootstrap(target)
 
@@ -561,18 +570,6 @@ async def resolve_targets(
         for tgt in parametrizations.generated_or_generator(generator.address)
     )
     return Targets(expanded_targets)
-
-
-@rule(_masked_types=[EnvironmentName])
-def find_all_targets_deprecated(_: AllTargetsRequest, all_targets: AllTargets) -> AllTargets:
-    return all_targets
-
-
-@rule(_masked_types=[EnvironmentName])
-def find_all_unexpanded_targets_deprecated(
-    _: AllTargetsRequest, all_targets: AllUnexpandedTargets
-) -> AllUnexpandedTargets:
-    return all_targets
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
@@ -705,7 +702,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     Targets,
                     DependenciesRequest(
                         tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
                     ),
                 )
                 for tgt in queued
@@ -716,7 +713,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     UnexpandedTargets,
                     DependenciesRequest(
                         tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
                     ),
                 )
                 for tgt in queued
@@ -792,7 +789,8 @@ async def coarsened_targets(
         _DependencyMapping,
         _DependencyMappingRequest(
             TransitiveTargetsRequest(
-                request.roots, include_special_cased_deps=request.include_special_cased_deps
+                request.roots,
+                should_traverse_deps_predicate=request.should_traverse_deps_predicate,
             ),
             expanded_targets=request.expanded_targets,
         ),
@@ -901,7 +899,15 @@ class OwnersRequest:
     match_if_owning_build_file_included_in_sources: bool = False
 
 
-class Owners(Collection[Address]):
+# NB: This was changed from:
+# class Owners(Collection[Address]):
+#     pass
+# In https://github.com/pantsbuild/pants/pull/19191 to facilitate surgical warning of deprecation
+# of SecondaryOwnerMixin. After the Deprecation ends, it can be changed back.
+IsPrimary = NewType("IsPrimary", bool)
+
+
+class Owners(FrozenDict[Address, IsPrimary]):
     pass
 
 
@@ -956,7 +962,7 @@ async def find_owners(
     )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
-    matching_addresses: OrderedSet[Address] = OrderedSet()
+    result = {}
     unmatched_sources = set(owners_request.sources)
     for live in (True, False):
         candidate_tgts: Sequence[Target]
@@ -981,6 +987,8 @@ async def find_owners(
             matching_files = set(
                 candidate_tgt.get(SourcesField).filespec_matcher.matches(list(sources_set))
             )
+            is_primary = bool(matching_files)
+
             # Also consider secondary ownership, meaning it's not a `SourcesField` field with
             # primary ownership, but the target still should match the file. We can't use
             # `tgt.get()` because this is a mixin, and there technically may be >1 field.
@@ -991,8 +999,9 @@ async def find_owners(
             )
             for secondary_owner_field in secondary_owner_fields:
                 matching_files.update(
-                    *secondary_owner_field.filespec_matcher.matches(list(sources_set))
+                    secondary_owner_field.filespec_matcher.matches(list(sources_set))
                 )
+
             if not matching_files and not (
                 owners_request.match_if_owning_build_file_included_in_sources
                 and bfa.rel_path in sources_set
@@ -1000,7 +1009,7 @@ async def find_owners(
                 continue
 
             unmatched_sources -= matching_files
-            matching_addresses.add(candidate_tgt.address)
+            result[candidate_tgt.address] = IsPrimary(is_primary)
 
     if (
         unmatched_sources
@@ -1010,7 +1019,7 @@ async def find_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
         )
 
-    return Owners(matching_addresses)
+    return Owners(result)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1199,8 +1208,24 @@ class TransitiveExcludesNotSupportedError(ValueError):
 
 
 @rule
-async def determine_explicitly_provided_dependencies(
+async def convert_dependencies_request_to_explicitly_provided_dependencies_request(
     request: DependenciesRequest,
+) -> ExplicitlyProvidedDependenciesRequest:
+    """This rule discards any deps predicate from DependenciesRequest.
+
+    Calculating ExplicitlyProvidedDependencies does not use any deps traversal predicates as it is
+    meant to list all explicit deps from the given field. By stripping the predicate from the
+    request, we ensure that the cache key for ExplicitlyProvidedDependencies calculation does not
+    include the predicate increasing the cache-hit rate.
+    """
+    # TODO: Maybe require Get(ExplicitlyProvidedDependencies, ExplicitlyProvidedDependenciesRequest)
+    #       and deprecate Get(ExplicitlyProvidedDependencies, DependenciesRequest) via this rule.
+    return ExplicitlyProvidedDependenciesRequest(request.field)
+
+
+@rule
+async def determine_explicitly_provided_dependencies(
+    request: ExplicitlyProvidedDependenciesRequest,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
     subproject_roots: SubprojectRoots,
@@ -1288,15 +1313,27 @@ async def resolve_dependencies(
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Addresses:
     environment_name = local_environment_name.val
-    wrapped_tgt, explicitly_provided = await MultiGet(
-        Get(
-            WrappedTarget,
-            # It's only possible to find dependencies for a target that we already know exists.
-            WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
-        ),
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest, request),
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        # It's only possible to find dependencies for a target that we already know exists.
+        WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
     )
     tgt = wrapped_tgt.target
+
+    # This predicate allows the dep graph to ignore dependencies of selected targets
+    # including any explicit deps and any inferred deps.
+    # For example, to avoid traversing the deps of package targets.
+    if request.should_traverse_deps_predicate(tgt, request.field) == DepsTraversalBehavior.EXCLUDE:
+        return Addresses([])
+
+    try:
+        explicitly_provided = await Get(
+            ExplicitlyProvidedDependencies, DependenciesRequest, request
+        )
+    except Exception as e:
+        raise InvalidFieldException(
+            f"{tgt.description_of_origin}: Failed to get dependencies for {tgt.address}: {e}"
+        )
 
     # Infer any dependencies (based on `SourcesField` field).
     inference_request_types = cast(
@@ -1367,33 +1404,34 @@ async def resolve_dependencies(
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to
-    # being handled elsewhere in the calling code.
-    special_cased: tuple[Address, ...] = ()
-    if request.include_special_cased_deps:
-        # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
-        # SpecialCasedDependencies.
-        special_cased_fields = tuple(
-            field
-            for field in tgt.field_values.values()
-            if isinstance(field, SpecialCasedDependencies)
-        )
-        # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
-        special_cased = await MultiGet(
-            Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(
-                    addr,
-                    relative_to=tgt.address.spec_path,
-                    subproject_roots=subproject_roots,
-                    description_of_origin=(
-                        f"the `{special_cased_field.alias}` field from the target {tgt.address}"
-                    ),
+    # being handled elsewhere in the calling code. So, we only include fields based on
+    # the should_traverse_deps_predicate.
+
+    # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
+    # SpecialCasedDependencies.
+    special_cased_fields = tuple(
+        field
+        for field in tgt.field_values.values()
+        if isinstance(field, SpecialCasedDependencies)
+        and request.should_traverse_deps_predicate(tgt, field) == DepsTraversalBehavior.INCLUDE
+    )
+    # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
+    special_cased = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(
+                addr,
+                relative_to=tgt.address.spec_path,
+                subproject_roots=subproject_roots,
+                description_of_origin=(
+                    f"the `{special_cased_field.alias}` field from the target {tgt.address}"
                 ),
-            )
-            for special_cased_field in special_cased_fields
-            for addr in special_cased_field.to_unparsed_address_inputs().values
+            ),
         )
+        for special_cased_field in special_cased_fields
+        for addr in special_cased_field.to_unparsed_address_inputs().values
+    )
 
     excluded = explicitly_provided_ignores.union(
         *itertools.chain(deps.exclude for deps in inferred)
@@ -1534,9 +1572,21 @@ async def generate_file_targets(
     request: GenerateFileTargets,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
-    )
+    try:
+        sources_paths = await Get(
+            SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
+        )
+    except Exception as e:
+        tgt = request.generator
+        fld = tgt[MultipleSourcesField]
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                {tgt.description_of_origin}: Invalid field value for {fld.alias!r} in target {tgt.address}:
+                {e}
+                """
+            )
+        ) from e
 
     add_dependencies_on_all_siblings = False
     if request.generator.settings_request_cls:

@@ -269,6 +269,11 @@ class DockerEnvironmentTarget(Target):
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
         the `environment` field defined on other targets.
+
+        Before running Pants using this environment, if you are using Docker Desktop, make sure the option
+        **Enable default Docker socket** is enabled, you can find it in **Docker Desktop Settings > Advanced**
+        panel. That option tells Docker to create a socket at `/var/run/docker.sock` which Pants can use to
+        communicate with Docker.
         """
         # TODO(#17096) Add a link to the environments docs once they land.
     )
@@ -289,7 +294,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
         """
         Platform properties to set on remote execution requests.
 
-        Format: property=value. Multiple values should be specified as multiple
+        Format: `property=value`. Multiple values should be specified as multiple
         occurrences of this flag.
 
         Pants itself may add additional platform properties.
@@ -308,7 +313,7 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
         Python value `None` to error when remote execution is disabled.
 
         Tip: if you are using a Docker image with your remote execution environment (usually
-        enabled by setting the field {RemoteExtraPlatformPropertiesField.alias}`), then it can be
+        enabled by setting the field `{RemoteExtraPlatformPropertiesField.alias}`), then it can be
         useful to fallback to an equivalent `docker_image` target so that you have a consistent
         execution environment.
         """

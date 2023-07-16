@@ -70,7 +70,7 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = session.graph_context();
     self
       .core
       .graph
@@ -120,7 +120,7 @@ impl Scheduler {
   /// Return Scheduler and per-Session metrics.
   ///
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = session.graph_context();
     let mut m = HashMap::new();
     m.insert("affected_file_count", {
       let mut count = 0;
@@ -150,7 +150,7 @@ impl Scheduler {
     &self,
     session: &Session,
   ) -> (Vec<Value>, HashMap<&'static str, (usize, usize)>) {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = session.graph_context();
     let mut items = vec![];
     let mut sizes: HashMap<&'static str, (usize, usize)> = HashMap::new();
     // TODO: Creation of a Context is exposed in https://github.com/Aeledfyr/deepsize/pull/31.
@@ -160,7 +160,7 @@ impl Scheduler {
         items.extend(t.params.keys().map(|k| k.to_value()));
         items.push(v.clone().try_into().unwrap());
       }
-      let mut entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
+      let entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
       entry.0 += 1;
       entry.1 += {
         std::mem::size_of_val(k)
@@ -192,7 +192,7 @@ impl Scheduler {
   /// Return all Digests currently in memory in this Scheduler.
   ///
   pub fn all_digests(&self, session: &Session) -> HashSet<hashing::Digest> {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = session.graph_context();
     let mut digests = HashSet::new();
     self
       .core
@@ -236,7 +236,7 @@ impl Scheduler {
     request: &ExecutionRequest,
     session: &Session,
   ) -> Vec<ObservedValueResult> {
-    let context = Context::new(session.core().clone(), session.clone());
+    let context = session.graph_context();
     let roots = session.roots_zip_last_observed(&request.roots);
     let poll = request.poll;
     let poll_delay = request.poll_delay;

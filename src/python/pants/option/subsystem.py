@@ -9,7 +9,6 @@ import re
 from abc import ABCMeta
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Sequence, TypeVar, cast
 
-from pants import ox
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass
@@ -195,11 +194,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         partial_construct_subsystem.__module__ = cls.__module__
         partial_construct_subsystem.__doc__ = cls.help
 
-        # `inspect.getsourcelines` does not work under oxidation
-        if not ox.is_oxidized:
-            _, class_definition_lineno = inspect.getsourcelines(cls)
-        else:
-            class_definition_lineno = 0  # `inspect.getsourcelines` returns 0 when undefined.
+        _, class_definition_lineno = inspect.getsourcelines(cls)
         partial_construct_subsystem.__line_number__ = class_definition_lineno
 
         return TaskRule(

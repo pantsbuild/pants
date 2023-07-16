@@ -12,7 +12,6 @@ import pytest
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
@@ -28,7 +27,6 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
     normalize_module_mapping,
-    parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
     InferPexBinaryEntryPointDependency,
@@ -51,6 +49,7 @@ from pants.engine.target import (
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 
@@ -334,32 +333,6 @@ def test_requirements_field() -> None:
         )
         in str(exc.value)
     )
-
-
-def test_parse_requirements_file() -> None:
-    content = dedent(
-        r"""\
-        # Comment.
-        --find-links=https://duckduckgo.com
-        -r more_reqs.txt
-        ansicolors>=1.18.0
-        Django==3.2 ; python_version>'3'
-        Un-Normalized-PROJECT  # Inline comment.
-        pip@ git+https://github.com/pypa/pip.git
-        setuptools==54.1.2; python_version >= "3.6" \
-            --hash=sha256:dd20743f36b93cbb8724f4d2ccd970dce8b6e6e823a13aa7e5751bb4e674c20b \
-            --hash=sha256:ebd0148faf627b569c8d2a1b20f5d3b09c873f12739d71c7ee88f037d5be82ff
-        wheel==1.2.3 --hash=sha256:dd20743f36b93cbb8724f4d2ccd970dce8b6e6e823a13aa7e5751bb4e674c20b
-        """
-    )
-    assert set(parse_requirements_file(content, rel_path="foo.txt")) == {
-        PipRequirement.parse("ansicolors>=1.18.0"),
-        PipRequirement.parse("Django==3.2 ; python_version>'3'"),
-        PipRequirement.parse("Un-Normalized-PROJECT"),
-        PipRequirement.parse("pip@ git+https://github.com/pypa/pip.git"),
-        PipRequirement.parse("setuptools==54.1.2; python_version >= '3.6'"),
-        PipRequirement.parse("wheel==1.2.3"),
-    }
 
 
 def test_resolve_python_distribution_entry_points_required_fields() -> None:

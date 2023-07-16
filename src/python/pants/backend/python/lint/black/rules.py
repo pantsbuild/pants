@@ -10,7 +10,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest, Partitions
+from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
@@ -25,7 +25,7 @@ class BlackRequest(FmtTargetsRequest):
 
 
 async def _run_black(
-    request: FmtRequest.Batch,
+    request: AbstractFmtRequest.Batch,
     black: Black,
     interpreter_constraints: InterpreterConstraints,
 ) -> FmtResult:
