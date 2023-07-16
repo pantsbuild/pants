@@ -128,8 +128,6 @@ The dependency `src/a/main.py` -> `src/b/lib.py` would consult the `__dependenci
 
 When declaring your rules, you not only provide the rules for the current directory, but also set the default rules for all the subdirectories as well. When overriding such default rules in a child BUILD file, there is a `extend=True` kwarg you may use if you want the default rules to still apply after the ones declared in the current BUILD file.
 
-Note: Any rule globs using the declaration path anchoring mode that is inherited using `extend=True` will be anchored to the path of the current BUILD file, not the original one where the rule was extended from.
-
 ```python
 # src/BUILD
 # given some parent rules:
@@ -157,6 +155,30 @@ __dependencies_rules__(
 
 # Due to the `extend=True` flag, which inherits the parent rules after those just declared.
 ```
+
+> 📘 Any rule globs using the declaration path anchoring mode that is inherited using `extend=True` will be anchored to the path of the current BUILD file, not the original one where the rule was extended from.
+
+Example show casing the caveat for `extend=True` using paths anchored to the declaration path (see [glob syntax](doc:targets#glob-syntax) for details on anchoring modes):
+```python
+# src/BUILD
+__dependencies_rules__(
+  (files,
+    "/relative/to/BUILD/file/**",
+    "!*",
+  ),
+)
+
+# src/subdir/BUILD
+__dependencies_rules__(
+  (resources,
+    "/relative/to/BUILD/file/**",
+    "!*",
+  ),
+  extend=True,
+)
+```
+
+The above rules when applied to `resources` _as well as_ `files` targets in `src/subdir` will allow dependencies only to other targets in the subtree of `src/subdir/relative/to/BUILD/file/` despite the inherited rule declared in `src/BUILD`. For `files` targets in other directories in the `src/` subtree (e.g. `src/another/dir`) dependencies will be allowed only to other targets in the subtree of `src/relative/to/BUILD/file/`.
 
 
 Rule sets
