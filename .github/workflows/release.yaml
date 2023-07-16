@@ -62,6 +62,7 @@ jobs:
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
     - env:
+        GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       if: needs.release_info.outputs.is-release == 'true'
       name: Upload Pants PEX
@@ -133,6 +134,7 @@ jobs:
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
     - env:
+        GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       if: needs.release_info.outputs.is-release == 'true'
       name: Upload Pants PEX
@@ -205,6 +207,7 @@ jobs:
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
     - env:
+        GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       if: needs.release_info.outputs.is-release == 'true'
       name: Upload Pants PEX
@@ -277,6 +280,7 @@ jobs:
       name: Deploy wheels to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py
     - env:
+        GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       if: needs.release_info.outputs.is-release == 'true'
       name: Upload Pants PEX
@@ -354,6 +358,7 @@ jobs:
       name: Deploy commit mapping to S3
       run: ./pants run src/python/pants_release/deploy_to_s3.py -- --scope tags/pantsbuild.pants
     - env:
+        GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       name: Publish GitHub Release
       run: 'gh release upload ${{ needs.release_info.outputs.build-ref }} dest/pypi_release
@@ -377,6 +382,7 @@ jobs:
         \nfi\necho \"build-ref=${ref}\" >> $GITHUB_OUTPUT\nif [[ \"${ref}\" =~ ^release_.+$\
         \ ]]; then\n    echo \"is-release=true\" >> $GITHUB_OUTPUT\nfi\n"
     - env:
+        GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
         == 'true'
