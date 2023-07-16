@@ -21,10 +21,13 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Baptiste Gentholz
 + Bardur Arantsson
 + Bastian Wegge
++ Ben Limmer
 + Benjy Weinberger
 + Berkay Öztürk
 + Bill Farner
 + Billy "Hyun Joon" Seol
++ Blaž Šnuderl
++ Bob Gregory
 + Borja Lorente
 + Brandon Milton
 + Brian Larson
@@ -98,6 +101,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Gerald Spencer
 + Gordon Cassie
 + Greg Shuflin
 + Grzegorz Kossakowski
@@ -203,6 +207,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Michael Glass
 + Michal Bryc
 + Mike Cripps
++ Mike Geeves
 + Mike Lindsey
 + Mike Solomon
 + Misho Krastev
@@ -236,6 +241,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Raph Estrada
 + Raúl Cuza
 + Rhuan Barreto
 + Rhys Madigan
@@ -297,6 +303,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Win Wang
 + Wolfram Arnold
 + Xaelias
++ Yarden Shoham
 + Yi Cheng
 + Yoav Alon
 + Yuhan GUO
@@ -306,6 +313,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + eugene yokota
 + hephex
 + philipp-sontag-by
++ sww
 + twunderlich-grapl
 + wimax-grapl
 + Ólafur Páll Geirsson

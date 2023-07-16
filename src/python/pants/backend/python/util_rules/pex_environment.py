@@ -96,17 +96,14 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
     """The BinaryPath of a Python executable for user code, along with some extras."""
 
     append_only_caches: FrozenDict[str, str] = FrozenDict({})
-    immutable_input_digests: FrozenDict[str, str] = FrozenDict({})
 
     def __init__(
         self,
         path: str,
         fingerprint: str | None = None,
         append_only_caches: Mapping[str, str] = FrozenDict({}),
-        immutable_input_digests: Mapping[str, str] = FrozenDict({}),
     ) -> None:
         object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches))
-        object.__setattr__(self, "immutable_input_digests", FrozenDict(immutable_input_digests))
         super().__init__(path, fingerprint)
         self.__post_init__()
 

@@ -10,14 +10,12 @@ from typing import Iterable, Mapping
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     MainSpecification,
     PexLayout,
     PythonRequirementsField,
     PythonResolveField,
-    parse_requirements_file,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
@@ -46,6 +44,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
+from pants.core.goals.package import TraverseIfNotPackageTarget
 from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
@@ -62,6 +61,8 @@ from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.pip_requirement import PipRequirement
+from pants.util.requirements import parse_requirements_file
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
@@ -538,7 +539,14 @@ async def create_pex_from_targets(
         sources_digests.append(request.additional_sources)
     if request.include_source_files:
         transitive_targets = await Get(
-            TransitiveTargets, TransitiveTargetsRequest(request.addresses)
+            TransitiveTargets,
+            TransitiveTargetsRequest(
+                request.addresses,
+                should_traverse_deps_predicate=TraverseIfNotPackageTarget(
+                    roots=request.addresses,
+                    union_membership=union_membership,
+                ),
+            ),
         )
         sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
 

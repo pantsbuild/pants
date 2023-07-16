@@ -49,6 +49,7 @@ plugins = [
 pantsd_invalidation_globs.add = [
   "!*_test.py",
   "!BUILD",
+  "!src/python/pants_release/**",
   # NB: The `target` directory is ignored via `pants_ignore` below.
   "src/rust/engine/**/*.rs",
   "src/rust/engine/**/*.toml",
@@ -90,9 +91,8 @@ enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [cli.alias]
-all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
-
+--all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 
 [source]
 root_patterns = [

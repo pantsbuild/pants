@@ -165,6 +165,7 @@ rule_graph = { path = "rule_graph" }
 smallvec = { version = "1", features = ["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
+serde = "1.0.160"
 serde_json = "1.0"
 task_executor = { path = "task_executor" }
 tempfile = "3.5.0"
@@ -175,7 +176,7 @@ tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
-url = "2.3"
+url = "2.4"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 remote = { path = "process_execution/remote" }

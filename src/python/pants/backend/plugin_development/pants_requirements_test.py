@@ -9,7 +9,6 @@ from pants.backend.plugin_development.pants_requirements import (
     PantsRequirementsTargetGenerator,
     determine_version,
 )
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementResolveField,
@@ -18,6 +17,7 @@ from pants.backend.python.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.pip_requirement import PipRequirement
 
 
 @pytest.mark.parametrize(

@@ -19,6 +19,7 @@ from pants.engine.internals.build_files import _get_target_family_and_adaptor_fo
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
+    AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
     DependenciesRuleApplication,
@@ -179,7 +180,9 @@ async def get_target_data(
     dependencies_per_target = await MultiGet(
         Get(
             Targets,
-            DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
+            DependenciesRequest(
+                tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
+            ),
         )
         for tgt in sorted_targets
     )

@@ -192,7 +192,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
     help = help_text(
         f"""
         Generate a `scalatest_test` target for each file in the `sources` field (defaults to
-        all files in the directory matching {ScalatestTestsGeneratorSourcesField.default}).
+        all files in the directory matching `{ScalatestTestsGeneratorSourcesField.default}`).
         """
     )
 

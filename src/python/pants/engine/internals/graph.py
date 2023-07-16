@@ -46,7 +46,9 @@ from pants.engine.target import (
     CoarsenedTargetsRequest,
     Dependencies,
     DependenciesRequest,
+    DepsTraversalBehavior,
     ExplicitlyProvidedDependencies,
+    ExplicitlyProvidedDependenciesRequest,
     Field,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
@@ -700,7 +702,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     Targets,
                     DependenciesRequest(
                         tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
                     ),
                 )
                 for tgt in queued
@@ -711,7 +713,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                     UnexpandedTargets,
                     DependenciesRequest(
                         tgt.get(Dependencies),
-                        include_special_cased_deps=request.tt_request.include_special_cased_deps,
+                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
                     ),
                 )
                 for tgt in queued
@@ -787,7 +789,8 @@ async def coarsened_targets(
         _DependencyMapping,
         _DependencyMappingRequest(
             TransitiveTargetsRequest(
-                request.roots, include_special_cased_deps=request.include_special_cased_deps
+                request.roots,
+                should_traverse_deps_predicate=request.should_traverse_deps_predicate,
             ),
             expanded_targets=request.expanded_targets,
         ),
@@ -1205,8 +1208,24 @@ class TransitiveExcludesNotSupportedError(ValueError):
 
 
 @rule
-async def determine_explicitly_provided_dependencies(
+async def convert_dependencies_request_to_explicitly_provided_dependencies_request(
     request: DependenciesRequest,
+) -> ExplicitlyProvidedDependenciesRequest:
+    """This rule discards any deps predicate from DependenciesRequest.
+
+    Calculating ExplicitlyProvidedDependencies does not use any deps traversal predicates as it is
+    meant to list all explicit deps from the given field. By stripping the predicate from the
+    request, we ensure that the cache key for ExplicitlyProvidedDependencies calculation does not
+    include the predicate increasing the cache-hit rate.
+    """
+    # TODO: Maybe require Get(ExplicitlyProvidedDependencies, ExplicitlyProvidedDependenciesRequest)
+    #       and deprecate Get(ExplicitlyProvidedDependencies, DependenciesRequest) via this rule.
+    return ExplicitlyProvidedDependenciesRequest(request.field)
+
+
+@rule
+async def determine_explicitly_provided_dependencies(
+    request: ExplicitlyProvidedDependenciesRequest,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
     subproject_roots: SubprojectRoots,
@@ -1300,6 +1319,13 @@ async def resolve_dependencies(
         WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
     )
     tgt = wrapped_tgt.target
+
+    # This predicate allows the dep graph to ignore dependencies of selected targets
+    # including any explicit deps and any inferred deps.
+    # For example, to avoid traversing the deps of package targets.
+    if request.should_traverse_deps_predicate(tgt, request.field) == DepsTraversalBehavior.EXCLUDE:
+        return Addresses([])
+
     try:
         explicitly_provided = await Get(
             ExplicitlyProvidedDependencies, DependenciesRequest, request
@@ -1378,33 +1404,34 @@ async def resolve_dependencies(
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to
-    # being handled elsewhere in the calling code.
-    special_cased: tuple[Address, ...] = ()
-    if request.include_special_cased_deps:
-        # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
-        # SpecialCasedDependencies.
-        special_cased_fields = tuple(
-            field
-            for field in tgt.field_values.values()
-            if isinstance(field, SpecialCasedDependencies)
-        )
-        # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
-        special_cased = await MultiGet(
-            Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(
-                    addr,
-                    relative_to=tgt.address.spec_path,
-                    subproject_roots=subproject_roots,
-                    description_of_origin=(
-                        f"the `{special_cased_field.alias}` field from the target {tgt.address}"
-                    ),
+    # being handled elsewhere in the calling code. So, we only include fields based on
+    # the should_traverse_deps_predicate.
+
+    # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
+    # SpecialCasedDependencies.
+    special_cased_fields = tuple(
+        field
+        for field in tgt.field_values.values()
+        if isinstance(field, SpecialCasedDependencies)
+        and request.should_traverse_deps_predicate(tgt, field) == DepsTraversalBehavior.INCLUDE
+    )
+    # We can't use the normal `Get(Addresses, UnparsedAddressInputs)` due to a graph cycle.
+    special_cased = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(
+                addr,
+                relative_to=tgt.address.spec_path,
+                subproject_roots=subproject_roots,
+                description_of_origin=(
+                    f"the `{special_cased_field.alias}` field from the target {tgt.address}"
                 ),
-            )
-            for special_cased_field in special_cased_fields
-            for addr in special_cased_field.to_unparsed_address_inputs().values
+            ),
         )
+        for special_cased_field in special_cased_fields
+        for addr in special_cased_field.to_unparsed_address_inputs().values
+    )
 
     excluded = explicitly_provided_ignores.union(
         *itertools.chain(deps.exclude for deps in inferred)

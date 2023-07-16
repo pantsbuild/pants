@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
-# To change, edit `build-support/bin/generate_github_workflows.py` and run:
-#   ./pants run build-support/bin/generate_github_workflows.py
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
 
 
 concurrency:
@@ -31,7 +31,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.71.0-*
 
           ~/.rustup/update-hashes
 
@@ -116,7 +116,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.71.0-*
 
           ~/.rustup/update-hashes
 
@@ -173,7 +173,7 @@ jobs:
 
           src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Validate CI config
-      run: './pants run build-support/bin/generate_github_workflows.py -- --check
+      run: './pants run src/python/pants_release/generate_github_workflows.py -- --check
 
         '
     - env:
@@ -213,7 +213,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.71.0-*
 
           ~/.rustup/update-hashes
 
@@ -315,17 +315,17 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
-
-        ./pants run build-support/bin/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-Linux-ARM64
+        name: logs-wheels-and-pex-Linux-ARM64
         path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_linux_x86_64:
@@ -369,17 +369,16 @@ jobs:
         go-version: 1.19.5
     - env: {}
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
-
-        ./pants run build-support/bin/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env: {}
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-Linux-x86_64
+        name: logs-wheels-and-pex-Linux-x86_64
         path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
@@ -404,7 +403,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.71.0-*
 
           ~/.rustup/update-hashes
 
@@ -424,17 +423,17 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
-
-        ./pants run build-support/bin/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch x86_64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-macOS10-15-x86_64
+        name: logs-wheels-and-pex-macOS10-15-x86_64
         path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_macos11_arm64:
@@ -459,7 +458,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.71.0-*
 
           ~/.rustup/update-hashes
 
@@ -479,17 +478,17 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: './pants run build-support/bin/release.py -- build-local-pex
-
-        ./pants run build-support/bin/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-macOS11-ARM64
+        name: logs-wheels-and-pex-macOS11-ARM64
         path: .pants.d/*.log
     timeout-minutes: 90
   check_labels:
@@ -676,7 +675,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -766,7 +765,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -856,7 +855,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -946,7 +945,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1036,7 +1035,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1126,7 +1125,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1216,7 +1215,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1306,7 +1305,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1396,7 +1395,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1486,7 +1485,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1576,7 +1575,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1634,7 +1633,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./build-support/bin/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
