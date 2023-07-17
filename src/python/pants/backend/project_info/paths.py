@@ -90,10 +90,21 @@ class SpecsPaths:
     paths: list[list[str]]
 
 
+@dataclass
+class SpecsPathsCollection:
+    specpaths: list[SpecsPaths]
+
+
 @dataclass(frozen=True)
 class RootDestinationPair:
     root: Target
     destination: Target
+
+
+@dataclass(frozen=True)
+class RootDestinationsPair:
+    root: Target
+    destinations: Targets
 
 
 @rule(desc="Get paths between root and destination.")
@@ -126,6 +137,21 @@ async def get_paths_between_root_and_destination(pair: RootDestinationPair) -> S
         spec_paths.append(spec_path)
 
     return SpecsPaths(paths=spec_paths)
+
+
+@rule
+async def get_paths_between_root_and_all_destinations(
+    pair: RootDestinationsPair,
+) -> SpecsPathsCollection:
+    spec_paths = await MultiGet(
+        Get(
+            SpecsPaths,
+            RootDestinationPair,
+            RootDestinationPair(destination=destination, root=pair.root),
+        )
+        for destination in pair.destinations
+    )
+    return SpecsPathsCollection(specpaths=list(spec_paths))
 
 
 @goal_rule
@@ -161,17 +187,18 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
     )
 
     all_spec_paths = []
-    for root in from_tgts:
-        spec_paths = await MultiGet(  # noqa: PNT30: keep iterating in for loop
-            Get(
-                SpecsPaths,
-                RootDestinationPair,
-                RootDestinationPair(destination=destination, root=root),
-            )
-            for destination in to_tgts
+    spec_paths = await MultiGet(
+        Get(
+            SpecsPathsCollection,
+            RootDestinationsPair,
+            RootDestinationsPair(root=root, destinations=to_tgts),
         )
-        for spec_path in spec_paths:
-            all_spec_paths.extend(spec_path.paths)
+        for root in from_tgts
+    )
+
+    for spec_path in spec_paths:
+        for path in (p.paths for p in spec_path.specpaths):
+            all_spec_paths.extend(path)
 
     with paths_subsystem.output(console) as write_stdout:
         write_stdout(json.dumps(all_spec_paths, indent=2) + "\n")
