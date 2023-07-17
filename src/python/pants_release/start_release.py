@@ -93,6 +93,11 @@ class ReleaseInfo:
         return Path(f"src/python/pants/notes/{self.slug}.md")
 
 
+def checkout_main() -> None:
+    main_ref = git_fetch("main")
+    git("checkout", main_ref)
+
+
 def relevant_shas(release_ref: str) -> list[str]:
     # infer the changes since the most recent previous release on this branch
     prior_tag = git("describe", "--tags", "--abbrev=0", release_ref)
@@ -293,6 +298,7 @@ def commit_and_pr(
     title = f"Prepare {release_info.version}"
     branch = f"automation/release/{release_info.version}"
 
+    # starting from main's HEAD, because we checked that out before
     git("checkout", "-b", branch)
     git("add", str(VERSION_PATH), str(CONTRIBUTORS_PATH), str(release_info.notes_file_name()))
     git("commit", "-m", title)
@@ -318,6 +324,9 @@ def main() -> None:
     gh_repo = github_repo() if args.publish else None
 
     release_info = ReleaseInfo.determine(args.new)
+
+    # do all the changes while on `main`
+    checkout_main()
 
     formatted = update_changelog(release_info)
     update_contributors(release_info)
