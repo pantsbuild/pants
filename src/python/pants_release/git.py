@@ -57,8 +57,9 @@ def git_fetch(rev: str) -> str:
 
 
 def github_repo() -> github.Repository.Repository:
-    # Borrow the token from `gh`: `gh auth login` is far more convenient for interactive use, and
-    # setting `GH_TOKEN=...` env var works well for scripting use
+    # Borrow the token from `gh`, because it works well both interactively (running `gh auth login`
+    # is far more convenient for interactive use than manually generating a token) and in
+    # scripts/automation (it reads the `GH_TOKEN=...` env var, if set)
     token = _run("gh", ("auth", "token"), check=False, capture_stdout=True, log_stdout=False)
     if not token:
         die(
