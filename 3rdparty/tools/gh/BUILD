@@ -7,7 +7,12 @@
 file(
     name="downloaded-gh",
     source=per_platform(
-        # macos_x86_64 is unsupported
+        macos_x86_64=http_source(
+            url="https://github.com/cli/cli/releases/download/v2.32.0/gh_2.32.0_macOS_amd64.zip",
+            len=10957234,
+            sha256="e6dd7cb61338c6aab27dfc744bf74817f26a938e505a8e817316513ebf02eb57",
+            filename="gh.archive",
+        ),
         macos_arm64=http_source(
             url="https://github.com/cli/cli/releases/download/v2.32.0/gh_2.32.0_macOS_arm64.zip",
             len=10318229,
