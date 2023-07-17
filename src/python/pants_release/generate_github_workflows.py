@@ -872,7 +872,7 @@ def build_wheels_job(
                                 """\
                                 LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
                                 mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
-                                pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref }} dist/src.python.pants/pants.$LOCAL_TAG.pex
+                                ./pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref }} dist/src.python.pants/pants.$LOCAL_TAG.pex
                                 """
                             ),
                         }
