@@ -313,11 +313,8 @@ def main() -> None:
     args = create_parser().parse_args()
     logging.basicConfig(level=args.log_level)
 
-    if args.publish:
-        # fail faster
-        gh_repo = github_repo()
-    else:
-        gh_repo = None
+    # connect to github first, to fail faster if credentials are wrong, etc.
+    gh_repo = github_repo() if args.publish else None
 
     release_info = ReleaseInfo.determine(args.new)
 
