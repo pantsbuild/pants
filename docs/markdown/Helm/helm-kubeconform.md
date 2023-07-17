@@ -5,7 +5,7 @@ hidden: false
 createdAt: "2023-07-07T10:32:00.000Z"
 ---
 
-Overwiew
+Overview
 --------
 
 The Helm backend has opt-in support for using [Kubeconform](https://github.com/yannh/kubeconform) as a validation tool for both Helm charts and deployments. This gives the extra confidence that the templates defined in the different charts are conformant to a Kubernetes version or specification, plus the addtional benefit of ensuring that their final version (when used in deployments) also meets that criteria.
