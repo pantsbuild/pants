@@ -5,7 +5,6 @@ from __future__ import annotations
 import collections.abc
 import functools
 import json
-import os
 import textwrap
 from typing import Iterable, TypedDict, cast
 
@@ -113,7 +112,7 @@ class PBSPythonProviderSubsystem(Subsystem):
     def get_all_pbs_pythons(self) -> dict[str, dict[str, PBSPythonInfo]]:
         all_pythons = load_pbs_pythons().copy()
 
-        for version_info in (self.known_python_versions or []):
+        for version_info in self.known_python_versions or []:
             try:
                 pyversion, platform, sha256, filesize, url = [
                     x.strip() for x in version_info.split("|")
@@ -208,7 +207,13 @@ async def get_python(
     await Get(
         ProcessResult,
         Process(
-            [cp.path, "--recursive", "--no-clobber", "python", f"{PBS_SANDBOX_NAME}/{python_version}"],
+            [
+                cp.path,
+                "--recursive",
+                "--no-clobber",
+                "python",
+                f"{PBS_SANDBOX_NAME}/{python_version}",
+            ],
             level=LogLevel.DEBUG,
             input_digest=downloaded_python.digest,
             description=f"Install Python {python_version}",
