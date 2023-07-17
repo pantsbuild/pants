@@ -9,7 +9,11 @@ from typing import cast
 import pytest
 
 from pants.backend.helm.subsystems import k8s_parser
-from pants.backend.helm.subsystems.k8s_parser import ParsedKubeManifest, ParseKubeManifestRequest
+from pants.backend.helm.subsystems.k8s_parser import (
+    ParsedImageRefEntry,
+    ParsedKubeManifest,
+    ParseKubeManifestRequest,
+)
 from pants.backend.helm.testutil import K8S_POD_FILE
 from pants.backend.helm.utils.yaml import YamlPath
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, FileContent, FileEntry
@@ -45,8 +49,8 @@ def test_parser_can_run(rule_runner: RuleRunner) -> None:
     )
 
     expected_image_refs = [
-        (0, YamlPath.parse("/spec/containers/0/image"), "busybox:1.28"),
-        (0, YamlPath.parse("/spec/initContainers/0/image"), "busybox:1.29"),
+        ParsedImageRefEntry(0, YamlPath.parse("/spec/containers/0/image"), "busybox:1.28"),
+        ParsedImageRefEntry(0, YamlPath.parse("/spec/initContainers/0/image"), "busybox:1.29"),
     ]
 
     assert parsed_manifest.found_image_refs == tuple(expected_image_refs)
