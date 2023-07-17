@@ -71,7 +71,7 @@ jobs:
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
 
-        pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref
+        ./pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref
         }} dist/src.python.pants/pants.$LOCAL_TAG.pex
 
         '
@@ -143,7 +143,7 @@ jobs:
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
 
-        pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref
+        ./pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref
         }} dist/src.python.pants/pants.$LOCAL_TAG.pex
 
         '
@@ -216,7 +216,7 @@ jobs:
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
 
-        pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref
+        ./pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref
         }} dist/src.python.pants/pants.$LOCAL_TAG.pex
 
         '
@@ -289,7 +289,7 @@ jobs:
 
         mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
 
-        pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref
+        ./pants run 3rdparty/tools/gh -- release upload --no-clobber ${{ needs.release_info.outputs.build-ref
         }} dist/src.python.pants/pants.$LOCAL_TAG.pex
 
         '
