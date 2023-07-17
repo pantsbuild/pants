@@ -13,7 +13,7 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.goals.run_python_source import rules as run_rules
-from pants.backend.python.providers.pbs import rules as pbs
+from pants.backend.python.providers.python_build_standalone import rules as pbs
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunRequest
