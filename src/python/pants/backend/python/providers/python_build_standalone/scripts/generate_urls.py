@@ -47,12 +47,10 @@ def main() -> None:
 
     asset_map: dict[str, github.GitReleaseAsset.GitReleaseAsset] = {}
     sha256_map: dict[str, str] = {}
-    for release in releases:
+    for release in releases.reversed:
         tag_name = release.tag_name
-        if int(tag_name) < 20210724:
-            break  # NB: This is the version where the install_only releases started
 
-        if tag_name not in scraped_releases and release:
+        if tag_name not in scraped_releases:
             scraped_releases.add(release.tag_name)
             assets = release.get_assets()
             for asset in assets:

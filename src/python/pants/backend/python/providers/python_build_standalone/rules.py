@@ -37,8 +37,8 @@ from pants.util.logging import LogLevel
 from pants.util.resources import read_sibling_resource
 from pants.util.strutil import softwrap
 
-PBS_SANDBOX_NAME = ".pbs"
-PBS_NAMED_CACHE_NAME = "pbs"
+PBS_SANDBOX_NAME = ".python-build-standalone"
+PBS_NAMED_CACHE_NAME = "python-build-standalone"
 PBS_APPEND_ONLY_CACHES = FrozenDict({PBS_NAMED_CACHE_NAME: PBS_SANDBOX_NAME})
 
 
@@ -57,8 +57,8 @@ def load_pbs_pythons() -> dict[str, dict[str, PBSPythonInfo]]:
 
 
 class PBSPythonProviderSubsystem(Subsystem):
-    options_scope = "pbs-python-provider"
-    name = "pbs"
+    options_scope = "python-build-standalone-python-provider"
+    name = "python-build-standalone"
     help = softwrap(
         """
         A subsystem for Pants-provided Python leveraging Python Build Standalone (or PBS) (https://gregoryszorc.com/docs/python-build-standalone/main/).
@@ -71,8 +71,8 @@ class PBSPythonProviderSubsystem(Subsystem):
         ensure they remain hermetic across runs of different tools and code.
 
         The Pythons themselves are stored in your `named_caches_dir`: https://www.pantsbuild.org/docs/reference-global#named_caches_dir
-        under `pbs/<version>`. Wiping the relevant version directory (with `sudo rm -rf`)
-        will force a re-download of Python.
+        under `python-build-standalone/<version>`. Wiping the relevant version directory
+        (with `sudo rm -rf`) will force a re-download of Python.
 
         WARNING: PBS does have some behavior quirks, most notably that it has some hardcoded references
         to build-time paths (such as constants that are found in the `sysconfig` module). These paths

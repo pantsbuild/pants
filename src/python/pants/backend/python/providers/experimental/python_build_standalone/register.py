@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.python.providers.pbs.rules import rules as pbs_rules
+from pants.backend.python.providers.python_build_standalone.rules import rules as pbs_rules
 
 
 def rules():
