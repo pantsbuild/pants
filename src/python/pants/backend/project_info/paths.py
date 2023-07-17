@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from collections import deque
+from dataclasses import dataclass
 from typing import Iterable
 
 from pants.base.specs import Specs
@@ -12,11 +13,12 @@ from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
+    Target,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -83,6 +85,49 @@ def find_paths_breadth_first(
             visited_edges.add(current_edge)
 
 
+@dataclass
+class SpecsPaths:
+    paths: list[list[str]]
+
+
+@dataclass(frozen=True)
+class RootDestinationPair:
+    root: Target
+    destination: Target
+
+
+@rule(desc="Get paths between root and destination.")
+async def get_paths_between_root_and_destination(pair: RootDestinationPair) -> SpecsPaths:
+    transitive_targets = await Get(
+        TransitiveTargets,
+        TransitiveTargetsRequest(
+            [pair.root.address], should_traverse_deps_predicate=AlwaysTraverseDeps()
+        ),
+    )
+
+    adjacent_targets_per_target = await MultiGet(
+        Get(
+            Targets,
+            DependenciesRequest(
+                tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
+            ),
+        )
+        for tgt in transitive_targets.closure
+    )
+
+    transitive_targets_closure_addresses = (t.address for t in transitive_targets.closure)
+    adjacency_lists = dict(zip(transitive_targets_closure_addresses, adjacent_targets_per_target))
+
+    spec_paths = []
+    for path in find_paths_breadth_first(
+        adjacency_lists, pair.root.address, pair.destination.address
+    ):
+        spec_path = [address.spec for address in path]
+        spec_paths.append(spec_path)
+
+    return SpecsPaths(paths=spec_paths)
+
+
 @goal_rule
 async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
     path_from = paths_subsystem.from_
@@ -117,37 +162,16 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
 
     all_spec_paths = []
     for root in from_tgts:
-        for destination in to_tgts:
-            spec_paths = []
-            transitive_targets = await Get(  # noqa: PNT30: experiment
-                TransitiveTargets,
-                TransitiveTargetsRequest(
-                    [root.address], should_traverse_deps_predicate=AlwaysTraverseDeps()
-                ),
+        spec_paths = await MultiGet(  # noqa: PNT30: keep iterating in for loop
+            Get(
+                SpecsPaths,
+                RootDestinationPair,
+                RootDestinationPair(destination=destination, root=root),
             )
-
-            adjacent_targets_per_target = await MultiGet(  # noqa: PNT30: experiment
-                Get(
-                    Targets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
-                    ),
-                )
-                for tgt in transitive_targets.closure
-            )
-
-            transitive_targets_closure_addresses = (t.address for t in transitive_targets.closure)
-            adjacency_lists = dict(
-                zip(transitive_targets_closure_addresses, adjacent_targets_per_target)
-            )
-
-            for path in find_paths_breadth_first(
-                adjacency_lists, root.address, destination.address
-            ):
-                spec_path = [address.spec for address in path]
-                spec_paths.append(spec_path)
-
-            all_spec_paths.extend(spec_paths)
+            for destination in to_tgts
+        )
+        for spec_path in spec_paths:
+            all_spec_paths.extend(spec_path.paths)
 
     with paths_subsystem.output(console) as write_stdout:
         write_stdout(json.dumps(all_spec_paths, indent=2) + "\n")
