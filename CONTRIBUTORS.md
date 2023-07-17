@@ -1,4 +1,4 @@
-Created by running `./pants run build-support/bin/contributors.py`.
+Created as part of the release process.
 
 + A. Alonso Dominguez
 + Aaron Mitchell
