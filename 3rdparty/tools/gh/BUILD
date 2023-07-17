@@ -42,7 +42,7 @@ shell_source(
 shell_command(
     name="extracted-gh",
     command="./extract.sh",
-    tools=["tar", "gzip", "zip", "mv", "mkdir"],
+    tools=["tar", "gzip", "zip", "mv", "mkdir", "bash"],
     execution_dependencies=[":downloaded-gh", ":extract.sh"],
     output_directories=["gh"],
 )
