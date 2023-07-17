@@ -300,12 +300,13 @@ def commit_and_pr(
 
     pr = repo.create_pull(
         title=title,
-        body=formatted.internal or "(No internal changes.)",
+        body="",
         base="main",
         head=branch,
     )
-    pr.add_to_assignees(release_manager)
     pr.add_to_labels("automation:release-prep", "category:internal")
+    pr.add_to_assignees(release_manager)
+    pr.create_issue_comment(formatted.internal)
     pr.create_issue_comment(PR_COMMENT_BODY)
 
 
