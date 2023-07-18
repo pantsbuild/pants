@@ -864,15 +864,21 @@ def build_wheels_job(
                         {
                             "name": "Upload Pants PEX",
                             "if": "needs.release_info.outputs.is-release == 'true'",
-                            "env": {
-                                "GH_TOKEN": "${{ github.token }}",
-                                "GH_REPO": "${{ github.repository }}",
-                            },
+                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
+                            #   in this job. Certain variations run on docker images without `gh`,
+                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
+                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
                             "run": dedent(
                                 """\
                                 LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
                                 mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
-                                gh release upload --no-clobber ${{ needs.release_info.outputs.build-ref }} dist/src.python.pants/pants.$LOCAL_TAG.pex
+
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$LOCAL_TAG.pex \\
+                                    --data-binary "@dist/src.python.pants/pants.$LOCAL_TAG.pex"
                                 """
                             ),
                         }
@@ -1067,6 +1073,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 {
                     "name": "Make GitHub Release",
+                    "id": "make_draft_release",
                     "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
                     "env": {
                         "GH_TOKEN": "${{ github.token }}",
@@ -1078,32 +1085,36 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         RELEASE_VERSION="${RELEASE_TAG#release_}"
 
                         # NB: This could be a re-run of a release, in the event a job/step failed.
-                        if gh release view $RELEASE_TAG ; then
-                            exit 0
-                        fi
-
-                        GH_RELEASE_ARGS=("--notes" "")
-                        GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
-                        if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
-                            GH_RELEASE_ARGS+=("--prerelease")
-                            GH_RELEASE_ARGS+=("--latest=false")
-                        else
-                            STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
-                            LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\\n' | sort --version-sort | tail -n 1)
-                            if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
-                                GH_RELEASE_ARGS+=("--latest=true")
-                            else
+                        if ! gh release view $RELEASE_TAG ; then
+                            GH_RELEASE_ARGS=("--notes" "")
+                            GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
+                            if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
+                                GH_RELEASE_ARGS+=("--prerelease")
                                 GH_RELEASE_ARGS+=("--latest=false")
+                            else
+                                STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
+                                LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\\n' | sort --version-sort | tail -n 1)
+                                if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
+                                    GH_RELEASE_ARGS+=("--latest=true")
+                                else
+                                    GH_RELEASE_ARGS+=("--latest=false")
+                                fi
                             fi
+
+                            gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}" --draft
                         fi
 
-                        gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}" --draft
+                        ASSET_UPLOAD_URL=$(gh release view "$RELEASE_TAG" --json uploadUrl --jq '.uploadUrl | sub("\\\\{\\\\?.*$"; "")')
+                        echo "release-asset-upload-url=$ASSET_UPLOAD_URL" >> $GITHUB_OUTPUT
                         """
                     ),
                 },
             ],
             "outputs": {
                 "build-ref": gha_expr("steps.get_info.outputs.build-ref"),
+                "release-asset-upload-url": gha_expr(
+                    "steps.make_draft_release.release-asset-upload-url"
+                ),
                 "is-release": gha_expr("steps.get_info.outputs.is-release"),
             },
         },
