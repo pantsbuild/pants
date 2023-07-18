@@ -1201,7 +1201,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "run": dedent(
                         f"""\
-                        gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}
+                        gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}/*
                         gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false
                         """
                     ),
