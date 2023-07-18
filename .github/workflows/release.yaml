@@ -352,7 +352,7 @@ jobs:
     outputs:
       build-ref: ${{ steps.get_info.outputs.build-ref }}
       is-release: ${{ steps.get_info.outputs.is-release }}
-      release-asset-upload-url: ${{ steps.make_draft_release.release-asset-upload-url
+      release-asset-upload-url: ${{ steps.make_draft_release.outputs.release-asset-upload-url
         }}
     runs-on: ubuntu-latest
     steps:
