@@ -157,8 +157,10 @@ __dependencies_rules__(
 ```
 
 > 📘 Any rule globs using the declaration path anchoring mode that is inherited using `extend=True` will be anchored to the path of the current BUILD file, not the original one where the rule was extended from.
+>
+> See [glob syntax](doc:targets#glob-syntax) for details on anchoring modes.
 
-Example show casing the caveat for `extend=True` using paths anchored to the declaration path (see [glob syntax](doc:targets#glob-syntax) for details on anchoring modes):
+For example:
 ```python
 # src/BUILD
 __dependencies_rules__(
