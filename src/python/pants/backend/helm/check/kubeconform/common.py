@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shlex
 from abc import ABCMeta
 from dataclasses import dataclass
 from itertools import chain
@@ -96,11 +95,10 @@ async def run_kubeconform(
                     else ()
                 ),
                 *chain.from_iterable(
-                    ("-ignore-filename-pattern", shlex.quote(pattern)) for pattern in ignore_sources
+                    ("-ignore-filename-pattern", pattern) for pattern in ignore_sources
                 ),
                 *chain.from_iterable(
-                    ("-schema-location", shlex.quote(schema))
-                    for schema in kubeconform.schema_locations
+                    ("-schema-location", schema) for schema in kubeconform.schema_locations
                 ),
                 *(
                     ("-kubernetes-version", request.field_set.kubernetes_version.value)
