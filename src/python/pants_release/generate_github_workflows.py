@@ -1113,7 +1113,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "outputs": {
                 "build-ref": gha_expr("steps.get_info.outputs.build-ref"),
                 "release-asset-upload-url": gha_expr(
-                    "steps.make_draft_release.release-asset-upload-url"
+                    "steps.make_draft_release.outputs.release-asset-upload-url"
                 ),
                 "is-release": gha_expr("steps.get_info.outputs.is-release"),
             },
