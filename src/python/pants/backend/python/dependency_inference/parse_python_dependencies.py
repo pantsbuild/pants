@@ -22,6 +22,7 @@ from pants.engine.internals.native_dep_inference import NativeParsedPythonDepend
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -189,7 +190,13 @@ async def parse_python_dependencies(
         warn_or_error(
             removal_version="2.18.0.dev0",
             entity="Not explicitly providing [python-infer].use_rust_parser",
-            hint="Read the help for [python-infer].use_rust_parser, then set the value in pants.toml.",
+            hint=softwrap(
+                f"""
+                Read the help for [python-infer].use_rust_parser
+                <{doc_url('reference-python-infer#use_rust_parser')}>, then set the value
+                in pants.toml.
+                """
+            ),
         )
 
     has_custom_dep_inferences = len(union_membership[PythonDependencyVisitorRequest]) > 1
