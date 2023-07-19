@@ -89,6 +89,30 @@ def test_collects_single_chart_sources(
     assert helm_chart.address == address
 
 
+def test_override_metadata_version(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "helm_chart(name='foo', version='2.0.0')",
+            "Chart.yaml": gen_chart_file("foo", version="1.0.0"),
+            "values.yaml": HELM_VALUES_FILE,
+            "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
+        }
+    )
+
+    expected_metadata = HelmChartMetadata(
+        name="foo",
+        version="2.0.0",
+    )
+
+    address = Address("", target_name="foo")
+    tgt = rule_runner.get_target(address)
+
+    helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(tgt)])
+    assert not helm_chart.artifact
+    assert helm_chart.info == expected_metadata
+
+
 def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
