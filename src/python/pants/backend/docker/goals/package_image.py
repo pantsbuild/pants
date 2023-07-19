@@ -20,6 +20,7 @@ from pants.backend.docker.registries import DockerRegistries, DockerRegistryOpti
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
+    DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
     DockerImageContextRootField,
@@ -311,6 +312,7 @@ def get_build_options(
     context: DockerBuildContext,
     field_set: DockerPackageFieldSet,
     global_target_stage_option: str | None,
+    global_build_hosts_options: dict | None,
     target: Target,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
@@ -324,8 +326,10 @@ def get_build_options(
                 source=source,
                 error_cls=DockerImageOptionValueError,
             )
-            yield from target[field_type].options(format)
+            yield from target[field_type].options(format, global_build_hosts_options)
         elif issubclass(field_type, DockerBuildOptionFieldValueMixin):
+            yield from target[field_type].options()
+        elif issubclass(field_type, DockerBuildOptionFieldMultiValueMixin):
             yield from target[field_type].options()
         elif issubclass(field_type, DockerBuildOptionFlagFieldMixin):
             yield from target[field_type].options()
@@ -413,6 +417,7 @@ async def build_docker_image(
                 context=context,
                 field_set=field_set,
                 global_target_stage_option=options.build_target_stage,
+                global_build_hosts_options=options.build_hosts,
                 target=wrapped_target.target,
             )
         ),

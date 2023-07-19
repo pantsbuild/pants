@@ -175,6 +175,22 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    build_hosts = DictOption[str](
+        default={},
+        help=softwrap(
+            f"""
+            Hosts entries to be added to the `/etc/hosts` file in all built images.
+
+            Example:
+
+                [{options_scope}]
+                build_hosts = {{"docker": "10.180.0.1", "docker2": "10.180.0.2"}}
+
+            Use the `extra_build_hosts` field on a `docker_image` target for additional
+            image specific host entries.
+            """
+        ),
+    )
     build_verbose = BoolOption(
         default=False,
         help="Whether to log the Docker output to the console. If false, only the image ID is logged.",

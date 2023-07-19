@@ -16,9 +16,13 @@ from typing import Any, Iterable
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
-from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentSourcesField
+from pants.backend.helm.target_types import (
+    HelmChartFieldSet,
+    HelmDeploymentFieldSet,
+    HelmDeploymentSourcesField,
+)
 from pants.backend.helm.util_rules import chart, tool
-from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
+from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.backend.helm.value_interpolation import HelmEnvironmentInterpolationValue
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -148,6 +152,15 @@ class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType)
             meta["output_directory"] = self.output_directory
 
         return meta
+
+
+@dataclass(frozen=True)
+class RenderHelmChartRequest(EngineAwareParameter):
+    field_set: HelmChartFieldSet
+    release_name: str | None = None
+
+    def debug_hint(self) -> str:
+        return self.field_set.address.spec
 
 
 @dataclass(frozen=True)
@@ -461,6 +474,48 @@ async def materialize_deployment_process_wrapper_into_interactive_process(
 
     process = await Get(Process, HelmProcess, process_wrapper.process)
     return InteractiveProcess.from_process(process)
+
+
+@rule
+async def render_helm_chart(request: RenderHelmChartRequest) -> RenderedHelmFiles:
+    output_dir = "__out"
+    chart, empty_output = await MultiGet(
+        Get(HelmChart, HelmChartRequest(request.field_set)),
+        Get(Digest, CreateDigest([Directory(output_dir)])),
+    )
+
+    release_name = request.release_name or request.field_set.address.target_name.replace("_", "-")
+
+    result = await Get(
+        ProcessResult,
+        HelmProcess(
+            argv=[
+                "template",
+                release_name,
+                chart.name,
+                *(
+                    ("--description", f'"{request.field_set.description.value}"')
+                    if request.field_set.description.value
+                    else ()
+                ),
+                "--output-dir",
+                output_dir,
+            ],
+            description=f"Rendering chart {request.field_set.address}",
+            input_digest=empty_output,
+            extra_immutable_input_digests=chart.immutable_input_digests,
+            output_directories=(output_dir,),
+            level=LogLevel.DEBUG,
+        ),
+    )
+
+    output_snapshot = await Get(Snapshot, RemovePrefix(result.output_digest, output_dir))
+    return RenderedHelmFiles(
+        address=request.field_set.address,
+        chart=chart,
+        snapshot=output_snapshot,
+        post_processed=False,
+    )
 
 
 def rules():

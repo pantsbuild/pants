@@ -184,6 +184,18 @@ class HelmChartRepositoryField(StringField):
     )
 
 
+class HelmChartVersionField(StringField):
+    alias = "version"
+    help = help_text(
+        """
+        Version number for the given Helm chart.
+
+        When specified, the version provided in the source Chart.yaml file will be overriden by the value
+        given to this field.
+        """
+    )
+
+
 class HelmChartTarget(Target):
     alias = "helm_chart"
     core_fields = (
@@ -194,6 +206,7 @@ class HelmChartTarget(Target):
         HelmChartOutputPathField,
         HelmChartLintStrictField,
         HelmChartRepositoryField,
+        HelmChartVersionField,
         HelmRegistriesField,
         HelmSkipPushField,
         HelmSkipLintField,
@@ -211,6 +224,8 @@ class HelmChartFieldSet(FieldSet):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
+    description: DescriptionField
+    version: HelmChartVersionField
 
 
 class AllHelmChartTargets(Targets):

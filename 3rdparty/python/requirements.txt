@@ -47,3 +47,6 @@ uvicorn[standard]==0.17.6
 
 beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
 python-gnupg==0.4.9 # For validating signatures
+
+# Only used for release management
+PyGithub==2.0.0rc1
