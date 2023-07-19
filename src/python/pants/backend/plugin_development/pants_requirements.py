@@ -70,6 +70,7 @@ PANTS_WHEEL_PLATFORMS = [
     ),
 ]
 
+
 class PantsRequirementsTestutilField(BoolField):
     alias = "testutil"
     default = True
@@ -85,6 +86,7 @@ class PantsRequirementsVersionField(StringField):
         This must be a full release version (e.g. 2.16.0 or 2.15.0.dev5).
         """
     )
+
 
 class PantsRequirementsTargetGenerator(TargetGenerator):
     alias = "pants_requirements"
@@ -119,7 +121,6 @@ class GenerateFromPantsRequirementsRequest(GenerateTargetsRequest):
     generate_from = PantsRequirementsTargetGenerator
 
 
-
 @rule
 def generate_from_pants_requirements(
     request: GenerateFromPantsRequirementsRequest, union_membership: UnionMembership
@@ -127,11 +128,14 @@ def generate_from_pants_requirements(
     generator = request.generator
     version = generator[PantsRequirementsVersionField].value
 
-    def create_tgt(dist: str, module: str, platforms: Iterable[tuple[str, Iterable[str]]]) -> PythonRequirementTarget:
+    def create_tgt(
+        dist: str, module: str, platforms: Iterable[tuple[str, Iterable[str]]]
+    ) -> PythonRequirementTarget:
         def maybe_markers(markers):
             if not markers:
                 return ""
             return f"; {' and '.join(markers)}"
+
         return PythonRequirementTarget(
             {
                 PythonRequirementsField.alias: (
@@ -147,7 +151,9 @@ def generate_from_pants_requirements(
 
     result = [create_tgt("pantsbuild.pants", "pants", PANTS_WHEEL_PLATFORMS)]
     if generator[PantsRequirementsTestutilField].value:
-        result.append(create_tgt("pantsbuild.pants.testutil", "pants.testutil", [("py3-none-any", [])]))
+        result.append(
+            create_tgt("pantsbuild.pants.testutil", "pants.testutil", [("py3-none-any", [])])
+        )
     return GeneratedTargets(generator, result)
 
 
