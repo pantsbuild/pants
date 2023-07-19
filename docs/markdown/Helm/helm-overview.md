@@ -141,7 +141,7 @@ name: example
 version: 0.1.0
 ```
 
-Now the value in `Chart.yaml` will be ignored and the chart will be understood to have version `1.0.0`.
+Now the value in `Chart.yaml` will be ignored and the chart will be understood to have version `2.0.0`.
 
 Because Pants has support for interpolating values in the target fields, we can also make this version value more dynamic as follows:
 
