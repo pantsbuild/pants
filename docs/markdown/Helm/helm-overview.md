@@ -146,7 +146,7 @@ Now the value in `Chart.yaml` will be ignored and the chart will be understood t
 Because Pants has support for interpolating values in the target fields, we can also make this version value more dynamic as follows:
 
 ```python src/helm/example/BUILD
-helm_chart(version=f"{env('HELM_CHART_VERSION')}")
+helm_chart(version=env('HELM_CHART_VERSION'))
 ```
 
 Now the version value for this chart will be what has been set as the value of the environment variable `HELM_CHART_VERSION`.
