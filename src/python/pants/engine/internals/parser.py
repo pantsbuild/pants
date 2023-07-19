@@ -203,11 +203,13 @@ class ParseState(threading.local):
         *args: SetDefaultsT,
         ignore_unknown_fields: bool = False,
         ignore_unknown_targets: bool = False,
+        **kwargs,
     ) -> None:
         self.defaults.set_defaults(
             *args,
             ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields,
             ignore_unknown_targets=self.is_bootstrap or ignore_unknown_targets,
+            **kwargs,
         )
 
     def set_dependents_rules(self, *args, **kwargs) -> None:
