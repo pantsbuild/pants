@@ -186,6 +186,9 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         Get(HelmChartMetadata, HelmChartMetaSourceField, request.field_set.chart),
     )
 
+    if request.field_set.version.value:
+        chart_info = dataclasses.replace(chart_info, version=request.field_set.version.value)
+
     subcharts_digest = EMPTY_DIGEST
     subcharts = await _find_charts_by_targets(
         dependencies, description_of_origin=f"the `helm_chart` {request.field_set.address}"
