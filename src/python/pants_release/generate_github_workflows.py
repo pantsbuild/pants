@@ -33,6 +33,7 @@ Env = Dict[str, str]
 
 
 class Platform(Enum):
+    # NB: If a new addition is made to this list, add it to `src/python/pants/backend/plugin_development/pants_requirements.py`
     LINUX_X86_64 = "Linux-x86_64"
     LINUX_ARM64 = "Linux-ARM64"
     MACOS10_15_X86_64 = "macOS10-15-x86_64"

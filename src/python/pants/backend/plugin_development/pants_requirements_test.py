@@ -26,6 +26,7 @@ def test_target_generator() -> None:
         {
             "BUILD": (
                 "pants_requirements(name='default')\n"
+                "pants_requirements(name='pants-2.16', version='2.16.0')\n"
                 "pants_requirements(\n"
                 "  name='no_testutil', testutil=False, resolve='a'\n"
                 ")"
@@ -48,12 +49,12 @@ def test_target_generator() -> None:
     )
     assert pants_req[PythonRequirementModulesField].value == ("pants",)
     assert testutil_req[PythonRequirementModulesField].value == ("pants.testutil",)
-    assert len(pants_req[PythonRequirementsField].value) == 4
+    assert len(pants_req[PythonRequirementsField].value) == 6
     assert all(
         req.project_name == "pantsbuild.pants" and "pantsbuild.pants-" in req.url
         for req in pants_req[PythonRequirementsField].value
     )
-    assert len(testutil_req[PythonRequirementsField].value) == 4
+    assert len(testutil_req[PythonRequirementsField].value) == 1
     assert all(
         req.project_name == "pantsbuild.pants.testutil" and "pantsbuild.pants.testutil-" in req.url
         for req in testutil_req[PythonRequirementsField].value
@@ -73,3 +74,17 @@ def test_target_generator() -> None:
     assert next(iter(result.keys())).generated_name == "pantsbuild.pants"
     pants_req = next(iter(result.values()))
     assert pants_req[PythonRequirementResolveField].value == "a"
+
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="pants-2.16"), description_of_origin="tests"
+            )
+        ],
+    ).parametrizations
+    assert len(result) == 2
+    assert next(iter(result.keys())).generated_name == "pantsbuild.pants"
+    pants_req = next(iter(result.values()))
+    print(dir(pants_req[PythonRequirementsField].value[0]))
+    assert "2.16.0" in str(pants_req[PythonRequirementsField].value[0])
