@@ -132,7 +132,7 @@ version: 0.1.0
 Will be understood to have version `0.1.0` (as read from the `Chart.yaml` file). However, if we specify a version in `helm_chart` as follows:
 
 ```python src/helm/example/BUILD
-helm_chart(version="1.0.0")
+helm_chart(version="2.0.0")
 ```
 ```yaml src/helm/example/Chart.yaml
 apiVersion: v2
