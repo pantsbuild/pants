@@ -28,7 +28,7 @@ tokio-rustls = "0.23"
 tokio-util = { version = "0.7", features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
 async-oncecell = "0.2"
-once_cell = "1.15"
+once_cell = "1.18"
 prost = "0.9"
 prost-types = "0.9"
 rand = "0.8"
