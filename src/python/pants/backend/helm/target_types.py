@@ -211,6 +211,7 @@ class HelmChartFieldSet(FieldSet):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
+    description: DescriptionField
 
 
 class AllHelmChartTargets(Targets):
