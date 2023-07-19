@@ -182,6 +182,11 @@ __dependencies_rules__(
 
 The above rules when applied to `resources` _as well as_ `files` targets in `src/subdir` will allow dependencies only to other targets in the subtree of `src/subdir/relative/to/BUILD/file/` despite the inherited rule declared in `src/BUILD`. For `files` targets in other directories in the `src/` subtree (e.g. `src/another/dir`) dependencies will be allowed only to other targets in the subtree of `src/relative/to/BUILD/file/`.
 
+Keep in mind that visibility rules only operate on direct dependencies - they do not validate dependencies transitively. This is because it would otherwise make it impossible to use private modules. For instance, imagine you have an application stored in `src.app.main`. It needs to access the public modules in the shared library `src.library`. The methods in the public module `src.library.public` make calls to the private modules in that shared library, which means that `src.library.public` depends on `src.library._private`. So when we declare that `src.app.main` may not depend on `src.library._private`, we only forbid the application accessing the private modules directly, since it still needs to access the functionality they provide transitively (but only via the public interface).
+
+If your codebase has a very complex dependency graph, you may need to make sure a given module never reaches some other modules (transitively). For instance, you may need to declare that modules in component `C1` may depend on any module in component `C2` as long as these modules (in `C2`) do not depend (transitively) on any module in component `C3`. This could be necessary if components are deployed separately, for instance, you may package a deployable artifact with components `C1` (full) and `C2` (partial) and another one with components `C2` (partial) and `C3` (full).
+
+In this scenario, you may need to look into alternative solutions to codify these constraints. For example, to check for violations, you could query the dependencies of component `C1` (transitively) using the `dependencies` goal with the `--transitive` option to confirm none of the modules from component `C3` are listed. If there are some, you may find the `paths` goal helpful as it would show you exactly why a certain module from component `C1` depends on a given module in component `C3` if it is unclear. 
 
 Rule sets
 ---------
