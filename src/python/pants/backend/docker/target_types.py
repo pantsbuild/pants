@@ -242,13 +242,19 @@ class DockerBuildOptionFieldMixin(ABC):
     docker_build_option: ClassVar[str]
 
     @abstractmethod
-    def option_values(self, *, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def option_values(
+        self, *, value_formatter: OptionValueFormatter, global_build_hosts_options: dict
+    ) -> Iterator[str]:
         """Subclasses must implement this, to turn their `self.value` into none, one or more option
         values."""
 
     @final
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
-        for value in self.option_values(value_formatter=value_formatter):
+    def options(
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options
+    ) -> Iterator[str]:
+        for value in self.option_values(
+            value_formatter=value_formatter, global_build_hosts_options=global_build_hosts_options
+        ):
             yield from (self.docker_build_option, value)
 
 
@@ -266,9 +272,29 @@ class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictSt
     )
     docker_build_option = "--label"
 
-    def option_values(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def option_values(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
         for label, value in (self.value or {}).items():
             yield f"{label}={value_formatter(value)}"
+
+
+class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStringToStringField):
+    alias = "extra_build_hosts"
+    help = help_text(
+        """
+        Extra hosts entries to be added to a container's `/etc/hosts` file.
+
+        Use `[docker].build_hosts` to set default host entries for all images.
+        """
+    )
+    docker_build_option = "--add-host"
+
+    def option_values(
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options: dict = {}
+    ) -> Iterator[str]:
+        if self.value:
+            merged_values = {**global_build_hosts_options, **self.value}
+            for label, value in merged_values.items():
+                yield f"{label}:{value_formatter(value)}"
 
 
 class DockerImageBuildSecretsOptionField(
@@ -350,6 +376,18 @@ class DockerBuildOptionFieldValueMixin(Field):
             yield f"{self.docker_build_option}={self.value}"
 
 
+class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
+    """Inherit this mixin class to provide options in the form of `--flag=value1,value2` to `docker
+    build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}={','.join(list(self.value))}"
+
+
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
     alias = "pull"
     default = False
@@ -402,6 +440,19 @@ class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, Strin
     docker_build_option = "--network"
 
 
+class DockerImageBuildPlatformOptionField(
+    DockerBuildOptionFieldMultiValueMixin, StringSequenceField
+):
+    alias = "build_platform"
+    default = None
+    help = help_text(
+        """
+        Set the target platform(s) for the build.
+        """
+    )
+    docker_build_option = "--platform"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -415,6 +466,7 @@ class DockerImageTarget(Target):
         DockerImageRegistriesField,
         DockerImageRepositoryField,
         DockerImageBuildImageLabelsOptionField,
+        DockerImageBuildImageExtraHostsField,
         DockerImageBuildSecretsOptionField,
         DockerImageBuildSSHOptionField,
         DockerImageSkipPushField,
@@ -422,6 +474,7 @@ class DockerImageTarget(Target):
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
         DockerImageBuildNetworkOptionField,
+        DockerImageBuildPlatformOptionField,
         OutputPathField,
         RestartableField,
     )
