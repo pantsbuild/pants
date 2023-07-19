@@ -115,7 +115,7 @@ The final output folder can customised using the `output_path` field in the `hel
 
 ### Helm chart version
 
-Helm charts are versioned artifacts with the value of the `version` field in `Chart.yaml` determining the actual version of the chart. Pants needs to know the version of a first party chart to be able to build packages and correctly stablish the dependencies among them. By default, Pants will use the value in `Chart.yaml` as the given version of a chart but it also supports overring that value via the `version` field in the `helm_chart` target.
+Helm charts are versioned artifacts with the value of the `version` field in `Chart.yaml` determining the actual version of the chart. Pants needs to know the version of a first party chart to be able to build packages and correctly establish the dependencies among them. By default, Pants will use the value in `Chart.yaml` as the given version of a chart but it also supports overriding that value via the `version` field in the `helm_chart` target.
 
 For example, a chart defined as such:
 
