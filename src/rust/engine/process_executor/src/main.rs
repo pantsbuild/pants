@@ -44,6 +44,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
+use remote::remote_cache::{RemoteCacheProviderOptions, RemoteCacheRunnerOptions};
 use store::{ImmutableInputs, RemoteOptions, Store};
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
@@ -316,24 +317,29 @@ async fn main() {
 
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
-          remote::remote_cache::CommandRunner::new(
-            Arc::new(remote_runner),
-            process_metadata.instance_name.clone(),
-            process_metadata.cache_key_gen_version.clone(),
-            executor,
-            store.clone(),
-            &address,
-            root_ca_certs,
-            headers,
-            true,
-            true,
-            remote::remote_cache::RemoteCacheWarningsBehavior::Backoff,
-            CacheContentBehavior::Defer,
-            args.cache_rpc_concurrency,
-            Duration::from_secs(2),
-            args
-              .named_cache_path
-              .map(|p| p.to_string_lossy().to_string()),
+          remote::remote_cache::CommandRunner::from_provider_options(
+            RemoteCacheRunnerOptions {
+              inner: Arc::new(remote_runner),
+              instance_name: process_metadata.instance_name.clone(),
+              process_cache_namespace: process_metadata.cache_key_gen_version.clone(),
+              executor,
+              store: store.clone(),
+              cache_read: true,
+              cache_write: true,
+              warnings_behavior: remote::remote_cache::RemoteCacheWarningsBehavior::Backoff,
+              cache_content_behavior: CacheContentBehavior::Defer,
+              append_only_caches_base_path: args
+                .named_cache_path
+                .map(|p| p.to_string_lossy().to_string()),
+            },
+            RemoteCacheProviderOptions {
+              instance_name: process_metadata.instance_name.clone(),
+              action_cache_address: address,
+              root_ca_certs,
+              headers,
+              concurrency_limit: args.cache_rpc_concurrency,
+              rpc_timeout: Duration::from_secs(2),
+            },
           )
           .expect("Failed to make remote cache command runner"),
         )
