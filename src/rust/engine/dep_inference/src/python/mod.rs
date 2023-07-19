@@ -271,9 +271,19 @@ impl Visitor for ImportCollector<'_> {
 
   fn visit_with_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let with_clause = node.named_child(0).unwrap();
-    let are_suppressing = with_clause
-      .named_children(&mut with_clause.walk())
-      .any(|x| self.withitem_is_with_contextlib_suppress(x));
+
+    for x in with_clause.children(&mut with_clause.walk()) {
+      println!("checking?? {} {}", x.kind(), self.code_at(x.range()))
+    }
+
+    let are_suppressing_importerror =
+      with_clause
+        .named_children(&mut with_clause.walk())
+        .any(|x| {
+          println!("checking {}", x.kind());
+          self.suppressing_importerror(x)
+        });
+    println!("suppressing {}", are_suppressing_importerror);
 
     // remember to visit the withitems themselves
     // for ex detecting imports in `with open("/foo/bar") as f`
@@ -284,7 +294,7 @@ impl Visitor for ImportCollector<'_> {
     let body_node = node.child_by_field_name("body").unwrap();
     let body: Vec<_> = body_node.named_children(&mut body_node.walk()).collect();
 
-    if are_suppressing {
+    if are_suppressing_importerror {
       let previous_weaken = self.weaken_imports;
       self.weaken_imports = true;
 
@@ -332,33 +342,57 @@ impl Visitor for ImportCollector<'_> {
 }
 
 impl ImportCollector<'_> {
-  fn withitem_is_with_contextlib_suppress(&mut self, with_node: tree_sitter::Node) -> bool {
+  fn suppressing_importerror(&mut self, with_node: tree_sitter::Node) -> bool {
     if with_node.kind_id() == KindID::WITH_ITEM {
       let node = with_node.child_by_field_name("value").unwrap(); // synthetic
 
-      if node.kind_id() != KindID::CALL {
+      let call_maybe_of_suppress = match node.kind_id() {
+        KindID::CALL => Some(node), // if we have a call directly `with suppress(ImportError):`
+        KindID::AS_PATTERN => node.named_child(0).and_then(|n| match n.kind_id() {
+          KindID::CALL => Some(n),
+          _ => None,
+        }), // if we have a call with an `as` item `with suppress(ImportError) as e:`
+        _ => None,
+      };
+      if call_maybe_of_suppress.is_none() {
         return false;
       }
-      let function_name_expr = node.child_by_field_name("function").unwrap();
+
+      let function_name_expr = call_maybe_of_suppress
+        .unwrap()
+        .child_by_field_name("function")
+        .unwrap();
+      println!("{}", function_name_expr.kind());
       let is_supress = match function_name_expr.kind_id() {
         KindID::ATTRIBUTE => function_name_expr
           .child_by_field_name("attribute")
           .map(|identifier| self.code_at(identifier.range()) == "suppress")
           .unwrap_or(false),
-        KindID::IDENTIFIER => self.code_at(function_name_expr.range()) == "suppress",
+        KindID::IDENTIFIER => {
+          println!("{}", self.code_at(function_name_expr.range()));
+          self.code_at(function_name_expr.range()) == "suppress"
+        }
         _ => false,
       };
       if !is_supress {
         return false;
       }
       let cur = &mut node.walk();
-      let has_importerror = node
+
+      for named_child in call_maybe_of_suppress.unwrap().named_children(cur) {
+        println!("child: {:?}", self.code_at(named_child.range()));
+      }
+      let has_importerror = call_maybe_of_suppress
+        .unwrap()
         .child_by_field_name("arguments")
         .map(|x| {
-          x.named_children(cur)
-            .any(|x| self.code_at(x.range()) == "ImportError")
+          x.named_children(cur).any(|arg| {
+            println!("args {}", self.code_at(arg.range()));
+            self.code_at(arg.range()) == "ImportError"
+          })
         })
         .unwrap_or(false);
+      println!("thinking: {} {}", is_supress, has_importerror);
       is_supress && has_importerror
     } else {
       false

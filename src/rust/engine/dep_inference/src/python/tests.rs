@@ -244,23 +244,30 @@ fn dunder_import() {
 }
 
 fn assert_imports_strong_weak(code: &str, strong: &[&str], weak: &[&str]) {
+  println!("begin test");
   let mut collector = ImportCollector::new(code);
   collector.collect();
   let (actual_weak, actual_strong): (Vec<_>, Vec<_>) =
     collector.import_map.iter().partition(|(_, v)| v.1);
+  let expected_weak = HashSet::from_iter(weak.iter().map(|s| s.to_string()));
+  let found_weak = actual_weak
+    .iter()
+    .map(|(k, _)| k.to_string())
+    .collect::<HashSet<_>>();
   assert_eq!(
-    HashSet::from_iter(weak.iter().map(|s| s.to_string())),
-    actual_weak
-      .iter()
-      .map(|(k, _)| k.to_string())
-      .collect::<HashSet<_>>()
+    expected_weak, found_weak,
+    "weak imports did not match, expected={:?} found={:?}",
+    expected_weak, found_weak
   );
+  let expected_strong = HashSet::from_iter(strong.iter().map(|s| s.to_string()));
+  let found_strong = actual_strong
+    .iter()
+    .map(|(k, _)| k.to_string())
+    .collect::<HashSet<_>>();
   assert_eq!(
-    HashSet::from_iter(strong.iter().map(|s| s.to_string())),
-    actual_strong
-      .iter()
-      .map(|(k, _)| k.to_string())
-      .collect::<HashSet<_>>()
+    expected_strong, found_strong,
+    "strong imports did not match, expected={:?} found={:?}",
+    expected_strong, found_strong
   );
 }
 
@@ -519,7 +526,63 @@ fn contextlib_suppress_weak_imports() {
         pass
     ";
   assert_imports_strong_weak(withitems_open, &[], &[]);
-  assert_strings(withitems_open, &["/dev/null", "data/subdir1/a.json"])
+  assert_strings(withitems_open, &["/dev/null", "data/subdir1/a.json"]);
+  // Ensure suppress bound to variable
+  assert_imports_strong_weak(
+    r"
+    with suppress(ImportError) as e:
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
+  // Ensure multiple items in `with`
+  assert_imports_strong_weak(
+    r"
+    with open('file') as f, suppress(ImportError):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
+  // Ensure multiple with_items
+  assert_imports_strong_weak(
+    r"
+    with suppress(ImportError), open('file'):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+    // &["weak0"],
+  );
+  // Ensure multiple with_items in parens
+  // assert_imports_strong_weak(
+  //   r"
+  //   with (suppress(ImportError), open('file'),):
+  //       import weak0
+  //   ",
+  //   &[],
+  //   &["weak0"],
+  //   // &["weak0"],
+  // );
+  // pathological: suppress without a child
+  assert_imports_strong_weak(
+    r"
+    with suppress():
+        import strong0
+    ",
+    &["strong0"],
+    &[],
+  );
+  // pathological: nothing in `with` clause
+  assert_imports_strong_weak(
+    r"
+    with:
+      import strong0
+    ",
+    &["strong0"],
+    &[],
+  );
 }
 
 fn assert_strings(code: &str, strings: &[&str]) {
