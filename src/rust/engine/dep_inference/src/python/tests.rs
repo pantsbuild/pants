@@ -555,16 +555,15 @@ fn contextlib_suppress_weak_imports() {
     &["weak0"],
     // &["weak0"],
   );
-  // Ensure multiple with_items in parens
-  // assert_imports_strong_weak(
-  //   r"
-  //   with (suppress(ImportError), open('file'),):
-  //       import weak0
-  //   ",
-  //   &[],
-  //   &["weak0"],
-  //   // &["weak0"],
-  // );
+  // Ensure multiple with_items in parens (with trailing comma)
+  assert_imports_strong_weak(
+    r"
+    with (suppress(ImportError), open('file'),):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
   // pathological: suppress without a child
   assert_imports_strong_weak(
     r"

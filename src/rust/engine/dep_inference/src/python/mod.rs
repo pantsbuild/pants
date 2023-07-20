@@ -244,7 +244,10 @@ impl Visitor for ImportCollector<'_> {
         // We only parse identifiers, or (Set/Tuple/List)-of-identifier expressions.
         let except_expr = child.named_child(0).unwrap();
         should_weaken = match except_expr.kind_id() {
-          KindID::IDENTIFIER => self.code_at(except_expr.range()) == "ImportError",
+          KindID::IDENTIFIER => {
+            println!("identifier is {}", self.code_at(except_expr.range()));
+            self.code_at(except_expr.range()) == "ImportError"
+          }
           KindID::SET | KindID::LIST | KindID::TUPLE => except_expr
             .named_children(&mut except_expr.walk())
             .any(|expr| {
@@ -258,11 +261,21 @@ impl Visitor for ImportCollector<'_> {
       }
     }
 
+    println!("should_weaken@visit_try_statement {}", should_weaken);
+
     for child in children.iter() {
       let previous_weaken = self.weaken_imports;
-      if child.kind_id() == KindID::BLOCK {
+      println!(
+        "child kind {}, kindid {}, target {:?} ",
+        child.kind(),
+        child.kind_id(),
+        KindID::BLOCK
+      );
+      if KindID::BLOCK.contains(&child.kind_id()) {
         self.weaken_imports = should_weaken;
       }
+      println!("weakening@visit_try_statement {}", self.weaken_imports);
+
       self.walk(&mut child.walk());
       self.weaken_imports = previous_weaken;
     }
