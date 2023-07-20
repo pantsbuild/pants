@@ -244,10 +244,7 @@ impl Visitor for ImportCollector<'_> {
         // We only parse identifiers, or (Set/Tuple/List)-of-identifier expressions.
         let except_expr = child.named_child(0).unwrap();
         should_weaken = match except_expr.kind_id() {
-          KindID::IDENTIFIER => {
-            println!("identifier is {}", self.code_at(except_expr.range()));
-            self.code_at(except_expr.range()) == "ImportError"
-          }
+          KindID::IDENTIFIER => self.code_at(except_expr.range()) == "ImportError",
           KindID::SET | KindID::LIST | KindID::TUPLE => except_expr
             .named_children(&mut except_expr.walk())
             .any(|expr| {
@@ -261,21 +258,11 @@ impl Visitor for ImportCollector<'_> {
       }
     }
 
-    println!("should_weaken@visit_try_statement {}", should_weaken);
-
     for child in children.iter() {
       let previous_weaken = self.weaken_imports;
-      println!(
-        "child kind {}, kindid {}, target {:?} ",
-        child.kind(),
-        child.kind_id(),
-        KindID::BLOCK
-      );
       if KindID::BLOCK.contains(&child.kind_id()) {
         self.weaken_imports = should_weaken;
       }
-      println!("weakening@visit_try_statement {}", self.weaken_imports);
-
       self.walk(&mut child.walk());
       self.weaken_imports = previous_weaken;
     }
@@ -285,18 +272,9 @@ impl Visitor for ImportCollector<'_> {
   fn visit_with_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let with_clause = node.named_child(0).unwrap();
 
-    for x in with_clause.children(&mut with_clause.walk()) {
-      println!("checking?? {} {}", x.kind(), self.code_at(x.range()))
-    }
-
-    let are_suppressing_importerror =
-      with_clause
-        .named_children(&mut with_clause.walk())
-        .any(|x| {
-          println!("checking {}", x.kind());
-          self.suppressing_importerror(x)
-        });
-    println!("suppressing {}", are_suppressing_importerror);
+    let are_suppressing_importerror = with_clause
+      .named_children(&mut with_clause.walk())
+      .any(|x| self.suppressing_importerror(x));
 
     // remember to visit the withitems themselves
     // for ex detecting imports in `with open("/foo/bar") as f`
@@ -375,16 +353,12 @@ impl ImportCollector<'_> {
         .unwrap()
         .child_by_field_name("function")
         .unwrap();
-      println!("{}", function_name_expr.kind());
       let is_supress = match function_name_expr.kind_id() {
         KindID::ATTRIBUTE => function_name_expr
           .child_by_field_name("attribute")
           .map(|identifier| self.code_at(identifier.range()) == "suppress")
           .unwrap_or(false),
-        KindID::IDENTIFIER => {
-          println!("{}", self.code_at(function_name_expr.range()));
-          self.code_at(function_name_expr.range()) == "suppress"
-        }
+        KindID::IDENTIFIER => self.code_at(function_name_expr.range()) == "suppress",
         _ => false,
       };
       if !is_supress {
@@ -392,20 +366,14 @@ impl ImportCollector<'_> {
       }
       let cur = &mut node.walk();
 
-      for named_child in call_maybe_of_suppress.unwrap().named_children(cur) {
-        println!("child: {:?}", self.code_at(named_child.range()));
-      }
       let has_importerror = call_maybe_of_suppress
         .unwrap()
         .child_by_field_name("arguments")
         .map(|x| {
-          x.named_children(cur).any(|arg| {
-            println!("args {}", self.code_at(arg.range()));
-            self.code_at(arg.range()) == "ImportError"
-          })
+          x.named_children(cur)
+            .any(|arg| self.code_at(arg.range()) == "ImportError")
         })
         .unwrap_or(false);
-      println!("thinking: {} {}", is_supress, has_importerror);
       is_supress && has_importerror
     } else {
       false
