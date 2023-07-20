@@ -936,7 +936,6 @@ class SkipPythonTestsField(BoolField):
 _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsDependenciesField,
     PythonResolveField,
-    PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
     PythonTestsXdistConcurrencyField,
     PythonTestsBatchCompatibilityTagField,
