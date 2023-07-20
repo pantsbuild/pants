@@ -1,10 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import sys
-from typing import Iterable
-
 from pants.backend.python.target_types import (
+    PythonRequirementFindLinksField,
     PythonRequirementModulesField,
     PythonRequirementResolveField,
     PythonRequirementsField,
@@ -22,53 +20,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.strutil import help_text
 from pants.version import PANTS_SEMVER
-
-PY = f"{sys.version_info.major}{sys.version_info.minor}"
-
-# NB: List of platforms comes from `src/python/pants_release/generate_github_workflows.py`
-#   we likely shouldn't ever remove a platform.
-PANTS_WHEEL_PLATFORMS = [
-    (
-        f"cp{PY}-cp{PY}-manylinux2014_x86_64",
-        ('sys_platform == "linux"', 'platform_machine == "x86_64"'),
-    ),
-    (
-        f"cp{PY}-cp{PY}-manylinux2014_aarch64",
-        ('sys_platform == "linux"', 'platform_machine == "aarch64"'),
-    ),
-    (
-        f"cp{PY}-cp{PY}-macosx_10_15_x86_64",
-        (
-            'sys_platform == "darwin"',
-            'platform_machine == "x86_64"',
-            'platform_release == "10.15"',
-        ),
-    ),
-    (
-        f"cp{PY}-cp{PY}-macosx_10_16_x86_64",
-        (
-            'sys_platform == "darwin"',
-            'platform_machine == "x86_64"',
-            'platform_release == "10.16"',
-        ),
-    ),
-    (
-        f"cp{PY}-cp{PY}-macosx_11_0_x86_64",
-        (
-            'sys_platform == "darwin"',
-            'platform_machine == "x86_64"',
-            'platform_release == "11.0"',
-        ),
-    ),
-    (
-        f"cp{PY}-cp{PY}-macosx_11_0_arm64",
-        (
-            'sys_platform == "darwin"',
-            'platform_machine == "arm64"',
-            'platform_release == "11.0"',
-        ),
-    ),
-]
 
 
 class PantsRequirementsTestutilField(BoolField):
@@ -112,6 +63,7 @@ class PantsRequirementsTargetGenerator(TargetGenerator):
         *COMMON_TARGET_FIELDS,
         PantsRequirementsVersionField,
         PantsRequirementsTestutilField,
+        PythonRequirementFindLinksField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (PythonRequirementResolveField,)
@@ -128,19 +80,12 @@ def generate_from_pants_requirements(
     generator = request.generator
     version = generator[PantsRequirementsVersionField].value
 
-    def create_tgt(
-        dist: str, module: str, platforms: Iterable[tuple[str, Iterable[str]]]
-    ) -> PythonRequirementTarget:
-        def maybe_markers(markers):
-            if not markers:
-                return ""
-            return f"; {' and '.join(markers)}"
-
+    def create_tgt(dist: str, module: str) -> PythonRequirementTarget:
         return PythonRequirementTarget(
             {
-                PythonRequirementsField.alias: (
-                    f"{dist} @ https://github.com/pantsbuild/pants/releases/download/release_{version}/{dist}-{version}-{plat_tag}.whl {maybe_markers(markers)}"
-                    for plat_tag, markers in platforms
+                PythonRequirementsField.alias: (f"{dist} == {version}",),
+                PythonRequirementFindLinksField.alias: (
+                    f"https://github.com/pantsbuild/pants/releases/expanded_assets/release_{version}",
                 ),
                 PythonRequirementModulesField.alias: (module,),
                 **request.template,
@@ -149,11 +94,9 @@ def generate_from_pants_requirements(
             union_membership,
         )
 
-    result = [create_tgt("pantsbuild.pants", "pants", PANTS_WHEEL_PLATFORMS)]
+    result = [create_tgt("pantsbuild.pants", "pants")]
     if generator[PantsRequirementsTestutilField].value:
-        result.append(
-            create_tgt("pantsbuild.pants.testutil", "pants.testutil", [("py3-none-any", [])])
-        )
+        result.append(create_tgt("pantsbuild.pants.testutil", "pants.testutil"))
     return GeneratedTargets(generator, result)
 
 

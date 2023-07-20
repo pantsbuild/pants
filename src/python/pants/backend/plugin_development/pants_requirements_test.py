@@ -4,6 +4,7 @@
 from pants.backend.plugin_development import pants_requirements
 from pants.backend.plugin_development.pants_requirements import PantsRequirementsTargetGenerator
 from pants.backend.python.target_types import (
+    PythonRequirementFindLinksField,
     PythonRequirementModulesField,
     PythonRequirementResolveField,
     PythonRequirementsField,
@@ -11,6 +12,8 @@ from pants.backend.python.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.pip_requirement import PipRequirement
+from pants.version import VERSION
 
 
 def test_target_generator() -> None:
@@ -49,16 +52,19 @@ def test_target_generator() -> None:
     )
     assert pants_req[PythonRequirementModulesField].value == ("pants",)
     assert testutil_req[PythonRequirementModulesField].value == ("pants.testutil",)
-    assert len(pants_req[PythonRequirementsField].value) == 6
-    assert all(
-        req.project_name == "pantsbuild.pants" and "pantsbuild.pants-" in req.url
-        for req in pants_req[PythonRequirementsField].value
+    assert pants_req[PythonRequirementsField].value == (
+        PipRequirement.parse(f"pantsbuild.pants=={VERSION}"),
     )
-    assert len(testutil_req[PythonRequirementsField].value) == 1
-    assert all(
-        req.project_name == "pantsbuild.pants.testutil" and "pantsbuild.pants.testutil-" in req.url
-        for req in testutil_req[PythonRequirementsField].value
+    assert testutil_req[PythonRequirementsField].value == (
+        PipRequirement.parse(f"pantsbuild.pants.testutil=={VERSION}"),
     )
+    assert pants_req[PythonRequirementFindLinksField].value == (
+        f"https://github.com/pantsbuild/pants/releases/expanded_assets/release_{VERSION}",
+    )
+    assert testutil_req[PythonRequirementFindLinksField].value == (
+        f"https://github.com/pantsbuild/pants/releases/expanded_assets/release_{VERSION}",
+    )
+
     for t in (pants_req, testutil_req):
         assert not t[PythonRequirementResolveField].value
 
@@ -83,8 +89,19 @@ def test_target_generator() -> None:
             )
         ],
     ).parametrizations
-    assert len(result) == 2
-    assert next(iter(result.keys())).generated_name == "pantsbuild.pants"
-    pants_req = next(iter(result.values()))
-    print(dir(pants_req[PythonRequirementsField].value[0]))
-    assert "2.16.0" in str(pants_req[PythonRequirementsField].value[0])
+    pants_req = next(t for t in result.values() if t.address.generated_name == "pantsbuild.pants")
+    testutil_req = next(
+        t for t in result.values() if t.address.generated_name == "pantsbuild.pants.testutil"
+    )
+    assert pants_req[PythonRequirementsField].value == (
+        PipRequirement.parse("pantsbuild.pants==2.16.0"),
+    )
+    assert testutil_req[PythonRequirementsField].value == (
+        PipRequirement.parse("pantsbuild.pants.testutil==2.16.0"),
+    )
+    assert pants_req[PythonRequirementFindLinksField].value == (
+        "https://github.com/pantsbuild/pants/releases/expanded_assets/release_2.16.0",
+    )
+    assert testutil_req[PythonRequirementFindLinksField].value == (
+        "https://github.com/pantsbuild/pants/releases/expanded_assets/release_2.16.0",
+    )
