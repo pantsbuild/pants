@@ -29,7 +29,7 @@ mod context;
 mod entry;
 mod node;
 
-use crate::entry::{Entry, Generation, RunToken, ResetStateAction};
+use crate::entry::{Entry, Generation, ResetStateAction, RunToken};
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -93,10 +93,15 @@ impl<N: Node> InnerGraph<N> {
       .expect("The unsafe_entry_for_id method should only be used in read-only methods!")
   }
 
+  fn update_root_access_time(&mut self, node: N) {
+    *(self
+      .roots_by_age
+      .get_mut(&node)
+      .expect("node should already exist as a root")) = Instant::now();
+  }
+
   fn ensure_entry(&mut self, node: N) -> EntryId {
     if let Some(&id) = self.nodes.get(&node) {
-      // Update node access time
-      *(self.roots_by_age.get_mut(&node).unwrap()) = Instant::now();
       return id;
     }
 
@@ -384,7 +389,7 @@ impl<N: Node> InnerGraph<N> {
   }
 
   fn prune_unreacheable_from_relevant(&mut self) {
-    let dur = Duration::new(60, 0);
+    let dur = Duration::from_secs(60);
     let now = Instant::now();
     let relevant_root_ids: HashSet<_> = self
       .roots_by_age
@@ -400,7 +405,7 @@ impl<N: Node> InnerGraph<N> {
     let reachable_from_relevant: HashSet<_> = self
       .walk(
         relevant_root_ids.into_iter().cloned().collect(),
-        Direction::Incoming,
+        Direction::Outgoing,
         |_| false,
       )
       .collect();
@@ -442,7 +447,10 @@ impl<N: Node> Graph<N> {
       run_id_generator: 0,
       roots_by_age: HashMap::default(),
     }));
-    let _join = executor.native_spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
+    let _joins = (
+      executor.native_spawn(Self::cycle_check_task(Arc::downgrade(&inner))),
+      executor.native_spawn(Self::garbage_collect_task(Arc::downgrade(&inner))),
+    );
 
     Graph {
       inner,
@@ -483,12 +491,23 @@ impl<N: Node> Graph<N> {
       if let Some(inner) = Weak::upgrade(&inner) {
         let mut lock = inner.lock();
         lock.terminate_cycles();
-        // TODO: figure out frequency to run this at
-        lock.prune_unreacheable_from_relevant();
       } else {
         // We've been shut down.
         break;
       };
+    }
+  }
+
+  async fn garbage_collect_task(inner: Weak<Mutex<InnerGraph<N>>>) {
+    loop {
+      sleep(Duration::from_secs(10)).await;
+
+      if let Some(inner) = Weak::upgrade(&inner) {
+        let mut lock = inner.lock();
+        lock.prune_unreacheable_from_relevant();
+      } else {
+        break; // Shutdown
+      }
     }
   }
 
@@ -561,7 +580,8 @@ impl<N: Node> Graph<N> {
   /// Return the value of the given Node.
   ///
   pub async fn create(&self, node: N, context: &Context<N>) -> Result<N::Item, N::Error> {
-    let (res, _generation) = self.get_inner(None, context, node).await;
+    let (res, _generation) = self.get_inner(None, context, node.clone()).await;
+    self.inner.lock().update_root_access_time(node.clone());
     res
   }
 
@@ -582,6 +602,7 @@ impl<N: Node> Graph<N> {
       let entry = {
         let mut inner = self.inner.lock();
         let entry_id = inner.ensure_entry(node.clone());
+        inner.update_root_access_time(node.clone());
         inner.unsafe_entry_for_id(entry_id).clone()
       };
       entry.poll(context, generation).await;
