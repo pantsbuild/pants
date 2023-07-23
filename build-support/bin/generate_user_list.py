@@ -46,6 +46,11 @@ _orgs = (
         "https://www.astranis.com/",
         "https://files.readme.io/e4989d4-astranis-small.png",
     ),
+    Org(
+        "Aviva Credito",
+        "https://www.avivacredito.com/",
+        "https://files.readme.io/dfc2801-aviva.png",
+    ),
     Org("Brand24", "https://brand24.com/", "https://files.readme.io/e3203d1-brand24-small.png"),
     Org(
         "Chartbeat", "https://chartbeat.com/", "https://files.readme.io/861ace7-chartbeat-small.png"
