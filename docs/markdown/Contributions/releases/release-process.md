@@ -81,6 +81,12 @@ The process may fail in two ways:
 - The cherry-picking process failed, and tagged the PR with `auto-cherry-picking-failed`: follow the instructions in the comment on the pull request. (This likely means there's merge conflicts that require manual resolution.)
 - the cherry-pick didn't (yet) run: trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
 
+### Step 1-4 below are automated (at least for dev releases)
+
+```
+./pants run src/python/pants_release/start_release.py -- --new <new version, such as 2.18.0.dev6>  --release-manager <github_username> --publish
+```
+
 ### 1. Start the release
 
 From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
