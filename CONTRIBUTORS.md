@@ -297,6 +297,7 @@ Created as part of the release process.
 + Tushar Singh
 + Ugo Di Girolamo
 + Viktor Kleen
++ Vincent Tavernier
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
@@ -311,6 +312,7 @@ Created as part of the release process.
 + bianca rosa
 + billybecker
 + eugene yokota
++ gyudoza
 + hephex
 + philipp-sontag-by
 + sww
