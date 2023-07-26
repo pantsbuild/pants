@@ -36,14 +36,16 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
     if tfsec.config:
         computed_args = [f"--config-file={tfsec.config}"]
 
+    argv = [
+        downloaded_tfsec.exe,
+        *computed_args,
+        *tfsec.args,
+    ]
+    # raise ValueError(argv)
     process_result = await Get(
         FallibleProcessResult,
         Process(
-            argv=[
-                downloaded_tfsec.exe,
-                *computed_args,
-                *tfsec.args,
-            ],
+            argv=argv,
             input_digest=input_digest,
             description="Run tfsec",
             level=LogLevel.DEBUG,

@@ -29,22 +29,30 @@ def test_run_tfsec():
         ],
     )
 
+    rule_runner.set_options(
+        [
+            "--terraform-tfsec-args='--no-colour'",
+            "--terraform-tfsec-config=.tfsec_config.json",  # changing the config since changing pants_ignore isn't possible with the rule_runner
+        ]
+    )
+
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-            terraform_deployment(name="tgt_good", root_module=":good")
-            terraform_module(name="good", sources=["main.tf"])
-            """
+                terraform_deployment(name="tgt_good", root_module=":good")
+                terraform_module(name="good", sources=["main.tf"])
+                """
             ),
             "main.tf": dedent(
                 """\
-            resource "aws_security_group_rule" "my-rule" {
-                type = "ingress"
-                cidr_blocks = ["0.0.0.0/0"]
-            }
-            """
+                resource "aws_s3_bucket" "my-bucket" {
+                  bucket = "foobar"
+                  acl    = "private"
+                }
+                """
             ),
+            ".tfsec_config.json": '{"exclude":["aws-s3-block-public-acls"]}',
         }
     )
 
@@ -56,4 +64,7 @@ def test_run_tfsec():
     )
 
     assert result.exit_code == 1
-    assert "2 passed, 2 potential problem(s) detected." in result.stdout
+    assert "1 ignored" in result.stdout, "Error wasn't ignored, did we pull in the config file?"
+    assert (
+        "\x1b[1m" not in result.stdout
+    ), "Found colour control code in ouput, are extra-args being passed?"
