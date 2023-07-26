@@ -1,6 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.terraform.lint.tfsec.tfsec import TFSec, TfSecRequest
+from pants.backend.terraform.lint.tfsec.tfsec import SkipTfSecField, TFSec, TfSecRequest
+from pants.backend.terraform.target_types import TerraformModuleTarget
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
@@ -60,4 +61,5 @@ def rules():
         *collect_rules(),
         *TfSecRequest.rules(),
         *config_files.rules(),
+        TerraformModuleTarget.register_plugin_field(SkipTfSecField),
     ]

@@ -9,6 +9,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.platform import Platform
+from pants.engine.target import BoolField, Target
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
@@ -73,9 +74,17 @@ class TFSec(ExternalTool):
         return "./tfsec"
 
 
+class SkipTfSecField(BoolField):
+    alias = "skip_tfsec"
+    default = False
+    help = "If true, don't run tfsec on this target's Terraform files."
+
+
 @dataclass(frozen=True)
 class TfSecFieldSet(TerraformFieldSet):
-    ...
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipTfSecField).value
 
 
 class TfSecRequest(LintTargetsRequest):
