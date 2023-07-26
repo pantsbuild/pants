@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.terraform.lint.tfsec.tfsec import TFSec, TfSecRequest
 from pants.core.goals.lint import LintResult
+from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -53,4 +54,8 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
 
 
 def rules():
-    return [*collect_rules(), *TfSecRequest.rules()]
+    return [
+        *collect_rules(),
+        *TfSecRequest.rules(),
+        *config_files.rules(),
+    ]

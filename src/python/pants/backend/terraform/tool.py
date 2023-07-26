@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple
 
+from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -285,4 +286,4 @@ async def setup_terraform_process(
 
 
 def rules():
-    return collect_rules()
+    return [*collect_rules(), *external_tool.rules()]
