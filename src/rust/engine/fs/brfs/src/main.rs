@@ -783,6 +783,7 @@ async fn main() {
           .value_of_t::<usize>("batch-api-size-limit")
           .expect("Bad batch-api-size-limit flag"),
       })
+      .await
       .expect("Error making remote store"),
     None => local_only_store,
   };

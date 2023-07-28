@@ -36,12 +36,13 @@ fn remote_options(
   }
 }
 
-fn new_provider(cas: &StubCAS) -> Provider {
+async fn new_provider(cas: &StubCAS) -> Provider {
   Provider::new(remote_options(
     cas.address(),
     10 * MEGABYTES,
     crate::tests::STORE_BATCH_API_SIZE_LIMIT,
   ))
+  .await
   .unwrap()
 }
 
@@ -53,7 +54,7 @@ async fn load_test(chunk_size: usize) {
   let testdata = TestData::roland();
   let cas = new_cas(chunk_size);
 
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
   let mut destination = Vec::new();
 
   let found = provider
@@ -89,7 +90,7 @@ async fn load_existing_multiple_chunks_nonfactor() {
 async fn load_missing() {
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
   let mut destination = Vec::new();
 
   let found = provider
@@ -106,7 +107,7 @@ async fn load_grpc_error() {
   let testdata = TestData::roland();
   let cas = StubCAS::cas_always_errors();
 
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
   let mut destination = Vec::new();
 
   let error = provider
@@ -130,7 +131,7 @@ async fn load_existing_wrong_digest_error() {
     )
     .build();
 
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
   let mut destination = Vec::new();
 
   let error = provider
@@ -170,7 +171,7 @@ fn assert_cas_store(
 async fn store_bytes_one_chunk() {
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   provider
     .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
@@ -188,6 +189,7 @@ async fn store_bytes_multiple_chunks() {
     chunk_size,
     0, // disable batch API, force streaming API
   ))
+  .await
   .unwrap();
 
   let all_the_henries = big_file_bytes();
@@ -206,7 +208,7 @@ async fn store_bytes_multiple_chunks() {
 async fn store_bytes_empty_file() {
   let testdata = TestData::empty();
   let cas = StubCAS::empty();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   provider
     .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
@@ -220,7 +222,7 @@ async fn store_bytes_empty_file() {
 async fn store_bytes_grpc_error() {
   let testdata = TestData::roland();
   let cas = StubCAS::cas_always_errors();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   let error = provider
     .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
@@ -240,6 +242,7 @@ async fn store_bytes_connection_error() {
     10 * MEGABYTES,
     crate::tests::STORE_BATCH_API_SIZE_LIMIT,
   ))
+  .await
   .unwrap();
 
   let error = provider
@@ -256,7 +259,7 @@ async fn store_bytes_connection_error() {
 async fn list_missing_digests_none_missing() {
   let cas = new_cas(1024);
 
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   assert_eq!(
     provider
@@ -270,7 +273,7 @@ async fn list_missing_digests_none_missing() {
 async fn list_missing_digests_some_missing() {
   let cas = StubCAS::empty();
 
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
   let digest = TestData::roland().digest();
 
   let mut digest_set = HashSet::new();
@@ -287,7 +290,7 @@ async fn list_missing_digests_some_missing() {
 #[tokio::test]
 async fn list_missing_digests_grpc_error() {
   let cas = StubCAS::cas_always_errors();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   let error = provider
     .list_missing_digests(&mut vec![TestData::roland().digest()].into_iter())
