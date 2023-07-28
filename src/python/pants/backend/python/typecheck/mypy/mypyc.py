@@ -42,7 +42,7 @@ class UsesMyPycField(BoolField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MyPycDistBuildEnvironmentRequest(DistBuildEnvironmentRequest):
     @classmethod
     def is_applicable(cls, tgt: Target) -> bool:

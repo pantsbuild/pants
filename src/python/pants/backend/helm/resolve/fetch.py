@@ -47,7 +47,7 @@ class InvalidHelmArtifactTarget(Exception):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FetchHelmArtifactRequest(EngineAwareParameter):
     field_set: HelmArtifactFieldSet
     description_of_origin: str
@@ -72,7 +72,7 @@ class FetchHelmArtifactRequest(EngineAwareParameter):
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FetchedHelmArtifact(EngineAwareReturnType):
     artifact: ResolvedHelmArtifact
     snapshot: Snapshot

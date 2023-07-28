@@ -27,7 +27,7 @@ from pants.util.strutil import ensure_binary
 Command = Union[str, List[str]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PantsResult:
     command: Command
     exit_code: int
@@ -55,7 +55,7 @@ class PantsResult:
         assert self.exit_code != 0, self._format_unexpected_error_code_msg(msg)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PantsJoinHandle:
     command: Command
     process: subprocess.Popen

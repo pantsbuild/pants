@@ -31,12 +31,12 @@ class MockRepositoriesField(StringSequenceField):
     alias = "repositories"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockPublishRequest(PublishRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PublishTestFieldSet(PublishFieldSet):
     publish_request_type = MockPublishRequest
     required_fields = (MockRepositoriesField,)

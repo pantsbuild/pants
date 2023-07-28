@@ -37,14 +37,14 @@ class JavaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".java",)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (JavaSourceField,)
 
     sources: JavaSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaGeneratorFieldSet(FieldSet):
     required_fields = (JavaGeneratorSourcesField,)
 

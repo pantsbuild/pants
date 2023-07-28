@@ -84,7 +84,7 @@ async def first_party_helm_chart_mapping(
     return FirstPartyHelmChartMapping(name_addr_mapping)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartDependenciesInferenceFieldSet(FieldSet):
     required_fields = (HelmChartMetaSourceField, HelmChartDependenciesField)
 

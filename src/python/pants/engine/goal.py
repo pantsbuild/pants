@@ -63,7 +63,7 @@ class GoalSubsystem(Subsystem):
         return cast(str, cls.name)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Goal:
     """The named product of a `@goal_rule`.
 
@@ -180,7 +180,7 @@ class LineOriented(Outputting):
             yield lambda msg: print(msg, file=output_sink, end=sep)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CurrentExecutingGoals(EngineAwareReturnType):
     executing: dict[str, type[Goal]] = field(default_factory=dict)
 

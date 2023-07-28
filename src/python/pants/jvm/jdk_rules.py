@@ -36,7 +36,7 @@ from pants.util.strutil import fmt_memory_size, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Nailgun:
     classpath_entry: ClasspathEntry
 
@@ -46,7 +46,7 @@ class DefaultJdk(Enum):
     SOURCE_DEFAULT = "source_default"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JdkRequest:
     """Request for a JDK with a specific major version, or a default (`--jvm-jdk` or System)."""
 
@@ -88,7 +88,7 @@ class JdkRequest:
         return JdkRequest.from_field(field)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JdkEnvironment:
     _digest: Digest
     nailgun_jar: str
@@ -130,7 +130,7 @@ class JdkEnvironment:
         return {**self.coursier.immutable_input_digests, self.bin_dir: self._digest}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InternalJdk(JdkEnvironment):
     """The JDK configured for internal Pants usage, rather than for matching source compatibility.
 
@@ -312,7 +312,7 @@ async def prepare_jdk_environment(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JvmProcess:
     jdk: JdkEnvironment
     argv: tuple[str, ...]

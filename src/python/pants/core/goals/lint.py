@@ -50,7 +50,7 @@ _T = TypeVar("_T")
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LintResult(EngineAwareReturnType):
     exit_code: int
     stdout: str

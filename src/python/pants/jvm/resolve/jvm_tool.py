@@ -175,7 +175,7 @@ class GenerateJvmToolLockfileSentinel(GenerateToolLockfileSentinel):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateJvmLockfileFromTool:
     """Create a `GenerateJvmLockfile` request for a JVM tool.
 

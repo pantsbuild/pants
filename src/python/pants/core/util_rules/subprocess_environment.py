@@ -42,7 +42,7 @@ class SubprocessEnvironment(Subsystem):
             return tuple(sorted(set(self._env_vars)))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SubprocessEnvironmentVars:
     vars: FrozenDict[str, str]
 

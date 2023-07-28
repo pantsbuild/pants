@@ -47,19 +47,19 @@ class UnsupportedVersionUsage(Enum):
     LogWarning = "warning"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExternalToolRequest:
     download_file_request: DownloadFile
     exe: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DownloadedExternalTool:
     digest: Digest
     exe: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExternalToolVersion:
     version: str
     platform: str

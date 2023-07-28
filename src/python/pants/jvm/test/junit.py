@@ -49,7 +49,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JunitTestFieldSet(TestFieldSet):
     required_fields = (
         JunitTestSourceField,
@@ -73,13 +73,13 @@ class JunitToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = JUnit.options_scope
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestSetupRequest:
     field_set: JunitTestFieldSet
     is_debug: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestSetup:
     process: JvmProcess
     reports_dir_prefix: str

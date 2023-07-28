@@ -21,12 +21,12 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class A:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class B:
     pass
 
@@ -57,7 +57,7 @@ def test_use_params() -> None:
         rule_runner.request(str, [a])
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class C:
     pass
 
@@ -67,7 +67,7 @@ def transitive_b_c(c: C) -> B:
     return B()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class D:
     b: B
 
@@ -132,7 +132,7 @@ def test_strict_equals() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Fuel:
     pass
 
@@ -164,7 +164,7 @@ def motorcycle_num_wheels(motorcycle: Motorcycle) -> int:
     return motorcycle.num_wheels()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WrappedVehicle:
     vehicle: Vehicle
 
@@ -271,12 +271,12 @@ def test_rule_helper_after_rule_definition_fails() -> None:
     ) in str(exc.value.args[0])
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SomeInput:
     s: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SomeOutput:
     s: str
 
@@ -286,7 +286,7 @@ def raise_an_exception(some_input: SomeInput) -> SomeOutput:
     raise Exception(some_input.s)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OuterInput:
     s: str
 
@@ -475,7 +475,7 @@ def test_trace_includes_nested_exception_traceback() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaybeHashableWrapper:
     maybe_hashable: Any
 

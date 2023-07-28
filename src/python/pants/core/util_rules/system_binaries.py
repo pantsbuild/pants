@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BinaryPath:
     path: str
     fingerprint: str
@@ -112,7 +112,7 @@ class BinaryPathRequest:
         object.__setattr__(self, "test", test)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BinaryPaths(EngineAwareReturnType):
     binary_name: str
     paths: tuple[BinaryPath, ...]
@@ -177,7 +177,7 @@ class BinaryNotFoundError(EnvironmentError):
 # -------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BinaryShimsRequest:
     """Request to create shims for one or more system binaries."""
 
@@ -213,7 +213,7 @@ class BinaryShimsRequest:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BinaryShims:
     """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
 
@@ -271,7 +271,7 @@ class UnzipBinary(BinaryPath):
         return (self.path, archive_path, "-d", extract_path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TarBinary(BinaryPath):
     platform: Platform
 
@@ -670,7 +670,7 @@ def rules():
 # -------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaybeGitBinary:
     git_binary: GitBinary | None = None
 

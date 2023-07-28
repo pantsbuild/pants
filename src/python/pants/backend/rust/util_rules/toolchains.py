@@ -27,7 +27,7 @@ class RustupBinary(BinaryPath):
     """Path to the rustup binary used to select and gain access to Rust toolchains."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RustToolchainProcess:
     binary: str
     args: tuple[str, ...]
@@ -75,7 +75,7 @@ async def find_rustup(rust_subsystem: RustSubsystem) -> RustupBinary:
     return RustupBinary(first_path.path, first_path.fingerprint)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RustBinaryPathRequest:
     binary: str
 

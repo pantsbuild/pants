@@ -111,7 +111,7 @@ class FortranModule(Target):
     core_fields = ()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockPutativeFortranModuleRequest(PutativeTargetsRequest):
     pass
 

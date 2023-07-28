@@ -16,7 +16,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CGoBinaryPathRequest(EngineAwareParameter):
     binary_name: str
     binary_path_test: BinaryPathTest | None

@@ -54,7 +54,7 @@ class AmbiguousChartMetadataException(Exception):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartDependency:
     name: str
     repository: str | None = None
@@ -90,7 +90,7 @@ class HelmChartDependency:
         return d
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartMaintainer:
     name: str
     email: str | None = None
@@ -112,7 +112,7 @@ class HelmChartMaintainer:
 DEFAULT_API_VERSION = "v2"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartMetadata:
     name: str
     version: str
@@ -208,7 +208,7 @@ class HelmChartMetadata:
 HELM_CHART_METADATA_FILENAMES = ["Chart.yaml", "Chart.yml"]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParseHelmChartMetadataDigest(EngineAwareParameter):
     """Request to parse the Helm chart definition file (i.e. `Chart.yaml`) from the given digest.
 

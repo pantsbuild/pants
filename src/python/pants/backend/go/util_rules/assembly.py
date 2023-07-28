@@ -15,7 +15,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateAssemblySymabisRequest:
     """Generate a `symabis` file with metadata about the assemnbly files for consumption by Go
     compiler.
@@ -30,13 +30,13 @@ class GenerateAssemblySymabisRequest:
     extra_assembler_flags: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateAssemblySymabisResult:
     symabis_digest: Digest
     symabis_path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleGenerateAssemblySymabisResult:
     result: GenerateAssemblySymabisResult | None
     exit_code: int = 0
@@ -44,7 +44,7 @@ class FallibleGenerateAssemblySymabisResult:
     stderr: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AssembleGoAssemblyFilesRequest:
     """Assemble Go assembly files to object files."""
 
@@ -55,12 +55,12 @@ class AssembleGoAssemblyFilesRequest:
     extra_assembler_flags: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AssembleGoAssemblyFilesResult:
     assembly_outputs: tuple[tuple[str, Digest], ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleAssembleGoAssemblyFilesResult:
     result: AssembleGoAssemblyFilesResult | None
     exit_code: int = 0

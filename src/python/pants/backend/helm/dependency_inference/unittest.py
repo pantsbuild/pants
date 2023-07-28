@@ -43,7 +43,7 @@ class AmbiguousHelmUnitTestChart(Exception):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmUnitTestChartDependencyInferenceFieldSet(FieldSet):
     required_fields = (HelmUnitTestDependenciesField,)
 

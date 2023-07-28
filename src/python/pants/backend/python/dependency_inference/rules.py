@@ -69,7 +69,7 @@ class UnownedDependencyError(Exception):
     """The inferred dependency does not have any owner."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonImportDependenciesInferenceFieldSet(FieldSet):
     required_fields = (
         PythonSourceField,
@@ -146,7 +146,7 @@ class ImportOwnerStatus(Enum):
     unownable = "unownable"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ImportResolveResult:
     status: ImportOwnerStatus
     address: tuple[Address, ...] = ()
@@ -233,7 +233,7 @@ def _remove_ignored_imports(
     return frozenset(unowned_imports_filtered)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnownedImportsPossibleOwnersRequest:
     """A request to find possible owners for several imports originating in a resolve."""
 
@@ -241,18 +241,18 @@ class UnownedImportsPossibleOwnersRequest:
     original_resolve: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnownedImportPossibleOwnerRequest:
     unowned_import: str
     original_resolve: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnownedImportsPossibleOwners:
     value: Dict[str, list[tuple[Address, ResolveName]]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnownedImportPossibleOwners:
     value: list[tuple[Address, ResolveName]]
 
@@ -372,14 +372,14 @@ async def _exec_parse_deps(
     return resp
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedParsedPythonDependenciesRequest:
     field_set: PythonImportDependenciesInferenceFieldSet
     parsed_dependencies: ParsedPythonDependencies
     resolve: Optional[str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedParsedPythonDependencies:
     resolve_results: dict[str, ImportResolveResult]
     assets: dict[str, ImportResolveResult]
@@ -486,7 +486,7 @@ async def infer_python_dependencies_via_source(
     return InferredDependencies(sorted(inferred_deps))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InitDependenciesInferenceFieldSet(FieldSet):
     required_fields = (PythonSourceField, PythonResolveField)
 
@@ -533,7 +533,7 @@ async def infer_python_init_dependencies(
     return InferredDependencies(python_owners)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ConftestDependenciesInferenceFieldSet(FieldSet):
     required_fields = (PythonTestSourceField, PythonResolveField)
 

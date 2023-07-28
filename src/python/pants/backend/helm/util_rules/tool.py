@@ -120,7 +120,7 @@ class ExternalHelmPlugin(HelmPluginSubsystem, TemplatedExternalTool, metaclass=A
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmPluginPlatformCommand:
     os: str
     arch: str
@@ -131,7 +131,7 @@ class HelmPluginPlatformCommand:
         return cls(**snake_case_attr_dict(d))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmPluginInfo:
     name: str
     version: str
@@ -164,7 +164,7 @@ _EHPB = TypeVar("_EHPB", bound="ExternalHelmPluginBinding")
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExternalHelmPluginBinding(Generic[_ExternalHelmPlugin], metaclass=ABCMeta):
     """Union type allowing Pants to discover global external Helm plugins."""
 
@@ -178,7 +178,7 @@ class ExternalHelmPluginBinding(Generic[_ExternalHelmPlugin], metaclass=ABCMeta)
         return cls(name=cls.plugin_subsystem_cls.plugin_name)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExternalHelmPluginRequest(EngineAwareParameter):
     """Helper class to create a download request for an external Helm plugin."""
 
@@ -204,7 +204,7 @@ class ExternalHelmPluginRequest(EngineAwareParameter):
         return {"platform": self.platform, "url": self._tool_request.download_file_request.url}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmPlugin(EngineAwareReturnType):
     info: HelmPluginInfo
     platform: Platform
@@ -284,7 +284,7 @@ async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> H
 # ---------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmBinary:
     path: str
 
@@ -316,7 +316,7 @@ class HelmBinary:
         return {_HELM_CACHE_NAME: _HELM_CACHE_DIR}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmProcess:
     argv: tuple[str, ...]
     input_digest: Digest

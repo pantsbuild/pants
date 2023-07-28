@@ -42,7 +42,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (GoBinaryMainPackageField,)
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC

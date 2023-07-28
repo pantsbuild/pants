@@ -67,7 +67,7 @@ class DumpPythonSourceAnalysis(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonSourceAnalysis:
     """Information on the inferred imports for a Python file, including all raw intermediate
     results."""
@@ -105,7 +105,7 @@ async def dump_python_source_analysis_single(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ImportAnalysis:
     """Information on the inferred imports for a Python file."""
 
@@ -115,7 +115,7 @@ class ImportAnalysis:
     possible_resolve: Optional[list[tuple[Address, ResolveName]]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CollectedImportAnalysis:
     """Collected information on all Python files."""
 

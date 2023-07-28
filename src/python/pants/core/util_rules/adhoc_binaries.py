@@ -21,7 +21,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonBuildStandaloneBinary:
     """A Python interpreter for use by `@rule` code as an alternative to BashBinary scripts.
 
@@ -100,12 +100,12 @@ async def download_python_binary(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GunzipBinaryRequest:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GunzipBinary:
     python_binary: PythonBuildStandaloneBinary
 

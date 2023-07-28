@@ -68,7 +68,7 @@ class DockerImageOptionValueError(ValueError):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerPackageFieldSet(PackageFieldSet):
     required_fields = (DockerImageSourceField,)
 
@@ -232,14 +232,14 @@ class DockerPackageFieldSet(PackageFieldSet):
         return os.path.normpath(context_root)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ImageRefRegistry:
     registry: DockerRegistryOptions | None
     repository: str
     tags: tuple[ImageRefTag, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ImageRefTag:
     template: str
     formatted: str
@@ -247,7 +247,7 @@ class ImageRefTag:
     uses_local_alias: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerInfoV1:
     """The format of the `$target_name.docker-info.json` file."""
 
@@ -290,7 +290,7 @@ class DockerInfoV1:
         return json.dumps(asdict(info)).encode()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerInfoV1Registry:
     # set if registry was specified as `@something`
     alias: str | None
@@ -299,7 +299,7 @@ class DockerInfoV1Registry:
     tags: list[DockerInfoV1ImageTag]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerInfoV1ImageTag:
     template: str
     tag: str

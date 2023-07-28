@@ -18,7 +18,7 @@ from pants.util.frozendict import FrozenDict
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ImportConfig:
     """An `importcfg` file associating import paths to their `__pkg__.a` files."""
 
@@ -27,7 +27,7 @@ class ImportConfig:
     CONFIG_PATH: ClassVar[str] = "./importcfg"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ImportConfigRequest:
     """Create an `importcfg` file associating import paths to their `__pkg__.a` files."""
 

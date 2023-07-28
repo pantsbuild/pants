@@ -22,7 +22,7 @@ CONTENT_TYPE = "binary/octet-stream"
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AWSCredentials:
     creds: Any
 
@@ -53,7 +53,7 @@ async def access_aws_credentials() -> AWSCredentials:
     return AWSCredentials(creds)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class S3DownloadFile:
     region: str
     bucket: str

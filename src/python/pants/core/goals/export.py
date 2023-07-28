@@ -38,7 +38,7 @@ class ExportError(Exception):
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExportRequest:
     """A union for exportable data provided by a backend.
 
@@ -48,7 +48,7 @@ class ExportRequest:
     targets: Sequence[Target]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PostProcessingCommand:
     """A command to run as a local process after an exported digest is materialized."""
 
@@ -69,7 +69,7 @@ class PostProcessingCommand:
         object.__setattr__(self, "extra_env", FrozenDict(extra_env))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExportResult:
     description: str
     # Materialize digests under this reldir.

@@ -56,7 +56,7 @@ from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeI
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionValueHistory:
     ranked_values: tuple[RankedValue]
 
@@ -146,7 +146,7 @@ class Parser:
     def history(self, dest: str) -> OptionValueHistory | None:
         return self._history.get(dest)
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class ParseArgsRequest:
         flag_value_map: dict[str, list[Any]]
         namespace: OptionValueContainerBuilder

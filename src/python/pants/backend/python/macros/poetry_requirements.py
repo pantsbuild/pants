@@ -190,7 +190,7 @@ def parse_python_constraint(constr: str | None, fp: str) -> str:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyProjectToml:
     build_root: PurePath
     toml_relpath: PurePath

@@ -20,7 +20,7 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinJunitTestDependencyInferenceFieldSet(FieldSet):
     required_fields = (KotlinJunitTestDependenciesField, JvmResolveField)
 
@@ -32,12 +32,12 @@ class InferKotlinJunitTestDependencyRequest(InferDependenciesRequest):
     infer_from = KotlinJunitTestDependencyInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinJunitLibrariesForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinJunitLibrariesForResolve:
     addresses: frozenset[Address]
 

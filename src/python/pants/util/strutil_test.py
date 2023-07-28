@@ -403,7 +403,7 @@ def test_docstring_decorator() -> None:
 
 
 def test_stable_hash() -> None:
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class Data:
         mapping: FrozenDict[str, str]
 

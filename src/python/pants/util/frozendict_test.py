@@ -124,7 +124,7 @@ def test_hash() -> None:
 
 
 def test_works_with_dataclasses() -> None:
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class Frozen:
         x: int
 

@@ -9,7 +9,7 @@ from pants.core.goals.package import BuiltPackageArtifact
 from pants.util.strutil import bullet_list, pluralize
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuiltDockerImage(BuiltPackageArtifact):
     # We don't really want a default for this field, but the superclass has a field with
     # a default, so all subsequent fields must have one too. The `create()` method below

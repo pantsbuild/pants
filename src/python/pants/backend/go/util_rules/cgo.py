@@ -52,7 +52,7 @@ _logger = logging.getLogger(__name__)
 #   // license that can be found in the LICENSE file.
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CGoCompileRequest(EngineAwareParameter):
     import_path: str
     pkg_name: str
@@ -73,7 +73,7 @@ class CGoCompileRequest(EngineAwareParameter):
         return self.import_path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CGoCompileResult:
     digest: Digest
     output_go_files: tuple[str, ...]
@@ -85,7 +85,7 @@ class CGoCompileResult:
     include_module_sources_with_output: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CGoCompilerFlags:
     cflags: tuple[str, ...]
     cppflags: tuple[str, ...]
@@ -106,13 +106,13 @@ class CGoCompilerFlags:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CheckCompilerSupportsFlagRequest:
     cc: str
     flag: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CheckCompilerSupportsOptionResult:
     supports_flag: bool
 
@@ -163,13 +163,13 @@ async def check_compiler_supports_flag(
     return CheckCompilerSupportsOptionResult(supported)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SetupCompilerCmdRequest:
     compiler: tuple[str, ...]
     include_dir: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SetupCompilerCmdResult:
     args: tuple[str, ...]
 
@@ -286,7 +286,7 @@ async def setup_compiler_cmd(
     return SetupCompilerCmdResult(tuple(args))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CGoCompilerWrapperScript:
     digest: Digest
 
@@ -421,7 +421,7 @@ async def _gccld(
     return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _DynImportResult:
     digest: Digest
     dyn_out_go: str | None  # if not empty, is a new Go file to build as part of the package.

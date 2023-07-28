@@ -62,7 +62,7 @@ class _ClasspathEntryRequestClassification(Enum):
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClasspathEntryRequest(metaclass=ABCMeta):
     """A request for a ClasspathEntry for the given CoarsenedTarget and resolve.
 
@@ -90,7 +90,7 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
     root_only: ClassVar[bool] = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClasspathEntryRequestFactory:
     impls: tuple[type[ClasspathEntryRequest], ...]
     generator_sources: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]]
@@ -216,7 +216,7 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathE
     return ClasspathEntryRequestFactory(tuple(cpe_impls), sources_by_impl)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClasspathEntry:
     """A JVM classpath entry represented as a series of JAR files, and their dependencies.
 
@@ -322,7 +322,7 @@ class CompileResult(Enum):
     DEPENDENCY_FAILED = "dependency failed"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleClasspathEntry(EngineAwareReturnType):
     description: str
     result: CompileResult
@@ -392,7 +392,7 @@ class FallibleClasspathEntries(Collection[FallibleClasspathEntry]):
         return FallibleClasspathEntry.if_all_succeeded(self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClasspathDependenciesRequest:
     request: ClasspathEntryRequest
     ignore_generated: bool = False

@@ -5,7 +5,7 @@ excerpt: "Getting started writing plugins for Pants by creating a new goal."
 hidden: false
 createdAt: "2022-02-07T05:44:28.620Z"
 ---
-In this tutorial, you'll learn the basics needed to get started writing a plugin. You will create a new goal, `project-version`, which will tell you the version (retrieved from the `VERSION` text file) of a particular project in your monorepository. You will learn how to create a new custom target to refer to the `VERSION` file, how to author a new goal, and, most importantly, how to connect rules and targets. 
+In this tutorial, you'll learn the basics needed to get started writing a plugin. You will create a new goal, `project-version`, which will tell you the version (retrieved from the `VERSION` text file) of a particular project in your monorepository. You will learn how to create a new custom target to refer to the `VERSION` file, how to author a new goal, and, most importantly, how to connect rules and targets.
 
 You can follow along this tutorial in your own repository; you only need to be on a recent version of Pants and have a `VERSION` file containing a version string e.g. `1.2.3`. If you do not have a repository with Pants enabled yet, you can use [this example Python repository](https://github.com/pantsbuild/example-python/) to work on the plugin.
 
@@ -38,11 +38,11 @@ class ProjectVersionTarget(Target):
     help = "A project version target representing the VERSION file."
 ```
 
-Our target has some common target fields such as `tags` and `description` available via the `COMMON_TARGET_FIELDS`; including those fields in your targets may be convenient if you decide to use tags and provide a description later. In addition, it also has the [`source` field](https://www.pantsbuild.org/docs/rules-api-and-target-api#sourcesfield) which will be used to provide path to the project's `VERSION` file. 
+Our target has some common target fields such as `tags` and `description` available via the `COMMON_TARGET_FIELDS`; including those fields in your targets may be convenient if you decide to use tags and provide a description later. In addition, it also has the [`source` field](https://www.pantsbuild.org/docs/rules-api-and-target-api#sourcesfield) which will be used to provide path to the project's `VERSION` file.
 
-We could [add a custom field](https://www.pantsbuild.org/docs/target-api-new-fields) to provide a file path, however, there are multiple advantages to  using the `source` field. You will learn more about them in the following tutorials. 
+We could [add a custom field](https://www.pantsbuild.org/docs/target-api-new-fields) to provide a file path, however, there are multiple advantages to  using the `source` field. You will learn more about them in the following tutorials.
 
-In order to start using a target, you only need to register it: 
+In order to start using a target, you only need to register it:
 
 ```python pants-plugins/project_version/register.py
 from typing import Iterable
@@ -58,7 +58,7 @@ def target_types() -> Iterable[type[Target]]:
 You can now run `pants help version_file` to learn more about the target:
 
 ```
-❯ pants help version_file  
+❯ pants help version_file
 
 `version_file` target
 ---------------------
@@ -74,7 +74,7 @@ source
     required
 
     A single file that belongs to this target.
-    
+
     Path is relative to the BUILD file's directory, e.g. `source='example.ext'`.
 
 ...
@@ -84,7 +84,7 @@ You can now also add a target to the `myapp/BUILD` file:
 
 ```python
 version_file(
-    name="main-project-version", 
+    name="main-project-version",
     source="VERSION",
 )
 ```
@@ -189,10 +189,10 @@ $ pants project-version myapp
 
 You can think of the `@goal_rule` as of the `main` function in your Python program where you would call various functions that your program needs to complete. For auxiliary code, it makes sense to place it into standalone functions which is what `@rule`s are for.
 
-Let's create a rule that will return a data structure that we'll use to represent our project version. [Data classes](https://www.pantsbuild.org/docs/rules-api-concepts#dataclasses) work really well with Pants engine, so let's create one: 
+Let's create a rule that will return a data structure that we'll use to represent our project version. [Data classes](https://www.pantsbuild.org/docs/rules-api-concepts#dataclasses) work really well with Pants engine, so let's create one:
 
 ```python
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProjectVersionFileView:
     path: str
     version: str
@@ -226,25 +226,25 @@ async def goal_show_project_version(console: Console, targets: Targets) -> Proje
     return ProjectVersionGoal(exit_code=0)
 ```
 
-Understanding that calling `Get()` is what causes a particular `@rule` to be executed is essential! It may feel awkward that you cannot run your function. However, by using the `Get()`, you are asking Pants to run your rule, and only knowing this will get you quite far! 
+Understanding that calling `Get()` is what causes a particular `@rule` to be executed is essential! It may feel awkward that you cannot run your function. However, by using the `Get()`, you are asking Pants to run your rule, and only knowing this will get you quite far!
 
 Compare this `Get()` call with the rule signature:
 
 ```python
-# requesting an object of type "ProjectVersionFileView", 
+# requesting an object of type "ProjectVersionFileView",
 # passing an object of type "ProjectVersionTarget" in the variable "target"
 Get(ProjectVersionFileView, ProjectVersionTarget, target)
 ```
 
 ```python
-# it requires an object of type "ProjectVersionTarget" and 
+# it requires an object of type "ProjectVersionTarget" and
 # will return an object of type "ProjectVersionFileView"
 @rule
 async def get_project_version_file_view(target: ProjectVersionTarget) -> ProjectVersionFileView: ...
 ```
 
 > 📘 Understanding the requests and rules signatures
-> In our basic usage, there's a 1:1 match between the `Get(output: B, input: A, obj)` request and the `@rule(input: A) -> B` function signature. This doesn't have to be the case! When you make a request (providing an input type and asking for an output type), Pants looks at all the [rules in the graph](https://www.pantsbuild.org/docs/rules-api-concepts#the-rule-graph) to find a way from the input to the output using all the available rules. 
+> In our basic usage, there's a 1:1 match between the `Get(output: B, input: A, obj)` request and the `@rule(input: A) -> B` function signature. This doesn't have to be the case! When you make a request (providing an input type and asking for an output type), Pants looks at all the [rules in the graph](https://www.pantsbuild.org/docs/rules-api-concepts#the-rule-graph) to find a way from the input to the output using all the available rules.
 
 Let's consider a following scenario where you have a few `@rule`s and a `Get()` request:
 
@@ -260,7 +260,7 @@ async def main(...):
     result = await Get(C, A, obj)
 ```
 
-With the following suite of rules, Pants will "figure out" that in order to return `C`, it's necessary to call `rule1` first to get `B` and then once there's `B`, call `rule2` to get C. This means you can focus on writing individual rules and leave the hard work of finding out the right order of calls that will need happen to Pants!   
+With the following suite of rules, Pants will "figure out" that in order to return `C`, it's necessary to call `rule1` first to get `B` and then once there's `B`, call `rule2` to get C. This means you can focus on writing individual rules and leave the hard work of finding out the right order of calls that will need happen to Pants!
 
 The `project-version` Pants goal now shows some useful information -- the target path along with a dummy version. This means our `@rule` was run!
 
@@ -273,7 +273,7 @@ You would normally expect for a project to have only a single `version_file` tar
 
 ### Reading the `VERSION` file
 
-Let's read the `VERSION` file and print the version number in the terminal. The `source` field of our target needs to be ["hydrated"](https://www.pantsbuild.org/docs/rules-api-and-target-api#sourcesfield). [Reading a file](https://www.pantsbuild.org/docs/rules-api-file-system) is pretty straightforward as well. We use `Get()` to transform our inputs as needed. Knowing what class you need to request may be tricky, so make sure to review the documentation, and ask for help if you are stuck!    
+Let's read the `VERSION` file and print the version number in the terminal. The `source` field of our target needs to be ["hydrated"](https://www.pantsbuild.org/docs/rules-api-and-target-api#sourcesfield). [Reading a file](https://www.pantsbuild.org/docs/rules-api-file-system) is pretty straightforward as well. We use `Get()` to transform our inputs as needed. Knowing what class you need to request may be tricky, so make sure to review the documentation, and ask for help if you are stuck!
 
 ```python
 @rule
@@ -282,7 +282,7 @@ async def get_project_version_file_view(
 ) -> ProjectVersionFileView:
     sources = await Get(HydratedSources, HydrateSourcesRequest(target[SourcesField]))
     digest_contents = await Get(DigestContents, Digest, sources.snapshot.digest)
-    file_content = digest_contents[0]    
+    file_content = digest_contents[0]
     return ProjectVersionFileView(
         path=file_content.path, version=file_content.content.decode("utf-8").strip()
     )
@@ -320,7 +320,7 @@ from pants.engine.target import (HydratedSources, HydrateSourcesRequest,
 from project_version.target_types import ProjectVersionTarget
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProjectVersionFileView:
     path: str
     version: str
@@ -395,6 +395,6 @@ $ pants project-version myapp
 ProjectVersionFileView(path='myapp/VERSION', version='0.0.1')
 ```
 
-The `VERSION` file was read and its contents is shown in the console. Congratulations, you have now finished writing your first plugin! 
+The `VERSION` file was read and its contents is shown in the console. Congratulations, you have now finished writing your first plugin!
 
-There are a few things that we could do to improve it, though. We may want to check that the version string follows a semver convention, let user see the version in the console as a JSON object if desired, or show the version number string when exploring the `version_file` target via the `peek` Pants goal. This is something we'll do in the following tutorials! 
+There are a few things that we could do to improve it, though. We may want to check that the version string follows a semver convention, let user see the version in the console as a JSON object if desired, or show the version number string when exploring the `version_file` target via the `peek` Pants goal. This is something we'll do in the following tutorials!

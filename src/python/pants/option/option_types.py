@@ -13,7 +13,7 @@ from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionsInfo:
     flag_names: tuple[str, ...]
     flag_options: dict[str, Any]

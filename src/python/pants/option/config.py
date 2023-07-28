@@ -45,7 +45,7 @@ class ConfigSource(Protocol):
 DEFAULT_SECTION = "DEFAULT"
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, slots=True, eq=False)
 class Config:
     """Encapsulates config file loading and access, including encapsulation of support for multiple
     config files.
@@ -173,7 +173,7 @@ _TomlPrimitive = Union[bool, int, float, str]
 _TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive], Dict[str, _TomlPrimitive]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ConfigValues:
     """The parsed contents of a TOML config file."""
 
@@ -280,7 +280,7 @@ class _ConfigValues:
         return error_log
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TomlSerializer:
     """Convert a dictionary of option scopes -> Python values into TOML understood by Pants.
 

@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RewrittenBuildFile:
     path: str
     lines: tuple[str, ...]
@@ -72,7 +72,7 @@ class Formatter(Enum):
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RewrittenBuildFileRequest(EngineAwareParameter):
     path: str
     lines: tuple[str, ...]

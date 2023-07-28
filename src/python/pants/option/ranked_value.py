@@ -37,7 +37,7 @@ Value = Union[str, int, float, None, Dict, Enum, List]
 ValueAndDetails = Tuple[Optional[Value], Optional[str]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RankedValue:
     """An option value, together with a rank inferred from its source.
 

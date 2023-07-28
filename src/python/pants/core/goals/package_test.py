@@ -77,7 +77,7 @@ class MockTarget(Target):
     core_fields = (MockTypeField, MockDependenciesField)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockPackageFieldSet(PackageFieldSet):
     required_fields = (MockTypeField,)
 

@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 _scripts_package = "pants.backend.python.util_rules.scripts"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PEP660BuildResult:
     output: Digest
     # Relpaths in the output digest.
@@ -232,7 +232,7 @@ async def run_pep660_build(
     return PEP660BuildResult(output_digest, editable_wheel_path=editable_path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LocalDistPEP660Wheels:
     """Contains the PEP 660 "editable" wheels isolated from a single local Python distribution."""
 
@@ -306,7 +306,7 @@ async def isolate_local_dist_pep660_wheels(
     return LocalDistPEP660Wheels(wheels, wheels_snapshot.digest, frozenset(provided_files))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllPythonDistributionTargets:
     targets: Targets
 
@@ -321,7 +321,7 @@ def find_all_python_distributions(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolveSortedPythonDistributionTargets:
     targets: FrozenDict[str | None, tuple[Target, ...]]
 
@@ -358,7 +358,7 @@ async def sort_all_python_distributions_by_resolve(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EditableLocalDistsRequest:
     """Request to generate PEP660 wheels of local dists in the given resolve.
 
@@ -371,7 +371,7 @@ class EditableLocalDistsRequest:
     resolve: str | None  # None if resolves is not enabled
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EditableLocalDists:
     """A Digest populated by editable (PEP660) wheels of local dists.
 

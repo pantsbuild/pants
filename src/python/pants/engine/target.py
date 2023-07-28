@@ -105,12 +105,12 @@ class AsyncFieldMixin(Field):
                 pass
 
 
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class HydrateSourcesRequest:
             field: Sources
 
 
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class HydratedSources:
             snapshot: Snapshot
 
@@ -167,7 +167,7 @@ class AsyncFieldMixin(Field):
 
 
 @union
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FieldDefaultFactoryRequest:
     """Registers a dynamic default for a Field.
 
@@ -184,14 +184,14 @@ class FieldDefaultFactory(Protocol):
         pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FieldDefaultFactoryResult:
     """A wrapper for a function which computes the default value of a Field."""
 
     default_factory: FieldDefaultFactory
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FieldDefaults:
     """Generic Field default values. To install a default, see `FieldDefaultFactoryRequest`.
 
@@ -241,7 +241,7 @@ class FieldDefaults:
 _F = TypeVar("_F", bound=Field)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Target:
     """A Target represents an addressable set of metadata.
 
@@ -642,7 +642,7 @@ class Target:
         """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WrappedTargetRequest:
     """Used with `WrappedTarget` to get the Target corresponding to an address.
 
@@ -654,7 +654,7 @@ class WrappedTargetRequest:
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WrappedTarget:
     """A light wrapper to encapsulate all the distinct `Target` subclasses into a single type.
 
@@ -727,7 +727,7 @@ class DepsTraversalBehavior(Enum):
     EXCLUDE = "exclude"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShouldTraverseDepsPredicate(metaclass=ABCMeta):
     """This callable determines whether to traverse through deps of a given Target + Field.
 
@@ -904,7 +904,7 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
     __hash__ = Tuple.__hash__
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoarsenedTargetsRequest:
     """A request to get CoarsenedTargets for input roots."""
 
@@ -924,7 +924,7 @@ class CoarsenedTargetsRequest:
         object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TransitiveTargets:
     """A set of Target roots, and their transitive, flattened, de-duped dependencies.
 
@@ -941,7 +941,7 @@ class TransitiveTargets:
         return FrozenOrderedSet([*self.roots, *self.dependencies])
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
 
@@ -962,7 +962,7 @@ class TransitiveTargetsRequest:
         object.__setattr__(self, "should_traverse_deps_predicate", should_traverse_deps_predicate)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RegisteredTargetTypes:
     aliases_to_types: FrozenDict[str, Type[Target]]
 
@@ -1103,7 +1103,7 @@ _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
     generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
 
@@ -1315,7 +1315,7 @@ def _get_field_set_fields_from_target(
 _FS = TypeVar("_FS", bound="FieldSet")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     """An ad hoc set of fields from a target which are used by rules.
 
@@ -1324,14 +1324,14 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     `required_fields`. When a field is optional, the default constructor for the field will be used
     for any targets that do not have that field registered.
 
-    Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
+    Subclasses must set `@dataclass(frozen=True, slots=True)` for their declared fields to be recognized.
 
     You can optionally set implement the classmethod `opt_out` so that targets have a
     mechanism to not match with the FieldSet even if they have the `required_fields` registered.
 
     For example:
 
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class FortranTestFieldSet(FieldSet):
             required_fields = (FortranSources,)
 
@@ -1417,7 +1417,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
         return f"{self.__class__.__name__}(address={self.address})"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetRootsToFieldSets(Generic[_FS]):
     mapping: FrozenDict[Target, Tuple[_FS, ...]]
 
@@ -1474,7 +1474,7 @@ def get_shard(key: str, num_shards: int) -> int:
     return zlib.crc32(key.encode()) % num_shards
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     goal_description: str
@@ -1501,7 +1501,7 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         return get_shard(key, self.num_shards) == self.shard
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FieldSetsPerTarget(Generic[_FS]):
     # One tuple of FieldSet instances per input target.
     collection: Tuple[Tuple[_FS, ...], ...]
@@ -1514,7 +1514,7 @@ class FieldSetsPerTarget(Generic[_FS]):
         return tuple(itertools.chain.from_iterable(self.collection))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FieldSetsPerTargetRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     targets: Tuple[Target, ...]
@@ -2301,7 +2301,7 @@ class SingleSourceField(OptionalSingleSourceField):
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HydrateSourcesRequest(EngineAwareParameter):
     field: SourcesField
     for_sources_types: tuple[type[SourcesField], ...]
@@ -2344,7 +2344,7 @@ class HydrateSourcesRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HydratedSources:
     """The result of hydrating a SourcesField.
 
@@ -2362,7 +2362,7 @@ class HydratedSources:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateSourcesRequest:
     """A request to go from protocol sources -> a particular language.
 
@@ -2402,7 +2402,7 @@ class GenerateSourcesRequest:
     exportable: ClassVar[bool] = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GeneratedSources:
     snapshot: Snapshot
 
@@ -2414,7 +2414,7 @@ class SourcesPaths(Paths):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourcesPathsRequest(EngineAwareParameter):
     """A request to resolve the file names of the `source`/`sources` field.
 
@@ -2542,7 +2542,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependenciesRequest(EngineAwareParameter):
     field: Dependencies
     should_traverse_deps_predicate: ShouldTraverseDepsPredicate = TraverseIfDependenciesField()
@@ -2552,7 +2552,7 @@ class DependenciesRequest(EngineAwareParameter):
 
 
 # NB: ExplicitlyProvidedDependenciesRequest does not have a predicate unlike DependenciesRequest.
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExplicitlyProvidedDependenciesRequest(EngineAwareParameter):
     field: Dependencies
 
@@ -2560,7 +2560,7 @@ class ExplicitlyProvidedDependenciesRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExplicitlyProvidedDependencies:
     """The literal addresses from a BUILD file `dependencies` field.
 
@@ -2677,7 +2677,7 @@ FS = TypeVar("FS", bound="FieldSet")
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     """A request to infer dependencies by analyzing source files.
 
@@ -2714,7 +2714,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     field_set: FS
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InferredDependencies:
     include: FrozenOrderedSet[Address]
     exclude: FrozenOrderedSet[Address]
@@ -2731,7 +2731,7 @@ class InferredDependencies:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ValidateDependenciesRequest(Generic[FS], ABC):
     """A request to validate dependencies after they have been computed.
 
@@ -2744,12 +2744,12 @@ class ValidateDependenciesRequest(Generic[FS], ABC):
     dependencies: Addresses
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ValidatedDependencies:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependenciesRuleApplicationRequest:
     """A request to return the applicable dependency rule action for each dependency of a target."""
 
@@ -2758,7 +2758,7 @@ class DependenciesRuleApplicationRequest:
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependenciesRuleApplication:
     """Maps all dependencies to their respective dependency rule application of a origin target
     address.

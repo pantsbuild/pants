@@ -45,7 +45,7 @@ class GenerateJavaFromThriftRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScroogeThriftJavaDependenciesInferenceFieldSet(FieldSet):
     required_fields = (
         ThriftDependenciesField,
@@ -85,12 +85,12 @@ async def generate_java_from_thrift_with_scrooge(
     return GeneratedSources(source_root_restored)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScroogeThriftJavaRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScroogeThriftJavaRuntimeForResolve:
     addresses: frozenset[Address]
 

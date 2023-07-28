@@ -23,7 +23,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
 

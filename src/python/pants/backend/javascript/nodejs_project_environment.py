@@ -29,12 +29,12 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJSProjectEnvironmentRequest:
     address: Address
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJsProjectEnvironment:
     resolve: ChosenNodeResolve
     package: OwningNodePackage | None = None
@@ -81,7 +81,7 @@ class NodeJsProjectEnvironment:
         raise ValueError("")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJsProjectEnvironmentProcess:
     env: NodeJsProjectEnvironment
     args: Iterable[str]

@@ -39,7 +39,7 @@ class RuffLintRequest(LintTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _RunRuffRequest:
     snapshot: Snapshot
     is_fix: bool

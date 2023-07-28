@@ -19,7 +19,7 @@ T = TypeVar("T")
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExplorerServerRequest:
     address: str
     port: int
@@ -33,7 +33,7 @@ class ExplorerServerRequest:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExplorerServer:
     main: Callable[[], ExitCode]
 
@@ -45,7 +45,7 @@ class ExplorerServer:
         return main()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RequestState:
     all_help_info: AllHelpInfo
     build_configuration: BuildConfiguration

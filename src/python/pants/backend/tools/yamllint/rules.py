@@ -25,7 +25,7 @@ class YamllintRequest(LintFilesRequest):
     tool_subsystem = Yamllint
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PartitionInfo:
     config_snapshot: Snapshot | None
 
@@ -37,12 +37,12 @@ class PartitionInfo:
             return "<default>"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class YamllintConfigFilesRequest:
     filepaths: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class YamllintConfigFiles:
     snapshot: Snapshot
     source_dir_to_config_files: FrozenDict[str, str]

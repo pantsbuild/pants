@@ -36,7 +36,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SystemBinaryFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 

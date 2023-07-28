@@ -41,7 +41,7 @@ T = TypeVar("T", bound="ReadmeEntity")  # Entity type.
 F = TypeVar("F")  # Field type.
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ReadmeEntity:
     _id: str
 
@@ -66,7 +66,7 @@ class ReadmeEntity:
         return cast(F, val)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Category(ReadmeEntity):
     slug: str
     title: str
@@ -76,7 +76,7 @@ class Category(ReadmeEntity):
         return f"Category(id={self.id}, slug={self.slug}, title={self.title}, order={self.order})"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DocRef(ReadmeEntity):
     """A reference to a doc, without its body and other details."""
 
@@ -102,7 +102,7 @@ class DocRef(ReadmeEntity):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Doc(ReadmeEntity):
     """A full doc, including its body and other details."""
 

@@ -11,7 +11,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.strutil import strip_prefix
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EmbedConfig:
     patterns: FrozenDict[str, tuple[str, ...]]
     files: FrozenDict[str, str]

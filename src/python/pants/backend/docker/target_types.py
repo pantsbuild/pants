@@ -504,7 +504,7 @@ class DockerImageTarget(Target):
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerImageTagsRequest:
     """A request to provide additional image tags."""
 

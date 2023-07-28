@@ -60,7 +60,7 @@ from pants.vcs.git import rules as git_rules
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GraphScheduler:
     """A thin wrapper around a Scheduler configured with @rules."""
 
@@ -89,7 +89,7 @@ class GraphScheduler:
         return GraphSession(session, console, self.goal_map)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GraphSession:
     """A thin wrapper around a SchedulerSession configured with @rules."""
 

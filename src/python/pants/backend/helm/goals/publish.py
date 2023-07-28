@@ -33,7 +33,7 @@ class PublishHelmChartRequest(PublishRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmPublishFieldSet(HelmChartFieldSet, PublishFieldSet):
     publish_request_type = PublishHelmChartRequest
 

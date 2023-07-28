@@ -10,7 +10,7 @@ from io import BytesIO
 from pants.engine.internals.parser import ParseError
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FixBUILDFileRequest:
     path: str
     content: bytes
@@ -26,7 +26,7 @@ class FixBUILDFileRequest:
             raise ParseError(f"Failed to parse {self.path}: {e}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FixedBUILDFile:
     path: str
     content: bytes

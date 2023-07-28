@@ -24,7 +24,7 @@ from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BufFieldSet(FieldSet):
     required_fields = (ProtobufSourceField,)
 

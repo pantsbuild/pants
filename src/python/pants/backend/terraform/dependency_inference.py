@@ -42,7 +42,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParserSetup:
     pex: VenvPex
 
@@ -68,7 +68,7 @@ async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
     return ParserSetup(parser_pex)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParseTerraformModuleSources:
     sources_digest: Digest
     paths: tuple[str, ...]
@@ -93,7 +93,7 @@ async def setup_process_for_parse_terraform_module_sources(
     return process
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformModuleDependenciesInferenceFieldSet(FieldSet):
     required_fields = (TerraformModuleSourcesField,)
 

@@ -118,7 +118,7 @@ class YamlPath:
         return path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class YamlElement(metaclass=ABCMeta):
     """Abstract base class for elements read from YAML files.
 
@@ -162,7 +162,7 @@ class MutableYamlIndex(Generic[T]):
         return FrozenYamlIndex(self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _YamlDocumentIndexNode(Generic[T]):
     """Helper node item for the `FrozenYamlIndex` type."""
 
@@ -179,7 +179,7 @@ class _YamlDocumentIndexNode(Generic[T]):
         return {"paths": items_dict}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FrozenYamlIndex(Generic[T]):
     """Represents a frozen collection of items that is indexed by the following keys:
 

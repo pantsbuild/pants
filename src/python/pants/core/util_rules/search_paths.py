@@ -22,7 +22,7 @@ from pants.util.strutil import help_text, softwrap
 _logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ValidateSearchPathsRequest:
     env_tgt: EnvironmentTarget
     search_paths: tuple[str, ...]
@@ -32,7 +32,7 @@ class ValidateSearchPathsRequest:
     local_only: FrozenOrderedSet[str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VersionManagerSearchPathsRequest:
     env_tgt: EnvironmentTarget
     root_dir: str | None

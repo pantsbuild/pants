@@ -71,12 +71,12 @@ class DummyObject2:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RootType:
     value: Any
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WrapperType:
     value: Any
 

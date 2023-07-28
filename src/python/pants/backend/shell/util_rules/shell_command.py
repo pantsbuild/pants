@@ -64,7 +64,7 @@ class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
     output = FileSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShellCommandProcessFromTargetRequest:
     target: Target
 

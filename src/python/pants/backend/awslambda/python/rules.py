@@ -33,7 +33,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _BaseFieldSet(PackageFieldSet):
     include_requirements: PythonAwsLambdaIncludeRequirements
     runtime: PythonAwsLambdaRuntime
@@ -42,14 +42,14 @@ class _BaseFieldSet(PackageFieldSet):
     environment: EnvironmentField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonAwsLambdaFieldSet(_BaseFieldSet):
     required_fields = (PythonAwsLambdaHandlerField,)
 
     handler: PythonAwsLambdaHandlerField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
     required_fields = (PythonAwsLambdaLayerDependenciesField,)
 

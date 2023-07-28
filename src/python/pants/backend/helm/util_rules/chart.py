@@ -64,7 +64,7 @@ class InvalidHelmChartTarget(ValueError):
         super().__init__(f"The target {target.address} is not a `{HelmChartTarget.alias}`.")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChart(EngineAwareReturnType):
     address: Address
     info: HelmChartMetadata
@@ -102,7 +102,7 @@ class HelmChart(EngineAwareReturnType):
         return {"snapshot": self.snapshot}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartRequest(EngineAwareParameter):
     field_set: HelmChartFieldSet
 
@@ -288,7 +288,7 @@ class TooManyChartDependenciesError(ValueError):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FindHelmDeploymentChart(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 

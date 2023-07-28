@@ -218,7 +218,7 @@ class CoverageSubsystem(PythonToolBase):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PytestCoverageData(CoverageData):
     addresses: tuple[Address, ...]
     digest: Digest
@@ -228,7 +228,7 @@ class PytestCoverageDataCollection(CoverageDataCollection[PytestCoverageData]):
     element_type = PytestCoverageData
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoverageConfig:
     digest: Digest
     path: str
@@ -332,7 +332,7 @@ async def create_or_update_coverage_config(coverage: CoverageSubsystem) -> Cover
     return CoverageConfig(digest, file_content.path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoverageSetup:
     pex: VenvPex
 
@@ -343,7 +343,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
     return CoverageSetup(pex)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MergedCoverageData:
     coverage_data: Digest
     addresses: tuple[Address, ...]

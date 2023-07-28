@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaImport:
     name: str
     is_static: bool = False
@@ -29,7 +29,7 @@ class JavaImport:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaSourceDependencyAnalysis:
     declared_package: str | None
     imports: Sequence[JavaImport]

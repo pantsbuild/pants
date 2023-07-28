@@ -9,7 +9,7 @@ from pants.bsp.spec.base import Uri
 from pants.bsp.utils import freeze_json
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildClientCapabilities:
     # The languages that this client supports.
     # The ID strings for each language is defined in the LSP.
@@ -27,7 +27,7 @@ class BuildClientCapabilities:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InitializeBuildParams:
     # Name of the client
     display_name: str
@@ -71,7 +71,7 @@ class InitializeBuildParams:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileProvider:
     language_ids: tuple[str, ...]
 
@@ -85,7 +85,7 @@ class CompileProvider:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RunProvider:
     language_ids: tuple[str, ...]
 
@@ -99,7 +99,7 @@ class RunProvider:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DebugProvider:
     language_ids: tuple[str, ...]
 
@@ -113,7 +113,7 @@ class DebugProvider:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestProvider:
     language_ids: tuple[str, ...]
 
@@ -127,7 +127,7 @@ class TestProvider:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildServerCapabilities:
     # The languages the server supports compilation via method buildTarget/compile.
     compile_provider: CompileProvider | None
@@ -212,7 +212,7 @@ class BuildServerCapabilities:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InitializeBuildResult:
     # Name of the server
     display_name: str

@@ -39,7 +39,7 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     default_lockfile_resource = (_HELM_K8S_PARSER_PACKAGE, "k8s_parser.lock")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _HelmKubeParserTool:
     pex: VenvPex
 
@@ -67,7 +67,7 @@ async def build_k8s_parser_tool(k8s_parser: HelmKubeParserSubsystem) -> _HelmKub
     return _HelmKubeParserTool(parser_pex)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParseKubeManifestRequest(EngineAwareParameter):
     file: FileEntry
 
@@ -78,14 +78,14 @@ class ParseKubeManifestRequest(EngineAwareParameter):
         return {"file": self.file}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParsedImageRefEntry:
     document_index: int
     path: YamlPath
     unparsed_image_ref: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParsedKubeManifest(EngineAwareReturnType):
     filename: str
     found_image_refs: tuple[ParsedImageRefEntry, ...]

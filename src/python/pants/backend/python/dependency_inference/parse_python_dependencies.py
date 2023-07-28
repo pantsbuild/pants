@@ -32,7 +32,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, slots=True, order=True)
 class ParsedPythonImportInfo:
     lineno: int
     # An import is considered "weak" if we're unsure if a dependency will exist between the parsed
@@ -52,13 +52,13 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     # N.B. Don't set `sort_input`, as the input is already sorted
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParsedPythonDependencies:
     imports: ParsedPythonImports
     assets: ParsedPythonAssetPaths
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParsePythonDependenciesRequest:
     source: PythonSourceField
     interpreter_constraints: InterpreterConstraints
@@ -69,7 +69,7 @@ class PythonDependencyVisitorRequest:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonDependencyVisitor:
     """Wraps a subclass of DependencyVisitorBase."""
 
@@ -78,7 +78,7 @@ class PythonDependencyVisitor:
     env: FrozenDict[str, str]  # Set these env vars when invoking the visitor
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParserScript:
     digest: Digest
     env: FrozenDict[str, str]
@@ -147,7 +147,7 @@ async def get_parser_script(union_membership: UnionMembership) -> ParserScript:
     return ParserScript(digest, FrozenDict(env))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GeneralPythonDependencyVisitorRequest(PythonDependencyVisitorRequest):
     # Union member for the general dep parser that applies to all .py files.
     pass

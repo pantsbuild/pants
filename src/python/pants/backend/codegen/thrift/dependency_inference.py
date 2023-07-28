@@ -32,7 +32,7 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThriftMapping:
     """A mapping of stripped .thrift file names to their owning file address."""
 
@@ -69,7 +69,7 @@ async def map_thrift_files(thrift_targets: AllThriftTargets) -> ThriftMapping:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThriftDependenciesInferenceFieldSet(FieldSet):
     required_fields = (ThriftSourceField, ThriftDependenciesField)
 

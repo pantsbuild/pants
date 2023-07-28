@@ -11,12 +11,12 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.jvm.resolve.common import Coordinate
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AnalysePomRequest:
     pom_digest: Digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PomReport:
     dependencies: tuple[Coordinate, ...]
 

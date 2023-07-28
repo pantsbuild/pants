@@ -40,7 +40,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodePackageInferenceFieldSet(FieldSet):
     required_fields = (PackageJsonSourceField, NodePackageDependenciesField)
 
@@ -52,7 +52,7 @@ class InferNodePackageDependenciesRequest(InferDependenciesRequest):
     infer_from = NodePackageInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JSSourceInferenceFieldSet(FieldSet):
     required_fields = (JSSourceField, JSDependenciesField)
 
@@ -83,7 +83,7 @@ class NodePackageCandidateMap(FrozenDict[str, Address]):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RequestNodePackagesCandidateMap:
     address: Address
 

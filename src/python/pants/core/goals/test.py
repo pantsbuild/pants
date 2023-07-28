@@ -72,7 +72,7 @@ from pants.util.strutil import help_text, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestResult(EngineAwareReturnType):
     # A None exit_code indicates a backend that performs its own test discovery/selection
     # (rather than delegating that to the underlying test tool), and discovered no tests.
@@ -275,7 +275,7 @@ class ShowOutput(Enum):
     NONE = "none"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestDebugRequest:
     process: InteractiveProcess
 
@@ -291,7 +291,7 @@ class TestDebugAdapterRequest(TestDebugRequest):
 
 
 @union
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
@@ -412,7 +412,7 @@ class CoverageDataCollection(Collection[_CD]):
     element_type: ClassVar[type[_CD]]  # type: ignore[misc]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoverageReport(ABC):
     """Represents a code coverage report that can be materialized to the terminal or disk."""
 
@@ -434,7 +434,7 @@ class CoverageReport(ABC):
         return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ConsoleCoverageReport(CoverageReport):
     """Materializes a code coverage report to the terminal."""
 
@@ -445,7 +445,7 @@ class ConsoleCoverageReport(CoverageReport):
         return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FilesystemCoverageReport(CoverageReport):
     """Materializes a code coverage report to disk."""
 
@@ -467,7 +467,7 @@ class FilesystemCoverageReport(CoverageReport):
         return f"coverage_{self.report_type}", self.result_snapshot
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoverageReports(EngineAwareReturnType):
     reports: tuple[CoverageReport, ...]
 
@@ -1031,7 +1031,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
     return f"{sigil} {result.description} {status}{suffix}."
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestExtraEnv:
     env: EnvironmentVars
 
@@ -1093,7 +1093,7 @@ class BuiltPackageDependencies(Collection[BuiltPackage]):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildPackageDependenciesRequest:
     field: RuntimePackageDependenciesField
 

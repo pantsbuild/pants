@@ -24,7 +24,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProductDescription:
     value: str
 
@@ -45,7 +45,7 @@ class ProcessCacheScope(Enum):
     PER_SESSION = "per_session"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Process:
     argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
@@ -143,7 +143,7 @@ class Process:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProcessResult:
     """Result of executing a process which should not fail.
 
@@ -163,7 +163,7 @@ class ProcessResult:
         return self.metadata.platform
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleProcessResult:
     """Result of executing a process which might fail.
 
@@ -183,7 +183,7 @@ class FallibleProcessResult:
         return self.metadata.platform
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
@@ -296,12 +296,12 @@ def fallible_to_exec_result_or_raise(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InteractiveProcessResult:
     exit_code: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InteractiveProcess(SideEffecting):
     # NB: Although InteractiveProcess supports only some of the features of Process, we construct an
     # underlying Process instance to improve code reuse.

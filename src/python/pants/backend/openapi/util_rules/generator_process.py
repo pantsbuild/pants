@@ -31,7 +31,7 @@ class OpenAPIGeneratorType(Enum):
     JAVA = "java"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenAPIGeneratorProcess:
     argv: tuple[str, ...]
     generator_type: OpenAPIGeneratorType

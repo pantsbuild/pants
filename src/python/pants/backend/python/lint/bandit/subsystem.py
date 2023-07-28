@@ -19,7 +19,7 @@ from pants.engine.target import FieldSet, Target
 from pants.option.option_types import ArgsListOption, FileOption, SkipOption
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BanditFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 

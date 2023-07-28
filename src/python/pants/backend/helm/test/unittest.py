@@ -68,7 +68,7 @@ class MissingUnitTestChartDependency(Exception):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmUnitTestFieldSet(TestFieldSet, GenerateSnapshotsFieldSet):
     required_fields = (HelmUnitTestSourceField,)
 
@@ -83,7 +83,7 @@ class HelmUnitTestRequest(TestRequest):
     field_set_type = HelmUnitTestFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmUnitTestSetup:
     chart: HelmChart
     chart_root: HelmChartRoot
@@ -92,7 +92,7 @@ class HelmUnitTestSetup:
     snapshot_output_directories: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmUnitTestSetupRequest:
     field_set: HelmUnitTestFieldSet
     description: str = dataclasses.field(compare=False)

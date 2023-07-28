@@ -11,7 +11,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PackageAnalyzerSetup:
     digest: Digest
     path: str

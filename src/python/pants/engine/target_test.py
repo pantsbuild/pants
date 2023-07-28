@@ -613,7 +613,7 @@ def test_field_set() -> None:
         alias = "opt_out_tgt"
         core_fields = (RequiredField, OptOutField)
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class RequiredFieldSet(FieldSet):
         required_fields = (RequiredField,)
 
@@ -624,7 +624,7 @@ def test_field_set() -> None:
         def opt_out(cls, tgt: Target) -> bool:
             return tgt.get(OptOutField).value is True
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class OptionalFieldSet(FieldSet):
         required_fields = ()
 
@@ -681,7 +681,7 @@ def test_field_set() -> None:
 
 
 def test_scalar_field() -> None:
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class CustomObject:
         pass
 
@@ -769,7 +769,7 @@ def test_int_float_fields_valid_numbers(field_cls: type) -> None:
 
 
 def test_sequence_field() -> None:
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class CustomObject:
         pass
 

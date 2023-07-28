@@ -30,13 +30,13 @@ class KubeconformCheckRequest(CheckRequest, metaclass=ABCMeta):
     tool_name = KubeconformSubsystem.name
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RunKubeconformRequest:
     field_set: KubeconformFieldSet
     rendered_files: RenderedHelmFiles
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KubeconformSetup:
     binary: DownloadedExternalTool
     env: FrozenDict[str, str]

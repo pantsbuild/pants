@@ -26,18 +26,18 @@ class StripJarToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "strip-jar"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StripJarRequest:
     digest: Digest
     filenames: Tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleStripJarResult:
     process_result: FallibleProcessResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StripJarCompiledClassfiles:
     digest: Digest
 

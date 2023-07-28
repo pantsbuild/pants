@@ -59,7 +59,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileOptions:
     patterns: tuple[str, ...]
     ignores: tuple[str, ...] = ()
@@ -166,7 +166,7 @@ async def resolve_address(maybe_address: MaybeAddress) -> Address:
     return maybe_address.val
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AddressFamilyDir(EngineAwareParameter):
     """The directory to find addresses for.
 
@@ -179,7 +179,7 @@ class AddressFamilyDir(EngineAwareParameter):
         return self.path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionalAddressFamily:
     path: str
     address_family: AddressFamily | None = None

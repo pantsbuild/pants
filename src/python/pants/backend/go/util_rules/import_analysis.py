@@ -20,7 +20,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoStdLibPackage:
     name: str
     import_path: str
@@ -53,7 +53,7 @@ class GoStdLibPackages(FrozenDict[str, GoStdLibPackage]):
     path."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoStdLibPackagesRequest:
     with_race_detector: bool
     cgo_enabled: bool = True

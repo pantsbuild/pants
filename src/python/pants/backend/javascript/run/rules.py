@@ -25,7 +25,7 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RunNodeBuildScriptFieldSet(RunFieldSet):
     required_fields = (NodeBuildScriptEntryPointField, NodePackageDependenciesField)
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC

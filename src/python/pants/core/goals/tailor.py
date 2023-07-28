@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativeTargetsRequest(metaclass=ABCMeta):
     dirs: tuple[str, ...]
 
@@ -63,7 +63,7 @@ class PutativeTargetsRequest(metaclass=ABCMeta):
         return PathGlobs(os.path.join(d, glob) for d in self.dirs for glob in filename_globs)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativeTargetsSearchPaths:
     dirs: tuple[str, ...]
 
@@ -93,7 +93,7 @@ def has_source_or_sources_field(tgt_type: type[Target]) -> bool:
     return False
 
 
-@dataclass(order=True, frozen=True)
+@dataclass(order=True, frozen=True, slots=True)
 class PutativeTarget:
     """A potential target to add, detected by various heuristics.
 
@@ -431,7 +431,7 @@ async def determine_all_owned_sources(all_tgts: AllUnexpandedTargets) -> AllOwne
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UniquelyNamedPutativeTargets:
     """Putative targets that have no name conflicts with existing targets (or each other)."""
 
@@ -461,7 +461,7 @@ async def rename_conflicting_targets(
     return UniquelyNamedPutativeTargets(PutativeTargets(uniquely_named_putative_targets))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DisjointSourcePutativeTarget:
     """Putative target whose sources don't overlap with those of any existing targets."""
 
@@ -506,12 +506,12 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
     return DisjointSourcePutativeTarget(ptgt)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EditBuildFilesRequest:
     putative_targets: PutativeTargets
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EditedBuildFiles:
     digest: Digest
     created_paths: tuple[str, ...]

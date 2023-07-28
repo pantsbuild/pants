@@ -44,7 +44,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.pip_requirement import PipRequirement
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
@@ -60,7 +60,7 @@ def wrap_python_lockfile_request(request: GeneratePythonLockfile) -> WrappedGene
     return WrappedGenerateLockfile(request)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _PipArgsAndConstraintsSetup:
     resolve_config: ResolvePexConfig
     args: tuple[str, ...]
@@ -244,7 +244,7 @@ async def setup_user_lockfile_requests(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
     """Register the type used to create synthetic targets for Python lockfiles.
 

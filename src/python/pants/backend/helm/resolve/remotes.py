@@ -28,7 +28,7 @@ class HelmRemoteAliasNotFoundError(ValueError):
         super().__init__(f"There is no Helm remote configured with alias: {alias}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmRegistry:
     address: str
     alias: str = ""
@@ -59,7 +59,7 @@ class HelmRegistry:
         return f"{repo_ref}/{artifact_name}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmRemotes:
     default: tuple[HelmRegistry, ...]
     all: FrozenDict[str, HelmRegistry]

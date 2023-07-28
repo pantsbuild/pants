@@ -52,7 +52,7 @@ _GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildConfiguration:
     """Stores the types and helper functions exposed to BUILD files."""
 

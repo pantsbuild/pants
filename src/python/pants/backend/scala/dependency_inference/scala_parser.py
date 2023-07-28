@@ -52,7 +52,7 @@ class ScalaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "scala-parser"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaImport:
     name: str
     alias: str | None
@@ -70,7 +70,7 @@ class ScalaImport:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaProvidedSymbol:
     name: str
     recursive: bool
@@ -86,7 +86,7 @@ class ScalaProvidedSymbol:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaSourceDependencyAnalysis:
     provided_symbols: FrozenOrderedSet[ScalaProvidedSymbol]
     provided_symbols_encoded: FrozenOrderedSet[ScalaProvidedSymbol]
@@ -183,7 +183,7 @@ class ScalaSourceDependencyAnalysis:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleScalaSourceDependencyAnalysisResult:
     process_result: FallibleProcessResult
 
@@ -192,7 +192,7 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AnalyzeScalaSourceRequest:
     source_files: SourceFiles
     scala_version: str

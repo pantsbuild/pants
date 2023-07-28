@@ -5,14 +5,14 @@ excerpt: "How to add a new implementation to the `package` goal."
 hidden: true
 createdAt: "2020-07-01T04:54:11.398Z"
 ---
-The `package` goal bundles all the relevant code and third-party dependencies into a single asset, such as a JAR, PEX, or zip file. 
+The `package` goal bundles all the relevant code and third-party dependencies into a single asset, such as a JAR, PEX, or zip file.
 
 Often, the asset is executable, but it need not be.
 
 > 📘 Example repository
-> 
+>
 > This guide walks through adding a simple `package` implementation for Bash that simply puts all the relevant source files into a `.zip` file.
-> 
+>
 > This duplicates the `archive` target type, and is solely implemented for instructional purposes. See [here](https://github.com/pantsbuild/example-plugin/blob/main/pants-plugins/examples/bash/package_bash_binary.py) for the final implementation.
 
 1. Set up a package target type (recommended)
@@ -24,7 +24,7 @@ The fields depend on what makes sense for the package format you're adding suppo
 
 Usually, you should include `OutputPathField` from `pants.core.goals.package` in your target's fields, which will allow the user to change where the package is built to.
 
-See [Creating new targets](doc:target-api-new-targets) for a guide on how to define new target types. 
+See [Creating new targets](doc:target-api-new-targets) for a guide on how to define new target types.
 
 ```python
 from pants.core.goals.package import OutputPathField
@@ -47,13 +47,13 @@ class BashBinarySources(BashSources):
 ```
 
 > 🚧 Binary targets and the `sources` field
-> 
+>
 > We've found that it often works best for targets used by the `package` goal to not have a `sources` field. Instead, use a "library" target to describe the source code, and add the library as a dependency of the binary target. For example, a `pex_binary` target may depend on some `python_library` targets.
-> 
+>
 > Why do we recommend not having a `sources` field? It can be helpful with modeling to have a clear separation between targets describing first-party code vs. artifacts you want to build. For example, this allows you to use a default value for the `sources` field of your library target without worrying that a user unintentionally set their binary's `sources` to overlap with the library's (things like dependency inference do not work as well when >1 target refer to the same source file.)
-> 
-> However, sometimes it does make sense to have a `sources` field, such as a `dockerfile` target type. Likewise, this guide uses a `sources` field for simplicity. 
-> 
+>
+> However, sometimes it does make sense to have a `sources` field, such as a `dockerfile` target type. Likewise, this guide uses a `sources` field for simplicity.
+>
 > Warning: If you do have a `sources` field, set `expected_num_files` to `1` or `range(0, 2)`. Because Pants operates on a file-level, it would try to create one distinct package for each source file belonging to your target, even though you probably only wanted a single package built.
 
 2. Set up a subclass of `PackageFieldSet`
@@ -68,7 +68,7 @@ from dataclasses import dataclass
 
 from pants.core.goals.package import OutputPathField, PackageFieldSet
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BashBinaryFieldSet(PackageFieldSet):
     required_fields = (BashBinarySources,)
 
@@ -96,7 +96,7 @@ def rules():
 
 Your rule should take as a parameter the `PackageFieldSet` from Step 2. It should return `BuiltPackage`, which has the fields `digest: Digest` and `artifacts: Tuple[BuiltPackageArtifact, ...]`, where each `BuiltPackageArtifact` has the field `relpath: str` and optional `extra_log_lines: Tuple[str, ...]`.
 
-Your package rule can have whatever logic you'd like to create a package. All that Pants cares about is that you return a valid `BuiltPackage` object. 
+Your package rule can have whatever logic you'd like to create a package. All that Pants cares about is that you return a valid `BuiltPackage` object.
 
 In this example, we simply create a `.zip` file with the `bash_binary` and all of its dependencies.
 

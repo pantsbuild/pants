@@ -34,7 +34,7 @@ from pants.engine.target import FieldSet, WrappedTarget, WrappedTargetRequest
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoBuildOptions:
     # Coverage configuration.
     # If this is set and a package's import path matches `import_path_include_patterns`, then the package
@@ -74,7 +74,7 @@ class GoBuildOptions:
         assert not (self.with_msan and self.with_asan)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoBuildOptionsFromTargetRequest(EngineAwareParameter):
     address: Address
     for_tests: bool = False
@@ -83,7 +83,7 @@ class GoBuildOptionsFromTargetRequest(EngineAwareParameter):
         return self.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoBuildOptionsFieldSet(FieldSet):
     required_fields = (
         GoCgoEnabledField,
@@ -103,7 +103,7 @@ class GoBuildOptionsFieldSet(FieldSet):
     assembler_flags: GoAssemblerFlagsField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoTestBuildOptionsFieldSet(FieldSet):
     required_fields = (
         GoTestRaceDetectorEnabledField,

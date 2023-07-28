@@ -43,7 +43,7 @@ from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaSourceDependenciesInferenceFieldSet(FieldSet):
     required_fields = (ScalaSourceField, ScalaDependenciesField, JvmResolveField)
 
@@ -99,7 +99,7 @@ async def infer_scala_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaLibraryDependencyInferenceFieldSet(FieldSet):
     required_fields = (ScalaDependenciesField, JvmResolveField)
 
@@ -111,7 +111,7 @@ class InferScalaLibraryDependencyRequest(InferDependenciesRequest):
     infer_from = ScalaLibraryDependencyInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPluginDependencyInferenceFieldSet(FieldSet):
     required_fields = (ScalaDependenciesField, JvmResolveField)
 
@@ -123,12 +123,12 @@ class InferScalaPluginDependenciesRequest(InferDependenciesRequest):
     infer_from = ScalaPluginDependencyInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaRuntimeForResolve:
     addresses: frozenset[Address]
 

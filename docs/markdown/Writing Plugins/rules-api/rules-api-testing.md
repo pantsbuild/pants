@@ -43,15 +43,15 @@ def test_timeout_validation() -> None:
 ```
 
 > 📘 How to create a `Target` in-memory
-> 
+>
 > For Approaches #1 and #2, you will often want to pass a `Target` instance to your test, such as a `PythonTestTarget` instance.
-> 
-> To create a `Target` instance, choose which subclass you want, then pass a dictionary of the values you want to use, followed by an `Address` object. The dictionary corresponds to what you'd put in the BUILD file; any values that you leave off will use their default values. 
-> 
+>
+> To create a `Target` instance, choose which subclass you want, then pass a dictionary of the values you want to use, followed by an `Address` object. The dictionary corresponds to what you'd put in the BUILD file; any values that you leave off will use their default values.
+>
 > The `Address` constructor's first argument is the path to the BUILD file; you can optionally define `target_name: str` if it is not the default `name`.
-> 
+>
 > For example, given this target definition for `project/app:tgt`:
-> 
+>
 > ```python
 > python_test(
 >     name="tgt",
@@ -59,20 +59,20 @@ def test_timeout_validation() -> None:
 >     timeout=120,
 > )
 > ```
-> 
+>
 > We would write:
-> 
+>
 > ```python
 > tgt = PythonTestTarget(
 >     {"source": "app_test.py", "timeout": 120},
 >     Address("project/app", target_name="tgt"),
 > )
 > ```
-> 
+>
 > Note that we did not put `"name": "tgt"` in the dictionary. `name` is a special field that does not use the Target API. Instead, pass the `name` to the `target_name` argument in the `Address` constructor.
-> 
+>
 > For Approach #3, you should instead use `rule_runner.write_files()` to write a BUILD file, followed by `rule_runner.get_target()`.
-> 
+>
 > For Approach #4, you should use `setup_tmpdir()` to set up BUILD files.
 
 Approach 2: `run_rule_with_mocks()` (unit tests for rules)
@@ -80,9 +80,9 @@ Approach 2: `run_rule_with_mocks()` (unit tests for rules)
 
 `run_rule_with_mocks()` will run your rule's logic, but with each argument to your `@rule` provided explicitly by you and with mocks for any `await Get`s. This means that the test is fully mocked; for example, `run_rule_with_mocks()` will not actually run a `Process`, nor will it use the file system operations. This is useful when you want to test the inlined logic in your rule, but usually, you will want to use Approach #3.
 
-To use `run_rule_with_mocks`, pass the `@rule` as its first arg, then `rule_args=[arg1, arg2, ...]` in the same order as the arguments to the `@rule`. 
+To use `run_rule_with_mocks`, pass the `@rule` as its first arg, then `rule_args=[arg1, arg2, ...]` in the same order as the arguments to the `@rule`.
 
-If your `@rule` has any `await Get`s or `await Effect`s, set the argument `mock_gets=[]` with `MockGet`/`MockEffect` objects corresponding to each of them. A `MockGet` takes three arguments: `output_type: type`, `input_types: tuple[type, ...]`, and `mock: Callable[..., InputType]`, which is a function that takes an instance of each of the `input_types` and returns a single instance of the `output_type`. 
+If your `@rule` has any `await Get`s or `await Effect`s, set the argument `mock_gets=[]` with `MockGet`/`MockEffect` objects corresponding to each of them. A `MockGet` takes three arguments: `output_type: type`, `input_types: tuple[type, ...]`, and `mock: Callable[..., InputType]`, which is a function that takes an instance of each of the `input_types` and returns a single instance of the `output_type`.
 
 For example, given this contrived rule to find all targets with `sources` with a certain filename included (find a "needle in the haystack"):
 
@@ -97,14 +97,14 @@ from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Target
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FindNeedle:
     """A request to find all targets with a `sources` file matching the `needle_filename`."""
     targets: tuple[Target, ...]
     needle_filename: str
 
 
-# We want to return a sequence of found `Target` objects. Rather than 
+# We want to return a sequence of found `Target` objects. Rather than
 # returning `Targets`, we create a "newtype" specific to this rule.
 class TargetsWithNeedle(Collection[Target]):
     pass
@@ -205,14 +205,14 @@ After setting up your isolated environment, you can run `rule_runner.request(Out
 
 ### Setting up the `RuleRunner`
 
-First, you must set up a `RuleRunner` instance and activate the rules and target types you'll use in your tests. Set the argument `target_types` with a list of the `Target` types used in your tests, and set `rules` with a list of all the rules used transitively. 
+First, you must set up a `RuleRunner` instance and activate the rules and target types you'll use in your tests. Set the argument `target_types` with a list of the `Target` types used in your tests, and set `rules` with a list of all the rules used transitively.
 
 This means that you must register the rules you directly wrote, and also any rules that they depend on. Pants will automatically register some core rules for you, but leaves off most of them for better isolation of tests. If you're missing some rules, the rule graph will fail to be built.
 
 > 🚧 Confusing rule graph error?
-> 
+>
 > It can be confusing figuring out what's wrong when setting up a `RuleRunner`. We know the error messages are not ideal and are working on improving them.
-> 
+>
 > Please feel free to reach out on [Slack](doc:community) for help with figuring out how to get things working.
 
 ```python
@@ -234,7 +234,7 @@ def test_example() -> None:
     )
 ```
 
-What's with the `QueryRule`? Normally, we don't use `QueryRule` because we're using the _asynchronous_ version of the Rules API, and Pants is able to parse your Python code to see how your rules are used. However, with tests, we are using the _synchronous_ version of the Rules API, so we need to give a hint to the engine about what requests we're going to make. Don't worry about filling in the `QueryRule` part yet. You'll add it later when writing `rule_runner.request()`. 
+What's with the `QueryRule`? Normally, we don't use `QueryRule` because we're using the _asynchronous_ version of the Rules API, and Pants is able to parse your Python code to see how your rules are used. However, with tests, we are using the _synchronous_ version of the Rules API, so we need to give a hint to the engine about what requests we're going to make. Don't worry about filling in the `QueryRule` part yet. You'll add it later when writing `rule_runner.request()`.
 
 Each test should create its own distinct `RuleRunner` instance. This is important for isolation between each test.
 
@@ -326,7 +326,7 @@ def test_example() -> None:
              """\
              python_source(
                  name="my_tgt",
-                 source="f.py", 
+                 source="f.py",
              """)
          }
      )
@@ -356,7 +356,7 @@ Warning: calling `rule_runner.set_options()` will override any options that were
 
 ### Running your rules
 
-Now that you have your `RuleRunner` set up, along with any options and the content/BUILD files for your test, you can test that your rules work correctly. 
+Now that you have your `RuleRunner` set up, along with any options and the content/BUILD files for your test, you can test that your rules work correctly.
 
 Unlike Approach #2, you will not explicitly say which `@rule` you want to run. Instead, look at the return type of your `@rule`. Use `rule_runner.request(MyOutput, [input1, ...])`, where `MyOutput` is the return type.
 
@@ -398,7 +398,7 @@ def test_find_needle(rule_runner: RuleRunner) -> None:
             "project/needle.txt": "",
             "project/BUILD": dedent(
                 """\
-                file(name="t1", source="f1.txt") 
+                file(name="t1", source="f1.txt")
                 file(name="t2", source="f2.txt")
                 file(name="t3", source="needle.txt")
                 """
@@ -445,7 +445,7 @@ def test_bandit(rule_runner: RuleRunner) -> None:
     # Set up files and targets.
     rule_runner.write_files(...)
     ...
- 
+
     # Run Bandit rule.
     bandit_request = BanditRequest(...)
     lint_results = rule_runner.request(LintResults, [bandit_request])
@@ -471,7 +471,7 @@ from pants.backend.project_info.filedeps import Filedeps
 from pants.engine.target import Dependencies, SingleSourceField, Target
 from pants.testutil.rule_runner import RuleRunner
 
-# We create a mock `Target` for better isolation of our tests. We could have 
+# We create a mock `Target` for better isolation of our tests. We could have
 # instead used a pre-defined target like `PythonLibrary` or `Files`.
 class MockTarget(Target):
     alias = "tgt"
@@ -507,7 +507,7 @@ You will typically use three functions:
   - It takes a single parameter `files: Mapping[str, str]`, which is a dictionary of file paths to file content.
     - All file paths will be prefixed by the temporary directory.
     - File content can include `{tmpdir}`, which will get substituted with the actual temporary directory.
-  - It yields the temporary directory, relative to the test's current work directory. 
+  - It yields the temporary directory, relative to the test's current work directory.
 - `run_pants()`, which runs Pants using the `list[str]` of arguments you pass, such as `["help"]`.
   - It returns a `PantsResult` object, which has the fields `exit_code: int`, `stdout: str`, and `stderr: str`.
   - It accepts several other optional arguments, including `config`, `extra_env`, and any keyword argument accepted by `subprocess.Popen()`.

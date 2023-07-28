@@ -56,7 +56,7 @@ class FortranTarget(Target):
     core_fields = (FortranSource,)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FortranFieldSet(FieldSet):
     required_fields = (FortranSource,)
 
@@ -133,7 +133,7 @@ class SmalltalkTarget(Target):
     core_fields = (SmalltalkSource,)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SmalltalkFieldSet(FieldSet):
     required_fields = (SmalltalkSource,)
 
@@ -447,14 +447,14 @@ def test_message_lists_files() -> None:
     assert result.message() == "fixer made changes.\n  added.ext\n  removed.ext"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KitchenSingleUtensilFieldSet(FieldSet):
     required_fields = (FortranSource,)
 
     utensil: SingleSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KitchenMultipleUtensilsFieldSet(FieldSet):
     required_fields = (FortranSource,)
 

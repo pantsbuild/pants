@@ -28,7 +28,7 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoBinaryMainPackage:
     address: Address
 
@@ -36,7 +36,7 @@ class GoBinaryMainPackage:
     import_path: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoBinaryMainPackageRequest(EngineAwareParameter):
     field: GoBinaryMainPackageField
 
@@ -118,7 +118,7 @@ async def determine_main_pkg_for_go_binary(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoBinaryMainDependencyInferenceFieldSet(FieldSet):
     required_fields = (GoBinaryDependenciesField, GoBinaryMainPackageField)
 

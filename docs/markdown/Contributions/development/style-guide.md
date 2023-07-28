@@ -16,9 +16,9 @@ $ build-support/githooks/pre-commit
 ```
 
 > 📘 Tip: improving Black's formatting by wrapping in `()`
-> 
+>
 > Sometimes, Black will split code over multiple lines awkwardly. For example:
-> 
+>
 > ```python
 > StrOption(
 >     default="pants",
@@ -26,9 +26,9 @@ $ build-support/githooks/pre-commit
 >     "Useful when printing help messages.",
 > )
 > ```
-> 
+>
 > Often, you can improve Black's formatting by wrapping the expression in parentheses, then rerunning `fmt`:
-> 
+>
 > ```python
 > StrOption(
 >     default="pants",
@@ -38,7 +38,7 @@ $ build-support/githooks/pre-commit
 >     ),
 > )
 > ```
-> 
+>
 > This is not mandatory, only encouraged.
 
 Comments
@@ -66,7 +66,7 @@ Comment lines should not exceed 100 characters. Black will not auto-format this 
 
 We strive for self-documenting code. Often, a comment can be better expressed by giving a variable a more descriptive name, adding type information, or writing a helper function.
 
-Further, there is no need to document how typical Python constructs behave, including how type hints work. 
+Further, there is no need to document how typical Python constructs behave, including how type hints work.
 
 Bad:
 
@@ -85,7 +85,7 @@ Good:
 
 ```
 def __hash__(self):
-    # By overriding __hash__ here, rather than using the default implementation, 
+    # By overriding __hash__ here, rather than using the default implementation,
     # we get a 10% speedup to `pants list ::` (1000 targets) thanks to more
     # cache hits. This is safe to do because ...
     ...
@@ -147,13 +147,13 @@ Often, functions will have branching based on a condition. When you `return` fro
 
 ```python
 # Good
-def safe_divide(dividend: int, divisor: int) -> Optional[int]: 
+def safe_divide(dividend: int, divisor: int) -> Optional[int]:
     if divisor == 0:
         return None
     return dividend / divisor
 
 # Discouraged
-def safe_divide(dividend: int, divisor: int) -> Optional[int]: 
+def safe_divide(dividend: int, divisor: int) -> Optional[int]:
     if divisor == 0:
         return None
     else:
@@ -245,7 +245,7 @@ We prefer [dataclasses](https://realpython.com/python-data-classes/) because the
 from dataclasses import dataclass
 
 # Good
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Example:
     name: str
     age: int = 33
@@ -257,12 +257,12 @@ class Example:
         self.age = age
 ```
 
-Dataclasses should be marked with `frozen=True`.
+Dataclasses should be marked with `frozen=True, slots=True`.
 
 If you want to validate the input, use `__post_init__`:
 
 ```python
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Example:
     name: str
     age: int = 33
@@ -280,7 +280,7 @@ If you need a custom constructor, such as to transform the parameters, the Pytho
 from dataclasses import dataclass
 from typing import Iterable, Tuple
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Example:
     values: Tuple[str, ...]
 
@@ -295,7 +295,7 @@ Refer to [MyPy documentation](https://mypy.readthedocs.io/en/stable/introduction
 
 ### Annotate all new code
 
-All new code should have type hints. Even simple functions like unit tests should have annotations. Why? MyPy will only check the body of functions if they have annotations. 
+All new code should have type hints. Even simple functions like unit tests should have annotations. Why? MyPy will only check the body of functions if they have annotations.
 
 ```python
 # Good
@@ -310,14 +310,14 @@ def test_demo():
 Precisely, all function definitions should have annotations for their parameters and their return type. MyPy will then tell you which other lines need annotations.
 
 > 📘 Interacting with legacy code? Consider adding type hints.
-> 
+>
 > Pants did not widely use type hints until the end of 2019. So, a substantial portion of the codebase is still untyped.
-> 
+>
 > If you are working with legacy code, it is often valuable to start by adding type hints. This will both help you to understand that code and to improve the quality of the codebase. Land those type hints as a precursor to your main PR.
 
 ### Prefer `cast()` to override annotations
 
-MyPy will complain when it cannot infer the types of certain lines. You must then either fix the underlying API that MyPy does not understand or explicitly provide an annotation at the call site. 
+MyPy will complain when it cannot infer the types of certain lines. You must then either fix the underlying API that MyPy does not understand or explicitly provide an annotation at the call site.
 
 Prefer fixing the underlying API if easy to do, but otherwise, prefer using `cast()` instead of a variable annotation.
 
@@ -416,7 +416,7 @@ User documentation uploaded to the [Pantsbuild web docs site](https://www.pantsb
 
 ### Reference docs
 
-Not every help string will make it to the website: currently only help strings for global options, goals, subsystems, and targets are published. Please be extra vigilant when writing these and remember that they are going to be rendered as Markdown. 
+Not every help string will make it to the website: currently only help strings for global options, goals, subsystems, and targets are published. Please be extra vigilant when writing these and remember that they are going to be rendered as Markdown.
 
 It may be helpful to consider the following:
 
@@ -425,7 +425,7 @@ It may be helpful to consider the following:
 * text inside the angle brackets (e.g. `<value>`) will be ignored when rendered if not wrapped in backticks
 * to create a numbered or bullet list, use 2 space indentation (or use the `bullet_list` convenience function)
 * to create a codeblock, use 4 space indentation (no need for triple backticks) and add one empty line between the code block and the text
-* make sure to use backticks to highlight config sections, command-line arguments, target names, and inline code examples.    
+* make sure to use backticks to highlight config sections, command-line arguments, target names, and inline code examples.
 
 It may be difficult to confirm the accuracy of text formatting in plain Python, so you may want to generate the relevant Markdown files to be able to preview them to confirm your help strings are rendered as expected. They can be converted into Markdown files for visual inspection using a custom build script.
 

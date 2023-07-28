@@ -87,7 +87,7 @@ You can use `str(address)` or `address.spec` to get the normalized string repres
 How to resolve targets
 ----------------------
 
-How do you get `Target`s in the first place in your plugin? 
+How do you get `Target`s in the first place in your plugin?
 
 As explained in [Goal rules](doc:rules-api-goal-rules), to get all the targets specified on the command line by a user, you can request the type `Targets` as a parameter to your `@rule` or `@goal_rule`. From there, you can optionally filter out the targets you want, such as by using `target.has_field()`.
 
@@ -370,7 +370,7 @@ A `FieldSet` is a way to specify which Fields your rule needs to use in a typed 
 
 Normally, your rule should simply use `tgt.get()` and `tgt.has_field()` instead of a `FieldSet`. However, for several of the [Common plugin tasks](doc:common-plugin-tasks), you will instead need to create a `FieldSet` so that the combination of fields you use can be represented by a type understood by the engine.
 
-To create a `FieldSet`, create a new dataclass with `@dataclass(frozen=True)`. You will sometimes directly subclass `FieldSet`, but will often subclass something like `BinaryFieldSet` or `TestFieldSet`. Refer to the instructions in [Common plugin tasks](doc:common-plugin-tasks).
+To create a `FieldSet`, create a new dataclass with `@dataclass(frozen=True, slots=True)`. You will sometimes directly subclass `FieldSet`, but will often subclass something like `BinaryFieldSet` or `TestFieldSet`. Refer to the instructions in [Common plugin tasks](doc:common-plugin-tasks).
 
 List every `Field` that your plugin will use as a field of your dataclass. The type hints you specify will be used by Pants to identify what `Field`s to use, e.g. `PythonSourceField` or `Dependencies`.
 
@@ -381,13 +381,13 @@ from dataclasses import dataclass
 
 from pants.engine.target import Dependencies, FieldSet
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShellcheckFieldSet(FieldSet):
     required_fields = (ShellSourceField,)
 
     source: ShellSourceField
-    # Because this is not in `required_fields`, this `FieldSet` will still match target types 
-    # that don't have a `Dependencies` field registered. If it's not registered, then a 
+    # Because this is not in `required_fields`, this `FieldSet` will still match target types
+    # that don't have a `Dependencies` field registered. If it's not registered, then a
     # default value for `Dependencies` will be used as if the user left off the field from
     # their BUILD file.
     dependencies: Dependencies

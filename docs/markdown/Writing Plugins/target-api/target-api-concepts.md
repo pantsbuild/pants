@@ -34,7 +34,7 @@ Each field has a Python class that defines its BUILD file alias, data type, and 
 
 ```python example_fields.py
 from pants.engine.target import IntField
-    
+
 class PythonTestTimeoutField(IntField):
     alias = "timeout"
     default = 60
@@ -81,7 +81,7 @@ A Field-Driven API
 
 Idiomatic Pants plugins do not care about specific target types; they only care that the target type has the right combination of field types that the plugin needs to operate.
 
-For example, the Python formatter Black does not actually care whether you have a `python_source`, `python_test`, or `custom_target` target; all that it cares about is that your target type has the field `PythonSourceField`. 
+For example, the Python formatter Black does not actually care whether you have a `python_source`, `python_test`, or `custom_target` target; all that it cares about is that your target type has the field `PythonSourceField`.
 
 Targets are only [used by the Rules API](doc:rules-api-and-target-api) to get access to the underlying fields through the methods `.has_field()` and `.get()`:
 
@@ -147,7 +147,7 @@ To declare synthetic targets from a Plugin, first subclass the `SyntheticTargets
     from pants.engine.rules import collect_rules, rule
 
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
         pass
 
@@ -184,11 +184,11 @@ If the source information is derived from parsing files from the project source 
 
 The mode of operation is declared per union member (i.e. on the subclass of the `SyntheticTargetsRequest` class) by providing a default value to the `path` field:
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class SyntheticExamplePerDirectoryTargetsRequest(SyntheticTargetsRequest):
         path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class SyntheticExampleAllTargetsAtOnceRequest(SyntheticTargetsRequest):
         path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 

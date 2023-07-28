@@ -21,7 +21,7 @@ from pants.util.strutil import pluralize, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyUpgradeFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 

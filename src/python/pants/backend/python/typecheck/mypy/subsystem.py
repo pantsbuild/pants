@@ -45,7 +45,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MyPyFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
@@ -180,7 +180,7 @@ class MyPy(PythonToolBase):
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MyPyConfigFile:
     digest: Digest
     _python_version_configured: bool
@@ -210,7 +210,7 @@ async def setup_mypy_config(mypy: MyPy) -> MyPyConfigFile:
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MyPyFirstPartyPlugins:
     requirement_strings: FrozenOrderedSet[str]
     sources_digest: Digest

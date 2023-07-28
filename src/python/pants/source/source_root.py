@@ -27,14 +27,14 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, slots=True, order=True)
 class SourceRoot:
     # Relative path from the buildroot.  Note that a source root at the buildroot
     # is represented as ".".
     path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionalSourceRoot:
     source_root: SourceRoot | None
 
@@ -65,7 +65,7 @@ class NoSourceRootError(SourceRootError):
 _repo_root = PurePath(os.path.sep)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceRootPatternMatcher:
     root_patterns: tuple[str, ...]
 
@@ -148,7 +148,7 @@ class SourceRootConfig(Subsystem):
         return SourceRootPatternMatcher(self.root_patterns)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceRootsRequest:
     """Find the source roots for the given files and/or dirs."""
 
@@ -174,7 +174,7 @@ class SourceRootsRequest:
         return cls({PurePath(file_path) for file_path in file_paths}, ())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceRootRequest(EngineAwareParameter):
     """Find the source root for the given path.
 
@@ -210,12 +210,12 @@ class SourceRootRequest(EngineAwareParameter):
         return str(self.path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceRootsResult:
     path_to_root: FrozenDict[PurePath, SourceRoot]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionalSourceRootsResult:
     path_to_optional_root: FrozenDict[PurePath, OptionalSourceRoot]
 

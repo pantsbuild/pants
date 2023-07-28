@@ -30,7 +30,7 @@ class GlobSpecsProtocol(Protocol):
         pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AddressLiteralSpec(Spec):
     """A single target address.
 
@@ -73,7 +73,7 @@ class AddressLiteralSpec(Spec):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileLiteralSpec(Spec):
     """A literal file name, e.g. `foo.py`.
 
@@ -92,7 +92,7 @@ class FileLiteralSpec(Spec):
         return self.file
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileGlobSpec(Spec):
     """A spec with a glob or globs, e.g. `*.py` and `**/*.java`.
 
@@ -111,7 +111,7 @@ class FileGlobSpec(Spec):
         return self.glob
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DirLiteralSpec(Spec):
     """A literal dir path, e.g. `some/dir`.
 
@@ -137,7 +137,7 @@ class DirLiteralSpec(Spec):
         return os.path.join(self.directory, "*")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DirGlobSpec(Spec):
     """E.g. `some/dir:`.
 
@@ -164,7 +164,7 @@ class DirGlobSpec(Spec):
         return os.path.join(self.directory, "*")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RecursiveGlobSpec(Spec):
     """E.g. `some/dir::`.
 
@@ -191,7 +191,7 @@ class RecursiveGlobSpec(Spec):
         return os.path.join(self.directory, "**")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AncestorGlobSpec(Spec):
     """E.g. `some/dir^`.
 
@@ -234,7 +234,7 @@ def _create_path_globs(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RawSpecs:
     """Convert the specs into matching targets and files.
 
@@ -346,7 +346,7 @@ class RawSpecs:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RawSpecsWithoutFileOwners:
     """The subset of `RawSpecs` that do not use the `Owners` rule to match targets.
 
@@ -433,7 +433,7 @@ class RawSpecsWithoutFileOwners:
         return build_path_globs, validation_path_globs
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RawSpecsWithOnlyFileOwners:
     """The subset of `RawSpecs` that require using the `Owners` rule to match targets.
 
@@ -482,7 +482,7 @@ class RawSpecsWithOnlyFileOwners:
         return bool(self.file_literals or self.file_globs)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Specs:
     """The specs provided by the user for what to run on.
 

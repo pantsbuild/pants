@@ -21,7 +21,7 @@ from pants.option.option_types import ArgsListOption, BoolOption, FileOption, Sk
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BlackFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 

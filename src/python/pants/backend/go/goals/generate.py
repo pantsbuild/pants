@@ -94,13 +94,13 @@ class GoGenerateGoal(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RunPackageGeneratorsRequest:
     address: Address
     regex: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RunPackageGeneratorsResult:
     digest: Digest
 
@@ -238,7 +238,7 @@ async def _run_generators(
     return digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OverwriteMergeDigests:
     orig_digest: Digest
     new_digest: Digest

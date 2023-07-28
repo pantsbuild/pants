@@ -380,7 +380,7 @@ def test_non_hermetic_venv_scripts(rule_runner: PythonRuleRunner) -> None:
         }
     )
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class Results:
         pythonpath: str | None
         sys_path: list[str]

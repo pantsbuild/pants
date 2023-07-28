@@ -39,7 +39,7 @@ class CuePackageTarget(Target):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CueFieldSet(FieldSet):
     required_fields = (CuePackageSourcesField,)
 

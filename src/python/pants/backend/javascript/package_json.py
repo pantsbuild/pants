@@ -81,7 +81,7 @@ class NodeScript(ABC):
     alias: ClassVar[str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeBuildScript(NodeScript):
     entry_point: str
     output_directories: tuple[str, ...] = ()
@@ -115,7 +115,7 @@ class NodeBuildScript(NodeScript):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeTestScript(NodeScript):
     entry_point: str = "test"
     report_args: tuple[str, ...] = ()
@@ -483,7 +483,7 @@ class NodeBuildScriptTarget(Target):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PackageJsonImports:
     """https://nodejs.org/api/packages.html#subpath-imports."""
 
@@ -517,7 +517,7 @@ class PackageJsonImports:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PackageJsonEntryPoints:
     """See https://nodejs.org/api/packages.html#package-entry-points and
     https://docs.npmjs.com/cli/v9/configuring-npm/package-json#browser."""
@@ -575,7 +575,7 @@ class PackageJsonEntryPoints:
         return FrozenDict()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PackageJsonScripts:
     scripts: FrozenDict[str, str]
 
@@ -584,7 +584,7 @@ class PackageJsonScripts:
         return cls(FrozenDict.deep_freeze(pkg_json.content.get("scripts", {})))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PackageJson:
     content: FrozenDict[str, Any]
     name: str
@@ -633,12 +633,12 @@ async def all_first_party_node_package_targets(targets: AllTargets) -> FirstPart
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OwningNodePackageRequest:
     address: Address
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OwningNodePackage:
     target: Target | None = None
     third_party: tuple[Target, ...] = ()
@@ -742,7 +742,7 @@ async def all_package_json() -> AllPackageJson:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PnpmWorkspaceGlobs:
     packages: tuple[str, ...]
     digest: Digest

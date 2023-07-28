@@ -26,12 +26,12 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RequestNodeResolve:
     address: Address
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChosenNodeResolve:
     project: NodeJSProject
 

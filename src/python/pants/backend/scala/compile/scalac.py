@@ -56,7 +56,7 @@ class CompileScalaSourceRequest(ClasspathEntryRequest):
     field_sets_consume_only = (JavaFieldSet, JavaGeneratorFieldSet)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaLibraryRequest:
     version: str
 

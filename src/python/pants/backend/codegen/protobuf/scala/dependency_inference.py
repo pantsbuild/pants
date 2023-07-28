@@ -24,7 +24,7 @@ _SCALAPB_RUNTIME_GROUP = "com.thesamet.scalapb"
 _SCALAPB_RUNTIME_ARTIFACT = "scalapb-runtime"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPBRuntimeDependencyInferenceFieldSet(FieldSet):
     required_fields = (ProtobufDependenciesField, JvmResolveField)
 
@@ -36,12 +36,12 @@ class InferScalaPBRuntimeDependencyRequest(InferDependenciesRequest):
     infer_from = ScalaPBRuntimeDependencyInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPBRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPBRuntimeForResolve:
     addresses: frozenset[Address]
 

@@ -149,11 +149,11 @@ class TestDirutilTest:
             with temporary_dir() as dst:
                 yield root, dst
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class Dir:
         path: str
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class File:
         path: str
         contents: str
@@ -167,7 +167,7 @@ class TestDirutilTest:
             with open(os.path.join(root, relpath)) as fp:
                 return cls(relpath, fp.read())
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class Symlink:
         path: str
 

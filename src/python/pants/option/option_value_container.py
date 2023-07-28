@@ -45,7 +45,7 @@ class OptionValueContainerBuilder:
         return OptionValueContainer(copy.copy(self._value_map))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionValueContainer:
     """A container for option values.
 

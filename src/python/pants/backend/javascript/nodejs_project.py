@@ -28,7 +28,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _TentativeProject:
     root_dir: str
     workspaces: FrozenOrderedSet[PackageJson]
@@ -49,7 +49,7 @@ class _TentativeProject:
         return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJSProject:
     root_dir: str
     workspaces: FrozenOrderedSet[PackageJson]
@@ -180,7 +180,7 @@ class AllNodeJSProjects(Collection[NodeJSProject]):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProjectPaths:
     root: str
     project_globs: list[str]

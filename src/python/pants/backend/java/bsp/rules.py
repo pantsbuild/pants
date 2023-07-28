@@ -39,7 +39,7 @@ class JavaBSPLanguageSupport(BSPLanguageSupport):
     can_provide_resources = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaMetadataFieldSet(FieldSet):
     required_fields = (JavaSourceField, JvmResolveField)
 
@@ -75,12 +75,12 @@ class JavacOptionsHandlerMapping(BSPHandlerMapping):
     response_type = JavacOptionsResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HandleJavacOptionsRequest:
     bsp_target_id: BuildTargetIdentifier
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HandleJavacOptionsResult:
     item: JavacOptionsItem
 
@@ -115,7 +115,7 @@ async def bsp_javac_options_request(request: JavacOptionsParams) -> JavacOptions
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaBSPCompileRequest(BSPCompileRequest):
     field_set_type = JavaFieldSet
 
@@ -133,7 +133,7 @@ async def bsp_java_compile_request(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaBSPResourcesRequest(BSPResourcesRequest):
     field_set_type = JavaFieldSet
 

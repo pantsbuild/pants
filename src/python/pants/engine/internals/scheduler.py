@@ -84,7 +84,7 @@ class PolledWorkunits(TypedDict):
     completed: tuple[Workunit, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExecutionRequest:
     """Holds the roots for an execution, which might have been requested by a user.
 

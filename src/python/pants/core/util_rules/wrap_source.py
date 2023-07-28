@@ -32,7 +32,7 @@ from pants.util.strutil import help_text
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WrapSource:
     rules: tuple[Union[Rule, UnionRule], ...]
     target_types: tuple[type[Target], ...]

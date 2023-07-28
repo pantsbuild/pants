@@ -34,7 +34,7 @@ class CompileRequestHandlerMapping(BSPHandlerMapping):
     response_type = CompileResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileOneBSPTargetRequest:
     bsp_target: BSPBuildTargetInternal
 

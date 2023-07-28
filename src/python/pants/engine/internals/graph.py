@@ -170,13 +170,13 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _AdaptorAndType:
     adaptor: TargetAdaptor
     target_type: type[Target]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _RequestAdaptorAndType:
     address: Address
     description_of_origin: str
@@ -207,23 +207,23 @@ async def _determine_target_adaptor_and_type(
     return _AdaptorAndType(target_adaptor, target_type)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _TargetGeneratorOverridesRequest:
     target_generator: TargetGenerator
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedTargetGeneratorRequests:
     requests: tuple[GenerateTargetsRequest, ...] = tuple()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolveTargetGeneratorRequests:
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolveAllTargetGeneratorRequests:
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
     of_type: type[TargetGenerator] | None = None
@@ -488,7 +488,7 @@ async def resolve_target(
     return WrappedTarget(target)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WrappedTargetForBootstrap:
     """Used to avoid a rule graph cycle when evaluating bootstrap targets.
 
@@ -670,13 +670,13 @@ def _detect_cycles(
             )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _DependencyMappingRequest:
     tt_request: TransitiveTargetsRequest
     expanded_targets: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _DependencyMapping:
     mapping: FrozenDict[Address, tuple[Address, ...]]
     visited: FrozenOrderedSet[Target]
@@ -885,7 +885,7 @@ def _log_or_raise_unmatched_owners(
         raise ResolveError(msg)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OwnersRequest:
     """A request for the owners of a set of file paths.
 

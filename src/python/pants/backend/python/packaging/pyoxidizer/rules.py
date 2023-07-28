@@ -62,7 +62,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyOxidizerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (PyOxidizerDependenciesField,)
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
@@ -76,7 +76,7 @@ class PyOxidizerFieldSet(PackageFieldSet, RunFieldSet):
     environment: EnvironmentField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyoxidizerRunnerScript:
     digest: Digest
     path: str

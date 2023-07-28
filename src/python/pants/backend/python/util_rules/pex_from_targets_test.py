@@ -464,7 +464,7 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Project:
     name: str
     version: str

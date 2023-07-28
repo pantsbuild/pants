@@ -52,7 +52,7 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyrightFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
@@ -70,7 +70,7 @@ class PyrightRequest(CheckRequest):
     tool_name = Pyright.options_scope
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyrightPartition:
     field_sets: FrozenOrderedSet[PyrightFieldSet]
     root_targets: CoarsenedTargets

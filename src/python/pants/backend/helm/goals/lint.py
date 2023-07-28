@@ -24,7 +24,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmLintFieldSet(HelmChartFieldSet):
     lint_strict: HelmChartLintStrictField
     skip_lint: HelmSkipLintField

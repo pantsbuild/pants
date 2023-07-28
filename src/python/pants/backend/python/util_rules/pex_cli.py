@@ -54,7 +54,7 @@ class PexCli(TemplatedExternalTool):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexCliProcess:
     subcommand: tuple[str, ...]
     extra_args: tuple[str, ...]

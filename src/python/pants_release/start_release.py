@@ -71,7 +71,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ReleaseInfo:
     version: Version
     slug: str
@@ -120,7 +120,7 @@ class Category(Enum):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Entry:
     category: Category | None
     text: str
@@ -176,7 +176,7 @@ def prepare_sha(sha: str) -> Entry:
     return Entry(category=category, text=f"* {subject_with_url}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Formatted:
     external: str
     internal: str

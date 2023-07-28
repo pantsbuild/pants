@@ -15,7 +15,7 @@ from typing import Iterator
 #
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParsedDockerfileInfo:
     """Keep fields in sync with `dockerfile_parser.py:DockerfileInfo`."""
 
@@ -60,7 +60,7 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
     # import here to allow the rest of the file to be tested without a dependency on dockerfile
     from dockerfile import Command, parse_file, parse_string  # pants: no-infer-dep
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class ParsedDockerfile:
         filename: str
         commands: tuple[Command, ...]

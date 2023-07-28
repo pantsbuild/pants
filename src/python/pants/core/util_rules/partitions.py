@@ -85,7 +85,7 @@ PartitionMetadataT = TypeVar("PartitionMetadataT", bound=PartitionMetadata)
 PartitionElementT = TypeVar("PartitionElementT")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 @runtime_ignore_subscripts
 class Partition(Generic[PartitionElementT, PartitionMetadataT]):
     """A collection of 'compatible' inputs for a plugin tool, with optional common metadata.
@@ -145,7 +145,7 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
         return Partitions([Partition(tuple(elements), metadata or _EmptyMetadata())])
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 @runtime_ignore_subscripts
 class _BatchBase(Generic[PartitionElementT, PartitionMetadataT], EngineAwareParameter):
     """Base class for a collection of elements that should all be processed together.
@@ -159,7 +159,7 @@ class _BatchBase(Generic[PartitionElementT, PartitionMetadataT], EngineAwarePara
     partition_metadata: PartitionMetadataT
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 @runtime_ignore_subscripts
 class _PartitionFieldSetsRequestBase(Generic[_FieldSetT], EngineAwareParameter):
     """Returns a unique type per calling type.
@@ -172,7 +172,7 @@ class _PartitionFieldSetsRequestBase(Generic[_FieldSetT], EngineAwareParameter):
     field_sets: tuple[_FieldSetT, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _PartitionFilesRequestBase(EngineAwareParameter):
     """Returns a unique type per calling type.
 

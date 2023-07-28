@@ -38,7 +38,7 @@ from pants.engine.target import (
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GolangciLintFieldSet(FieldSet):
     required_fields = (GoPackageSourcesField,)
 

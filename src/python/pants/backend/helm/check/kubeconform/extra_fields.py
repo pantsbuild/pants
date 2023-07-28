@@ -62,7 +62,7 @@ class KubeconformKubernetesVersionField(StringField):
     help = help_text("Kubernetes version to use for the validation.")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KubeconformFieldSet(FieldSet, metaclass=ABCMeta):
     skip: KubeconformSkipField
     ignore_sources: KubeconformIgnoreSourcesField

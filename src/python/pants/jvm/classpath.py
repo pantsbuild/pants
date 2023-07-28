@@ -21,7 +21,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Classpath:
     """A transitive classpath which is sufficient to launch the target(s) it was generated for.
 
@@ -92,7 +92,7 @@ async def classpath(
     return Classpath(classpath_entries, resolve)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LooseClassfiles:
     """The contents of a classpath entry as loose classfiles.
 

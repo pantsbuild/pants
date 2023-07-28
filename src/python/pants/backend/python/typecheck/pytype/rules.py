@@ -49,7 +49,7 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PytypeFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
@@ -67,7 +67,7 @@ class PytypeRequest(CheckRequest):
     tool_name = Pytype.options_scope
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PytypePartition:
     field_sets: FrozenOrderedSet[PytypeFieldSet]
     root_targets: CoarsenedTargets

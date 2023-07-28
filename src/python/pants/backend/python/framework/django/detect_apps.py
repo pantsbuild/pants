@@ -26,7 +26,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.resources import read_resource
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DjangoApps:
     label_to_name: FrozenDict[str, str]
 

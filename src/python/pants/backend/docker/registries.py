@@ -37,7 +37,7 @@ class DockerRegistryAddressCollisionError(DockerRegistryError):
         super().__init__(message)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerRegistryOptions:
     address: str
     alias: str = ""
@@ -70,7 +70,7 @@ class DockerRegistryOptions:
             registries[f"@{self.alias}"] = self
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerRegistries:
     default: tuple[DockerRegistryOptions, ...]
     registries: FrozenDict[str, DockerRegistryOptions]

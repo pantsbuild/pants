@@ -57,14 +57,14 @@ class KotlincConsumedPluginIdsField(StringSequenceField):
     required = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (KotlinSourceField,)
 
     sources: KotlinSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinGeneratorFieldSet(FieldSet):
     required_fields = (KotlinGeneratorSourcesField,)
 

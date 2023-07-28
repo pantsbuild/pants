@@ -32,7 +32,7 @@ class DependentsOption(Enum):
     TRANSITIVE = "transitive"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChangedRequest:
     sources: tuple[str, ...]
     dependents: DependentsOption
@@ -95,7 +95,7 @@ async def find_changed_owners(
     return ChangedAddresses(result)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChangedOptions:
     """A wrapper for the options from the `Changed` Subsystem.
 

@@ -25,7 +25,7 @@ from pants.backend.go.util_rules.coverage_profile import (
 #
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProfileTestCase:
     name: str
     input: str

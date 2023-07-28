@@ -30,7 +30,7 @@ class InvalidCoordinateString(Exception):
         super().__init__(f"Received invalid artifact coordinates: {coords}")
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, slots=True, order=True)
 class Coordinate:
     """A single Maven-style coordinate for a JVM dependency.
 
@@ -142,7 +142,7 @@ class Coordinates(DeduplicatedCollection[Coordinate]):
     """An ordered list of `Coordinate`s."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ArtifactRequirement:
     """A single Maven-style coordinate for a JVM dependency, along with information of how to fetch
     the dependency if it is not to be fetched from a Maven repository."""
@@ -212,7 +212,7 @@ class ArtifactRequirements(DeduplicatedCollection[ArtifactRequirement]):
         return ArtifactRequirements(coord.as_requirement() for coord in coordinates)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GatherJvmCoordinatesRequest:
     """A request to turn strings of coordinates (`group:artifact:version`) and/or addresses to
     `jvm_artifact` targets into `ArtifactRequirements`."""

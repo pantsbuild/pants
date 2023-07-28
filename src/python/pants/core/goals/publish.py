@@ -59,7 +59,7 @@ class PublishOutputData(FrozenDict[str, ImmutableValue]):
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PublishRequest(Generic[_F]):
     """Implement a union member subclass of this union class along with a PublishFieldSet subclass
     that appoints that member subclass in order to receive publish requests for targets compatible
@@ -88,7 +88,7 @@ _T = TypeVar("_T", bound=PublishRequest)
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """FieldSet for PublishRequest.
 
@@ -117,7 +117,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
         return PublishOutputData({"target": self.address})
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PublishPackages:
     """Processes to run in order to publish the named artifacts.
 
@@ -155,7 +155,7 @@ class PublishProcesses(Collection[PublishPackages]):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PublishProcessesRequest:
     """Internal request taking all field sets for a target and turning it into a `PublishProcesses`
     collection (via registered publish plugins)."""

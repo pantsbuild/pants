@@ -37,7 +37,7 @@ from pants.util.strutil import softwrap
 INCLUDE_REGEX = re.compile(r"^\s*#\s*include\s+((\".*\")|(<.*>))")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CCDependencyInferenceFieldSet(FieldSet):
     required_fields = (CCSourceField, CCDependenciesField)
 
@@ -58,7 +58,7 @@ def find_all_cc_targets(targets: AllTargets) -> AllCCTargets:
     return AllCCTargets(tgt for tgt in targets if tgt.has_field(CCSourceField))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CCFilesMapping:
     """A mapping of stripped CC file names to their owning file address."""
 
@@ -99,7 +99,7 @@ async def map_cc_files(cc_targets: AllCCTargets) -> CCFilesMapping:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CCIncludeDirective:
     path: str
     system_paths_only: bool  # True if include used `<foo.h>` instead of `"foo.h"`.

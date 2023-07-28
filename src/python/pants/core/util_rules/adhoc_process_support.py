@@ -43,7 +43,7 @@ from pants.util.frozendict import FrozenDict
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AdhocProcessRequest:
     description: str
     address: Address
@@ -64,26 +64,26 @@ class AdhocProcessRequest:
     capture_stderr_file: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AdhocProcessResult:
     process_result: ProcessResult
     adjusted_digest: Digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolveExecutionDependenciesRequest:
     address: Address
     execution_dependencies: tuple[str, ...] | None
     runnable_dependencies: tuple[str, ...] | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedExecutionDependencies:
     digest: Digest
     runnable_dependencies: RunnableDependencies | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RunnableDependencies:
     path_component: str
     immutable_input_digests: Mapping[str, Digest]
@@ -96,7 +96,7 @@ class RunnableDependencies:
 #
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExtraSandboxContents:
     digest: Digest
     path: str | None
@@ -105,12 +105,12 @@ class ExtraSandboxContents:
     extra_env: Mapping[str, str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MergeExtraSandboxContents:
     additions: tuple[ExtraSandboxContents, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AddExtraSandboxContentsToProcess:
     process: Process
     contents: ExtraSandboxContents

@@ -32,7 +32,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShadeJarRequest(EngineAwareParameter):
     path: PurePath
     digest: Digest
@@ -68,7 +68,7 @@ class ShadeJarRequest(EngineAwareParameter):
         return str(self.path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShadedJar:
     path: str
     digest: Digest

@@ -88,7 +88,7 @@ class InterpolationContext(FrozenDict[str, Union[str, InterpolationValue]]):
                     )
             raise (error_cls or default_error_cls)(msg) from e
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class TextSource:
         address: Address | None = None
         target_alias: str | None = None

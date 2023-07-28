@@ -27,7 +27,7 @@ from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SyntheticPyenvTargetsRequest(SyntheticTargetsRequest):
     path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 
@@ -51,7 +51,7 @@ async def make_synthetic_targets(request: SyntheticPyenvTargetsRequest) -> Synth
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RunPyenvInstallFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
     required_fields = (PyenvInstallSentinelField,)

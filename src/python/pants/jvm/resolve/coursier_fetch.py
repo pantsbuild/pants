@@ -104,7 +104,7 @@ class NoCompatibleResolve(Exception):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoursierLockfileEntry:
     """A single artifact entry from a Coursier-resolved lockfile.
 
@@ -189,7 +189,7 @@ class CoursierLockfileEntry:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoursierResolvedLockfile:
     """An in-memory representation of Pants' Coursier lockfile format.
 
@@ -290,7 +290,7 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
     return f"{dest_name}{ext}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoursierResolveInfo:
     coord_arg_strings: FrozenSet[str]
     extra_args: tuple[str, ...]
@@ -693,7 +693,7 @@ async def get_coursier_lockfile_for_resolve(
     return CoursierResolvedLockfile.from_serialized(lockfile_contents)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ToolClasspathRequest:
     """A request to set up the classpath for a JVM tool by fetching artifacts and merging the
     classpath.
@@ -717,7 +717,7 @@ class ToolClasspathRequest:
             )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ToolClasspath:
     """A fully fetched and merged classpath for running a JVM tool."""
 

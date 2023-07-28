@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pants.engine.fs import Digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoursierResolveKey:
     name: str
     path: str

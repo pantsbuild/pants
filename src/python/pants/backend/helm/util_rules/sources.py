@@ -28,7 +28,7 @@ from pants.engine.target import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartRootRequest(EngineAwareParameter):
     source: HelmChartMetaSourceField
 
@@ -36,7 +36,7 @@ class HelmChartRootRequest(EngineAwareParameter):
         return self.source.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartRoot:
     path: str
 
@@ -54,7 +54,7 @@ async def find_chart_source_root(request: HelmChartRootRequest) -> HelmChartRoot
     return HelmChartRoot(os.path.dirname(source.snapshot.files[0]))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartSourceFilesRequest(EngineAwareParameter):
     field_set: HelmChartFieldSet
     include_resources: bool
@@ -115,7 +115,7 @@ class HelmChartSourceFilesRequest(EngineAwareParameter):
         return self.field_set.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartSourceFiles:
     snapshot: Snapshot
     unrooted_files: tuple[str, ...]

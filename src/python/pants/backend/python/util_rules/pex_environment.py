@@ -91,7 +91,7 @@ class PexSubsystem(Subsystem):
         return level
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonExecutable(BinaryPath, EngineAwareReturnType):
     """The BinaryPath of a Python executable for user code, along with some extras."""
 
@@ -104,7 +104,7 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
         append_only_caches: Mapping[str, str] = FrozenDict({}),
     ) -> None:
         object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches))
-        super().__init__(path, fingerprint)
+        super(PythonExecutable, self).__init__(path, fingerprint)
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -127,7 +127,7 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
         return f"Selected {self.path} to run PEXes with."
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexEnvironment:
     path: tuple[str, ...]
     interpreter_search_paths: tuple[str, ...]
@@ -188,7 +188,7 @@ async def find_pex_python(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompletePexEnvironment:
     _pex_environment: PexEnvironment
     pex_root: PurePath

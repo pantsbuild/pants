@@ -65,7 +65,7 @@ async def generate_python_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApacheThriftPythonDependenciesInferenceFieldSet(FieldSet):
     required_fields = (ThriftDependenciesField, ThriftPythonResolveField)
 

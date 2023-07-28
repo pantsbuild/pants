@@ -41,7 +41,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OwningGoModRequest(EngineAwareParameter):
     address: Address
 
@@ -49,12 +49,12 @@ class OwningGoModRequest(EngineAwareParameter):
         return self.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OwningGoMod:
     address: Address
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NearestAncestorGoModRequest(EngineAwareParameter):
     address: Address
 
@@ -62,7 +62,7 @@ class NearestAncestorGoModRequest(EngineAwareParameter):
         return self.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NearestAncestorGoModResult:
     address: Address
 
@@ -210,7 +210,7 @@ async def find_owning_go_mod(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoModInfo:
     # Import path of the Go module, based on the `module` in `go.mod`.
     import_path: str
@@ -219,7 +219,7 @@ class GoModInfo:
     minimum_go_version: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoModInfoRequest(EngineAwareParameter):
     source: Address | GoModSourcesField
 

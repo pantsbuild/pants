@@ -34,7 +34,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProtobufMapping:
     """A mapping of stripped .proto file names to their owning file address."""
 
@@ -84,7 +84,7 @@ def parse_proto_imports(file_content: str) -> FrozenOrderedSet[str]:
     return FrozenOrderedSet(IMPORT_REGEX.findall(file_content))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProtobufDependencyInferenceFieldSet(FieldSet):
     required_fields = (ProtobufSourceField, ProtobufDependenciesField)
 

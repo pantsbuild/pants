@@ -32,14 +32,14 @@ from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateScroogeThriftSourcesRequest:
     thrift_source_field: ThriftSourceField
     lang_id: str
     lang_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GeneratedScroogeThriftSources:
     snapshot: Snapshot
 

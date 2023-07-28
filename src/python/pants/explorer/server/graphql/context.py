@@ -12,7 +12,7 @@ from pants.engine.explorer import RequestState
 from pants.explorer.server.uvicorn import UvicornServer
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GraphQLContext:
     uvicorn: UvicornServer
 

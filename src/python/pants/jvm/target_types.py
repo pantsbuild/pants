@@ -112,7 +112,7 @@ class JvmMainClassNameField(StringField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JvmRunnableSourceFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
     jdk_version: JvmJdkField
@@ -124,7 +124,7 @@ class JvmRunnableSourceFieldSet(RunFieldSet):
         yield from cls.rules()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenericJvmRunRequest:
     """Allows the use of a generic rule to return a `RunRequest` based on the field set."""
 
@@ -267,7 +267,7 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JvmArtifactExclusion:
     alias: ClassVar[str] = "jvm_exclude"
     help: ClassVar[str | Callable[[], str]] = help_text(
@@ -361,7 +361,7 @@ class JvmArtifactResolveField(JvmResolveField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JvmArtifactFieldSet(JvmRunnableSourceFieldSet):
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
@@ -477,7 +477,7 @@ class JvmShadingRule(ABC):
         return f"{self.alias}({', '.join(fields)})"
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False)
 class JvmShadingRenameRule(JvmShadingRule):
     alias = "shading_rename"
     help = "Renames all occurrences of the given `pattern` by the `replacement`."
@@ -499,7 +499,7 @@ class JvmShadingRenameRule(JvmShadingRule):
         return set(errors)
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False)
 class JvmShadingRelocateRule(JvmShadingRule):
     alias = "shading_relocate"
     help = help_text(
@@ -532,7 +532,7 @@ class JvmShadingRelocateRule(JvmShadingRule):
         return set(errors)
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False)
 class JvmShadingZapRule(JvmShadingRule):
     alias = "shading_zap"
     help = "Removes from the final artifact the occurrences of the `pattern`."
@@ -546,7 +546,7 @@ class JvmShadingZapRule(JvmShadingRule):
         return JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False)
 class JvmShadingKeepRule(JvmShadingRule):
     alias = "shading_keep"
     help = help_text(
@@ -637,7 +637,7 @@ class JvmShadingRulesField(SequenceField[JvmShadingRule], metaclass=ABCMeta):
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DeployJarDuplicateRule:
     alias: ClassVar[str] = "duplicate_rule"
     valid_actions: ClassVar[tuple[str, ...]] = ("skip", "replace", "concat", "concat_text", "throw")

@@ -22,7 +22,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCoverageData(CoverageData):
     coverage_digest: Digest
     import_path: str
@@ -37,7 +37,7 @@ class GoCoverMode(enum.Enum):
     ATOMIC = "atomic"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCoverageConfig:
     # How to count the code usage.
     cover_mode: GoCoverMode
@@ -46,7 +46,7 @@ class GoCoverageConfig:
     import_path_include_patterns: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApplyCodeCoverageRequest:
     """Apply code coverage to a package using `go tool cover`."""
 
@@ -58,7 +58,7 @@ class ApplyCodeCoverageRequest:
     import_path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileCodeCoverageMetadata:
     """Metadata for code coverage applied to a single Go file."""
 
@@ -68,7 +68,7 @@ class FileCodeCoverageMetadata:
     cover_var: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuiltGoPackageCodeCoverageMetadata:
     import_path: str
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...]
@@ -76,7 +76,7 @@ class BuiltGoPackageCodeCoverageMetadata:
     sources_dir_path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApplyCodeCoverageResult:
     digest: Digest
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...]
@@ -84,7 +84,7 @@ class ApplyCodeCoverageResult:
     cgo_files: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApplyCodeCoverageToFileRequest:
     digest: Digest
     go_file: str
@@ -93,7 +93,7 @@ class ApplyCodeCoverageToFileRequest:
     cover_var: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApplyCodeCoverageToFileResult:
     digest: Digest
     cover_go_file: str
@@ -214,13 +214,13 @@ async def go_apply_code_coverage(request: ApplyCodeCoverageRequest) -> ApplyCode
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateCoverageSetupCodeRequest:
     packages: FrozenOrderedSet[BuiltGoPackageCodeCoverageMetadata]
     cover_mode: GoCoverMode
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateCoverageSetupCodeResult:
     PATH = "pants_cover_setup.go"
     digest: Digest

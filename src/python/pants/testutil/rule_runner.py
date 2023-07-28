@@ -222,7 +222,7 @@ atexit.register(lambda: EXECUTOR.shutdown(5))
 PYTHON_BOOTSTRAP_ENV = {"PATH", "PYENV_ROOT", "HOME"}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoalRuleResult:
     exit_code: int
     stdout: str
@@ -632,14 +632,14 @@ class RuleRunner:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockEffect(Generic[_O]):
     output_type: type[_O]
     input_types: tuple[type, ...]
     mock: Callable[..., _O]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockGet(Generic[_O]):
     output_type: type[_O]
     input_types: tuple[type, ...]

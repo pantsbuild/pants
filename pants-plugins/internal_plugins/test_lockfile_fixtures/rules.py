@@ -38,7 +38,7 @@ from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JVMLockfileFixtureConfig:
     definition: JVMLockfileFixtureDefinition
     test_file_path: str
@@ -48,7 +48,7 @@ class CollectedJVMLockfileFixtureConfigs(DeduplicatedCollection[JVMLockfileFixtu
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderedJVMLockfileFixture:
     content: bytes
     path: str

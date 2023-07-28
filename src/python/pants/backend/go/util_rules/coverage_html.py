@@ -38,7 +38,7 @@ from pants.engine.rules import collect_rules, rule
 #  // license that can be found in the LICENSE file.
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderGoCoverageProfileToHtmlRequest:
     raw_coverage_profile: bytes
     description_of_origin: str
@@ -46,12 +46,12 @@ class RenderGoCoverageProfileToHtmlRequest:
     sources_dir_path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderGoCoverageProfileToHtmlResult:
     html_output: bytes
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderedFile:
     name: str
     body: str

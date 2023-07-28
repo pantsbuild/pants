@@ -31,7 +31,7 @@ class MockTarget(Target):
     core_fields = (MockRequiredField,)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockGenerateSnapshotsFieldSet(GenerateSnapshotsFieldSet):
     required_fields = (MockRequiredField,)
 

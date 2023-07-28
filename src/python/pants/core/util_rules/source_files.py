@@ -9,7 +9,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceFiles:
     """A merged snapshot of the `sources` fields of multiple targets."""
 
@@ -24,7 +24,7 @@ class SourceFiles:
         return self.snapshot.files
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceFilesRequest:
     sources_fields: Tuple[SourcesField, ...]
     for_sources_types: Tuple[Type[SourcesField], ...]

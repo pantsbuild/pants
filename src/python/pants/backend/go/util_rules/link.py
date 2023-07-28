@@ -25,7 +25,7 @@ from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LinkGoBinaryRequest:
     """Link a Go binary from package archives and an import configuration."""
 
@@ -37,14 +37,14 @@ class LinkGoBinaryRequest:
     description: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LinkedGoBinary:
     """A linked Go binary stored in a `Digest`."""
 
     digest: Digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LinkerSetup:
     digest: Digest
     extld_wrapper_path: str

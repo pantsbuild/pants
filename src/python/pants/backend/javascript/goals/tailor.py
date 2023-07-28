@@ -31,17 +31,17 @@ from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativeJSTargetsRequest(PutativeTargetsRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativePackageJsonTargetsRequest(PutativeTargetsRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ClassifiedSources:
     target_type: type[Target]
     files: Collection[str]

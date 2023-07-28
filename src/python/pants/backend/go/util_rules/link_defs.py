@@ -13,12 +13,12 @@ from pants.util.frozendict import FrozenDict
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ImplicitLinkerDependenciesHook:
     build_opts: GoBuildOptions
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ImplicitLinkerDependencies:
     digest: Digest
     import_paths_to_pkg_a_files: FrozenDict[str, str]

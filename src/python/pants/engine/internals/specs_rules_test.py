@@ -851,13 +851,13 @@ def test_find_valid_field_sets(caplog) -> None:
     class FieldSetSuperclass(FieldSet):
         pass
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class FieldSetSubclass1(FieldSetSuperclass):
         required_fields = (FortranSources,)
 
         sources: FortranSources
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class FieldSetSubclass2(FieldSetSuperclass):
         required_fields = (FortranSources,)
 
@@ -1068,7 +1068,7 @@ def test_secondary_owner_warning(caplog) -> None:
     class SomeGoalFieldSet(FieldSet):
         pass
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class SecondaryOwnerFS(SomeGoalFieldSet):
         required_fields = (FortranSecondaryOwnerField,)
 

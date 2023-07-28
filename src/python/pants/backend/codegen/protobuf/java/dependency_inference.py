@@ -27,7 +27,7 @@ _PROTOBUF_JAVA_RUNTIME_GROUP = "com.google.protobuf"
 _PROTOBUF_JAVA_RUNTIME_ARTIFACT = "protobuf-java"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProtobufJavaRuntimeDependencyInferenceFieldSet(FieldSet):
     required_fields = (
         ProtobufDependenciesField,
@@ -44,12 +44,12 @@ class InferProtobufJavaRuntimeDependencyRequest(InferDependenciesRequest):
     infer_from = ProtobufJavaRuntimeDependencyInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProtobufJavaRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProtobufJavaRuntimeForResolve:
     addresses: FrozenSet[Address]
 
@@ -76,12 +76,12 @@ async def resolve_protobuf_java_runtime_for_resolve(
     return ProtobufJavaRuntimeForResolve(addresses)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProtobufJavaGrpcRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProtobufJavaGrpcRuntimeForResolve:
     addresses: FrozenSet[Address]
 

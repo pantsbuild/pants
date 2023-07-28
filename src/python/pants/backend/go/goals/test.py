@@ -101,7 +101,7 @@ TEST_FLAGS = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoTestFieldSet(TestFieldSet):
     required_fields = (GoPackageSourcesField,)
 
@@ -120,19 +120,19 @@ class GoTestRequest(TestRequest):
     field_set_type = GoTestFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PrepareGoTestBinaryCoverageConfig:
     coverage_mode: GoCoverMode
     coverage_packages: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PrepareGoTestBinaryRequest:
     field_set: GoTestFieldSet
     coverage: PrepareGoTestBinaryCoverageConfig | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PrepareGoTestBinaryResult:
     test_binary_digest: Digest
     test_binary_path: str
@@ -141,7 +141,7 @@ class PrepareGoTestBinaryResult:
     pkg_analysis: FirstPartyPkgAnalysis
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FalliblePrepareGoTestBinaryResult:
     binary: PrepareGoTestBinaryResult | None
     stdout: str

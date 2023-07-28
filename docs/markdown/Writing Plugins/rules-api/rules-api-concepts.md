@@ -10,7 +10,7 @@ Rules
 
 Plugin logic is defined in _rules_: [pure functions](https://en.wikipedia.org/wiki/Pure_function) that map a set of statically-declared input types to a statically-declared output type.
 
-Each rule is an `async` Python function annotated with the decorator `@rule`, which takes any number of parameters (including zero) and returns a value of one specific type. Rules must be annotated with [type hints](https://www.python.org/dev/peps/pep-0484/). 
+Each rule is an `async` Python function annotated with the decorator `@rule`, which takes any number of parameters (including zero) and returns a value of one specific type. Rules must be annotated with [type hints](https://www.python.org/dev/peps/pep-0484/).
 
 For example, this rule maps `(int) -> str`.
 
@@ -64,9 +64,9 @@ The engine will find a path through the rules to satisfy the types that you are 
 If the engine cannot find a path, or if there is ambiguity due to multiple possible paths, the rule graph will fail to compile. This ensures that the rule graph is always unambiguous.
 
 > 🚧 Rule graph errors can be confusing
-> 
+>
 > We know that rule graph errors can be intimidating and confusing to understand. We are planning to improve them. In the meantime, please do not hesitate to ask for help in the #plugins channel on [Slack](doc:getting-help).
-> 
+>
 > Also see [Tips and debugging](doc:rules-api-tips#debugging-rule-graph-issues) for some tips for how to approach these errors.
 
 `await Get` - awaiting results in a rule body
@@ -97,7 +97,7 @@ In this example, we could not have requested the type `ProcessResult` as a param
 Thanks to `await Get`, we can write a recursive rule to compute a [Fibonacci number](https://en.wikipedia.org/wiki/Fibonacci_number):
 
 ```python
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Fibonacci:
     val: int
 
@@ -120,27 +120,27 @@ async def call_fibonacci(...) -> Foo:
 ```
 
 > 📘 `Get` constructor shorthand
-> 
+>
 > The verbose constructor for a `Get` object takes three parameters: `Get(OutputType, InputType, input)`, where `OutputType` and `InputType` are both types, and `input` is an instance of `InputType`.
-> 
+>
 > Instead, you can use `Get(OutputType, InputType(constructor arguments))`. These two are equivalent:
-> 
+>
 > - `Get(ProcessResult, Process, Process(["/bin/echo"]))`
 > - `Get(ProcessResult, Process(["/bin/echo"]))`
-> 
+>
 > However, the below is invalid because Pants's AST parser will not be able to see what the `InputType` is:
-> 
+>
 > ```python
 > process = Process(["/bin/echo"])
 > Get(ProcessResult, process)
 > ```
 
 > 📘 Why only one input?
-> 
+>
 > Currently, you can only give a single input. It is not possible to do something like `Get(OutputType, InputType1(...), InputType2(...))`.
-> 
+>
 > Instead, it's common for rules to create a "Request" data class, such as `PexRequest` or `SourceFilesRequest`. This request centralizes all the data it needs to operate into one data structure, which allows for call sites to say `await Get(SourceFiles, SourceFilesRequest, my_request)`, for example.
-> 
+>
 > See <https://github.com/pantsbuild/pants/issues/7490> for the tracking issue.
 
 ### `MultiGet` for concurrency
@@ -199,20 +199,20 @@ To disambiguate between different uses of the same type, you will usually want t
 
 Python 3's [dataclasses](https://docs.python.org/3/library/dataclasses.html) work well with the engine because:
 
-1. If `frozen=True` is set, they are immutable and hashable.
+1. If `frozen=True, slots=True` is set, they are immutable and hashable.
 2. Dataclasses use type hints.
 3. Dataclasses are declarative and ergonomic.
 
 You do not need to use dataclasses. You can use alternatives like `attrs` or normal Python classes. However, dataclasses are a nice default.
 
-You should set `@dataclass(frozen=True)` for Python to autogenerate `__hash__()` and to ensure that the type is immutable.
+You should set `@dataclass(frozen=True, slots=True)` for Python to autogenerate `__hash__()` and to ensure that the type is immutable.
 
 ```python
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Name:
     first: str
     last: str | None
@@ -223,25 +223,25 @@ async def demo(name: Name) -> Foo:
 ```
 
 > 🚧 Don't use `NamedTuple`
-> 
+>
 > `NamedTuple` behaves similarly to dataclasses, but it should not be used because the `__eq__()` implementation uses structural equality, rather than the nominal equality used by the engine.
 
 > 📘 Custom dataclass `__init__()`
-> 
+>
 > Sometimes, you may want to have a custom `__init__()` constructor. For example, you may want your dataclass to store a `tuple[str, ...]`, but for your constructor to take the more flexible `Iterable[str]` which you then convert to an immutable tuple sequence.
-> 
+>
 > The Python docs suggest using `object.__setattr__` to set attributes in your `__init__` for frozen dataclasses.
-> 
+>
 > ```python
 > from __future__ import annotations
-> 
+>
 > from dataclasses import dataclass
 > from typing import Iterable
-> 
-> @dataclass(frozen=True)
+>
+> @dataclass(frozen=True, slots=True)
 > class Example:
 >     args: tuple[str, ...]
-> 
+>
 >     def __init__(self, args: Iterable[str]) -> None:
 >         object.__setattr__(self, "args", tuple(args))
 > ```
@@ -253,7 +253,7 @@ If you want a rule to use a homogenous sequence, you can use `pants.engine.colle
 ```python
 from pants.engine.collection import Collection
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LintResult:
     stdout: str
     stderr: str

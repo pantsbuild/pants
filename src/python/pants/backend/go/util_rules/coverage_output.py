@@ -27,7 +27,7 @@ class GoCoverageDataCollection(CoverageDataCollection):
     element_type = GoCoverageData
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderGoCoverageReportRequest(EngineAwareParameter):
     raw_report: GoCoverageData
 
@@ -35,7 +35,7 @@ class RenderGoCoverageReportRequest(EngineAwareParameter):
         return self.raw_report.import_path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderGoCoverageReportResult:
     coverage_report: FilesystemCoverageReport
     html_report: FilesystemCoverageReport | None = None

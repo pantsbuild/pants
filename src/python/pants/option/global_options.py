@@ -76,7 +76,7 @@ class DynamicUIRenderer(Enum):
 _G = TypeVar("_G", bound="_GlobMatchErrorBehaviorOptionBase")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _GlobMatchErrorBehaviorOptionBase:
     """This class exists to have dedicated types per global option of the `GlobMatchErrorBehavior`
     so we can extract the relevant option in a rule to limit the scope of downstream rules to avoid
@@ -140,7 +140,7 @@ class AuthPluginState(Enum):
     UNAVAILABLE = "unavailable"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AuthPluginResult:
     """The return type for a function specified via `[GLOBAL].remote_auth_plugin`.
 
@@ -188,7 +188,7 @@ class AuthPluginResult:
         return self.state == AuthPluginState.OK
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DynamicRemoteOptions:
     """Options related to remote execution of processes which are computed dynamically."""
 
@@ -471,7 +471,7 @@ class DynamicRemoteOptions:
         return re.sub(r"^grpc", "http", address) if address else None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExecutionOptions:
     """A collection of all options related to (remote) execution of processes.
 
@@ -572,7 +572,7 @@ class ExecutionOptions:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LocalStoreOptions:
     """A collection of all options related to the local store.
 
@@ -1958,7 +1958,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         return Path(self._named_caches_dir).resolve()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GlobalOptionsFlags:
     flags: FrozenOrderedSet[str]
     short_flags: FrozenOrderedSet[str]
@@ -1979,7 +1979,7 @@ class GlobalOptionsFlags:
         return cls(FrozenOrderedSet(flags), FrozenOrderedSet(short_flags))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProcessCleanupOption:
     """A wrapper around the global option `process_cleanup`.
 
@@ -1989,7 +1989,7 @@ class ProcessCleanupOption:
     val: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NamedCachesDirOption:
     """A wrapper around the global option `named_caches_dir`.
 

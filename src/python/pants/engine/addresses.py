@@ -35,7 +35,7 @@ class Addresses(Collection[Address]):
         return self[0]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnparsedAddressInputs:
     """Raw addresses that have not been parsed yet.
 

@@ -52,7 +52,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize, shell_quote
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MyPyPartition:
     field_sets: FrozenOrderedSet[MyPyFieldSet]
     root_targets: CoarsenedTargets

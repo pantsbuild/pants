@@ -47,7 +47,7 @@ class JarDuplicateAction(Enum):
     THROW = "throw"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JarToolRequest:
     jar_name: str
     digest: Digest
@@ -113,7 +113,7 @@ class JarToolGenerateLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = "jar_tool"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JarToolCompiledClassfiles:
     digest: Digest
 

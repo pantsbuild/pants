@@ -41,7 +41,7 @@ from pants.util.strutil import pluralize, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AnalyseHelmDeploymentRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 
@@ -49,7 +49,7 @@ class AnalyseHelmDeploymentRequest(EngineAwareParameter):
         return self.field_set.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmDeploymentReport(EngineAwareReturnType):
     address: Address
     image_refs: FrozenYamlIndex[str]
@@ -102,7 +102,7 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 
@@ -110,7 +110,7 @@ class FirstPartyHelmDeploymentMappingRequest(EngineAwareParameter):
         return self.field_set.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyHelmDeploymentMapping:
     """A mapping between `helm_deployment` target addresses and tuples made up of a Docker image
     reference and a `docker_image` target address.

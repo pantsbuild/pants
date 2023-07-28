@@ -51,13 +51,13 @@ class PythonAwsLambdaHandlerField(PythonFaaSHandlerField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedPythonAwsHandler:
     val: str
     file_name_used: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvePythonAwsHandlerRequest:
     field: PythonAwsLambdaHandlerField
 

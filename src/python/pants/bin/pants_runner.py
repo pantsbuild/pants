@@ -21,7 +21,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PantsRunner:
     """A higher-level runner that delegates runs to either a LocalPantsRunner or
     RemotePantsRunner."""

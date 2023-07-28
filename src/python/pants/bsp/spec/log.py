@@ -26,7 +26,7 @@ class MessageType(Enum):
     LOG = 4
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LogMessageParams(BSPNotification):
     notification_name = "build/logMessage"
 

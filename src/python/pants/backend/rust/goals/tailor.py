@@ -14,7 +14,7 @@ from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativeRustTargetsRequest(PutativeTargetsRequest):
     pass
 

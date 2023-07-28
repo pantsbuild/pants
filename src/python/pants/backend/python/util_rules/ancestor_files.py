@@ -10,7 +10,7 @@ from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AncestorFilesRequest:
     """A request for ancestor files of the given names.
 
@@ -23,7 +23,7 @@ class AncestorFilesRequest:
     ignore_empty_files: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AncestorFiles:
     """Any ancestor files found."""
 

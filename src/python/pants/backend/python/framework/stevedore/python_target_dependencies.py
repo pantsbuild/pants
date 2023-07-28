@@ -73,7 +73,7 @@ def find_all_python_distributions_with_any_stevedore_entry_points(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StevedoreExtensions:
     """A mapping of stevedore namespaces to a list of targets that provide them.
 
@@ -125,7 +125,7 @@ def find_python_distributions_with_entry_points_in_stevedore_namespaces(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonTestsStevedoreNamespaceInferenceFieldSet(FieldSet):
     required_fields = (PythonTestsDependenciesField, StevedoreNamespacesField)
 

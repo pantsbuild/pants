@@ -15,7 +15,7 @@ from pants.util.strutil import bullet_list, softwrap
 
 
 @union
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class URLDownloadHandler:
     """Union base for custom URL handler.
 

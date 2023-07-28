@@ -14,14 +14,14 @@ def normalize_scope(scope: str):
     return scope.lower().replace("-", "_")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Scope:
     """An options scope."""
 
     scope: str
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, slots=True, order=True)
 class ScopeInfo:
     """Information about a scope."""
 
@@ -63,7 +63,7 @@ class ScopeInfo:
         return getattr(self.subsystem_cls, name, default) if self.subsystem_cls else default
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScopedOptions:
     """A wrapper around options selected for a particular Scope."""
 

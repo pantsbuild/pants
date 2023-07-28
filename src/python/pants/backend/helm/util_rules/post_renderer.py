@@ -41,7 +41,7 @@ from pants.util.strutil import bullet_list, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmDeploymentPostRendererRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 

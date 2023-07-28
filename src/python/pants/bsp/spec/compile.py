@@ -13,7 +13,7 @@ from pants.bsp.spec.base import BuildTargetIdentifier
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileParams:
     # A sequence of build targets to compile.
     targets: tuple[BuildTargetIdentifier, ...]
@@ -42,7 +42,7 @@ class CompileParams:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileResult:
     # An optional request id to know the origin of this report.
     origin_id: str | None
@@ -79,7 +79,7 @@ class CompileResult:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileTask:
     target: BuildTargetIdentifier
 
@@ -91,7 +91,7 @@ class CompileTask:
         return {"target": self.target.to_json_dict()}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileReport:
     # The build target that was compiled
     target: BuildTargetIdentifier

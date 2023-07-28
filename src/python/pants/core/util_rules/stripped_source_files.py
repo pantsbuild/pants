@@ -21,7 +21,7 @@ from pants.source.source_root import rules as source_root_rules
 from pants.util.dirutil import fast_relpath
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StrippedSourceFiles:
     """Wrapper for a snapshot of files whose source roots have been stripped.
 
@@ -90,12 +90,12 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
     return StrippedSourceFiles(resulting_snapshot)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StrippedFileName:
     value: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StrippedFileNameRequest(EngineAwareParameter):
     file_path: str
 

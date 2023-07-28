@@ -29,7 +29,7 @@ from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExactRequirement:
     project_name: str
     version: str
@@ -58,7 +58,7 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
         yield ExactRequirement.parse(requirement)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexData:
     pex: Pex | VenvPex
     is_zipapp: bool

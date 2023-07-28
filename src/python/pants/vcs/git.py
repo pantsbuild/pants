@@ -120,7 +120,7 @@ class GitWorktree(EngineAwareReturnType):
         return id(self) == id(other)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaybeGitWorktree(EngineAwareReturnType):
     git_worktree: GitWorktree | None = None
 
@@ -128,7 +128,7 @@ class MaybeGitWorktree(EngineAwareReturnType):
         return False
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class GitWorktreeRequest:
     gitdir: PathLike[str] | None = None
     subdir: PathLike[str] | None = None

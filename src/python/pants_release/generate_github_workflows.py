@@ -941,7 +941,7 @@ def test_workflow_jobs() -> Jobs:
     return jobs
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WorkflowInput:
     name: str
     type_str: str

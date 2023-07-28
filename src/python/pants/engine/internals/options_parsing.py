@@ -15,7 +15,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _Options:
     """A wrapper around bootstrapped options values: not for direct consumption.
 

@@ -16,7 +16,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenFilesRequest:
     files: Tuple[PurePath, ...]
     error_if_open_not_found: bool
@@ -26,7 +26,7 @@ class OpenFilesRequest:
         object.__setattr__(self, "error_if_open_not_found", error_if_open_not_found)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenFiles:
     processes: Tuple[InteractiveProcess, ...]
 

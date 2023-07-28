@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DeployFieldSet(FieldSet, metaclass=ABCMeta):
     """The FieldSet type for the `deploy` goal.
 
@@ -41,7 +41,7 @@ class DeployFieldSet(FieldSet, metaclass=ABCMeta):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DeployProcess:
     """A process that when executed will have the side effect of deploying a target.
 
@@ -50,7 +50,7 @@ class DeployProcess:
 
     Example:
 
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class MyDeploymentFieldSet(DeployFieldSet):
             pass
 
@@ -86,13 +86,13 @@ class DeploySubsystem(GoalSubsystem):
     required_union_implementation = (DeployFieldSet,)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Deploy(Goal):
     subsystem_cls = DeploySubsystem
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _PublishProcessesForTargetRequest:
     target: Target
 

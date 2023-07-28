@@ -61,7 +61,7 @@ class ProjectVersionTarget(Target):
 You may have noticed that we have decided to override the `help` property to show more relevant information than the default help message:
 
 ```
-$ pants help version_file          
+$ pants help version_file
 `version_file` target
 ---------------------
 
@@ -91,11 +91,11 @@ to
 targets = [tgt for tgt in targets if tgt.has_field(ProjectVersionSourceField)]
 ```
 
-Using own classes via subclassing will also help with refactoring if you decide to deprecate the target alias in order to rename it. In a more advanced scenario, other plugins may import the `ProjectVersionSourceField` field and use it in their own custom targets, so that `project-version` specific behavior would still apply to those targets as well. 
+Using own classes via subclassing will also help with refactoring if you decide to deprecate the target alias in order to rename it. In a more advanced scenario, other plugins may import the `ProjectVersionSourceField` field and use it in their own custom targets, so that `project-version` specific behavior would still apply to those targets as well.
 
 ## Ensuring a version follows a semver convention
 
-With the current implementation, we have simply returned the contents of the file as is. We may want to add some validation, for instance, to check that a version string follows a semver convention. Let's learn how to [bring a 3rd party Python package](https://www.pantsbuild.org/docs/plugins-overview#thirdparty-dependencies), namely, [packaging](https://pypi.org/project/packaging/), into our plugin to do that! 
+With the current implementation, we have simply returned the contents of the file as is. We may want to add some validation, for instance, to check that a version string follows a semver convention. Let's learn how to [bring a 3rd party Python package](https://www.pantsbuild.org/docs/plugins-overview#thirdparty-dependencies), namely, [packaging](https://pypi.org/project/packaging/), into our plugin to do that!
 
 To start depending on the `packaging` package in our in-repo plugin, we must extend the `pants.toml` file:
 
@@ -152,7 +152,7 @@ You can confirm that cache is being used by adding [log statements](https://www.
 We have so far shown the version string as part of the `ProjectVersionFileView` class:
 
 ```
-$ pants project-version myapp: 
+$ pants project-version myapp:
 ProjectVersionFileView(path='myapp/VERSION', version='0.0.1')
 ```
 
@@ -222,7 +222,7 @@ from pants.engine.unions import UnionRule
 from project_version.target_types import ProjectVersionTarget
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativeProjectVersionTargetsRequest(PutativeTargetsRequest):
     pass
 
@@ -285,15 +285,15 @@ def rules():
 Let's remove existing `version_file` target from the `myapp/BUILD` file and run the `tailor` goal:
 
 ```
-$ pants tailor ::        
+$ pants tailor ::
 Created myapp/BUILD:
-  - Add version_file target project-version-file 
+  - Add version_file target project-version-file
 ```
 
 If you have multiple projects, being able to generate the targets automatically may save time. You would also likely want to run the `tailor` goal in the check mode to confirm that new projects created have a `version_file` target. Remove the `version_file` target from the `myapp/BUILD` file and re-run the `tailor` goal:
 
 ```
-$ pants tailor --check ::                         
+$ pants tailor --check ::
 Would create myapp/BUILD:
   - Add version_file target project-version-file
 
@@ -371,7 +371,7 @@ Now, let's tag our repository with another tag and update our `VERSION` file:
 
 ```
 $ git tag --delete 0.0.1
-Deleted tag '0.0.1' (was 006f320) 
+Deleted tag '0.0.1' (was 006f320)
 $ git tag 0.0.2
 $ git describe --tags
 0.0.2
@@ -413,7 +413,7 @@ Let's add another option so that we can control whether Git tag should be retrie
 class ProjectVersionSubsystem(GoalSubsystem):
     name = "project-version"
     help = "Show representation of the project version from the `VERSION` file."
-    
+
     ...
     match_git = BoolOption(
         default=False,
@@ -436,7 +436,7 @@ match_git = false
 We have now extended the plugin with extra functionality:
 
 ```
-$ pants project-version myapp:                      
+$ pants project-version myapp:
 [INFO] Initializing scheduler...
 [INFO] Scheduler initialized.
 {"path": "myapp/VERSION", "version": "0.0.1"}
@@ -485,7 +485,7 @@ from pants.option.option_types import BoolOption
 from project_version.target_types import ProjectVersionSourceField, ProjectVersionTarget
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProjectVersionFileView:
     path: str
     version: str
@@ -613,7 +613,7 @@ from pants.util.dirutil import group_by_dir
 from project_version.target_types import ProjectVersionTarget
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativeProjectVersionTargetsRequest(PutativeTargetsRequest):
     pass
 

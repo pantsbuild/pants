@@ -53,7 +53,7 @@ class DependencyRuleAction(Enum):
         return self.name
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencyRuleApplication:
     action: DependencyRuleAction
     rule_description: str
@@ -139,12 +139,12 @@ class BuildFileDependencyRulesImplementationRequest:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileDependencyRulesImplementation:
     build_file_dependency_rules_class: type[BuildFileDependencyRules]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaybeBuildFileDependencyRulesImplementation:
     build_file_dependency_rules_class: type[BuildFileDependencyRules] | None
 

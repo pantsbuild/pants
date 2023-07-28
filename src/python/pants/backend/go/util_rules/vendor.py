@@ -19,7 +19,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParseVendorModulesMetadataRequest(EngineAwareParameter):
     digest: Digest
     path: str
@@ -28,7 +28,7 @@ class ParseVendorModulesMetadataRequest(EngineAwareParameter):
         return str(self.path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VendoredModuleMetadata:
     """Metadata from vendor/modules.txt for one module."""
 
@@ -49,12 +49,12 @@ class VendoredModuleMetadata:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParseVendorModulesMetadataResult:
     modules: tuple[VendoredModuleMetadata, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VendorModulesParserSetup:
     digest: Digest
     path: str

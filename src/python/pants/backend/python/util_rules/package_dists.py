@@ -131,7 +131,7 @@ class AmbiguousOwnerError(OwnershipError):
     """Indicates an exportable target has more than one owning exported target."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExportedTarget:
     """A target that explicitly exports a setup.py artifact, using a `provides=` stanza.
 
@@ -145,7 +145,7 @@ class ExportedTarget:
         return self.target[PythonProvidesField].value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencyOwner:
     """An ExportedTarget in its role as an owner of other targets.
 
@@ -157,7 +157,7 @@ class DependencyOwner:
     exported_target: ExportedTarget
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OwnedDependency:
     """A target that is owned by some ExportedTarget.
 
@@ -185,7 +185,7 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
     sort_input = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DistBuildSources:
     """The source-root-stripped sources required to build a distribution with a generated setup.py.
 
@@ -199,7 +199,7 @@ class DistBuildSources:
     package_data: tuple[PackageDatum, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DistBuildChrootRequest:
     """A request to create a chroot for building a dist in."""
 
@@ -207,7 +207,7 @@ class DistBuildChrootRequest:
     interpreter_constraints: InterpreterConstraints
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
@@ -272,7 +272,7 @@ class SetupKwargs:
 # authors. To resolve `SetupKwargs`, call `await Get(SetupKwargs, ExportedTarget)`, which handles
 # running any custom implementations vs. using the default implementation.
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SetupKwargsRequest(ABC):
     """A request to allow setting the kwargs passed to the `setup()` function.
 
@@ -304,7 +304,7 @@ class FinalizedSetupKwargs(SetupKwargs):
         super().__init__(kwargs, address=address, _allow_banned_keys=True)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DistBuildChroot:
     """A chroot containing PEP 517 build setup and the sources it operates on."""
 
@@ -337,7 +337,7 @@ class NoDistTypeSelected(ValueError):
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DistBuildEnvironmentRequest:
     target_addresses: tuple[Address, ...]
     interpreter_constraints: InterpreterConstraints
@@ -348,7 +348,7 @@ class DistBuildEnvironmentRequest:
         return False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DistBuildEnvironment:
     """Various extra information that might be needed to build a dist."""
 
@@ -520,14 +520,14 @@ async def determine_explicitly_provided_setup_kwargs(
     return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateSetupPyRequest:
     exported_target: ExportedTarget
     sources: DistBuildSources
     interpreter_constraints: InterpreterConstraints
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GeneratedSetupPy:
     digest: Digest
 

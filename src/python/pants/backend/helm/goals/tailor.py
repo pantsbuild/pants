@@ -32,7 +32,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativeHelmTargetsRequest(PutativeTargetsRequest):
     pass
 

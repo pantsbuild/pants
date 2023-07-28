@@ -8,7 +8,7 @@ from typing import Any
 from pants.bsp.spec.base import BSPData, Uri
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JvmBuildTarget:
     # Uri representing absolute path to jdk
     # For example: file:///usr/lib/jvm/java-8-openjdk-amd64
@@ -34,7 +34,7 @@ class JvmBuildTarget:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MavenDependencyModuleArtifact:
     uri: Uri
     classifier: str | None = None
@@ -50,7 +50,7 @@ class MavenDependencyModuleArtifact:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MavenDependencyModule(BSPData):
     """Maven-related module metadata."""
 

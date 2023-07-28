@@ -69,12 +69,12 @@ class ScalaPBShimCompiledClassfiles(ClasspathEntry):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaterializeJvmPluginRequest:
     plugin: PluginArtifactSpec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaterializedJvmPlugin:
     name: str
     classpath: ToolClasspath
@@ -84,12 +84,12 @@ class MaterializedJvmPlugin:
         return f"--jvm-plugin={self.name}={classpath_arg}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaterializeJvmPluginsRequest:
     plugins: tuple[PluginArtifactSpec, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaterializedJvmPlugins:
     digest: Digest
     plugins: tuple[MaterializedJvmPlugin, ...]

@@ -39,7 +39,7 @@ def glob_to_regexp(pattern: str, snap_to_path: bool = False) -> str:
     return glob + r"$"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Glob:
     raw: str
     regexp: Pattern = field(compare=False)
@@ -74,7 +74,7 @@ class PathGlobAnchorMode(Enum):
         raise TypeError("Internal Error: should not get here, please file a bug report!")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PathGlob:
     raw: str
     anchor_mode: PathGlobAnchorMode
@@ -157,7 +157,7 @@ RULE_REGEXP = "|".join(
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetGlob:
     type_: Glob | None
     name: Glob | None

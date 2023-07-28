@@ -213,7 +213,7 @@ class MainSpecification(ABC):
         ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EntryPoint(MainSpecification):
     module: str
     function: str | None = None
@@ -285,7 +285,7 @@ class EntryPoint(MainSpecification):
         return self.module if self.function is None else f"{self.module}:{self.function}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ConsoleScript(MainSpecification):
     name: str
 
@@ -345,13 +345,13 @@ class PexEntryPointField(EntryPointField):
 
 
 # See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedPexEntryPoint:
     val: EntryPoint | None
     file_name_used: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvePexEntryPointRequest:
     """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
@@ -1398,7 +1398,7 @@ class PythonDistributionOutputPathField(StringField, AsyncFieldMixin):
     default = ""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonDistributionEntryPoint:
     """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
 
@@ -1407,7 +1407,7 @@ class PythonDistributionEntryPoint:
 
 
 # See `target_type_rules.py` for the `Resolve..Request -> Resolved..` rule
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedPythonDistributionEntryPoints:
     # E.g. {"console_scripts": {"ep": PythonDistributionEntryPoint(...)}}.
     val: FrozenDict[str, FrozenDict[str, PythonDistributionEntryPoint]] = FrozenDict()
@@ -1439,7 +1439,7 @@ class ResolvedPythonDistributionEntryPoints:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvePythonDistributionEntryPointsRequest:
     """Looks at the entry points to see if it is a setuptools entry point, or a BUILD target address
     that should be resolved into a setuptools entry point.

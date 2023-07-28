@@ -28,7 +28,7 @@ from pants.util.strutil import bullet_list, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateThriftSourcesRequest:
     thrift_source_field: ThriftSourceField
     lang_id: str
@@ -36,12 +36,12 @@ class GenerateThriftSourcesRequest:
     lang_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GeneratedThriftSources:
     snapshot: Snapshot
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApacheThriftSetup:
     path: str
 

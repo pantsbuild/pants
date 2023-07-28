@@ -42,7 +42,7 @@ class AsdfPathString(str, Enum):
         raise NotImplementedError(f"{self} has no description.")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AsdfToolPathsRequest:
     env_tgt: EnvironmentTarget
     tool_name: str
@@ -53,7 +53,7 @@ class AsdfToolPathsRequest:
     bin_relpath: str = "bin"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AsdfToolPathsResult:
     tool_name: str
     standard_tool_paths: tuple[str, ...] = ()

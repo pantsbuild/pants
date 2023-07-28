@@ -29,7 +29,7 @@ class DockerBuildEnvironmentError(ValueError):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerBuildEnvironment:
     environment: EnvironmentVars
 
@@ -53,7 +53,7 @@ class DockerBuildEnvironment:
         return self.environment.get(key, default)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerBuildEnvironmentRequest:
     target: Target
 

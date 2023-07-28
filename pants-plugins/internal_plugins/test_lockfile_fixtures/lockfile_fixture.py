@@ -15,7 +15,7 @@ from pants.jvm.resolve.lockfile_metadata import LockfileContext
 from pants.util.docutil import bin_name
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JVMLockfileFixtureDefinition:
     lockfile_rel_path: Path
     requirements: tuple[Coordinate, ...]
@@ -76,7 +76,7 @@ class JVMLockfileFixtureDefinition:
         return JVMLockfileFixture(lockfile, lockfile_contents.decode(), artifact_reqs)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JVMLockfileFixture:
     lockfile: CoursierResolvedLockfile
     serialized_lockfile: str

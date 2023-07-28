@@ -30,7 +30,7 @@ def _named_args_explanation(arg: str) -> str:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Parametrize:
     """A builtin function/dataclass that can be used to parametrize Targets.
 
@@ -122,7 +122,7 @@ class Parametrize:
         return f"parametrize({', '.join(strs)})"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _TargetParametrization:
     original_target: Target | None
     parametrization: FrozenDict[Address, Target]
@@ -143,7 +143,7 @@ class _TargetParametrization:
 # TODO: This is not the right name for this class, nor the best place for it to live. But it is
 # consumed by both `pants.engine.internals.graph` and `pants.engine.internals.build_files`, and
 # shouldn't live in `pants.engine.target` (yet? needs more stabilization).
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _TargetParametrizationsRequest(EngineAwareParameter):
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)

@@ -45,7 +45,7 @@ class GenerateScalaFromThriftRequest(GenerateSourcesRequest):
     output = ScalaSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScroogeThriftScalaDependenciesInferenceFieldSet(FieldSet):
     required_fields = (
         ThriftDependenciesField,
@@ -85,12 +85,12 @@ async def generate_scala_from_thrift_with_scrooge(
     return GeneratedSources(source_root_restored)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScroogeThriftScalaRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScroogeThriftScalaRuntimeForResolve:
     addresses: frozenset[Address]
 

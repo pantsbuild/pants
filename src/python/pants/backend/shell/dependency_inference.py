@@ -48,7 +48,7 @@ def find_all_shell_targets(all_tgts: AllTargets) -> AllShellTargets:
     return AllShellTargets(tgt for tgt in all_tgts if tgt.has_field(ShellSourceField))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShellMapping:
     """A mapping of Shell file names to their owning file address."""
 
@@ -83,7 +83,7 @@ class ParsedShellImports(DeduplicatedCollection):
     sort_input = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParseShellImportsRequest:
     digest: Digest
     fp: str
@@ -149,7 +149,7 @@ async def parse_shell_imports(
     return ParsedShellImports(paths)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShellDependenciesInferenceFieldSet(FieldSet):
     required_fields = (ShellSourceField, ShellDependenciesField)
 

@@ -15,7 +15,7 @@ class Collection(Tuple[T, ...]):
 
     This should be subclassed when you want to create a distinct collection type, such as:
 
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class Example:
             val1: str
 
@@ -66,7 +66,7 @@ class DeduplicatedCollection(FrozenOrderedSet[T]):
 
     This should be subclassed when you want to create a distinct collection type, such as:
 
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class Example:
             val1: str
 

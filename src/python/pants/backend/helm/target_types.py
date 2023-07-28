@@ -214,7 +214,7 @@ class HelmChartTarget(Target):
     help = "A Helm chart."
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmChartFieldSet(FieldSet):
     required_fields = (
         HelmChartMetaSourceField,
@@ -379,7 +379,7 @@ class HelmArtifactTarget(Target):
     help = "A third party Helm artifact."
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmArtifactFieldSet(FieldSet):
     required_fields = (HelmArtifactArtifactField, HelmArtifactVersionField)
 
@@ -599,7 +599,7 @@ class HelmDeploymentTarget(Target):
     help = "A Helm chart deployment."
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmDeploymentFieldSet(FieldSet):
     required_fields = (
         HelmDeploymentDependenciesField,

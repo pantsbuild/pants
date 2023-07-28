@@ -22,7 +22,7 @@ from pants.util.strutil import strip_prefix
 #
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCoverageProfileBlock:
     start_line: int
     start_col: int
@@ -32,7 +32,7 @@ class GoCoverageProfileBlock:
     count: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCoverageBoundary:
     offset: int
     start: bool
@@ -41,7 +41,7 @@ class GoCoverageBoundary:
     index: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCoverageProfile:
     """Parsed representation of a raw Go coverage profile for a single file.
 

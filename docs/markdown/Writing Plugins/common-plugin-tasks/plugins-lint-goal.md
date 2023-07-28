@@ -69,7 +69,7 @@ from pants.engine.target import Dependencies, FieldSet
 
 ...
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShellcheckFieldSet(FieldSet):
     required_fields = (BashSources,)
 

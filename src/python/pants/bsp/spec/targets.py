@@ -14,7 +14,7 @@ from pants.bsp.spec.base import BSPData, BuildTarget, BuildTargetIdentifier, Uri
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WorkspaceBuildTargetsParams:
     @classmethod
     def from_json_dict(cls, _d):
@@ -24,7 +24,7 @@ class WorkspaceBuildTargetsParams:
         return {}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WorkspaceBuildTargetsResult:
     targets: tuple[BuildTarget, ...]
 
@@ -42,7 +42,7 @@ class WorkspaceBuildTargetsResult:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourcesParams:
     targets: tuple[BuildTargetIdentifier, ...]
 
@@ -63,7 +63,7 @@ class SourceItemKind(IntEnum):
     DIRECTORY = 2
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourceItem:
     uri: Uri
     kind: SourceItemKind
@@ -85,7 +85,7 @@ class SourceItem:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourcesItem:
     target: BuildTargetIdentifier
     sources: tuple[SourceItem, ...]
@@ -109,7 +109,7 @@ class SourcesItem:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SourcesResult:
     items: tuple[SourcesItem, ...]
 
@@ -129,7 +129,7 @@ class SourcesResult:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencySourcesParams:
     targets: tuple[BuildTargetIdentifier, ...]
 
@@ -145,7 +145,7 @@ class DependencySourcesParams:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencySourcesItem:
     target: BuildTargetIdentifier
     # List of resources containing source files of the
@@ -160,7 +160,7 @@ class DependencySourcesItem:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencySourcesResult:
     items: tuple[DependencySourcesItem, ...]
 
@@ -174,7 +174,7 @@ class DependencySourcesResult:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencyModulesParams:
     targets: tuple[BuildTargetIdentifier, ...]
 
@@ -190,7 +190,7 @@ class DependencyModulesParams:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencyModule:
     # Module name
     name: str
@@ -213,7 +213,7 @@ class DependencyModule:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencyModulesItem:
     target: BuildTargetIdentifier
     modules: tuple[DependencyModule, ...]
@@ -225,7 +225,7 @@ class DependencyModulesItem:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencyModulesResult:
     items: tuple[DependencyModulesItem, ...]
 

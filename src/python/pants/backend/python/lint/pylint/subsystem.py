@@ -40,7 +40,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PylintFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
@@ -145,7 +145,7 @@ class Pylint(PythonToolBase):
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PylintFirstPartyPlugins:
     requirement_strings: FrozenOrderedSet[str]
     interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]

@@ -219,7 +219,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             return tuple(sorted(set(self._corepack_env_vars)))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJSToolProcess:
     """A request for a tool installed with NodeJS."""
 
@@ -270,13 +270,13 @@ class NodeJSToolProcess:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJSBinaries:
     binary_dir: str
     digest: Digest | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJSProcessEnvironment:
     binaries: NodeJSBinaries
     npm_config_cache: str
@@ -375,7 +375,7 @@ async def node_process_environment(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJSBootstrap:
     nodejs_search_paths: tuple[str, ...]
 
@@ -527,7 +527,7 @@ async def determine_nodejs_binaries(
     return NodeJSBinaries(os.path.dirname(paths_per_version[satisfying_version][0].path))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CorepackToolRequest:
     tool: str
     input_digest: Digest
@@ -535,7 +535,7 @@ class CorepackToolRequest:
     version: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CorepackToolDigest:
     digest: Digest
 

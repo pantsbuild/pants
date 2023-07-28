@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from pants.build_graph.build_configuration import BuildConfiguration
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionsBootstrapper:
     """Holds the result of the first stage of options parsing, and assists with parsing full
     options."""
@@ -122,7 +122,7 @@ class OptionsBootstrapper:
         """
         with warnings.catch_warnings(record=True):
             # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
-            @dataclass(frozen=True)
+            @dataclass(frozen=True, slots=True)
             class FileContent:
                 path: str
                 content: bytes

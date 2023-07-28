@@ -140,7 +140,7 @@ class PantsDaemonMonitor(ProcessManager):
                 break
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PantsdRunContext:
     runner: Callable[..., Any]
     checker: PantsDaemonMonitor

@@ -59,7 +59,7 @@ class GetParseError(ValueError):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AwaitableConstraints:
     output_type: type
     input_types: tuple[type, ...]
@@ -160,7 +160,7 @@ class Get(Generic[_Output], Awaitable[_Output]):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _MultiGet:
     gets: tuple[Get, ...]
 
@@ -580,7 +580,7 @@ async def MultiGet(  # noqa: F811
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Params:
     """A set of values with distinct types.
 

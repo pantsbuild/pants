@@ -17,7 +17,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget, WrappedTargetRequest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerRunFieldSet(RunFieldSet):
     required_fields = (DockerImageSourceField,)
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC

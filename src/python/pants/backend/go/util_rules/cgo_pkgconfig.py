@@ -24,14 +24,14 @@ from pants.engine.rules import collect_rules, rule
 #   // license that can be found in the LICENSE file.
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CGoPkgConfigFlagsRequest:
     """Request resolution of pkg-config arguments into CFLAGS and LDFLAGS."""
 
     pkg_config_args: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CGoPkgConfigFlagsResult:
     cflags: tuple[str, ...]
     ldflags: tuple[str, ...]

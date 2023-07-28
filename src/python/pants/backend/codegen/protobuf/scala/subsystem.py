@@ -9,7 +9,7 @@ from pants.option.option_types import StrListOption
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginArtifactSpec:
     name: str
     artifact: str

@@ -49,7 +49,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
@@ -107,7 +107,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         return tuple(args)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexFromTargetsRequestForBuiltPackage:
     """An intermediate class that gives consumers access to the data used to create a
     `PexFromTargetsRequest` to fulfil a `BuiltPackage` request.

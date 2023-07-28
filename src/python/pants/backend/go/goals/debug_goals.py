@@ -150,13 +150,13 @@ class GoExportCgoCodegen(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExportCgoPackageRequest:
     address: Address
     build_opts: GoBuildOptions
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExportCgoPackageResult:
     digest: Digest = EMPTY_DIGEST
     error: str | None = None

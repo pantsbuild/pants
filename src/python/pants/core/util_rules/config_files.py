@@ -17,14 +17,14 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ConfigFiles:
     """Config files used by a tool run by Pants."""
 
     snapshot: Snapshot
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ConfigFilesRequest:
     """Resolve the specified config files if given, else look for candidate config files if
     discovery is enabled.

@@ -96,7 +96,7 @@ logger = logging.getLogger()
 # -----------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PytestPluginSetup:
     """The result of custom set up logic before Pytest runs.
 
@@ -108,7 +108,7 @@ class PytestPluginSetup:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PytestPluginSetupRequest(ABC):
     """A request to set up the test environment before Pytest runs, e.g. to set up databases.
 
@@ -130,7 +130,7 @@ class AllPytestPluginSetups(Collection[PytestPluginSetup]):
 
 
 # TODO: Why is this necessary? We should be able to use `PythonTestFieldSet` as the rule param.
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllPytestPluginSetupsRequest:
     addresses: tuple[Address, ...]
 
@@ -166,7 +166,7 @@ async def run_all_setup_plugins(
 _EXTRA_OUTPUT_DIR = "extra-output"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestMetadata:
     """Parameters that must be constant for all test targets in a `pytest` batch."""
 
@@ -189,7 +189,7 @@ class TestMetadata:
         return self.compatability_tag
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestSetupRequest:
     field_sets: Tuple[PythonTestFieldSet, ...]
     metadata: TestMetadata
@@ -199,7 +199,7 @@ class TestSetupRequest:
     additional_pexes: Tuple[Pex, ...] = ()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestSetup:
     process: Process
     results_file_name: Optional[str]
@@ -605,7 +605,7 @@ async def debugpy_python_test(
 # -----------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RuntimePackagesPluginRequest(PytestPluginSetupRequest):
     @classmethod
     def is_applicable(cls, target: Target) -> bool:

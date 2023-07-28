@@ -54,13 +54,13 @@ class ModuleProviderType(enum.Enum):
         return self.name < other.name
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, slots=True, order=True)
 class ModuleProvider:
     addr: Address
     typ: ModuleProviderType
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, slots=True, order=True)
 class PossibleModuleProvider:
     provider: ModuleProvider
     # 0 = The provider mapped to the module itself, 1 = the provider mapped to its parent, etc.
@@ -74,7 +74,7 @@ def module_from_stripped_path(path: PurePath) -> str:
     return module_name_with_slashes.as_posix().replace("/", ".")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllPythonTargets:
     first_party: tuple[Target, ...]
     third_party: tuple[Target, ...]
@@ -135,7 +135,7 @@ class FirstPartyPythonMappingImplMarker:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyPythonModuleMapping:
     resolves_to_modules_to_providers: FrozenDict[
         ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
@@ -263,7 +263,7 @@ async def map_first_party_python_targets_to_modules(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThirdPartyPythonModuleMapping:
     """A mapping of each resolve to the modules they contain and the addresses providing those
     modules."""
@@ -381,7 +381,7 @@ async def map_third_party_modules_to_addresses(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonModuleOwners:
     """The target(s) that own a Python module.
 
@@ -407,7 +407,7 @@ class PythonModuleOwners:
             )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonModuleOwnersRequest:
     module: str
     resolve: str | None

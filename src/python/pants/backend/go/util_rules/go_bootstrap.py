@@ -19,7 +19,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoBootstrap:
     go_search_paths: tuple[str, ...]
 

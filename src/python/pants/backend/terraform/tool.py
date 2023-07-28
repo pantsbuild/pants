@@ -244,7 +244,7 @@ class TerraformTool(TemplatedExternalTool):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformProcess:
     """A request to invoke Terraform."""
 

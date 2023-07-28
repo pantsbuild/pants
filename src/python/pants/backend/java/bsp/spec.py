@@ -12,7 +12,7 @@ from pants.bsp.spec.base import BuildTargetIdentifier, Uri
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavacOptionsParams:
     targets: tuple[BuildTargetIdentifier, ...]
 
@@ -28,7 +28,7 @@ class JavacOptionsParams:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavacOptionsItem:
     target: BuildTargetIdentifier
 
@@ -54,7 +54,7 @@ class JavacOptionsItem:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavacOptionsResult:
     items: tuple[JavacOptionsItem, ...]
 

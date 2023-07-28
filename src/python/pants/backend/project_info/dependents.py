@@ -22,7 +22,7 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AddressToDependents:
     mapping: FrozenDict[Address, FrozenOrderedSet[Address]]
 
@@ -53,7 +53,7 @@ async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> Addr
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependentsRequest:
     addresses: FrozenOrderedSet[Address]
     transitive: bool

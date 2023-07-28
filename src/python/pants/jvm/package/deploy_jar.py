@@ -44,7 +44,7 @@ from pants.jvm.target_types import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (
         JvmMainClassNameField,

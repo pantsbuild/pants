@@ -41,24 +41,24 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPluginsForTargetWithoutResolveRequest:
     target: Target
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPluginsForTargetRequest:
     target: Target
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPluginTargetsForTarget:
     plugins: Targets
     artifacts: Targets
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPluginsRequest:
     plugins: Targets
     artifacts: Targets
@@ -80,7 +80,7 @@ class ScalaPluginsRequest:
         return ScalaPluginsRequest(Targets(plugins), Targets(artifacts), resolve)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaPlugins:
     names: tuple[str, ...]
     classpath: ClasspathEntry

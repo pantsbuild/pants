@@ -20,7 +20,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoSdkProcess:
     command: tuple[str, ...]
     description: str
@@ -62,7 +62,7 @@ class GoSdkProcess:
         object.__setattr__(self, "replace_sandbox_root_in_args", replace_sandbox_root_in_args)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoSdkRunSetup:
     digest: Digest
     script: FileContent
@@ -149,12 +149,12 @@ async def setup_go_sdk_process(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoSdkToolIDRequest:
     tool_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoSdkToolIDResult:
     tool_name: str
     tool_id: str

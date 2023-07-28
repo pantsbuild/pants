@@ -48,7 +48,7 @@ def _in_chroot(relpath: str) -> str:
     return os.path.join("{chroot}", relpath)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonRequirementFieldSet(RunFieldSet):
     supports_debug_adapter = False
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC

@@ -74,7 +74,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "mypy_protobuf.lock")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonProtobufDependenciesInferenceFieldSet(FieldSet):
     required_fields = (
         ProtobufDependenciesField,

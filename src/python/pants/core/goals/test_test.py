@@ -134,7 +134,7 @@ class MockTarget(Target):
     core_fields = (MockMultipleSourcesField, MockSkipTestsField, MockRequiredField)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockCoverageData(CoverageData):
     addresses: Iterable[Address]
 
@@ -143,7 +143,7 @@ class MockCoverageDataCollection(CoverageDataCollection):
     element_type = MockCoverageData
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockTestFieldSet(TestFieldSet):
     required_fields = (MultipleSourcesField, MockRequiredField)
     sources: MultipleSourcesField

@@ -21,7 +21,7 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonSourceFiles:
     """Sources that can be introspected by Python, relative to a set of source roots.
 
@@ -45,7 +45,7 @@ class PythonSourceFiles:
         return cls(SourceFiles(EMPTY_SNAPSHOT, tuple()), tuple())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StrippedPythonSourceFiles:
     """A PythonSourceFiles that has had its source roots stripped."""
 

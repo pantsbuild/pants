@@ -21,7 +21,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuiltHelmArtifact(BuiltPackageArtifact):
     info: HelmChartMetadata | None = None
 
@@ -34,7 +34,7 @@ class BuiltHelmArtifact(BuiltPackageArtifact):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmPackageFieldSet(HelmChartFieldSet, PackageFieldSet):
     output_path: HelmChartOutputPathField
 

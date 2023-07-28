@@ -40,7 +40,7 @@ class JvmFirstPartyPackageMappingException(Exception):
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyMappingRequest:
     """An entry point for a specific implementation of mapping JVM package names to owning targets.
 
@@ -54,7 +54,7 @@ class SymbolMap(FrozenDict[_ResolveName, FrozenTrieNode]):
     """The first party symbols provided by a single inference implementation."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SymbolMapping:
     """The merged first and third party symbols provided by all inference implementations."""
 

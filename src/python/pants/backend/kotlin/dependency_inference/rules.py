@@ -34,7 +34,7 @@ from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinSourceDependenciesInferenceFieldSet(FieldSet):
     required_fields = (KotlinSourceField, KotlinDependenciesField, JvmResolveField)
 
@@ -88,7 +88,7 @@ async def infer_kotlin_dependencies_via_source_analysis(
     return InferredDependencies(dependencies)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinRuntimeDependencyInferenceFieldSet(FieldSet):
     required_fields = (KotlinDependenciesField, JvmResolveField)
 
@@ -100,12 +100,12 @@ class InferKotlinRuntimeDependencyRequest(InferDependenciesRequest):
     infer_from = KotlinRuntimeDependencyInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinRuntimeForResolve:
     addresses: frozenset[Address]
 

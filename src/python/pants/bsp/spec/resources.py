@@ -13,7 +13,7 @@ from pants.bsp.spec.base import BuildTargetIdentifier, Uri
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResourcesParams:
     targets: tuple[BuildTargetIdentifier, ...]
 
@@ -27,7 +27,7 @@ class ResourcesParams:
         return {"targets": [tgt.to_json_dict() for tgt in self.targets]}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResourcesItem:
     target: BuildTargetIdentifier
     # List of resource files.
@@ -41,7 +41,7 @@ class ResourcesItem:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResourcesResult:
     items: tuple[ResourcesItem, ...]
 

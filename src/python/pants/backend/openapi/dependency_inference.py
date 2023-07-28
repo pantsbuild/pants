@@ -36,13 +36,13 @@ from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParseOpenApiSources:
     sources_digest: Digest
     paths: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenApiDependencies:
     dependencies: FrozenDict[str, frozenset[str]]
 
@@ -97,7 +97,7 @@ def _find_local_refs(path: str, d: Mapping[str, Any]) -> frozenset[str]:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenApiDocumentDependenciesInferenceFieldSet(FieldSet):
     required_fields = (OpenApiDocumentField, OpenApiDocumentDependenciesField)
 
@@ -141,7 +141,7 @@ async def infer_openapi_document_dependencies(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenApiSourceDependenciesInferenceFieldSet(FieldSet):
     required_fields = (OpenApiSourceField, OpenApiSourceDependenciesField)
 

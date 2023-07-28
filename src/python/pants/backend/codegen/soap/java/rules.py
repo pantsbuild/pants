@@ -56,7 +56,7 @@ class JaxWsToolsLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = JaxWsTools.options_scope
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileWsdlSourceRequest:
     digest: Digest
     path: str
@@ -64,7 +64,7 @@ class CompileWsdlSourceRequest:
     package: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompiledWsdlSource:
     output_digest: Digest
 

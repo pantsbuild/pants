@@ -37,7 +37,7 @@ class TerraformModuleSourcesField(MultipleSourcesField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformFieldSet(FieldSet):
     required_fields = (TerraformModuleSourcesField,)
 
@@ -113,7 +113,7 @@ class TerraformDeploymentTarget(Target):
     help = "A deployment of Terraform"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformDeploymentFieldSet(FieldSet):
     required_fields = (
         TerraformDependenciesField,

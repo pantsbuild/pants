@@ -31,14 +31,14 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CCToolchainRequest:
     """A request for a C/C++ toolchain."""
 
     language: CCLanguage
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CCToolchain:
     """A C/C++ toolchain."""
 
@@ -163,7 +163,7 @@ async def setup_cc_toolchain(
         return await _setup_system_toolchain(request, subsystem)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CCProcess:
     args: tuple[str, ...]
     language: CCLanguage

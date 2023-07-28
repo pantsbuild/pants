@@ -33,7 +33,7 @@ from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativeGoTargetsRequest(PutativeTargetsRequest):
     pass
 
@@ -98,14 +98,14 @@ async def _find_cgo_sources(
     return [*wildcard_globs, *sorted(files_to_add)], sorted(triggering_files)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FindPutativeGoPackageTargetRequest:
     dir_path: str
     files: tuple[str, ...]
     all_go_mod_dirs: frozenset[str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FindPutativeGoPackageTargetResult:
     putative_target: PutativeTarget | None
 

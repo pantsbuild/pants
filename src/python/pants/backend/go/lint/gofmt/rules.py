@@ -25,7 +25,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GofmtFieldSet(FieldSet):
     required_fields = (GoPackageSourcesField,)
 

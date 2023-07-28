@@ -28,24 +28,24 @@ from pants.jvm.target_types import JvmResolveField
 from pants.util.frozendict import FrozenDict
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlincPluginsForTargetWithoutResolveRequest:
     target: Target
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlincPluginsForTargetRequest:
     target: Target
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlincPluginTargetsForTarget:
     plugins: Targets
     artifacts: Targets
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlincPluginsRequest:
     plugins: Targets
     artifacts: Targets
@@ -67,7 +67,7 @@ class KotlincPluginsRequest:
         return KotlincPluginsRequest(Targets(plugins), Targets(artifacts), resolve)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlincPlugins:
     ids: tuple[str, ...]
     classpath: ClasspathEntry

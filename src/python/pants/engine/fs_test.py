@@ -1245,7 +1245,7 @@ def test_write_digest_workspace_clear_paths(rule_runner: RuleRunner) -> None:
     check({"a", "b"})
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DigestRequest:
     create_digest: CreateDigest
 

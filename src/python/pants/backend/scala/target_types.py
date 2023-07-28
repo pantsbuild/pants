@@ -103,14 +103,14 @@ class ScalaConsumedPluginNamesField(StringSequenceField):
     required = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (ScalaSourceField,)
 
     sources: ScalaSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaGeneratorFieldSet(FieldSet):
     required_fields = (ScalaGeneratorSourcesField,)
 
@@ -431,7 +431,7 @@ class ScalaArtifactCrossversionField(StringField):
     valid_choices = ScalaCrossVersion
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaArtifactExclusion(JvmArtifactExclusion):
     alias = "scala_exclude"
     help = help_text(
@@ -468,7 +468,7 @@ class ScalaArtifactExclusionsField(JvmArtifactExclusionsField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaArtifactFieldSet(FieldSet):
     group: JvmArtifactGroupField
     artifact: ScalaArtifactArtifactField

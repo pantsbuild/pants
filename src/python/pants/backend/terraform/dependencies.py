@@ -33,7 +33,7 @@ from pants.engine.target import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformDependenciesRequest:
     source_files: SourceFiles
     directories: Tuple[str, ...]
@@ -44,7 +44,7 @@ class TerraformDependenciesRequest:
     initialise_backend: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformDependenciesResponse:
     fetched_deps: Tuple[Tuple[str, Digest], ...]
 
@@ -99,7 +99,7 @@ async def get_terraform_providers(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformInitRequest:
     root_module: TerraformRootModuleField
     backend_config: TerraformBackendConfigField
@@ -109,7 +109,7 @@ class TerraformInitRequest:
     initialise_backend: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformInitResponse:
     sources_and_deps: Digest
     terraform_files: tuple[str, ...]

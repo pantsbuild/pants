@@ -31,7 +31,7 @@ from pants.util.strutil import bullet_list, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateLockfileResult:
     """The result of generating a lockfile for a particular resolve."""
 
@@ -42,7 +42,7 @@ class GenerateLockfileResult:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateLockfile:
     """A union base for generating ecosystem-specific lockfiles.
 
@@ -59,7 +59,7 @@ class GenerateLockfile:
     diff: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateLockfileWithEnvironments(GenerateLockfile):
     """Allows a `GenerateLockfile` subclass to specify which environments the request is compatible
     with, if the relevant backend supports environments."""
@@ -67,7 +67,7 @@ class GenerateLockfileWithEnvironments(GenerateLockfile):
     environments: tuple[EnvironmentName, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WrappedGenerateLockfile:
     request: GenerateLockfile
 
@@ -110,7 +110,7 @@ class KnownUserResolveNamesRequest:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KnownUserResolveNames:
     """All defined user resolves for a particular language ecosystem.
 
@@ -158,7 +158,7 @@ LockfilePackages = FrozenDict[PackageName, PackageVersion]
 ChangedPackages = FrozenDict[PackageName, Tuple[PackageVersion, PackageVersion]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LockfileDiff:
     path: str
     resolve_name: str
@@ -310,7 +310,7 @@ class _ResolveProviderType(Enum):
     USER = 2
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, slots=True, order=True)
 class _ResolveProvider:
     option_name: str
 

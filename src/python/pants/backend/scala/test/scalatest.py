@@ -47,7 +47,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalatestTestFieldSet(TestFieldSet):
     required_fields = (
         ScalatestTestSourceField,
@@ -71,13 +71,13 @@ class ScalatestToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = Scalatest.options_scope
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestSetupRequest:
     field_set: ScalatestTestFieldSet
     is_debug: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestSetup:
     process: JvmProcess
     reports_dir_prefix: str

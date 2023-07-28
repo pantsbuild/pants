@@ -30,7 +30,7 @@ class InvalidPythonLockfileReason(Enum):
     NO_BINARY_MISMATCH = "no_binary_mismatch"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonLockfileMetadata(LockfileMetadata):
     scope = LockfileScope.PYTHON
 
@@ -91,7 +91,7 @@ class PythonLockfileMetadata(LockfileMetadata):
 
 
 @_python_lockfile_metadata(1)
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonLockfileMetadataV1(PythonLockfileMetadata):
     requirements_invalidation_digest: str
 
@@ -146,7 +146,7 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
 
 
 @_python_lockfile_metadata(2)
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonLockfileMetadataV2(PythonLockfileMetadata):
     """Lockfile version that permits specifying a requirements as a set rather than a digest.
 
@@ -211,7 +211,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
 
 
 @_python_lockfile_metadata(3)
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
     """Lockfile version that considers constraints files."""
 
@@ -227,7 +227,7 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         lockfile_description: str,
         error_suffix: str,
     ) -> PythonLockfileMetadataV3:
-        v2_metadata = super()._from_json_dict(json_dict, lockfile_description, error_suffix)
+        v2_metadata = super(PythonLockfileMetadataV3, cls)._from_json_dict(json_dict, lockfile_description, error_suffix)
         metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
         manylinux = metadata("manylinux", str, lambda l: l)  # type: ignore[no-any-return]
         requirement_constraints = metadata(

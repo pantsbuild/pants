@@ -68,7 +68,7 @@ from pants.util.strutil import path_safe, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
@@ -199,7 +199,7 @@ class PexFromTargetsRequest:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InterpreterConstraintsRequest:
     addresses: Addresses
     hardcoded_interpreter_constraints: InterpreterConstraints | None
@@ -236,13 +236,13 @@ async def interpreter_constraints_for_targets(
     return interpreter_constraints
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChosenPythonResolve:
     name: str
     lockfile: Lockfile
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChosenPythonResolveRequest:
     addresses: Addresses
 
@@ -334,7 +334,7 @@ async def determine_global_requirement_constraints(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _PexRequirementsRequest:
     """Determine the requirement strings used transitively.
 
@@ -366,7 +366,7 @@ async def determine_requirement_strings_in_closure(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _RepositoryPexRequest:
     addresses: Addresses
     hardcoded_interpreter_constraints: InterpreterConstraints | None
@@ -401,7 +401,7 @@ class _RepositoryPexRequest:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ConstraintsRepositoryPexRequest:
     repository_pex_request: _RepositoryPexRequest
 
@@ -744,7 +744,7 @@ async def _setup_constraints_repository_pex(
     return OptionalPexRequest(repository_pex)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RequirementsPexRequest:
     """Requests a PEX containing only thirdparty requirements for internal/non-portable use.
 

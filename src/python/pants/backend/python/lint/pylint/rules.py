@@ -44,7 +44,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PartitionMetadata:
     coarsened_targets: CoarsenedTargets
     # NB: These are the same across every element in a partition

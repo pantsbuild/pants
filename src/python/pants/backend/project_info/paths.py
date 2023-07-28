@@ -95,13 +95,13 @@ class SpecsPathsCollection:
     spec_paths: list[SpecsPaths]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RootDestinationPair:
     root: Target
     destination: Target
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RootDestinationsPair:
     root: Target
     destinations: Targets

@@ -31,7 +31,7 @@ class PublishDockerImageRequest(PublishRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PublishDockerImageFieldSet(PublishFieldSet):
     publish_request_type = PublishDockerImageRequest
     required_fields = (DockerImageRegistriesField,)

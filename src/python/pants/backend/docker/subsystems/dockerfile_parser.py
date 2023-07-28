@@ -42,7 +42,7 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile.lock")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParserSetup:
     pex: VenvPex
 
@@ -72,7 +72,7 @@ async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
     return ParserSetup(parser_pex)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerfileParseRequest:
     sources_digest: Digest
     args: tuple[str, ...]
@@ -99,7 +99,7 @@ class DockerfileInfoError(Exception):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerfileInfo:
     address: Address
     digest: Digest
@@ -113,7 +113,7 @@ class DockerfileInfo:
     version_tags: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerfileInfoRequest:
     address: Address
 

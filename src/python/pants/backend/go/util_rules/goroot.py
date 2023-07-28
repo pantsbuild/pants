@@ -26,7 +26,7 @@ from pants.util.strutil import bullet_list, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoRoot:
     """Path to the Go installation (the `GOROOT`)."""
 

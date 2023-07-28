@@ -34,13 +34,13 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateJvmLockfile(GenerateLockfile):
     artifacts: ArtifactRequirements
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ValidateJvmArtifactsForResolveRequest:
     """Hook for backends to validate the artifact requirements requested for a resolve.
 
@@ -51,7 +51,7 @@ class ValidateJvmArtifactsForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ValidateJvmArtifactsForResolveResult:
     """Sentinel type that represents that a backend is satisfied with the artifacts for a JVM
     resolve."""
@@ -106,7 +106,7 @@ def determine_jvm_user_resolves(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ValidateJvmArtifactsRequest:
     artifacts: ArtifactRequirements
     resolve_name: str

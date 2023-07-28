@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class PantsDaemonClient(PantsDaemonProcessManager):
     """A client for interacting with a "potentially running" pantsd instance."""
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class Handle:
         """A handle to a "probably running" pantsd instance.
 

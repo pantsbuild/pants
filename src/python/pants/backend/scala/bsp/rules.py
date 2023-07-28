@@ -75,7 +75,7 @@ class ScalaBSPLanguageSupport(BSPLanguageSupport):
     can_provide_resources = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaMetadataFieldSet(FieldSet):
     required_fields = (ScalaSourceField, JvmResolveField, JvmJdkField)
 
@@ -93,12 +93,12 @@ class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
     resolve_field = JvmResolveField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThirdpartyModulesRequest:
     addresses: Addresses
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThirdpartyModules:
     resolve: CoursierResolveKey
     entries: dict[CoursierLockfileEntry, ClasspathEntry]
@@ -318,12 +318,12 @@ class ScalacOptionsHandlerMapping(BSPHandlerMapping):
     response_type = ScalacOptionsResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HandleScalacOptionsRequest:
     bsp_target_id: BuildTargetIdentifier
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HandleScalacOptionsResult:
     item: ScalacOptionsItem
 
@@ -421,7 +421,7 @@ async def bsp_scala_test_classes_request(request: ScalaTestClassesParams) -> Sca
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaBSPDependencyModulesRequest(BSPDependencyModulesRequest):
     field_set_type = ScalaMetadataFieldSet
 
@@ -483,7 +483,7 @@ async def scala_bsp_dependency_modules(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaBSPCompileRequest(BSPCompileRequest):
     field_set_type = ScalaFieldSet
 
@@ -502,7 +502,7 @@ async def bsp_scala_compile_request(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaBSPResourcesRequest(BSPResourcesRequest):
     field_set_type = ScalaFieldSet
 

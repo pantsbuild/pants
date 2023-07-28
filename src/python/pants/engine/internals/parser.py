@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileSymbolsInfo:
     info: FrozenDict[str, BuildFileSymbolInfo]
 
@@ -57,7 +57,7 @@ class BuildFileSymbolsInfo:
         return FrozenDict({name: symbol.value for name, symbol in self.info.items()})
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
     referenced_env_vars: tuple[str, ...]
 
@@ -69,7 +69,7 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
         return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileSymbolInfo:
     name: str
     value: Any

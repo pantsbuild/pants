@@ -99,7 +99,7 @@ class PackageVersionType(Enum):
         return self.value < other.value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PackageVersion:
     name: str
     version: Version

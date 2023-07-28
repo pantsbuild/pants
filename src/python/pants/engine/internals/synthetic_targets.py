@@ -18,7 +18,7 @@ Example demonstrating how to register synthetic targets:
     from pants.engine.rules import collect_rules, rule
 
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
         path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 
@@ -27,7 +27,7 @@ Example demonstrating how to register synthetic targets:
         pass
 
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class SyntheticExampleTargetsPerDirectoryRequest(SyntheticTargetsRequest):
         path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
 
@@ -90,7 +90,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SyntheticTargetsSpecPathsRequest:
     specs: tuple[GlobSpecsProtocol, ...]
 
@@ -113,7 +113,7 @@ class SyntheticTargetsSpecPaths(Collection[str]):
 
 
 @union
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SyntheticTargetsRequest:
     """Union members of the `SyntheticTargetsRequest` should implement a rule returning an instance
     of a `SyntheticAddressMaps`."""
@@ -202,7 +202,7 @@ class SyntheticAddressMap(AddressMap):
                 target_adaptor.kwargs = {**default_values, **target_adaptor.kwargs}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SyntheticAddressMapsRequest:
     """Request all registered synthetic targets for a given path."""
 
@@ -226,7 +226,7 @@ class SyntheticAddressMaps(Collection[SyntheticAddressMap]):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllSyntheticAddressMaps:
     """All pre-loaded SyntheticAddressMaps per directory."""
 

@@ -20,14 +20,14 @@ class KitchenSource(SingleSourceField):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KitchenSingleUtensilFieldSet(FieldSet):
     required_fields = (KitchenSource,)
 
     utensil: SingleSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KitchenMultipleUtensilsFieldSet(FieldSet):
     required_fields = (KitchenSource,)
 

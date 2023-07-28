@@ -70,7 +70,7 @@ class GenerateJavaFromOpenAPIRequest(GenerateSourcesRequest):
     output = JavaSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenApiDocumentJavaFieldSet(FieldSet):
     required_fields = (OpenApiDocumentField,)
 
@@ -81,7 +81,7 @@ class OpenApiDocumentJavaFieldSet(FieldSet):
     skip: OpenApiJavaSkipField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileOpenApiIntoJavaRequest:
     input_file: str
     input_digest: Digest
@@ -90,7 +90,7 @@ class CompileOpenApiIntoJavaRequest:
     model_package: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompiledJavaFromOpenApi:
     output_digest: Digest
     runtime_dependencies: tuple[Coordinate, ...]
@@ -201,7 +201,7 @@ async def generate_java_from_openapi(request: GenerateJavaFromOpenAPIRequest) ->
     return GeneratedSources(source_root_restored)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenApiDocumentJavaRuntimeInferenceFieldSet(FieldSet):
     required_fields = (OpenApiDocumentDependenciesField, JvmResolveField)
 

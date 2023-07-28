@@ -35,7 +35,7 @@ class WorkunitsLoggerRequest:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WorkunitsLogger(WorkunitsCallback):
     dest: str
 

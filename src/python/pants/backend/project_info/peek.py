@@ -77,7 +77,7 @@ def _normalize_value(val: Any) -> Any:
     return val
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetData:
     target: Target
     # Sources may not be registered on the target, so we'll have nothing to expand.

@@ -55,7 +55,7 @@ for resource in exe.pip_install($UNCLASSIFIED_RESOURCES):
 """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyOxidizerConfig:
     executable_name: str
     wheels: list[str]

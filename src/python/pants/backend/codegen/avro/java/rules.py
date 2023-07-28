@@ -70,13 +70,13 @@ class AvroToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = AvroSubsystem.options_scope
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompileAvroSourceRequest:
     digest: Digest
     path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CompiledAvroSource:
     output_digest: Digest
 
@@ -229,7 +229,7 @@ def generate_avro_tools_lockfile_request(
     return GenerateJvmLockfileFromTool.create(tool)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AvroRuntimeDependencyInferenceFieldSet(FieldSet):
     required_fields = (
         AvroDependenciesField,
@@ -244,12 +244,12 @@ class InferAvroRuntimeDependencyRequest(InferDependenciesRequest):
     infer_from = AvroRuntimeDependencyInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApacheAvroRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApacheAvroRuntimeForResolve:
     addresses: frozenset[Address]
 

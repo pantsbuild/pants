@@ -40,7 +40,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Flake8FieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
@@ -154,7 +154,7 @@ class Flake8(PythonToolBase):
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Flake8FirstPartyPlugins:
     requirement_strings: FrozenOrderedSet[str]
     interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]

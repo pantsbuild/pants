@@ -30,7 +30,7 @@ from pants.engine.unions import UnionRule
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KubeconformDeploymentFieldSet(HelmDeploymentFieldSet, KubeconformFieldSet):
     pass
 

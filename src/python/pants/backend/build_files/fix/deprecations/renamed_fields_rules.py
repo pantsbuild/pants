@@ -30,7 +30,7 @@ class RenameFieldsInFileRequest(FixBUILDFileRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenamedFieldTypes:
     """Map deprecated field names to their new name, per target."""
 

@@ -45,14 +45,14 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodePackageTarFieldSet(PackageFieldSet):
     required_fields = (PackageJsonSourceField, OutputPathField)
     source: PackageJsonSourceField
     output_path: OutputPathField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeBuildScriptPackageFieldSet(PackageFieldSet):
     required_fields = (
         NodeBuildScriptSourcesField,
@@ -71,7 +71,7 @@ class NodeBuildScriptPackageFieldSet(PackageFieldSet):
     extra_env_vars: NodeBuildScriptExtraEnvVarsField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateResourcesFromNodeBuildScriptRequest(GenerateSourcesRequest):
     input = NodeBuildScriptSourcesField
     output = ResourceSourceField
@@ -118,13 +118,13 @@ async def pack_node_package_into_tgz_for_publication(
 _NOT_ALPHANUMERIC = re.compile("[^0-9a-zA-Z]+")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeBuildScriptResult:
     process: ProcessResult
     project_directory: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeBuildScriptRequest:
     address: Address
     output_files: tuple[str, ...]

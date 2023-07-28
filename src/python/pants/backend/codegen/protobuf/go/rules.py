@@ -104,7 +104,7 @@ class GenerateGoFromProtobufRequest(GenerateSourcesRequest):
     output = GoPackageSourcesField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _SetupGoProtocPlugin:
     digest: Digest
 
@@ -201,7 +201,7 @@ async def map_import_paths_of_all_go_protobuf_targets(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _SetupGoProtobufPackageBuildRequest:
     """Request type used to trigger setup of a BuildGoPackageRequest for entire generated Go
     Protobuf package.

@@ -8,7 +8,7 @@ from pants.engine.rules import Get, MultiGet, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Deep:
     val: int
 
@@ -21,7 +21,7 @@ async def deep(n: int) -> Deep:
     return Deep(x.val + y.val)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Wide:
     val: int
 

@@ -35,17 +35,17 @@ class JavaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "java-parser"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaSourceDependencyAnalysisRequest:
     source_files: SourceFiles
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleJavaSourceDependencyAnalysisResult:
     process_result: FallibleProcessResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaParserCompiledClassfiles:
     digest: Digest
 

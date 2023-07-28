@@ -32,7 +32,7 @@ class DuplicateNameError(MappingError):
 AddressMapT = TypeVar("AddressMapT", bound="AddressMap")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AddressMap:
     """Maps target adaptors from a byte source."""
 
@@ -94,7 +94,7 @@ class DifferingFamiliesError(MappingError):
     """Indicates an attempt was made to merge address maps from different families together."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AddressFamily:
     """Represents the family of target adaptors collected from the BUILD files in one directory.
 
@@ -199,7 +199,7 @@ class AddressFamily:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SpecsFilter:
     """Filters targets with the `--tags`, `--exclude-target-regexp`, and `[filter]` subsystem
     options."""

@@ -59,7 +59,7 @@ class HelmDeploymentCmd(Enum):
     RENDER = "template"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmDeploymentRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 
@@ -96,7 +96,7 @@ class HelmDeploymentRequest(EngineAwareParameter):
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType):
     """Intermediate representation of a `HelmProcess` that will produce a fully rendered set of
     manifests from a given chart.
@@ -154,7 +154,7 @@ class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType)
         return meta
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderHelmChartRequest(EngineAwareParameter):
     field_set: HelmChartFieldSet
     release_name: str | None = None
@@ -163,7 +163,7 @@ class RenderHelmChartRequest(EngineAwareParameter):
         return self.field_set.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderedHelmFiles(EngineAwareReturnType):
     address: Address
     chart: HelmChart

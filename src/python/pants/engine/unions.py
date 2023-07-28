@@ -77,7 +77,7 @@ def union_in_scope_types(input_type: type) -> tuple[type, ...] | None:
     return cast("tuple[type, ...]", getattr(input_type, "_union_in_scope_types"))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnionRule:
     """Specify that an instance of `union_member` can be substituted wherever `union_base` is
     used."""
@@ -99,7 +99,7 @@ class UnionRule:
             raise ValueError(msg)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnionMembership:
     union_rules: FrozenDict[type, FrozenOrderedSet[type]]
 
@@ -156,7 +156,7 @@ class UnionMembership:
         return bool(self.union_rules.get(union_type))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _DistinctUnionTypePerSubclassGetter(Generic[_T]):
     _class: _T
     _in_scope_types: list[type] | None

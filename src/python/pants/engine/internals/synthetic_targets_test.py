@@ -42,7 +42,7 @@ from pants.util.strutil import softwrap
 TargetAdaptor = functools.partial(_TargetAdaptor, __description_of_origin__="BUILD")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
     path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 
@@ -81,7 +81,7 @@ class SyntheticExampleTargetsPerDirectorySpecPathsRequest:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SyntheticExampleTargetsPerDirectoryRequest(SyntheticTargetsRequest):
     path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
     spec_paths_request = SyntheticExampleTargetsPerDirectorySpecPathsRequest

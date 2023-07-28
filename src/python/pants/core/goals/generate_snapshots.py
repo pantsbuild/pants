@@ -28,12 +28,12 @@ class GenerateSnapshotsFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to generate snapshots from a target."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateSnapshotsResult:
     snapshot: Snapshot
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EnvironmentAwareGenerateSnapshotsRequest:
     """Request class to request a `GenerateSnapshotsResult` in an environment-aware fashion."""
 

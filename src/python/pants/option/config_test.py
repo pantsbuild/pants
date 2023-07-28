@@ -13,7 +13,7 @@ from pants.engine.fs import FileContent
 from pants.option.config import Config, TomlSerializer
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ConfigFile:
     content: str
     unexpanded_default_values: Dict

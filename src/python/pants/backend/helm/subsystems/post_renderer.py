@@ -56,7 +56,7 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
 _HELM_POST_RENDERER_TOOL = "__pants_helm_post_renderer.py"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _HelmPostRendererTool:
     pex: VenvPex
 
@@ -90,7 +90,7 @@ HELM_POST_RENDERER_CFG_FILENAME = "post_renderer.cfg.yaml"
 _HELM_POST_RENDERER_WRAPPER_SCRIPT = "post_renderer_wrapper.sh"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SetupHelmPostRenderer(EngineAwareParameter):
     """Request for a post-renderer process that will perform a series of replacements in the
     generated files."""
@@ -103,7 +103,7 @@ class SetupHelmPostRenderer(EngineAwareParameter):
         return self.description_of_origin
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmPostRenderer(EngineAwareReturnType):
     exe: str
     digest: Digest

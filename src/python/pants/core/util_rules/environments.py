@@ -466,7 +466,7 @@ class AllEnvironmentTargets(FrozenDict[str, Target]):
     """A mapping of environment names to their corresponding environment target."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EnvironmentTarget:
     name: str | None
     val: Target | None
@@ -519,7 +519,7 @@ def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
     return EnvironmentField(None, address=field_set.address)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EnvironmentNameRequest(EngineAwareParameter):
     f"""Normalize the value into a name from `[environments-preview].names`, such as by
     applying {LOCAL_ENVIRONMENT_MATCHER}."""
@@ -567,7 +567,7 @@ class EnvironmentNameRequest(EngineAwareParameter):
         return self.raw_value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SingleEnvironmentNameRequest(EngineAwareParameter):
     """Asserts that all of the given environment strings resolve to the same EnvironmentName."""
 

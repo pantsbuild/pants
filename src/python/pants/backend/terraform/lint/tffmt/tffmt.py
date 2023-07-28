@@ -37,7 +37,7 @@ class TffmtRequest(FmtTargetsRequest):
     tool_subsystem = TfFmtSubsystem
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PartitionMetadata:
     directory: str
 

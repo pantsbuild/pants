@@ -43,12 +43,12 @@ from pants.util.strutil import path_safe, softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExportVenvsRequest(ExportRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ExportVenvForResolveRequest(EngineAwareParameter):
     resolve: str
 
@@ -130,7 +130,7 @@ async def _get_full_python_version(pex_or_venv_pex: Pex | VenvPex) -> str:
     return res.stdout.strip().decode()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VenvExportRequest:
     pex_request: PexRequest
     dest_prefix: str
@@ -309,7 +309,7 @@ async def do_export(
         raise ExportError("Unsupported value for [export].py_resolve_format")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaybeExportResult:
     result: ExportResult | None
 

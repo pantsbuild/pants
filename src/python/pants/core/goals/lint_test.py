@@ -58,7 +58,7 @@ class MockTarget(Target):
     core_fields = (MockMultipleSourcesField, MockRequiredField)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockLinterFieldSet(FieldSet):
     required_fields = (MultipleSourcesField,)
     sources: MultipleSourcesField

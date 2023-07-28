@@ -20,7 +20,7 @@ class ScalaPlatform:
     Native = 3
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaBuildTarget(BSPData):
     DATA_KIND = "scala"
 
@@ -76,7 +76,7 @@ class ScalaBuildTarget(BSPData):
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalacOptionsParams:
     targets: tuple[BuildTargetIdentifier, ...]
 
@@ -92,7 +92,7 @@ class ScalacOptionsParams:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalacOptionsItem:
     target: BuildTargetIdentifier
 
@@ -127,7 +127,7 @@ class ScalacOptionsItem:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalacOptionsResult:
     items: tuple[ScalacOptionsItem, ...]
 
@@ -147,7 +147,7 @@ class ScalacOptionsResult:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaMainClassesParams:
     targets: tuple[BuildTargetIdentifier, ...]
 
@@ -170,7 +170,7 @@ class ScalaMainClassesParams:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaMainClass:
     # The main class to run.
     class_: str
@@ -195,7 +195,7 @@ class ScalaMainClass:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaMainClassesItem:
     # The build target that contains the test classes.
     target: BuildTargetIdentifier
@@ -210,7 +210,7 @@ class ScalaMainClassesItem:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaMainClassesResult:
     items: tuple[ScalaMainClassesItem, ...]
 
@@ -232,7 +232,7 @@ class ScalaMainClassesResult:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaTestClassesParams:
     targets: tuple[BuildTargetIdentifier, ...]
 
@@ -255,7 +255,7 @@ class ScalaTestClassesParams:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaTestClassesItem:
     # The build target that contains the test classes.
     target: BuildTargetIdentifier
@@ -278,7 +278,7 @@ class ScalaTestClassesItem:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaTestClassesResult:
     items: tuple[ScalaTestClassesItem, ...]
 

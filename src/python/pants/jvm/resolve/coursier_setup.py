@@ -152,7 +152,7 @@ class CoursierSubsystem(TemplatedExternalTool):
         return f"./{filename}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Coursier:
     """The Coursier tool and various utilities, prepared for use via `immutable_input_digests`."""
 
@@ -210,7 +210,7 @@ class Coursier:
         return {self.bin_dir: self._digest, **self._immutable_input_digests}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CoursierFetchProcess:
     args: Tuple[str, ...]
     input_digest: Digest

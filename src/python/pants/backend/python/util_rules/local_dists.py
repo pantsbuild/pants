@@ -36,7 +36,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LocalDistWheels:
     """Contains the wheels isolated from a single local Python distribution."""
 
@@ -101,7 +101,7 @@ async def isolate_local_dist_wheels(
     return LocalDistWheels(tuple(wheels), wheels_snapshot.digest, frozenset(provided_files))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LocalDistsPexRequest:
     """Request to build the local dists from the dependency closure of a set of addresses."""
 
@@ -126,7 +126,7 @@ class LocalDistsPexRequest:
         object.__setattr__(self, "sources", sources)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LocalDistsPex:
     """A PEX file containing locally-built dists.
 

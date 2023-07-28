@@ -33,7 +33,7 @@ class KotlinParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = "kotlin-parser"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinImport:
     name: str
     alias: str | None
@@ -55,7 +55,7 @@ class KotlinImport:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KotlinSourceDependencyAnalysis:
     package: str
     imports: frozenset[KotlinImport]
@@ -129,7 +129,7 @@ class KotlinSourceDependencyAnalysis:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleKotlinSourceDependencyAnalysisResult:
     process_result: FallibleProcessResult
 

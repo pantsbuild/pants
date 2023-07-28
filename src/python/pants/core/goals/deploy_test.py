@@ -62,19 +62,19 @@ class MockDeployTarget(Target):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockPublishRequest(PublishRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockPackageFieldSet(PackageFieldSet):
     required_fields = (MockRepositoriesField,)
 
     repositories: MockRepositoriesField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockPublishFieldSet(PublishFieldSet):
     publish_request_type = MockPublishRequest
     required_fields = (MockRepositoriesField,)
@@ -82,7 +82,7 @@ class MockPublishFieldSet(PublishFieldSet):
     repositories: MockRepositoriesField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MockDeployFieldSet(DeployFieldSet):
     required_fields = (MockDestinationField,)
 

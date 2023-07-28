@@ -193,7 +193,7 @@ class _ServiceState:
             return self._state == self._TERMINATING
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PantsServices:
     """A collection of running PantsServices threads."""
 

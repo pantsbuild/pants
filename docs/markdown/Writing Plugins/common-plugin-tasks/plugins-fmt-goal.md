@@ -74,7 +74,7 @@ from pants.engine.target import FieldSet
 
 ...
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ShfmtFieldSet(FieldSet):
     required_fields = (ShellSourceField,)
 

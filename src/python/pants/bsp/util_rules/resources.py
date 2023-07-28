@@ -34,7 +34,7 @@ class ResourcesRequestHandlerMapping(BSPHandlerMapping):
     response_type = ResourcesResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResourcesForOneBSPTargetRequest:
     bsp_target: BSPBuildTargetInternal
 

@@ -12,7 +12,7 @@ from pants.util.frozendict import FrozenDict
 ContextAwareObjectFactory = Callable[[ParseContext], Callable[..., None]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileAliases:
     """A structure containing sets of symbols to be exposed in BUILD files.
 

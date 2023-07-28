@@ -17,7 +17,7 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateTestMainRequest(EngineAwareParameter):
     digest: Digest
     test_paths: FrozenOrderedSet[str]
@@ -30,7 +30,7 @@ class GenerateTestMainRequest(EngineAwareParameter):
         return self.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GeneratedTestMain:
     digest: Digest
     has_tests: bool

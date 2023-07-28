@@ -11,7 +11,7 @@ from pants.util.frozendict import FrozenDict
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoModuleImportPathsMappingsHook:
     """An entry point for a specific implementation of mapping Go import paths to owning targets.
 
@@ -20,13 +20,13 @@ class GoModuleImportPathsMappingsHook:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoImportPathsMappingAddressSet:
     addresses: tuple[Address, ...]
     infer_all: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoModuleImportPathsMapping:
     """Maps import paths (as strings) to one or more addresses of targets providing those import
     path(s) for a single Go module."""
@@ -35,7 +35,7 @@ class GoModuleImportPathsMapping:
     address_to_import_path: FrozenDict[Address, str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoModuleImportPathsMappings:
     """Import path mappings for all Go modules in the repository.
 

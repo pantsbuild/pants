@@ -50,7 +50,7 @@ class GoThirdPartyPkgError(Exception):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThirdPartyPkgAnalysis:
     """All the info and files needed to build a third-party package.
 
@@ -92,7 +92,7 @@ class ThirdPartyPkgAnalysis:
     error: GoThirdPartyPkgError | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
     """Request the info and digest needed to build a third-party package.
 
@@ -109,7 +109,7 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
         return f"{self.import_path} from {self.go_mod_path}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
     """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
 
@@ -122,7 +122,7 @@ class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
     import_paths_to_pkg_info: FrozenDict[str, ThirdPartyPkgAnalysis]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllThirdPartyPackagesRequest:
     go_mod_address: Address
     go_mod_digest: Digest
@@ -130,13 +130,13 @@ class AllThirdPartyPackagesRequest:
     build_opts: GoBuildOptions
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ModuleDescriptorsRequest:
     digest: Digest
     path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ModuleDescriptor:
     import_path: str
     name: str
@@ -145,13 +145,13 @@ class ModuleDescriptor:
     minimum_go_version: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ModuleDescriptors:
     modules: FrozenOrderedSet[ModuleDescriptor]
     go_mods_digest: Digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AnalyzeThirdPartyModuleRequest:
     go_mod_address: Address
     go_mod_digest: Digest
@@ -163,12 +163,12 @@ class AnalyzeThirdPartyModuleRequest:
     build_opts: GoBuildOptions
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AnalyzedThirdPartyModule:
     packages: FrozenOrderedSet[ThirdPartyPkgAnalysis]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AnalyzeThirdPartyPackageRequest:
     pkg_json: FrozenDict[str, Any]
     module_sources_digest: Digest
@@ -178,7 +178,7 @@ class AnalyzeThirdPartyPackageRequest:
     minimum_go_version: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleThirdPartyPkgAnalysis:
     """Metadata for a third-party Go package, but fallible if our analysis failed."""
 

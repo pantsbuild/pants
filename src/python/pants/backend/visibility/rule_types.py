@@ -58,7 +58,7 @@ class BuildFileVisibilityRulesError(DependencyRulesError):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VisibilityRule:
     """A single rule with an associated action when matched against a given path."""
 
@@ -113,7 +113,7 @@ def flatten(xs, *types: type) -> Iterator:
         raise ValueError(f"expected {' or '.join(typ.__name__ for typ in types)} but got: {xs!r}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VisibilityRuleSet:
     """An ordered set of rules that applies to some set of target types."""
 
@@ -180,7 +180,7 @@ class VisibilityRuleSet:
         return any(selector.match(address, adaptor, relpath) for selector in self.selectors)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileVisibilityRules(BuildFileDependencyRules):
     path: str
     rulesets: tuple[VisibilityRuleSet, ...]

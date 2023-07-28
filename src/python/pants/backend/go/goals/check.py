@@ -18,7 +18,7 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCheckFieldSet(FieldSet):
     required_fields = (GoPackageSourcesField,)
 

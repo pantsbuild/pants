@@ -47,7 +47,7 @@ class InvalidBuildConfigError(Exception):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildSystemRequest:
     """A request to find build system config in the given dir of the given digest."""
 
@@ -55,7 +55,7 @@ class BuildSystemRequest:
     working_directory: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildSystem:
     """A PEP 517/518 build system configuration."""
 
@@ -104,7 +104,7 @@ async def find_build_system(request: BuildSystemRequest, _setuptools: Setuptools
     return ret
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DistBuildRequest:
     """A request to build dists via a PEP 517 build backend."""
 
@@ -128,7 +128,7 @@ class DistBuildRequest:
     extra_build_time_env: Mapping[str, str] | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DistBuildResult:
     output: Digest
     # Relpaths in the output digest.

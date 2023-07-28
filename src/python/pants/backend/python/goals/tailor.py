@@ -50,7 +50,7 @@ from pants.util.requirements import parse_requirements_file
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PutativePythonTargetsRequest(PutativeTargetsRequest):
     pass
 

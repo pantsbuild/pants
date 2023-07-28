@@ -75,7 +75,7 @@ def to_help_str(val) -> str:
         return str(val)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionHelpInfo:
     """A container for help information for a single option.
 
@@ -123,7 +123,7 @@ class OptionHelpInfo:
     fromfile: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionScopeHelpInfo:
     """A container for help information for a scope of options.
 
@@ -166,7 +166,7 @@ class OptionScopeHelpInfo:
         return flags
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoalHelpInfo:
     """A container for help information for a goal."""
 
@@ -191,7 +191,7 @@ def pretty_print_type_hint(hint: Any) -> str:
     return hint_str.replace("typing.", "").replace("NoneType", "None")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetFieldHelpInfo:
     """A container for help information for a field in a target type."""
 
@@ -235,7 +235,7 @@ class TargetFieldHelpInfo:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetTypeHelpInfo:
     """A container for help information for a target type."""
 
@@ -283,7 +283,7 @@ def maybe_cleandoc(doc: str | None) -> str | None:
     return doc and inspect.cleandoc(doc)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RuleInfo:
     """A container for help information for a rule.
 
@@ -312,7 +312,7 @@ class RuleInfo:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginAPITypeInfo:
     """A container for help information for a plugin API type.
 
@@ -394,7 +394,7 @@ class PluginAPITypeInfo:
         return satisfies
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BackendHelpInfo:
     name: str
     description: str
@@ -402,7 +402,7 @@ class BackendHelpInfo:
     provider: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileSymbolHelpInfo:
     name: str
     is_target: bool
@@ -410,7 +410,7 @@ class BuildFileSymbolHelpInfo:
     documentation: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllHelpInfo:
     """All available help info."""
 

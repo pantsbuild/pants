@@ -72,7 +72,7 @@ def nested_raise(x: B) -> A:  # type: ignore[return]
     fn_raises(x)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Fib:
     val: int
 
@@ -85,12 +85,12 @@ async def fib(n: int) -> Fib:
     return Fib(x.val + y.val)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MyInt:
     val: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MyFloat:
     val: float
 
@@ -486,7 +486,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         assert r_C["parent_id"] == r_B["span_id"]
 
     def test_engine_aware_rule(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class ModifiedOutput(EngineAwareReturnType):
             _level: LogLevel
             val: int
@@ -516,7 +516,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         assert workunit["level"] == "ERROR"
 
     def test_engine_aware_param(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class ModifiedMetadata(EngineAwareParameter):
             def metadata(self):
                 return {"example": "thing"}
@@ -543,7 +543,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         assert workunit["metadata"] == {"example": "thing"}
 
     def test_engine_aware_none_case(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         # If level() returns None, the engine shouldn't try to set
         # a new workunit level.
         class ModifiedOutput(EngineAwareReturnType):
@@ -575,7 +575,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         assert workunit["level"] == "TRACE"
 
     def test_artifacts_on_engine_aware_type(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class Output(EngineAwareReturnType):
             val: int
 
@@ -603,7 +603,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         assert artifacts["some_arbitrary_key"] == EMPTY_SNAPSHOT
 
     def test_metadata_on_engine_aware_type(self, tmp_path: Path) -> None:
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class Output(EngineAwareReturnType):
             val: int
 
@@ -636,7 +636,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         # this should fail to produce a meaningful metadata entry on
         # the workunit (with a warning), but not fail.
 
-        @dataclass(frozen=True)
+        @dataclass(frozen=True, slots=True)
         class Output(EngineAwareReturnType):
             val: int
 
@@ -664,13 +664,13 @@ class TestStreamingWorkunit(SchedulerTestBase):
         assert workunit["metadata"] == {}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ComplicatedInput:
     snapshot_1: Snapshot
     snapshot_2: Snapshot
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Output(EngineAwareReturnType):
     snapshot_1: Snapshot
     snapshot_2: Snapshot
@@ -1011,12 +1011,12 @@ def test_union_member_construction(run_tracker: RunTracker) -> None:
     assert "yep" == rule_runner.request(str, [])
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileInput:
     filename: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MergedOutput:
     digest: Digest
 

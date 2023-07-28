@@ -20,7 +20,7 @@ from pants.engine.unions import UnionRule
 from pants.util.strutil import softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerInferenceFieldSet(FieldSet):
     required_fields = (DockerImageDependenciesField,)
 

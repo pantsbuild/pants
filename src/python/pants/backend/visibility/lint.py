@@ -23,7 +23,7 @@ from pants.engine.target import (
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VisibilityFieldSet(FieldSet):
     required_fields = (Dependencies,)
     dependencies: Dependencies

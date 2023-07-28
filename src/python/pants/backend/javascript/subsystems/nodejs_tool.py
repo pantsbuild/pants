@@ -79,7 +79,7 @@ class NodeJSToolBase(Subsystem):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeJSToolRequest:
     tool: str
     resolve: str | None

@@ -27,7 +27,7 @@ class RenameTargetsInFileRequest(FixBUILDFileRequest):
     """Deprecated target type names to new names."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenamedTargetTypes:
     """Map deprecated field names to their new name, per target."""
 

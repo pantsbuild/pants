@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pants.util.frozendict import FrozenDict
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NativeParsedPythonDependencies:
     imports: FrozenDict[str, tuple[int, bool]]
     string_candidates: FrozenDict[str, int]
@@ -18,7 +18,7 @@ class NativeParsedPythonDependencies:
         object.__setattr__(self, "string_candidates", FrozenDict(string_candidates))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NativeParsedJavascriptDependencies:
     file_imports: frozenset[str]
     package_imports: frozenset[str]

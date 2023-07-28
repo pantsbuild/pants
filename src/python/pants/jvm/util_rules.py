@@ -9,7 +9,7 @@ from pants.engine.fs import Digest, DigestEntries, DigestSubset, FileDigest, Fil
 from pants.engine.rules import Get, collect_rules, rule
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExtractFileDigest:
     digest: Digest
     file_path: str

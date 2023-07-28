@@ -64,7 +64,7 @@ If you have a "skip" field, use it in an `opt_out` method of your subclass:
 ```python
 from pants.core.goals.test import TestFieldSet
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExampleTestFieldSet(TestFieldSet):
     required_fields = (ExamleTestSourceField,)
     sources: ExampleTestSourceField
@@ -102,7 +102,7 @@ The rules used to drive batching and executing tests come from the `TestRequest`
 ```python
 from pants.core.goals.test import TestRequest
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExampleTestRequest(TestRequest):
     field_set_type = ExampleTestFieldSet
     tool_subsystem = ExampleTestSubsystem
@@ -123,7 +123,7 @@ In addition to registering your subclass as a valid `TestRequest`, this will aut
 ```python
 from pants.core.goals.test import PartitionerType
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExampleTestRequest(TestRequest):
     field_set_type = ExampleTestFieldSet
     tool_subsystem = ExampleTestSubsystem
@@ -173,7 +173,7 @@ def description(self) -> str:
 Any metadata returned by the partitioning rule will be passed back to your test runner as an input to the test execution rule, so it can be useful to declare a custom type modeling everything that's constant for a collection of `TestFieldSet` inputs:
 
 ```python
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExampleTestMetadata:
     common_property: str
     other_common_property: int | None
@@ -224,7 +224,7 @@ If you didn't override the `partitioner_type` in your `TestRequest` subclass, `e
 from pants.core.goals.test import TestDebugAdapterRequest, TestDebugRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExampleTestRequest(TestRequest):
     ...  # Fields from earlier
     supports_debug = True  # Supports --debug

@@ -73,7 +73,7 @@ async def generate_java_from_thrift(
     return GeneratedSources(source_root_restored)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApacheThriftJavaDependenciesInferenceFieldSet(FieldSet):
     required_fields = (ThriftDependenciesField, JvmResolveField)
 
@@ -85,12 +85,12 @@ class InferApacheThriftJavaDependencies(InferDependenciesRequest):
     infer_from = ApacheThriftJavaDependenciesInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApacheThriftJavaRuntimeForResolveRequest:
     resolve_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ApacheThriftJavaRuntimeForResolve:
     addresses: frozenset[Address]
 

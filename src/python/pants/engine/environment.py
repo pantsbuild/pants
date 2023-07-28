@@ -9,7 +9,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 LOCAL_ENVIRONMENT_MATCHER = "__local__"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EnvironmentName(EngineAwareParameter):
     """The normalized name for an environment, from `[environments-preview].names`, after applying
     things like the __local__ matcher.
@@ -25,7 +25,7 @@ class EnvironmentName(EngineAwareParameter):
         return f"environment:{self.val}" if self.val else None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChosenLocalEnvironmentName:
     """Which environment name from `[environments-preview].names` that __local__ resolves to."""
 

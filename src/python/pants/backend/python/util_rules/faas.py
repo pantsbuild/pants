@@ -116,14 +116,14 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
         return {"includes": [full_glob]}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedPythonFaaSHandler:
     module: str
     func: str
     file_name_used: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvePythonFaaSHandlerRequest:
     field: PythonFaaSHandlerField
 
@@ -176,7 +176,7 @@ class PythonFaaSDependencies(Dependencies):
     supports_transitive_excludes = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonFaaSHandlerInferenceFieldSet(FieldSet):
     required_fields = (
         PythonFaaSDependencies,
@@ -263,7 +263,7 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonFaaSKnownRuntime:
     major: int
     minor: int
@@ -323,7 +323,7 @@ async def digest_complete_platforms(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RuntimePlatformsRequest:
     address: Address
     target_name: str
@@ -332,7 +332,7 @@ class RuntimePlatformsRequest:
     complete_platforms: PythonFaaSCompletePlatforms
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RuntimePlatforms:
     interpreter_version: None | tuple[int, int]
     pex_platforms: PexPlatforms = PexPlatforms()
@@ -421,7 +421,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildLambdexRequest:
     address: Address
     target_name: str
@@ -529,7 +529,7 @@ async def build_lambdex(
     return BuiltPackage(digest=result.output_digest, artifacts=(artifact,))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildPythonFaaSRequest:
     address: Address
     target_name: str

@@ -34,7 +34,7 @@ from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaSourceDependenciesInferenceFieldSet(FieldSet):
     required_fields = (JavaSourceField,)
 
@@ -45,13 +45,13 @@ class InferJavaSourceDependencies(InferDependenciesRequest):
     infer_from = JavaSourceDependenciesInferenceFieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaInferredDependencies:
     dependencies: FrozenOrderedSet[Address]
     exports: FrozenOrderedSet[Address]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JavaInferredDependenciesAndExportsRequest:
     source: SourcesField
 

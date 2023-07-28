@@ -33,7 +33,7 @@ def jvm_classes_directory(target_id: BuildTargetIdentifier) -> str:
     return f"jvm/classes/{path_safe(target_id.uri)}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPClasspathEntryRequest:
     """A wrapper around a `ClasspathEntryRequest` which notifies the BSP client on completion.
 

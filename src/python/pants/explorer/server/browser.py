@@ -13,7 +13,7 @@ from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Browser:
     open_binary: OpenBinary
     protocol: str
@@ -37,7 +37,7 @@ class Browser:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BrowserRequest:
     protocol: str
     server: str

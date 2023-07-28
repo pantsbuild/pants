@@ -63,7 +63,7 @@ class CompleteEnvironmentVars(FrozenDict):
         return FrozenDict(env_var_subset)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EnvironmentVarsRequest:
     """Requests a subset of the variables set in the environment.
 

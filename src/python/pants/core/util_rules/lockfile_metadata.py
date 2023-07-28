@@ -71,7 +71,7 @@ class NoLockfileMetadataBlock(InvalidLockfileError):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LockfileMetadata:
     """Base class for metadata that is attached to a given lockfile.
 

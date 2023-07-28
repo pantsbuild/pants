@@ -41,7 +41,7 @@ from pants.engine.internals.native_engine import (  # noqa: F401
 from pants.util.strutil import bullet_list, softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileAddressRequest(EngineAwareParameter):
     """A request to find the BUILD file path for an address."""
 
@@ -52,7 +52,7 @@ class BuildFileAddressRequest(EngineAwareParameter):
         return self.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildFileAddress:
     """An address, along with the relative file path of its BUILD file."""
 
@@ -85,7 +85,7 @@ class ResolveError(MappingError):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaybeAddress:
     """A target address, or an error if it could not be created.
 

@@ -64,7 +64,7 @@ class AllStevedoreExtensionTargets(Targets):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StevedoreNamespacesProviderTargetsRequest:
     stevedore_namespaces: StevedoreNamespacesField
 

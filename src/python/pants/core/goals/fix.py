@@ -41,7 +41,7 @@ from pants.util.strutil import softwrap, strip_v2_chroot_path
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FixResult(EngineAwareReturnType):
     input: Snapshot
     output: Snapshot
@@ -172,7 +172,7 @@ class _FixBatchRequest(Collection[_FixBatchElement]):
     """Request to serially fix all the elements in the given batch."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _FixBatchResult:
     results: tuple[FixResult, ...]
 

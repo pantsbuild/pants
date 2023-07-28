@@ -24,7 +24,7 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClangFormatFmtFieldSet(FieldSet):
     required_fields = (CCSourceField,)
 

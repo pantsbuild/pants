@@ -46,7 +46,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyPkgImportPath:
     """The derived import path of a first party package, based on its owning go.mod.
 
@@ -58,7 +58,7 @@ class FirstPartyPkgImportPath:
     dir_path_rel_to_gomod: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyPkgImportPathRequest(EngineAwareParameter):
     address: Address
 
@@ -66,7 +66,7 @@ class FirstPartyPkgImportPathRequest(EngineAwareParameter):
         return self.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyPkgAnalysis:
     """All the metadata for a first-party Go package.
 
@@ -107,7 +107,7 @@ class FirstPartyPkgAnalysis:
     xtest_embed_patterns: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleFirstPartyPkgAnalysis:
     """Metadata for a Go package, but fallible if our analysis failed."""
 
@@ -195,7 +195,7 @@ class FallibleFirstPartyPkgAnalysis:
         return cls(analysis, import_path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyPkgAnalysisRequest(EngineAwareParameter):
     address: Address
     build_opts: GoBuildOptions
@@ -205,7 +205,7 @@ class FirstPartyPkgAnalysisRequest(EngineAwareParameter):
         return self.address.spec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyPkgDigest:
     """The source files needed to build the package."""
 
@@ -215,7 +215,7 @@ class FirstPartyPkgDigest:
     xtest_embed_config: EmbedConfig | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleFirstPartyPkgDigest:
     """The source files for a Go package, but fallible if embed preparation failed."""
 
@@ -224,7 +224,7 @@ class FallibleFirstPartyPkgDigest:
     stderr: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FirstPartyPkgDigestRequest(EngineAwareParameter):
     address: Address
     build_opts: GoBuildOptions

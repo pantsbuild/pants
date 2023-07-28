@@ -21,7 +21,7 @@ class PexVenvLayout(Enum):
     FLAT_ZIPPED = "flat-zipped"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexVenvRequest:
     pex: Pex
     layout: PexVenvLayout
@@ -33,7 +33,7 @@ class PexVenvRequest:
     prefix: None | str = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexVenv:
     digest: Digest
     path: Path

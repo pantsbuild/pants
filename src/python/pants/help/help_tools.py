@@ -13,7 +13,7 @@ from pants.help.maybe_color import MaybeColor
 from pants.util.docutil import terminal_width
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ToolHelpInfo:
     name: str
     description: str

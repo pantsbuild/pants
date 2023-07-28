@@ -25,7 +25,7 @@ _IMPORT_REGEX = re.compile(rf"include\s+{_QUOTE_CHAR}{_FILE_NAME}{_QUOTE_CHAR}\s
 _NAMESPACE_REGEX = re.compile(r"namespace\s+([a-z]+)\s+(.+)\s*")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParsedThrift:
     imports: FrozenOrderedSet[str]
     # Note that Thrift only allows one namespace per language per file; later namespaces overwrite
@@ -33,7 +33,7 @@ class ParsedThrift:
     namespaces: FrozenDict[str, str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ParsedThriftRequest(EngineAwareParameter):
     sources_field: ThriftSourceField
 

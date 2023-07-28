@@ -8,12 +8,12 @@ from pants.engine.rules import collect_rules, rule
 from pants.jvm.resolve.common import Coordinate
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaArtifactsForVersionRequest:
     scala_version: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalaArtifactsForVersionResult:
     compiler_coordinate: Coordinate
     library_coordinate: Coordinate

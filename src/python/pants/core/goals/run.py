@@ -110,7 +110,7 @@ class RestartableField(BoolField):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RunRequest:
     digest: Digest
     # Values in args and in env can contain the format specifier "{chroot}", which will

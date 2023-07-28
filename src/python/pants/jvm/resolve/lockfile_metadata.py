@@ -29,7 +29,7 @@ class LockfileContext(Enum):
     TOOL = "tool"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JVMLockfileMetadata(LockfileMetadata):
     scope = LockfileScope.JVM
 
@@ -59,7 +59,7 @@ class JVMLockfileMetadata(LockfileMetadata):
 
 
 @_jvm_lockfile_metadata(1)
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JVMLockfileMetadataV1(JVMLockfileMetadata):
     """Initial metadata version for JVM user lockfiles.
 

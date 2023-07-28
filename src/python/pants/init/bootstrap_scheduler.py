@@ -6,14 +6,14 @@ from dataclasses import dataclass
 from pants.engine.internals.scheduler import Scheduler
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BootstrapScheduler:
     """A Scheduler that has been configured with only the rules for bootstrapping."""
 
     scheduler: Scheduler
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BootstrapStatus:
     """A singleton value that `@rules` can use to determine whether bootstrap is underway.
 

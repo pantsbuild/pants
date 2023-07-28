@@ -20,19 +20,19 @@ from pants.jvm.compile import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileFieldSet(FieldSet):
     required_fields = (FileSourceField,)
     sources: FileSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FilesGeneratorFieldSet(FieldSet):
     required_fields = (FilesGeneratingSourcesField,)
     sources: FilesGeneratingSourcesField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RelocatedFilesFieldSet(FieldSet):
     required_fields = (RelocatedFilesSourcesField,)
     sources: RelocatedFilesSourcesField

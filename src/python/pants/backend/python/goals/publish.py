@@ -57,7 +57,7 @@ class PublishPythonPackageRequest(PublishRequest):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PublishPythonPackageFieldSet(PublishFieldSet):
     publish_request_type = PublishPythonPackageRequest
     required_fields = (PythonRepositoriesField,)

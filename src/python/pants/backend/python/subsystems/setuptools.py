@@ -10,7 +10,7 @@ from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import collect_rules
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonDistributionFieldSet(PackageFieldSet):
     required_fields = (PythonProvidesField,)
 

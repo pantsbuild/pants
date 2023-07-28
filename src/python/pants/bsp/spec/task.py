@@ -36,7 +36,7 @@ class TaskDataKind(Enum):
     TEST_FINISH = "test-finish"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TaskStartParams(BSPNotification):
     notification_name = "build/taskStart"
 
@@ -70,7 +70,7 @@ class TaskStartParams(BSPNotification):
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TaskProgressParams(BSPNotification):
     notification_name = "build/taskProgress"
 
@@ -110,7 +110,7 @@ class TaskProgressParams(BSPNotification):
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TaskFinishParams(BSPNotification):
     notification_name = "build/taskFinish"
 

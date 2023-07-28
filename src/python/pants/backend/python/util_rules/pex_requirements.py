@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Resolve:
     # A named resolve for a "user lockfile".
     # Soon to be the only kind of lockfile, as this class will help
@@ -62,7 +62,7 @@ class Resolve:
     use_entire_lockfile: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Lockfile:
     url: str
     url_description_of_origin: str
@@ -82,7 +82,7 @@ async def get_lockfile_for_resolve(resolve: Resolve, python_setup: PythonSetup) 
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LoadedLockfile:
     """A lockfile after loading and header stripping.
 
@@ -109,7 +109,7 @@ class LoadedLockfile:
     original_lockfile: Lockfile
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LoadedLockfileRequest:
     """A request to load and validate the content of the given lockfile."""
 
@@ -259,7 +259,7 @@ async def load_lockfile(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EntireLockfile:
     """A request to resolve the entire contents of a lockfile.
 
@@ -276,7 +276,7 @@ class EntireLockfile:
     complete_req_strings: tuple[str, ...] | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexRequirements:
     """A request to resolve a series of requirements (optionally from a "superset" resolve)."""
 
@@ -327,14 +327,14 @@ class PexRequirements:
         return bool(self.req_strings_or_addrs)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvePexConstraintsFile:
     digest: Digest
     path: str
     constraints: FrozenOrderedSet[PipRequirement]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvePexConfig:
     """Configuration from `[python]` that impacts how the resolve is created."""
 
@@ -370,7 +370,7 @@ class ResolvePexConfig:
         yield from (f"--path-mapping={v}" for v in self.path_mappings)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvePexConfigRequest(EngineAwareParameter):
     """Find all configuration from `[python]` that impacts how the resolve is created.
 

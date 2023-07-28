@@ -19,7 +19,7 @@ class InvalidDistDir(Exception):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DistDir:
     """The directory to which we write distributable files."""
 

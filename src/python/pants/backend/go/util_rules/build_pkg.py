@@ -215,7 +215,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         return self.import_path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleBuildGoPackageRequest(EngineAwareParameter, EngineAwareReturnType):
     """Request to build a package, but fallible if determining the request metadata failed.
 
@@ -248,7 +248,7 @@ class FallibleBuildGoPackageRequest(EngineAwareParameter, EngineAwareReturnType)
         return self.exit_code == 0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FallibleBuiltGoPackage(EngineAwareReturnType):
     """Fallible version of `BuiltGoPackage` with error details."""
 
@@ -280,7 +280,7 @@ class FallibleBuiltGoPackage(EngineAwareReturnType):
         return self.exit_code == 0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuiltGoPackage:
     """A package and its dependencies compiled as `__pkg__.a` files.
 
@@ -292,23 +292,23 @@ class BuiltGoPackage:
     coverage_metadata: BuiltGoPackageCodeCoverageMetadata | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderEmbedConfigRequest:
     embed_config: EmbedConfig | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderedEmbedConfig:
     digest: Digest
     PATH = "./embedcfg"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCompileActionIdRequest:
     build_request: BuildGoPackageRequest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCompileActionIdResult:
     action_id: str
 
@@ -342,7 +342,7 @@ async def _add_objects_to_archive(
     return pack_result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SetupAsmCheckBinary:
     digest: Digest
     path: str
@@ -376,14 +376,14 @@ async def setup_golang_asm_check_binary() -> SetupAsmCheckBinary:
 
 
 # Check whether the given files looks like they could be Golang-format assembly language files.
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CheckForGolangAssemblyRequest:
     digest: Digest
     dir_path: str
     s_files: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CheckForGolangAssemblyResult:
     maybe_golang_assembly: bool
 

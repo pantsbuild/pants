@@ -63,7 +63,7 @@ class GPGVerifier:
         return has_ok
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Link:
     text: str
     link: str
@@ -89,7 +89,7 @@ def get_tf_links(page: BeautifulSoup) -> Links:
     return links
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TFVersionLinks:
     binary_links: Links
     sha256sums_link: Link
@@ -110,13 +110,13 @@ def get_info_for_version(version_page_links: Links) -> TFVersionLinks:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VersionHash:
     filename: str
     sha256sum: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VersionHashes:
     sha256sums: List[VersionHash]
     signature: bytes

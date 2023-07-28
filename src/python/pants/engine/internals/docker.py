@@ -3,12 +3,12 @@
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerResolveImageRequest:
     image_name: str
     platform: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerResolveImageResult:
     image_id: str

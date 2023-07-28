@@ -52,14 +52,14 @@ class CCGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = CC_FILE_EXTENSIONS
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CCFieldSet(FieldSet):
     required_fields = (CCSourceField,)
 
     sources: CCSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CCGeneratorFieldSet(FieldSet):
     required_fields = (CCGeneratorSourcesField,)
 

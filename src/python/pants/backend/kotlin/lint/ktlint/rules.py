@@ -24,7 +24,7 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class KtlintFieldSet(FieldSet):
     required_fields = (KotlinSourceField,)
 

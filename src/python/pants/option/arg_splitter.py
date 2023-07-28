@@ -18,7 +18,7 @@ class ArgSplitterError(Exception):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SplitArgs:
     """The result of splitting args."""
 
@@ -34,7 +34,7 @@ class HelpRequest(ABC):
     """Represents an implicit or explicit request for help by the user."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThingHelp(HelpRequest):
     """The user requested help on one or more things: e.g., an options scope or a target type."""
 
@@ -51,7 +51,7 @@ class AllHelp(HelpRequest):
     """The user requested a dump of all help info."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnknownGoalHelp(HelpRequest):
     """The user specified an unknown goal (or task)."""
 

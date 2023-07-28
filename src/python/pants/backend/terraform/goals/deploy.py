@@ -22,12 +22,12 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DeployTerraformFieldSet(TerraformDeploymentFieldSet, DeployFieldSet):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TerraformDeploymentRequest(EngineAwareParameter):
     field_set: TerraformDeploymentFieldSet
 

@@ -463,7 +463,7 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
     return list(iter_rules())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TaskRule:
     """A Rule that runs a task function when all of its input selectors are satisfied.
 
@@ -491,7 +491,7 @@ class TaskRule:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class QueryRule:
     """A QueryRule declares that a given set of Params will be used to request an output type.
 
@@ -507,7 +507,7 @@ class QueryRule:
         object.__setattr__(self, "input_types", tuple(input_types))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 

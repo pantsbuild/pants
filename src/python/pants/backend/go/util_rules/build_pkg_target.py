@@ -77,7 +77,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildGoPackageTargetRequest(EngineAwareParameter):
     """Build a `go_package`, `go_third_party_package`, or Go codegen target and its dependencies as
     `__pkg__.a` files."""
@@ -105,14 +105,14 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
             )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildGoPackageRequestForStdlibRequest:
     import_path: str
     build_opts: GoBuildOptions
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoCodegenBuildRequest:
     """The plugin hook to build/compile Go code.
 
@@ -541,12 +541,12 @@ def _is_coverage_enabled_for_stdlib_package(import_path: str, build_opts: GoBuil
     return False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ResolveStdlibEmbedConfigRequest:
     package: GoStdLibPackage
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ResolveStdlibEmbedConfigResult:
     embed_config: EmbedConfig | None
     stderr: str | None

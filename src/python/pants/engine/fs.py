@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Paths:
     """A Paths object is a collection of sorted file paths and dir paths.
 
@@ -41,7 +41,7 @@ class Paths:
     dirs: Tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileContent:
     """The content of a file.
 
@@ -60,7 +60,7 @@ class FileContent:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileEntry:
     """An indirect reference to the content of a file by digest.
 
@@ -73,7 +73,7 @@ class FileEntry:
     is_executable: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SymlinkEntry:
     """A symlink pointing to a target path.
 
@@ -91,7 +91,7 @@ class SymlinkEntry:
     target: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Directory:
     """The path to a directory.
 
@@ -146,7 +146,7 @@ class GlobExpansionConjunction(Enum):
     all_match = "all_match"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PathGlobs:
     globs: Tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
@@ -201,7 +201,7 @@ class PathGlobs:
                 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PathGlobsAndRoot:
     """A set of PathGlobs to capture relative to some root (which may exist outside of the
     buildroot).
@@ -217,7 +217,7 @@ class PathGlobsAndRoot:
     digest_hint: Optional[Digest] = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DigestSubset:
     """A request to get a subset of a digest.
 
@@ -234,7 +234,7 @@ class DigestSubset:
     globs: PathGlobs
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DownloadFile:
     """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
 
@@ -247,7 +247,7 @@ class DownloadFile:
     expected_digest: FileDigest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NativeDownloadFile:
     """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
 
@@ -274,7 +274,7 @@ class NativeDownloadFile:
         object.__setattr__(self, "auth_headers", FrozenDict(auth_headers or {}))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
 
@@ -302,7 +302,7 @@ class Workspace(SideEffecting):
         self._scheduler.write_digest(digest, path_prefix=path_prefix, clear_paths=clear_paths)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SpecsPaths(Paths):
     """All files matched by command line specs.
 
@@ -311,7 +311,7 @@ class SpecsPaths(Paths):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SnapshotDiff:
     our_unique_files: tuple[str, ...] = ()
     our_unique_dirs: tuple[str, ...] = ()

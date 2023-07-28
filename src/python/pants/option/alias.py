@@ -59,7 +59,7 @@ class CliOptions(Subsystem):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CliAlias:
     definitions: FrozenDict[str, tuple[str, ...]] = field(default_factory=FrozenDict)
 

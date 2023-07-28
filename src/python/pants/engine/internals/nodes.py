@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, Tuple
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Return:
     """Indicates that a Node successfully returned a value."""
 
@@ -17,7 +17,7 @@ class Return:
 _Frame = Tuple[str, Optional[str]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Throw:
     """Indicates that a Node should have been able to return a value, but failed."""
 

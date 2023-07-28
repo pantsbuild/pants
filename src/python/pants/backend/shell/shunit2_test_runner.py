@@ -53,7 +53,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import create_path_env_var
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Shunit2FieldSet(TestFieldSet):
     required_fields = (Shunit2TestSourceField,)
 
@@ -73,12 +73,12 @@ class Shunit2TestRequest(TestRequest):
     supports_debug = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestSetupRequest:
     field_set: Shunit2FieldSet
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestSetup:
     process: Process
 
@@ -109,14 +109,14 @@ def add_source_shunit2(fc: FileContent, binary_name: str) -> FileContent:
     return FileContent(fc.path, b"\n".join(lines))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Shunit2RunnerRequest:
     address: Address
     test_file_content: FileContent
     shell_field: Shunit2ShellField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Shunit2Runner:
     shell: Shunit2Shell
     binary_path: BinaryPath

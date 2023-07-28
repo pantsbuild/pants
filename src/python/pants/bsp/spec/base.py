@@ -16,7 +16,7 @@ from pants.build_graph.address import Address
 Uri = str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildTargetIdentifier:
     """A unique identifier for a target, can use any URI-compatible encoding as long as it is unique
     within the workspace.
@@ -40,7 +40,7 @@ class BuildTargetIdentifier:
         return cls(uri=f"pants:{str(addr)}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildTargetCapabilities:
     # This target can be compiled by the BSP server.
     can_compile: bool = False
@@ -74,7 +74,7 @@ class BuildTargetCapabilities:
 
 # Note: The BSP "build target" concept is _not_ the same as a Pants "target". They are similar but
 # should be not be conflated with one another.
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildTarget:
     """Build target contains metadata about an artifact (for example library, test, or binary
     artifact)"""
@@ -195,7 +195,7 @@ class BuildTargetTag:
     MANUAL = "manual"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TaskId:
     """The Task Id allows clients to uniquely identify a BSP task and establish a client-parent
     relationship with another task id."""

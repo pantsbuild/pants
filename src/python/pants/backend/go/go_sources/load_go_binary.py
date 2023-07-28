@@ -19,12 +19,12 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.resources import read_resource
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LoadedGoBinary:
     digest: Digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LoadedGoBinaryRequest(EngineAwareParameter):
     dir_name: str
     file_names: tuple[str, ...]
@@ -34,7 +34,7 @@ class LoadedGoBinaryRequest(EngineAwareParameter):
         return self.output_name
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NaiveBuildGoPackageRequestForStdlibPackageRequest:
     import_path: str
 

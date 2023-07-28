@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 _FS = TypeVar("_FS", bound=FieldSet)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CheckResult:
     exit_code: int
     stdout: str
@@ -72,7 +72,7 @@ class CheckResult:
         return {"partition": self.partition_description}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CheckResults(EngineAwareReturnType):
     """Zero or more CheckResult objects for a single type checker.
 
@@ -138,8 +138,8 @@ class CheckResults(EngineAwareReturnType):
         return False
 
 
-@dataclass(frozen=True)
 @union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True, slots=True)
 class CheckRequest(Generic[_FS], EngineAwareParameter):
     """A union for targets that should be checked.
 

@@ -48,7 +48,7 @@ class PackageFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to build an asset from a target."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuiltPackageArtifact:
     """Information about artifacts in a built package.
 
@@ -59,7 +59,7 @@ class BuiltPackageArtifact:
     extra_log_lines: tuple[str, ...] = tuple()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuiltPackage:
     digest: Digest
     artifacts: tuple[BuiltPackageArtifact, ...]
@@ -99,7 +99,7 @@ class OutputPathField(StringField, AsyncFieldMixin):
         return os.path.join(self.address.spec_path.replace(os.sep, "."), file_name)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EnvironmentAwarePackageRequest:
     """Request class to request a `BuiltPackage` in an environment-aware fashion."""
 
@@ -186,7 +186,7 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     return Package(exit_code=0)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
     """This predicate stops dep traversal after package targets.
 

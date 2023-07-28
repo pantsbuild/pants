@@ -48,7 +48,7 @@ def make_resolve(
     return CoursierResolveKey(name=resolve_name, path=resolve_path, digest=digest)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderedClasspath:
     """The contents of a classpath, organized as a key per entry with its contained classfiles."""
 

@@ -22,7 +22,7 @@ from pants.engine.target import FieldSet, Target
 from pants.testutil.rule_runner import RuleRunner
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UniqueICsRequest:
     include_extra_fields: bool
 

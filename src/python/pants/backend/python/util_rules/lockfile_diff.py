@@ -31,7 +31,7 @@ from pants.util.frozendict import FrozenDict
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, slots=True, order=True)
 class PythonRequirementVersion:
     _parsed: LegacyVersion | Version
 

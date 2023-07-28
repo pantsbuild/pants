@@ -79,7 +79,7 @@ logger = logging.getLogger(__name__)
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonProvider:
     """Union which should have 0 or 1 implementations registered which provide Python.
 
@@ -155,7 +155,7 @@ async def digest_complete_platforms(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
@@ -310,12 +310,12 @@ class PexRequest(EngineAwareParameter):
         return self.output_filename
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionalPexRequest:
     maybe_pex_request: PexRequest | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Pex:
     """Wrapper for a digest containing a pex file created with some filename."""
 
@@ -324,7 +324,7 @@ class Pex:
     python: PythonExecutable | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OptionalPex:
     maybe_pex: Pex | None
 
@@ -405,7 +405,7 @@ async def find_interpreter(
     return PythonExecutable(path=path, fingerprint=fingerprint)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BuildPexResult:
     result: ProcessResult
     pex_filename: str
@@ -462,7 +462,7 @@ class _BuildPexRequirementsSetup:
     concurrency_available: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ReqStrings:
     req_strings: tuple[str, ...]
 
@@ -809,7 +809,7 @@ async def create_optional_pex(request: OptionalPexRequest) -> OptionalPex:
     return OptionalPex(result)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Script:
     path: PurePath
 
@@ -818,13 +818,13 @@ class Script:
         return f"./{self.path}" if self.path.parent == PurePath() else str(self.path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VenvScript:
     script: Script
     content: FileContent
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VenvScriptWriter:
     complete_pex_env: CompletePexEnvironment
     pex: Pex
@@ -945,7 +945,7 @@ class VenvScriptWriter:
         return self.bin(bash, "python")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VenvPex:
     digest: Digest
     append_only_caches: FrozenDict[str, str] | None
@@ -956,7 +956,7 @@ class VenvPex:
     venv_rel_dir: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VenvPexRequest:
     pex_request: PexRequest
     complete_pex_env: CompletePexEnvironment
@@ -1080,7 +1080,7 @@ async def create_venv_pex(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexProcess:
     pex: Pex
     argv: tuple[str, ...]
@@ -1262,7 +1262,7 @@ async def setup_venv_pex_process(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexDistributionInfo:
     """Information about an individual distribution in a PEX file, as reported by `PEX_TOOLS=1
     repository info -v`."""

@@ -460,13 +460,13 @@ def test_environment_name_request_from_field_set() -> None:
         help = "foo"
         core_fields = (OptionalSingleSourceField, EnvFieldSubclass)
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class NoEnvFS(FieldSet):
         required_fields = (OptionalSingleSourceField,)
 
         source: OptionalSingleSourceField
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class EnvFS(FieldSet):
         required_fields = (OptionalSingleSourceField,)
 

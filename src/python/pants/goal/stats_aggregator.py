@@ -150,7 +150,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
             )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StatsAggregatorCallbackFactoryRequest:
     """A unique request type that is installed to trigger construction of the WorkunitsCallback."""
 

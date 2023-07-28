@@ -31,7 +31,7 @@ from pants.util.strutil import pluralize
 _SCALAFMT_CONF_FILENAME = ".scalafmt.conf"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalafmtFieldSet(FieldSet):
     required_fields = (ScalaSourceField,)
 
@@ -51,18 +51,18 @@ class ScalafmtToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = ScalafmtSubsystem.options_scope
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GatherScalafmtConfigFilesRequest:
     filepaths: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScalafmtConfigFiles:
     snapshot: Snapshot
     source_dir_to_config_file: FrozenDict[str, str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PartitionInfo:
     classpath_entries: tuple[str, ...]
     config_snapshot: Snapshot

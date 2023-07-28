@@ -16,7 +16,7 @@ class DockerBuildArgs(KeyValueSequenceUtil):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerBuildArgsRequest:
     target: Target
 

@@ -70,7 +70,7 @@ class UvicornServer:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UvicornServerSetupRequest:
     server: UvicornServerRequest
 
@@ -79,7 +79,7 @@ class UvicornServerSetupRequest:
         return BrowserRequest(protocol, server)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UvicornServerSetup:
     callback: Callable[[UvicornServer], None]
 

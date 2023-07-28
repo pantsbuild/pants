@@ -74,7 +74,7 @@ class TestRunFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestRunSecondaryFieldSet(RunFieldSet):
     required_fields = ()
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED

@@ -83,7 +83,7 @@ def fmt_rule(
     return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product}{gets_str})"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RuleFormatRequest:
     rule: Callable
     for_param: Optional[Union[Type, Tuple[Type, ...]]] = None

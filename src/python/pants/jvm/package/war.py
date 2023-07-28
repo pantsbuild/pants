@@ -57,7 +57,7 @@ from pants.jvm.target_types import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PackageWarFileFieldSet(PackageFieldSet):
     required_fields = (
         JvmWarDependenciesField,
@@ -71,23 +71,23 @@ class PackageWarFileFieldSet(PackageFieldSet):
     shading_rules: JvmWarShadingRulesField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderWarDeploymentDescriptorRequest:
     descriptor: JvmWarDescriptorAddressField
     owning_address: Address
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderedWarDeploymentDescriptor:
     digest: Digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderWarContentRequest:
     content: JvmWarContentField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RenderedWarContent:
     digest: Digest
 

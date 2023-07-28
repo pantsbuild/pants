@@ -15,7 +15,7 @@ class AClass:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BClass:
     pass
 

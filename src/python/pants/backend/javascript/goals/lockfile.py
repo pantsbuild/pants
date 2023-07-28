@@ -33,7 +33,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize, softwrap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GeneratePackageLockJsonFile(GenerateLockfile):
     project: NodeJSProject
 

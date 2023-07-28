@@ -32,7 +32,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CreateArchive:
     """A request to create an archive.
 
@@ -103,7 +103,7 @@ async def create_archive(request: CreateArchive) -> Digest:
     return result.output_digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaybeExtractArchiveRequest:
     """A request to extract a single archive file (otherwise returns the input digest).
 
@@ -119,7 +119,7 @@ class MaybeExtractArchiveRequest:
     use_suffix: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExtractedArchive:
     """The result of extracting an archive."""
 

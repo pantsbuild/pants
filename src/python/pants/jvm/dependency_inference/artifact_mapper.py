@@ -28,7 +28,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 _ResolveName = str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UnversionedCoordinate:
     group: str
     artifact: str
@@ -106,15 +106,8 @@ class MutableTrieNode:
 FrozenTrieNodeItem = Tuple[str, bool, FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]], bool]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FrozenTrieNode:
-    __slots__ = [
-        "_children",
-        "_recursive",
-        "_addresses",
-        "_first_party",
-    ]  # don't use a `dict` to store attrs (speeds up attr access significantly)
-
     _children: FrozenDict[str, FrozenTrieNode]
     _recursive: bool
     _addresses: FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]]

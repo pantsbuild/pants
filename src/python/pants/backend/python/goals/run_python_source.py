@@ -33,7 +33,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonSourceFieldSet(RunFieldSet):
     supports_debug_adapter = True
     required_fields = (PythonSourceField, PythonRunGoalUseSandboxField)

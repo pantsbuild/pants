@@ -429,9 +429,9 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
             return DepsTraversalBehavior.INCLUDE
 
     predicate = SkipDepsTagOrTraverse()
-    # Assert the class is frozen even though it was not decorated with @dataclass(frozen=True)
+    # Assert the class is frozen even though it was not decorated with @dataclass(frozen=True, slots=True)
     with pytest.raises(dataclasses.FrozenInstanceError):
-        # The dataclass(frozen=True) decorator is only needed if the subclass adds fields.
+        # The dataclass(frozen=True, slots=True) decorator is only needed if the subclass adds fields.
         predicate._callable = SkipDepsTagOrTraverse.__call__  # type: ignore[misc] # noqa
 
     transitive_targets = transitive_targets_rule_runner.request(
@@ -1920,7 +1920,7 @@ class SmalltalkLibraryGenerator(TargetFilesGenerator):
     moved_fields = (MockDependencies,)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SmalltalkDependenciesInferenceFieldSet(FieldSet):
     required_fields = (SmalltalkLibrarySource,)
 

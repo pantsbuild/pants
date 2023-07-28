@@ -55,7 +55,7 @@ class HelmArtifactLocationSpec(ABC):
         return self.spec.startswith("@")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmArtifactRegistryLocationSpec(HelmArtifactLocationSpec):
     registry: str
     repository: str | None
@@ -65,7 +65,7 @@ class HelmArtifactRegistryLocationSpec(HelmArtifactLocationSpec):
         return self.registry
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmArtifactClassicRepositoryLocationSpec(HelmArtifactLocationSpec):
     repository: str
 
@@ -74,14 +74,14 @@ class HelmArtifactClassicRepositoryLocationSpec(HelmArtifactLocationSpec):
         return self.repository
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmArtifactRequirement:
     name: str
     version: str
     location: HelmArtifactLocationSpec
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HelmArtifact:
     requirement: HelmArtifactRequirement
     address: Address
@@ -121,7 +121,7 @@ class HelmArtifact:
         return self.requirement.version
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedHelmArtifact(HelmArtifact, EngineAwareReturnType):
     location_url: str
 

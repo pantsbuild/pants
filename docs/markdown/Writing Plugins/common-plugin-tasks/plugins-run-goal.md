@@ -8,7 +8,7 @@ createdAt: "2020-07-01T04:55:11.390Z"
 The `run` goal runs a single interactive process in the foreground, such as running a script or a program.
 
 > 📘 Example repository
-> 
+>
 > This guide walks through adding a simple `run` implementation for Bash that runs the equivalent `/bin/bash ./script.sh`. See [here](https://github.com/pantsbuild/example-plugin/blob/main/pants-plugins/examples/bash/run_binary.py) for the final implementation.
 
 1. Set up a binary target type
@@ -18,7 +18,7 @@ Usually, you will want to add a "binary" target type for your language, such as 
 
 When creating a binary target, you should usually subclass the `Sources` field and set the class property `expected_num_files = 1`.
 
-See [Creating new targets](doc:target-api-new-targets) for a guide on how to define new target types. 
+See [Creating new targets](doc:target-api-new-targets) for a guide on how to define new target types.
 
 ```python
 from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, Target
@@ -53,7 +53,7 @@ from dataclasses import dataclass
 
 from pants.core.goals.run import RunFieldSet
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BashRunFieldSet(RunFieldSet):
     required_fields = (BashBinarySources,)
 
@@ -78,7 +78,7 @@ def rules():
 3. Create a rule for your logic
 -------------------------------
 
-Your rule should take as a parameter the `BashRunFieldSet` from Step 2. It should return `RunRequest`, which has the fields `digest: Digest`, `args: Iterable[str]`, and `extra_env: Optional[Mapping[str, str]]`. 
+Your rule should take as a parameter the `BashRunFieldSet` from Step 2. It should return `RunRequest`, which has the fields `digest: Digest`, `args: Iterable[str]`, and `extra_env: Optional[Mapping[str, str]]`.
 
 The `RunRequest` will get converted into an `InteractiveProcess` that will run in the foreground.
 
@@ -164,7 +164,7 @@ Now, when you run `pants run path/to/binary.sh`, Pants should run the program.
 from pants.core.goals.run import RunDebugAdapterRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BashRunFieldSet(RunFieldSet):
     ...  # Fields from earlier
     supports_debug_adapter = True  # Supports --debug-adapter

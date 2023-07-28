@@ -38,12 +38,12 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InstalledNodePackageRequest:
     address: Address
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InstalledNodePackage:
     project_env: NodeJsProjectEnvironment
     digest: Digest
@@ -60,7 +60,7 @@ class InstalledNodePackage:
         return self.project_env.ensure_target()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InstalledNodePackageWithSource(InstalledNodePackage):
     pass
 

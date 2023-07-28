@@ -74,7 +74,7 @@ from pants.util.strutil import help_text, softwrap
 _T = TypeVar("_T")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class per_platform(Generic[_T]):
     """An object containing differing homogeneous platform-dependent values.
 
@@ -159,7 +159,7 @@ class per_platform(Generic[_T]):
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class http_source:
     url: str
     len: int
@@ -609,14 +609,14 @@ class ResourcesGeneratorTarget(TargetFilesGenerator):
     help = "Generate a `resource` target for each file in the `sources` field."
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResourcesFieldSet(FieldSet):
     required_fields = (ResourceSourceField,)
 
     sources: ResourceSourceField
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResourcesGeneratorFieldSet(FieldSet):
     required_fields = (ResourcesGeneratingSourcesField,)
 
@@ -650,7 +650,7 @@ class GenericTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllAssetTargets:
     resources: tuple[Target, ...]
     files: tuple[Target, ...]
@@ -668,7 +668,7 @@ def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
     return AllAssetTargets(tuple(resources), tuple(files))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AllAssetTargetsByPath:
     resources: FrozenDict[PurePath, frozenset[Target]]
     files: FrozenDict[PurePath, frozenset[Target]]
@@ -782,7 +782,7 @@ class ArchiveTarget(Target):
     help = "A ZIP or TAR file containing loose files and code packages."
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ArchiveFieldSet(PackageFieldSet):
     required_fields = (ArchiveFormatField,)
 

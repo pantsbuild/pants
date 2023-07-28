@@ -13,7 +13,7 @@ from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetAdaptorRequest(EngineAwareParameter):
     """Lookup the TargetAdaptor for an Address."""
 

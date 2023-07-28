@@ -57,7 +57,7 @@ class GrpcJavaToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = JavaProtobufGrpcSubsystem.options_scope
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProtobufJavaGrpcPlugin:
     digest: Digest
     path: str

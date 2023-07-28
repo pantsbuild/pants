@@ -202,7 +202,7 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PexBinaryEntryPointDependencyInferenceFieldSet(FieldSet):
     required_fields = (PexBinaryDependenciesField, PexEntryPointField, PythonResolveField)
 
@@ -430,7 +430,7 @@ async def resolve_python_distribution_entry_points(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonDistributionDependenciesInferenceFieldSet(FieldSet):
     required_fields = (
         PythonDistributionDependenciesField,
@@ -534,7 +534,7 @@ def python_resolve_field_default_factory(
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DependencyValidationFieldSet(FieldSet):
     required_fields = (InterpreterConstraintsField,)
 

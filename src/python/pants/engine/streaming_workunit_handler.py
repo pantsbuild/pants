@@ -51,17 +51,17 @@ def thread_locals_set_for_current_thread(thread_locals: PyThreadLocals) -> None:
     thread_locals.set_for_current_thread()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetInfo:
     filename: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExpandedSpecs:
     targets: dict[str, list[TargetInfo]]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StreamingWorkunitContext:
     _scheduler: SchedulerSession
     _run_tracker: RunTracker
@@ -184,7 +184,7 @@ class WorkunitsCallback(ABC):
         """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WorkunitsCallbackFactory:
     """A wrapper around a callable that constructs WorkunitsCallbacks.
 

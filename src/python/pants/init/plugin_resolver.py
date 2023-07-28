@@ -32,7 +32,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginsRequest:
     # Interpreter constraints to resolve for, or None to resolve for the interpreter that Pants is
     # running under.

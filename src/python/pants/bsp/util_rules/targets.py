@@ -68,7 +68,7 @@ _FS = TypeVar("_FS", bound=FieldSet)
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPBuildTargetsMetadataRequest(Generic[_FS]):
     """Hook to allow language backends to provide metadata for BSP build targets."""
 
@@ -82,7 +82,7 @@ class BSPBuildTargetsMetadataRequest(Generic[_FS]):
     field_sets: tuple[_FS, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPBuildTargetsMetadataResult:
     """Response type for a BSPBuildTargetsMetadataRequest."""
 
@@ -93,7 +93,7 @@ class BSPBuildTargetsMetadataResult:
     digest: Digest = EMPTY_DIGEST
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPTargetDefinition:
     display_name: str | None
     base_directory: str | None
@@ -101,7 +101,7 @@ class BSPTargetDefinition:
     resolve_filter: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPBuildTargetInternal:
     name: str
     specs: RawSpecs
@@ -112,7 +112,7 @@ class BSPBuildTargetInternal:
         return BuildTargetIdentifier(f"pants:{self.name}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPBuildTargetSourcesInfo:
     """Source files and roots for a BSP build target.
 
@@ -123,12 +123,12 @@ class BSPBuildTargetSourcesInfo:
     source_roots: frozenset[str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPBuildTargets:
     targets_mapping: FrozenDict[str, BSPBuildTargetInternal]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ParseOneBSPMappingRequest:
     name: str
     definition: BSPTargetDefinition
@@ -297,12 +297,12 @@ class WorkspaceBuildTargetsHandlerMapping(BSPHandlerMapping):
     response_type = WorkspaceBuildTargetsResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateOneBSPBuildTargetRequest:
     bsp_target: BSPBuildTargetInternal
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GenerateOneBSPBuildTargetResult:
     build_target: BuildTarget
     digest: Digest = EMPTY_DIGEST
@@ -462,12 +462,12 @@ class BuildTargetSourcesHandlerMapping(BSPHandlerMapping):
     response_type = SourcesResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaterializeBuildTargetSourcesRequest:
     bsp_target_id: BuildTargetIdentifier
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MaterializeBuildTargetSourcesResult:
     sources_item: SourcesItem
 
@@ -537,7 +537,7 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPDependencyModulesRequest(Generic[_FS]):
     """Hook to allow language backends to provide dependency modules."""
 
@@ -546,7 +546,7 @@ class BSPDependencyModulesRequest(Generic[_FS]):
     field_sets: tuple[_FS, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPDependencyModulesResult:
     modules: tuple[DependencyModule, ...]
     digest: Digest = EMPTY_DIGEST
@@ -558,12 +558,12 @@ class DependencyModulesHandlerMapping(BSPHandlerMapping):
     response_type = DependencyModulesResult
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolveOneDependencyModuleRequest:
     bsp_target_id: BuildTargetIdentifier
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ResolveOneDependencyModuleResult:
     bsp_target_id: BuildTargetIdentifier
     modules: tuple[DependencyModule, ...] = ()
@@ -635,7 +635,7 @@ async def bsp_dependency_modules(
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPCompileRequest(Generic[_FS]):
     """Hook to allow language backends to compile targets."""
 
@@ -646,7 +646,7 @@ class BSPCompileRequest(Generic[_FS]):
     task_id: TaskId
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPCompileResult:
     """Result of compilation of a target capable of target compilation."""
 
@@ -665,7 +665,7 @@ class BSPCompileResult:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPResourcesRequest(Generic[_FS]):
     """Hook to allow language backends to provide resources for targets."""
 
@@ -675,7 +675,7 @@ class BSPResourcesRequest(Generic[_FS]):
     field_sets: tuple[_FS, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class BSPResourcesResult:
     """Resources for a target."""
 

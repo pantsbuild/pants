@@ -40,7 +40,7 @@ class DetailLevel(Enum):
     all = "all"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PathPattern:
     name: str
     pattern: str
@@ -48,14 +48,14 @@ class PathPattern:
     content_encoding: str = "utf8"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ContentPattern:
     name: str
     pattern: str
     inverted: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ValidationConfig:
     path_patterns: tuple[PathPattern, ...]
     content_patterns: tuple[ContentPattern, ...]
@@ -135,7 +135,7 @@ class RegexLintSubsystem(Subsystem):
         return MultiMatcher(ValidationConfig.from_dict(self._config)) if self._config else None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RegexMatchResult:
     """The result of running regex matches on a source file."""
 

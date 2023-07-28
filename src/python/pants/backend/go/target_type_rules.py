@@ -67,7 +67,7 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoImportPathMappingRequest(EngineAwareParameter):
     go_mod_address: Address
 
@@ -203,7 +203,7 @@ async def map_import_paths_to_packages(
     return module_import_path_mappings.modules[request.go_mod_address]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoPackageDependenciesInferenceFieldSet(FieldSet):
     required_fields = (GoPackageSourcesField,)
 
@@ -278,7 +278,7 @@ async def infer_go_dependencies(
     return InferredDependencies(inferred_dependencies)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GoThirdPartyPackageInferenceFieldSet(FieldSet):
     required_fields = (GoThirdPartyPackageDependenciesField, GoImportPathField)
 

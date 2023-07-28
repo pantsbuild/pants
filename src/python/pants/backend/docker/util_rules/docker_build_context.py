@@ -89,13 +89,13 @@ async def hydrate_input_sources(request: GenerateDockerContextFiles) -> Generate
     return GeneratedSources(request.protocol_sources)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerBuildContextRequest:
     address: Address
     build_upstream_images: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DockerBuildContext:
     build_args: DockerBuildArgs
     digest: Digest

@@ -7,7 +7,7 @@ import pytest
 
 
 def test_frozen_dataclass_checking() -> None:
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class MissingInitialization:
         x: str
 
@@ -17,7 +17,7 @@ def test_frozen_dataclass_checking() -> None:
     with pytest.raises(AssertionError):
         MissingInitialization()
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class TooMuchInitialized:
         def __init__(self):
             object.__setattr__(self, "x", 1)
@@ -26,7 +26,7 @@ def test_frozen_dataclass_checking() -> None:
         TooMuchInitialized()
 
     # Also make sure it works with slots
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, slots=True)
     class MissingInitializationWithSlots:
         __slots__ = ("x",)
         x: str

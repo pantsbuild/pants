@@ -68,7 +68,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JSCoverageData(CoverageData):
     snapshot: Snapshot
     addresses: tuple[Address, ...]
@@ -81,7 +81,7 @@ class JSCoverageDataCollection(CoverageDataCollection[JSCoverageData]):
     element_type = JSCoverageData
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JSTestFieldSet(TestFieldSet):
     required_fields = (JSTestSourceField,)
 
@@ -99,7 +99,7 @@ class JSTestRequest(TestRequest):
     partitioner_type = PartitionerType.CUSTOM
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestMetadata:
     extra_env_vars: tuple[str, ...]
     owning_target: Target

@@ -229,7 +229,7 @@ def test_invalid_get_dict_value_not_type() -> None:
         collect_awaitables(rule)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Request:
     arg1: str
     arg2: float

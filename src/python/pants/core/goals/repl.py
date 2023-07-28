@@ -25,7 +25,7 @@ from pants.util.strutil import softwrap
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ReplImplementation(ABC):
     """A REPL implementation for a specific language or runtime.
 
@@ -67,7 +67,7 @@ class Repl(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ReplRequest:
     digest: Digest
     args: Tuple[str, ...]

@@ -20,7 +20,7 @@ from pants.engine.internals.native_engine import PyThreadLocals
 from pants.testutil.rule_runner import RuleRunner
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PipesForTest:
     server_reader: BinaryIO
     server_writer: BinaryIO
