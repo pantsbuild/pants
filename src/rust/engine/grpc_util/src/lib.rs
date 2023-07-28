@@ -266,6 +266,7 @@ mod tests {
       None,
       &mut headers,
     )
+    .await
     .unwrap();
 
     let channel = Channel::balance_list(vec![endpoint].into_iter());
