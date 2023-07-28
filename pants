@@ -7,7 +7,7 @@
 # The script defaults to running with either Python 3.7 or Python 3.8. To use another Python version,
 # prefix the script with `PY=python3.8`.
 
-set -eo pipefail
+set -eox pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 

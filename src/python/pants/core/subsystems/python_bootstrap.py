@@ -30,7 +30,7 @@ from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
-_PBS_URL_TEMPLATE = "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.9.16+20230116-{}-install_only.tar.gz"
+_PBS_URL_TEMPLATE = "https://github.com/indygreg/python-build-standalone/releases/download/20230726/cpython-3.11.4+20230726-{}-install_only.tar.gz"
 
 
 class PythonBootstrapSubsystem(Subsystem):
@@ -49,23 +49,23 @@ class PythonBootstrapSubsystem(Subsystem):
         default={
             "linux_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-unknown-linux-gnu"),
-                "1ba520c0db431c84305677f56eb9a4254f5097430ed443e92fc8617f8fba973d",
-                23873387,
+                "2e84fc53f4e90e11963281c5c871f593abcb24fc796a50337fa516be99af02fb",
+                25061612,
             ),
             "linux_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-unknown-linux-gnu"),
-                "7ba397787932393e65fc2fb9fcfabf54f2bb6751d5da2b45913cb25b2d493758",
-                26129729,
+                "e26247302bc8e9083a43ce9e8dd94905b40d464745b1603041f7bc9a93c65d05",
+                28658858,
             ),
             "macos_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-apple-darwin"),
-                "d732d212d42315ac27c6da3e0b69636737a8d72086c980daf844344c010cab80",
-                17084463,
+                "cb6d2948384a857321f2aa40fa67744cd9676a330f08b6dad7070bda0b6120a4",
+                17343022,
             ),
             "macos_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-apple-darwin"),
-                "3948384af5e8d4ee7e5ccc648322b99c1c5cf4979954ed5e6b3382c69d6db71e",
-                17059474,
+                "47e1557d93a42585972772e82661047ca5f608293158acb2778dccf120eabb00",
+                17677396,
             ),
         },
         help=softwrap(
@@ -136,13 +136,13 @@ class PythonBootstrapSubsystem(Subsystem):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PythonBootstrap:
     interpreter_names: tuple[str, ...]
     interpreter_search_paths: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _ExpandInterpreterSearchPathsRequest:
     interpreter_search_paths: Collection[str]
     env_tgt: EnvironmentTarget

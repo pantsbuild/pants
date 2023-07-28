@@ -41,7 +41,7 @@ backend_packages.add = [
   "internal_plugins.test_lockfile_fixtures",
 ]
 plugins = [
-  "hdrhistogram", # For use with `--stats-log`.
+  # "hdrhistogram", # For use with `--stats-log`.
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -141,7 +141,7 @@ venv_use_symlinks = true
 # + src/python/pants/testutil:testutil_wheel
 # And update the PythonBuildStandalone version/URL:
 # + src/python/pants/core/subsystems/python_bootstrap.py
-interpreter_constraints = ["==3.9.*"]
+interpreter_constraints = ["==3.11.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
@@ -197,7 +197,7 @@ requirements = ["//3rdparty/python:mypy"]
 
 
 [coverage-py]
-interpreter_constraints = ["==3.9.*"]
+interpreter_constraints = ["==3.11.*"]
 
 [preamble]
 template_by_globs = "@build-support/preambles/config.yaml"
