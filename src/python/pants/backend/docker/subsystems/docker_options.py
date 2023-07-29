@@ -191,6 +191,10 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    build_no_cache = BoolOption(
+        default=False,
+        help="Do not use the Docker cache when building images.",
+    )
     build_verbose = BoolOption(
         default=False,
         help="Whether to log the Docker output to the console. If false, only the image ID is logged.",
