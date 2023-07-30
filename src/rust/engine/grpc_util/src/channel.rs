@@ -3,7 +3,7 @@
 
 use std::task::{Context, Poll};
 
-use http::{HeaderMap, Request, Response, Uri};
+use http::{Request, Response, Uri};
 use hyper::client::{HttpConnector, ResponseFuture};
 use hyper_rustls::HttpsConnector;
 use rustls::ClientConfig;
@@ -31,14 +31,12 @@ pub enum Client {
 pub struct Channel {
   client: Client,
   uri: Uri,
-  headers: HeaderMap,
 }
 
 impl Channel {
   pub async fn new(
     tls_config: Option<&ClientConfig>,
     uri: Uri,
-    headers: HeaderMap,
   ) -> Result<Self, Box<dyn std::error::Error>> {
     let client = match tls_config {
       None => {
@@ -60,11 +58,7 @@ impl Channel {
       }
     };
 
-    Ok(Self {
-      client,
-      uri,
-      headers,
-    })
+    Ok(Self { client, uri })
   }
 }
 
@@ -86,10 +80,6 @@ impl Service<Request<BoxBody>> for Channel {
       .unwrap();
     *req.uri_mut() = uri;
 
-    for (key, value) in &self.headers {
-      req.headers_mut().insert(key, value.clone());
-    }
-
     match &self.client {
       Client::Plain(client) => client.request(req),
       Client::Tls(client) => client.request(req),
@@ -105,7 +95,7 @@ mod tests {
 
   use axum::{routing::get, Router};
   use axum_server::tls_rustls::RustlsConfig;
-  use http::{HeaderMap, Request, Uri};
+  use http::{Request, Uri};
   use rustls::ClientConfig;
   use tower::ServiceExt;
   use tower_service::Service;
@@ -135,7 +125,7 @@ mod tests {
 
     let uri = Uri::try_from(format!("http://{}", addr.to_string())).unwrap();
 
-    let mut channel = Channel::new(None, uri, HeaderMap::new()).await.unwrap();
+    let mut channel = Channel::new(None, uri).await.unwrap();
 
     let request = Request::builder()
       .uri(format!("http://{}", addr))
@@ -179,9 +169,7 @@ mod tests {
       .with_custom_certificate_verifier(Arc::new(NoVerifier))
       .with_no_client_auth();
 
-    let mut channel = Channel::new(Some(&tls_config), uri, HeaderMap::new())
-      .await
-      .unwrap();
+    let mut channel = Channel::new(Some(&tls_config), uri).await.unwrap();
 
     let request = Request::builder()
       .uri(format!("https://{}", addr))

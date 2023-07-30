@@ -98,11 +98,9 @@ lazy_static! {
 pub async fn create_channel(
   addr: &str,
   tls_config: Option<&ClientConfig>,
-  headers: &BTreeMap<String, String>,
 ) -> Result<Channel, String> {
   let uri = Uri::try_from(addr).map_err(|err| format!("invalid address: {err}"))?;
-  let headers = headers_to_http_header_map(headers)?;
-  Channel::new(tls_config, uri, headers)
+  Channel::new(tls_config, uri)
     .await
     .map_err(|err| format!("gRPC connection error: {err}"))
 }
@@ -190,6 +188,7 @@ mod tests {
   use tonic::{Request, Response, Status};
 
   use crate::hyper_util::AddrIncomingWithStream;
+  use crate::{headers_to_http_header_map, layered_service};
 
   #[tokio::test]
   async fn user_agent_is_set_correctly() {
@@ -238,21 +237,21 @@ mod tests {
         .unwrap();
     });
 
-    let mut headers = {
+    let headers = {
       let mut h = BTreeMap::new();
       h.insert("user-agent".to_owned(), EXPECTED_USER_AGENT.to_owned());
       h
     };
 
-    let endpoint = super::create_channel(
-      &format!("http://127.0.0.1:{}", local_addr.port()),
-      None,
-      &mut headers,
-    )
-    .await
-    .unwrap();
+    let headers = headers_to_http_header_map(&headers).unwrap();
 
-    let mut client = gen::test_client::TestClient::new(endpoint);
+    let channel = super::create_channel(&format!("http://127.0.0.1:{}", local_addr.port()), None)
+      .await
+      .unwrap();
+
+    let client = layered_service(channel, 1, headers, None);
+
+    let mut client = gen::test_client::TestClient::new(client);
     client.call(gen::Input {}).await.expect("success");
   }
 }

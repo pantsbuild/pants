@@ -181,14 +181,12 @@ impl CommandRunner {
       None
     };
 
-    let execution_headers = headers;
     let execution_endpoint = grpc_util::create_channel(
       execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
-      &execution_headers,
     )
     .await?;
-    let execution_http_headers = headers_to_http_header_map(&execution_headers)?;
+    let execution_http_headers = headers_to_http_header_map(&headers)?;
     let execution_channel = layered_service(
       execution_endpoint,
       execution_concurrency_limit,

@@ -41,8 +41,7 @@ impl Provider {
     };
 
     let channel =
-      grpc_util::create_channel(&action_cache_address, tls_client_config.as_ref(), &headers)
-        .await?;
+      grpc_util::create_channel(&action_cache_address, tls_client_config.as_ref()).await?;
     let http_headers = headers_to_http_header_map(&headers)?;
     let channel = layered_service(
       channel,
