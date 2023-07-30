@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import NoReturn
@@ -24,12 +25,15 @@ def die(message: str) -> NoReturn:
 
 
 def green(message: str) -> None:
-    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}")
+    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}", file=sys.stder)
 
 
 def banner(message: str) -> None:
     minutes, seconds = elapsed_time()
-    print(f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}")
+    print(
+        f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}",
+        file=sys.stderr,
+    )
 
 
 def elapsed_time() -> tuple[int, int]:
