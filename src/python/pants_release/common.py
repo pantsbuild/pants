@@ -25,7 +25,7 @@ def die(message: str) -> NoReturn:
 
 
 def green(message: str) -> None:
-    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}", file=sys.stder)
+    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}", file=sys.stderr)
 
 
 def banner(message: str) -> None:
