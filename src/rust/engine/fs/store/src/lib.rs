@@ -373,12 +373,12 @@ impl Store {
   /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
   /// attempt to back-fill its local storage from the remote storage.
   ///
-  pub fn into_with_remote(self, remote_options: RemoteOptions) -> Result<Store, String> {
+  pub async fn into_with_remote(self, remote_options: RemoteOptions) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
-      remote: Some(RemoteStore::new(remote::ByteStore::from_options(
-        remote_options,
-      )?)),
+      remote: Some(RemoteStore::new(
+        remote::ByteStore::from_options(remote_options).await?,
+      )),
       immutable_inputs_base: self.immutable_inputs_base,
     })
   }
