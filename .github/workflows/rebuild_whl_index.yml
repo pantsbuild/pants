@@ -1,0 +1,30 @@
+name: Rebuild Wheel Index
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+concurrency: ${{ github.workflow }}  # Only run one at a time
+jobs:
+  rebuild:
+    name: Gather Prerequisites
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    env:
+      MODE: DEBUG
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Rebuild
+        run: ./pants run src/python/pants_release/rebuild_whl_index.py > s3/index.html
+      - name: Upload to S3
+        run: |
+          ./pants run src/python/pants_release/copy_to_s3.py -- \
+            --src-prefix s3 \
+            --dest-prefix s3://binaries.pantsbuild.org/v2-cheeseshop/simple \
+            --path ""
+        env:
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
