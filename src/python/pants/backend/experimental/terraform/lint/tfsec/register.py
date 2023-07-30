@@ -4,4 +4,4 @@ from pants.backend.terraform.lint.tfsec.rules import rules as tfsec_rules
 
 
 def rules():
-    return [*tfsec_rules()]
+    return tfsec_rules()

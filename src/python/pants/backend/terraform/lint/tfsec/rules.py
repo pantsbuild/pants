@@ -12,6 +12,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
+from pants.util.strutil import pluralize
 
 
 @rule
@@ -42,13 +43,12 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
         *computed_args,
         *tfsec.args,
     ]
-    # raise ValueError(argv)
     process_result = await Get(
         FallibleProcessResult,
         Process(
             argv=argv,
             input_digest=input_digest,
-            description="Run tfsec",
+            description=f"Run tfsec on {pluralize(len(sources.files), 'file')}",
             level=LogLevel.DEBUG,
         ),
     )
