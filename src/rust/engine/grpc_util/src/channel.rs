@@ -12,10 +12,8 @@ use tower_service::Service;
 
 // Inspired by https://github.com/LucioFranco/tonic-openssl/blob/master/example/src/client2.rs.
 
-/// Enumeration representing a generic HTTP/HTTPS Hyper client. It implements the `Service`
-/// expected by Tonic for the underlying communication channel. This strategy is necessary because
-/// Tonic removed the ability to pass in a raw `rustls` configuration, and so Pants must implement
-/// its own connection setup logic to be able to continue to use `rustls` directly.
+/// Enumeration wrapping the HTTP and HTTPS clients so they can be treated equiavlent by
+/// `Channel`.
 #[derive(Clone, Debug)]
 pub enum Client {
   Plain(hyper::Client<HttpConnector, BoxBody>),
@@ -24,6 +22,11 @@ pub enum Client {
 
 /// A communication channel which may either communicate using HTTP or HTTP over TLS. This
 /// `Channel` can be passed directly to Tonic clients as a connector.
+///
+/// `Channel` implements the `Service` expected by Tonic for the underlying communication channel.
+/// This strategy is necessary because Tonic removed the ability to pass in a raw `rustls`
+/// configuration, and so Pants must implement its own connection setup logic to be able to
+/// continue to use `rustls` directly.
 #[derive(Clone, Debug)]
 pub struct Channel {
   client: Client,
@@ -37,11 +40,13 @@ impl Channel {
     uri: Uri,
     headers: HeaderMap,
   ) -> Result<Self, Box<dyn std::error::Error>> {
-    let mut http = HttpConnector::new();
-    http.enforce_http(false);
-
     let client = match tls_config {
-      None => Client::Plain(hyper::Client::builder().http2_only(true).build(http)),
+      None => {
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+
+        Client::Plain(hyper::Client::builder().http2_only(true).build(http))
+      }
       Some(tls_config) => {
         let tls_config = tls_config.to_owned();
 
