@@ -182,7 +182,7 @@ There are several other optional parameters that may be helpful.
 
 The resulting `Pex` object has a `digest: Digest` field containing the built `.pex` file. This digest should be included in the `input_digest` to the `Process` you run.
 
-Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(ProcessResult, PexProcess)`, which will set up the environment properly for your Pex to execute. There is a predefined rule to go from `PexProcess -> Process`, so `Get(ProcessResult, Process)` will cause the engine to run `PexProcess -> Process -> ProcessResult`.
+Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(ProcessResult, PexProcess)`, which will set up the environment properly for your Pex to execute. There is a predefined rule to go from `PexProcess -> Process`, so `Get(ProcessResult, PexProcess)` will cause the engine to run `PexProcess -> Process -> ProcessResult`.
 
 `PexProcess` requires arguments for `pex: Pex`, `argv: Iterable[str]`, and `description: str`. It has several optional parameters that mirror the arguments to `Process`. If you specify `input_digest`, be careful to first use `Get(Digest, MergeDigests)` on the `pex.digest` and any of the other input digests.
 
@@ -203,10 +203,10 @@ Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(Process
 >     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 >
 >     default_main = ConsoleScript("black")
->     
+>
 >     register_interpreter_constraints = True
 >     default_interpreter_constraints = ["CPython>=3.8,<3.9"]
-> 
+>
 >     default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
 >
 >     config = StrOption(
