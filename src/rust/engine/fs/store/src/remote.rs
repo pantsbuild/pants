@@ -104,9 +104,9 @@ impl ByteStore {
     }
   }
 
-  pub fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
+  pub async fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
     let instance_name = options.instance_name.clone();
-    let provider = Arc::new(reapi::Provider::new(options)?);
+    let provider = Arc::new(reapi::Provider::new(options).await?);
     Ok(ByteStore::new(instance_name, provider))
   }
 

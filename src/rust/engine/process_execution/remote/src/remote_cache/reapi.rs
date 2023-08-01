@@ -24,7 +24,7 @@ pub struct Provider {
 }
 
 impl Provider {
-  pub fn new(
+  pub async fn new(
     RemoteCacheProviderOptions {
       instance_name,
       action_cache_address,
@@ -44,7 +44,8 @@ impl Provider {
       &action_cache_address,
       tls_client_config.as_ref(),
       &mut headers,
-    )?;
+    )
+    .await?;
     let http_headers = headers_to_http_header_map(&headers)?;
     let channel = layered_service(
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),

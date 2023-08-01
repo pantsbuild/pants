@@ -136,11 +136,11 @@ impl CommandRunner {
     }
   }
 
-  pub fn from_provider_options(
+  pub async fn from_provider_options(
     runner_options: RemoteCacheRunnerOptions,
     provider_options: RemoteCacheProviderOptions,
   ) -> Result<Self, String> {
-    let provider = Arc::new(reapi::Provider::new(provider_options)?);
+    let provider = Arc::new(reapi::Provider::new(provider_options).await?);
 
     Ok(Self::new(runner_options, provider))
   }

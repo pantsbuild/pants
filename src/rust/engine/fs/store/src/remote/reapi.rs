@@ -66,7 +66,7 @@ impl std::error::Error for ByteStoreError {}
 impl Provider {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
   // `super::LocalOptions`.
-  pub fn new(mut options: RemoteOptions) -> Result<Provider, String> {
+  pub async fn new(mut options: RemoteOptions) -> Result<Provider, String> {
     let tls_client_config = if options.cas_address.starts_with("https://") {
       Some(options.tls_config.try_into()?)
     } else {
@@ -77,7 +77,8 @@ impl Provider {
       &options.cas_address,
       tls_client_config.as_ref(),
       &mut options.headers,
-    )?;
+    )
+    .await?;
     let http_headers = headers_to_http_header_map(&options.headers)?;
     let channel = layered_service(
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),

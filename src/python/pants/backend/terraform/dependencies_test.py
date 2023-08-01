@@ -7,16 +7,16 @@ from typing import Optional
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
-from pants.backend.terraform.goals.deploy_test import (
+from pants.backend.terraform.testutil import (
     StandardDeployment,
-    rule_runner,
+    rule_runner_with_auto_approve,
     standard_deployment,
 )
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.native_engine import Address
 from pants.testutil.rule_runner import RuleRunner
 
-rule_runner = rule_runner
+rule_runner = rule_runner_with_auto_approve
 standard_deployment = standard_deployment
 
 

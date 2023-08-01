@@ -94,7 +94,7 @@ lazy_static! {
 }
 
 /// Create a Tonic `Endpoint` from a string containing a schema and IP address/name.
-pub fn create_endpoint(
+pub async fn create_endpoint(
   addr: &str,
   tls_config_opt: Option<&ClientConfig>,
   headers: &mut BTreeMap<String, String>,
@@ -266,6 +266,7 @@ mod tests {
       None,
       &mut headers,
     )
+    .await
     .unwrap();
 
     let channel = Channel::balance_list(vec![endpoint].into_iter());
