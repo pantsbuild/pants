@@ -107,7 +107,7 @@ class Shellcheck(ExternalTool):
         return f"./shellcheck-{self.version}/shellcheck"
 ```
 
-You must define the class properties `default_version` and `default_known_version`. `default_known_version` is a list of pipe-separated strings in the form `version|platform|sha256|length`. Use the values you found earlier by running `shasum` and `wc` for sha256 and length, respectively. `platform` should be one of `linux_arm64`, `linux_x86_64`, `macos_arm64`, and `macos_x86_64`.
+You must define the class properties `default_version` and `default_known_versions`. `default_known_versions` is a list of pipe-separated strings in the form `version|platform|sha256|length`. Use the values you found earlier by running `shasum` and `wc` for sha256 and length, respectively. `platform` should be one of `linux_arm64`, `linux_x86_64`, `macos_arm64`, and `macos_x86_64`.
 
 You must also define the methods `generate_url`, which is the URL to make a GET request to download the file, and `generate_exe`, which is the relative path to the binary in the downloaded digest. Both methods take `plat: Platform` as a parameter.
 
