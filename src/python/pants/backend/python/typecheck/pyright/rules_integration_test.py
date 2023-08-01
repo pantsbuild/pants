@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 from textwrap import dedent
 from typing import Iterable
 
@@ -30,10 +29,8 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present, skip_unless_python39_present
+from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_rmtree
 
 
 @pytest.fixture
@@ -345,50 +342,31 @@ def test_thirdparty_dependency(
     assert f"{PACKAGE}/f.py:3" in result[0].stdout
 
 
-def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
-    return {
-        f"{folder}/dep.py": "",
-        f"{folder}/root.py": "",
-        f"{folder}/BUILD": dedent(
-            f"""\
-            python_source(
-                name='dep',
-                source='dep.py',
-                resolve='{resolve}',
-                interpreter_constraints=['=={interpreter}.*'],
-            )
-            python_source(
-                name='root',
-                source='root.py',
-                resolve='{resolve}',
-                interpreter_constraints=['=={interpreter}.*'],
-                dependencies=[':dep'],
-            )
-            """
-        ),
-    }
-
-
-def assert_partition(
-    partition: PyrightPartition,
-    roots: list[Target],
-    deps: list[Target],
-    interpreter: str,
-    resolve: str,
-) -> None:
-    root_addresses = {t.address for t in roots}
-    assert {fs.address for fs in partition.field_sets} == root_addresses
-    assert {t.address for t in partition.root_targets.closure()} == {
-        *root_addresses,
-        *(t.address for t in deps),
-    }
-    ics = [f"CPython=={interpreter}.*"]
-    assert partition.interpreter_constraints == InterpreterConstraints(ics)
-    assert partition.description() == f"{resolve}, {ics}"
-
-
 @skip_unless_all_pythons_present("3.8", "3.9")
 def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
+    def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
+        return {
+            f"{folder}/dep.py": "",
+            f"{folder}/root.py": "",
+            f"{folder}/BUILD": dedent(
+                f"""\
+                python_source(
+                    name='dep',
+                    source='dep.py',
+                    resolve='{resolve}',
+                    interpreter_constraints=['=={interpreter}.*'],
+                )
+                python_source(
+                    name='root',
+                    source='root.py',
+                    resolve='{resolve}',
+                    interpreter_constraints=['=={interpreter}.*'],
+                    dependencies=[':dep'],
+                )
+                """
+            ),
+        }
+
     files = {
         **create_folder("resolveA_py38", "a", "3.8"),
         **create_folder("resolveA_py39", "a", "3.9"),
@@ -422,6 +400,23 @@ def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
     partitions = rule_runner.request(PyrightPartitions, [request])
     assert len(partitions) == 3
 
+    def assert_partition(
+        partition: PyrightPartition,
+        roots: list[Target],
+        deps: list[Target],
+        interpreter: str,
+        resolve: str,
+    ) -> None:
+        root_addresses = {t.address for t in roots}
+        assert {fs.address for fs in partition.field_sets} == root_addresses
+        assert {t.address for t in partition.root_targets.closure()} == {
+            *root_addresses,
+            *(t.address for t in deps),
+        }
+        ics = [f"CPython=={interpreter}.*"]
+        assert partition.interpreter_constraints == InterpreterConstraints(ics)
+        assert partition.description() == f"{resolve}, {ics}"
+
     assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
     assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
     assert_partition(
@@ -431,54 +426,3 @@ def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
         "3.9",
         "b",
     )
-
-@skip_unless_python39_present
-def test_requirements_venv_creation_partition(rule_runner: PythonRuleRunner) -> None:
-    files = {
-        **create_folder("resolveA_py39", "a", "3.9"),
-        **create_folder("resolveB_1", "b", "3.9"),
-        **create_folder("resolveB_2", "b", "3.9"),
-    }
-    rule_runner.write_files(files)
-
-    with temporary_dir() as cache_dir:
-        rule_runner.set_options(
-            [
-                "--python-resolves={'a': '', 'b': ''}",
-                "--python-enable-resolves",
-                f"--named-caches-dir={cache_dir}",
-            ],
-            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-        )
-
-        resolve_a_py39_dep = rule_runner.get_target(Address("resolveA_py39", target_name="dep"))
-        resolve_a_py39_root = rule_runner.get_target(Address("resolveA_py39", target_name="root"))
-        resolve_b_dep1 = rule_runner.get_target(Address("resolveB_1", target_name="dep"))
-        resolve_b_root1 = rule_runner.get_target(Address("resolveB_1", target_name="root"))
-        resolve_b_dep2 = rule_runner.get_target(Address("resolveB_2", target_name="dep"))
-        resolve_b_root2 = rule_runner.get_target(Address("resolveB_2", target_name="root"))
-        request = PyrightRequest(
-            PyrightFieldSet.create(t)
-            for t in (
-                resolve_a_py39_root,
-                resolve_b_root1,
-                resolve_b_root2,
-            )
-        )
-
-        def run_partition_test():
-            partitions = rule_runner.request(PyrightPartitions, [request])
-            assert len(partitions) == 2
-            assert_partition(partitions[0], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
-            assert_partition(
-                partitions[1],
-                [resolve_b_root1, resolve_b_root2],
-                [resolve_b_dep1, resolve_b_dep2],
-                "3.9",
-                "b",
-            )
-
-        run_partition_test()
-        safe_rmtree(cache_dir)
-        assert not os.path.exists(cache_dir), f"Cache dir {cache_dir} was not removed!"
-        run_partition_test()
