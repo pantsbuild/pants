@@ -159,7 +159,7 @@ impl Drop for RunningOperation {
 
 impl CommandRunner {
   /// Construct a new CommandRunner
-  pub fn new(
+  pub async fn new(
     execution_address: &str,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
@@ -186,7 +186,8 @@ impl CommandRunner {
       execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
       &mut execution_headers,
-    )?;
+    )
+    .await?;
     let execution_http_headers = headers_to_http_header_map(&execution_headers)?;
     let execution_channel = layered_service(
       tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),

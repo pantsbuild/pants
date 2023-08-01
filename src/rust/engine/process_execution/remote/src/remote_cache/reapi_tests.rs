@@ -9,7 +9,7 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 use super::{reapi::Provider, ActionCacheProvider, RemoteCacheProviderOptions};
 
-fn new_provider(cas: &StubCAS) -> Provider {
+async fn new_provider(cas: &StubCAS) -> Provider {
   Provider::new(RemoteCacheProviderOptions {
     instance_name: None,
     action_cache_address: cas.address(),
@@ -18,13 +18,14 @@ fn new_provider(cas: &StubCAS) -> Provider {
     concurrency_limit: 256,
     rpc_timeout: Duration::from_secs(2),
   })
+  .await
   .unwrap()
 }
 
 #[tokio::test]
 async fn get_action_result_existing() {
   let cas = StubCAS::empty();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   let action_digest = Digest::of_bytes(b"get_action_cache test");
   let action_result = remexec::ActionResult {
@@ -48,7 +49,7 @@ async fn get_action_result_existing() {
 #[tokio::test]
 async fn get_action_result_missing() {
   let cas = StubCAS::empty();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   let action_digest = Digest::of_bytes(b"update_action_cache test");
 
@@ -63,7 +64,7 @@ async fn get_action_result_missing() {
 #[tokio::test]
 async fn get_action_result_grpc_error() {
   let cas = StubCAS::builder().ac_always_errors().build();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   let action_digest = Digest::of_bytes(b"get_action_result_grpc_error test");
 
@@ -81,7 +82,7 @@ async fn get_action_result_grpc_error() {
 #[tokio::test]
 async fn update_action_cache() {
   let cas = StubCAS::empty();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   let action_digest = Digest::of_bytes(b"update_action_cache test");
   let action_result = remexec::ActionResult {
@@ -103,7 +104,7 @@ async fn update_action_cache() {
 #[tokio::test]
 async fn update_action_cache_grpc_error() {
   let cas = StubCAS::builder().ac_always_errors().build();
-  let provider = new_provider(&cas);
+  let provider = new_provider(&cas).await;
 
   let action_digest = Digest::of_bytes(b"update_action_cache_grpc_error test");
   let action_result = remexec::ActionResult {

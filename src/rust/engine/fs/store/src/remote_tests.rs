@@ -39,6 +39,7 @@ async fn smoke_test_from_options_reapi_provider() {
     capabilities_cell_opt: None,
     batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
   })
+  .await
   .unwrap();
 
   let mut missing_set = HashSet::new();

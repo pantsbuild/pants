@@ -97,11 +97,11 @@ struct StoreSetup {
 }
 
 impl StoreSetup {
-  pub fn new() -> Self {
-    Self::new_with_stub_cas(StubCAS::builder().build())
+  pub async fn new() -> Self {
+    Self::new_with_stub_cas(StubCAS::builder().build()).await
   }
 
-  pub fn new_with_stub_cas(cas: StubCAS) -> Self {
+  pub async fn new_with_stub_cas(cas: StubCAS) -> Self {
     let executor = task_executor::Executor::new();
     let store_temp_dir = TempDir::new().unwrap();
     let store_dir = store_temp_dir.path().join("store_dir");
@@ -119,6 +119,7 @@ impl StoreSetup {
         capabilities_cell_opt: None,
         batch_api_size_limit: 4 * 1024 * 1024,
       })
+      .await
       .unwrap();
     Self {
       store,
@@ -142,7 +143,7 @@ fn create_local_runner(
   (local_runner, call_counter)
 }
 
-fn create_cached_runner(
+async fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
   store_setup: &StoreSetup,
   cache_content_behavior: CacheContentBehavior,
@@ -170,6 +171,7 @@ fn create_cached_runner(
         rpc_timeout: CACHE_READ_TIMEOUT,
       },
     )
+    .await
     .expect("caching command runner"),
   )
 }
@@ -195,9 +197,10 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
 #[tokio::test]
 async fn cache_read_success() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
 
   let (process, action_digest) = create_process(&store_setup).await;
   store_setup
@@ -219,9 +222,10 @@ async fn cache_read_success() {
 #[tokio::test]
 async fn cache_read_skipped_on_action_cache_errors() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
 
   let (process, action_digest) = create_process(&store_setup).await;
   store_setup
@@ -256,9 +260,10 @@ async fn cache_read_skipped_on_action_cache_errors() {
 #[tokio::test]
 async fn cache_read_skipped_on_missing_digest() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Fetch);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Fetch).await;
 
   // Claim that the process has a non-empty and not-persisted stdout digest.
   let (process, action_digest) = create_process(&store_setup).await;
@@ -301,9 +306,10 @@ async fn cache_read_eager_fetch() {
     cache_content_behavior: CacheContentBehavior,
     workunit: &mut RunningWorkunit,
   ) -> (i32, usize) {
-    let store_setup = StoreSetup::new();
+    let store_setup = StoreSetup::new().await;
     let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
-    let cache_runner = create_cached_runner(local_runner, &store_setup, cache_content_behavior);
+    let cache_runner =
+      create_cached_runner(local_runner, &store_setup, cache_content_behavior).await;
 
     let (process, action_digest) = create_process(&store_setup).await;
     store_setup.cas.action_cache.insert(
@@ -351,10 +357,11 @@ async fn cache_read_speculation() {
       StubCAS::builder()
         .ac_read_delay(Duration::from_millis(remote_delay_ms))
         .build(),
-    );
+    )
+    .await;
     let (local_runner, local_runner_call_counter) = create_local_runner(1, local_delay_ms);
     let cache_runner =
-      create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+      create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
 
     let (process, action_digest) = create_process(&store_setup).await;
     let process = process.cache_scope(cache_scope);
@@ -488,9 +495,10 @@ async fn cache_read_speculation() {
 #[tokio::test]
 async fn cache_write_success() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
   let (process, action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -522,9 +530,10 @@ async fn cache_write_success() {
 #[tokio::test]
 async fn cache_write_not_for_failures() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
   let (process, _action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -550,9 +559,11 @@ async fn cache_write_does_not_block() {
     StubCAS::builder()
       .ac_write_delay(Duration::from_millis(100))
       .build(),
-  );
+  )
+  .await;
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
   let (process, action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -760,6 +771,7 @@ async fn make_action_result_basic() {
       rpc_timeout: CACHE_READ_TIMEOUT,
     },
   )
+  .await
   .expect("caching command runner");
 
   let command = remexec::Command {
