@@ -252,19 +252,21 @@ async fn main() {
         );
       }
 
-      local_only_store.into_with_remote(RemoteOptions {
-        cas_address: cas_server.to_owned(),
-        instance_name: args.remote_instance_name.clone(),
-        tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs),
-        headers,
-        chunk_size_bytes: args.upload_chunk_bytes,
-        rpc_timeout: Duration::from_secs(30),
-        rpc_retries: args.store_rpc_retries,
-        rpc_concurrency_limit: args.store_rpc_concurrency,
+      local_only_store
+        .into_with_remote(RemoteOptions {
+          cas_address: cas_server.to_owned(),
+          instance_name: args.remote_instance_name.clone(),
+          tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs),
+          headers,
+          chunk_size_bytes: args.upload_chunk_bytes,
+          rpc_timeout: Duration::from_secs(30),
+          rpc_retries: args.store_rpc_retries,
+          rpc_concurrency_limit: args.store_rpc_concurrency,
 
-        capabilities_cell_opt: None,
-        batch_api_size_limit: args.store_batch_api_size_limit,
-      })
+          capabilities_cell_opt: None,
+          batch_api_size_limit: args.store_batch_api_size_limit,
+        })
+        .await
     }
     (None, None) => Ok(local_only_store),
     _ => panic!("Can't specify --server without --cas-server"),
@@ -313,6 +315,7 @@ async fn main() {
         args.execution_rpc_concurrency,
         None,
       )
+      .await
       .expect("Failed to make remote command runner");
 
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
@@ -341,6 +344,7 @@ async fn main() {
               rpc_timeout: Duration::from_secs(2),
             },
           )
+          .await
           .expect("Failed to make remote cache command runner"),
         )
       };
