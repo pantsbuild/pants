@@ -1206,6 +1206,17 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         """
                     ),
                 },
+                {
+                    "name": "Trigger cheeseshop build",
+                    "env": {
+                        "GH_TOKEN": "${{ secrets.WORKER_PANTS_CHEESESHOP_TRIGGER_PAT }}",
+                    },
+                    "run": dedent(
+                        """\
+                        gh api "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -X POST
+                        """
+                    ),
+                },
             ],
         },
     }
