@@ -16,7 +16,7 @@ Pants installs, orchestrates and runs dozens of standard underlying tools - comp
 
 Pants is designed to be easy to adopt, use, and extend. It doesn't require you to refactor your codebase or to create and maintain massive amounts of build metadata. You invoke it directly on source files and directories, so it doesn't require users to adopt a new conceptual model.
 
-Pants is currently focused on Python, Go, Java, Scala, Shell, and Docker, with more languages and frameworks coming soon. [The Pants community](doc:the-pants-community) is friendly and helpful.
+Pants is currently focused on Python, Go, Java, Scala, Shell, and Docker, with more languages and frameworks coming soon. [The Pants community](doc:the-pants-community) is friendly and helpful and welcomes involvement of anyone who is interested in creating modern software development tooling.
 
 Who is Pants for?
 =================
