@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from textwrap import dedent
-from typing import Iterable, Mapping
+from typing import Iterable
 
 import pytest
 
@@ -19,7 +19,6 @@ from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.target_types import ScalaJunitTestsGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
-from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files
@@ -33,11 +32,12 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.test.junit import JunitTestFieldSet, JunitTestRequest
+from pants.jvm.test.junit import JunitTestRequest
 from pants.jvm.test.junit import rules as junit_rules
+from pants.jvm.test.testutil import run_junit_test
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 # TODO(12812): Switch tests to using parsed junit.xml results instead of scanning stdout strings.
 
@@ -622,24 +622,3 @@ def test_vintage_extra_env_vars(
         },
     )
     assert result.exit_code == 0
-
-
-def run_junit_test(
-    rule_runner: RuleRunner,
-    target_name: str,
-    relative_file_path: str,
-    *,
-    extra_args: Iterable[str] | None = None,
-    env: Mapping[str, str] | None = None,
-) -> TestResult:
-    args = [
-        "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
-        *(extra_args or ()),
-    ]
-    rule_runner.set_options(args, env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
-    )
-    return rule_runner.request(
-        TestResult, [JunitTestRequest.Batch("", (JunitTestFieldSet.create(tgt),), None)]
-    )
