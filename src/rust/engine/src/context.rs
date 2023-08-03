@@ -33,10 +33,12 @@ use process_execution::{
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
-use remote::remote_cache::RemoteCacheWarningsBehavior;
+use remote::remote_cache::{
+  RemoteCacheProviderOptions, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
+};
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, Store};
+use store::{self, ImmutableInputs, RemoteOptions, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
@@ -142,7 +144,7 @@ impl From<&LocalStoreOptions> for store::LocalOptions {
 }
 
 impl Core {
-  fn make_store(
+  async fn make_store(
     executor: &Executor,
     local_store_options: &LocalStoreOptions,
     local_execution_root_dir: &Path,
@@ -159,21 +161,24 @@ impl Core {
       local_store_options.into(),
     )?;
     if enable_remote {
-      let remote_store_address = remote_store_address
+      let cas_address = remote_store_address
         .as_ref()
-        .ok_or("Remote store required, but none configured")?;
-      local_only.into_with_remote(
-        remote_store_address,
-        remoting_opts.instance_name.clone(),
-        grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
-        remoting_opts.store_headers.clone(),
-        remoting_opts.store_chunk_bytes,
-        remoting_opts.store_rpc_timeout,
-        remoting_opts.store_rpc_retries,
-        remoting_opts.store_rpc_concurrency,
-        capabilities_cell_opt,
-        remoting_opts.store_batch_api_size_limit,
-      )
+        .ok_or("Remote store required, but none configured")?
+        .clone();
+      local_only
+        .into_with_remote(RemoteOptions {
+          cas_address,
+          instance_name: remoting_opts.instance_name.clone(),
+          tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
+          headers: remoting_opts.store_headers.clone(),
+          chunk_size_bytes: remoting_opts.store_chunk_bytes,
+          rpc_timeout: remoting_opts.store_rpc_timeout,
+          rpc_retries: remoting_opts.store_rpc_retries,
+          rpc_concurrency_limit: remoting_opts.store_rpc_concurrency,
+          capabilities_cell_opt,
+          batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
+        })
+        .await
     } else {
       Ok(local_only)
     }
@@ -183,7 +188,7 @@ impl Core {
   /// Make the innermost / leaf runner. Will have concurrency control and process pooling, but
   /// will not have caching.
   ///
-  fn make_leaf_runner(
+  async fn make_leaf_runner(
     full_store: &Store,
     local_runner_store: &Store,
     executor: &Executor,
@@ -266,21 +271,24 @@ impl Core {
       // We always create the remote execution runner if it is globally enabled, but it may not
       // actually be used thanks to the `SwitchedCommandRunner` below. Only one of local execution
       // or remote execution will be used for any particular process.
-      let remote_execution_runner = Box::new(remote::remote::CommandRunner::new(
-        // We unwrap because global_options.py will have already validated this is defined.
-        remoting_opts.execution_address.as_ref().unwrap(),
-        instance_name,
-        process_cache_namespace,
-        remoting_opts.append_only_caches_base_path.clone(),
-        root_ca_certs.clone(),
-        remoting_opts.execution_headers.clone(),
-        full_store.clone(),
-        executor.clone(),
-        remoting_opts.execution_overall_deadline,
-        Duration::from_millis(100),
-        remoting_opts.execution_rpc_concurrency,
-        capabilities_cell_opt,
-      )?);
+      let remote_execution_runner = Box::new(
+        remote::remote::CommandRunner::new(
+          // We unwrap because global_options.py will have already validated this is defined.
+          remoting_opts.execution_address.as_ref().unwrap(),
+          instance_name,
+          process_cache_namespace,
+          remoting_opts.append_only_caches_base_path.clone(),
+          root_ca_certs.clone(),
+          remoting_opts.execution_headers.clone(),
+          full_store.clone(),
+          executor.clone(),
+          remoting_opts.execution_overall_deadline,
+          Duration::from_millis(100),
+          remoting_opts.execution_rpc_concurrency,
+          capabilities_cell_opt,
+        )
+        .await?,
+      );
       let remote_execution_runner = Box::new(bounded::CommandRunner::new(
         executor,
         remote_execution_runner,
@@ -307,7 +315,7 @@ impl Core {
   /// The given cache read/write flags override the relevant cache flags to allow this method
   /// to be called with all cache reads disabled, regardless of their configured values.
   ///
-  fn make_cached_runner(
+  async fn make_cached_runner(
     mut runner: Arc<dyn CommandRunner>,
     full_store: &Store,
     executor: &Executor,
@@ -322,23 +330,31 @@ impl Core {
     local_cache_write: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
     if remote_cache_read || remote_cache_write {
-      runner = Arc::new(remote_cache::CommandRunner::new(
-        runner,
-        instance_name,
-        process_cache_namespace.clone(),
-        executor.clone(),
-        full_store.clone(),
-        remoting_opts.store_address.as_ref().unwrap(),
-        root_ca_certs.clone(),
-        remoting_opts.store_headers.clone(),
-        remote_cache_read,
-        remote_cache_write,
-        remoting_opts.cache_warnings_behavior,
-        remoting_opts.cache_content_behavior,
-        remoting_opts.cache_rpc_concurrency,
-        remoting_opts.cache_rpc_timeout,
-        remoting_opts.append_only_caches_base_path.clone(),
-      )?);
+      runner = Arc::new(
+        remote_cache::CommandRunner::from_provider_options(
+          RemoteCacheRunnerOptions {
+            inner: runner,
+            instance_name: instance_name.clone(),
+            process_cache_namespace: process_cache_namespace.clone(),
+            executor: executor.clone(),
+            store: full_store.clone(),
+            cache_read: remote_cache_read,
+            cache_write: remote_cache_write,
+            warnings_behavior: remoting_opts.cache_warnings_behavior,
+            cache_content_behavior: remoting_opts.cache_content_behavior,
+            append_only_caches_base_path: remoting_opts.append_only_caches_base_path.clone(),
+          },
+          RemoteCacheProviderOptions {
+            instance_name,
+            action_cache_address: remoting_opts.store_address.clone().unwrap(),
+            root_ca_certs: root_ca_certs.clone(),
+            headers: remoting_opts.store_headers.clone(),
+            concurrency_limit: remoting_opts.cache_rpc_concurrency,
+            rpc_timeout: remoting_opts.cache_rpc_timeout,
+          },
+        )
+        .await?,
+      );
     }
 
     if local_cache_read || local_cache_write {
@@ -358,7 +374,7 @@ impl Core {
   ///
   /// Creates the stack of CommandRunners for the purposes of backtracking.
   ///
-  fn make_command_runners(
+  async fn make_command_runners(
     full_store: &Store,
     local_runner_store: &Store,
     executor: &Executor,
@@ -386,14 +402,16 @@ impl Core {
       exec_strategy_opts,
       remoting_opts,
       capabilities_cell_opt,
-    )?;
+    )
+    .await?;
 
     let remote_cache_read = exec_strategy_opts.remote_cache_read;
     let remote_cache_write = exec_strategy_opts.remote_cache_write;
     let local_cache_read_write = exec_strategy_opts.local_cache;
 
-    let make_cached_runner = |should_cache_read: bool| -> Result<Arc<dyn CommandRunner>, String> {
-      Self::make_cached_runner(
+    // The first attempt is always with all caches.
+    let mut runners = {
+      let cached_runner = Self::make_cached_runner(
         leaf_runner.clone(),
         full_store,
         executor,
@@ -402,19 +420,35 @@ impl Core {
         process_cache_namespace.clone(),
         root_ca_certs,
         remoting_opts,
-        remote_cache_read && should_cache_read,
+        remote_cache_read,
         remote_cache_write,
-        local_cache_read_write && should_cache_read,
+        local_cache_read_write,
         local_cache_read_write,
       )
-    };
+      .await?;
 
-    // The first attempt is always with all caches.
-    let mut runners = vec![make_cached_runner(true)?];
+      vec![cached_runner]
+    };
     // If any cache is both readable and writable, we additionally add a backtracking attempt which
     // disables all cache reads.
     if (remote_cache_read && remote_cache_write) || local_cache_read_write {
-      runners.push(make_cached_runner(false)?);
+      let disabled_cached_runner = Self::make_cached_runner(
+        leaf_runner.clone(),
+        full_store,
+        executor,
+        local_cache,
+        instance_name.clone(),
+        process_cache_namespace.clone(),
+        root_ca_certs,
+        remoting_opts,
+        false,
+        remote_cache_write,
+        false,
+        local_cache_read_write,
+      )
+      .await?;
+
+      runners.push(disabled_cached_runner);
     }
 
     Ok(runners)
@@ -453,7 +487,7 @@ impl Core {
     Ok(certs)
   }
 
-  pub fn new(
+  pub async fn new(
     executor: Executor,
     tasks: Tasks,
     types: Types,
@@ -510,6 +544,7 @@ impl Core {
       &root_ca_certs,
       capabilities_cell_opt.clone(),
     )
+    .await
     .map_err(|e| format!("Could not initialize Store: {e:?}"))?;
 
     let local_cache = PersistentCache::new(
@@ -553,7 +588,8 @@ impl Core {
       &exec_strategy_opts,
       &remoting_opts,
       capabilities_cell_opt,
-    )?;
+    )
+    .await?;
     log::debug!("Using {command_runners:?} for process execution.");
 
     let graph = Arc::new(InvalidatableGraph(Graph::new(executor.clone())));

@@ -26,13 +26,13 @@ from xml.etree import ElementTree
 
 import requests
 from packaging.version import Version
-from pants_release.common import banner, die, green
+from pants_release.common import VERSION_PATH, banner, die, green
 from pants_release.git import git, git_rev_parse
 from pants_release.reversion import reversion
 
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
-from pants.util.strutil import softwrap, strip_prefix
+from pants.util.strutil import softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -387,8 +387,7 @@ class _Constants:
             "--date=format:%Y%m%d%H%M",
             self._head_sha,
         )
-        self.pants_version_file = Path("src/python/pants/VERSION")
-        self.pants_stable_version = self.pants_version_file.read_text().strip()
+        self.pants_stable_version = VERSION_PATH.read_text().strip()
 
     @property
     def binary_base_url(self) -> str:
@@ -456,12 +455,12 @@ def get_pgp_program_name() -> str:
 @contextmanager
 def set_pants_version(version: str) -> Iterator[None]:
     """Temporarily rewrite the VERSION file."""
-    original_content = CONSTANTS.pants_version_file.read_text()
-    CONSTANTS.pants_version_file.write_text(version)
+    original_content = VERSION_PATH.read_text()
+    VERSION_PATH.write_text(version)
     try:
         yield
     finally:
-        CONSTANTS.pants_version_file.write_text(original_content)
+        VERSION_PATH.write_text(original_content)
 
 
 def is_cross_platform(wheel_paths: Iterable[Path]) -> bool:
@@ -497,35 +496,6 @@ def create_twine_venv() -> None:
         shutil.rmtree(CONSTANTS.twine_venv_dir)
     bin_dir = create_venv(CONSTANTS.twine_venv_dir)
     subprocess.run([bin_dir / "pip", "install", "--quiet", "twine"], check=True)
-
-
-@contextmanager
-def download_pex_bin() -> Iterator[Path]:
-    """Download PEX and return the path to the binary."""
-    try:
-        pex_version = next(
-            strip_prefix(ln, "pex==").rstrip()
-            for ln in Path("3rdparty/python/requirements.txt").read_text().splitlines()
-            if ln.startswith("pex==")
-        )
-    except (FileNotFoundError, StopIteration) as exc:
-        die(
-            softwrap(
-                f"""
-                Could not find a requirement starting with `pex==` in
-                3rdparty/python/requirements.txt: {repr(exc)}
-                """
-            )
-        )
-
-    with temporary_dir() as tempdir:
-        resp = requests.get(
-            f"https://github.com/pantsbuild/pex/releases/download/v{pex_version}/pex"
-        )
-        resp.raise_for_status()
-        result = Path(tempdir, "pex")
-        result.write_bytes(resp.content)
-        yield result
 
 
 # -----------------------------------------------------------------------------------------------
@@ -708,85 +678,6 @@ def build_fs_util() -> None:
         dest_dir,
     )
     green(f"Built fs_util at {dest_dir / 'fs_util'}.")
-
-
-# TODO: We should be using `./pants package` and `pex_binary` for this...If Pants is lacking in
-#  capabilities, we should improve Pants. When porting, using `runtime_package_dependencies` to do
-#  the validation.
-def build_pex(fetch: bool) -> None:
-    stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
-    if fetch:
-        # TODO: Support macos and linux arm64.
-        extra_pex_args = [
-            "--python-shebang",
-            "/usr/bin/env python",
-            *(f"--platform={plat}-cp-39-cp39" for plat in ("linux_x86_64", "macosx_11.0_x86_64")),
-        ]
-        pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
-        banner(f"Building {pex_name} by fetching wheels.")
-    else:
-        # TODO: Support macos and linux arm64. Will require qualifying the pex name with the arch.
-        major, minor = sys.version_info[:2]
-        extra_pex_args = [
-            f"--interpreter-constraint=CPython=={major}.{minor}.*",
-            f"--python={sys.executable}",
-        ]
-        plat = os.uname()[0].lower()
-        py = f"cp{major}{minor}"
-        pex_name = f"pants.{CONSTANTS.pants_unstable_version}.{plat}-{py}.pex"
-        banner(f"Building {pex_name} by building wheels.")
-
-    if CONSTANTS.deploy_dir.exists():
-        shutil.rmtree(CONSTANTS.deploy_dir)
-    CONSTANTS.deploy_dir.mkdir(parents=True)
-
-    if fetch:
-        fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
-        check_pants_wheels_present(CONSTANTS.deploy_dir)
-        if stable:
-            stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
-            reversion_prebuilt_wheels(str(stable_wheel_dir))
-    else:
-        build_pants_wheels()
-        build_3rdparty_wheels()
-
-    # We need to both run Pex and the Pants PEX we build with it with clean environments since we
-    # ourselves may be running via `./pants run ...` which injects confounding environment variables
-    # like PEX_EXTRA_SYS_PATH, PEX_PATH and PEX_ROOT that need not or should not apply to these
-    # sub-processes.
-    env = {k: v for k, v in os.environ.items() if not k.startswith("PEX_")}
-
-    dest = Path("dist") / pex_name
-    with download_pex_bin() as pex_bin:
-        subprocess.run(
-            [
-                sys.executable,
-                str(pex_bin),
-                "-o",
-                str(dest),
-                "--no-build",
-                "--no-pypi",
-                "--disable-cache",
-                "-f",
-                str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
-                "-f",
-                str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
-                "--no-strip-pex-env",
-                "--console-script=pants",
-                *extra_pex_args,
-                f"pantsbuild.pants=={CONSTANTS.pants_unstable_version}",
-                "--venv",
-            ],
-            env=env,
-            check=True,
-        )
-
-    if stable:
-        stable_dest = CONSTANTS.deploy_dir / "pex" / f"pants.{CONSTANTS.pants_stable_version}.pex"
-        stable_dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.rename(stable_dest)
-        dest = stable_dest
-    green(f"Built {dest}")
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1108,8 +999,6 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
-    subparsers.add_parser("build-local-pex")
-    subparsers.add_parser("build-universal-pex")
     subparsers.add_parser("validate-freshness")
     subparsers.add_parser("list-prebuilt-wheels")
     subparsers.add_parser("check-pants-wheels")
@@ -1128,10 +1017,6 @@ def main() -> None:
         build_all_wheels()
     if args.command == "build-fs-util":
         build_fs_util()
-    if args.command == "build-local-pex":
-        build_pex(fetch=False)
-    if args.command == "build-universal-pex":
-        build_pex(fetch=True)
     if args.command == "validate-freshness":
         prompt_artifact_freshness()
     if args.command == "list-prebuilt-wheels":

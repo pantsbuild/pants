@@ -3,7 +3,7 @@
 
 # This contains all the plumbing in order to get https://github.com/nektos/act working in a sandbox
 # and in `run`.
-# To run `act`, use `pants run build-support/bin/act -- --version` (or whatever args you want).
+# To run `act`, use `pants run 3rdparty/tools/act -- --version` (or whatever args you want).
 
 file(
     name="downloaded-act",

@@ -20,6 +20,8 @@ use workunit_store::{in_workunit, ObservationMetric};
 use crate::StoreError;
 
 mod reapi;
+#[cfg(test)]
+mod reapi_tests;
 
 pub type ByteSource = Arc<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
 
@@ -39,6 +41,21 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
   ) -> Result<HashSet<Digest>, String>;
 
   fn chunk_size_bytes(&self) -> usize;
+}
+
+// TODO: Consider providing `impl Default`, similar to `super::LocalOptions`.
+#[derive(Clone)]
+pub struct RemoteOptions {
+  pub cas_address: String,
+  pub instance_name: Option<String>,
+  pub headers: BTreeMap<String, String>,
+  pub tls_config: grpc_util::tls::Config,
+  pub chunk_size_bytes: usize,
+  pub rpc_timeout: Duration,
+  pub rpc_retries: usize,
+  pub rpc_concurrency_limit: usize,
+  pub capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
+  pub batch_api_size_limit: usize,
 }
 
 #[derive(Clone)]
@@ -77,36 +94,20 @@ impl LoadDestination for Vec<u8> {
 }
 
 impl ByteStore {
-  // TODO: Consider extracting these options to a struct with `impl Default`, similar to
-  // `super::LocalOptions`.
   pub fn new(
-    cas_address: &str,
     instance_name: Option<String>,
-    tls_config: grpc_util::tls::Config,
-    headers: BTreeMap<String, String>,
-    chunk_size_bytes: usize,
-    rpc_timeout: Duration,
-    rpc_retries: usize,
-    rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-    batch_api_size_limit: usize,
-  ) -> Result<ByteStore, String> {
-    let provider = Arc::new(reapi::Provider::new(
-      cas_address,
-      instance_name.clone(),
-      tls_config,
-      headers,
-      chunk_size_bytes,
-      rpc_timeout,
-      rpc_retries,
-      rpc_concurrency_limit,
-      capabilities_cell_opt,
-      batch_api_size_limit,
-    )?);
-    Ok(ByteStore {
+    provider: Arc<dyn ByteStoreProvider + 'static>,
+  ) -> ByteStore {
+    ByteStore {
       instance_name,
       provider,
-    })
+    }
+  }
+
+  pub async fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
+    let instance_name = options.instance_name.clone();
+    let provider = Arc::new(reapi::Provider::new(options).await?);
+    Ok(ByteStore::new(instance_name, provider))
   }
 
   pub(crate) fn chunk_size_bytes(&self) -> usize {
@@ -116,10 +117,10 @@ impl ByteStore {
   pub async fn store_buffered<WriteToBuffer, WriteResult>(
     &self,
     digest: Digest,
-    mut write_to_buffer: WriteToBuffer,
+    write_to_buffer: WriteToBuffer,
   ) -> Result<(), StoreError>
   where
-    WriteToBuffer: FnMut(std::fs::File) -> WriteResult,
+    WriteToBuffer: FnOnce(std::fs::File) -> WriteResult,
     WriteResult: Future<Output = Result<(), StoreError>>,
   {
     let write_buffer = tempfile::tempfile().map_err(|e| {

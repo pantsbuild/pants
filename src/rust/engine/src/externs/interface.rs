@@ -701,22 +701,25 @@ fn scheduler_create(
   let core = py_executor
     .0
     .enter(|| {
-      Core::new(
-        py_executor.0.clone(),
-        tasks,
-        types,
-        intrinsics,
-        build_root,
-        ignore_patterns,
-        use_gitignore,
-        watch_filesystem,
-        local_execution_root_dir,
-        named_caches_dir,
-        ca_certs_path,
-        local_store_options.0.clone(),
-        remoting_options.0.clone(),
-        exec_strategy_opts.0.clone(),
-      )
+      py_executor.0.block_on(async {
+        Core::new(
+          py_executor.0.clone(),
+          tasks,
+          types,
+          intrinsics,
+          build_root,
+          ignore_patterns,
+          use_gitignore,
+          watch_filesystem,
+          local_execution_root_dir,
+          named_caches_dir,
+          ca_certs_path,
+          local_store_options.0.clone(),
+          remoting_options.0.clone(),
+          exec_strategy_opts.0.clone(),
+        )
+        .await
+      })
     })
     .map_err(PyValueError::new_err)?;
   Ok(PyScheduler(Scheduler::new(core)))

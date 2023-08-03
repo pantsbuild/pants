@@ -167,6 +167,9 @@ class PythonRunGoalUseSandboxField(TriBoolField):
         If false, runs of this target with the `run` goal will use the in-repo sources
         directly.
 
+        Note that this field only applies when running a target with the `run` goal. No other goals
+        (such as `test`, if applicable) consult this field.
+
         The former mode is more hermetic, and is closer to building and running the source as it
         were packaged in a `pex_binary`. Additionally, it may be necessary if your sources depend
         transitively on "generated" files which will be materialized in the sandbox in a source

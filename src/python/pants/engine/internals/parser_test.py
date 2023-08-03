@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from textwrap import dedent
 from typing import Any
 
@@ -10,6 +11,7 @@ import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget
+from pants.engine.addresses import Address
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.parser import (
@@ -18,7 +20,7 @@ from pants.engine.internals.parser import (
     Parser,
     _extract_symbol_from_name_error,
 )
-from pants.engine.target import RegisteredTargetTypes
+from pants.engine.target import InvalidFieldException, RegisteredTargetTypes, StringField
 from pants.engine.unions import UnionMembership
 from pants.testutil.pytest_util import no_exception
 from pants.util.docutil import doc_url
@@ -126,6 +128,69 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
     perform_test(test_targs[:2], dym_two)
     dym_many = "Did you mean FAKE5, FAKE4, or FAKE3?\n\n"
     perform_test(test_targs, dym_many)
+
+
+def test_unrecognized_symbol_during_bootstrap_issue_19156(
+    defaults_parser_state: BuildFileDefaultsParserState,
+) -> None:
+    build_file_aliases = BuildFileAliases(
+        objects={"obj": 0},
+        context_aware_object_factories={"caof": lambda parse_context: lambda _: None},
+    )
+    parser = Parser(
+        build_root="",
+        registered_target_types=RegisteredTargetTypes({"tgt": GenericTarget}),
+        union_membership=UnionMembership({}),
+        object_aliases=build_file_aliases,
+        ignore_unrecognized_symbols=True,
+    )
+    prelude_symbols = BuildFilePreludeSymbols.create({"prelude": 0}, ())
+    target_adaptors = parser.parse(
+        "dir/BUILD",
+        "tgt(field=fake(42,a=(), b='c'))",
+        prelude_symbols,
+        EnvironmentVars({}),
+        False,
+        defaults_parser_state,
+        dependents_rules=None,
+        dependencies_rules=None,
+    )
+
+    assert len(target_adaptors) == 1
+    raw_field = target_adaptors[0].kwargs["field"]
+    assert repr(raw_field) == "fake(42, a=(), b='c')"
+
+    class TestField(StringField):
+        alias = "field"
+
+    err = re.escape(
+        f"The 'field' field in target // must be a string, but was `{raw_field!r}` "
+        "with type `<unrecognized symbol>`."
+    )
+    with pytest.raises(InvalidFieldException, match=err):
+        TestField(raw_field, Address(""))
+
+
+def test_unknown_target_for_defaults_during_bootstrap_issue_19445(
+    defaults_parser_state: BuildFileDefaultsParserState,
+) -> None:
+    parser = Parser(
+        build_root="",
+        registered_target_types=RegisteredTargetTypes({}),
+        union_membership=UnionMembership({}),
+        object_aliases=BuildFileAliases(),
+        ignore_unrecognized_symbols=True,
+    )
+    parser.parse(
+        "BUILD",
+        "__defaults__({'type_1': dict(), type_2: dict()})",
+        BuildFilePreludeSymbols.create({}, ()),
+        EnvironmentVars({}),
+        True,
+        defaults_parser_state,
+        dependents_rules=None,
+        dependencies_rules=None,
+    )
 
 
 @pytest.mark.parametrize("symbol", ["a", "bad", "BAD", "a___b_c", "a231", "áç"])

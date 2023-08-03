@@ -7,6 +7,6 @@
 
 python_tests(
     name="tests",
-    dependencies=["//build-support/bin/act:act-at-root"],
+    dependencies=["//3rdparty/tools/act:act-at-root"],
     timeout=180,
 )

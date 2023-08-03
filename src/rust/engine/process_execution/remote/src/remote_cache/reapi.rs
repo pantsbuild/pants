@@ -1,9 +1,7 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::sync::Arc;
-use std::time::Duration;
 
 use async_trait::async_trait;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -18,7 +16,7 @@ use crate::remote::apply_headers;
 use process_execution::Context;
 use tonic::{Code, Request};
 
-use super::ActionCacheProvider;
+use super::{ActionCacheProvider, RemoteCacheProviderOptions};
 
 pub struct Provider {
   instance_name: Option<String>,
@@ -26,13 +24,15 @@ pub struct Provider {
 }
 
 impl Provider {
-  pub fn new(
-    instance_name: Option<String>,
-    action_cache_address: &str,
-    root_ca_certs: Option<Vec<u8>>,
-    mut headers: BTreeMap<String, String>,
-    concurrency_limit: usize,
-    rpc_timeout: Duration,
+  pub async fn new(
+    RemoteCacheProviderOptions {
+      instance_name,
+      action_cache_address,
+      root_ca_certs,
+      mut headers,
+      concurrency_limit,
+      rpc_timeout,
+    }: RemoteCacheProviderOptions,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
@@ -41,10 +41,11 @@ impl Provider {
     };
 
     let endpoint = grpc_util::create_endpoint(
-      action_cache_address,
+      &action_cache_address,
       tls_client_config.as_ref(),
       &mut headers,
-    )?;
+    )
+    .await?;
     let http_headers = headers_to_http_header_map(&headers)?;
     let channel = layered_service(
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
