@@ -349,7 +349,8 @@ jobs:
     - env:
         GH_TOKEN: ${{ secrets.WORKER_PANTS_CHEESESHOP_TRIGGER_PAT }}
       name: Trigger cheeseshop build
-      run: 'gh api "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -X POST
+      run: 'gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F
+        event_type=github-pages
 
         '
   release_info:

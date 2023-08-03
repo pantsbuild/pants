@@ -1213,7 +1213,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "run": dedent(
                         """\
-                        gh api "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -X POST
+                        gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F event_type=github-pages
                         """
                     ),
                 },
