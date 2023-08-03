@@ -31,6 +31,7 @@ from pants.engine.fs import SpecsPaths
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.specs_rules import NoApplicableTargetsException
+from pants.engine.internals.testutil import resolve_raw_specs_without_file_owners
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import (
     Dependencies,
@@ -141,23 +142,6 @@ def rule_runner() -> RuleRunner:
 # -----------------------------------------------------------------------------------------------
 # RawSpecsWithoutFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
-
-
-def resolve_raw_specs_without_file_owners(
-    rule_runner: RuleRunner,
-    specs: Iterable[Spec],
-    ignore_nonexistent: bool = False,
-) -> list[Address]:
-    specs_obj = RawSpecs.create(
-        specs,
-        filter_by_global_options=True,
-        unmatched_glob_behavior=(
-            GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
-        ),
-        description_of_origin="tests",
-    )
-    result = rule_runner.request(Addresses, [RawSpecsWithoutFileOwners.from_raw_specs(specs_obj)])
-    return sorted(result)
 
 
 def test_raw_specs_without_file_owners_literals_vs_globs(rule_runner: RuleRunner) -> None:
