@@ -19,7 +19,7 @@ There are four steps to creating a new [goal](doc:goals) with Pants:
 1. Define a subclass of `GoalSubsystem`. This is the API to your goal.
    1. Set the class property `name` to the name of your goal.
    2. Set the class property `help`, which is used by `pants help`.
-   3. You may register options through attributes of `pants.option.option_types` types. See [Options and subsystems](doc:subsystems).
+   3. You may register options through attributes of `pants.option.option_types` types. See [Options and subsystems](doc:rules-api-subsystems).
 2. Define a subclass of `Goal`. When a user runs `pants my-goal`, the engine will request your subclass, which is what causes the `@goal_rule` to run.
    1. Set the class property `subsystem_cls` to the `GoalSubsystem` from the previous step.
    2. A `Goal` takes a single argument in its constructor, `exit_code: int`. Pants will use this to determine what its own exit code should be.

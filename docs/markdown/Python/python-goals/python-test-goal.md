@@ -85,7 +85,7 @@ output = "all"
 
 > 📘 Tip: Use Pytest options to make output more or less verbose
 >
-> See ["Passing arguments to Pytest"](doc:test#passing-arguments-to-pytest).
+> See ["Passing arguments to Pytest"](doc:python-test-goal#passing-arguments-to-pytest).
 >
 > For example:
 >

@@ -70,7 +70,7 @@ When you run `docker build` directly, the context is usually a directory within 
 
 Pants, however, takes care of assembling the context for you. It does so using the dependencies of the [`docker_image`](doc:reference-docker_image) target, which can include:
 
-- Loose files specified using  [`file` / `files` targets](doc:resources#files).
+- Loose files specified using  [`file` / `files` targets](doc:assets#files).
 - Artifacts packaged from a variety of targets, such as [`pex_binary`](doc:reference-pex_binary) , [`python_distribution`](doc:reference-python_distribution), [`archive`](doc:reference-archive), and any other target that can be built via the [package](doc:reference-package) goal, including other docker images.
 
 The context is assembled as follows:
