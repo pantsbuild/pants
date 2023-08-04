@@ -85,7 +85,7 @@ def generate_from_pants_requirements(
             {
                 PythonRequirementsField.alias: (f"{dist} == {version}",),
                 PythonRequirementFindLinksField.alias: (
-                    f"https://github.com/pantsbuild/pants/releases/expanded_assets/release_{version}",
+                    "https://wheels.pantsbuild.org/simple",
                 ),
                 PythonRequirementModulesField.alias: (module,),
                 **request.template,
