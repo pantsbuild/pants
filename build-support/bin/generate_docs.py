@@ -217,6 +217,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.yapf",
         "pants.backend.python.mixed_interpreter_constraints",
         "pants.backend.python.typecheck.mypy",
+        "pants.backend.python.typecheck.pytype",
         "pants.backend.shell",
         "pants.backend.shell.lint.shellcheck",
         "pants.backend.shell.lint.shfmt",

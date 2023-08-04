@@ -229,7 +229,7 @@ class PythonSetup(Subsystem):
         ),
     )
     pip_version = EnumOption(
-        default=PipVersion.V20_3_4,
+        default=PipVersion.V23_1_2,
         help=softwrap(
             """
             Use this version of Pip for resolving requirements and generating lockfiles.

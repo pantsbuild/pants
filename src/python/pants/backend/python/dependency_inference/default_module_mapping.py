@@ -234,6 +234,7 @@ DEFAULT_MODULE_MAPPING = {
     "randomwords": ("random_words",),
     "scikit-image": ("skimage",),
     "scikit-learn": ("sklearn",),
+    "scikit-video": ("skvideo",),
     "sseclient-py": ("sseclient",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
     "snowflake-connector-python": ("snowflake.connector",),

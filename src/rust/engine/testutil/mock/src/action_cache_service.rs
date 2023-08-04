@@ -111,6 +111,10 @@ impl ActionCache for ActionCacheResponder {
 
     let request = request.into_inner();
 
+    if self.always_errors.load(Ordering::SeqCst) {
+      return Err(Status::unavailable("unavailable".to_owned()));
+    }
+
     let action_digest: Digest = match require_digest(request.action_digest.as_ref()) {
       Ok(digest) => digest,
       Err(_) => {

@@ -206,7 +206,7 @@ python_sources(name="lib")
 
 pex_binary(name="bin", entry_point="main.py")
 ```
-```python src/py/hw/main.py
+```python src/python/hw/main.py
 import os
 
 msg = "Hello"
