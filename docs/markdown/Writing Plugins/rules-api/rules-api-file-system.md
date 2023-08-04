@@ -11,7 +11,7 @@ Instead, Pants has several mechanisms to work with the file system in a safe and
 
 > 🚧 Missing certain file operations?
 > 
-> If it would help you to have a certain file operation, please let us know by either opening a new [GitHub issue](https://github.com/pantsbuild/pants/issues) or by messaging us on [Slack](doc:community) in the #plugins room.
+> If it would help you to have a certain file operation, please let us know by either opening a new [GitHub issue](https://github.com/pantsbuild/pants/issues) or by messaging us on [Slack](doc:the-pants-community) in the #plugins room.
 
 Core abstractions: `Digest` and `Snapshot`
 ------------------------------------------
