@@ -58,8 +58,12 @@ def test_target_generator() -> None:
     assert testutil_req[PythonRequirementsField].value == (
         PipRequirement.parse(f"pantsbuild.pants.testutil=={VERSION}"),
     )
-    assert pants_req[PythonRequirementFindLinksField].value == ("https://wheels.pantsbuild.org",)
-    assert testutil_req[PythonRequirementFindLinksField].value == ("https://wheels.pantsbuild.org",)
+    assert pants_req[PythonRequirementFindLinksField].value == (
+        "https://wheels.pantsbuild.org/simple",
+    )
+    assert testutil_req[PythonRequirementFindLinksField].value == (
+        "https://wheels.pantsbuild.org/simple",
+    )
 
     for t in (pants_req, testutil_req):
         assert not t[PythonRequirementResolveField].value
@@ -95,5 +99,9 @@ def test_target_generator() -> None:
     assert testutil_req[PythonRequirementsField].value == (
         PipRequirement.parse("pantsbuild.pants.testutil==2.16.0"),
     )
-    assert pants_req[PythonRequirementFindLinksField].value == ("https://wheels.pantsbuild.org",)
-    assert testutil_req[PythonRequirementFindLinksField].value == ("https://wheels.pantsbuild.org",)
+    assert pants_req[PythonRequirementFindLinksField].value == (
+        "https://wheels.pantsbuild.org/simple",
+    )
+    assert testutil_req[PythonRequirementFindLinksField].value == (
+        "https://wheels.pantsbuild.org/simple",
+    )
