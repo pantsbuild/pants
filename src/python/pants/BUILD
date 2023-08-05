@@ -60,8 +60,8 @@ __dependencies_rules__(
     (
         # test modules should not depend on other test modules
         (python_tests, python_test),
-        "?<python_tests>",
-        "?<python_test>",
+        "!<python_tests>",
+        "!<python_test>",
         "//BUILD_ROOT:files",
         "//pants.toml:files",
         "conftest.py",
