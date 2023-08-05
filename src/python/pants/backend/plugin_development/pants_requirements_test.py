@@ -29,7 +29,7 @@ def test_target_generator() -> None:
         {
             "BUILD": (
                 "pants_requirements(name='default')\n"
-                "pants_requirements(name='pants-2.16', version='2.16.0')\n"
+                "pants_requirements(name='pants-2.16', version_spec='>= 2.16.0, < 2.17.0')\n"
                 "pants_requirements(\n"
                 "  name='no_testutil', testutil=False, resolve='a'\n"
                 ")"
@@ -94,10 +94,10 @@ def test_target_generator() -> None:
         t for t in result.values() if t.address.generated_name == "pantsbuild.pants.testutil"
     )
     assert pants_req[PythonRequirementsField].value == (
-        PipRequirement.parse("pantsbuild.pants==2.16.0"),
+        PipRequirement.parse("pantsbuild.pants>=2.16.0,<2.17.0"),
     )
     assert testutil_req[PythonRequirementsField].value == (
-        PipRequirement.parse("pantsbuild.pants.testutil==2.16.0"),
+        PipRequirement.parse("pantsbuild.pants.testutil>=2.16.0,<2.17.0"),
     )
     assert pants_req[PythonRequirementFindLinksField].value == (
         "https://wheels.pantsbuild.org/simple",

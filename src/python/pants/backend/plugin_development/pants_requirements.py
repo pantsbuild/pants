@@ -28,13 +28,13 @@ class PantsRequirementsTestutilField(BoolField):
     help = "If true, include `pantsbuild.pants.testutil` to write tests for your plugin."
 
 
-class PantsRequirementsVersionField(StringField):
-    alias = "version"
-    default = PANTS_SEMVER.public
+class PantsRequirementsVersionSpecField(StringField):
+    alias = "version_spec"
+    default = f"== {PANTS_SEMVER.public}"
     help = help_text(
         """
-        The version of Pants to target.
-        This must be a full release version (e.g. 2.16.0 or 2.15.0.dev5).
+        The PEP 440 version specifier version of Pants to target.
+        E.g. `== 2.15.*`, or `>= 2.16.0, < 2.17.0`
         """
     )
 
@@ -61,7 +61,7 @@ class PantsRequirementsTargetGenerator(TargetGenerator):
     generated_target_cls = PythonRequirementTarget
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        PantsRequirementsVersionField,
+        PantsRequirementsVersionSpecField,
         PantsRequirementsTestutilField,
         PythonRequirementFindLinksField,
     )
@@ -78,12 +78,12 @@ def generate_from_pants_requirements(
     request: GenerateFromPantsRequirementsRequest, union_membership: UnionMembership
 ) -> GeneratedTargets:
     generator = request.generator
-    version = generator[PantsRequirementsVersionField].value
+    version_spec = generator[PantsRequirementsVersionSpecField].value
 
     def create_tgt(dist: str, module: str) -> PythonRequirementTarget:
         return PythonRequirementTarget(
             {
-                PythonRequirementsField.alias: (f"{dist} == {version}",),
+                PythonRequirementsField.alias: (f"{dist} {version_spec}",),
                 PythonRequirementFindLinksField.alias: ("https://wheels.pantsbuild.org/simple",),
                 PythonRequirementModulesField.alias: (module,),
                 **request.template,
