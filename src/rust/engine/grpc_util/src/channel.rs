@@ -12,7 +12,7 @@ use tower_service::Service;
 
 // Inspired by https://github.com/LucioFranco/tonic-openssl/blob/master/example/src/client2.rs.
 
-/// Enumeration wrapping the HTTP and HTTPS clients so they can be treated equiavlent by
+/// Enumeration wrapping the HTTP and HTTPS clients so they can be treated equivalently by
 /// `Channel`.
 #[derive(Clone, Debug)]
 pub enum Client {
