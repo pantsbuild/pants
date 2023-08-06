@@ -1271,6 +1271,14 @@ class PythonRequirementResolveField(PythonResolveField):
     )
 
 
+class PythonRequirementFindLinksField(StringSequenceField):
+    # NB: This is solely used for `pants_requirements` target generation
+    alias = "_find_links"
+    required = False
+    default = ()
+    help = "<Internal>"
+
+
 class PythonRequirementEntryPointField(EntryPointField):
     # Specialist subclass for matching `PythonRequirementTarget` when running.
     pass
@@ -1286,6 +1294,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,
         PythonRequirementEntryPointField,
+        PythonRequirementFindLinksField,
     )
     help = help_text(
         f"""
