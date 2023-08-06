@@ -198,6 +198,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.python.lint.add_trailing_comma",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
+        "pants.backend.experimental.python.lint.ruff",
         "pants.backend.experimental.python.packaging.pyoxidizer",
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
