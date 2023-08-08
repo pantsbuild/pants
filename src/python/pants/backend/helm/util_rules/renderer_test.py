@@ -22,10 +22,9 @@ from pants.backend.helm.util_rules.renderer import (
     RenderedHelmFiles,
     RenderHelmChartRequest,
 )
+from pants.backend.helm.util_rules.testutil import _read_file_from_digest
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents, DigestSubset, PathGlobs
-from pants.engine.internals.native_engine import Digest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -51,12 +50,6 @@ def rule_runner() -> RuleRunner:
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner
-
-
-def _read_file_from_digest(rule_runner: RuleRunner, *, digest: Digest, filename: str) -> str:
-    config_file_digest = rule_runner.request(Digest, [DigestSubset(digest, PathGlobs([filename]))])
-    config_file_contents = rule_runner.request(DigestContents, [config_file_digest])
-    return config_file_contents[0].content.decode("utf-8")
 
 
 _COMMON_WORKSPACE_FILES = {

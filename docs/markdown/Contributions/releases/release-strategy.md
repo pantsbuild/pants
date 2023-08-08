@@ -16,7 +16,7 @@ Pants follows semantic versioning, along with using regular time-based dev relea
 
 > 📘 Tip: join the mailing group for release announcements
 > 
-> See [Community](doc:community).
+> See [Community](doc:the-pants-community).
 > 
 > Also see [Upgrade tips](doc:upgrade-tips) for suggestions on how to effectively upgrade Pants versions.
 
@@ -41,7 +41,7 @@ Patch versions after `*.0` (i.e.: `2.2.1`) must have also had at least one relea
 > 
 > We try our best to write bug-free code, but, like everyone, we sometimes make mistakes.
 > 
-> If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](doc:community).
+> If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](doc:the-pants-community).
 
 Release candidates
 ------------------
@@ -62,7 +62,7 @@ Release candidates are subject to the constraints on cherry-picks mentioned in t
 > 
 > We greatly appreciate when users test out release candidates. While we do our best to have comprehensive CI—and we "dogfood" release candidates—we are not able to test all the ways Pants is used in the wild.
 > 
-> If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](doc:community).
+> If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](doc:the-pants-community).
 
 Alpha releases
 --------------

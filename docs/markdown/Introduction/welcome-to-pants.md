@@ -16,7 +16,7 @@ Pants installs, orchestrates and runs dozens of standard underlying tools - comp
 
 Pants is designed to be easy to adopt, use, and extend. It doesn't require you to refactor your codebase or to create and maintain massive amounts of build metadata. You invoke it directly on source files and directories, so it doesn't require users to adopt a new conceptual model.
 
-Pants is currently focused on Python, Go, Java, Scala, Shell, and Docker, with more languages and frameworks coming soon. [The Pants community](doc:the-pants-community) is friendly and helpful, and supported by [Toolchain](https://toolchain.com/), a venture-backed company whose mission is to enable fast, stable, ergonomic developer workflows for everyone.
+Pants is currently focused on Python, Go, Java, Scala, Shell, and Docker, with more languages and frameworks coming soon. [The Pants community](doc:the-pants-community) is friendly and helpful and welcomes involvement of anyone who is interested in creating modern software development tooling.
 
 Who is Pants for?
 =================
@@ -74,8 +74,6 @@ Who develops Pants?
 ===================
 
 Pants is an open-source software project, developed at [github.com/pantsbuild/pants](https://github.com/pantsbuild/pants). Pants is released under the [Apache License 2.0](https://github.com/pantsbuild/pants/blob/master/LICENSE).
-
-[Toolchain](https://toolchain.com/) is the lead sponsor of the Pants project.
 
 > 📘 Pants v2 vs. v1
 > 
