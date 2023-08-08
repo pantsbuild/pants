@@ -152,7 +152,7 @@ class PythonToolRequirementsBase(Subsystem):
             2. If not, you can set up a new resolve as described at the link above.
 
             Either way, the resolve you choose should provide the requirements currently set
-            by the `requirements` option for this tool, which you can see
+            by the `version` and `extra-requirements` options for this tool, which you can see
             by running `pants help-advanced {cls.options_scope}`.
             """
         ),
@@ -280,9 +280,10 @@ class PythonToolRequirementsBase(Subsystem):
             # about the remedy. We will only display this note if the invocation actually
             # tries to use the tool, whereas the deprecations will display on options parsing,
             # so this is just a best-effort attempt to be helpful when we can.
+            tool_reqs = [self.version, *self.extra_requirements]
             logger.warning(
                 f"Note: the resolve you use for the {self.options_scope} tool must "
-                f"provide these requirements:" + "\n\n" + "\n".join(self.requirements) + "\n"
+                f"provide these requirements:" + "\n\n" + "\n".join(tool_reqs) + "\n"
             )
         return self._lockfile
 
