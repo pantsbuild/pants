@@ -316,23 +316,6 @@ def install_go() -> Step:
     }
 
 
-def deploy_to_s3(
-    name: str,
-    *,
-    scope: str | None = None,
-) -> Step:
-    run = "./pants run src/python/pants_release/deploy_to_s3.py"
-    if scope:
-        run = f"{run} -- --scope {scope}"
-    return {
-        "name": name,
-        "run": run,
-        "env": {
-            "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
-            "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
-        },
-    }
-
 
 def download_apache_thrift() -> Step:
     return {
@@ -858,16 +841,17 @@ def build_wheels_job(
                     "env": helper.platform_env(),
                 },
                 helper.upload_log_artifacts(name="wheels-and-pex"),
-                *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
                 *(
                     [
                         {
-                            "name": "Upload Pants PEX",
+                            "name": "Upload Wheels and Pex",
                             "if": "needs.release_info.outputs.is-release == 'true'",
                             # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
                             #   in this job. Certain variations run on docker images without `gh`,
                             #   and we could be building on a tag that doesn't have the `pants run <gh>`
                             #   support. `curl` is a good lowest-common-denominator way to upload the assets.
+                            # NB: Each job will re-upload the same testutil wheel. It's easier than
+                            #   trying to coordinate which job gets to (and since it's pure-python, meh).
                             "run": dedent(
                                 """\
                                 LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
@@ -879,6 +863,17 @@ def build_wheels_job(
                                     -H "Content-Type: application/octet-stream" \\
                                     ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$LOCAL_TAG.pex \\
                                     --data-binary "@dist/src.python.pants/pants.$LOCAL_TAG.pex"
+
+                                WHLS=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "*.whl")
+                                for WHL in $WHLS; do
+                                    curl -L --fail \\
+                                        -X POST \\
+                                        -H "Authorization: Bearer ${{ github.token }}" \\
+                                        -H "Content-Type: application/octet-stream" \\
+                                        "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \\
+                                        --data-binary "@$WHL";
+                                done
+
                                 """
                             ),
                         }
@@ -1123,6 +1118,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "runs-on": "ubuntu-latest",
             "needs": [*wheels_job_names, "release_info"],
             "if": f"{IS_PANTS_OWNER} && needs.release_info.outputs.is-release == 'true'",
+            "env": {
+                # This job does not actually build anything: only download wheels from S3.
+                "MODE": "debug",
+            },
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
@@ -1137,30 +1136,8 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
                 {
-                    "name": "Fetch and stabilize wheels",
-                    "run": f"./pants run src/python/pants_release/release.py -- fetch-and-stabilize --dest={pypi_release_dir}",
-                    "env": {
-                        # This step does not actually build anything: only download wheels from S3.
-                        "MODE": "debug",
-                    },
-                },
-                {
-                    "name": "Create Release -> Commit Mapping",
-                    # The `git rev-parse` subshell below is used to obtain the tagged commit sha.
-                    # The syntax it uses is tricky, but correct. The literal suffix `^{commit}` gets
-                    # the sha of the commit object that is the tag's target (as opposed to the sha
-                    # of the tag object itself). Due to Python f-strings, the nearness of shell
-                    # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
-                    "run": dedent(
-                        f"""\
-                        tag="{gha_expr("needs.release_info.outputs.build-ref")}"
-                        commit="$(git rev-parse ${{tag}}^{{commit}})"
-
-                        echo "Recording tag ${{tag}} is of commit ${{commit}}"
-                        mkdir -p dist/deploy/tags/pantsbuild.pants
-                        echo "${{commit}}" > "dist/deploy/tags/pantsbuild.pants/${{tag}}"
-                        """
-                    ),
+                    "name": "Download wheels",
+                    "run": f"gh release download {gha_expr('needs.release_info.outputs.build-ref')} -p '*.whl' --dir {pypi_release_dir}",
                 },
                 {
                     "name": "Publish to PyPI",
@@ -1189,10 +1166,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"},
                 },
-                deploy_to_s3(
-                    "Deploy commit mapping to S3",
-                    scope="tags/pantsbuild.pants",
-                ),
                 {
                     "name": "Get release notes",
                     "run": dedent(

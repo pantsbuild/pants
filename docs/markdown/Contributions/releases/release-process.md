@@ -294,26 +294,3 @@ to the development or maintainers channels on Pantbuild Slack in the absence of 
 whom to ask for help.
 
 Some issues are well known or well understood, and they are documented here.
-
-#### https://binaries.pantsbuild.com outage / missing wheels
-
-The https://binaries.pantsbuild.com site is an S3 bucket that houses Pantsbuild wheels generated in
-CI and used as part of the release process. If there are missing wheels or the wheels can't be
-fetched due to connectivity issues or an S3 outage, you'll learn about this through the release
-script erroring out. The script is idempotent; so you can just run it again, potentially waiting
-longer for wheels to be built in CI or outages to clear.
-
-When the release script finishes, it creates and pushes a release tag. This will trigger a [release
-GitHub workflow](https://github.com/pantsbuild/pants/blob/main/.github/workflows/release.yaml) that
-could ~silently error later if there were to be an S3 outage. This job currently is responsible for
-pushing a file mapping the release tag to the commit it tags out to
-`https://binaries.pantsbuild.com/tags/pantsbuild.pants/<tag>`. If the tag is missing, it should be
-fixed by running the following in an environment where you have both `AWS_ACCESS_KEY_ID` and
-`AWS_SECRET_ACCESS_KEY` of an account that has permissions to push to the Pantsbuild S3 bucket:
-```
-pants run src/python/pants_release/backfill_s3_release_tag_mappings.py -- \
-   --aws-cli-symlink-path $HOME/bin
-```
-If this sounds mysterious or new to you, you probably don't have such an account and should ask for
-help from other maintainers. You may want to adjust the `--aws-cli-symlink-path` to your liking as
-well, consult `--help` for more information.
