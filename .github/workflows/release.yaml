@@ -57,18 +57,18 @@ jobs:
         name: logs-wheels-and-pex-Linux-ARM64
         path: .pants.d/*.log
     - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Wheels and Pex
+      name: Upload Wheel and Pex
       run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
         import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
         )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
         \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
         \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
-        \n\nWHLS=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"*.whl\"\
-        )\nfor WHL in $WHLS; do\n    curl -L --fail \\\n        -X POST \\\n     \
-        \   -H \"Authorization: Bearer ${{ github.token }}\" \\\n        -H \"Content-Type:\
-        \ application/octet-stream\" \\\n        \"${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=$(basename $WHL)\" \\\n        --data-binary \"@$WHL\";\ndone\n\n"
+        \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -123,18 +123,25 @@ jobs:
         name: logs-wheels-and-pex-Linux-x86_64
         path: .pants.d/*.log
     - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Wheels and Pex
+      name: Upload Wheel and Pex
       run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
         import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
         )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
         \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
         \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
-        \n\nWHLS=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"*.whl\"\
-        )\nfor WHL in $WHLS; do\n    curl -L --fail \\\n        -X POST \\\n     \
-        \   -H \"Authorization: Bearer ${{ github.token }}\" \\\n        -H \"Content-Type:\
-        \ application/octet-stream\" \\\n        \"${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=$(basename $WHL)\" \\\n        --data-binary \"@$WHL\";\ndone\n\n"
+        \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload testutil Wheel
+      run: "WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants.testutil*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -190,18 +197,18 @@ jobs:
         name: logs-wheels-and-pex-macOS10-15-x86_64
         path: .pants.d/*.log
     - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Wheels and Pex
+      name: Upload Wheel and Pex
       run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
         import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
         )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
         \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
         \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
-        \n\nWHLS=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"*.whl\"\
-        )\nfor WHL in $WHLS; do\n    curl -L --fail \\\n        -X POST \\\n     \
-        \   -H \"Authorization: Bearer ${{ github.token }}\" \\\n        -H \"Content-Type:\
-        \ application/octet-stream\" \\\n        \"${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=$(basename $WHL)\" \\\n        --data-binary \"@$WHL\";\ndone\n\n"
+        \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -257,18 +264,18 @@ jobs:
         name: logs-wheels-and-pex-macOS11-ARM64
         path: .pants.d/*.log
     - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Wheels and Pex
+      name: Upload Wheel and Pex
       run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
         import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
         )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
         \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
         \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
-        \n\nWHLS=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"*.whl\"\
-        )\nfor WHL in $WHLS; do\n    curl -L --fail \\\n        -X POST \\\n     \
-        \   -H \"Authorization: Bearer ${{ github.token }}\" \\\n        -H \"Content-Type:\
-        \ application/octet-stream\" \\\n        \"${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=$(basename $WHL)\" \\\n        --data-binary \"@$WHL\";\ndone\n\n"
+        \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
   publish:
     env:

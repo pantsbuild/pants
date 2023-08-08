@@ -843,14 +843,12 @@ def build_wheels_job(
                 *(
                     [
                         {
-                            "name": "Upload Wheels and Pex",
+                            "name": "Upload Wheel and Pex",
                             "if": "needs.release_info.outputs.is-release == 'true'",
                             # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
                             #   in this job. Certain variations run on docker images without `gh`,
                             #   and we could be building on a tag that doesn't have the `pants run <gh>`
                             #   support. `curl` is a good lowest-common-denominator way to upload the assets.
-                            # NB: Each job will re-upload the same testutil wheel. It's easier than
-                            #   trying to coordinate which job gets to (and since it's pure-python, meh).
                             "run": dedent(
                                 """\
                                 LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
@@ -863,19 +861,38 @@ def build_wheels_job(
                                     ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$LOCAL_TAG.pex \\
                                     --data-binary "@dist/src.python.pants/pants.$LOCAL_TAG.pex"
 
-                                WHLS=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "*.whl")
-                                for WHL in $WHLS; do
-                                    curl -L --fail \\
-                                        -X POST \\
-                                        -H "Authorization: Bearer ${{ github.token }}" \\
-                                        -H "Content-Type: application/octet-stream" \\
-                                        "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \\
-                                        --data-binary "@$WHL";
-                                done
-
+                                WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \\
+                                    --data-binary "@$WHL";
                                 """
                             ),
-                        }
+                        },
+                        *(
+                            [
+                                {
+                                    "name": "Upload testutil Wheel",
+                                    "if": "needs.release_info.outputs.is-release == 'true'",
+                                    # NB: See above about curl
+                                    "run": dedent(
+                                        """\
+                                        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants.testutil*.whl")
+                                        curl -L --fail \\
+                                            -X POST \\
+                                            -H "Authorization: Bearer ${{ github.token }}" \\
+                                            -H "Content-Type: application/octet-stream" \\
+                                            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \\
+                                            --data-binary "@$WHL";
+                                """
+                                    ),
+                                },
+                            ]
+                            if platform == Platform.LINUX_X86_64
+                            else []
+                        ),
                     ]
                     if for_deploy_ref
                     else []

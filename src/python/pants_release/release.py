@@ -521,8 +521,6 @@ def build_pants_wheels() -> None:
             )
         )
 
-    # TODO(#10718): Allow for sdist releases. We can build an sdist for
-    #  `pantsbuild.pants.testutil`, but need to wire it up to the rest of our release process.
     for package in PACKAGES:
         found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
         # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
