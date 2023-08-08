@@ -316,7 +316,6 @@ def install_go() -> Step:
     }
 
 
-
 def download_apache_thrift() -> Step:
     return {
         "name": "Download Apache `thrift` binary (Linux)",

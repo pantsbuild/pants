@@ -20,15 +20,12 @@ from enum import Enum
 from functools import total_ordering
 from math import ceil
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, cast
-from urllib.parse import quote_plus
-from xml.etree import ElementTree
+from typing import Any, Callable, Iterable, Iterator, Sequence, cast
 
 import requests
 from packaging.version import Version
 from pants_release.common import VERSION_PATH, banner, die, green
 from pants_release.git import git, git_rev_parse
-from pants_release.reversion import reversion
 
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
@@ -477,7 +474,6 @@ def create_twine_venv() -> None:
 
 def build_all_wheels() -> None:
     build_pants_wheels()
-    return
     build_3rdparty_wheels()
     install_and_test_packages(
         CONSTANTS.pants_stable_version,
@@ -549,8 +545,10 @@ def build_pants_wheels() -> None:
                 shutil.copy2(wheel, dest)
             # Rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/.
             # We use manylinux2014 images.
-            os.rename(wheel_dest, wheel_dest.with_name(wheel_dest.name.replace("linux_", "manylinux2014_")))
-
+            os.rename(
+                wheel_dest,
+                wheel_dest.with_name(wheel_dest.name.replace("linux_", "manylinux2014_")),
+            )
 
     green(f"Wrote Pants wheels to {dest}.")
 
@@ -643,11 +641,7 @@ def build_fs_util() -> None:
         .strip()
     )
     dest_dir = (
-        Path(CONSTANTS.deploy_dir)
-        / "bin"
-        / "fs_util"
-        / current_os
-        / CONSTANTS.pants_stable_version
+        Path(CONSTANTS.deploy_dir) / "bin" / "fs_util" / current_os / CONSTANTS.pants_stable_version
     )
     dest_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(
@@ -655,7 +649,6 @@ def build_fs_util() -> None:
         dest_dir,
     )
     green(f"Built fs_util at {dest_dir / 'fs_util'}.")
-
 
 
 # -----------------------------------------------------------------------------------------------
@@ -863,7 +856,6 @@ def main() -> None:
         build_all_wheels()
     if args.command == "build-fs-util":
         build_fs_util()
-
 
 
 if __name__ == "__main__":
