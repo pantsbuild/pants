@@ -1,16 +1,20 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import argparse
 import json
+import os
 
 from pants_release.common import VERSION_PATH, sorted_contributors
 from pants_release.git import git
 
+from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import softwrap
+
+version = VERSION_PATH.read_text().strip()
 
 
 def announcement_text() -> str:
-    version = VERSION_PATH.read_text().strip()
     cur_version_sha, prev_version_sha = git(
         "log", "-2", "--pretty=format:%h", str(VERSION_PATH)
     ).splitlines(keepends=False)
@@ -28,7 +32,7 @@ def announcement_text() -> str:
         f"""\
         Pants {version} is now available!
 
-        To upgrade, set pants_version="{version}" in the [GLOBAL] section of your pants.toml.
+        To upgrade, set `pants_version="{version}"` in the `[GLOBAL]` section of your pants.toml.
         """
     )
     if "dev" in version or "a" in version:
@@ -53,29 +57,36 @@ def announcement_text() -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--channel",
+        "--output-dir",
         required=True,
-        choices=["slack", "email"],
-        help="Which channel to generate the announcement for.",
+        help="Generate announcement messages into this directory.",
     )
     options = parser.parse_args()
-    if options.channel == "slack":
-        announcement = json.dumps(
+    safe_mkdir(options.output_dir)
+
+    def dump(basename: str, text: str) -> None:
+        with open(os.path.join(options.output_dir, basename), "w") as fp:
+            fp.write(text)
+
+    announcement = announcement_text()
+    dump(
+        "slack_announcement.json",
+        json.dumps(
             {
                 "blocks": [
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": announcement_text(),
+                            "text": announcement,
                         },
                     },
                 ]
             }
-        )
-    else:
-        announcement = announcement_text()
-    print(announcement)
+        ),
+    )
+    dump("email_announcement_subject.txt", f"Pants {version} is released")
+    dump("email_announcement_body.md", announcement)
 
 
 if __name__ == "__main__":
