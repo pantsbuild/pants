@@ -11,7 +11,7 @@ from pants_release.git import git
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import softwrap
 
-version = VERSION_PATH.read_text().strip()
+VERSION = VERSION_PATH.read_text().strip()
 
 
 def announcement_text() -> str:
@@ -30,12 +30,12 @@ def announcement_text() -> str:
 
     announcement = softwrap(
         f"""\
-        Pants {version} is now available!
+        Pants {VERSION} is now available!
 
-        To upgrade, set `pants_version="{version}"` in the `[GLOBAL]` section of your pants.toml.
+        To upgrade, set `pants_version="{VERSION}"` in the `[GLOBAL]` section of your pants.toml.
         """
     )
-    if "dev" in version or "a" in version:
+    if "dev" in VERSION or "a" in VERSION:
         announcement += "\n\nThanks to all the contributors to this release:\n\n"
         for contributor in all_contributors:
             announcement += contributor
@@ -85,7 +85,7 @@ def main() -> None:
             }
         ),
     )
-    dump("email_announcement_subject.txt", f"Pants {version} is released")
+    dump("email_announcement_subject.txt", f"Pants {VERSION} is released")
     dump("email_announcement_body.md", announcement)
 
 
