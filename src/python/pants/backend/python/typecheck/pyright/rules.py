@@ -222,7 +222,6 @@ async def pyright_typecheck_partition(
     )
 
     complete_pex_env = pex_environment.in_workspace()
-
     process = await Get(
         Process,
         NodeJSToolRequest,

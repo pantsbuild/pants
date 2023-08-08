@@ -144,6 +144,7 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
     # Ensure that the requirements venv must be created, by adding in a third-party
     # requirement to the test code.
     rule_runner.write_files({
+        "BUILD": "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])",
         f"{PACKAGE}/f.py": dedent(
             """\
             from more_itertools import flatten
@@ -151,17 +152,14 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
             assert flatten(42) == [4, 2]
             """
         ),
-        f"{PACKAGE}/BUILD": dedent("""\
-            python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])
-
-            python_sources()
-            """
-        ),
+        f"{PACKAGE}/BUILD": "python_sources()",
     })
     with temporary_dir() as named_caches:
         tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
         assert len(result) == 1
+        print(result[0].stdout)
+        print(result[0].stderr)
         assert result[0].exit_code == 0
         assert "0 errors" in result[0].stdout
         assert result[0].report == EMPTY_DIGEST
