@@ -333,9 +333,7 @@ jobs:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       name: Publish GitHub Release
-      run: 'gh release upload ${{ needs.release_info.outputs.build-ref }} dest/pypi_release/*
-
-        gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
+      run: 'gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
         --notes-file notes.txt
 
         '
