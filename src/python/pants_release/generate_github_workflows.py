@@ -1198,7 +1198,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "run": dedent(
                         """\
                         REF="${{ needs.release_info.outputs.build-ref }}"
-                        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"} > notes.txt",
+                        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"} > notes.txt
                         """
                     ),
                 },
