@@ -341,7 +341,7 @@ jobs:
       run: 'REF="${{ needs.release_info.outputs.build-ref }}"
 
         ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"}
-        > notes.txt",
+        > notes.txt
 
         '
     - env:
