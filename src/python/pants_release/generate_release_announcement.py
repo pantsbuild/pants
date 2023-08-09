@@ -47,7 +47,7 @@ def announcement_text() -> str:
                 announcement += "\n"
             announcement += (
                 "\nWelcome to the Pants community! We appreciate your contributions, "
-                "and look forward to more."
+                "and look forward to more of them in the future."
             )
     else:
         announcement += "\n\nThanks to all the contributors to this release!"
