@@ -1207,7 +1207,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         "from": "Pants Announce",
                         "body": "file://${{ runner.temp }}/email_announcement_body.md",
                         "convert_markdown": True,
-
                     },
                 },
                 deploy_to_s3(
