@@ -17,6 +17,24 @@ message CacheKey {
   build.bazel.remote.execution.v2.Digest digest = 2;
 }
 
+message DependencyInferenceRequest {
+  build.bazel.remote.execution.v2.Digest input_file_digest = 1;
+  oneof metadata {
+    JavascriptInferenceMetadata js = 2;
+  }
+  string impl_hash = 3;
+}
+
+
+message JavascriptInferenceMetadata {
+  message ImportPattern {
+    string pattern = 1;
+    repeated string replacements = 2;
+  }
+  string package_root = 1;
+  repeated ImportPattern import_patterns = 2;
+}
+
 // A URL and Digest tuple, which is itself digested and used as a CacheKey. ObservedURLs
 // collectively represent the set of digests that we have ever observed for a particular URL:
 // their cache value is always empty.

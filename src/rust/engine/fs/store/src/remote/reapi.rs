@@ -1,11 +1,11 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::cmp::min;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fmt;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
@@ -26,6 +26,8 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
+
+use crate::RemoteOptions;
 
 use super::{ByteSource, ByteStoreProvider, LoadDestination};
 
@@ -64,32 +66,21 @@ impl std::error::Error for ByteStoreError {}
 impl Provider {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
   // `super::LocalOptions`.
-  pub fn new(
-    cas_address: &str,
-    instance_name: Option<String>,
-    tls_config: grpc_util::tls::Config,
-    mut headers: BTreeMap<String, String>,
-    chunk_size_bytes: usize,
-    rpc_timeout: Duration,
-    rpc_retries: usize,
-    rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-    batch_api_size_limit: usize,
-  ) -> Result<Provider, String> {
-    let tls_client_config = if cas_address.starts_with("https://") {
-      Some(tls_config.try_into()?)
+  pub async fn new(options: RemoteOptions) -> Result<Provider, String> {
+    let tls_client_config = if options.cas_address.starts_with("https://") {
+      Some(options.tls_config.try_into()?)
     } else {
       None
     };
 
-    let endpoint =
-      grpc_util::create_endpoint(cas_address, tls_client_config.as_ref(), &mut headers)?;
-    let http_headers = headers_to_http_header_map(&headers)?;
+    let channel =
+      grpc_util::create_channel(&options.cas_address, tls_client_config.as_ref()).await?;
+    let http_headers = headers_to_http_header_map(&options.headers)?;
     let channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
-      rpc_concurrency_limit,
+      channel,
+      options.rpc_concurrency_limit,
       http_headers,
-      Some((rpc_timeout, Metric::RemoteStoreRequestTimeouts)),
+      Some((options.rpc_timeout, Metric::RemoteStoreRequestTimeouts)),
     );
 
     let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
@@ -99,14 +90,16 @@ impl Provider {
     let capabilities_client = Arc::new(CapabilitiesClient::new(channel));
 
     Ok(Provider {
-      instance_name,
-      chunk_size_bytes,
-      _rpc_attempts: rpc_retries + 1,
+      instance_name: options.instance_name,
+      chunk_size_bytes: options.chunk_size_bytes,
+      _rpc_attempts: options.rpc_retries + 1,
       byte_stream_client,
       cas_client,
-      capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
+      capabilities_cell: options
+        .capabilities_cell_opt
+        .unwrap_or_else(|| Arc::new(OnceCell::new())),
       capabilities_client,
-      batch_api_size_limit,
+      batch_api_size_limit: options.batch_api_size_limit,
     })
   }
 

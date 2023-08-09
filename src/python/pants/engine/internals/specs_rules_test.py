@@ -31,6 +31,7 @@ from pants.engine.fs import SpecsPaths
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.specs_rules import NoApplicableTargetsException
+from pants.engine.internals.testutil import resolve_raw_specs_without_file_owners
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import (
     Dependencies,
@@ -141,23 +142,6 @@ def rule_runner() -> RuleRunner:
 # -----------------------------------------------------------------------------------------------
 # RawSpecsWithoutFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
-
-
-def resolve_raw_specs_without_file_owners(
-    rule_runner: RuleRunner,
-    specs: Iterable[Spec],
-    ignore_nonexistent: bool = False,
-) -> list[Address]:
-    specs_obj = RawSpecs.create(
-        specs,
-        filter_by_global_options=True,
-        unmatched_glob_behavior=(
-            GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
-        ),
-        description_of_origin="tests",
-    )
-    result = rule_runner.request(Addresses, [RawSpecsWithoutFileOwners.from_raw_specs(specs_obj)])
-    return sorted(result)
 
 
 def test_raw_specs_without_file_owners_literals_vs_globs(rule_runner: RuleRunner) -> None:
@@ -1124,11 +1108,17 @@ def test_secondary_owner_warning(caplog) -> None:
     assert "Refer to the following targets" not in caplog.text
     assert not result.mapping
 
-    run_rule([FileLiteralSpec("a.ft")])
-    assert len(caplog.records) == 1
-    assert "Refer to the following targets by their addresses:\n\n  * //:secondary1" in caplog.text
+    with pytest.raises(ExecutionError) as exc:
+        run_rule([FileLiteralSpec("a.ft")])
+    assert len(caplog.records) == 0
+    assert "Refer to the following targets by their addresses:\n  * //:secondary1" in str(exc.value)
 
-    run_rule([FileLiteralSpec("a.ft"), AddressLiteralSpec("", "secondary1")])
-    assert len(caplog.records) == 1
-    assert "secondary1" not in caplog.text
-    assert "secondary2" in caplog.text
+    with pytest.raises(ExecutionError) as exc:
+        run_rule([FileLiteralSpec("a.ft"), AddressLiteralSpec("", "secondary1")])
+    assert len(caplog.records) == 0
+    assert "secondary1" not in str(exc.value)
+    assert "secondary2" in str(exc.value)
+
+    result = run_rule([RecursiveGlobSpec("")])
+    assert len(caplog.records) == 0
+    assert result.mapping

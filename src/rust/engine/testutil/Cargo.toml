@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "testutil"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -11,5 +11,5 @@ bytes = "1.2"
 fs = { path = "../fs" }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
-prost = "0.9" 
+prost = "0.11"
 protos = { path = "../protos" }

@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "grpc_util"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -10,20 +10,22 @@ bytes = "1.0"
 either = "1"
 futures = "0.3"
 hyper = "0.14"
+hyper-rustls = { version = "0.24", features = ["http2"] }
 http = "0.2"
+http-body = "0.4"
 itertools = "0.10"
-rustls-native-certs = "0.5"
+rustls-native-certs = "0.6"
 lazy_static = "1"
 pin-project = "1.0.12"
 pin-project-lite = "0.2"
-prost = "0.9"
+prost = "0.11"
 rand = "0.8"
-rustls = { version = "0.19", features = ["dangerous_configuration"] }
-rustls-pemfile = "0.2"
+rustls = { version = "0.21.1", features = ["dangerous_configuration", 'logging'] }
+rustls-pemfile = "1.0"
 tokio = { version = "1.28", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-rustls = "0.22"
-tokio-util = { version = "0.6", features = ["codec"] }
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tokio-rustls = "0.24"
+tokio-util = { version = "0.7", features = ["codec"] }
+tonic = { version = "0.9", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower = { version = "0.4", features = ["limit"] }
 tower-layer = "0.3"
 tower-service = "0.3"
@@ -31,10 +33,12 @@ webpki = "0.21"
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
+axum = "0.6"
+axum-server = { version = "0.5", features = ["tls-rustls"] }
 async-trait = "0.1"
 parking_lot = "0.11"
-prost-types = "0.9"
+prost-types = "0.11"
 
 [build-dependencies]
-prost-build = "0.9"
-tonic-build = "0.6"
+prost-build = "0.11"
+tonic-build = "0.9"

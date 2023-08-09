@@ -1,34 +1,15 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import json
 from pathlib import Path
 from textwrap import dedent
-from typing import Mapping
 
 from pants.backend.go.util_rules.go_bootstrap import GoBootstrap, compatible_go_version
 from pants.backend.go.util_rules.go_bootstrap import rules as go_bootstrap_rules
-from pants.core.util_rules.asdf_test import fake_asdf_root, materialize_indices
+from pants.backend.go.util_rules.testutil import EXPECTED_VERSION, mock_go_binary
+from pants.core.util_rules.testutil import fake_asdf_root, materialize_indices
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
-
-EXPECTED_VERSION = "1.17"
-EXPECTED_VERSION_NEXT_RELEASE = "1.18"
-
-
-def mock_go_binary(*, version_output: str, env_output: Mapping[str, str]) -> str:
-    """Return a bash script that emulates `go version` and `go env`."""
-    return dedent(
-        f"""\
-        #!/bin/bash
-
-        if [[ "$1" == version ]]; then
-            echo '{version_output}'
-        else
-            echo '{json.dumps(env_output)}'
-        fi
-        """
-    )
 
 
 def test_expand_search_paths() -> None:

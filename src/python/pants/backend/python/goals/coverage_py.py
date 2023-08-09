@@ -12,7 +12,7 @@ from typing import Any, MutableMapping, cast
 
 import toml
 
-from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
@@ -108,14 +108,12 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=6.5,<8"
     default_main = ConsoleScript("coverage")
-    default_requirements = [default_version]
+    default_requirements = ["coverage[toml]>=6.5,<8"]
 
     register_interpreter_constraints = True
 
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
     filter = StrListOption(
         help=softwrap(
@@ -187,7 +185,7 @@ class CoverageSubsystem(PythonToolBase):
             Fail if the total combined coverage percentage for all tests is less than this
             number.
 
-            Use this instead of setting fail_under in a coverage.py config file,
+            Use this instead of setting `fail_under` in a coverage.py config file,
             as the config will apply to each test separately, while you typically want this
             to apply to the combined coverage for all tests run.
 
@@ -195,7 +193,7 @@ class CoverageSubsystem(PythonToolBase):
             check to trigger.
 
             Note also that if you specify a non-integral value, you must
-            also set [report] precision properly in the coverage.py config file to make use
+            also set `[report] precision` properly in the coverage.py config file to make use
             of the decimal places. See https://coverage.readthedocs.io/en/latest/config.html.
             """
         ),

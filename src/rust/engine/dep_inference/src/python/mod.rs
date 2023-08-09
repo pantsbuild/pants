@@ -2,8 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
 
-include!(concat!(env!("OUT_DIR"), "/constants.rs"));
-include!(concat!(env!("OUT_DIR"), "/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/python/constants.rs"));
+include!(concat!(env!("OUT_DIR"), "/python/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/python_impl_hash.rs"));
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use serde_derive::{Deserialize, Serialize};
@@ -50,7 +51,11 @@ pub fn get_dependencies(
     }
 
     let mut new_key_parts = path_parts[0..((path_parts.len() - level) + 1)].to_vec();
-    new_key_parts.push(nonrelative);
+    if !nonrelative.is_empty() {
+      // an import like `from .. import *` can end up with key == '..', and hence nonrelative == "";
+      // the result should just be the raw parent traversal, without a suffix part
+      new_key_parts.push(nonrelative);
+    }
 
     let old_value = import_map.remove(&key).unwrap();
     import_map.insert(new_key_parts.join("."), old_value);
@@ -91,37 +96,6 @@ impl ImportCollector<'_> {
     self.walk(&mut cursor);
   }
 
-  fn walk(&mut self, cursor: &mut tree_sitter::TreeCursor) {
-    loop {
-      let node = cursor.node();
-      let children_behavior = self.visit(node);
-
-      if children_behavior == ChildBehavior::Visit && cursor.goto_first_child() {
-        continue;
-      }
-      // NB: Could post_visit(node) here
-
-      if cursor.goto_next_sibling() {
-        continue;
-      }
-
-      let mut at_root = false;
-      while !at_root {
-        if cursor.goto_parent() {
-          // NB: Could post_visit(cursor.node()) here
-          if cursor.goto_next_sibling() {
-            break;
-          }
-        } else {
-          at_root = true
-        }
-      }
-      if at_root {
-        break;
-      }
-    }
-  }
-
   fn code_at(&self, range: tree_sitter::Range) -> &str {
     &self.code[range.start_byte..range.end_byte]
   }
@@ -149,48 +123,68 @@ impl ImportCollector<'_> {
     false
   }
 
+  fn unnest_alias(node: tree_sitter::Node) -> tree_sitter::Node {
+    match node.kind_id() {
+      KindID::ALIASED_IMPORT => node
+        .named_child(0)
+        .expect("aliased imports must have a child"),
+      _ => node,
+    }
+  }
+
+  /// Handle different styles of references to modules/imports
+  ///
+  /// ```python
+  /// import $base
+  /// "$base"  # string import
+  /// from $base import *  # (the * node is passed as `specific` too)
+  /// from $base import $specific
+  /// ```
   fn insert_import(
     &mut self,
-    name: tree_sitter::Node,
-    module_name: Option<tree_sitter::Node>,
+    base: tree_sitter::Node,
+    specific: Option<tree_sitter::Node>,
     is_string: bool,
   ) {
-    let dotted_name = match name.kind_id() {
-      KindID::ALIASED_IMPORT => name
-        .named_child(0)
-        .expect("Expected named child of aliased_import while parsing Python file."),
-      KindID::ERROR => {
-        return;
-      }
-      _ => name,
-    };
-    let name_range = dotted_name.range();
+    // the specifically-imported item takes precedence over the base name for ignoring and lines
+    // etc.
+    let most_specific = specific.unwrap_or(base);
 
-    if self.is_pragma_ignored(name) {
+    if self.is_pragma_ignored(most_specific) {
       return;
     }
 
-    let name_ref = if is_string {
-      self.string_at(name_range)
+    let base = ImportCollector::unnest_alias(base);
+    // * and errors are the same as not having an specific import
+    let specific = specific
+      .map(ImportCollector::unnest_alias)
+      .filter(|n| !matches!(n.kind_id(), KindID::WILDCARD_IMPORT | KindID::ERROR));
+
+    let base_range = base.range();
+    let base_ref = if is_string {
+      self.string_at(base_range)
     } else {
-      self.code_at(name_range)
+      self.code_at(base_range)
     };
-    let full_name = match module_name {
-      Some(module_name) => {
-        let mut mod_text = self.code_at(module_name.range());
-        if mod_text == "." {
-          mod_text = "";
-        }
-        [mod_text, name_ref].join(".")
+
+    let full_name = match specific {
+      Some(specific) => {
+        let specific_ref = self.code_at(specific.range());
+        // `from ... import a` => `...a` should concat base_ref and specific_ref directly, but `from
+        // x import a` => `x.a` needs to insert a . between them
+        let joiner = if base_ref.ends_with('.') { "" } else { "." };
+        [base_ref, specific_ref].join(joiner)
       }
-      None => name_ref.to_string(),
+      None => base_ref.to_string(),
     };
+
+    let line0 = most_specific.range().start_point.row;
 
     self
       .import_map
       .entry(full_name)
       .and_modify(|v| *v = (v.0, v.1 && self.weaken_imports))
-      .or_insert(((name_range.start_point.row as u64) + 1, self.weaken_imports));
+      .or_insert(((line0 as u64) + 1, self.weaken_imports));
   }
 }
 
@@ -205,8 +199,36 @@ impl Visitor for ImportCollector<'_> {
 
   fn visit_import_from_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     if !self.is_pragma_ignored(node) {
+      // the grammar is something like `from $module_name import $($name),* | '*'`, where $... is a field
+      // name.
+      let module_name = node
+        .child_by_field_name("module_name")
+        .expect("`from ... import ...` must have module_name");
+
+      let mut any_inserted = false;
       for child in node.children_by_field_name("name", &mut node.walk()) {
-        self.insert_import(child, Some(node.named_child(0).unwrap()), false);
+        self.insert_import(module_name, Some(child), false);
+        any_inserted = true;
+      }
+
+      if !any_inserted {
+        // There's no names (i.e. it's probably not `from ... import some, names`), let's look for
+        // the * in a wildcard import. (It doesn't have a field name, so we have to search for it
+        // manually.)
+        for child in node.children(&mut node.walk()) {
+          if child.kind_id() == KindID::WILDCARD_IMPORT {
+            self.insert_import(module_name, Some(child), false);
+            any_inserted = true
+          }
+        }
+      }
+
+      if !any_inserted {
+        // Still nothing inserted, which means something has probably gone wrong and/or we haven't
+        // understood the syntax tree! We're working on a definite import statement, so silently
+        // doing nothing with it is likely to be wrong. Let's insert the import node itself and let
+        // that be surfaced as an dep-inference failure.
+        self.insert_import(node, None, false)
       }
     }
     ChildBehavior::Ignore

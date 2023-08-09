@@ -37,7 +37,7 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::fs::Permissions as FSPermissions;
@@ -64,7 +64,7 @@ use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
-use remexec::{ServerCapabilities, Tree};
+use remexec::Tree;
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 #[cfg(target_os = "macos")]
@@ -84,6 +84,7 @@ mod local;
 pub mod local_tests;
 
 mod remote;
+pub use remote::RemoteOptions;
 #[cfg(test)]
 mod remote_tests;
 
@@ -372,33 +373,12 @@ impl Store {
   /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
   /// attempt to back-fill its local storage from the remote storage.
   ///
-  pub fn into_with_remote(
-    self,
-    cas_address: &str,
-    instance_name: Option<String>,
-    tls_config: grpc_util::tls::Config,
-    headers: BTreeMap<String, String>,
-    chunk_size_bytes: usize,
-    rpc_timeout: Duration,
-    rpc_retries: usize,
-    rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-    batch_api_size_limit: usize,
-  ) -> Result<Store, String> {
+  pub async fn into_with_remote(self, remote_options: RemoteOptions) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
-      remote: Some(RemoteStore::new(remote::ByteStore::new(
-        cas_address,
-        instance_name,
-        tls_config,
-        headers,
-        chunk_size_bytes,
-        rpc_timeout,
-        rpc_retries,
-        rpc_concurrency_limit,
-        capabilities_cell_opt,
-        batch_api_size_limit,
-      )?)),
+      remote: Some(RemoteStore::new(
+        remote::ByteStore::from_options(remote_options).await?,
+      )),
       immutable_inputs_base: self.immutable_inputs_base,
     })
   }

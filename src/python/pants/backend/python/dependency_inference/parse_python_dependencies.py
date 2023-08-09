@@ -19,9 +19,11 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
+from pants.engine.internals.native_engine import NativeDependenciesRequest
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -183,19 +185,25 @@ async def parse_python_dependencies(
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
 
-    if python_infer_subsystem.options.is_default("use_rust_parser"):
-        # NB: In 2.18, we'll switch the default to `True` and then warn if the value is set (to anything)
+    if not python_infer_subsystem.options.is_default("use_rust_parser"):
         # NB: In 2.19, we remove the option altogether and remove the old code.
         warn_or_error(
-            removal_version="2.18.0.dev0",
-            entity="Not explicitly providing [python-infer].use_rust_parser",
-            hint="Read the help for [python-infer].use_rust_parser, then set the value in pants.toml.",
+            removal_version="2.19.0.dev0",
+            entity="Explicitly providing [python-infer].use_rust_parser",
+            hint=softwrap(
+                f"""
+                Read the help for [python-infer].use_rust_parser
+                <{doc_url('reference-python-infer#use_rust_parser')}>, then stop setting the value
+                in pants.toml.
+                """
+            ),
         )
 
     has_custom_dep_inferences = len(union_membership[PythonDependencyVisitorRequest]) > 1
     if python_infer_subsystem.use_rust_parser and not has_custom_dep_inferences:
         native_result = await Get(
-            NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest
+            NativeParsedPythonDependencies,
+            NativeDependenciesRequest(stripped_sources.snapshot.digest),
         )
         imports = dict(native_result.imports)
         assets = set()

@@ -12,7 +12,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use futures::{FutureExt, Stream};
-use grpc_util::hyper::AddrIncomingWithStream;
+use grpc_util::hyper_util::AddrIncomingWithStream;
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;

@@ -267,26 +267,6 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
-class JvmArtifactExcludeDependenciesField(StringSequenceField):
-    alias = "excludes"
-    help = help_text(
-        """
-        A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded
-        as dependencies when this artifact is resolved.
-
-        This does not prevent this artifact from being included in the resolve as a dependency
-        of other artifacts that depend on it, and is currently intended as a way to resolve
-        version conflicts in complex resolves.
-
-        These values are passed directly to Coursier, and if specified incorrectly will show a
-        parse error from Coursier.
-        """
-    )
-
-    removal_hint = "Use `exclusions` field instead"
-    removal_version = "2.18.0.dev0"
-
-
 @dataclass(frozen=True)
 class JvmArtifactExclusion:
     alias: ClassVar[str] = "jvm_exclude"
@@ -405,7 +385,6 @@ class JvmArtifactTarget(Target):
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
-        JvmArtifactExcludeDependenciesField,
         JvmArtifactExclusionsField,
         JvmJdkField,
         JvmMainClassNameField,
@@ -694,18 +673,16 @@ class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
 
         Example:
 
-        ```
-        duplicate_policy=[
-            duplicate_rule(pattern="^META-INF/services", action="concat_text"),
-            duplicate_rule(pattern="^reference\\.conf", action="concat_text"),
-            duplicate_rule(pattern="^org/apache/commons", action="throw"),
-        ]
-        ```
+            duplicate_policy=[
+                duplicate_rule(pattern="^META-INF/services", action="concat_text"),
+                duplicate_rule(pattern="^reference\\.conf", action="concat_text"),
+                duplicate_rule(pattern="^org/apache/commons", action="throw"),
+            ]
 
         Where:
 
         * The `pattern` field is treated as a regular expression
-        * The `action` field must be one of {list(DeployJarDuplicateRule.valid_actions)}.
+        * The `action` field must be one of `{list(DeployJarDuplicateRule.valid_actions)}`.
 
         Note that the order in which the rules are listed is relevant.
         """
@@ -790,7 +767,7 @@ class JvmWarDependenciesField(Dependencies):
 class JvmWarDescriptorAddressField(SingleSourceField):
     alias = "descriptor"
     default = "web.xml"
-    help = "Path to a file containing the descriptor (i.e., web.xml) for this WAR file. Defaults to `web.xml`."
+    help = "Path to a file containing the descriptor (i.e., `web.xml`) for this WAR file. Defaults to `web.xml`."
 
 
 class JvmWarContentField(SpecialCasedDependencies):

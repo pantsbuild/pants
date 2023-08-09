@@ -8,7 +8,6 @@ from typing import Iterable
 
 import pytest
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     InvalidPythonLockfileReason,
@@ -18,6 +17,7 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadataV3,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
+from pants.util.pip_requirement import PipRequirement
 
 INTERPRETER_UNIVERSE = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 

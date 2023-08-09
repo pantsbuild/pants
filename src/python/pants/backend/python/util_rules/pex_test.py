@@ -18,7 +18,6 @@ from pkg_resources import Requirement
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex_test_utils
@@ -82,6 +81,7 @@ from pants.testutil.rule_runner import (
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_rmtree
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.pip_requirement import PipRequirement
 
 
 @pytest.fixture
@@ -505,6 +505,7 @@ def test_local_requirements_and_path_mappings(
             [
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet([wheel_req_str]),
+                    find_links=FrozenOrderedSet([]),
                     interpreter_constraints=InterpreterConstraints([">=3.7,<4"]),
                     resolve_name="test",
                     lockfile_dest="test.lock",

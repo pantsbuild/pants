@@ -3,6 +3,8 @@
 
 resource(name="lockfile", source="bandit.lock")
 
+resource(name="test_lockfile", source="bandit_plugin_test.lock")
+
 python_sources(
     overrides={"subsystem.py": {"dependencies": [":lockfile"]}},
 )
@@ -13,6 +15,7 @@ python_tests(
         "rules_integration_test.py": {
             "timeout": 240,
             "tags": ["platform_specific_behavior"],
+            "dependencies": [":test_lockfile"],
         }
     },
 )

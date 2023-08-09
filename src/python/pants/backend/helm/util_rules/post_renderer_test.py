@@ -30,7 +30,7 @@ from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRequest,
     RenderedHelmFiles,
 )
-from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
+from pants.backend.helm.util_rules.testutil import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.backend.shell.target_types import ShellCommandRunTarget, ShellSourcesGeneratorTarget
 from pants.backend.shell.util_rules import shell_command

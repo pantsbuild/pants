@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 from pants.backend.helm.target_types import (
+    HelmChartFieldSet,
     HelmChartTarget,
     HelmDeploymentFieldSet,
     HelmDeploymentTarget,
@@ -19,11 +20,11 @@ from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentCmd,
     HelmDeploymentRequest,
     RenderedHelmFiles,
+    RenderHelmChartRequest,
 )
+from pants.backend.helm.util_rules.testutil import _read_file_from_digest
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents, DigestSubset, PathGlobs
-from pants.engine.internals.native_engine import Digest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -40,6 +41,7 @@ def rule_runner() -> RuleRunner:
             *renderer.rules(),
             QueryRule(InteractiveProcess, (HelmDeploymentRequest,)),
             QueryRule(RenderedHelmFiles, (HelmDeploymentRequest,)),
+            QueryRule(RenderedHelmFiles, (RenderHelmChartRequest,)),
         ],
     )
     source_root_patterns = ("src/*",)
@@ -50,55 +52,73 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def _read_file_from_digest(rule_runner: RuleRunner, *, digest: Digest, filename: str) -> str:
-    config_file_digest = rule_runner.request(Digest, [DigestSubset(digest, PathGlobs([filename]))])
-    config_file_contents = rule_runner.request(DigestContents, [config_file_digest])
-    return config_file_contents[0].content.decode("utf-8")
+_COMMON_WORKSPACE_FILES = {
+    "src/mychart/BUILD": "helm_chart()",
+    "src/mychart/Chart.yaml": HELM_CHART_FILE,
+    "src/mychart/values.yaml": dedent(
+        """\
+        config_maps:
+            - name: foo
+              data:
+                foo_key: foo_value
+            - name: bar
+              data:
+                bar_key: bar_value
+        """
+    ),
+    "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+    "src/mychart/templates/configmap.yaml": dedent(
+        """\
+        {{- $root := . -}}
+        {{- $allConfigMaps := .Values.config_maps -}}
+        {{- range $configMap := $allConfigMaps }}
+        ---
+        {{- with $configMap }}
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: {{ template "fullname" $root }}-{{ .name }}
+          labels:
+            chart: "{{ $root.Chart.Name }}-{{ $root.Chart.Version | replace "+" "_" }}"
+        data:
+        {{ toYaml .data | indent 2 }}
+        {{- end }}
+        {{- end }}
+        """
+    ),
+}
 
-
-def _common_workspace_files() -> dict[str, str]:
-    return {
-        "src/mychart/BUILD": "helm_chart()",
-        "src/mychart/Chart.yaml": HELM_CHART_FILE,
-        "src/mychart/values.yaml": dedent(
-            """\
-                config_maps:
-                  - name: foo
-                    data:
-                      foo_key: foo_value
-                  - name: bar
-                    data:
-                      bar_key: bar_value
-                """
-        ),
-        "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-        "src/mychart/templates/configmap.yaml": dedent(
-            """\
-                {{- $root := . -}}
-                {{- $allConfigMaps := .Values.config_maps -}}
-                {{- range $configMap := $allConfigMaps }}
-                ---
-                {{- with $configMap }}
-                apiVersion: v1
-                kind: ConfigMap
-                metadata:
-                  name: {{ template "fullname" $root }}-{{ .name }}
-                  labels:
-                    chart: "{{ $root.Chart.Name }}-{{ $root.Chart.Version | replace "+" "_" }}"
-                data:
-                {{ toYaml .data | indent 2 }}
-                {{- end }}
-                {{- end }}
-                """
-        ),
-    }
+_DEFAULT_CONFIG_MAP = dedent(
+    """\
+    ---
+    # Source: mychart/templates/configmap.yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: foo-mychart-foo
+      labels:
+        chart: "mychart-0.1.0"
+    data:
+      foo_key: foo_value
+    ---
+    # Source: mychart/templates/configmap.yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: foo-mychart-bar
+      labels:
+        chart: "mychart-0.1.0"
+    data:
+      bar_key: bar_value
+    """
+)
 
 
 def test_sort_deployment_files_alphabetically(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            **_common_workspace_files(),
-            "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'])",
+            **_COMMON_WORKSPACE_FILES,
+            "src/deployment/BUILD": "helm_deployment(name='foo', chart='//src/mychart')",
             "src/deployment/b.yaml": "",
             "src/deployment/a.yaml": "",
         }
@@ -123,8 +143,8 @@ def test_sort_deployment_files_alphabetically(rule_runner: RuleRunner) -> None:
 def test_sort_deployment_files_as_given(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            **_common_workspace_files(),
-            "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'], sources=['b.yaml', '*.yaml'])",
+            **_COMMON_WORKSPACE_FILES,
+            "src/deployment/BUILD": "helm_deployment(name='foo', chart='//src/mychart', sources=['b.yaml', '*.yaml'])",
             "src/deployment/b.yaml": "",
             "src/deployment/a.yaml": "",
         }
@@ -149,38 +169,67 @@ def test_sort_deployment_files_as_given(rule_runner: RuleRunner) -> None:
 def test_renders_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            **_common_workspace_files(),
-            "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'])",
+            **_COMMON_WORKSPACE_FILES,
+            "src/deployment/BUILD": "helm_deployment(name='foo', chart='//src/mychart')",
         }
     )
 
     tgt = rule_runner.get_target(Address("src/deployment", target_name="foo"))
     field_set = HelmDeploymentFieldSet.create(tgt)
 
-    expected_config_map_file = dedent(
+    render_request = HelmDeploymentRequest(
+        cmd=HelmDeploymentCmd.RENDER,
+        field_set=field_set,
+        description="Test template rendering",
+    )
+
+    rendered = rule_runner.request(RenderedHelmFiles, [render_request])
+
+    assert rendered.snapshot.files
+    assert not rendered.post_processed
+    assert "mychart/templates/configmap.yaml" in rendered.snapshot.files
+
+    template_output = _read_file_from_digest(
+        rule_runner,
+        digest=rendered.snapshot.digest,
+        filename="mychart/templates/configmap.yaml",
+    )
+    assert template_output == _DEFAULT_CONFIG_MAP
+
+
+def test_renders_files_using_deployment_values(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            **_COMMON_WORKSPACE_FILES,
+            "src/deployment/BUILD": "helm_deployment(name='example', release_name='test', chart='//src/mychart')",
+            "src/deployment/values.yaml": dedent(
+                """\
+                config_maps:
+                  - name: example_map
+                    data:
+                      example_key: example_value
+                """
+            ),
+        }
+    )
+
+    expected_rendered_config_map = dedent(
         """\
         ---
         # Source: mychart/templates/configmap.yaml
         apiVersion: v1
         kind: ConfigMap
         metadata:
-          name: foo-mychart-foo
+          name: test-mychart-example_map
           labels:
             chart: "mychart-0.1.0"
         data:
-          foo_key: foo_value
-        ---
-        # Source: mychart/templates/configmap.yaml
-        apiVersion: v1
-        kind: ConfigMap
-        metadata:
-          name: foo-mychart-bar
-          labels:
-            chart: "mychart-0.1.0"
-        data:
-          bar_key: bar_value
+          example_key: example_value
         """
     )
+
+    tgt = rule_runner.get_target(Address("src/deployment", target_name="example"))
+    field_set = HelmDeploymentFieldSet.create(tgt)
 
     render_request = HelmDeploymentRequest(
         cmd=HelmDeploymentCmd.RENDER,
@@ -198,18 +247,18 @@ def test_renders_files(rule_runner: RuleRunner) -> None:
         digest=rendered.snapshot.digest,
         filename="mychart/templates/configmap.yaml",
     )
-    assert template_output == expected_config_map_file
+    assert template_output == expected_rendered_config_map
 
 
 def test_ignore_missing_interpolated_keys_during_render(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            **_common_workspace_files(),
+            **_COMMON_WORKSPACE_FILES,
             "src/deployment/BUILD": dedent(
                 """\
                 helm_deployment(
                     name='foo',
-                    dependencies=['//src/mychart'],
+                    chart='//src/mychart',
                     values={"foo": "{env.foo}"},
                 )
                 """
@@ -243,8 +292,8 @@ def test_flag_dns_lookups(rule_runner: RuleRunner) -> None:
                 apiVersion: v1
                 kind: ConfigMap
                 metadata:
-                name: foo-mychart-foo
-                labels:
+                  name: foo-mychart-foo
+                  labels:
                     chart: "mychart-0.1.0"
                 data:
                     host_addr: "{{ getHostByName "www.google.com" }}"
@@ -252,8 +301,8 @@ def test_flag_dns_lookups(rule_runner: RuleRunner) -> None:
             ),
             "src/deployment/BUILD": dedent(
                 """\
-                helm_deployment(name='foo', dependencies=['//src/mychart'])
-                helm_deployment(name='bar', dependencies=['//src/mychart'], enable_dns=True)
+                helm_deployment(name='foo', chart='//src/mychart')
+                helm_deployment(name='bar', chart='//src/mychart', enable_dns=True)
                 """
             ),
         }
@@ -288,3 +337,25 @@ def test_flag_dns_lookups(rule_runner: RuleRunner) -> None:
 
     assert foo_rendered["data"]["host_addr"] == ""
     assert not bar_rendered["data"]["host_addr"] == ""
+
+
+def test_render_standalone_chart(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(_COMMON_WORKSPACE_FILES)
+
+    tgt = rule_runner.get_target(Address("src/mychart"))
+    field_set = HelmChartFieldSet.create(tgt)
+
+    rendered_files = rule_runner.request(
+        RenderedHelmFiles, [RenderHelmChartRequest(field_set, release_name="foo")]
+    )
+
+    assert rendered_files.snapshot.files
+    assert "mychart/templates/configmap.yaml" in rendered_files.snapshot.files
+    assert not rendered_files.post_processed
+
+    template_output = _read_file_from_digest(
+        rule_runner,
+        digest=rendered_files.snapshot.digest,
+        filename="mychart/templates/configmap.yaml",
+    )
+    assert template_output == _DEFAULT_CONFIG_MAP

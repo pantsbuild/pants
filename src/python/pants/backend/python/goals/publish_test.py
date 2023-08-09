@@ -23,13 +23,14 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.process import Process
 from pants.testutil.process_util import process_assertion
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         preserve_tmpdirs=True,
         rules=[
             *config_files_rules(),
@@ -43,7 +44,7 @@ def rule_runner() -> RuleRunner:
     return set_options(rule_runner)
 
 
-def set_options(rule_runner: RuleRunner, options: list | None = None) -> RuleRunner:
+def set_options(rule_runner: PythonRuleRunner, options: list | None = None) -> PythonRuleRunner:
     rule_runner.set_options(
         options or [],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
@@ -92,7 +93,7 @@ def project_files(
     }
 
 
-def request_publish_processes(rule_runner: RuleRunner, packages) -> PublishProcesses:
+def request_publish_processes(rule_runner: PythonRuleRunner, packages) -> PublishProcesses:
     tgt = rule_runner.get_target(Address("src", target_name="dist"))
     fs = PublishPythonPackageFieldSet.create(tgt)
     return rule_runner.request(PublishProcesses, [fs._request(packages)])

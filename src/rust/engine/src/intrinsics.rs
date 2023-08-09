@@ -6,10 +6,10 @@ use std::env::current_dir;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::context::Context;
-use crate::externs;
 use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
 use crate::nodes::{
   lift_directory_digest, task_side_effected, DownloadedFile, ExecuteProcess, NodeResult, Paths,
@@ -19,10 +19,15 @@ use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
-use dep_inference::python::get_dependencies;
-use protos::gen::pants::cache::{CacheKey, CacheKeyType};
+use crate::{externs, Core};
+use dep_inference::{javascript, python};
+use protos::gen::pants::cache::{
+  dependency_inference_request, CacheKey, CacheKeyType, DependencyInferenceRequest,
+};
 
 use bytes::Bytes;
+use dep_inference::javascript::ParsedJavascriptDependencies;
+use dep_inference::python::ParsedPythonDependencies;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
@@ -39,9 +44,12 @@ use process_execution::local::{
 use process_execution::{ManagedChild, Platform, ProcessExecutionStrategy};
 use rule_graph::DependencyKey;
 use stdio::TryCloneAsFile;
-use store::{SnapshotOps, SubsetParams};
+use store::{SnapshotOps, Store, SubsetParams};
 
+use crate::externs::dep_inference::PyNativeDependenciesRequest;
 use workunit_store::{in_workunit, Level};
+
+use grpc_util::prost::MessageExt;
 
 type IntrinsicFn =
   Box<dyn Fn(Context, Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> + Send + Sync>;
@@ -50,7 +58,6 @@ pub struct Intrinsics {
   intrinsics: IndexMap<Intrinsic, IntrinsicFn>,
 }
 
-// NB: Keep in sync with `rules()` in `src/python/pants/engine/fs.py`.
 impl Intrinsics {
   pub fn new(types: &Types) -> Intrinsics {
     let mut intrinsics: IndexMap<Intrinsic, IntrinsicFn> = IndexMap::new();
@@ -142,9 +149,16 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.parsed_python_deps_result,
-        inputs: vec![DependencyKey::new(types.directory_digest)],
+        inputs: vec![DependencyKey::new(types.deps_request)],
       },
       Box::new(parse_python_deps),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.parsed_javascript_deps_result,
+        inputs: vec![DependencyKey::new(types.deps_request)],
+      },
+      Box::new(parse_javascript_deps),
     );
     Intrinsics { intrinsics }
   }
@@ -750,15 +764,53 @@ fn docker_resolve_image(
   .boxed()
 }
 
-fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
-  async move {
-    let core = &context.core;
-    let store = core.store();
-    let directory_digest = Python::with_gil(|py| {
-      let py_digest = (*args[0]).as_ref(py);
-      lift_directory_digest(py_digest)
-    })?;
+struct PreparedInferenceRequest {
+  pub path: PathBuf,
+  pub digest: Digest,
+  inner: DependencyInferenceRequest,
+}
 
+impl PreparedInferenceRequest {
+  pub async fn prepare(
+    args: Vec<Value>,
+    store: &Store,
+    backend: &str,
+    impl_hash: &str,
+  ) -> NodeResult<Self> {
+    let PyNativeDependenciesRequest {
+      directory_digest,
+      metadata,
+    } = Python::with_gil(|py| (*args[0]).as_ref(py).extract())?;
+
+    let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
+
+    Ok(Self {
+      path,
+      digest,
+      inner: DependencyInferenceRequest {
+        input_file_digest: Some(digest.into()),
+        metadata,
+        impl_hash: impl_hash.to_string(),
+      },
+    })
+  }
+
+  pub async fn read_digest(&self, store: &Store) -> NodeResult<String> {
+    let bytes = store
+      .load_file_bytes_with(self.digest, |bytes| Vec::from(bytes))
+      .await?;
+
+    Ok(
+      String::from_utf8(bytes)
+        .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?,
+    )
+  }
+
+  async fn find_one_file(
+    directory_digest: DirectoryDigest,
+    store: &Store,
+    backend: &str,
+  ) -> NodeResult<(PathBuf, Digest)> {
     let mut path = None;
     let mut digest = None;
     store
@@ -772,48 +824,43 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
       });
     if digest.is_none() || path.is_none() {
       Err(format!(
-        "Couldn't find a file in digest for Python inference: {directory_digest:?}"
+        "Couldn't find a file in digest for {backend} inference: {directory_digest:?}"
       ))?
     }
     let path = path.unwrap();
     let digest = digest.unwrap();
+    Ok((path, digest))
+  }
 
+  fn cache_key(&self) -> CacheKey {
+    CacheKey {
+      key_type: CacheKeyType::DepInferenceRequest.into(),
+      digest: Some(Digest::of_bytes(&self.inner.to_bytes()).into()),
+    }
+  }
+}
+
+fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let core = &context.core;
+    let store = core.store();
+    let prepared_inference_request =
+      PreparedInferenceRequest::prepare(args, &store, "Python", python::IMPL_HASH).await?;
     in_workunit!(
       "parse_python_dependencies",
       Level::Debug,
-      desc = Some(format!("Determine Python dependencies for {path:?}")),
+      desc = Some(format!(
+        "Determine Python dependencies for {:?}",
+        &prepared_inference_request.path
+      )),
       |_workunit| async move {
-        let cache_key = CacheKey {
-          key_type: CacheKeyType::DepInferenceRequest.into(),
-          digest: Some(digest.into()),
-        };
-        let cached_result = core.local_cache.load(&cache_key).await?;
-
-        let result = if let Some(result) =
-          cached_result.and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        {
-          result
-        } else {
-          let bytes = store
-            .load_file_bytes_with(digest, |bytes| Vec::from(bytes))
-            .await?;
-
-          let contents = std::str::from_utf8(&bytes)
-            .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?;
-          let result = Some(get_dependencies(contents, path)?);
-          core
-            .local_cache
-            .store(
-              &cache_key,
-              Bytes::from(
-                serde_json::to_string(&result)
-                  .map_err(|e| format!("Failed to serialize dep inference cache result: {e}"))?,
-              ),
-            )
-            .await?;
-          result
-        };
-        let result = result.unwrap();
+        let result: ParsedPythonDependencies = get_or_create_inferred_dependencies(
+          core,
+          &store,
+          prepared_inference_request,
+          |content, request| python::get_dependencies(content, request.path),
+        )
+        .await?;
 
         let result = Python::with_gil(|py| {
           externs::unsafe_call(
@@ -832,4 +879,103 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
     .await
   }
   .boxed()
+}
+
+fn parse_javascript_deps(
+  context: Context,
+  args: Vec<Value>,
+) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let core = &context.core;
+    let store = core.store();
+    let prepared_inference_request =
+      PreparedInferenceRequest::prepare(args, &store, "Javascript", javascript::IMPL_HASH).await?;
+
+    in_workunit!(
+      "parse_javascript_dependencies",
+      Level::Debug,
+      desc = Some(format!(
+        "Determine Javascript dependencies for {:?}",
+        prepared_inference_request.path
+      )),
+      |_workunit| async move {
+        let result: ParsedJavascriptDependencies = get_or_create_inferred_dependencies(
+          core,
+          &store,
+          prepared_inference_request,
+          |content, request| {
+            if let Some(dependency_inference_request::Metadata::Js(metadata)) =
+              request.inner.metadata
+            {
+              javascript::get_dependencies(content, request.path, metadata)
+            } else {
+              Err(format!(
+                "{:?} is not valid metadata for Javascript dependency inference",
+                request.inner.metadata
+              ))
+            }
+          },
+        )
+        .await?;
+
+        let result = Python::with_gil(|py| {
+          externs::unsafe_call(
+            py,
+            core.types.parsed_javascript_deps_result,
+            &[
+              result.file_imports.to_object(py).into(),
+              result.package_imports.to_object(py).into(),
+            ],
+          )
+        });
+
+        Ok(result)
+      }
+    )
+    .await
+  }
+  .boxed()
+}
+
+async fn get_or_create_inferred_dependencies<T, F>(
+  core: &Arc<Core>,
+  store: &Store,
+  request: PreparedInferenceRequest,
+  dependencies_parser: F,
+) -> NodeResult<T>
+where
+  T: serde::de::DeserializeOwned + serde::Serialize,
+  F: Fn(&str, PreparedInferenceRequest) -> Result<T, String>,
+{
+  let cache_key = request.cache_key();
+  let result = if let Some(result) = lookup_inferred_dependencies(&cache_key, core).await? {
+    result
+  } else {
+    let contents = request.read_digest(store).await?;
+    let result = dependencies_parser(&contents, request)?;
+    core
+      .local_cache
+      .store(
+        &cache_key,
+        Bytes::from(
+          serde_json::to_string(&result)
+            .map_err(|e| format!("Failed to serialize dep inference cache result: {e}"))?,
+        ),
+      )
+      .await?;
+    result
+  };
+  Ok(result)
+}
+
+async fn lookup_inferred_dependencies<T: serde::de::DeserializeOwned>(
+  key: &CacheKey,
+  core: &Arc<Core>,
+) -> NodeResult<Option<T>> {
+  let cached_result = core.local_cache.load(key).await?;
+  Ok(
+    cached_result
+      .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+      .flatten(),
+  )
 }

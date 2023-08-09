@@ -8,7 +8,6 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
-importlib_resources==5.0.*
 ijson==3.1.4
 packaging==21.3
 pex==2.1.137
@@ -48,3 +47,6 @@ uvicorn[standard]==0.17.6
 
 beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
 python-gnupg==0.4.9 # For validating signatures
+
+# Only used for release management
+PyGithub==2.0.0rc1
