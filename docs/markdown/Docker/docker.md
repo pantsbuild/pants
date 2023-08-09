@@ -311,7 +311,7 @@ Most authentication mechanisms will also require tools exposed on the `$PATH` to
 [docker]
 env_vars = ["DOCKER_CONFIG=%(homedir)s/.docker"]
 tools = [
-  "docker-credential-gcr",
+  "docker-credential-gcr", # or docker-credential-gcloud when using artifact registry
   "dirname",
   "readlink",
   "python3",

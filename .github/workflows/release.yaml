@@ -312,7 +312,7 @@ jobs:
         skip-existing: true
     - name: Generate announcement
       run: './pants run src/python/pants_release/generate_release_announcement.py                         --
-        --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+        --output-dir=${{ runner.temp }}
 
         '
     - env:
@@ -322,11 +322,21 @@ jobs:
       with:
         channel-id: C18RRR4JK
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
+    - name: Announce to pants-devel
+      uses: dawidd6/action-send-mail@v3.8.0
+      with:
+        body: file://${{ runner.temp }}/email_announcement_body.md
+        connection_url: ${{ secrets.EMAIL_CONNECTION_URL }}
+        convert_markdown: true
+        from: Pants Announce
+        secure: true
+        subject: file://${{ runner.temp }}/email_announcement_subject.txt
+        to: pants-devel@googlegroups.com
     - name: Get release notes
       run: 'REF="${{ needs.release_info.outputs.build-ref }}"
 
         ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"}
-        > notes.txt",
+        > notes.txt
 
         '
     - env:

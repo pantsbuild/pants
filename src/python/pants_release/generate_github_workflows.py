@@ -1169,7 +1169,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "run": dedent(
                         """\
                         ./pants run src/python/pants_release/generate_release_announcement.py \
-                        -- --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+                        -- --output-dir=${{ runner.temp }}
                         """
                     ),
                 },
@@ -1183,11 +1183,31 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"},
                 },
                 {
+                    "name": "Announce to pants-devel",
+                    "uses": "dawidd6/action-send-mail@v3.8.0",
+                    "with": {
+                        # Note: Email is sent from the dedicated account pants.announce@gmail.com.
+                        # The EMAIL_CONNECTION_URL should be of the form:
+                        # smtp+starttls://pants.announce@gmail.com:password@smtp.gmail.com:465
+                        # (i.e., should use gmail's raw SMTP server), and the password
+                        # should be a Google account "app password" set up for this purpose
+                        # (not the Google account's regular password).
+                        # And, of course, that account must have permission to post to pants-devel.
+                        "connection_url": f"{gha_expr('secrets.EMAIL_CONNECTION_URL')}",
+                        "secure": True,
+                        "subject": "file://${{ runner.temp }}/email_announcement_subject.txt",
+                        "to": "pants-devel@googlegroups.com",
+                        "from": "Pants Announce",
+                        "body": "file://${{ runner.temp }}/email_announcement_body.md",
+                        "convert_markdown": True,
+                    },
+                },
+                {
                     "name": "Get release notes",
                     "run": dedent(
                         """\
                         REF="${{ needs.release_info.outputs.build-ref }}"
-                        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"} > notes.txt",
+                        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"} > notes.txt
                         """
                     ),
                 },
