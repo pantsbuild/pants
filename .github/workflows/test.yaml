@@ -327,6 +327,11 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
@@ -378,6 +383,11 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -438,6 +448,11 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -498,6 +513,11 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
