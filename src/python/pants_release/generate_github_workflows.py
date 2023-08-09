@@ -316,6 +316,20 @@ def install_go() -> Step:
     }
 
 
+# NOTE: Any updates to the version of arduino/setup-protoc will require an audit of the updated  source code to verify
+# nothing "bad" has been added to the action. (We pass the user's GitHub secret to the action in order to avoid the
+# default GitHub rate limits when downloading protoc._
+def install_protoc() -> Step:
+    return {
+        "name": "Install Protoc",
+        "uses": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+        "with": {
+            "version": "23.x",
+            "repo-token": "${{ secrets.GITHUB_TOKEN }}",
+        },
+    }
+
+
 def deploy_to_s3(
     name: str,
     *,
@@ -436,6 +450,7 @@ class Helper:
 
     def rust_caches(self) -> Sequence[Step]:
         return [
+            install_protoc(),  # for `prost` crate
             {
                 "name": "Cache Rust toolchain",
                 "uses": "actions/cache@v3",
@@ -1176,7 +1191,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "run": dedent(
                         """\
                         ./pants run src/python/pants_release/generate_release_announcement.py \
-                        -- --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+                        -- --output-dir=${{ runner.temp }}
                         """
                     ),
                 },
@@ -1189,6 +1204,26 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"},
                 },
+                {
+                    "name": "Announce to pants-devel",
+                    "uses": "dawidd6/action-send-mail@v3.8.0",
+                    "with": {
+                        # Note: Email is sent from the dedicated account pants.announce@gmail.com.
+                        # The EMAIL_CONNECTION_URL should be of the form:
+                        # smtp+starttls://pants.announce@gmail.com:password@smtp.gmail.com:465
+                        # (i.e., should use gmail's raw SMTP server), and the password
+                        # should be a Google account "app password" set up for this purpose
+                        # (not the Google account's regular password).
+                        # And, of course, that account must have permission to post to pants-devel.
+                        "connection_url": f"{gha_expr('secrets.EMAIL_CONNECTION_URL')}",
+                        "secure": True,
+                        "subject": "file://${{ runner.temp }}/email_announcement_subject.txt",
+                        "to": "pants-devel@googlegroups.com",
+                        "from": "Pants Announce",
+                        "body": "file://${{ runner.temp }}/email_announcement_body.md",
+                        "convert_markdown": True,
+                    },
+                },
                 deploy_to_s3(
                     "Deploy commit mapping to S3",
                     scope="tags/pantsbuild.pants",
@@ -1198,7 +1233,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "run": dedent(
                         """\
                         REF="${{ needs.release_info.outputs.build-ref }}"
-                        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"} > notes.txt",
+                        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"} > notes.txt
                         """
                     ),
                 },

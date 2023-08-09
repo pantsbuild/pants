@@ -145,5 +145,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(PackageFieldSet, PythonAwsLambdaFieldSet),
+        UnionRule(PackageFieldSet, PythonAwsLambdaLayerFieldSet),
         *faas_rules(),
     ]
