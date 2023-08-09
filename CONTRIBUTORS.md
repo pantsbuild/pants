@@ -9,6 +9,7 @@ Created as part of the release process.
 + Alex Bancroft
 + Alex Schmitt
 + Alexander Johnson
++ Alexander Kuhn-Regnier
 + Alexey Tereshenkov
 + Andreas Stenius
 + Andrew Hamilton
@@ -281,6 +282,7 @@ Created as part of the release process.
 + Tianshuo Deng
 + Tien Nguyen
 + Tim Gates
++ Tim Nielens
 + Tim Treptow
 + Timur Abishev
 + Tina Huang
@@ -309,6 +311,7 @@ Created as part of the release process.
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ azban
 + bianca rosa
 + billybecker
 + eugene yokota

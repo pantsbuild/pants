@@ -91,7 +91,7 @@ async fn load_missing() {
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
   let provider = new_provider(&cas).await;
-  let mut destination = Vec::new();
+  let mut destination: Vec<u8> = Vec::new();
 
   let found = provider
     .load(testdata.digest(), &mut destination)
@@ -99,7 +99,7 @@ async fn load_missing() {
     .unwrap();
 
   assert!(!found);
-  assert_eq!(destination, Vec::new());
+  assert!(destination.is_empty());
 }
 
 #[tokio::test]
