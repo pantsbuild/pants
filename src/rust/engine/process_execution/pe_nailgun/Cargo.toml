@@ -15,7 +15,7 @@ nails = "0.13"
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
 tokio = { version = "1.28", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-rustls = "0.23"
+tokio-rustls = "0.24"
 tokio-util = { version = "0.7", features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
 itertools = "0.10"

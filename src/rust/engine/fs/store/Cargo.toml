@@ -35,7 +35,7 @@ serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
 task_executor = { path = "../../task_executor" }
 tempfile = "3.5.0"
-tokio-rustls = "0.23"
+tokio-rustls = "0.24"
 tokio = { version = "1.28", features = ["fs"] }
 tonic = { version = "0.9", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = "0.3"
