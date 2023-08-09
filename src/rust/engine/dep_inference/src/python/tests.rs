@@ -431,6 +431,20 @@ fn tryexcept_weak_imports() {
     &["weak0", "weak1", "weak2"],
   );
 }
+#[test]
+fn tryexcept_weak_imports_dunder() {
+  assert_imports_strong_weak(
+    r"
+    __import__('strong')
+    try:
+      __import__('weak')
+    except ImportError:
+      pass
+    ",
+    &["strong"],
+    &["weak"],
+  )
+}
 
 #[test]
 fn contextlib_suppress_weak_imports() {
@@ -582,6 +596,19 @@ fn contextlib_suppress_weak_imports() {
     &["strong0"],
     &[],
   );
+}
+
+#[test]
+fn contextlib_suppress_weak_imports_dunder() {
+  assert_imports_strong_weak(
+    r"
+    __import__('strong')
+    with contextlib.suppress(ImportError):
+      __import__('weak')
+    ",
+    &["strong"],
+    &["weak"],
+  )
 }
 
 fn assert_strings(code: &str, strings: &[&str]) {
