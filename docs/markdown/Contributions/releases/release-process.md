@@ -63,7 +63,7 @@ The process may fail in one of two ways:
 Step 1: Create the release commit
 ---------------------------------
 
-The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. FOR `rc` and stable releases, this happens in the relevant stable branch (while the release notes are still updated on `main`).
+The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. For `rc` and stable releases, this happens in the relevant stable branch (while the release notes are still updated on `main`).
 
 ### `dev0` - set up the new release series
 
