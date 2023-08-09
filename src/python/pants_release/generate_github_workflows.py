@@ -316,6 +316,20 @@ def install_go() -> Step:
     }
 
 
+# NOTE: Any updates to the version of arduino/setup-protoc will require an audit of the updated  source code to verify
+# nothing "bad" has been added to the action. (We pass the user's GitHub secret to the action in order to avoid the
+# default GitHub rate limits when downloading protoc._
+def install_protoc() -> Step:
+    return {
+        "name": "Install Protoc",
+        "uses": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+        "with": {
+            "version": "23.x",
+            "repo-token": "${{ secrets.GITHUB_TOKEN }}",
+        },
+    }
+
+
 def deploy_to_s3(
     name: str,
     *,
@@ -436,6 +450,7 @@ class Helper:
 
     def rust_caches(self) -> Sequence[Step]:
         return [
+            install_protoc(),  # for `prost` crate
             {
                 "name": "Cache Rust toolchain",
                 "uses": "actions/cache@v3",

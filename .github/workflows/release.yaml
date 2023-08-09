@@ -155,6 +155,11 @@ jobs:
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
@@ -223,6 +228,11 @@ jobs:
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
