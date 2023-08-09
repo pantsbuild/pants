@@ -406,6 +406,12 @@ class Helper:
         if self.platform == Platform.LINUX_ARM64:
             ret["PANTS_CONFIG_FILES"] = "+['pants.ci.toml','pants.ci.aarch64.toml']"
         if self.platform == Platform.LINUX_X86_64:
+            # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
+            # these are weak dual-core machines. Default parallelism on those machines
+            # leads to many test timeouts. This parallelism reduction appears to lead
+            # to test shard runs that are 50% slower on average, but more likely to
+            # complete without timeouts.
+            # TODO: If we add a "redo timed out tests" feature, we can kill this.
             ret["PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM"] = "1"
         return ret
 
