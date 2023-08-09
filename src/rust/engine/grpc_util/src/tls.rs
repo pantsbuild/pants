@@ -47,7 +47,7 @@ impl TryFrom<Config> for ClientConfig {
           tls_config.with_no_client_auth()
         }
       }
-      _ => {
+      CertificateCheck::Enabled => {
         let tls_config = match config.root_ca_certs {
           Some(pem_bytes) => {
             let reader = std::io::Cursor::new(pem_bytes);

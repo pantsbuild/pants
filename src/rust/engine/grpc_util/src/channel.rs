@@ -72,6 +72,12 @@ impl Service<Request<BoxBody>> for Channel {
   }
 
   fn call(&mut self, mut req: Request<BoxBody>) -> Self::Future {
+    // Apparently the schema and authority do not get set by Hyper. Thus, the examples generally
+    // opy the URI and replace the scheme and authority with the ones from the initial URI used
+    // to configure the client.
+    //
+    // See https://github.com/LucioFranco/tonic-openssl/blob/bdaaecda437949244a1b4d61cb39110c4bcad019/example/src/client2.rs#L92
+    // from the inspiration example
     let uri = Uri::builder()
       .scheme(self.uri.scheme().unwrap().clone())
       .authority(self.uri.authority().unwrap().clone())
