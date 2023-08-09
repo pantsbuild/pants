@@ -91,7 +91,6 @@ class GeneralDependencyVisitor(DependencyVisitorBase):
         self._visit_import_stmt(node, abs_module + ".")
 
     def visit_TryExcept(self, node):
-        previous_weaken = self.weaken_strong_imports
         for handler in node.handlers:
             # N.B. Python allows any arbitrary expression as an except handler.
             # We only parse Name, or (Set/Tuple/List)-of-Names expressions
@@ -109,7 +108,7 @@ class GeneralDependencyVisitor(DependencyVisitorBase):
         for stmt in node.body:
             self.visit(stmt)
 
-        self.weaken_strong_imports = previous_weaken
+        self.weaken_strong_imports = False
 
         for handler in node.handlers:
             self.visit(handler)
@@ -146,48 +145,3 @@ class GeneralDependencyVisitor(DependencyVisitorBase):
     def visit_Constant(self, node):
         if isinstance(node.value, str):
             self.maybe_add_string_dependency(node, node.value)
-
-    def _is_with_contexlib_suppress(self, n: ast.withitem) -> bool:
-        context_expr = n.context_expr
-        if not isinstance(context_expr, ast.Call):
-            return False
-
-        call = context_expr
-        # for `contextlib.suppress(ImportError)`
-        if isinstance(call.func, ast.Attribute):
-            attr = call.func
-            if isinstance(attr.value, ast.Name):
-                # is_contextlib = attr.value.id == 'contextlib'
-                is_suppress = attr.attr == "suppress"
-                args = call.args
-            else:
-                return False
-        # for `suppress(ImportError)`
-        elif isinstance(call.func, ast.Name):
-            is_suppress = call.func.id == "suppress"
-            args = call.args
-        else:
-            return False
-
-        has_importerror = any(isinstance(arg, ast.Name) and arg.id == "ImportError" for arg in args)
-        return is_suppress and has_importerror
-
-    def visit_With(self, node: ast.With):
-        """Explore `with` nodes for weakening imports wrapped in
-        `contextlib.suppress(ImportError)`"""
-
-        # remember to visit the withitems themselves
-        # for ex detecting imports in `with open("/foo/bar") as f`
-        for withitem in node.items:
-            self.visit(withitem)
-
-        is_suppressing = any(self._is_with_contexlib_suppress(withitem) for withitem in node.items)
-        if is_suppressing:
-            previous_weaken = self.weaken_strong_imports
-            self.weaken_strong_imports = True
-            for stmt in node.body:
-                self.visit(stmt)
-            self.weaken_strong_imports = previous_weaken
-        else:
-            for stmt in node.body:
-                self.visit(stmt)
