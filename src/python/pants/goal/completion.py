@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-from enum import Enum
 import logging
+from enum import Enum
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
@@ -19,9 +19,11 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
+
 class Shell(Enum):
     BASH = "bash"
     ZSH = "zsh"
+
 
 class CompletionBuiltinGoal(BuiltinGoal):
     name = "complete"
@@ -56,13 +58,13 @@ class CompletionBuiltinGoal(BuiltinGoal):
         specs: Specs,
         union_membership: UnionMembership,
     ) -> ExitCode:
-        """
-        This function is called under two main circumstances.
+        """This function is called under two main circumstances.
+
         - By a user generating a completion script for their shell (e.g. `pants complete --zsh > pants-completions.zsh`)
         - By the shell completions script when the user attempts a tab completion (e.g. `pants <tab>`, `pants fmt lint che<tab>`, etc...)
-        
+
         In the first case, we should generate a completion script for the specified shell and print it to stdout.
-        In the second case, we should generate the completion options for the current command and print them to stdout.        
+        In the second case, we should generate the completion options for the current command and print them to stdout.
 
         The trigger to determine which case we're in is the presence of the passthrough arguments. If there are passthrough
         arguments, then we're generating completion options. If there are no passthrough arguments, then we're generating
@@ -72,38 +74,36 @@ class CompletionBuiltinGoal(BuiltinGoal):
             completion_options = self._generate_completion_options(options)
             print("\n".join(completion_options))
             return PANTS_SUCCEEDED_EXIT_CODE
-        
+
         script = self._generate_completion_script(self.shell)
         print(script)
         return PANTS_SUCCEEDED_EXIT_CODE
-    
-    def _generate_completion_script(self, shell: Shell) -> str:
-        """
-        Generate a completion script for the specified shell.
 
-        Implementation note: In practice, we're just going to read in 
+    def _generate_completion_script(self, shell: Shell) -> str:
+        """Generate a completion script for the specified shell.
+
+        Implementation note: In practice, we're just going to read in
         and return the contents of the appropriate static completion script file.
 
         :param shell: The shell to generate a completion script for.
         :return: The completion script for the specified shell.
         """
         pass
-    
+
     def _generate_completion_options(self, options: Options) -> list[str]:
-        """
-        Generate the completion options for the specified args.
+        """Generate the completion options for the specified args.
 
         We're guaranteed to have at least two arguments (`["pants", ""]`). If there are only two arguments,
-        then we're at the top-level Pants command, and we should show all goals. 
+        then we're at the top-level Pants command, and we should show all goals.
         - `pants <tab>` -> `... fmt fix lint list repl run test ...`
-        
+
         If we're at the top-level and the user has typed a hyphen, then we should show global options.
         - `pants -<tab>` -> `... --pants-config-files --pants-distdir --pants-ignore ...`
 
         As we add goals, we should show the remaining goals that are available.
         - `pants fmt fix lint <tab>` -> `... list repl run test ...`
 
-        If there is a goal in the list of arguments and the user has typed a hyphen, then we should 
+        If there is a goal in the list of arguments and the user has typed a hyphen, then we should
         show the available scoped options for the previous goal.
         - `pants fmt -<tab>` -> `... --only ...`
 
@@ -117,7 +117,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         previous_goal = self._get_previous_goal(options._passthru)
         logger.debug(f"Current word is '{current_word}', and previous goal is '{previous_goal}'")
 
-        all_goals = sorted([k for k,v in options.known_scope_to_info.items() if v.is_goal])
+        all_goals = sorted([k for k, v in options.known_scope_to_info.items() if v.is_goal])
 
         # If there is no previous goal, then we're at the top-level Pants command, so show all goals or global options
         if not previous_goal:
@@ -137,13 +137,14 @@ class CompletionBuiltinGoal(BuiltinGoal):
 
         # If there is a previous goal and current_word does not start with a hyphen, then show remaining goals
         # excluding the goals that are already in the command
-        candidate_goals = [g for g in all_goals if g.startswith(current_word) and g not in options._passthru]
+        candidate_goals = [
+            g for g in all_goals if g.startswith(current_word) and g not in options._passthru
+        ]
         return candidate_goals
-        
+
     def _get_previous_goal(self, args: list[str]) -> str | None:
-        """
-        Get the most recent goal in the command arguments, so options can be correctly applied.
-        
+        """Get the most recent goal in the command arguments, so options can be correctly applied.
+
         This function will ignore hyphenated options when looking for the goal. The args list
         should never be empty, as we should always have at least the `pants` command.
 
@@ -152,7 +153,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         :param args: The list of arguments to search for the previous goal.
         :return: The previous goal, or None if there is no previous goal.
         """
-        # If there is a goal in the list of arguments, reverse the args and return the first 
+        # If there is a goal in the list of arguments, reverse the args and return the first
         # non-hyphenated arg (which should be a goal).
         for arg in reversed(args):
             if not arg.startswith("-"):
@@ -161,8 +162,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
         return None
 
     def _build_options_for_goal(self, options: Options, goal: str = "") -> list[str]:
-        """
-        Build a list of stringified options for the specified goal, prefixed by `--`.
+        """Build a list of stringified options for the specified goal, prefixed by `--`.
 
         :param options: The options object for the current Pants run.
         :param goal: The goal to build options for. Defaults to "" for the global scope.
@@ -172,7 +172,7 @@ class CompletionBuiltinGoal(BuiltinGoal):
             global_options = sorted(options.for_global_scope().as_dict().keys())
             return [f"--{o}" for o in global_options]
 
-        try: 
+        try:
             scoped_options = sorted(options.for_scope(goal).as_dict().keys())
             return [f"--{o}" for o in scoped_options]
         except:

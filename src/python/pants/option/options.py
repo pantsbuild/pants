@@ -272,9 +272,8 @@ class Options:
         return register
 
     def get_parser(self, scope: str) -> Parser:
-        """
-        Returns the parser for the given scope, so code can register on it directly.
-        
+        """Returns the parser for the given scope, so code can register on it directly.
+
         :param scope: The scope to retrieve the parser for.
         :return: The parser for the given scope.
         :raises pants.option.errors.ConfigValidationError: if the scope is not known.
