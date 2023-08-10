@@ -28,6 +28,11 @@ Step 2: Bootstrap the Rust engine
 
 Pants uses Rustup to install Rust. Run the command from <https://rustup.rs> to install Rustup; ensure that `rustup` is on your `$PATH`.
 
+You also need a suitable Python 3.9 interpreter. The [Python Standalone Builds](https://gregoryszorc.com/docs/python-build-standalone/main/) by Gregory Szorc should work.
+Avoid the Python interpreters from Ubuntu's deadsnakes PPA, they don't work with Pants. The python39 package from the Nix package manager has also caused problems for users in the past.
+
+You also need to have the protobuf compiler and LLVM clang installed. On Debian derivatives, these can be installed using `apt install clang protobuf-compiler`.
+
 Then, run `pants` to set up the Python virtual environment and compile the engine.
 
 > 🚧 This will take several minutes
