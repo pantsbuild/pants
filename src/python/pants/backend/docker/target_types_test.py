@@ -25,6 +25,11 @@ from pants.engine.internals.native_engine import Address
             os.path.expanduser("~/home/path"),
         ),
     ],
+    ids=[
+        "absolute_path",
+        "relative_path",
+        "homedir_path",
+    ],
 )
 def test_secret_path_resolvement(src: str, expected: str):
     Path.cwd().joinpath("pants.toml").write_text("")
