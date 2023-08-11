@@ -40,8 +40,6 @@ object Analysis {
 }
 
 case class ProvidedSymbol(
-    sawClass: Boolean,
-    sawTrait: Boolean,
     sawObject: Boolean,
     recursive: Boolean
 )
@@ -121,8 +119,6 @@ class SourceAnalysisTraverser extends Traverser {
 
   def recordProvidedName(
       symbolName: String,
-      sawClass: Boolean = false,
-      sawTrait: Boolean = false,
       sawObject: Boolean = false,
       recursive: Boolean = false
   ): Unit = {
@@ -136,16 +132,12 @@ class SourceAnalysisTraverser extends Traverser {
       if (providedSymbols.contains(symbolName)) {
         val existingSymbol = providedSymbols(symbolName)
         val newSymbol = ProvidedSymbol(
-          sawClass = existingSymbol.sawClass || sawClass,
-          sawTrait = existingSymbol.sawTrait || sawTrait,
           sawObject = existingSymbol.sawObject || sawObject,
           recursive = existingSymbol.recursive || recursive
         )
         providedSymbols(symbolName) = newSymbol
       } else {
         providedSymbols(symbolName) = ProvidedSymbol(
-          sawClass = sawClass,
-          sawTrait = sawTrait,
           sawObject = sawObject,
           recursive = recursive
         )
@@ -242,14 +234,14 @@ class SourceAnalysisTraverser extends Traverser {
     case defn: Member.Type with WithMods with WithTParamClause with WithCtor with WithTemplate => // traits, enums and classes
       visitMods(defn.mods)
       val name = extractName(defn.name)
-      recordProvidedName(name, sawClass = true)
+      recordProvidedName(name)
       apply(defn.tparamClause)
       apply(defn.ctor)
       visitTemplate(defn.templ, name)
     case Defn.EnumCase.After_4_6_0(mods, nameNode, tparamClause, ctor, _) =>
       visitMods(mods)
       val name = extractName(nameNode)
-      recordProvidedName(name, sawClass = true)
+      recordProvidedName(name)
       apply(tparamClause)
       apply(ctor)
 
