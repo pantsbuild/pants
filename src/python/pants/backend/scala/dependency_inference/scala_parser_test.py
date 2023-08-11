@@ -625,6 +625,7 @@ def test_enum(rule_runner: RuleRunner) -> None:
 
     assert sorted(analysis.provided_symbols, key=lambda x: x.name) == expected_symbols
 
+
 def test_enum_use(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         args=[
@@ -646,6 +647,7 @@ def test_enum_use(rule_runner: RuleRunner) -> None:
         ),
     )
     assert sorted(analysis.fully_qualified_consumed_symbols()) == ["foo.Eggs"]
+
 
 def test_types_at_toplevel_package(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
