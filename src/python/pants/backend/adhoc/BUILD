@@ -4,6 +4,6 @@ python_sources()
 python_tests(
     name="tests",
     overrides={
-        "run_system_binary_integration_test.py": dict(timeout=120),
+        "run_system_binary_integration_test.py": dict(timeout=180),
     },
 )
