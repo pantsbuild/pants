@@ -10,6 +10,8 @@ import io.circe.syntax._
 
 import scala.meta._
 import scala.meta.transversers.Traverser
+import scala.meta.Stat.{WithMods, WithCtor, WithTemplate}
+import scala.meta.Tree.WithTParamClause
 
 import scala.collection.SortedSet
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
@@ -237,23 +239,19 @@ class SourceAnalysisTraverser extends Traverser {
       )
     }
 
-    case Defn.Class(mods, nameNode, tparams, ctor, templ) => {
+    case defn: Member.Type with WithMods with WithTParamClause with WithCtor with WithTemplate => // traits, enums and classes
+      visitMods(defn.mods)
+      val name = extractName(defn.name)
+      recordProvidedName(name, sawClass = true)
+      apply(defn.tparamClause)
+      apply(defn.ctor)
+      visitTemplate(defn.templ, name)
+    case Defn.EnumCase.After_4_6_0(mods, nameNode, tparamClause, ctor, _) =>
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawClass = true)
-      apply(tparams)
+      apply(tparamClause)
       apply(ctor)
-      visitTemplate(templ, name)
-    }
-
-    case Defn.Trait(mods, nameNode, tparams, ctor, templ) => {
-      visitMods(mods)
-      val name = extractName(nameNode)
-      recordProvidedName(name, sawTrait = true)
-      apply(tparams)
-      apply(ctor)
-      visitTemplate(templ, name)
-    }
 
     case Defn.Object(mods, nameNode, templ) => {
       visitMods(mods)
