@@ -38,7 +38,7 @@ pex_binary(
 )
 ```
 
-Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults. See [Field default values](doc:targets#field-default-values) for how you may override a fields default value.
+Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults. See [Field default values](doc:targets#field-default-values) for how you may override a field's default value.
 
 All target types have a `name` field, which is used to identify the target. Target names must be unique within a directory.
 

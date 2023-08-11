@@ -66,22 +66,18 @@ impl std::error::Error for ByteStoreError {}
 impl Provider {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
   // `super::LocalOptions`.
-  pub async fn new(mut options: RemoteOptions) -> Result<Provider, String> {
+  pub async fn new(options: RemoteOptions) -> Result<Provider, String> {
     let tls_client_config = if options.cas_address.starts_with("https://") {
       Some(options.tls_config.try_into()?)
     } else {
       None
     };
 
-    let endpoint = grpc_util::create_endpoint(
-      &options.cas_address,
-      tls_client_config.as_ref(),
-      &mut options.headers,
-    )
-    .await?;
+    let channel =
+      grpc_util::create_channel(&options.cas_address, tls_client_config.as_ref()).await?;
     let http_headers = headers_to_http_header_map(&options.headers)?;
     let channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
+      channel,
       options.rpc_concurrency_limit,
       http_headers,
       Some((options.rpc_timeout, Metric::RemoteStoreRequestTimeouts)),
