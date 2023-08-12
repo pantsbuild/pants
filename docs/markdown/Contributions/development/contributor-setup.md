@@ -26,7 +26,7 @@ We use the popular forking workflow typically used by open source projects. See 
 Step 2: Bootstrap the Rust engine
 ---------------------------------
 
-Pants requires several dependencies to be installed: a Python 3.9 interpreter, Rust, the protobuf compiler, clang and others. The easiest and fastest way to set up an environment with all necessary dependencies is to use the Nix package manager. The Pants repository includes a suitable `shell.nix` file. Follow the instructions on the [Nix website](https://nixos.org/download.html) to install Nix. Then `cd` into the directory where you cloned the Pants repo and type `nix-shell`. This will download all the necessary dependencies and start a shell with a suitably configured PATH variable to make them available for use.
+Pants requires several dependencies to be installed: a Python 3.9 interpreter, Rust, the protobuf compiler, clang and others. There is experimental support for the Nix package manager that makes it easy to set up a dev environment. Follow the instructions on the [Nix website](https://nixos.org/download.html) to install Nix. Then `cd` into the directory where you cloned the Pants repo and type `nix-shell`. This will download all the necessary dependencies and start a shell with a suitably configured PATH variable to make them available for use.
 
 Alternatively, you can install the dependencies manually as follows:
 
