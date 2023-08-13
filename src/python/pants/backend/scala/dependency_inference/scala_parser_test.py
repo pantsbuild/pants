@@ -595,6 +595,60 @@ def test_package_object_extends_trait(rule_runner: RuleRunner) -> None:
     assert sorted(analysis.fully_qualified_consumed_symbols()) == ["foo.Trait", "foo.bar.Trait"]
 
 
+def test_enum(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.3.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+            enum Spam {
+                case Ham
+                case Eggs
+            }
+            """
+        ),
+    )
+
+    expected_symbols = [
+        ScalaProvidedSymbol("foo.Spam", False),
+        ScalaProvidedSymbol("foo.Spam.Eggs", False),
+        ScalaProvidedSymbol("foo.Spam.Ham", False),
+    ]
+
+    assert sorted(analysis.provided_symbols, key=lambda x: x.name) == expected_symbols
+
+
+def test_enum_use(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.3.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+            enum Spam {
+                case Ham(x: Eggs)
+            }
+            """
+        ),
+    )
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == ["foo.Eggs"]
+
+
 def test_types_at_toplevel_package(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
         rule_runner,
