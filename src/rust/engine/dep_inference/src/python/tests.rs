@@ -244,7 +244,6 @@ fn dunder_import() {
 }
 
 fn assert_imports_strong_weak(code: &str, strong: &[&str], weak: &[&str]) {
-  println!("begin test");
   let mut collector = ImportCollector::new(code);
   collector.collect();
   let (actual_weak, actual_strong): (Vec<_>, Vec<_>) =
