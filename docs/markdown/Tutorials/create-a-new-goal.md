@@ -126,6 +126,7 @@ class ProjectVersionSubsystem(GoalSubsystem):
 
 class ProjectVersionGoal(Goal):
     subsystem_cls = ProjectVersionSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -345,6 +346,7 @@ class ProjectVersionSubsystem(GoalSubsystem):
 
 class ProjectVersionGoal(Goal):
     subsystem_cls = ProjectVersionSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
