@@ -519,6 +519,7 @@ class ProjectVersionSubsystem(GoalSubsystem):
 
 class ProjectVersionGoal(Goal):
     subsystem_cls = ProjectVersionSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 class InvalidProjectVersionString(ValueError):
