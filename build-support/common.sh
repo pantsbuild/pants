@@ -55,11 +55,11 @@ function determine_python() {
   version='3.9'
   interpreter_path="$(command -v "python${version}")"
   if [[ -z "${interpreter_path}" ]]; then
-    echo "pants: Failed to find a Python ${version} interpreter" && return 1
+    echo "pants: Failed to find a Python ${version} interpreter" 1>&2 && return 1
   fi
   # Check if the Python version is installed via Pyenv but not activated.
   if [[ "$("${interpreter_path}" --version 2>&1 > /dev/null)" == "pyenv: python${version}"* ]]; then
-    echo "pants: The Python ${version} interpreter at ${interpreter_path} is an inactive pyenv interpreter" && return 1
+    echo "pants: The Python ${version} interpreter at ${interpreter_path} is an inactive pyenv interpreter" 1>&2 && return 1
   fi
   echo "${interpreter_path}"
   return 0
