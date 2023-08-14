@@ -13,7 +13,8 @@ from pants.backend.javascript.nodejs_project_environment import (
     NodeJsProjectEnvironmentProcess,
 )
 from pants.backend.javascript.package_json import PackageJsonTarget
-from pants.backend.javascript.resolve import NodeJSProjectResolves, UserChosenNodeJSResolveAliases
+from pants.backend.javascript.resolve import NodeJSProjectResolves
+from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
