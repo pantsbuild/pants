@@ -122,8 +122,7 @@ async def setup_go_sdk_process(
         **env_vars,
         **request.env,
         GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
-        # TODO: Maybe could just use MAJOR.MINOR for version part here?
-        "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.version}/{goroot.goos}/{goroot.goarch}",
+        "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.full_version}/{goroot.goos}/{goroot.goarch}",
     }
 
     if request.replace_sandbox_root_in_args:
