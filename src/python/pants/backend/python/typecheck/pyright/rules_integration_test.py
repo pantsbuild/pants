@@ -158,8 +158,6 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
         tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
         assert len(result) == 1
-        print(result[0].stdout)
-        print(result[0].stderr)
         assert result[0].exit_code == 0
         assert "0 errors" in result[0].stdout
         assert result[0].report == EMPTY_DIGEST
