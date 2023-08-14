@@ -170,6 +170,7 @@ def assert_build(
         opts.setdefault("build_target_stage", None)
         opts.setdefault("build_hosts", None)
         opts.setdefault("build_verbose", False)
+        opts.setdefault("build_no_cache", False)
         opts.setdefault("env_vars", [])
 
         docker_options = create_subsystem(
@@ -997,6 +998,45 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
             "--pull=False",
             "--ssh",
             "default",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_no_cache_option(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_NO_CACHE": "true",
+        },
+    )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=False",
+            "--no-cache",
             "--tag",
             "img1:latest",
             "--file",
