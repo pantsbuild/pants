@@ -49,8 +49,8 @@ async def terraform_check(
             TerraformProcess(
                 args=("validate",),
                 input_digest=deployment.sources_and_deps,
-                output_files=tuple(deployment.terraform_files),
-                description=f"Run `terraform fmt` on {pluralize(len(deployment.terraform_files), 'file')}.",
+                output_files=tuple(deployment.terraform_files.files),
+                description=f"Run `terraform fmt` on {pluralize(len(deployment.terraform_files.files), 'file')}.",
                 chdir=deployment.chdir,
             ),
         )

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.terraform.target_types import (
     TerraformBackendConfigField,
@@ -32,7 +31,7 @@ class TerraformDependenciesRequest:
 
 @dataclass(frozen=True)
 class TerraformDependenciesResponse:
-    fetched_deps: Tuple[Tuple[str, Digest], ...]
+    digest: Digest
 
 
 @rule
@@ -75,10 +74,7 @@ async def get_terraform_providers(
         ),
     )
 
-    return TerraformDependenciesResponse(
-        ((req.chdir, fetched_deps.output_digest),)
-        # tuple(zip(req.directories, (x.output_digest for x in fetched_deps)))
-    )
+    return TerraformDependenciesResponse(fetched_deps.output_digest)
 
 
 @dataclass(frozen=True)
@@ -93,8 +89,9 @@ class TerraformInitRequest:
 
 @dataclass(frozen=True)
 class TerraformInitResponse:
+    terraform_dependencies: Digest
+    terraform_files: SourceFiles
     sources_and_deps: Digest
-    terraform_files: tuple[str, ...]
     chdir: str
 
 
@@ -121,16 +118,14 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         ),
     )
 
-    merged_fetched_deps = await Get(Digest, MergeDigests([x[1] for x in fetched_deps.fetched_deps]))
-
-    sources_and_deps = await Get(
-        Digest,
-        MergeDigests([merged_fetched_deps, dependencies_files.snapshot.digest]),
+    all_terraform_files = await Get(
+        Digest, MergeDigests([fetched_deps.digest, dependencies_files.snapshot.digest])
     )
 
     return TerraformInitResponse(
-        sources_and_deps,
-        dependencies_files.files,  # TODO: I think this includes the wrong files (all the dependencies, not just TF ones). It's now a bit muddled which files are actually TF files
+        fetched_deps.digest,
+        dependencies_files,  # TODO: I think this includes the wrong files (all the dependencies, not just TF ones). It's now a bit muddled which files are actually TF files
+        all_terraform_files,
         request.root_module.address.spec_path,
     )
 
