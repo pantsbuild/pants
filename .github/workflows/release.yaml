@@ -41,6 +41,11 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
@@ -106,14 +111,21 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
         go-version: 1.19.5
-    - env: {}
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env: {}
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -155,11 +167,16 @@ jobs:
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.71.0-*
+        path: '~/.rustup/toolchains/1.71.1-*
 
           ~/.rustup/update-hashes
 
@@ -172,6 +189,11 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -223,11 +245,16 @@ jobs:
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.71.0-*
+        path: '~/.rustup/toolchains/1.71.1-*
 
           ~/.rustup/update-hashes
 
@@ -240,6 +267,11 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -322,7 +354,7 @@ jobs:
         skip-existing: true
     - name: Generate announcement
       run: './pants run src/python/pants_release/generate_release_announcement.py                         --
-        --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+        --output-dir=${{ runner.temp }}
 
         '
     - env:
@@ -332,6 +364,16 @@ jobs:
       with:
         channel-id: C18RRR4JK
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
+    - name: Announce to pants-devel
+      uses: dawidd6/action-send-mail@v3.8.0
+      with:
+        body: file://${{ runner.temp }}/email_announcement_body.md
+        connection_url: ${{ secrets.EMAIL_CONNECTION_URL }}
+        convert_markdown: true
+        from: Pants Announce
+        secure: true
+        subject: file://${{ runner.temp }}/email_announcement_subject.txt
+        to: pants-devel@googlegroups.com
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
