@@ -39,6 +39,7 @@ class HelloWorldSubsystem(GoalSubsystem):
 
 class HelloWorld(Goal):
     subsystem_cls = HelloWorldSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
