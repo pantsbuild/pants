@@ -249,10 +249,12 @@ jobs:
     timeout-minutes: 90
   determine_ref:
     if: github.repository_owner == 'pantsbuild'
-    name: Determine the ref to build
+    name: Create draft release and output info
     outputs:
-      build-ref: ${{ steps.determine_ref.outputs.build-ref }}
-      is-release: ${{ steps.determine_ref.outputs.is-release }}
+      build-ref: ${{ steps.get_info.outputs.build-ref }}
+      is-release: ${{ steps.get_info.outputs.is-release }}
+      release-asset-upload-url: ${{ steps.make_draft_release.outputs.release-asset-upload-url
+        }}
     runs-on: ubuntu-latest
     steps:
     - env:
@@ -262,6 +264,29 @@ jobs:
       run: "if [[ -n \"$REF\" ]]; then\n    ref=\"$REF\"\nelse\n    ref=\"${GITHUB_REF#refs/tags/}\"\
         \nfi\necho \"build-ref=${ref}\" >> $GITHUB_OUTPUT\nif [[ \"${ref}\" =~ ^release_.+$\
         \ ]]; then\n    echo \"is-release=true\" >> $GITHUB_OUTPUT\nfi\n"
+    - env:
+        GH_REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+      id: make_draft_release
+      if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
+        == 'true'
+      name: Make GitHub Release
+      run: "RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}\nRELEASE_VERSION=\"\
+        ${RELEASE_TAG#release_}\"\n\n# NB: This could be a re-run of a release, in\
+        \ the event a job/step failed.\nif ! gh release view $RELEASE_TAG ; then\n\
+        \    GH_RELEASE_ARGS=(\"--notes\" \"\")\n    GH_RELEASE_ARGS+=(\"--title\"\
+        \ \"$RELEASE_TAG\")\n    if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then\n\
+        \        GH_RELEASE_ARGS+=(\"--prerelease\")\n        GH_RELEASE_ARGS+=(\"\
+        --latest=false\")\n    else\n        STABLE_RELEASE_TAGS=$(gh api -X GET -F\
+        \ per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub(\"\
+        ^release_\"; \"\") | select(test(\"^[0-9.]+$\"))')\n        LATEST_TAG=$(echo\
+        \ \"$STABLE_RELEASE_TAGS $RELEASE_TAG\" | tr ' ' '\\n' | sort --version-sort\
+        \ | tail -n 1)\n        if [[ $RELEASE_TAG == $LATEST_TAG ]]; then\n     \
+        \       GH_RELEASE_ARGS+=(\"--latest=true\")\n        else\n            GH_RELEASE_ARGS+=(\"\
+        --latest=false\")\n        fi\n    fi\n\n    gh release create \"$RELEASE_TAG\"\
+        \ \"${GH_RELEASE_ARGS[@]}\" --draft\nfi\n\nASSET_UPLOAD_URL=$(gh release view\
+        \ \"$RELEASE_TAG\" --json uploadUrl --jq '.uploadUrl | sub(\"\\\\{\\\\?.*$\"\
+        ; \"\")')\necho \"release-asset-upload-url=$ASSET_UPLOAD_URL\" >> $GITHUB_OUTPUT\n"
   publish:
     if: github.repository_owner == 'pantsbuild' && needs.determine_ref.outputs.is-release
       == 'true'
@@ -318,6 +343,30 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy commit mapping to S3
       run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
+    - name: Get release notes
+      run: 'REF="${{ needs.release_info.outputs.build-ref }}"
+
+        ./pants run build-support/bin/get_release_notes.py -- ${REF#"release_"} >
+        notes.txt
+
+        '
+    - env:
+        GH_REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+      name: Publish GitHub Release
+      run: 'gh release upload ${{ needs.release_info.outputs.build-ref }} dest/pypi_release/*
+
+        gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
+        --notes-file notes.txt
+
+        '
+    - env:
+        GH_TOKEN: ${{ secrets.WORKER_PANTS_CHEESESHOP_TRIGGER_PAT }}
+      name: Trigger cheeseshop build
+      run: 'gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F
+        event_type=github-pages
+
+        '
 name: Release
 'on':
   push:
