@@ -273,8 +273,13 @@ async def setup_terraform_process(
     def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
         return tuple((Path(request.chdir) / path).as_posix() for path in paths)
 
+    def normalise_chdir(chdir: str) -> str:
+        if not chdir:
+            chdir = "."
+        return shlex.quote(chdir)
+
     return Process(
-        argv=("__terraform/terraform", f"-chdir={shlex.quote(request.chdir)}") + request.args,
+        argv=("__terraform/terraform", f"-chdir={normalise_chdir(request.chdir)}") + request.args,
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         output_files=prepend_paths(request.output_files),
