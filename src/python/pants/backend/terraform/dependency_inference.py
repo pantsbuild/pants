@@ -9,10 +9,14 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.terraform.target_types import TerraformModuleSourcesField
+from pants.backend.terraform.target_types import (
+    TerraformDeploymentFieldSet,
+    TerraformModuleSourcesField,
+)
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import Address, AddressInput
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -139,9 +143,45 @@ async def infer_terraform_module_dependencies(
     return InferredDependencies(terraform_module_addresses)
 
 
+@dataclass(frozen=True)
+class TerraformDeploymentDependenciesInferenceFieldSet(TerraformDeploymentFieldSet):
+    pass
+
+
+class InferTerraformDeploymentDependenciesRequest(InferDependenciesRequest):
+    infer_from = TerraformDeploymentDependenciesInferenceFieldSet
+
+
+@rule
+async def infer_terraform_deployment_dependencies(
+    request: InferTerraformDeploymentDependenciesRequest,
+) -> InferredDependencies:
+    root_module_address_input = request.field_set.root_module.to_address_input()
+    root_module = await Get(Address, AddressInput, root_module_address_input)
+
+    # # TODO: This leads to a dependency on self. Can we do something about it?
+    # var_files_names = request.field_set.var_files.value
+    # print(request.field_set.address.spec_path)
+    # var_files_addresses = [
+    #     Address(
+    #         spec_path=request.field_set.address.spec_path,
+    #         target_name="a",
+    #         relative_file_path=v,
+    #     ) for v in var_files_names
+    # ]
+
+    return InferredDependencies(
+        [
+            root_module,
+            # *var_files_addresses,
+        ]
+    )
+
+
 def rules():
     return [
         *collect_rules(),
         *pex_rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferTerraformDeploymentDependenciesRequest),
     ]
