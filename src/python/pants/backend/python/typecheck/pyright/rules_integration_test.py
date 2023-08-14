@@ -154,7 +154,9 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
         ),
         f"{PACKAGE}/BUILD": "python_sources()",
     })
+    print("Rule runner is running from directory: ", rule_runner.build_root)
     with temporary_dir() as named_caches:
+        print("Temporary cache dir located at: ", named_caches)
         tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
         assert len(result) == 1
