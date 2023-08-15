@@ -29,6 +29,6 @@ tokio = { workspace = true, features = ["fs"] }
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
-tempfile = "3.5.0"
+tempfile = { workspace = true }
 testutil = { path = "../testutil" }
 tokio = { workspace = true, features = ["rt", "macros"] }

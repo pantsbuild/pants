@@ -16,5 +16,5 @@ sha2 = { workspace = true }
 tokio = { workspace = true, features = ["io-util"] }
 
 [dev-dependencies]
-serde_test = "1.0"
-tempfile = "3.5.0"
+serde_test = { workspace = true }
+tempfile = { workspace = true }

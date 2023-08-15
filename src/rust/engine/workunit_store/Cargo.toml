@@ -21,6 +21,6 @@ strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync"] }
 
 [dev-dependencies]
-futures = "0.3"
-internment = "0.6"
+futures = { workspace = true }
+internment = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }

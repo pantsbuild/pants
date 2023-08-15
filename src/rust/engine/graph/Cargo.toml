@@ -19,6 +19,6 @@ tokio = { workspace = true, features = ["time", "parking_lot"] }
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
-rand = "0.8"
-env_logger = "0.10.0"
+rand = { workspace = true }
+env_logger = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }

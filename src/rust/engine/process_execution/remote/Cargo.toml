@@ -38,11 +38,11 @@ strum_macros = { workspace = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]
-env_logger = "0.10.0"
-maplit = "1.0.1"
+env_logger = { workspace = true }
+maplit = { workspace = true }
 mock = { path = "../../testutil/mock" }
-parking_lot = "0.12"
+parking_lot = { workspace = true }
 sharded_lmdb = { path = "../../sharded_lmdb" }
-tempfile = "3.5.0"
+tempfile = { workspace = true }
 testutil = { path = "../../testutil" }
 tokio = { workspace = true, features = ["macros"] }

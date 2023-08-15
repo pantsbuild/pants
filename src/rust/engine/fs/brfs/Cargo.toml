@@ -26,6 +26,6 @@ tokio-stream = { workspace = true, features = ["signal"] }
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
-bytes = "1.2"
-tempfile = "3.5.0"
+bytes = { workspace = true }
+tempfile = { workspace = true }
 testutil = { path = "../../testutil" }
