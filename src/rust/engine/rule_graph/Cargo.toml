@@ -6,10 +6,7 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-deepsize = { workspace = true, features = [
-  "internment",
-  "smallvec",
-] }
+deepsize = { workspace = true, features = ["internment", "smallvec"] }
 fnv = { workspace = true }
 indexmap = { workspace = true }
 internment = { workspace = true }
