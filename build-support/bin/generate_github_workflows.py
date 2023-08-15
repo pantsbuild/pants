@@ -1025,7 +1025,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     wheels_job_names = tuple(wheels_jobs.keys())
     jobs = {
         "determine_ref": {
-            "name": "Determine the ref to build",
+            "name": "Create draft release and output info",
             "runs-on": "ubuntu-latest",
             "if": IS_PANTS_OWNER,
             "steps": [
@@ -1047,10 +1047,51 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         """
                     ),
                 },
+                {
+                    "name": "Make GitHub Release",
+                    "id": "make_draft_release",
+                    "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
+                    "env": {
+                        "GH_TOKEN": "${{ github.token }}",
+                        "GH_REPO": "${{ github.repository }}",
+                    },
+                    "run": dedent(
+                        """\
+                        RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
+                        RELEASE_VERSION="${RELEASE_TAG#release_}"
+
+                        # NB: This could be a re-run of a release, in the event a job/step failed.
+                        if ! gh release view $RELEASE_TAG ; then
+                            GH_RELEASE_ARGS=("--notes" "")
+                            GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
+                            if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
+                                GH_RELEASE_ARGS+=("--prerelease")
+                                GH_RELEASE_ARGS+=("--latest=false")
+                            else
+                                STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
+                                LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\\n' | sort --version-sort | tail -n 1)
+                                if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
+                                    GH_RELEASE_ARGS+=("--latest=true")
+                                else
+                                    GH_RELEASE_ARGS+=("--latest=false")
+                                fi
+                            fi
+
+                            gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}" --draft
+                        fi
+
+                        ASSET_UPLOAD_URL=$(gh release view "$RELEASE_TAG" --json uploadUrl --jq '.uploadUrl | sub("\\\\{\\\\?.*$"; "")')
+                        echo "release-asset-upload-url=$ASSET_UPLOAD_URL" >> $GITHUB_OUTPUT
+                        """
+                    ),
+                },
             ],
             "outputs": {
-                "build-ref": gha_expr("steps.determine_ref.outputs.build-ref"),
-                "is-release": gha_expr("steps.determine_ref.outputs.is-release"),
+                "build-ref": gha_expr("steps.get_info.outputs.build-ref"),
+                "release-asset-upload-url": gha_expr(
+                    "steps.make_draft_release.outputs.release-asset-upload-url"
+                ),
+                "is-release": gha_expr("steps.get_info.outputs.is-release"),
             },
         },
         **wheels_jobs,
@@ -1107,6 +1148,39 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "Deploy commit mapping to S3",
                     scope="tags/pantsbuild.pants",
                 ),
+                {
+                    "name": "Get release notes",
+                    "run": dedent(
+                        """\
+                        REF="${{ needs.release_info.outputs.build-ref }}"
+                        ./pants run build-support/bin/get_release_notes.py -- ${REF#"release_"} > notes.txt
+                        """
+                    ),
+                },
+                {
+                    "name": "Publish GitHub Release",
+                    "env": {
+                        "GH_TOKEN": "${{ github.token }}",
+                        "GH_REPO": "${{ github.repository }}",
+                    },
+                    "run": dedent(
+                        f"""\
+                        gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}/*
+                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false --notes-file notes.txt
+                        """
+                    ),
+                },
+                {
+                    "name": "Trigger cheeseshop build",
+                    "env": {
+                        "GH_TOKEN": "${{ secrets.WORKER_PANTS_CHEESESHOP_TRIGGER_PAT }}",
+                    },
+                    "run": dedent(
+                        """\
+                        gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F event_type=github-pages
+                        """
+                    ),
+                },
             ],
         },
     }
