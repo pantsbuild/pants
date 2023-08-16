@@ -124,7 +124,7 @@ async def download_python_binary(
         ),
     )
 
-    return _PythonBuildStandaloneBinary(f"{installation_root}/python/bin/python3")
+    return _PythonBuildStandaloneBinary(f"{installation_root}/bin/python3")
 
 
 @dataclass(frozen=True)
