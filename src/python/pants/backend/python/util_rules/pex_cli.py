@@ -197,8 +197,10 @@ async def setup_pex_cli_process(
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=complete_pex_env.append_only_caches,
-        immutable_input_digests=bootstrap_python.immutable_input_digests,
+        append_only_caches={
+            **complete_pex_env.append_only_caches,
+            **bootstrap_python.APPEND_ONLY_CACHES,
+        },
         level=request.level,
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
