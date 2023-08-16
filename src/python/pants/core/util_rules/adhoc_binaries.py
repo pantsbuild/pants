@@ -108,7 +108,6 @@ async def download_python_binary(
     )
 
     env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
-    print(env_vars)
     await Get(
         ProcessResult,
         Process(
