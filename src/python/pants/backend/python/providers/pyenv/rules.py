@@ -212,8 +212,7 @@ async def get_pyenv_install_info(
             "TMPDIR": "{chroot}/tmpdir",
             **installation_env_vars,
         },
-        immutable_input_digests=bootstrap_python.immutable_input_digests,
-        append_only_caches=PYENV_APPEND_ONLY_CACHES,
+        append_only_caches={**PYENV_APPEND_ONLY_CACHES, **bootstrap_python.APPEND_ONLY_CACHES},
     )
 
 

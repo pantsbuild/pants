@@ -14,7 +14,6 @@ from pants.core.util_rules.adhoc_binaries import (
     _PythonBuildStandaloneBinary,
 )
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 
 
@@ -45,7 +44,7 @@ def test_local(env_tgt) -> None:
             )
         ],
     )
-    assert result == adhoc_binaries.PythonBuildStandaloneBinary(sys.executable, EMPTY_DIGEST)
+    assert result == adhoc_binaries.PythonBuildStandaloneBinary(sys.executable)
 
 
 def test_docker_uses_helper() -> None:
@@ -56,23 +55,24 @@ def test_docker_uses_helper() -> None:
             MockGet(
                 output_type=_PythonBuildStandaloneBinary,
                 input_types=(_DownloadPythonBuildStandaloneBinaryRequest,),
-                mock=lambda _: _PythonBuildStandaloneBinary("", EMPTY_DIGEST),
+                mock=lambda _: _PythonBuildStandaloneBinary(""),
             )
         ],
     )
-    assert result == PythonBuildStandaloneBinary("", EMPTY_DIGEST)
+    assert result == PythonBuildStandaloneBinary("")
 
 
-def test_docker_helper(rule_runner):
+def test_docker_helper(rule_runner: RuleRunner):
     rule_runner.write_files(
         {
             "BUILD": "local_environment(name='local')",
         }
     )
-    rule_runner.set_options(["--environments-preview-names={'local': '//:local'}"])
+    rule_runner.set_options(
+        ["--environments-preview-names={'local': '//:local'}"], env_inherit={"PATH"}
+    )
     pbs = rule_runner.request(
         _PythonBuildStandaloneBinary,
         [_DownloadPythonBuildStandaloneBinaryRequest()],
     )
     assert not pbs.path.startswith("/")
-    assert pbs._digest is not None
