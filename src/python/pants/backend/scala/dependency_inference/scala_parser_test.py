@@ -16,6 +16,7 @@ from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.engine import process
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *jdk_rules.rules(),
             *target_types.rules(),
             *jvm_util_rules.rules(),
+            *process.rules(),
             QueryRule(AnalyzeScalaSourceRequest, (SourceFilesRequest,)),
             QueryRule(ScalaSourceDependencyAnalysis, (AnalyzeScalaSourceRequest,)),
         ],
