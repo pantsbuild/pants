@@ -32,6 +32,7 @@ backend_packages.add = [
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
+  "pants.backend.experimental.scala.lint.scalafix",
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.tools.workunit_logger",
   "pants.backend.experimental.visibility",
