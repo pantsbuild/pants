@@ -73,7 +73,7 @@ class PythonRequirementsTargetGenerator(TargetGenerator):
     help = help_text(
         """
         Generate a `python_requirement` for each entry in a requirements.txt-style or PEP 621
-        compliant pyproject.toml file. The choice of parser for the `source` field is determined
+        compliant `pyproject.toml` file. The choice of parser for the `source` field is determined
         by the file name. If the `source` field ends with `pyproject.toml`, then the file is
         assumed to be a PEP 621 compliant file. Any other file name uses the requirements.txt-style
         parser.
@@ -85,9 +85,9 @@ class PythonRequirementsTargetGenerator(TargetGenerator):
         Pants will not follow `-r reqs.txt` lines. Instead, add a dedicated `python_requirements`
         target generator for that additional requirements file.
 
-        Further details about PEP 621 and pyproject.toml files are available from the PEP itself:
+        Further details about PEP 621 and `pyproject.toml` files are available from the PEP itself:
         https://peps.python.org/pep-0621/. If the `project.optional-dependencies` table is
-        included, pants will save the key/name of the optional dependency group as a tag on the
+        included, Pants will save the key/name of the optional dependency group as a tag on the
         generated `python_requirement`.
         """
     )

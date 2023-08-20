@@ -1740,7 +1740,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
             Platform properties to set on remote execution requests.
 
-            Format: property=value. Multiple values should be specified as multiple
+            Format: `property=value`. Multiple values should be specified as multiple
             occurrences of this flag.
 
             Pants itself may add additional platform properties.

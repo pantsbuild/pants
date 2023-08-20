@@ -36,8 +36,8 @@ class UsesMyPycField(BoolField):
         extra type stubs, and the distribution's own requirements (which normally would not
         be needed at build time, but in this case may provide necessary type annotations).
 
-        You will typically set this field on distributions whose setup.py uses
-        mypyc.build.mypycify(). See https://mypyc.readthedocs.io/en/latest/index.html .
+        You will typically set this field on distributions whose `setup.py` uses
+        `mypyc.build.mypycify()`. See https://mypyc.readthedocs.io/en/latest/index.html .
         """
     )
 

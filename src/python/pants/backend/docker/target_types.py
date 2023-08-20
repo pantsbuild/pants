@@ -181,7 +181,7 @@ class DockerImageRegistriesField(StringSequenceField):
         built image.
 
         The address is a domain name with optional port for your registry, and any registry
-        aliases are prefixed with `@` for addresses in the [docker].registries configuration
+        aliases are prefixed with `@` for addresses in the `[docker].registries` configuration
         section.
 
         By default, all configured registries with `default = true` are used.
@@ -211,11 +211,11 @@ class DockerImageRepositoryField(StringField):
     alias = "repository"
     help = help_text(
         f"""
-        The repository name for the Docker image. e.g. "<repository>/<name>".
+        The repository name for the Docker image. e.g. `"<repository>/<name>"`.
 
         It uses the `[docker].default_repository` by default.
 
-        {_interpolation_help.format(kind="repository")}
+        {_interpolation_help.format(kind="Repository")}
 
         Additional placeholders for the repository field are: `name`, `directory`,
         `parent_directory`, and `default_repository`.
@@ -230,9 +230,7 @@ class DockerImageRepositoryField(StringField):
 class DockerImageSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = (
-        f"If set to true, do not push this image to registries when running `{bin_name()} publish`."
-    )
+    help = f"If true, do not push this image to registries when running `{bin_name()} publish`."
 
 
 OptionValueFormatter = Callable[[str], str]
@@ -260,7 +258,7 @@ class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictSt
         f"""
         Provide image metadata.
 
-        {_interpolation_help.format(kind="label value")}
+        {_interpolation_help.format(kind="Label value")}
 
         See [Docker labels](https://docs.docker.com/config/labels-custom-metadata/#manage-labels-on-objects)
         for more information.
@@ -319,7 +317,7 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
     help = help_text(
         """
         SSH agent socket or keys to expose to the build (only if BuildKit enabled)
-        (format: default|<id>[=<socket>|<key>[,<key>]])
+        (format: `default|<id>[=<socket>|<key>[,<key>]]`)
 
         The exposed agent and/or keys can then be used in your `Dockerfile` by mounting them in
         your `RUN` instructions:
