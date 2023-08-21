@@ -168,7 +168,7 @@ You only need to declare direct dependencies. Pants will pull in _transitive dep
 >
 > You can use the prefix `!!` to transitively exclude a dependency, meaning that even if a target's dependencies include the bad dependency, the final result will not include the value.
 >
-> Transitive excludes can only be used in target types that conventionally are not dependend upon by other targets, such as `pex_binary` and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
+> Transitive excludes can only be used in target types that conventionally are not depended upon by other targets, such as `pex_binary`, `python_distribution`, and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
 
 Field default values
 ====================
