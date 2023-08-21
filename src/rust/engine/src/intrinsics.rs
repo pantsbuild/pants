@@ -783,11 +783,13 @@ impl PreparedInferenceRequest {
     } = Python::with_gil(|py| (*args[0]).as_ref(py).extract())?;
 
     let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
+    let str_path = path.display().to_string();
 
     Ok(Self {
       path,
       digest,
       inner: DependencyInferenceRequest {
+        input_file_path: str_path,
         input_file_digest: Some(digest.into()),
         metadata,
         impl_hash: impl_hash.to_string(),
