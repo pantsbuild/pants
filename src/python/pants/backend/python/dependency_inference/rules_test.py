@@ -749,7 +749,7 @@ def test_infer_python_identical_files_with_relative_imports_should_be_treated_di
 ) -> None:
     # dependency inference shouldn't cache _just_ based on file contents, because this can break
     # relative imports. When b reused a's results, b/__init__.py was incorrectly depending on
-    # a/file.py
+    # a/file.py (https://github.com/pantsbuild/pants/issues/19618).
     contents = "from . import file"
     imports_rule_runner.write_files(
         {
@@ -762,20 +762,30 @@ def test_infer_python_identical_files_with_relative_imports_should_be_treated_di
         }
     )
 
-    for directory in ["a", "b"]:
+    def get_deps(directory: str) -> InferredDependencies:
         tgt = imports_rule_runner.get_target(
             Address(directory, target_name=directory, relative_file_path="__init__.py")
         )
 
-        deps = imports_rule_runner.request(
+        return imports_rule_runner.request(
             InferredDependencies,
             [InferPythonImportDependencies(PythonImportDependenciesInferenceFieldSet.create(tgt))],
         )
-        assert deps == InferredDependencies(
-            [
-                Address(directory, target_name=directory, relative_file_path="file.py"),
-            ]
-        )
+
+    # first, seed the cache with the deps for "a"
+    assert get_deps("a") == InferredDependencies(
+        [
+            Address("a", target_name="a", relative_file_path="file.py"),
+        ]
+    )
+
+    # then, run with "b", which _shouldn't_ reuse the cache from the previous run to give
+    # "a/file.py:a" (as it did previously, see #19618), and should instead give "b/file.py:b"
+    assert get_deps("b") == InferredDependencies(
+        [
+            Address("b", target_name="b", relative_file_path="file.py"),
+        ]
+    )
 
 
 class TestCategoriseImportsInfo:

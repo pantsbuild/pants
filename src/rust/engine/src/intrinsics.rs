@@ -769,7 +769,7 @@ struct PreparedInferenceRequest {
   /// The request that's guaranteed to have been constructed via ::prepare().
   ///
   /// NB. this `inner` value is used as the cache key, so anything that can influence the dep
-  /// inference should (also) be inside it, not just a key on this struct
+  /// inference should (also) be inside it, not just a key on the outer struct
   inner: DependencyInferenceRequest,
 }
 
