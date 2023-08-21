@@ -106,11 +106,25 @@ class PythonToolRequirementsBase(Subsystem):
     version = StrOption(
         advanced=True,
         default=lambda cls: cls.default_version,
+        removal_version="2.18.0.dev1",
+        removal_hint=lambda cls: softwrap(
+            f"""\
+            Custom tool versions are now installed from named resolves, as
+            described at {doc_url("python-lockfiles")}.
+            """
+        ),
         help="Requirement string for the tool.",
     )
     extra_requirements = StrListOption(
         advanced=True,
         default=lambda cls: cls.default_extra_requirements,
+        removal_version="2.18.0.dev1",
+        removal_hint=lambda cls: softwrap(
+            f"""\
+            Custom tool versions are now installed from named resolves, as
+            described at {doc_url("python-lockfiles")}.
+            """
+        ),
         help="Any additional requirement strings to use with the tool. This is useful if the "
         "tool allows you to install plugins or if you need to constrain a dependency to "
         "a certain version.",
@@ -138,7 +152,7 @@ class PythonToolRequirementsBase(Subsystem):
             2. If not, you can set up a new resolve as described at the link above.
 
             Either way, the resolve you choose should provide the requirements currently set
-            by the `requirements` option for this tool, which you can see
+            by the `version` and `extra-requirements` options for this tool, which you can see
             by running `pants help-advanced {cls.options_scope}`.
             """
         ),
@@ -266,9 +280,10 @@ class PythonToolRequirementsBase(Subsystem):
             # about the remedy. We will only display this note if the invocation actually
             # tries to use the tool, whereas the deprecations will display on options parsing,
             # so this is just a best-effort attempt to be helpful when we can.
+            tool_reqs = [self.version, *self.extra_requirements]
             logger.warning(
                 f"Note: the resolve you use for the {self.options_scope} tool must "
-                f"provide these requirements:" + "\n\n" + "\n".join(self.requirements) + "\n"
+                f"provide these requirements:" + "\n\n" + "\n".join(tool_reqs) + "\n"
             )
         return self._lockfile
 

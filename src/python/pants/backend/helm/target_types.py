@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
 from pants.engine.rules import collect_rules, rule
@@ -53,7 +54,7 @@ class HelmRegistriesField(StringSequenceField):
         built chart.
 
         The address is an `oci://` prefixed domain name with optional port for your registry, and any registry
-        aliases are prefixed with `@` for addresses in the [helm].registries configuration
+        aliases are prefixed with `@` for addresses in the `[helm].registries` configuration
         section.
 
         By default, all configured registries with `default = true` are used.
@@ -303,7 +304,6 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = HelmUnitTestTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
-        HelmUnitTestDependenciesField,
         HelmUnitTestStrictField,
         HelmUnitTestTimeoutField,
     )
@@ -408,6 +408,7 @@ class HelmDeploymentSkipCrdsField(BoolField):
 class HelmDeploymentSourcesField(MultipleSourcesField):
     default = ("*.yaml", "*.yml")
     expected_file_extensions = (".yaml", ".yml")
+    default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
     help = "Helm configuration files for a given deployment."
 
 
@@ -420,24 +421,20 @@ class HelmDeploymentValuesField(DictStringToStringField):
 
         Value names should be defined using dot-syntax as in the following example:
 
-        ```
-        helm_deployment(
-            values={
-                "nameOverride": "my_custom_name",
-                "image.pullPolicy": "Always",
-            },
-        )
-        ```
+            helm_deployment(
+                values={
+                    "nameOverride": "my_custom_name",
+                    "image.pullPolicy": "Always",
+                },
+            )
 
         Values can be dynamically calculated using interpolation as shown in the following example:
 
-        ```
-        helm_deployment(
-            values={
-                "configmap.deployedAt": "{env.DEPLOY_TIME}",
-            },
-        )
-        ```
+            helm_deployment(
+                values={
+                    "configmap.deployedAt": "{env.DEPLOY_TIME}",
+                },
+            )
 
         Check the Helm backend documentation on what are the options available and its caveats when making
         usage of dynamic values in your deployments.

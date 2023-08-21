@@ -66,10 +66,6 @@ _known_packages = [
     "pantsbuild.pants.testinfra",
 ]
 
-_expected_owners = {"benjyw", "John.Sirois", "stuhood"}
-
-_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi", "kaos"}
-
 
 # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
 # otherwise inclusion of that plugin will fail due to its `pytest` import not being included in the pex.
@@ -809,14 +805,6 @@ def build_pex(fetch: bool) -> None:
         dest = stable_dest
     green(f"Built {dest}")
 
-    # We filter out Pants options like `PANTS_CONFIG_FILES` and disable certain internal backends.
-    env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
-    env.update(DISABLED_BACKENDS_CONFIG)
-    # NB: Set `--concurrent` so that if this script is running under `pantsd`, the validation
-    # won't kill it.
-    subprocess.run([dest, "--concurrent", "--version"], env=env, check=True)
-    green(f"Validated {dest}")
-
 
 # -----------------------------------------------------------------------------------------------
 # Fetch and stabilize the versions of wheels for publishing
@@ -946,9 +934,6 @@ def upload_wheels_via_twine() -> None:
         [
             str(CONSTANTS.twine_venv_dir / "bin/twine"),
             "upload",
-            "--sign",
-            f"--sign-with={get_pgp_program_name()}",
-            f"--identity={get_pgp_key_id()}",
             "--skip-existing",  # Makes the upload idempotent.
             str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version / "*.whl"),
         ],

@@ -296,26 +296,6 @@ class UnzipBinary(BinaryPath):
 
 
 @dataclass(frozen=True)
-class GunzipBinary:
-    python: PythonBinary
-
-    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
-        archive_name = os.path.basename(archive_path)
-        dest_file_name = os.path.splitext(archive_name)[0]
-        dest_path = os.path.join(extract_path, dest_file_name)
-        script = dedent(
-            f"""
-            import gzip
-            import shutil
-            with gzip.GzipFile(filename={archive_path!r}, mode="rb") as source:
-                with open({dest_path!r}, "wb") as dest:
-                    shutil.copyfileobj(source, dest)
-            """
-        )
-        return (self.python.path, "-c", script)
-
-
-@dataclass(frozen=True)
 class TarBinary(BinaryPath):
     platform: Platform
 
@@ -594,6 +574,12 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
 
 @rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
 async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
+    warn_or_error(
+        removal_version="2.18.0.dev1",
+        entity="Requesting `PythonBinary`",
+        hint="Use the `PythonBuildStandalone` type instead (be sure to provide the `immutable_input_digests` to any applicable process).",
+    )
+
     # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
     # for maximum compatibility with internal scripts.
     interpreter_search_paths = python_bootstrap.interpreter_search_paths
@@ -686,11 +672,6 @@ async def find_unzip() -> UnzipBinary:
         request, rationale="download the tools Pants needs to run"
     )
     return UnzipBinary(first_path.path, first_path.fingerprint)
-
-
-@rule
-def find_gunzip(python: PythonBinary) -> GunzipBinary:
-    return GunzipBinary(python)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
@@ -814,16 +795,6 @@ class UnzipBinaryRequest:
         )
 
 
-@dataclass(frozen=True)
-class GunzipBinaryRequest:
-    def __post_init__(self) -> None:
-        warn_or_error(
-            "2.18.0.dev0",
-            "using `Get(GunzipBinary, GunzipBinaryRequest)",
-            "Instead, simply use `Get(GunzipBinary)` or put `GunzipBinary` in the rule signature",
-        )
-
-
 class CatBinaryRequest:
     def __post_init__(self) -> None:
         warn_or_error(
@@ -900,11 +871,6 @@ async def find_zip_wrapper(_: ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBin
 @rule
 async def find_unzip_wrapper(_: UnzipBinaryRequest, unzip_binary: UnzipBinary) -> UnzipBinary:
     return unzip_binary
-
-
-@rule
-async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> GunzipBinary:
-    return gunzip
 
 
 @rule

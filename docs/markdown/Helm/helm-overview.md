@@ -158,6 +158,101 @@ pants test ::
 ✓ testprojects/src/helm/example/tests/env-configmap_test.yaml succeeded in 0.75s.
 ```
 
+### Feeding additional files to unit tests
+
+In some cases we may want our tests to have access to additional files which are not part of the chart. This can be achieved by setting a dependency between our unit test targets and a `resources` target as follows:
+
+```python src/helm/example/tests/BUILD
+helm_unittest_tests(dependencies=[":extra-values"])
+
+resources(name="extra-values", sources=["extra-values.yml"])
+```
+```yaml src/helm/example/templates/env-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-configmap
+data:
+{{- range $key, $val := .Values.data }}
+  {{ $key | upper }}: {{ $val | quote }}
+{{- end }}
+```
+```yaml src/helm/example/tests/extra-values.yml
+data:
+  VAR1_NAME: var1Value
+  var2_name: var2Value
+```
+```yaml src/helm/example/tests/env-configmap_test.yaml
+suite: test env-configmap
+templates:
+  - env-configmap.yaml
+values:
+  - extra-values.yml
+tests:
+  - it: should contain the env map variables
+    asserts:
+      - equal:
+          path: data.VAR1_NAME
+          value: "var1Value"
+      - equal:
+          path: data.VAR2_NAME
+          value: "var2Value"
+```
+
+Additional files can be referenced from any location inside your workspace. Note that the actual path to the additional files will be relative to the source roots configured in Pants.
+
+In this example, since Helm charts define their source root at the location of the `Chart.yaml` file and the `extra-values.yml` file is inside the `tests` folder relative to the chart, the test suite can access it as being local to it.
+
+However, in the following case, we need to reference the extra file relative to the chart root. Note the `../data/extra-values.yml` path in the test suite.
+
+```toml pants.toml
+[source]
+root_patterns=["src/extra"]
+```
+```python src/extra/data/BUILD
+resources(name="extra-values", sources=["extra-values.yml"])
+```
+```yaml src/extra/data/extra-values.yml
+data:
+  VAR1_NAME: var1Value
+  var2_name: var2Value
+```
+```python src/helm/example/tests/BUILD
+helm_unittest_tests(dependencies=["src/extra/data:extra-values"])
+```
+```yaml src/helm/example/templates/env-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-configmap
+data:
+{{- range $key, $val := .Values.data }}
+  {{ $key | upper }}: {{ $val | quote }}
+{{- end }}
+```
+```yaml src/helm/example/tests/env-configmap_test.yaml
+suite: test env-configmap
+templates:
+  - env-configmap.yaml
+values:
+  - ../data/extra-values.yml
+tests:
+  - it: should contain the env map variables
+    asserts:
+      - equal:
+          path: data.VAR1_NAME
+          value: "var1Value"
+      - equal:
+          path: data.VAR2_NAME
+          value: "var2Value"
+```
+
+> 🚧 Using `file`, `files` and `relocated_files` targets
+>
+> Other file-centric targets are also supported, just be aware that `file` and `files` targets are
+> not affected by the source roots setting. When using `relocated_files`, the files will be relative
+> to the value set in the `dest` field.
+
 ### Timeouts
 
 Pants can cancel tests that take too long, which is useful to prevent tests from hanging indefinitely.

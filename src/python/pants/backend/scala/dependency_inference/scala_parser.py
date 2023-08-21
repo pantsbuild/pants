@@ -409,7 +409,7 @@ def generate_scala_parser_lockfile_request(
     return GenerateJvmLockfileFromTool(
         artifact_inputs=FrozenOrderedSet(
             {
-                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.4.30",
+                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.8.7",
                 f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
                 f"org.scala-lang:scala-library:{_PARSER_SCALA_VERSION}",
             }
