@@ -24,8 +24,8 @@ In VSCode, the Python extension will look for a file named `.env` in the current
 For Python, to generate the `.env` file containing all the source roots, you can use something like this:
 
 ```shell
-$ ROOTS=$(pants roots --roots-sep=' ')
-$ python3 -c "print('PYTHONPATH=\"./' + ':./'.join(\"${ROOTS}\".split()) + ':\$PYTHONPATH\"')" > .env
+$ ROOTS=$(pants roots)
+$ python3 -c "print('PYTHONPATH=\"./' + ':./'.join('''${ROOTS}'''.split('\n')) + ':\$PYTHONPATH\"')" > .env
 ```
 
 See [Use of the PYTHONPATH variable](https://code.visualstudio.com/docs/python/environments#_use-of-the-pythonpath-variable) to learn more about using the `PYTHONPATH` variable in VSCode.
