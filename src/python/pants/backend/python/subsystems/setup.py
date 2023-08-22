@@ -29,20 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 @enum.unique
-class PipVersion(enum.Enum):
-    V20_3_4 = "20.3.4-patched"
-    V22_2_2 = "22.2.2"
-    V22_3 = "22.3"
-    V22_3_1 = "22.3.1"
-    V23_0 = "23.0"
-    V23_0_1 = "23.0.1"
-    V23_1 = "23.1"
-    V23_1_1 = "23.1.1"
-    V23_1_2 = "23.1.2"
-    LATEST = "latest"
-
-
-@enum.unique
 class InvalidLockfileBehavior(enum.Enum):
     error = "error"
     ignore = "ignore"
@@ -228,13 +214,13 @@ class PythonSetup(Subsystem):
             """
         ),
     )
-    pip_version = EnumOption(
-        default=PipVersion.V23_1_2,
+    pip_version = StrOption(
+        default="23.1.2",
         help=softwrap(
             """
             Use this version of Pip for resolving requirements and generating lockfiles.
 
-            N.B.: The `latest` value selects the latest of the listed choices which is not
+            N.B.: The `latest` value selects the latest of the choices listed by PEX which is not
             necessarily the latest Pip version released on PyPI.
             """
         ),
