@@ -169,7 +169,7 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
 
     merge_digest_get = Get(Digest, MergeDigests((request.digest, output_dir_digest)))
     env = {}
-    immutable_input_digests: FrozenDict[str, Digest] = FrozenDict({})
+    append_only_caches: FrozenDict[str, str] = FrozenDict({})
     if is_zip:
         input_digest, unzip_binary = await MultiGet(
             merge_digest_get,
@@ -192,7 +192,7 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
             Get(GunzipBinary, GunzipBinaryRequest()),
         )
         argv = gunzip.extract_archive_argv(archive_path, extract_archive_dir)
-        immutable_input_digests = gunzip.python_binary.immutable_input_digests
+        append_only_caches = gunzip.python_binary.APPEND_ONLY_CACHES
 
     result = await Get(
         ProcessResult,
@@ -203,7 +203,7 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
             description=f"Extract {archive_path}",
             level=LogLevel.DEBUG,
             output_directories=(extract_archive_dir,),
-            immutable_input_digests=immutable_input_digests,
+            append_only_caches=append_only_caches,
         ),
     )
     resulting_digest = await Get(Digest, RemovePrefix(result.output_digest, extract_archive_dir))
