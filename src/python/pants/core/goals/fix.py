@@ -21,7 +21,7 @@ from pants.core.goals.lint import (
     _MultiToolGoalSubsystem,
 )
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
-from pants.core.util_rules.partitions import PartitionerType, PartitionMetadataT
+from pants.core.util_rules.partitions import PartitionElementT, PartitionerType, PartitionMetadataT
 from pants.core.util_rules.partitions import Partitions as UntypedPartitions
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -121,7 +121,7 @@ class AbstractFixRequest(AbstractLintRequest):
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
-    class Batch(AbstractLintRequest.Batch):
+    class Batch(AbstractLintRequest.Batch[PartitionElementT, PartitionMetadataT]):
         snapshot: Snapshot
 
         @property
