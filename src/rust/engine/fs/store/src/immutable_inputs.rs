@@ -37,8 +37,7 @@ pub struct ImmutableInputs(Arc<Inner>);
 
 impl ImmutableInputs {
   pub fn new(store: Store, base: &Path) -> Result<Self, String> {
-    create_dir_all(base)
-      .map_err(|e| format!("Failed to create base for immutable inputs: {e}"))?;
+    create_dir_all(base).map_err(|e| format!("Failed to create base for immutable inputs: {e}"))?;
     let workdir = tempfile::Builder::new()
       .prefix("immutable_inputs")
       .tempdir_in(base)
