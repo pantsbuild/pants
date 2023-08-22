@@ -765,8 +765,11 @@ fn docker_resolve_image(
 }
 
 struct PreparedInferenceRequest {
-  pub path: PathBuf,
-  pub digest: Digest,
+  digest: Digest,
+  /// The request that's guaranteed to have been constructed via ::prepare().
+  ///
+  /// NB. this `inner` value is used as the cache key, so anything that can influence the dep
+  /// inference should (also) be inside it, not just a key on the outer struct
   inner: DependencyInferenceRequest,
 }
 
@@ -783,11 +786,12 @@ impl PreparedInferenceRequest {
     } = Python::with_gil(|py| (*args[0]).as_ref(py).extract())?;
 
     let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
+    let str_path = path.display().to_string();
 
     Ok(Self {
-      path,
       digest,
       inner: DependencyInferenceRequest {
+        input_file_path: str_path,
         input_file_digest: Some(digest.into()),
         metadata,
         impl_hash: impl_hash.to_string(),
@@ -851,14 +855,16 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
       Level::Debug,
       desc = Some(format!(
         "Determine Python dependencies for {:?}",
-        &prepared_inference_request.path
+        &prepared_inference_request.inner.input_file_path
       )),
       |_workunit| async move {
         let result: ParsedPythonDependencies = get_or_create_inferred_dependencies(
           core,
           &store,
           prepared_inference_request,
-          |content, request| python::get_dependencies(content, request.path),
+          |content, request| {
+            python::get_dependencies(content, request.inner.input_file_path.into())
+          },
         )
         .await?;
 
@@ -896,7 +902,7 @@ fn parse_javascript_deps(
       Level::Debug,
       desc = Some(format!(
         "Determine Javascript dependencies for {:?}",
-        prepared_inference_request.path
+        prepared_inference_request.inner.input_file_path
       )),
       |_workunit| async move {
         let result: ParsedJavascriptDependencies = get_or_create_inferred_dependencies(
@@ -907,7 +913,7 @@ fn parse_javascript_deps(
             if let Some(dependency_inference_request::Metadata::Js(metadata)) =
               request.inner.metadata
             {
-              javascript::get_dependencies(content, request.path, metadata)
+              javascript::get_dependencies(content, request.inner.input_file_path.into(), metadata)
             } else {
               Err(format!(
                 "{:?} is not valid metadata for Javascript dependency inference",
