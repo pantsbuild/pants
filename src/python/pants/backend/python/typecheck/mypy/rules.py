@@ -265,13 +265,15 @@ async def mypy_typecheck_partition(
                             #
                             # If we can hardlink (this means the two sides of the link are on the
                             # same filesystem), then after mypy runs, we hardlink from the sandbox
-                            # back to the named cache. File descriptors referring to the existing
-                            # named cache file are still valid, and new file descriptors will use
-                            # the new contents.
+                            # back to the named cache.
                             #
                             # If we can't hardlink, we resort to copying the result next to the
                             # cache under a temporary name, and finally doing an atomic mv from the
                             # tempfile to the real one.
+                            #
+                            # In either case, the result is an atomic replacement of the "old" named
+                            # cache db, such that old references (via opened file descriptors) are
+                            # still valid, but new references use the new contents.
                             #
                             # There is a chance of multiple processes thrashing on the cache, leaving
                             # it in a state that doesn't reflect reality at the current point in time,
