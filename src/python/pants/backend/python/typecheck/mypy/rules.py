@@ -39,7 +39,7 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.base.build_root import BuildRoot
 from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.system_binaries import CpBinary, MkdirBinary, MvBinary
+from pants.core.util_rules.system_binaries import CpBinary, MkdirBinary, MvBinary, ReadlinkBinary
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
@@ -135,6 +135,7 @@ async def mypy_typecheck_partition(
     mkdir: MkdirBinary,
     cp: CpBinary,
     mv: MvBinary,
+    readlink: ReadlinkBinary,
     global_options: GlobalOptions,
 ) -> CheckResult:
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
@@ -279,10 +280,28 @@ async def mypy_typecheck_partition(
 
                             {mkdir.path} -p {run_cache_dir}/{py_version} > /dev/null 2>&1 || true
                             {cp.path} {mypy_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+
                             {' '.join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
+
+                            get_device_id() {{
+                                TEST_PATH=$({readlink.path} -f "$1")
+                                stat -c "%d" "$TEST_PATH" 2>/dev/null || stat -f "%d" "$TEST_PATH" 2>/dev/null
+                            }}
                             {mkdir.path} -p {mypy_cache_dir}/{py_version} > /dev/null 2>&1 || true
-                            {mv.path} {run_cache_dir}/{py_version}/cache.db {mypy_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+                            SANDBOX_DEVID=$(get_device_id "{run_cache_dir}")
+                            NAMED_CACHE_DEVID=$(get_device_id "{mypy_cache_dir}")
+
+                            if [ "$SANDBOX_DEVID" = "$NAMED_CACHE_DEVID" ]; then
+                                # Same device, just `mv`
+                                {mv.path} {run_cache_dir}/{py_version}/cache.db {mypy_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+                            else
+                                # Different devices, `cp` into a tempfile, then `mv`
+                                TMP_CACHE=$(mktemp "{mypy_cache_dir}/{py_version}/cache.db.tmp.XXXXXX")
+                                {cp.path} {run_cache_dir}/{py_version}/cache.db $TMP_CACHE > /dev/null 2>&1 || true
+                                {mv.path} $TMP_CACHE {mypy_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+                            fi
+
                             exit $EXIT_CODE
                         """
                     ).encode(),
