@@ -263,14 +263,13 @@ async def mypy_typecheck_partition(
                             # Our workaround depends on whether we can hardlink between the sandbox
                             # and cache or not.
                             #
-                            # If we can hardlink (usually this means the two sides of the link are on
-                            # the same filesystem), then our strategy is simply a hardlink from the
-                            # sandbox to the cache file before the run. Run the command. Then
-                            # hardlink from the cache to the sandbox file. Each of these operations
-                            # is atomic, and multi-write safe due to the guarantees of hardlinking.
+                            # If we can hardlink (this means the two sides of the link are on the
+                            # same filesystem), then after mypy runs, we hardlink from the sandbox
+                            # back to the named cache. File descriptors referring to the existing
+                            # named cache file are still valid, and new file descriptors will use
+                            # the new contents.
                             #
-                            # If we can't workaround, we resort to copying the cache file into the
-                            # sandbox. Running the command. Then copying the result next to the
+                            # If we can't hardlink, we resort to copying the result next to the
                             # cache under a temporary name, and finally doing an atomic mv from the
                             # tempfile to the real one.
                             #
@@ -293,17 +292,14 @@ async def mypy_typecheck_partition(
                             SANDBOX_CACHE_DIR="{run_cache_dir}/{py_version}"
                             SANDBOX_CACHE_DB="$SANDBOX_CACHE_DIR/cache.db"
 
-                            {mkdir.path} -p "$NAMED_CACHE_DIR" > /dev/null 2>&1
                             {mkdir.path} -p "$SANDBOX_CACHE_DIR" > /dev/null 2>&1
-                            if ! {ln.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1; then
-                                {cp.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1
-                            fi
+                            {cp.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1
 
                             {' '.join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
 
                             if ! {ln.path} "$SANDBOX_CACHE_DB" "$NAMED_CACHE_DB" > /dev/null 2>&1; then
-                                TMP_CACHE=$({mktemp.path} "$NAMED_CACHE_DIR/cache.db.tmp.XXXXXX")
+                                TMP_CACHE=$({mktemp.path} "$SANDBOX_CACHE_DB.tmp.XXXXXX")
                                 {cp.path} "$SANDBOX_CACHE_DB" "$TMP_CACHE" > /dev/null 2>&1
                                 {mv.path} "$TMP_CACHE" "$NAMED_CACHE_DB" > /dev/null 2>&1
                             fi
