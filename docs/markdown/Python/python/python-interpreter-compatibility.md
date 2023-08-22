@@ -55,6 +55,7 @@ python_sources(
         "py2.py": {"interpreter_constraints": ["==2.7.*"]},
         # You can use a tuple for multiple files:
         ("common.py", "f.py"): {"interpreter_constraints": ["==2.7.*"]},
+    }
 )
 ```
 
