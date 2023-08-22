@@ -344,6 +344,10 @@ class MkdirBinary(BinaryPath):
     pass
 
 
+class MktempBinary(BinaryPath):
+    pass
+
+
 class TouchBinary(BinaryPath):
     pass
 
@@ -353,6 +357,10 @@ class CpBinary(BinaryPath):
 
 
 class MvBinary(BinaryPath):
+    pass
+
+
+class LnBinary(BinaryPath):
     pass
 
 
@@ -712,6 +720,14 @@ async def find_mkdir() -> MkdirBinary:
     return MkdirBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `mktempt` binary", level=LogLevel.DEBUG)
+async def find_mktemp() -> MktempBinary:
+    request = BinaryPathRequest(binary_name="mktemp", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="create temporary files/directories")
+    return MktempBinary(first_path.path, first_path.fingerprint)
+
+
 @rule(desc="Finding the `touch` binary", level=LogLevel.DEBUG)
 async def find_touch() -> TouchBinary:
     request = BinaryPathRequest(binary_name="touch", search_path=SEARCH_PATHS)
@@ -734,6 +750,14 @@ async def find_mv() -> MvBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="move files")
     return MvBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `ln` binary", level=LogLevel.DEBUG)
+async def find_ln() -> LnBinary:
+    request = BinaryPathRequest(binary_name="ln", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="link files")
+    return LnBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `chmod` binary", level=LogLevel.DEBUG)
