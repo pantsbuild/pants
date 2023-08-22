@@ -7,7 +7,7 @@ createdAt: "2021-10-08T18:16:00.142Z"
 ---
 > 🚧 Go support is beta stage
 >
-> We are done implementing the initial core functionality for Pants's initial Go support ([tracked here](https://github.com/pantsbuild/pants/projects/21)). However, there may be some edge cases we aren't yet handling. There are also some features that are not yet supported like vendoring, which we'd love your input on how to prioritize!
+> We are done implementing the initial core functionality for Pants's initial Go support ([tracked here](https://github.com/pantsbuild/pants/issues/17447)). However, there may be some edge cases we aren't yet handling. There are also some features that are not yet supported like vendoring, which we'd love your input on how to prioritize!
 >
 > Please share feedback for what you need to use Pants with your Go project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:the-pants-community)!
 
