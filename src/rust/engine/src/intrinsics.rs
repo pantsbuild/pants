@@ -20,7 +20,8 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 use dep_inference::python::get_dependencies;
-use protos::gen::pants::cache::{CacheKey, CacheKeyType};
+use grpc_util::prost::MessageExt;
+use protos::gen::pants::cache::{CacheKey, CacheKeyType, DependencyInferenceRequest};
 
 use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
@@ -783,9 +784,15 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
       Level::Debug,
       desc = Some(format!("Determine Python dependencies for {path:?}")),
       |_workunit| async move {
+        let request = DependencyInferenceRequest {
+          input_file_digest: Some(digest.into()),
+          metadata: None,
+          impl_hash: "fixed value for 2.17".into(),
+          input_file_path: path.to_str().expect("must have UTF-8 path").into(),
+        };
         let cache_key = CacheKey {
           key_type: CacheKeyType::DepInferenceRequest.into(),
-          digest: Some(digest.into()),
+          digest: Some(Digest::of_bytes(&request.to_bytes()).into()),
         };
         let cached_result = core.local_cache.load(&cache_key).await?;
 
