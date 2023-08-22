@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
-from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
+import os
+
+from pants.backend.javascript.subsystems import nodejs_tool
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.openapi.lint.openapi_format.subsystem import (
     OpenApiFormatFieldSet,
     OpenApiFormatSubsystem,
@@ -29,14 +32,13 @@ async def run_openapi_format(
 ) -> FmtResult:
     result = await Get(
         ProcessResult,
-        NodeJSToolProcess,
-        NodeJSToolProcess.npx(
-            npm_package=openapi_format.version,
+        NodeJSToolRequest,
+        openapi_format.request(
             args=(
                 *openapi_format.args,
-                request.snapshot.files[0],
+                os.path.join("{chroot}", request.snapshot.files[0]),
                 "--output",
-                request.snapshot.files[0],
+                os.path.join("{chroot}", request.snapshot.files[0]),
             ),
             input_digest=request.snapshot.digest,
             output_files=request.snapshot.files,
@@ -51,5 +53,6 @@ async def run_openapi_format(
 def rules():
     return [
         *collect_rules(),
+        *nodejs_tool.rules(),
         *OpenApiFormatRequest.rules(),
     ]

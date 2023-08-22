@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.javascript.subsystems.npx_tool import NpxToolBase
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.backend.openapi.lint.openapi_format.skip_field import SkipOpenApiFormatField
 from pants.backend.openapi.target_types import OpenApiSourceField
 from pants.engine.target import FieldSet, Target
@@ -22,7 +22,7 @@ class OpenApiFormatFieldSet(FieldSet):
         return tgt.get(SkipOpenApiFormatField).value
 
 
-class OpenApiFormatSubsystem(NpxToolBase):
+class OpenApiFormatSubsystem(NodeJSToolBase):
     options_scope = "openapi-format"
     name = "openapi-format"
     help = "Format an OpenAPI document by ordering, formatting and filtering fields (https://github.com/thim81/openapi-format)."

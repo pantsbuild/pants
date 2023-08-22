@@ -15,7 +15,7 @@ from pants.core.goals.fmt import FmtResult, Partitions
 from pants.core.util_rules import config_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, FileContent, PathGlobs
+from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
