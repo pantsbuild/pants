@@ -337,14 +337,17 @@ impl ImportCollector<'_> {
     if with_node.kind_id() == KindID::WITH_ITEM {
       let node = with_node.child_by_field_name("value").unwrap(); // synthetic
 
-      let call_maybe_of_suppress = match node.kind_id() {
-        KindID::CALL => Some(node), // if we have a call directly `with suppress(ImportError):`
-        KindID::AS_PATTERN => node.named_child(0).and_then(|n| match n.kind_id() {
+      let call_maybe_of_suppress = if node.kind_id() == KindID::CALL {
+        Some(node) // if we have a call directly `with suppress(ImportError):`
+      } else if KindID::AS_PATTERN.contains(&node.kind_id()) {
+        node.named_child(0).and_then(|n| match n.kind_id() {
           KindID::CALL => Some(n),
           _ => None,
-        }), // if we have a call with an `as` item `with suppress(ImportError) as e:`
-        _ => None,
+        }) // if we have a call with an `as` item `with suppress(ImportError) as e:`
+      } else {
+        None
       };
+
       if call_maybe_of_suppress.is_none() {
         return false;
       }
