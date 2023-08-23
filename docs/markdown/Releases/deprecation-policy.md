@@ -30,7 +30,7 @@ Allowed changes
 Plugin API deprecation policy
 -----------------------------
 
-When [writing plugins](doc:plugin-overview), Pants is used as a _library_, rather than a _binary_. That is, you import Pants code to write plugins. We try to make this API stable for your plugins.
+When [writing plugins](doc:plugins-overview), Pants is used as a _library_, rather than a _binary_. That is, you import Pants code to write plugins. We try to make this API stable for your plugins.
 
 ### What is public?
 

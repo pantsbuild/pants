@@ -56,7 +56,7 @@ The `--py-resolve-format=symlinked_immutable_virtualenv` option symlinks to an i
 Generated code
 --------------
 
-If you're using [Protobuf and gRPC](doc:protobuf), you may want your editor to be able to index and navigate the generated source code. 
+If you're using [Protobuf and gRPC](doc:protobuf-python), you may want your editor to be able to index and navigate the generated source code. 
 
 Normally Pants treats generated code as an internal byproduct, and doesn't expose it. But you can run the `export-codegen` goal to generate code to a well-known output location for consumption:
 
