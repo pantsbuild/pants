@@ -172,19 +172,20 @@ testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3.20"
 tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread"] }
 tokio-retry = "0.3"
-tokio-util = { version = "0.7", features = ["io"] }
-tryfuture = { path = "tryfuture" }
-ui = { path = "ui" }
-url = "2.3"
-watch = { path = "watch" }
-workunit_store = { path = "workunit_store" }
-remote = { path = "process_execution/remote" }
-pe_nailgun = { path = "process_execution/pe_nailgun" }
-
-[dev-dependencies]
-testutil = { path = "./testutil" }
-fs = { path = "./fs" }
-env_logger = "0.10.0"
-
-[build-dependencies]
-pyo3-build-config = "0.18"
+tokio-rustls = "0.24"
+tokio-stream = "0.1"
+tokio-util = "0.7"
+toml = "0.5"
+tonic = "0.9"
+tonic-build = "0.9"
+tower = "0.4"
+tower-layer = "0.3"
+tower-service = "0.3"
+tree-sitter = "0.20.10"
+tree-sitter-javascript = "0.20.0"
+tree-sitter-python = "0.20.4"
+uname = "0.1.1"
+url = "2.4"
+uuid = "1.1.2"
+walkdir = "2"
+webpki = "0.21"
