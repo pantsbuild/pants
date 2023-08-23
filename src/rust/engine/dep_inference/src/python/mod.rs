@@ -234,16 +234,6 @@ impl Visitor for ImportCollector<'_> {
     ChildBehavior::Ignore
   }
 
-  // @TODO: If we wanted to be most correct, this should use a stack. But realistically, that's
-  // kinda complicated:
-  // try:
-  //   try:
-  //       import weak1
-  //   except Whatever:
-  //       ...
-  //   import weak2
-  // except ImportError:
-  //   ...
   fn visit_try_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let mut should_weaken = false;
     let mut cursor = node.walk();
@@ -269,12 +259,46 @@ impl Visitor for ImportCollector<'_> {
     }
 
     for child in children.iter() {
-      if child.kind_id() == KindID::BLOCK {
+      let previous_weaken = self.weaken_imports;
+      if KindID::BLOCK.contains(&child.kind_id()) {
         self.weaken_imports = should_weaken;
       }
       self.walk(&mut child.walk());
-      self.weaken_imports = false;
+      self.weaken_imports = previous_weaken;
     }
+    ChildBehavior::Ignore
+  }
+
+  fn visit_with_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
+    let with_clause = node.named_child(0).unwrap();
+
+    let are_suppressing_importerror = with_clause
+      .named_children(&mut with_clause.walk())
+      .any(|x| self.suppressing_importerror(x));
+
+    // remember to visit the withitems themselves
+    // for ex detecting imports in `with open("/foo/bar") as f`
+    for child in with_clause.named_children(&mut with_clause.walk()) {
+      self.walk(&mut child.walk());
+    }
+
+    let body_node = node.child_by_field_name("body").unwrap();
+    let body: Vec<_> = body_node.named_children(&mut body_node.walk()).collect();
+
+    if are_suppressing_importerror {
+      let previous_weaken = self.weaken_imports;
+      self.weaken_imports = true;
+
+      for child in body {
+        self.walk(&mut child.walk());
+      }
+      self.weaken_imports = previous_weaken;
+    } else {
+      for child in body {
+        self.walk(&mut child.walk());
+      }
+    }
+
     ChildBehavior::Ignore
   }
 
@@ -305,6 +329,58 @@ impl Visitor for ImportCollector<'_> {
         .insert(text.to_string(), (range.start_point.row + 1) as u64);
     }
     ChildBehavior::Ignore
+  }
+}
+
+impl ImportCollector<'_> {
+  fn suppressing_importerror(&mut self, with_node: tree_sitter::Node) -> bool {
+    if with_node.kind_id() == KindID::WITH_ITEM {
+      let node = with_node.child_by_field_name("value").unwrap(); // synthetic
+
+      let call_maybe_of_suppress = if node.kind_id() == KindID::CALL {
+        Some(node) // if we have a call directly `with suppress(ImportError):`
+      } else if KindID::AS_PATTERN.contains(&node.kind_id()) {
+        node.named_child(0).and_then(|n| match n.kind_id() {
+          KindID::CALL => Some(n),
+          _ => None,
+        }) // if we have a call with an `as` item `with suppress(ImportError) as e:`
+      } else {
+        None
+      };
+
+      if call_maybe_of_suppress.is_none() {
+        return false;
+      }
+
+      let function_name_expr = call_maybe_of_suppress
+        .unwrap()
+        .child_by_field_name("function")
+        .unwrap();
+      let is_supress = match function_name_expr.kind_id() {
+        KindID::ATTRIBUTE => function_name_expr
+          .child_by_field_name("attribute")
+          .map(|identifier| self.code_at(identifier.range()) == "suppress")
+          .unwrap_or(false),
+        KindID::IDENTIFIER => self.code_at(function_name_expr.range()) == "suppress",
+        _ => false,
+      };
+      if !is_supress {
+        return false;
+      }
+      let cur = &mut node.walk();
+
+      let has_importerror = call_maybe_of_suppress
+        .unwrap()
+        .child_by_field_name("arguments")
+        .map(|x| {
+          x.named_children(cur)
+            .any(|arg| self.code_at(arg.range()) == "ImportError")
+        })
+        .unwrap_or(false);
+      is_supress && has_importerror
+    } else {
+      false
+    }
   }
 }
 
