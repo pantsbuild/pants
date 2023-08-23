@@ -710,7 +710,7 @@ class PexBinary(Target):
         A Python target that can be converted into an executable PEX file.
 
         PEX files are self-contained executable files that contain a complete Python environment
-        capable of running the target. For more information, see {doc_url('pex-files')}.
+        capable of running the target. For more information, see {doc_url('pex')}.
         """
     )
 

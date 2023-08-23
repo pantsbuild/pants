@@ -221,7 +221,7 @@ class PythonSetup(Subsystem):
             Use this version of Pip for resolving requirements and generating lockfiles.
 
             The value used here must be one of the Pip versions supported by the underlying PEX
-            version. See {doc_url("pex-files")} for details.
+            version. See {doc_url("pex")} for details.
 
             N.B.: The `latest` value selects the latest of the choices listed by PEX which is not
             necessarily the latest Pip version released on PyPI.
