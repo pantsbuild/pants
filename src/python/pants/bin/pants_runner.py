@@ -87,7 +87,11 @@ class PantsRunner:
             stdout_fileno=stdout_fileno,
             stderr_fileno=stderr_fileno,
         ):
-            if "SCIE" not in os.environ and "NO_SCIE_WARNING" not in os.environ:
+            run_via_scie = "SCIE" in os.environ
+            enable_scie_warning = "NO_SCIE_WARNING" not in os.environ
+            scie_pants_version = os.environ.get("SCIE_PANTS_VERSION")
+
+            if not run_via_scie and enable_scie_warning:
                 raise RuntimeError(
                     softwrap(
                         f"""
@@ -97,9 +101,10 @@ class PantsRunner:
                     ),
                 )
 
-            scie_pants_version = os.environ.get("SCIE_PANTS_VERSION")
-            if (
+            if run_via_scie and (
+                # either scie-pants is too old to communicate its version:
                 scie_pants_version is None
+                # or the version itself is too old:
                 or Version(scie_pants_version) < MINIMUM_SCIE_PANTS_VERSION
             ):
                 current_version_text = (
