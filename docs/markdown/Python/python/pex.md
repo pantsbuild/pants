@@ -35,7 +35,9 @@ known_versions = [
 ]
 ```
 
-The Pex version determines what Pip versions are supported. Using the standalone Pex CLI, you can run `pex --help` to see the list of Pip versions that Pex version supports. The Pip version that Pex uses is determined by the `pip_version` option in Pants. To upgrade the Pex version, update this option value accordingly. For instance, in `pants.toml`, to set the Pip version to be the latest supported by Pex:
+The Pex version determines which Pip versions are supported. To see the lists of Pip versions a certain version of Pex supports you can either install that version of Pex as a standalone CLI and run `pex --help`, or examine [pex/pip/version.py](https://github.com/pantsbuild/pex/blob/main/pex/pip/version.py) in the sources of the relevant Pex version. 
+
+The Pip version that Pex uses is determined by the `pip_version` option in Pants. To upgrade the Pip version, update this option value accordingly. For instance, in `pants.toml`, to set the Pip version to be the latest supported by Pex:
 
 ```[python]
 pip_version = "latest"
