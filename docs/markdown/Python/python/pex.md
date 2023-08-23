@@ -23,7 +23,7 @@ Check out [blog.pantsbuild.org/pants-pex-and-docker](https://blog.pantsbuild.org
 Setting Pex and Pip versions
 ----------------------------
 
-Pants makes use of the [Pex](https://github.com/pantsbuild/pex) library internally for Pex building. The Pex version that Pants uses is specified by the `version` option under the `pex-cli` subsystem. The known Pex versions are specified by the `known_versions` option under the `pex-cli` subsystem. You can see all Pex tool options and their current values by running `pants help-advanced pex-cli`. To upgrade the Pex version, update these option values accordingly. For instance, in `pants.toml`, to upgrade to Pex 2.1.143:
+Pants makes use of the [Pex](https://github.com/pantsbuild/pex) command-line tool internally for Pex building. The Pex version that Pants uses is specified by the `version` option under the `pex-cli` subsystem. The known Pex versions are specified by the `known_versions` option under the `pex-cli` subsystem. You can see all Pex tool options and their current values by running `pants help-advanced pex-cli`. To upgrade the Pex version, update these option values accordingly. For instance, in `pants.toml`, to upgrade to Pex 2.1.143:
 
 ```[pex-cli]
 version = "v2.1.143"
