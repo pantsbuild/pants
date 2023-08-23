@@ -110,7 +110,7 @@ class PantsRunner:
                 current_version_text = (
                     f"The current version of the `pants` launcher binary is {scie_pants_version}"
                     if scie_pants_version
-                    else f"Run `PANTS_BOOTSTRAP_VERSION=report pants` to see the current version of the `pants` launcher binary"
+                    else "Run `PANTS_BOOTSTRAP_VERSION=report pants` to see the current version of the `pants` launcher binary"
                 )
                 warn_or_error(
                     "2.18.0.dev6",
