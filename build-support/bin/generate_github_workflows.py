@@ -1050,14 +1050,14 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Make GitHub Release",
                     "id": "make_draft_release",
-                    "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
+                    "if": f"{IS_PANTS_OWNER} && steps.determine_ref.outputs.is-release == 'true'",
                     "env": {
                         "GH_TOKEN": "${{ github.token }}",
                         "GH_REPO": "${{ github.repository }}",
                     },
                     "run": dedent(
                         """\
-                        RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
+                        RELEASE_TAG=${{ steps.determine_ref.outputs.build-ref }}
                         RELEASE_VERSION="${RELEASE_TAG#release_}"
 
                         # NB: This could be a re-run of a release, in the event a job/step failed.
@@ -1087,11 +1087,11 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
             ],
             "outputs": {
-                "build-ref": gha_expr("steps.get_info.outputs.build-ref"),
+                "build-ref": gha_expr("steps.determine_ref.outputs.build-ref"),
                 "release-asset-upload-url": gha_expr(
                     "steps.make_draft_release.outputs.release-asset-upload-url"
                 ),
-                "is-release": gha_expr("steps.get_info.outputs.is-release"),
+                "is-release": gha_expr("steps.determine_ref.outputs.is-release"),
             },
         },
         **wheels_jobs,
