@@ -1152,7 +1152,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "name": "Get release notes",
                     "run": dedent(
                         """\
-                        REF="${{ needs.release_info.outputs.build-ref }}"
+                        REF="${{ needs.determine_ref.outputs.build-ref }}"
                         ./pants run build-support/bin/get_release_notes.py -- ${REF#"release_"} > notes.txt
                         """
                     ),
@@ -1165,8 +1165,8 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "run": dedent(
                         f"""\
-                        gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}/*
-                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false --notes-file notes.txt
+                        gh release upload {gha_expr("needs.determine_ref.outputs.build-ref") } {pypi_release_dir}/*
+                        gh release edit {gha_expr("needs.determine_ref.outputs.build-ref") } --draft=false --notes-file notes.txt
                         """
                     ),
                 },
