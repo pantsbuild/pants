@@ -251,8 +251,8 @@ jobs:
     if: github.repository_owner == 'pantsbuild'
     name: Create draft release and output info
     outputs:
-      build-ref: ${{ steps.get_info.outputs.build-ref }}
-      is-release: ${{ steps.get_info.outputs.is-release }}
+      build-ref: ${{ steps.determine_ref.outputs.build-ref }}
+      is-release: ${{ steps.determine_ref.outputs.is-release }}
       release-asset-upload-url: ${{ steps.make_draft_release.outputs.release-asset-upload-url
         }}
     runs-on: ubuntu-latest
@@ -268,10 +268,10 @@ jobs:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       id: make_draft_release
-      if: github.repository_owner == 'pantsbuild' && steps.get_info.outputs.is-release
+      if: github.repository_owner == 'pantsbuild' && steps.determine_ref.outputs.is-release
         == 'true'
       name: Make GitHub Release
-      run: "RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}\nRELEASE_VERSION=\"\
+      run: "RELEASE_TAG=${{ steps.determine_ref.outputs.build-ref }}\nRELEASE_VERSION=\"\
         ${RELEASE_TAG#release_}\"\n\n# NB: This could be a re-run of a release, in\
         \ the event a job/step failed.\nif ! gh release view $RELEASE_TAG ; then\n\
         \    GH_RELEASE_ARGS=(\"--notes\" \"\")\n    GH_RELEASE_ARGS+=(\"--title\"\
@@ -344,7 +344,7 @@ jobs:
       name: Deploy commit mapping to S3
       run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
     - name: Get release notes
-      run: 'REF="${{ needs.release_info.outputs.build-ref }}"
+      run: 'REF="${{ needs.determine_ref.outputs.build-ref }}"
 
         ./pants run build-support/bin/get_release_notes.py -- ${REF#"release_"} >
         notes.txt
@@ -354,9 +354,9 @@ jobs:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       name: Publish GitHub Release
-      run: 'gh release upload ${{ needs.release_info.outputs.build-ref }} dest/pypi_release/*
+      run: 'gh release upload ${{ needs.determine_ref.outputs.build-ref }} dest/pypi_release/*
 
-        gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
+        gh release edit ${{ needs.determine_ref.outputs.build-ref }} --draft=false
         --notes-file notes.txt
 
         '
