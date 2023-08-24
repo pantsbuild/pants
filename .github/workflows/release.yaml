@@ -344,7 +344,7 @@ jobs:
       name: Deploy commit mapping to S3
       run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
     - name: Get release notes
-      run: 'REF="${{ needs.release_info.outputs.build-ref }}"
+      run: 'REF="${{ needs.determine_ref.outputs.build-ref }}"
 
         ./pants run build-support/bin/get_release_notes.py -- ${REF#"release_"} >
         notes.txt
@@ -354,9 +354,9 @@ jobs:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       name: Publish GitHub Release
-      run: 'gh release upload ${{ needs.release_info.outputs.build-ref }} dest/pypi_release/*
+      run: 'gh release upload ${{ needs.determine_ref.outputs.build-ref }} dest/pypi_release/*
 
-        gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
+        gh release edit ${{ needs.determine_ref.outputs.build-ref }} --draft=false
         --notes-file notes.txt
 
         '
