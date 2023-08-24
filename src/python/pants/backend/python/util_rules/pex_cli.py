@@ -166,9 +166,7 @@ async def setup_pex_cli_process(
     # All old-style pex runs take the --pip-version flag, but only certain subcommands of the
     # `pex3` console script do. So if invoked with a subcommand, the caller must selectively
     # set --pip-version only on subcommands that take it.
-    pip_version_args = (
-        [] if request.subcommand else ["--pip-version", python_setup.pip_version.value]
-    )
+    pip_version_args = [] if request.subcommand else ["--pip-version", python_setup.pip_version]
     args = [
         *request.subcommand,
         *global_args,
