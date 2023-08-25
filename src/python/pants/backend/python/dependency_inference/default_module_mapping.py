@@ -242,7 +242,6 @@ DEFAULT_MODULE_MAPPING = {
     "snowflake-sqlalchemy": ("snowflake.sqlalchemy",),
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
-    "tensorboard": ("torch.utils.tensorboard",),
     "unleashclient": ("UnleashClient",),
     "websocket-client": ("websocket",),
 }
