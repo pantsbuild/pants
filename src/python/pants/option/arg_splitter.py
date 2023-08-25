@@ -164,9 +164,13 @@ class ArgSplitter:
             # Use builtin goal as default scope for args.
             return builtin_goal or scope_info.scope
 
-        self._unconsumed_args = list(reversed(args))
-        # The first token is the binary name, so skip it.
-        self._unconsumed_args.pop()
+        self._unconsumed_args = [
+            arg
+            # The first token is the binary name, so skip it:
+            for arg in reversed(args[1:])
+            # Ignore empty strings, they never mean anything:
+            if arg != ""
+        ]
 
         def assign_flag_to_scope(flg: str, default_scope: str) -> None:
             flag_scope, descoped_flag = self._descope_flag(flg, default_scope=default_scope)

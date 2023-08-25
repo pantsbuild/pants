@@ -198,6 +198,40 @@ def goal_split_test(command_line: str, **expected):
                 expected_specs=["check.java"],
             ),
         ),
+        # empty args should be ignored everywhere...
+        (
+            "./pants '' test --debug ::",
+            dict(
+                expected_goals=["test"],
+                expected_scope_to_flags={"": [], "test": ["--debug"]},
+                expected_specs=["::"],
+            ),
+        ),
+        (
+            "./pants test '' --debug ::",
+            dict(
+                expected_goals=["test"],
+                expected_scope_to_flags={"": [], "test": ["--debug"]},
+                expected_specs=["::"],
+            ),
+        ),
+        (
+            "./pants test --debug '' ::",
+            dict(
+                expected_goals=["test"],
+                expected_scope_to_flags={"": [], "test": ["--debug"]},
+                expected_specs=["::"],
+            ),
+        ),
+        # ... except if one somehow end up as the binary name:
+        (
+            "'' test --debug ::",
+            dict(
+                expected_goals=["test"],
+                expected_scope_to_flags={"": [], "test": ["--debug"]},
+                expected_specs=["::"],
+            ),
+        ),
     ],
 )
 def test_valid_arg_splits(
