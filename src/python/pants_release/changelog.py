@@ -13,29 +13,10 @@ from dataclasses import dataclass
 from enum import Enum
 
 import github
-from packaging.version import Version
 from pants_release.common import die
 from pants_release.git import git, github_repo
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class ReleaseInfo:
-    version: Version
-    branch: str
-
-    @staticmethod
-    def determine(new_version: Version) -> ReleaseInfo:
-        slug = f"{new_version.major}.{new_version.minor}.x"
-        # Use the main branch for all dev releases, and for the first alpha (which creates a stable branch).
-        use_main_branch = new_version.is_devrelease or (
-            new_version.pre
-            and "a0" == "".join(str(p) for p in new_version.pre)
-            and new_version.micro == 0
-        )
-        branch = "main" if use_main_branch else slug
-        return ReleaseInfo(version=new_version, branch=branch)
 
 
 def relevant_shas(tag: str) -> list[str]:
