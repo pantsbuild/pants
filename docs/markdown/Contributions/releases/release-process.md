@@ -63,7 +63,7 @@ The process may fail in one of two ways:
 Step 1: Create the release commit
 ---------------------------------
 
-The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. For `rc` and stable releases, this happens in the relevant stable branch (while the release notes are still updated on `main`).
+The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. For `rc` and stable releases, this happens in the relevant stable branch.
 
 ### `dev0` - set up the new release series
 
@@ -78,13 +78,8 @@ From the `main` branch, run `pants run src/python/pants_release/start_release.py
 
 This will create a pull request that:
 
-1. updates release notes (remember to check over the changes and follow the instructions in the PR to make any updates)
-2. updates `CONTRIBUTORS.md`
-3. bumps the `VERSION` on `main`, if appropriate
-
-> 🚧 Reminder: always do this against the `main` branch
->
-> Even if you are preparing notes for a release candidate, always prepare the notes in a branch based on `main` and, later, target your PR to merge with `main`.
+1. updates `CONTRIBUTORS.md`
+2. bumps the `VERSION` on the branch
 
 ### Merge the pull request
 
@@ -100,14 +95,6 @@ For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running
 $ git checkout -b 2.9.x
 $ git push upstream 2.9.x
 ```
-
-### Release candidates - cherry-pick and bump the VERSION
-
-If you're releasing a release candidate, your release notes PR above did not bump the VERSION on main. You must bump it in the release branch.
-
-1. Checkout from `main` into the release branch, e.g. `2.9.x`.
-2. Cherry-pick the release notes prep into the release branch using `git cherry-pick <sha>`.
-3. Bump the `VERSION` in `src/python/pants/VERSION`, e.g. to `2.9.0rc1`. Push this as a new commit directly to the release branch - you do not need to open a pull request.
 
 Step 2: Update this docs site
 -----------------------------
