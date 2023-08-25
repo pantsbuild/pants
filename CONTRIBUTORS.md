@@ -1,4 +1,4 @@
-Created by running `./pants run build-support/bin/contributors.py`.
+Created as part of the release process.
 
 + A. Alonso Dominguez
 + Aaron Mitchell
@@ -145,6 +145,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Jonathan D. Simms
 + Jonathan Sokolowski
 + Joseph Tilahun
++ Josh Cannon
 + Josh Reed
 + Josh Soref
 + Josh Suereth
@@ -196,6 +197,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Matt Landis
 + Matt Olsen
 + Matthew Jeffryes
++ Matthias Berndt
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
@@ -294,6 +296,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Wilhelmina Drengwitz
 + Win Wang
 + Wolfram Arnold
++ Worker Pants (Pantsbuild GitHub Automation Bot)
 + Xaelias
 + Yi Cheng
 + Yoav Alon
