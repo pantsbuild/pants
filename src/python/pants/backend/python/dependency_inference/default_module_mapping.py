@@ -238,6 +238,7 @@ DEFAULT_MODULE_MAPPING = {
     "sseclient-py": ("sseclient",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
     "snowflake-connector-python": ("snowflake.connector",),
+    "snowflake-snowpark-python": ("snowflake.snowpark",),
     "snowflake-sqlalchemy": ("snowflake.sqlalchemy",),
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
