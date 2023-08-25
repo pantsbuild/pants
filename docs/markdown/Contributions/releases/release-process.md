@@ -90,14 +90,6 @@ This will create a pull request that:
 
 Post the PR to the `#development` channel in Slack. Merge once approved and green.
 
-> 🚧 Watch out for any recently landed PRs
->
-> From the time you put up your release prep until you hit "merge", be careful that no one merges any commits into main.
->
-> If they do—and you're doing a `dev` or `a0` release—you should merge `main` into your PR and update the changelog with their changes. It's okay if the changes were internal only, but any public changes must be added to the changelog.
->
-> Once you click "merge", it is safe for people to merge changes again.
-
 ### `a0` - create a new Git branch
 
 If you're releasing an `a0` release, you must create the stable branch for that version.
@@ -140,10 +132,8 @@ Still on the relevant release branch, run `./pants run build-support/bin/generat
 
 The first stable release of a branch should update the "default" version of the docsite. For example: when releasing the stable `2.9.0`, the docsite would be changed to pointing from `v2.8` to pointing to `v2.9` by default.
 
-Also, update the [Changelog](doc:changelog)'s "highlights" column with a link to the blog summarizing the release. See the section "Announce the release" below for more info on the blog.
-
 > 🚧 Don't have edit access?
-> 
+>
 > Ping someone in the `#maintainers-confidential` channel in Slack to be added. Alternatively, you can "Suggest edits" in the top right corner.
 
 Step 3: Tag the release to trigger publishing
@@ -154,7 +144,7 @@ Once you have merged the `VERSION` bump — which will be on `main` for `dev` an
 First, ensure that you are on your release branch at your version bump commit.
 
 > 📘 Tip: if new commits have landed after your release commit
-> 
+>
 > You can reset to your release commit by running `git reset --hard <sha>`.
 
 Then, run:
@@ -174,7 +164,7 @@ Run this script as a basic smoke test:
 ./pants run src/python/pants_release/release.py -- test-release
 ```
 
-You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm the changelog is correct on the "Project description" page and that the `macOS` and `manylinux` wheels show up in the "Download files" page. 
+You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm that the `macOS` and `manylinux` wheels show up in the "Download files" page.
 
 Step 5: Run release testing on public repositories
 --------------------------------------------------
