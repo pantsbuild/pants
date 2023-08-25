@@ -237,7 +237,6 @@ DEFAULT_MODULE_MAPPING = {
     "snowflake-connector-python": ("snowflake.connector",),
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
-    "tensorboard": ("torch.utils.tensorboard",),
     "websocket-client": ("websocket",),
 }
 
