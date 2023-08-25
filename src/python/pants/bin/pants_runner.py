@@ -23,9 +23,8 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-# Pants 2.18 is using a new distribution model, that's only supported in 0.9.0 (this is 0.9.2,
-# because _detecting_ the version is only supported from 0.9.2), so people should upgrade
-MINIMUM_SCIE_PANTS_VERSION = Version("0.9.2")
+# Pants 2.18 is using a new distribution model, that's supported (sans bugs) in 0.10.0.
+MINIMUM_SCIE_PANTS_VERSION = Version("0.10.0")
 
 
 @dataclass(frozen=True)
