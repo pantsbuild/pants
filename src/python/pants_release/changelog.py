@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def relevant_shas(tag: str) -> list[str]:
     try:
         prior_tag = git("describe", "--tags", "--abbrev=0", f"{tag}~1")
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         die("Ensure that you have the full history of the relevant branch locally.")
     print(f"Found prior tag: {prior_tag}", file=sys.stderr)
     return git("log", "--format=format:%H", tag, f"^{prior_tag}").splitlines()
