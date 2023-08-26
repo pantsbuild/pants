@@ -527,7 +527,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
       // Get all the inputs which didn't transitively expand to any files.
       let matching_inputs = sources
         .iter()
-        .zip(matched.into_iter())
+        .zip(matched)
         .filter_map(
           |(source, matched)| {
             if matched {
