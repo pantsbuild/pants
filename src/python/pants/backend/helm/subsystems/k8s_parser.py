@@ -10,10 +10,7 @@ from pathlib import PurePath
 from typing import Any
 
 from pants.backend.helm.utils.yaml import YamlPath
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -34,14 +31,12 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-k8s-parser"
     help = "Analyses K8S manifests rendered by Helm."
 
-    default_version = "hikaru==0.11.0b"
     default_requirements = ["hikaru>=0.11.0b,<1"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]
 
     default_lockfile_resource = (_HELM_K8S_PARSER_PACKAGE, "k8s_parser.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)
@@ -84,9 +79,16 @@ class ParseKubeManifestRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
+class ParsedImageRefEntry:
+    document_index: int
+    path: YamlPath
+    unparsed_image_ref: str
+
+
+@dataclass(frozen=True)
 class ParsedKubeManifest(EngineAwareReturnType):
     filename: str
-    found_image_refs: tuple[tuple[int, YamlPath, str], ...]
+    found_image_refs: tuple[ParsedImageRefEntry, ...]
 
     def level(self) -> LogLevel | None:
         return LogLevel.DEBUG
@@ -120,7 +122,7 @@ async def parse_kube_manifest(
 
     if result.exit_code == 0:
         output = result.stdout.decode("utf-8").splitlines()
-        image_refs: list[tuple[int, YamlPath, str]] = []
+        image_refs: list[ParsedImageRefEntry] = []
         for line in output:
             parts = line.split(",")
             if len(parts) != 3:
@@ -133,7 +135,13 @@ async def parse_kube_manifest(
                     )
                 )
 
-            image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
+            image_refs.append(
+                ParsedImageRefEntry(
+                    document_index=int(parts[0]),
+                    path=YamlPath.parse(parts[1]),
+                    unparsed_image_ref=parts[2],
+                )
+            )
 
         return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
     else:

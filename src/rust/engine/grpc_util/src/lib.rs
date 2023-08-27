@@ -25,7 +25,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::str::FromStr;
@@ -36,23 +35,25 @@ use std::time::Duration;
 use either::Either;
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryFutureExt};
-use http::header::{HeaderName, USER_AGENT};
+use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
+use hyper::Uri;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use tokio_rustls::rustls::ClientConfig;
-use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 use tower::limit::ConcurrencyLimit;
 use tower::timeout::{Timeout, TimeoutLayer};
 use tower::ServiceBuilder;
 use tower_service::Service;
 use workunit_store::{get_workunit_store_handle, Metric, ObservationMetric};
 
+use crate::channel::Channel;
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
 use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
 
+pub mod channel;
 pub mod headers;
-pub mod hyper;
+pub mod hyper_util;
 pub mod metrics;
 pub mod prost;
 pub mod retry;
@@ -73,6 +74,7 @@ pub fn layered_service(
   let (timeout, metric) = timeout
     .map(|(t, m)| (t, Some(m)))
     .unwrap_or_else(|| (Duration::from_secs(60 * 60), None));
+
   ServiceBuilder::new()
     .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
@@ -93,35 +95,14 @@ lazy_static! {
   };
 }
 
-/// Create a Tonic `Endpoint` from a string containing a schema and IP address/name.
-pub fn create_endpoint(
+pub async fn create_channel(
   addr: &str,
-  tls_config_opt: Option<&ClientConfig>,
-  headers: &mut BTreeMap<String, String>,
-) -> Result<Endpoint, String> {
-  let uri =
-    tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {err}"))?;
-  let endpoint = Channel::builder(uri);
-
-  let endpoint = if let Some(tls_config) = tls_config_opt {
-    endpoint
-      .tls_config(ClientTlsConfig::new().rustls_client_config(tls_config.clone()))
-      .map_err(|e| format!("TLS setup error: {e}"))?
-  } else {
-    endpoint
-  };
-
-  let endpoint = match headers.entry(USER_AGENT.as_str().to_owned()) {
-    Entry::Occupied(e) => {
-      let (_, user_agent) = e.remove_entry();
-      endpoint
-        .user_agent(user_agent)
-        .map_err(|e| format!("Unable to convert user-agent header: {e}"))?
-    }
-    Entry::Vacant(_) => endpoint,
-  };
-
-  Ok(endpoint)
+  tls_config: Option<&ClientConfig>,
+) -> Result<Channel, String> {
+  let uri = Uri::try_from(addr).map_err(|err| format!("invalid address: {err}"))?;
+  Channel::new(tls_config, uri)
+    .await
+    .map_err(|err| format!("gRPC connection error: {err}"))
 }
 
 pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, String> {
@@ -164,7 +145,7 @@ pub struct CountErrorsService<S> {
 
 impl<S, Request> Service<Request> for CountErrorsService<S>
 where
-  S: Service<Request> + Send + Sync + 'static,
+  S: Service<Request> + Send + 'static,
   S::Response: Send + 'static,
   S::Error: Send + 'static,
   S::Future: Send + 'static,
@@ -203,10 +184,11 @@ mod tests {
   use async_trait::async_trait;
   use futures::FutureExt;
   use tokio::sync::oneshot;
-  use tonic::transport::{Channel, Server};
+  use tonic::transport::Server;
   use tonic::{Request, Response, Status};
 
-  use crate::hyper::AddrIncomingWithStream;
+  use crate::hyper_util::AddrIncomingWithStream;
+  use crate::{headers_to_http_header_map, layered_service};
 
   #[tokio::test]
   async fn user_agent_is_set_correctly() {
@@ -255,24 +237,21 @@ mod tests {
         .unwrap();
     });
 
-    let mut headers = {
+    let headers = {
       let mut h = BTreeMap::new();
       h.insert("user-agent".to_owned(), EXPECTED_USER_AGENT.to_owned());
       h
     };
 
-    let endpoint = super::create_endpoint(
-      &format!("grpc://127.0.0.1:{}", local_addr.port()),
-      None,
-      &mut headers,
-    )
-    .unwrap();
+    let headers = headers_to_http_header_map(&headers).unwrap();
 
-    let channel = Channel::balance_list(vec![endpoint].into_iter());
+    let channel = super::create_channel(&format!("http://127.0.0.1:{}", local_addr.port()), None)
+      .await
+      .unwrap();
 
-    let mut client = gen::test_client::TestClient::new(channel);
-    if let Err(err) = client.call(gen::Input {}).await {
-      panic!("test failed: {}", err.message());
-    }
+    let client = layered_service(channel, 1, headers, None);
+
+    let mut client = gen::test_client::TestClient::new(client);
+    client.call(gen::Input {}).await.expect("success");
   }
 }

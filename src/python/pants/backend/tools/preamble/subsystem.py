@@ -19,7 +19,7 @@ class PreambleSubsystem(Subsystem):
 
         This is useful for things such as copyright headers or shebang lines.
 
-        Pants substitutes the following identifiers (following Python's string.Template substitutions):
+        Pants substitutes the following identifiers (following Python's `string.Template` substitutions):
         - $year: The current year (only used when actually writing the year to the file).
         """
     )
@@ -34,8 +34,8 @@ class PreambleSubsystem(Subsystem):
             Example:
 
                 {
-                    '*.rs': '// Copyright (c) $year\n// Line 2\n'
-                    '*.py:!__init__.py': '# Copyright (c) $year\n# Line 2\n',
+                    '*.rs': '// Copyright (c) $year\\n// Line 2\\n'
+                    '*.py:!__init__.py': '# Copyright (c) $year\\n# Line 2\\n',
                 }
 
             It might be helpful to load this config from a JSON or YAML file. To do that, set

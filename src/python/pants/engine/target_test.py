@@ -115,7 +115,7 @@ def test_field_and_target_eq() -> None:
     assert hash(field) == hash(other)
 
     # Ensure the field is frozen.
-    with pytest.raises(FrozenInstanceError):
+    with pytest.raises(AttributeError):
         field.value = "foo"
 
     tgt = FortranTarget({"version": "dev0"}, addr)
@@ -215,11 +215,11 @@ def test_has_fields() -> None:
     empty_union_membership = UnionMembership({})
     tgt = FortranTarget({}, Address("", target_name="lib"))
 
-    assert tgt.field_types == (FortranExtensions, FortranVersion)
-    assert FortranTarget.class_field_types(union_membership=empty_union_membership) == (
+    assert tgt.field_types == {FortranExtensions, FortranVersion}
+    assert set(FortranTarget.class_field_types(union_membership=empty_union_membership)) == {
         FortranExtensions,
         FortranVersion,
-    )
+    }
 
     assert tgt.has_fields([]) is True
     assert FortranTarget.class_has_fields([], union_membership=empty_union_membership) is True
@@ -268,16 +268,15 @@ def test_add_custom_fields() -> None:
         tgt_values, Address("", target_name="lib"), union_membership=union_membership
     )
 
-    assert tgt.field_types == (FortranExtensions, FortranVersion, CustomField)
+    assert tgt.field_types == {FortranExtensions, FortranVersion, CustomField}
     assert tgt.core_fields == (FortranExtensions, FortranVersion)
-    assert tgt.plugin_fields == (CustomField,)
     assert tgt.has_field(CustomField) is True
 
-    assert FortranTarget.class_field_types(union_membership=union_membership) == (
+    assert set(FortranTarget.class_field_types(union_membership=union_membership)) == {
         FortranExtensions,
         FortranVersion,
         CustomField,
-    )
+    }
     assert FortranTarget.class_has_field(CustomField, union_membership=union_membership) is True
     assert (
         FortranTarget.class_get_field(CustomField, union_membership=union_membership) is CustomField
@@ -296,7 +295,7 @@ def test_add_custom_fields() -> None:
         core_fields = ()
 
     other_tgt = OtherTarget({}, Address("", target_name="other"))
-    assert other_tgt.plugin_fields == ()
+    assert tuple(other_tgt.field_types) == ()
     assert other_tgt.has_field(CustomField) is False
 
 
@@ -446,7 +445,7 @@ def test_async_field_mixin() -> None:
     assert hash(field) != hash(other)
 
     # Ensure it's still frozen.
-    with pytest.raises(FrozenInstanceError):
+    with pytest.raises(AttributeError):
         field.value = 11
 
     # Ensure that subclasses are not equal.
@@ -1511,6 +1510,6 @@ def test_generate_file_based_overrides_field_help_message() -> None:
         }
         """,
     )
-    assert "example:\n    overrides={\n" in message
+    assert "example:\n\n    overrides={\n" in message
     assert '\n        "bar.proto"' in message
     assert "\n    }\n\nFile" in message

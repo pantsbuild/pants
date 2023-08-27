@@ -23,6 +23,7 @@ use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
 mod address;
+pub mod dep_inference;
 pub mod engine_aware;
 pub mod fs;
 mod interface;
@@ -32,6 +33,7 @@ pub mod nailgun;
 pub mod process;
 pub mod scheduler;
 mod stdio;
+mod target;
 pub mod testutil;
 pub mod workunits;
 
@@ -353,7 +355,7 @@ impl PyGeneratorResponseGet {
     input_arg0: Option<&PyAny>,
     input_arg1: Option<&PyAny>,
   ) -> PyResult<Self> {
-    let product = product.cast_as::<PyType>().map_err(|_| {
+    let product = product.downcast::<PyType>().map_err(|_| {
       let actual_type = product.get_type();
       PyTypeError::new_err(format!(
         "Invalid Get. The first argument (the output type) must be a type, but given \
@@ -370,18 +372,18 @@ impl PyGeneratorResponseGet {
         ))
       }
       (Some(input_arg0), None) => {
-        if input_arg0.is_instance_of::<PyType>()? {
+        if input_arg0.is_instance_of::<PyType>() {
           return Err(PyTypeError::new_err(format!(
             "Invalid Get. Because you are using the shorthand form \
             Get(OutputType, InputType(constructor args)), the second argument should be \
             a constructor call, rather than a type, but given {input_arg0}."
           )));
         }
-        if let Ok(d) = input_arg0.cast_as::<PyDict>() {
+        if let Ok(d) = input_arg0.downcast::<PyDict>() {
           let mut input_types = SmallVec::new();
           let mut inputs = SmallVec::new();
           for (value, declared_type) in d.iter() {
-            input_types.push(TypeId::new(declared_type.cast_as::<PyType>().map_err(
+            input_types.push(TypeId::new(declared_type.downcast::<PyType>().map_err(
               |_| {
                 PyTypeError::new_err(
               "Invalid Get. Because the second argument was a dict, we expected the keys of the \
@@ -401,7 +403,7 @@ impl PyGeneratorResponseGet {
         }
       }
       (Some(input_arg0), Some(input_arg1)) => {
-        let declared_type = input_arg0.cast_as::<PyType>().map_err(|_| {
+        let declared_type = input_arg0.downcast::<PyType>().map_err(|_| {
           let input_arg0_type = input_arg0.get_type();
           PyTypeError::new_err(format!(
             "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
@@ -410,7 +412,7 @@ impl PyGeneratorResponseGet {
           ))
         })?;
 
-        if input_arg1.is_instance_of::<PyType>()? {
+        if input_arg1.is_instance_of::<PyType>() {
           return Err(PyTypeError::new_err(format!(
             "Invalid Get. Because you are using the longhand form \
           Get(OutputType, InputType, input), the third argument should be \

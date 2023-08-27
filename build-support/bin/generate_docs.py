@@ -26,13 +26,11 @@ import pkgutil
 import re
 import subprocess
 import textwrap
-from html.parser import HTMLParser
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, cast
 
 import chevron
-import requests
-from common import die
+from pants_release.common import die
 from readme_api import DocRef, ReadmeAPI
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
@@ -56,19 +54,8 @@ def main() -> None:
 
     version = determine_pants_version(args.no_prompt)
     help_info = run_pants_help_all()
-    doc_urls = find_doc_urls(value_strs_iter(help_info))
-    logger.info("Found the following docsite URLs:")
-    for url in sorted(doc_urls):
-        logger.info(f"  {url}")
-
-    if not args.skip_check_urls:
-        logger.info("Fetching titles...")
-        slug_to_title = get_titles(doc_urls)
-        logger.info("Found the following titles:")
-        for slug, title in sorted(slug_to_title.items()):
-            logger.info(f"  {slug}: {title}")
-
-        help_info = rewrite_value_strs(help_info, slug_to_title)
+    slug_to_title = get_titles()
+    help_info = rewrite_value_strs(help_info, slug_to_title)
 
     generator = ReferenceGenerator(args, version, help_info)
     if args.sync:
@@ -131,60 +118,18 @@ class DocUrlRewriter:
         return DOC_URL_RE.sub(self._rewrite_url, s)
 
 
-class TitleFinder(HTMLParser):
-    """Grabs the page title out of a docsite page."""
+def get_titles() -> dict[str, str]:
+    """Return map from slug->title for each possible docsite reference."""
+    result = {}
+    for markdown_path in Path("docs/markdown").glob("**/*.md"):
+        markdown_text = markdown_path.read_text()
+        title_match = re.search(r'title: "(.*)"', markdown_text)
+        assert title_match is not None
+        slug_match = re.search(r'slug: "(.*)"', markdown_text)
+        assert slug_match is not None
+        result[slug_match[1]] = title_match[1]
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._in_title: bool = False
-        self._title: str | None = None
-
-    def handle_starttag(self, tag, attrs):
-        if tag == "title":
-            self._in_title = True
-
-    def handle_endtag(self, tag):
-        if tag == "title":
-            self._in_title = False
-
-    def handle_data(self, data):
-        if self._in_title:
-            self._title = data.strip()
-
-    @property
-    def title(self) -> str:
-        return self._title or ""
-
-
-def get_url(url: str):
-    response = requests.get(url)
-    if response.status_code != 200:
-        die(
-            softwrap(
-                f"""
-                Error getting URL: {url}
-
-                If the URL is pantsbuild.org, a `doc_url` link might be using the wrong slug or the
-                docs for this version might be unpublished. Otherwise, the link might be dead.
-
-                You can use `--skip-check-urls` to skip.
-                """
-            )
-        )
-    return response
-
-
-def get_titles(urls: set[str]) -> dict[str, str]:
-    """Return map from slug->title for each given docsite URL."""
-
-    # TODO: Parallelize the http requests.
-    #  E.g., by turning generate_docs.py into a plugin goal and using the engine.
-    ret = {}
-    for url in urls:
-        title_finder = TitleFinder()
-        title_finder.feed(get_url(url).text)
-        ret[get_doc_slug(url)] = title_finder.title
-    return ret
+    return result
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -220,12 +165,6 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
-    parser.add_argument(
-        "--skip-check-urls",
-        action="store_true",
-        default=False,
-        help="Skip checking URLs (including pantsbuild.org ones).",
-    )
     return parser
 
 
@@ -253,21 +192,23 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.kotlin",
         "pants.backend.experimental.kotlin.lint.ktlint",
         "pants.backend.experimental.openapi",
+        "pants.backend.experimental.openapi.lint.openapi_format",
         "pants.backend.experimental.openapi.lint.spectral",
         "pants.backend.experimental.python",
         "pants.backend.experimental.python.framework.stevedore",
         "pants.backend.experimental.python.lint.add_trailing_comma",
-        "pants.backend.experimental.python.lint.autoflake",
-        "pants.backend.experimental.python.lint.pyupgrade",
+        "pants.backend.experimental.python.lint.ruff",
         "pants.backend.experimental.python.packaging.pyoxidizer",
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
         "pants.backend.experimental.terraform",
         "pants.backend.experimental.tools.semgrep",
+        "pants.backend.experimental.tools.workunit_logger",
         "pants.backend.experimental.tools.yamllint",
         "pants.backend.google_cloud_function.python",
         "pants.backend.plugin_development",
         "pants.backend.python",
+        "pants.backend.python.lint.autoflake",
         "pants.backend.python.lint.bandit",
         "pants.backend.python.lint.black",
         "pants.backend.python.lint.docformatter",
@@ -275,9 +216,11 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.isort",
         "pants.backend.python.lint.pydocstyle",
         "pants.backend.python.lint.pylint",
+        "pants.backend.python.lint.pyupgrade",
         "pants.backend.python.lint.yapf",
         "pants.backend.python.mixed_interpreter_constraints",
         "pants.backend.python.typecheck.mypy",
+        "pants.backend.python.typecheck.pytype",
         "pants.backend.shell",
         "pants.backend.shell.lint.shellcheck",
         "pants.backend.shell.lint.shfmt",

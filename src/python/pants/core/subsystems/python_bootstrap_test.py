@@ -19,12 +19,12 @@ from pants.core.subsystems.python_bootstrap import (
 from pants.core.subsystems.python_bootstrap import rules as python_bootstrap_rules
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
-from pants.core.util_rules.asdf_test import fake_asdf_root
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.core.util_rules.search_paths import (
     VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,
 )
+from pants.core.util_rules.testutil import fake_asdf_root
 from pants.engine.addresses import Address
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
 from pants.engine.rules import QueryRule

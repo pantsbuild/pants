@@ -440,10 +440,12 @@ async def setup_helm(
 
 @rule
 async def helm_process(
-    request: HelmProcess, helm_binary: HelmBinary, helm_subsytem: HelmSubsystem
+    request: HelmProcess,
+    helm_binary: HelmBinary,
+    helm_subsystem: HelmSubsystem,
 ) -> Process:
     global_extra_env = await Get(
-        EnvironmentVars, EnvironmentVarsRequest(helm_subsytem.extra_env_vars)
+        EnvironmentVars, EnvironmentVarsRequest(helm_subsystem.extra_env_vars)
     )
 
     # Helm binary's setup parameters go last to prevent end users overriding any of its values.
@@ -455,8 +457,21 @@ async def helm_process(
     }
     append_only_caches = {**request.extra_append_only_caches, **helm_binary.append_only_caches}
 
+    argv = [helm_binary.path, *request.argv]
+
+    # A special case for "--debug".
+    # This ensures that it is applied to all operations in the chain,
+    # not just the final one.
+    # For example, we want this applied to the call to `template`, not just the call to `install`
+    # Also, we can be helpful and automatically forward a request to debug Pants to also debug Helm
+    debug_requested = "--debug" in helm_subsystem.valid_args() or (
+        0 < logger.getEffectiveLevel() <= LogLevel.DEBUG.level
+    )
+    if debug_requested and "--debug" not in request.argv:
+        argv.append("--debug")
+
     return Process(
-        [helm_binary.path, *request.argv],
+        argv,
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         env=env,

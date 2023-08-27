@@ -49,6 +49,7 @@ target(
         "src/python/pants/backend/experimental/kotlin/debug_goals",
         "src/python/pants/backend/experimental/kotlin/lint/ktlint",
         "src/python/pants/backend/experimental/openapi",
+        "src/python/pants/backend/experimental/openapi/lint/openapi_format",
         "src/python/pants/backend/experimental/openapi/lint/spectral",
         "src/python/pants/backend/experimental/python",
         "src/python/pants/backend/experimental/python/framework/stevedore",
@@ -64,6 +65,7 @@ target(
         "src/python/pants/backend/experimental/terraform",
         "src/python/pants/backend/experimental/tools/semgrep",
         "src/python/pants/backend/experimental/tools/yamllint",
+        "src/python/pants/backend/experimental/tools/workunit_logger",
         "src/python/pants/backend/experimental/visibility",
         "src/python/pants/backend/google_cloud_function/python",
         "src/python/pants/backend/plugin_development",
@@ -84,6 +86,7 @@ target(
         "src/python/pants/backend/shell/lint/shellcheck",
         "src/python/pants/backend/shell/lint/shfmt",
         "src/python/pants/backend/tools/preamble",
+        "src/python/pants/backend/tools/taplo",
         "src/python/pants/backend/url_handlers/s3",
         "src/python/pants/core",
     ],
@@ -100,5 +103,9 @@ pex_binary(
     strip_pex_env=False,
 )
 
+resources(
+    name="native_client",
+    sources=["native_client"],
+)
 
 python_tests(name="tests")

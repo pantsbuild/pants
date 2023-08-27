@@ -13,10 +13,12 @@ from pants.backend.javascript.install_node_package import (
 from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
 from pants.backend.javascript.package_json import (
     NodeBuildScriptEntryPointField,
+    NodeBuildScriptExtraEnvVarsField,
     NodePackageDependenciesField,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.environments import EnvironmentField
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process
 from pants.engine.rules import Rule, collect_rules, rule
@@ -29,6 +31,7 @@ class RunNodeBuildScriptFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
     entry_point: NodeBuildScriptEntryPointField
+    extra_env_vars: NodeBuildScriptExtraEnvVarsField
     environment: EnvironmentField
 
 
@@ -39,6 +42,9 @@ async def run_node_build_script(
     installation = await Get(
         InstalledNodePackageWithSource, InstalledNodePackageRequest(field_set.address)
     )
+    target_env_vars = await Get(
+        EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())
+    )
     process = await Get(
         Process,
         NodeJsProjectEnvironmentProcess(
@@ -46,6 +52,7 @@ async def run_node_build_script(
             args=("--prefix", "{chroot}", "run", str(field_set.entry_point.value)),
             description=f"Running {str(field_set.entry_point.value)}.",
             input_digest=installation.digest,
+            extra_env=target_env_vars,
         ),
     )
 

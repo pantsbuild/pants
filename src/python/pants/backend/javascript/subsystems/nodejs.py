@@ -219,15 +219,6 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             return tuple(sorted(set(self._corepack_env_vars)))
 
 
-class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
-    pass
-
-
-@rule(level=LogLevel.DEBUG)
-async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolveAliases:
-    return UserChosenNodeJSResolveAliases((value, key) for key, value in nodejs.resolves.items())
-
-
 @dataclass(frozen=True)
 class NodeJSToolProcess:
     """A request for a tool installed with NodeJS."""
@@ -276,26 +267,6 @@ class NodeJSToolProcess:
             timeout_seconds=timeout_seconds,
             extra_env=extra_env or FrozenDict(),
             project_digest=project_digest,
-        )
-
-    @classmethod
-    def npx(
-        cls,
-        args: Iterable[str],
-        npm_package: str,
-        description: str,
-        level: LogLevel = LogLevel.INFO,
-        input_digest: Digest = EMPTY_DIGEST,
-        output_files: tuple[str, ...] = (),
-    ) -> NodeJSToolProcess:
-        return cls(
-            tool="npx",
-            tool_version=None,
-            args=("--yes", npm_package, *args),
-            description=description,
-            level=level,
-            input_digest=input_digest,
-            output_files=output_files,
         )
 
 
@@ -353,7 +324,7 @@ async def add_corepack_shims_to_digest(
     enable_corepack_result = await Get(
         ProcessResult,
         Process(
-            argv=("corepack", "enable", "npm", "pnpm", "--install-directory", "._corepack"),
+            argv=("corepack", "enable", "npm", "pnpm", "yarn", "--install-directory", "._corepack"),
             input_digest=input_digest,
             immutable_input_digests={**tool_shims.immutable_input_digests},
             output_directories=["._corepack"],
@@ -601,7 +572,7 @@ async def prepare_corepack_tool(
 async def setup_node_tool_process(
     request: NodeJSToolProcess, environment: NodeJSProcessEnvironment
 ) -> Process:
-    if request.tool in ("npm", "npx", "pnpm"):
+    if request.tool in ("npm", "npx", "pnpm", "yarn"):
         tool_name = request.tool.replace("npx", "npm")
         corepack_tool = await Get(
             CorepackToolDigest,
@@ -628,6 +599,15 @@ async def setup_node_tool_process(
         append_only_caches={**request.append_only_caches, **environment.append_only_caches},
         timeout_seconds=request.timeout_seconds,
     )
+
+
+class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
+    pass
+
+
+@rule(level=LogLevel.DEBUG)
+async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolveAliases:
+    return UserChosenNodeJSResolveAliases((value, key) for key, value in nodejs.resolves.items())
 
 
 def rules() -> Iterable[Rule | UnionRule]:

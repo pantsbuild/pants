@@ -15,9 +15,9 @@ from pants.base.specs import Specs
 from pants.core.goals.fix import FixFilesRequest, FixTargetsRequest
 from pants.core.goals.fmt import FmtFilesRequest, FmtTargetsRequest
 from pants.core.goals.lint import (
+    AbstractLintRequest,
     Lint,
     LintFilesRequest,
-    LintRequest,
     LintResult,
     LintSubsystem,
     LintTargetsRequest,
@@ -41,7 +41,7 @@ from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_ru
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
-_LintRequestT = TypeVar("_LintRequestT", bound=LintRequest)
+_LintRequestT = TypeVar("_LintRequestT", bound=AbstractLintRequest)
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -65,7 +65,7 @@ class MockLinterFieldSet(FieldSet):
     required: MockRequiredField
 
 
-class MockLintRequest(LintRequest, metaclass=ABCMeta):
+class MockLintRequest(AbstractLintRequest, metaclass=ABCMeta):
     @staticmethod
     @abstractmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -330,8 +330,8 @@ def run_lint_rule(
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
-            LintRequest: lint_request_types,
-            LintRequest.Batch: [rt.Batch for rt in lint_request_types],
+            AbstractLintRequest: lint_request_types,
+            AbstractLintRequest.Batch: [rt.Batch for rt in lint_request_types],
             LintTargetsRequest.PartitionRequest: [
                 rt.PartitionRequest
                 for rt in lint_request_types
@@ -378,7 +378,7 @@ def run_lint_rule(
                 ),
                 MockGet(
                     output_type=LintResult,
-                    input_types=(LintRequest.Batch,),
+                    input_types=(AbstractLintRequest.Batch,),
                     mock=mock_lint_partition,
                 ),
                 MockGet(

@@ -79,6 +79,8 @@ pub mod local;
 pub mod local_tests;
 
 pub mod named_caches;
+#[cfg(test)]
+pub mod named_caches_tests;
 
 extern crate uname;
 
@@ -1271,7 +1273,7 @@ pub async fn make_execute_request(
   };
 
   if let Some(timeout) = req.timeout {
-    action.timeout = Some(prost_types::Duration::from(timeout));
+    action.timeout = Some(prost_types::Duration::try_from(timeout).unwrap());
   }
 
   let execute_request = remexec::ExecuteRequest {

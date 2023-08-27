@@ -47,6 +47,7 @@ from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.typecheck.pytype.subsystem import Pytype
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
@@ -121,6 +122,7 @@ all_python_tools = tuple(
             PythonTool(PyUpgrade, "pants.backend.python.lint.pyupgrade"),
             PythonTool(Pylint, "pants.backend.python.lint.pylint"),
             PythonTool(PythonProtobufMypyPlugin, "pants.backend.codegen.protobuf.python"),
+            PythonTool(Pytype, "pants.backend.python.typecheck.pytype", "CPython>=3.7,<3.11"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
@@ -129,7 +131,6 @@ all_python_tools = tuple(
             PythonTool(TwineSubsystem, "pants.backend.python"),
             PythonTool(Yamllint, "pants.backend.experimental.tools.yamllint"),
             PythonTool(Yapf, "pants.backend.python.lint.yapf"),
-            PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff"),
         ],
         key=lambda tool: tool.name,
     )
@@ -228,7 +229,7 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             # Regardless of the backend the tool is defined in, we need the Python backend
             # for the Python resolves mechanism to work.
             "--backend-packages=pants.backend.python",
-            "--python-pip-version=23.0.1",
+            "--python-pip-version=latest",
             f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
             "--python-enable-resolves",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
@@ -261,7 +262,7 @@ def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None
 
 def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run: bool) -> None:
     pants_repo_root = get_buildroot()
-    touch(os.path.join(buildroot, "BUILDROOT"))
+    touch(os.path.join(buildroot, "pants.toml"))
     backends = sorted({tool.backend for tool in tools})
     custom_cmd = "./pants run build-support/bin/generate_builtin_lockfiles.py"
     args = [

@@ -16,7 +16,7 @@ from pants.backend.javascript.package_json import (
     PnpmWorkspaces,
 )
 from pants.backend.javascript.subsystems import nodejs
-from pants.backend.javascript.subsystems.nodejs import NodeJS
+from pants.backend.javascript.subsystems.nodejs import NodeJS, UserChosenNodeJSResolveAliases
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.collection import Collection
@@ -25,7 +25,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, softwrap
 
 
 @dataclass(frozen=True)
@@ -62,34 +62,51 @@ class NodeJSProject:
     def lockfile_name(self) -> str:
         if self.package_manager == "pnpm":
             return "pnpm-lock.yaml"
+        elif self.package_manager == "yarn":
+            return "yarn.lock"
         return "package-lock.json"
 
     @property
     def generate_lockfile_args(self) -> tuple[str, ...]:
         if self.package_manager == "pnpm":
             return ("install", "--lockfile-only")
+        elif self.package_manager == "yarn":
+            return ("install",)  # yarn does not provide a lockfile only mode.
         return ("install", "--package-lock-only")
 
     @property
     def immutable_install_args(self) -> tuple[str, ...]:
-        if self.package_manager == "pnpm":
-            return ("install", "--frozen-lockfile")
-        return ("clean-install",)
+        if self.package_manager == "npm":
+            return ("clean-install",)
+        return ("install", "--frozen-lockfile")
 
     @property
     def workspace_specifier_arg(self) -> str:
         if self.package_manager == "pnpm":
             return "--filter"
+        elif self.package_manager == "yarn":
+            return "workspace"
         return "--workspace"
 
     def extra_env(self) -> dict[str, str]:
         if self.package_manager == "pnpm":
             return {"PNPM_HOME": "{chroot}/._pnpm_home"}
+        elif self.package_manager == "yarn":
+            return {"YARN_CACHE_FOLDER": "{chroot}/._yarn_cache"}
         return {}
+
+    @property
+    def pack_archive_format(self) -> str:
+        if self.package_manager == "yarn":
+            return "{}-v{}.tgz"
+        else:
+            return "{}-{}.tgz"
 
     def extra_caches(self) -> dict[str, str]:
         if self.package_manager == "pnpm":
-            return {"pnpm_home": "{chroot}/._pnpm_home"}
+            return {"pnpm_home": "._pnpm_home"}
+        elif self.package_manager == "yarn":
+            return {"yarn_cache": "._yarn_cache"}
         return {}
 
     def get_project_digest(self) -> MergeDigests:
@@ -106,7 +123,10 @@ class NodeJSProject:
 
     @classmethod
     def from_tentative(
-        cls, project: _TentativeProject, nodejs: NodeJS, pnpm_workspaces: PnpmWorkspaces
+        cls,
+        project: _TentativeProject,
+        nodejs: NodeJS,
+        pnpm_workspaces: PnpmWorkspaces,
     ) -> NodeJSProject:
         root_ws = project.root_workspace()
         package_manager: str | None = None
@@ -146,7 +166,7 @@ class NodeJSProject:
         return NodeJSProject(
             root_dir=project.root_dir,
             workspaces=project.workspaces,
-            default_resolve_name=project.default_resolve_name,
+            default_resolve_name=project.default_resolve_name or "nodejs-default",
             package_manager=package_manager_command,
             package_manager_version=package_manager_version,
             pnpm_workspace=pnpm_workspaces.for_root(project.root_dir),
@@ -173,7 +193,13 @@ class ProjectPaths:
 
     def matches_glob(self, pkg_json: PackageJson) -> bool:
         path = PurePath(pkg_json.root_dir)
-        return any(path.match(glob) for glob in self.full_globs())
+
+        def safe_match(glob: str) -> bool:
+            if glob == "":
+                return pkg_json.root_dir == ""
+            return path.match(glob)
+
+        return any(safe_match(glob) for glob in self.full_globs())
 
 
 async def _get_default_resolve_name(path: str) -> str:
@@ -183,7 +209,10 @@ async def _get_default_resolve_name(path: str) -> str:
 
 @rule
 async def find_node_js_projects(
-    package_workspaces: AllPackageJson, pnpm_workspaces: PnpmWorkspaces, nodejs: NodeJS
+    package_workspaces: AllPackageJson,
+    pnpm_workspaces: PnpmWorkspaces,
+    nodejs: NodeJS,
+    resolve_names: UserChosenNodeJSResolveAliases,
 ) -> AllNodeJSProjects:
     project_paths = (
         ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
@@ -201,9 +230,41 @@ async def find_node_js_projects(
         for paths in project_paths
     }
     merged_projects = _merge_workspaces(node_js_projects)
-    return AllNodeJSProjects(
+    all_projects = AllNodeJSProjects(
         NodeJSProject.from_tentative(p, nodejs, pnpm_workspaces) for p in merged_projects
     )
+    _ensure_resolve_names_are_unique(all_projects, resolve_names)
+
+    return all_projects
+
+
+_AMBIGUOUS_RESOLVE_SOLUTIONS = [
+    f"Configure [{NodeJS.options_scope}].resolves to grant the package.json directories different names.",
+    "Make one package a workspace of the other.",
+    "Re-configure your source root(s).",
+]
+
+
+def _ensure_resolve_names_are_unique(
+    all_projects: AllNodeJSProjects, resolve_names: UserChosenNodeJSResolveAliases
+) -> None:
+    seen: dict[str, NodeJSProject] = {}
+    for project in all_projects:
+        resolve_name = resolve_names.get(project.root_dir, project.default_resolve_name)
+        seen_project = seen.get(resolve_name)
+        if seen_project:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Projects with root directories '{project.root_dir}' and '{seen_project.root_dir}'
+                    have the same resolve name {resolve_name}. This will cause ambiguities.
+
+                    To disambiguate, either:\n\n
+                    {bullet_list(_AMBIGUOUS_RESOLVE_SOLUTIONS)}
+                    """
+                )
+            )
+        seen[resolve_name] = project
 
 
 def _project_to_parents(

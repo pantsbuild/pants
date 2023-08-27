@@ -5,12 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
@@ -37,13 +35,11 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"
     help = "Used to parse Terraform modules to infer their dependencies."
 
-    default_version = "python-hcl2==4.3.0"
     default_requirements = ["python-hcl2>=3.0.5,<5"]
 
     register_interpreter_constraints = True
 
     default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)
@@ -146,5 +142,6 @@ async def infer_terraform_module_dependencies(
 def rules():
     return [
         *collect_rules(),
+        *pex_rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
     ]

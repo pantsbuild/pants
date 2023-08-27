@@ -16,11 +16,12 @@ from unittest.mock import Mock
 import pytest
 
 from pants.backend.python import target_types_rules
+from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
     EntryPoint,
+    PexBinary,
     PexLayout,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -34,6 +35,7 @@ from pants.backend.python.util_rules.pex import (
     Pex,
     PexPlatforms,
     PexRequest,
+    ReqStrings,
 )
 from pants.backend.python.util_rules.pex_from_targets import (
     ChosenPythonResolve,
@@ -55,13 +57,14 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.backend.python.util_rules.pex_test_utils import get_all_data
 from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Snapshot
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import MockGet, QueryRule, engine_error, run_rule_with_mocks
 from pants.util.contextutil import pushd
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -69,20 +72,24 @@ from pants.util.strutil import softwrap
 def rule_runner() -> PythonRuleRunner:
     return PythonRuleRunner(
         rules=[
+            *package_pex_binary.rules(),
             *pex_test_utils.rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
+            QueryRule(ReqStrings, (PexRequirements,)),
             QueryRule(GlobalRequirementConstraints, ()),
             QueryRule(ChosenPythonResolve, [ChosenPythonResolveRequest]),
             *setuptools.rules(),
-            QueryRule(Setuptools, []),
         ],
         target_types=[
+            PexBinary,
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             PythonSourceTarget,
             PythonTestTarget,
+            FileTarget,
+            ResourceTarget,
         ],
     )
 
@@ -646,10 +653,10 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     additional_lockfile_args = ["--no-strip-pex-env"]
 
     pex_req1 = get_pex_request(constraints1_filename, resolve_all_constraints=False)
-    assert pex_req1.requirements == PexRequirements(
-        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req],
-        constraints_strings=constraints1_strings,
-    )
+    assert isinstance(pex_req1.requirements, PexRequirements)
+    assert pex_req1.requirements.constraints_strings == FrozenOrderedSet(constraints1_strings)
+    req_strings_obj1 = rule_runner.request(ReqStrings, (pex_req1.requirements,))
+    assert req_strings_obj1.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
 
     pex_req2 = get_pex_request(
         constraints1_filename,
@@ -659,7 +666,8 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     )
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
-    assert list(pex_req2_reqs.req_strings) == ["bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req]
+    req_strings_obj2 = rule_runner.request(ReqStrings, (pex_req2_reqs,))
+    assert req_strings_obj2.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
     assert isinstance(pex_req2_reqs.from_superset, Pex)
     repository_pex = pex_req2_reqs.from_superset
     assert not get_all_data(rule_runner, repository_pex).info["strip_pex_env"]
@@ -720,7 +728,7 @@ def test_exclude_requirements(
     )
     pex_request = rule_runner.request(PexRequest, [request])
     assert isinstance(pex_request.requirements, PexRequirements)
-    assert len(pex_request.requirements.req_strings) == (1 if include_requirements else 0)
+    assert len(pex_request.requirements.req_strings_or_addrs) == (1 if include_requirements else 0)
 
 
 @pytest.mark.parametrize("include_sources", [False, True])
@@ -753,6 +761,52 @@ def test_exclude_sources(include_sources: bool, rule_runner: PythonRuleRunner) -
     pex_request = rule_runner.request(PexRequest, [request])
     snapshot = rule_runner.request(Snapshot, [pex_request.sources])
     assert len(snapshot.files) == (1 if include_sources else 0)
+
+
+def test_include_sources_without_transitive_package_sources(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/app/BUILD": dedent(
+                """
+                python_sources(
+                    name="app",
+                    sources=["app.py"],
+                    dependencies=["//src/dep:pkg"],
+                )
+                """
+            ),
+            "src/app/app.py": "",
+            "src/dep/BUILD": dedent(
+                # This test requires a package that has a standard dependencies field.
+                # 'pex_binary' has a dependencies field; 'archive' does not.
+                """
+                pex_binary(name="pkg", dependencies=[":dep"])
+                python_sources(name="dep", sources=["dep.py"])
+                """
+            ),
+            "src/dep/dep.py": "",
+        }
+    )
+
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.python",
+            "--python-repos-indexes=[]",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    request = PexFromTargetsRequest(
+        [Address("src/app", target_name="app")],
+        output_filename="demo.pex",
+        internal_only=True,
+        include_source_files=True,
+    )
+    pex_request = rule_runner.request(PexRequest, [request])
+    snapshot = rule_runner.request(Snapshot, [pex_request.sources])
+
+    # the packaged transitive dep is excluded
+    assert snapshot.files == ("app/app.py",)
 
 
 @pytest.mark.parametrize("enable_resolves", [False, True])
@@ -797,7 +851,11 @@ def test_cross_platform_pex_disables_subsetting(
     )
     result = rule_runner.request(PexRequest, [request])
 
-    assert result.requirements == PexRequirements(["foo"], constraints_strings=constraints)
+    assert result.requirements == PexRequirements(
+        request.addresses,
+        constraints_strings=constraints,
+        description_of_origin="//:lib",
+    )
 
 
 class ResolveMode(Enum):
@@ -885,3 +943,39 @@ def test_lockfile_requirements_selection(
             assert mode == ResolveMode.pex
             assert isinstance(result.requirements.from_superset, Resolve)
             assert result.requirements.from_superset.name == "myresolve"
+
+
+def test_warn_about_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
+    rule_runner.write_files(
+        {
+            "app.py": "",
+            "file.txt": "",
+            "resource.txt": "",
+            "BUILD": dedent(
+                """
+                file(name="file_target", source="file.txt")
+                resource(name="resource_target", source="resource.txt")
+                python_sources(name="app", dependencies=[":file_target", ":resource_target"])
+                """
+            ),
+        }
+    )
+
+    rule_runner.request(
+        PexRequest,
+        [
+            PexFromTargetsRequest(
+                [Address("", target_name="app")],
+                output_filename="app.pex",
+                internal_only=True,
+                warn_for_transitive_files_targets=True,
+            )
+        ],
+    )
+
+    assert "The target //:app (`python_source`) transitively depends on" in caplog.text
+    # files are not fine:
+    assert "//:file_target" in caplog.text
+    # resources are fine:
+    assert "resource_target" not in caplog.text
+    assert "resource.txt" not in caplog.text

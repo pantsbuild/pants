@@ -145,9 +145,7 @@ impl TypeId {
   }
 
   pub fn is_union(&self) -> bool {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    externs::is_union(py, self.as_py_type(py)).unwrap()
+    Python::with_gil(|py| externs::is_union(py, self.as_py_type(py)).unwrap())
   }
 
   pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
@@ -271,9 +269,7 @@ impl Key {
   }
 
   pub fn from_value(val: Value) -> PyResult<Key> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    externs::INTERNS.key_insert(py, val.consume_into_py_object(py))
+    Python::with_gil(|py| externs::INTERNS.key_insert(py, val.consume_into_py_object(py)))
   }
 
   pub fn to_value(&self) -> Value {
@@ -379,9 +375,7 @@ impl From<PyObject> for Value {
 
 impl From<PyErr> for Value {
   fn from(py_err: PyErr) -> Self {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Value::new(py_err.into_py(py))
+    Python::with_gil(|py| Value::new(py_err.into_py(py)))
   }
 }
 
@@ -581,18 +575,15 @@ impl From<String> for Failure {
 
 impl From<PyErr> for Failure {
   fn from(py_err: PyErr) -> Self {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Failure::from_py_err_with_gil(py, py_err)
+    Python::with_gil(|py| Failure::from_py_err_with_gil(py, py_err))
   }
 }
 
 pub fn throw(msg: String) -> Failure {
   let python_traceback = Failure::native_traceback(&msg);
-  let gil = Python::acquire_gil();
-  Failure::Throw {
-    val: externs::create_exception(gil.python(), msg),
+  Python::with_gil(|py| Failure::Throw {
+    val: externs::create_exception(py, msg),
     python_traceback,
     engine_traceback: Vec::new(),
-  }
+  })
 }

@@ -2,8 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from pants.backend.visibility.rules import rules as visibility_rules
+from pants.backend.visibility import lint
+from pants.backend.visibility import rules as visibility
 
 
 def rules():
-    return visibility_rules()
+    return (
+        *visibility.rules(),
+        *lint.rules(),
+    )

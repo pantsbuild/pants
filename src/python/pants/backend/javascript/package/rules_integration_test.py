@@ -11,6 +11,7 @@ import pytest
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package.rules import (
     GenerateResourcesFromNodeBuildScriptRequest,
+    NodeBuildScriptPackageFieldSet,
     NodePackageTarFieldSet,
 )
 from pants.backend.javascript.package.rules import rules as package_rules
@@ -31,6 +32,7 @@ def rule_runner() -> RuleRunner:
             *package_rules(),
             QueryRule(BuiltPackage, (NodePackageTarFieldSet,)),
             QueryRule(GeneratedSources, (GenerateResourcesFromNodeBuildScriptRequest,)),
+            QueryRule(BuiltPackage, (NodeBuildScriptPackageFieldSet,)),
             QueryRule(Snapshot, (Digest,)),
         ],
         target_types=[
@@ -46,16 +48,16 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@pytest.mark.parametrize(
-    "lockfile, package_manager",
-    [
-        pytest.param(Path(__file__).parent / "package-lock.json", "npm"),
-        pytest.param(Path(__file__).parent / "pnpm-lock.yaml", "pnpm"),
+@pytest.fixture(
+    params=[
+        pytest.param((Path(__file__).parent / "package-lock.json", "npm"), id="npm"),
+        pytest.param((Path(__file__).parent / "pnpm-lock.yaml", "pnpm"), id="pnpm"),
+        pytest.param((Path(__file__).parent / "yarn.lock", "yarn"), id="yarn"),
     ],
+    autouse=True,
 )
-def test_packages_sources_as_resource_using_build_tool(
-    rule_runner: RuleRunner, package_manager: str, lockfile: Path
-) -> None:
+def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRunner:
+    lockfile, package_manager = request.param
     rule_runner.set_options([f"--nodejs-package-manager={package_manager}"], env_inherit={"PATH"})
     rule_runner.write_files(
         {
@@ -97,6 +99,10 @@ def test_packages_sources_as_resource_using_build_tool(
             "src/js/lib/index.mjs": "import './style.css' ",
         }
     )
+    return rule_runner
+
+
+def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/js", generated_name="build"))
     snapshot = rule_runner.request(Snapshot, (EMPTY_DIGEST,))
     result = rule_runner.request(
@@ -108,3 +114,22 @@ def test_packages_sources_as_resource_using_build_tool(
         "src/js/dist/index.js",
         "src/js/dist/index.js.map",
     )
+
+
+def test_packages_sources_as_package_using_build_tool(rule_runner: RuleRunner) -> None:
+    tgt = rule_runner.get_target(Address("src/js", generated_name="build"))
+    result = rule_runner.request(BuiltPackage, [NodeBuildScriptPackageFieldSet.create(tgt)])
+    rule_runner.write_digest(result.digest)
+
+    assert result.artifacts[0].relpath == "dist"
+
+    result_path = Path(rule_runner.build_root) / "dist"
+
+    assert sorted(
+        str(path.relative_to(rule_runner.build_root)) for path in result_path.iterdir()
+    ) == [
+        "dist/index.css",
+        "dist/index.css.map",
+        "dist/index.js",
+        "dist/index.js.map",
+    ]

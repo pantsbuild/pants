@@ -59,38 +59,6 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_npx_process(rule_runner: RuleRunner):
-    rule_runner.set_options(["--nodejs-package-managers={'npm': '8.5.5'}"], env_inherit={"PATH"})
-    result = rule_runner.request(
-        ProcessResult,
-        [
-            nodejs.NodeJSToolProcess.npx(
-                npm_package="",
-                args=("--version",),
-                description="Testing NpxProcess",
-            )
-        ],
-    )
-
-    assert result.stdout.strip() == b"8.5.5"
-
-
-def test_npx_process_with_different_version(rule_runner: RuleRunner):
-    rule_runner.set_options(["--nodejs-package-managers={'npm': '7.20.0'}"], env_inherit={"PATH"})
-    result = rule_runner.request(
-        ProcessResult,
-        [
-            nodejs.NodeJSToolProcess.npx(
-                npm_package="",
-                args=("--version",),
-                description="Testing NpxProcess",
-            )
-        ],
-    )
-
-    assert result.stdout.strip() == b"7.20.0"
-
-
 def test_npm_process(rule_runner: RuleRunner):
     rule_runner.set_options(["--nodejs-package-managers={'npm': '8.5.5'}"], env_inherit={"PATH"})
     result = rule_runner.request(
@@ -125,6 +93,22 @@ def test_pnpm_process(rule_runner: RuleRunner):
     )
 
     assert result.stdout.strip() == b"7.5.0"
+
+
+def test_yarn_process(rule_runner: RuleRunner):
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            nodejs.NodeJSToolProcess(
+                tool="yarn",
+                tool_version="1.22.19",
+                args=("--version",),
+                description="Testing yarn process",
+            )
+        ],
+    )
+
+    assert result.stdout.strip() == b"1.22.19"
 
 
 def given_known_version(version: str) -> str:

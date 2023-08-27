@@ -17,7 +17,16 @@ class ScalaArtifactsForVersionRequest:
 class ScalaArtifactsForVersionResult:
     compiler_coordinate: Coordinate
     library_coordinate: Coordinate
+    reflect_coordinate: Coordinate | None
     compiler_main: str
+    repl_main: str
+
+    @property
+    def all_coordinates(self) -> tuple[Coordinate, ...]:
+        coords = [self.compiler_coordinate, self.library_coordinate]
+        if self.reflect_coordinate:
+            coords.append(self.reflect_coordinate)
+        return tuple(coords)
 
 
 @rule
@@ -37,7 +46,9 @@ async def resolve_scala_artifacts_for_version(
                 artifact="scala3-library_3",
                 version=request.scala_version,
             ),
+            reflect_coordinate=None,
             compiler_main="dotty.tools.dotc.Main",
+            repl_main="dotty.tools.repl.Main",
         )
 
     return ScalaArtifactsForVersionResult(
@@ -51,7 +62,13 @@ async def resolve_scala_artifacts_for_version(
             artifact="scala-library",
             version=request.scala_version,
         ),
+        reflect_coordinate=Coordinate(
+            group="org.scala-lang",
+            artifact="scala-reflect",
+            version=request.scala_version,
+        ),
         compiler_main="scala.tools.nsc.Main",
+        repl_main="scala.tools.nsc.MainGenericRunner",
     )
 
 

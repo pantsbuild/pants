@@ -1,29 +1,11 @@
 [GLOBAL]
 colors = true
 
-remote_cache_read = true
-remote_cache_write = true
+[test]
+report = true
 
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]
-
-[auth]
-from_env_var = "TOOLCHAIN_AUTH_TOKEN"
-org = "pantsbuild"
-# CI runs occasionally hit the 30 minute mark.
-token_expiration_threshold = 40
-ci_env_variables = [
-  "GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_REF", "GITHUB_EVENT_NAME", "GITHUB_SHA", "GITHUB_REPOSITORY",
-  "GITHUB_WORKFLOW","GITHUB_JOB",  # temporary, for debugging issues w/ restricted tokens.
-]
-restricted_token_matches =  """{
-  'GITHUB_REPOSITORY': 'pantsbuild/pants',
-}"""
-
-[buildsense]
-enable = true
-collect_platform_data = true
-log_final_upload_latency = true
 
 [subprocess-environment]
 env_vars.add = [

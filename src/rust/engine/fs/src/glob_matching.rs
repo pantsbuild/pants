@@ -419,8 +419,8 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     symlink_behavior: SymlinkBehavior,
     link_depth: LinkDepth,
   ) -> Result<Vec<(PathStat, LinkDepth)>, E> {
-    // List the directory.
-    let dir_listing = self.scandir(canonical_dir).await?;
+    // List the directory to create relative Stats.
+    let dir_listing = self.scandir(canonical_dir.clone()).await?;
 
     // Match any relevant Stats, and join them into PathStats.
     let path_stats = future::try_join_all(
@@ -446,10 +446,11 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
         .map(|(stat_symbolic_path, stat)| {
           let context = self.clone();
           let exclude = exclude.clone();
+          let stat = stat.within(&canonical_dir.0);
           async move {
             // Canonicalize matched PathStats, and filter paths that are ignored by local excludes.
             // Context ("global") ignore patterns are applied during `scandir`.
-            if exclude.is_ignored(stat) {
+            if exclude.is_ignored(&stat) {
               Ok(None)
             } else {
               match stat {
@@ -463,25 +464,17 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
 
                   if let SymlinkBehavior::Aware = symlink_behavior {
                     return Ok(Some((
-                      PathStat::link(stat_symbolic_path, l.clone()),
+                      PathStat::link(stat_symbolic_path, l),
                       link_depth + 1,
                     )));
                   }
 
-                  let dest = context
-                    .canonicalize_link(stat_symbolic_path, l.clone())
-                    .await?;
+                  let dest = context.canonicalize_link(stat_symbolic_path, l).await?;
 
                   Ok(dest.map(|ps| (ps, link_depth + 1)))
                 }
-                Stat::Dir(d) => Ok(Some((
-                  PathStat::dir(stat_symbolic_path, d.clone()),
-                  link_depth,
-                ))),
-                Stat::File(f) => Ok(Some((
-                  PathStat::file(stat_symbolic_path, f.clone()),
-                  link_depth,
-                ))),
+                Stat::Dir(d) => Ok(Some((PathStat::dir(stat_symbolic_path, d), link_depth))),
+                Stat::File(f) => Ok(Some((PathStat::file(stat_symbolic_path, f), link_depth))),
               }
             }
           }
@@ -534,7 +527,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
       // Get all the inputs which didn't transitively expand to any files.
       let matching_inputs = sources
         .iter()
-        .zip(matched.into_iter())
+        .zip(matched)
         .filter_map(
           |(source, matched)| {
             if matched {

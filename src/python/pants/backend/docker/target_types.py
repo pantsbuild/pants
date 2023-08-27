@@ -181,7 +181,7 @@ class DockerImageRegistriesField(StringSequenceField):
         built image.
 
         The address is a domain name with optional port for your registry, and any registry
-        aliases are prefixed with `@` for addresses in the [docker].registries configuration
+        aliases are prefixed with `@` for addresses in the `[docker].registries` configuration
         section.
 
         By default, all configured registries with `default = true` are used.
@@ -211,11 +211,11 @@ class DockerImageRepositoryField(StringField):
     alias = "repository"
     help = help_text(
         f"""
-        The repository name for the Docker image. e.g. "<repository>/<name>".
+        The repository name for the Docker image. e.g. `"<repository>/<name>"`.
 
         It uses the `[docker].default_repository` by default.
 
-        {_interpolation_help.format(kind="repository")}
+        {_interpolation_help.format(kind="Repository")}
 
         Additional placeholders for the repository field are: `name`, `directory`,
         `parent_directory`, and `default_repository`.
@@ -230,9 +230,7 @@ class DockerImageRepositoryField(StringField):
 class DockerImageSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = (
-        f"If set to true, do not push this image to registries when running `{bin_name()} publish`."
-    )
+    help = f"If true, do not push this image to registries when running `{bin_name()} publish`."
 
 
 OptionValueFormatter = Callable[[str], str]
@@ -244,13 +242,19 @@ class DockerBuildOptionFieldMixin(ABC):
     docker_build_option: ClassVar[str]
 
     @abstractmethod
-    def option_values(self, *, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def option_values(
+        self, *, value_formatter: OptionValueFormatter, global_build_hosts_options: dict
+    ) -> Iterator[str]:
         """Subclasses must implement this, to turn their `self.value` into none, one or more option
         values."""
 
     @final
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
-        for value in self.option_values(value_formatter=value_formatter):
+    def options(
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options
+    ) -> Iterator[str]:
+        for value in self.option_values(
+            value_formatter=value_formatter, global_build_hosts_options=global_build_hosts_options
+        ):
             yield from (self.docker_build_option, value)
 
 
@@ -260,7 +264,7 @@ class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictSt
         f"""
         Provide image metadata.
 
-        {_interpolation_help.format(kind="label value")}
+        {_interpolation_help.format(kind="Label value")}
 
         See [Docker labels](https://docs.docker.com/config/labels-custom-metadata/#manage-labels-on-objects)
         for more information.
@@ -268,9 +272,29 @@ class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictSt
     )
     docker_build_option = "--label"
 
-    def option_values(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def option_values(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
         for label, value in (self.value or {}).items():
             yield f"{label}={value_formatter(value)}"
+
+
+class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStringToStringField):
+    alias = "extra_build_hosts"
+    help = help_text(
+        """
+        Extra hosts entries to be added to a container's `/etc/hosts` file.
+
+        Use `[docker].build_hosts` to set default host entries for all images.
+        """
+    )
+    docker_build_option = "--add-host"
+
+    def option_values(
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options: dict = {}
+    ) -> Iterator[str]:
+        if self.value:
+            merged_values = {**global_build_hosts_options, **self.value}
+            for label, value in merged_values.items():
+                yield f"{label}:{value_formatter(value)}"
 
 
 class DockerImageBuildSecretsOptionField(
@@ -282,8 +306,9 @@ class DockerImageBuildSecretsOptionField(
         Secret files to expose to the build (only if BuildKit enabled).
 
         Secrets may use absolute paths, or paths relative to your build root, or the BUILD file
-        if prefixed with `./`. The id should be valid as used by the Docker build `--secret`
-        option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
+        if prefixed with `./`. Paths to your home directory will be automatically expanded.
+        The id should be valid as used by the Docker build `--secret` option.
+        See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
         information.
 
         Example:
@@ -292,6 +317,7 @@ class DockerImageBuildSecretsOptionField(
                 secrets={
                     "mysecret": "/var/secrets/some-secret",
                     "repo-secret": "src/proj/secrets/some-secret",
+                    "home-dir-secret": "~/.config/some-secret",
                     "target-secret": "./secrets/some-secret",
                 }
             )
@@ -308,8 +334,9 @@ class DockerImageBuildSecretsOptionField(
             full_path = os.path.join(
                 get_buildroot(),
                 self.address.spec_path if re.match(r"\.{1,2}/", path) else "",
-                path,
+                os.path.expanduser(path),
             )
+
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
 
@@ -319,7 +346,7 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
     help = help_text(
         """
         SSH agent socket or keys to expose to the build (only if BuildKit enabled)
-        (format: default|<id>[=<socket>|<key>[,<key>]])
+        (format: `default|<id>[=<socket>|<key>[,<key>]]`)
 
         The exposed agent and/or keys can then be used in your `Dockerfile` by mounting them in
         your `RUN` instructions:
@@ -345,7 +372,20 @@ class DockerBuildOptionFieldValueMixin(Field):
 
     @final
     def options(self) -> Iterator[str]:
-        yield f"{self.docker_build_option}={self.value}"
+        if self.value is not None:
+            yield f"{self.docker_build_option}={self.value}"
+
+
+class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
+    """Inherit this mixin class to provide options in the form of `--flag=value1,value2` to `docker
+    build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}={','.join(list(self.value))}"
 
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
@@ -387,6 +427,32 @@ class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
     docker_build_option = "--squash"
 
 
+class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, StringField):
+    alias = "build_network"
+    default = None
+    help = help_text(
+        """
+        Sets the networking mode for the run commands during build.
+        Supported standard values are: bridge, host, none, and container:<name|id>.
+        Any other value is taken as a custom network's name to which the container should connect to.
+        """
+    )
+    docker_build_option = "--network"
+
+
+class DockerImageBuildPlatformOptionField(
+    DockerBuildOptionFieldMultiValueMixin, StringSequenceField
+):
+    alias = "build_platform"
+    default = None
+    help = help_text(
+        """
+        Set the target platform(s) for the build.
+        """
+    )
+    docker_build_option = "--platform"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -400,12 +466,15 @@ class DockerImageTarget(Target):
         DockerImageRegistriesField,
         DockerImageRepositoryField,
         DockerImageBuildImageLabelsOptionField,
+        DockerImageBuildImageExtraHostsField,
         DockerImageBuildSecretsOptionField,
         DockerImageBuildSSHOptionField,
         DockerImageSkipPushField,
         DockerImageTargetStageField,
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
+        DockerImageBuildNetworkOptionField,
+        DockerImageBuildPlatformOptionField,
         OutputPathField,
         RestartableField,
     )

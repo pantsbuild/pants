@@ -62,8 +62,10 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::nailgun::register(py, m)?;
   externs::process::register(m)?;
   externs::scheduler::register(m)?;
+  externs::target::register(m)?;
   externs::testutil::register(m)?;
   externs::workunits::register(m)?;
+  externs::dep_inference::register(m)?;
 
   m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
@@ -197,6 +199,8 @@ impl PyTypes {
     engine_aware_parameter: &PyType,
     docker_resolve_image_request: &PyType,
     docker_resolve_image_result: &PyType,
+    parsed_python_deps_result: &PyType,
+    parsed_javascript_deps_result: &PyType,
     py: Python,
   ) -> Self {
     Self(RefCell::new(Some(Types {
@@ -232,6 +236,11 @@ impl PyTypes {
       engine_aware_parameter: TypeId::new(engine_aware_parameter),
       docker_resolve_image_request: TypeId::new(docker_resolve_image_request),
       docker_resolve_image_result: TypeId::new(docker_resolve_image_result),
+      parsed_python_deps_result: TypeId::new(parsed_python_deps_result),
+      parsed_javascript_deps_result: TypeId::new(parsed_javascript_deps_result),
+      deps_request: TypeId::new(
+        py.get_type::<externs::dep_inference::PyNativeDependenciesRequest>(),
+      ),
     })))
   }
 }
@@ -292,11 +301,6 @@ impl PyRemotingOptions {
   #[new]
   fn __new__(
     execution_enable: bool,
-    store_address: Option<String>,
-    execution_address: Option<String>,
-    execution_process_cache_namespace: Option<String>,
-    instance_name: Option<String>,
-    root_ca_certs_path: Option<PathBuf>,
     store_headers: BTreeMap<String, String>,
     store_chunk_bytes: usize,
     store_rpc_retries: usize,
@@ -310,6 +314,11 @@ impl PyRemotingOptions {
     execution_headers: BTreeMap<String, String>,
     execution_overall_deadline_secs: u64,
     execution_rpc_concurrency: usize,
+    store_address: Option<String>,
+    execution_address: Option<String>,
+    execution_process_cache_namespace: Option<String>,
+    instance_name: Option<String>,
+    root_ca_certs_path: Option<PathBuf>,
     append_only_caches_base_path: Option<String>,
   ) -> Self {
     Self(RemotingOptions {
@@ -553,31 +562,31 @@ fn nailgun_server_create(
   let server_future = {
     let executor = py_executor.0.clone();
     nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      let result = runner.as_ref(py).call1((
-        exe.cmd.command,
-        PyTuple::new(py, exe.cmd.args),
-        exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
-        exe.cmd.working_dir,
-        PySessionCancellationLatch(exe.cancelled),
-        exe.stdin_fd as i64,
-        exe.stdout_fd as i64,
-        exe.stderr_fd as i64,
-      ));
-      match result {
-        Ok(exit_code) => {
-          let code: i32 = exit_code.extract().unwrap();
-          nailgun::ExitCode(code)
+      Python::with_gil(|py| {
+        let result = runner.as_ref(py).call1((
+          exe.cmd.command,
+          PyTuple::new(py, exe.cmd.args),
+          exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
+          exe.cmd.working_dir,
+          PySessionCancellationLatch(exe.cancelled),
+          exe.stdin_fd as i64,
+          exe.stdout_fd as i64,
+          exe.stderr_fd as i64,
+        ));
+        match result {
+          Ok(exit_code) => {
+            let code: i32 = exit_code.extract().unwrap();
+            nailgun::ExitCode(code)
+          }
+          Err(e) => {
+            error!(
+              "Uncaught exception in nailgun handler: {:#?}",
+              Failure::from_py_err_with_gil(py, e)
+            );
+            nailgun::ExitCode(1)
+          }
         }
-        Err(e) => {
-          error!(
-            "Uncaught exception in nailgun handler: {:#?}",
-            Failure::from_py_err_with_gil(py, e)
-          );
-          nailgun::ExitCode(1)
-        }
-      }
+      })
     })
   };
 
@@ -665,13 +674,13 @@ fn scheduler_create(
   build_root: PathBuf,
   local_execution_root_dir: PathBuf,
   named_caches_dir: PathBuf,
-  ca_certs_path: Option<PathBuf>,
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
   watch_filesystem: bool,
   remoting_options: &PyRemotingOptions,
   local_store_options: &PyLocalStoreOptions,
   exec_strategy_opts: &PyExecutionStrategyOptions,
+  ca_certs_path: Option<PathBuf>,
 ) -> PyO3Result<PyScheduler> {
   match fs::increase_limits() {
     Ok(msg) => debug!("{}", msg),
@@ -692,22 +701,25 @@ fn scheduler_create(
   let core = py_executor
     .0
     .enter(|| {
-      Core::new(
-        py_executor.0.clone(),
-        tasks,
-        types,
-        intrinsics,
-        build_root,
-        ignore_patterns,
-        use_gitignore,
-        watch_filesystem,
-        local_execution_root_dir,
-        named_caches_dir,
-        ca_certs_path,
-        local_store_options.0.clone(),
-        remoting_options.0.clone(),
-        exec_strategy_opts.0.clone(),
-      )
+      py_executor.0.block_on(async {
+        Core::new(
+          py_executor.0.clone(),
+          tasks,
+          types,
+          intrinsics,
+          build_root,
+          ignore_patterns,
+          use_gitignore,
+          watch_filesystem,
+          local_execution_root_dir,
+          named_caches_dir,
+          ca_certs_path,
+          local_store_options.0.clone(),
+          remoting_options.0.clone(),
+          exec_strategy_opts.0.clone(),
+        )
+        .await
+      })
     })
     .map_err(PyValueError::new_err)?;
   Ok(PyScheduler(Scheduler::new(core)))
@@ -728,9 +740,7 @@ async fn workunit_to_py_value(
     ))
   })?;
   let has_parent_ids = !workunit.parent_ids.is_empty();
-  let mut dict_entries = {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
+  let mut dict_entries = Python::with_gil(|py| {
     let mut dict_entries = vec![
       (
         externs::store_utf8(py, "name"),
@@ -806,18 +816,16 @@ async fn workunit_to_py_value(
       ));
     }
     dict_entries
-  };
+  });
 
   let mut artifact_entries = Vec::new();
 
   for (artifact_name, digest) in metadata.artifacts.iter() {
     let store = core.store();
     let py_val = match digest {
-      ArtifactOutput::FileDigest(digest) => {
-        let gil = Python::acquire_gil();
-        crate::nodes::Snapshot::store_file_digest(gil.python(), *digest)
-          .map_err(PyException::new_err)?
-      }
+      ArtifactOutput::FileDigest(digest) => Python::with_gil(|py| {
+        crate::nodes::Snapshot::store_file_digest(py, *digest).map_err(PyException::new_err)
+      })?,
       ArtifactOutput::Snapshot(digest_handle) => {
         let digest = (**digest_handle)
           .as_any()
@@ -830,89 +838,88 @@ async fn workunit_to_py_value(
         let snapshot = store::Snapshot::from_digest(store, digest.clone())
           .await
           .map_err(possible_store_missing_digest)?;
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        crate::nodes::Snapshot::store_snapshot(py, snapshot).map_err(PyException::new_err)?
+
+        Python::with_gil(|py| {
+          crate::nodes::Snapshot::store_snapshot(py, snapshot).map_err(PyException::new_err)
+        })?
       }
     };
 
-    let gil = Python::acquire_gil();
-    artifact_entries.push((
-      externs::store_utf8(gil.python(), artifact_name.as_str()),
-      py_val,
-    ))
+    Python::with_gil(|py| {
+      artifact_entries.push((externs::store_utf8(py, artifact_name.as_str()), py_val))
+    })
   }
 
-  let gil = Python::acquire_gil();
-  let py = gil.python();
-
-  let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
-  for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
-    let value = match user_metadata_item {
-      UserMetadataItem::String(v) => v.into_py(py),
-      UserMetadataItem::Int(n) => n.into_py(py),
-      UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-          PyException::new_err(format!("Failed to convert {py_val_handle:?} to a Value."))
-        })?
-        .to_object(py),
-    };
-    user_metadata_entries.push((
-      externs::store_utf8(py, user_metadata_key.as_str()),
-      Value::new(value),
-    ));
-  }
-
-  dict_entries.push((
-    externs::store_utf8(py, "metadata"),
-    externs::store_dict(py, user_metadata_entries)?,
-  ));
-
-  if let Some(stdout_digest) = metadata.stdout {
-    artifact_entries.push((
-      externs::store_utf8(py, "stdout_digest"),
-      crate::nodes::Snapshot::store_file_digest(py, stdout_digest).map_err(PyException::new_err)?,
-    ));
-  }
-
-  if let Some(stderr_digest) = metadata.stderr {
-    artifact_entries.push((
-      externs::store_utf8(py, "stderr_digest"),
-      crate::nodes::Snapshot::store_file_digest(py, stderr_digest).map_err(PyException::new_err)?,
-    ));
-  }
-
-  dict_entries.push((
-    externs::store_utf8(py, "artifacts"),
-    externs::store_dict(py, artifact_entries)?,
-  ));
-
-  // TODO: Temporarily attaching the global counters to the "root" workunit. Callers should
-  // switch to consuming `StreamingWorkunitContext.get_metrics`.
-  // Remove this deprecation after 2.14.0.dev0.
-  if !has_parent_ids {
-    let mut metrics = workunit_store.get_metrics();
-
-    metrics.insert("DEPRECATED_ConsumeGlobalCountersInstead", 0);
-    let counters_entries = metrics
-      .into_iter()
-      .map(|(counter_name, counter_value)| {
-        (
-          externs::store_utf8(py, counter_name),
-          externs::store_u64(py, counter_value),
-        )
-      })
-      .collect();
+  Python::with_gil(|py| {
+    let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
+    for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
+      let value = match user_metadata_item {
+        UserMetadataItem::String(v) => v.into_py(py),
+        UserMetadataItem::Int(n) => n.into_py(py),
+        UserMetadataItem::PyValue(py_val_handle) => (**py_val_handle)
+          .as_any()
+          .downcast_ref::<Value>()
+          .ok_or_else(|| {
+            PyException::new_err(format!("Failed to convert {py_val_handle:?} to a Value."))
+          })?
+          .to_object(py),
+      };
+      user_metadata_entries.push((
+        externs::store_utf8(py, user_metadata_key.as_str()),
+        Value::new(value),
+      ));
+    }
 
     dict_entries.push((
-      externs::store_utf8(py, "counters"),
-      externs::store_dict(py, counters_entries)?,
+      externs::store_utf8(py, "metadata"),
+      externs::store_dict(py, user_metadata_entries)?,
     ));
-  }
 
-  externs::store_dict(py, dict_entries)
+    if let Some(stdout_digest) = metadata.stdout {
+      artifact_entries.push((
+        externs::store_utf8(py, "stdout_digest"),
+        crate::nodes::Snapshot::store_file_digest(py, stdout_digest)
+          .map_err(PyException::new_err)?,
+      ));
+    }
+
+    if let Some(stderr_digest) = metadata.stderr {
+      artifact_entries.push((
+        externs::store_utf8(py, "stderr_digest"),
+        crate::nodes::Snapshot::store_file_digest(py, stderr_digest)
+          .map_err(PyException::new_err)?,
+      ));
+    }
+
+    dict_entries.push((
+      externs::store_utf8(py, "artifacts"),
+      externs::store_dict(py, artifact_entries)?,
+    ));
+
+    // TODO: Temporarily attaching the global counters to the "root" workunit. Callers should
+    // switch to consuming `StreamingWorkunitContext.get_metrics`.
+    // Remove this deprecation after 2.14.0.dev0.
+    if !has_parent_ids {
+      let mut metrics = workunit_store.get_metrics();
+
+      metrics.insert("DEPRECATED_ConsumeGlobalCountersInstead", 0);
+      let counters_entries = metrics
+        .into_iter()
+        .map(|(counter_name, counter_value)| {
+          (
+            externs::store_utf8(py, counter_name),
+            externs::store_u64(py, counter_value),
+          )
+        })
+        .collect();
+
+      dict_entries.push((
+        externs::store_utf8(py, "counters"),
+        externs::store_dict(py, counters_entries)?,
+      ));
+    }
+    externs::store_dict(py, dict_entries)
+  })
 }
 
 async fn workunits_to_py_tuple_value(
@@ -950,36 +957,34 @@ fn session_poll_workunits(
   let py_session = std::panic::AssertUnwindSafe(py_session);
   std::panic::catch_unwind(|| {
     let (core, session, py_level) = {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-
-      let py_scheduler = py_scheduler.extract::<PyRef<PyScheduler>>(py)?;
-      let py_session = py_session.extract::<PyRef<PySession>>(py)?;
-      let py_level: PythonLogLevel = max_log_verbosity_level
-        .try_into()
-        .map_err(|e| PyException::new_err(format!("{e}")))?;
-      (py_scheduler.0.core.clone(), py_session.0.clone(), py_level)
+      Python::with_gil(|py| -> PyO3Result<_> {
+        let py_scheduler = py_scheduler.extract::<PyRef<PyScheduler>>(py)?;
+        let py_session = py_session.extract::<PyRef<PySession>>(py)?;
+        let py_level: PythonLogLevel = max_log_verbosity_level
+          .try_into()
+          .map_err(|e| PyException::new_err(format!("{e}")))?;
+        Ok((py_scheduler.0.core.clone(), py_session.0.clone(), py_level))
+      })?
     };
     core.executor.enter(|| {
       let workunit_store = session.workunit_store();
       let (started, completed) = workunit_store.latest_workunits(py_level.into());
 
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-
-      let started_val = core.executor.block_on(workunits_to_py_tuple_value(
-        py,
-        &workunit_store,
-        started,
-        &core,
-      ))?;
-      let completed_val = core.executor.block_on(workunits_to_py_tuple_value(
-        py,
-        &workunit_store,
-        completed,
-        &core,
-      ))?;
-      Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
+      Python::with_gil(|py| -> PyO3Result<_> {
+        let started_val = core.executor.block_on(workunits_to_py_tuple_value(
+          py,
+          &workunit_store,
+          started,
+          &core,
+        ))?;
+        let completed_val = core.executor.block_on(workunits_to_py_tuple_value(
+          py,
+          &workunit_store,
+          completed,
+          &core,
+        ))?;
+        Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
+      })
     })
   })
   .unwrap_or_else(|e| {
@@ -1607,9 +1612,7 @@ fn single_file_digests_to_bytes<'py>(
       async move {
         store
           .load_file_bytes_with(py_file_digest.0, |bytes| {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            externs::store_bytes(py, bytes)
+            Python::with_gil(|py| externs::store_bytes(py, bytes))
           })
           .await
       }
@@ -1625,6 +1628,19 @@ fn single_file_digests_to_bytes<'py>(
   })
 }
 
+fn ensure_path_doesnt_exist(path: &Path) -> io::Result<()> {
+  match std::fs::remove_file(path) {
+    Ok(()) => Ok(()),
+    Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+    // Always fall through to remove_dir_all unless the path definitely doesn't exist, because
+    // std::io::ErrorKind::IsADirectory is unstable https://github.com/rust-lang/rust/issues/86442
+    //
+    // NB. we don't need to check this returning NotFound because remove_file will identify that
+    // above (except if there's a concurrent removal, which is out of scope)
+    Err(_) => std::fs::remove_dir_all(path),
+  }
+}
+
 #[pyfunction]
 fn write_digest(
   py: Python,
@@ -1632,7 +1648,7 @@ fn write_digest(
   py_session: &PySession,
   digest: &PyAny,
   path_prefix: String,
-  clear_destination: bool,
+  clear_paths: Vec<String>,
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
@@ -1646,9 +1662,13 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
-    if clear_destination {
-      std::fs::remove_dir_all(&destination).map_err(|e| {
-        PyException::new_err(format!("Failed to clear {}: {e}", destination.display()))
+    for subpath in &clear_paths {
+      let resolved = destination.join(subpath);
+      ensure_path_doesnt_exist(&resolved).map_err(|e| {
+        PyIOError::new_err(format!(
+          "Failed to clear {} when writing digest: {e}",
+          resolved.display()
+        ))
       })?;
     }
 

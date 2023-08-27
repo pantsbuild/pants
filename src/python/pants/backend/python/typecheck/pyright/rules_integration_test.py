@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import json
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
-from pants.backend.javascript.subsystems.nodejs import rules as nodejs_rules
+from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.python import target_types_rules
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
@@ -35,13 +37,17 @@ from pants.testutil.python_rule_runner import PythonRuleRunner
 def rule_runner() -> PythonRuleRunner:
     return PythonRuleRunner(
         rules=[
-            *nodejs_rules(),
             *pyright_rules(),
             *target_types_rules.rules(),
             QueryRule(CheckResults, (PyrightRequest,)),
             QueryRule(PyrightPartitions, (PyrightRequest,)),
         ],
-        target_types=[PythonRequirementTarget, PythonSourcesGeneratorTarget, PythonSourceTarget],
+        target_types=[
+            PythonRequirementTarget,
+            PythonSourcesGeneratorTarget,
+            PythonSourceTarget,
+            PackageJsonTarget,
+        ],
     )
 
 
@@ -84,9 +90,36 @@ UNDEFINED_VARIABLE_TOML_CONFIG = dedent(
     """
 )
 
+PYRIGHT_LOCKFILE = json.dumps(
+    {
+        "name": "@the-company/project",
+        "lockfileVersion": 2,
+        "requires": True,
+        "packages": {
+            "": {"name": "@the-company/project", "devDependencies": {"pyright": "1.1.316"}},
+            "node_modules/pyright": {
+                "version": "1.1.316",
+                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.316.tgz",
+                "integrity": "sha512-Pdb9AwOO07uNOuEVtwCThyDpB0wigWmLjeCw5vdPG7gVbVYYgY2iw64kBdwTu78NrO0igVKzmoRuApMoL6ZE0w==",
+                "dev": True,
+                "bin": {"pyright": "index.js", "pyright-langserver": "langserver.index.js"},
+                "engines": {"node": ">=12.0.0"},
+            },
+        },
+        "dependencies": {
+            "pyright": {
+                "version": "1.1.316",
+                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.316.tgz",
+                "integrity": "sha512-Pdb9AwOO07uNOuEVtwCThyDpB0wigWmLjeCw5vdPG7gVbVYYgY2iw64kBdwTu78NrO0igVKzmoRuApMoL6ZE0w==",
+                "dev": True,
+            }
+        },
+    }
+)
+
 
 def run_pyright(
-    rule_runner: PythonRuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, targets: list[Target], *, extra_args: Iterable[str] | None = None
 ) -> tuple[CheckResult, ...]:
     rule_runner.set_options(extra_args or (), env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     result = rule_runner.request(
@@ -119,21 +152,21 @@ def test_failing(rule_runner: PythonRuleRunner) -> None:
 def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
-            f"{PACKAGE}/good.py": GOOD_FILE,
-            f"{PACKAGE}/bad.py": BAD_FILE,
+            f"{PACKAGE}/bad1.py": BAD_FILE,
+            f"{PACKAGE}/bad2.py": BAD_FILE,
             f"{PACKAGE}/BUILD": "python_sources()",
         }
     )
     tgts = [
-        rule_runner.get_target(Address(PACKAGE, relative_file_path="good.py")),
-        rule_runner.get_target(Address(PACKAGE, relative_file_path="bad.py")),
+        rule_runner.get_target(Address(PACKAGE, relative_file_path="bad1.py")),
+        rule_runner.get_target(Address(PACKAGE, relative_file_path="bad2.py")),
     ]
     result = run_pyright(rule_runner, tgts)
     assert len(result) == 1
     assert result[0].exit_code == 1
-    assert f"{PACKAGE}/good.py" not in result[0].stdout
-    assert f"{PACKAGE}/bad.py:4" in result[0].stdout
-    assert "Found 2 source files" in result[0].stdout
+    assert f"{PACKAGE}/bad1.py:4" in result[0].stdout
+    assert f"{PACKAGE}/bad2.py:4" in result[0].stdout
+    assert "4 errors" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
 
@@ -161,17 +194,65 @@ def test_config_file(
     assert result[0].exit_code == exit_code
 
 
-def test_additional_source_roots(rule_runner: PythonRuleRunner) -> None:
-    LIB_1_PACKAGE = f"{PACKAGE}/lib1"
-    LIB_2_PACKAGE = f"{PACKAGE}/lib2"
-    rule_runner.write_files(
-        {
-            f"{LIB_1_PACKAGE}/core/a.py": GOOD_FILE,
-            f"{LIB_1_PACKAGE}/core/BUILD": "python_sources()",
-            f"{LIB_2_PACKAGE}/core/b.py": "from core.a import add",
-            f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
-        }
-    )
+LIB_1_PACKAGE = f"{PACKAGE}/lib1"
+LIB_2_PACKAGE = f"{PACKAGE}/lib2"
+
+
+@pytest.mark.parametrize(
+    "files, extra_args",
+    [
+        pytest.param(
+            {
+                f"{LIB_1_PACKAGE}/core/a.py": GOOD_FILE,
+                f"{LIB_1_PACKAGE}/core/BUILD": "python_sources()",
+                f"{LIB_2_PACKAGE}/core/b.py": "from core.a import add",
+                f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
+            },
+            (f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}']",),
+            id="from_version",
+        ),
+        pytest.param(
+            {
+                f"{LIB_1_PACKAGE}/core/a.py": GOOD_FILE,
+                f"{LIB_1_PACKAGE}/core/BUILD": "python_sources()",
+                f"{LIB_2_PACKAGE}/core/b.py": "from core.a import add",
+                f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
+                "src/js/lib3/BUILD": "package_json()",
+                "src/js/lib3/package.json": json.dumps(
+                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                ),
+                "src/js/lib3/package-lock.json": PYRIGHT_LOCKFILE,
+            },
+            (
+                f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}', 'src/js']",
+                "--pyright-install-from-resolve=lib3",
+            ),
+            id="from_resolve",
+        ),
+        pytest.param(
+            {
+                f"{LIB_1_PACKAGE}/core/a.py": GOOD_FILE,
+                f"{LIB_1_PACKAGE}/core/BUILD": "python_sources()",
+                f"{LIB_2_PACKAGE}/core/b.py": "from core.a import add",
+                f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
+                "BUILD": "package_json(name='root_package')",
+                "package.json": json.dumps(
+                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                ),
+                "package-lock.json": PYRIGHT_LOCKFILE,
+            },
+            (
+                f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}', '/']",
+                "--pyright-install-from-resolve=nodejs-default",
+            ),
+            id="from_resolve_at_root",
+        ),
+    ],
+)
+def test_additional_source_roots(
+    files: dict[str, str], extra_args: tuple[str, ...], rule_runner: PythonRuleRunner
+) -> None:
+    rule_runner.write_files(files)
     tgts = [
         rule_runner.get_target(Address(f"{LIB_1_PACKAGE}/core", relative_file_path="a.py")),
         rule_runner.get_target(Address(f"{LIB_2_PACKAGE}/core", relative_file_path="b.py")),
@@ -184,7 +265,7 @@ def test_additional_source_roots(rule_runner: PythonRuleRunner) -> None:
     result = run_pyright(
         rule_runner,
         tgts,
-        extra_args=[f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}']"],
+        extra_args=extra_args,
     )
     assert len(result) == 1
     assert result[0].exit_code == 0
@@ -193,7 +274,7 @@ def test_additional_source_roots(rule_runner: PythonRuleRunner) -> None:
     result = run_pyright(
         rule_runner,
         tgts[1:],
-        extra_args=[f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}']"],
+        extra_args=extra_args,
     )
     assert len(result) == 1
     assert result[0].exit_code == 0
@@ -206,24 +287,56 @@ def test_skip(rule_runner: PythonRuleRunner) -> None:
     assert not result
 
 
-def test_thirdparty_dependency(rule_runner: PythonRuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": (
-                "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])"
-            ),
-            f"{PACKAGE}/f.py": dedent(
-                """\
+@pytest.mark.parametrize(
+    "files, extra_args",
+    [
+        pytest.param(
+            {
+                "BUILD": (
+                    "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])"
+                ),
+                f"{PACKAGE}/f.py": dedent(
+                    """\
+            from more_itertools import flatten
+
+            assert flatten(42) == [4, 2]
+            """
+                ),
+                f"{PACKAGE}/BUILD": "python_sources()",
+            },
+            (),
+            id="from_version",
+        ),
+        pytest.param(
+            {
+                "BUILD": (
+                    "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])"
+                ),
+                f"{PACKAGE}/f.py": dedent(
+                    """\
                 from more_itertools import flatten
 
                 assert flatten(42) == [4, 2]
                 """
-            ),
-            f"{PACKAGE}/BUILD": "python_sources()",
-        }
-    )
+                ),
+                f"{PACKAGE}/BUILD": "python_sources()",
+                "src/js/BUILD": "package_json()",
+                "src/js/package.json": json.dumps(
+                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                ),
+                "src/js/package-lock.json": PYRIGHT_LOCKFILE,
+            },
+            ("--pyright-install-from-resolve=js",),
+            id="from_resolve",
+        ),
+    ],
+)
+def test_thirdparty_dependency(
+    rule_runner: PythonRuleRunner, files: dict[str, str], extra_args: tuple[str, ...]
+) -> None:
+    rule_runner.write_files(files)
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    result = run_pyright(rule_runner, [tgt])
+    result = run_pyright(rule_runner, [tgt], extra_args=extra_args)
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/f.py:3" in result[0].stdout

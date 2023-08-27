@@ -66,6 +66,7 @@ class DockerOptions(Subsystem):
                         "extra_image_tags": [],
                         "skip_push": bool,
                         "repository": str,
+                        "use_local_alias": bool,
                     },
                     ...
                 }
@@ -91,6 +92,10 @@ class DockerOptions(Subsystem):
             `docker_image.repository` or the default repository. Using the placeholders
             `{target_repository}` or `{default_repository}` those overridden values may be
             incorporated into the registry specific repository value.
+
+            If `use_local_alias` is true, a built image is additionally tagged locally using the
+            registry alias as the value for repository (i.e. the additional image tag is not pushed)
+            and will be used for any `pants run` requests.
             """
         ),
         fromfile=True,
@@ -169,6 +174,26 @@ class DockerOptions(Subsystem):
             build for at execution time.
             """
         ),
+    )
+    build_hosts = DictOption[str](
+        default={},
+        help=softwrap(
+            f"""
+            Hosts entries to be added to the `/etc/hosts` file in all built images.
+
+            Example:
+
+                [{options_scope}]
+                build_hosts = {{"docker": "10.180.0.1", "docker2": "10.180.0.2"}}
+
+            Use the `extra_build_hosts` field on a `docker_image` target for additional
+            image specific host entries.
+            """
+        ),
+    )
+    build_no_cache = BoolOption(
+        default=False,
+        help="Do not use the Docker cache when building images.",
     )
     build_verbose = BoolOption(
         default=False,

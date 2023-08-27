@@ -81,10 +81,11 @@ class ShfmtFieldSet(FieldSet):
     sources: ShellSourceField
 ```
 
-Then, hook this up to a new subclass of `FmtRequest`.
+Then, hook this up to a new subclass of `FmtTargetsRequest`.
 
 ```python
-from pants.core.goals.fmt import FmtRequest
+from pants.core.goals.fmt import FmtTargetsRequest
+
 
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
@@ -144,7 +145,7 @@ async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platfor
     return await FmtResult.create(request, result, output_snapshot)
 ```
 
-The `FmtRequest.Batch` has `.snapshot`, which stores the list of files and the `Digest` for each source file.
+The `ShfmtRequest.Batch` object has `.snapshot`, which stores the list of files and the `Digest` for each source file.
 
 If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to ensure that the tool is fetched.
 

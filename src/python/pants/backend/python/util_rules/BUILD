@@ -4,9 +4,10 @@
 python_sources(
     overrides={
         "local_dists_pep660.py": dict(dependencies=["./scripts/pep660_backend_wrapper.py"]),
-    }
+    },
 )
 
+resources(name="complete_platform_faas-test", sources=["complete_platform_faas-test*.json"])
 python_tests(
     name="tests",
     overrides={
@@ -15,5 +16,6 @@ python_tests(
         "pex_test.py": {"timeout": 600},
         "package_dists_test.py": {"timeout": 150},
         "vcs_versioning_test.py": {"timeout": 120},
+        "faas_test.py": {"dependencies": [":complete_platform_faas-test"]},
     },
 )
