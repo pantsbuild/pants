@@ -1368,6 +1368,7 @@ PUBLIC_REPOS = [
         goals=[DefaultGoals.tailor_update_build_files, "lint ::", DefaultGoals.test],
     ),
     # public repos
+    Repo(name="AlexTereshenkov/cheeseshop-query", python_version="3.9"),
     Repo(name="Ars-Linguistica/mlconjug3", goals=[DefaultGoals.package]),
     Repo(
         name="fucina/treb",
