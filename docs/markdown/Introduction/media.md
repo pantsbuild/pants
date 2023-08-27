@@ -200,6 +200,14 @@ Sept 3, 2020
 
 ## Talks
 
+### PyCon AU 2023
+
+#### Packaging for serverless: effortless? Doubtless!
+August 19, 2023
+<https://www.youtube.com/watch?v=YwuUI6bYUh0&t=5s&pp=ygUwUGFja2FnaW5nIGZvciBzZXJ2ZXJsZXNzOiBlZmZvcnRsZXNzPyBEb3VidGxlc3Mh>
+
+> Pants team member Huon Wilson talks about how the Pants build system works in practice for getting our Python code running in AWS Lambdas in production, and how it's improved upon other common practices we previously used.
+
 ### Pycon China 2022
 
 #### [LIGHTNING TALK] 沈达：Pants，Python工程化必备构建工具
