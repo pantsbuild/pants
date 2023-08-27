@@ -206,7 +206,7 @@ Sept 3, 2020
 December 17, 2022
 <https://www.bilibili.com/video/BV1L3411S76J/>
 
-> Pants team member Darcy Shen gives an overview of using Pants for data science.
+> 这是一次闪电演讲，在此次演讲中，Darcy Shen简明扼要地介绍了他使用Pants做Python项目工程化的经历。
 
 ### Tubi China
 
