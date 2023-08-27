@@ -200,6 +200,42 @@ Sept 3, 2020
 
 ## Talks
 
+### Pycon China 2022
+
+#### [LIGHTNING TALK] 沈达：Pants，Python工程化必备构建工具
+December 17, 2022
+<https://www.bilibili.com/video/BV1L3411S76J/>
+
+> Pants team member Darcy Shen gives an overview of using Pants for data science.
+
+### Tubi China
+
+#### Pants : Python 工程化的必备工具
+
+December 1, 2022
+<https://www.bilibili.com/video/BV1L3411S76J/>
+
+> In this internal tech talk, TubiTV data engineer Darcy Shen illustrates: one command line to launch JupyterLab with a proper dependency set, writing Python snippets just using a web browser, best practices for managing Python projects with Pants, and smart dependency inference of Pants.
+
+### Pycon Japan
+
+#### Modernizing development workflow for a 7-year old 74K LoC Python project using Pantsbuild
+
+October 15, 2022
+<https://www.youtube.com/watch?v=nZr1Wks07vc&t=3459s>
+
+> Mono-repository or not? That is a boggling question for many medium-to-large-sized development teams. As a growing company, Lablup had to onboard new hires quickly while coping with flooding customer requests and increasing codebase complexity. They merged 7 repositories into a single one and migrated to the Pantsbuild system, a Python-friendly modern build system. Here is the story, as told by CTO Joongi Kim.
+
+### Pycon Korea
+
+#### Pantsbuild를 활용하여 대규모 Python 프로젝트를 모노리포로 이전하기
+
+October 2, 2022
+<https://youtu.be/r2FpfmcoL5M>
+
+> 이 세션에서는 Backend.AI 오픈소스 프로젝트를 Pantsbuild 도구를 활용하여 모노리포(mono-repo)로 이전한 과정을 소개합니다. Backend.AI 프로젝트는 7년 동안 쌓인 7만 4천 줄 이상의 Python 코드로 작성되어 있으며, 다수의 패키지를 조합하고 설치해야 전체적인 기능 개발 및 테스트가 가능한 상당한 복잡도가 있는 코드베이스를 가지고 있습니다. 프로젝트 참여 인원의 규모가 늘어나고 내부의 코드도 복잡해지면서 패키지 단위로 저장소를 관리하는 것이 개발 프로세스의 병목을 가져왔고, 이 문제를 타개하기 위해 모노리포 도입을 고민하고 결정하였습니다. 모노리포가 모든 경우에 항상 정답은 아니지만, 개발팀의 규모, 내부 의존성들의 현재와 미래 예상 복잡도, 조직의 운영 방식, 코드의 변경이 영향을 미치는 범위, 릴리즈 주기, 이슈 관리 도구인 GitHub의 프로젝트 보드 기능 제약 등의 다양한 조건을 고려하였을 때 현 시점에서 합리적 전환이라 생각하였습니다. 특히, 하나의 이슈를 해결하기 위해 여러 개의 저장소에 여러 개의 pull request를 작성하고 이를 리뷰하는 과정은 개발자들의 컨텍스트 스위칭 오버헤드를 크게 증가시켰으며, 특정 저장소의 pull request 작성 자체를 빼먹는다거나 branch 통일을 깜빡하여 오류를 겪는 문제들이 반복되었습니다. 모노리포 전환 과정에서는 내외부 의존성 관리를 최대한 명시화 및 자동화하기 위해 Pantsbuild를 도입하였습니다. Pantsbuild는 Python 생태계를 우선적으로 지원하는 현대적 빌드 도구로, 강력한 캐싱과 빌드 및 CI 관련 작업의 병렬 실행을 잘 지원합니다. 본 발표에서는 Pantsbuild를 원활하게 사용할 수 있도록 기존 Backend.AI 저장소들을 어떻게 합쳤는지와 함께, Pantsbuild의 플러그인 작성 및 Backend.AI의 동적 모듈 로딩 메커니즘 대응을 통해 Pantsbuild에 적응해나간 과정도 함께 소개합니다. 기본적인 마이그레이션 이후에도 개발팀에서 겪었던 추가적인 문제들과 그런 문제들을 어떻게 대응하였는지에 대한 사례도 함께 설명합니다. 이 세션을 통해 대규모 Python 프로젝트의 모노리포 구성에 대한 사례와 힌트를 파악해가실 수 있는 시간이 되기를 바랍니다.
+
+
 ### AWS Community Day Bay Area 2022
 
 #### When Projects Grow: CI/CD at scale
