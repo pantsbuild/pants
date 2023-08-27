@@ -346,15 +346,31 @@ Pants Build 2 Tour: <https://www.youtube.com/playlist?list=PLwPRXwjURiOzXjgqydxZ
 
 ## Repositories
 
+### Official examples
+
+[Pantsbuild-maintained example repos](https://github.com/orgs/pantsbuild/repositories?q=example&type=source&language=&sort=stargazers), focusing on language support, Docker, Django, code generation, and other key features.
+
 ### Example: Python with Pants and PEX
 
-"A running example of the Pants Build system and Python packaging with PEX."  
+A running example of the Pants Build system and Python packaging with PEX.
 <https://github.com/StephanErb/pexample>
 
 ### Example: Pylint custom linter rules for a Python project using Pants
 
-"A ready-to-use example of a repository that contains a Python project and Pylint custom linter rules"  
+A ready-to-use example of a repository that contains a Python project and Pylint custom linter rules.
 <https://github.com/DoctrineLegal/demo-pants-pylint>
+
+### liga
+
+Pants makes open source project [`liga`](https://github.com/liga-ai/liga) more modular and extensible by replacing setuptools.
+
+### Backend.ai
+
+Lablup CTO Joongi Kim's Pycon Japan slides illustrate how open source project [Backend.ai](https://github.com/lablup/backend.ai) takes advantage of Pants in [daily development workflows](https://docs.backend.ai/en/latest/dev/daily-workflows.html).
+
+### StackStorm
+
+A showcase of open source project [StackStorm's upcoming migration to Pants](https://github.com/StackStorm/st2).
 
 > 📘 Suggest a Resource
 > 
