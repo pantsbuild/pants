@@ -1367,6 +1367,8 @@ PUBLIC_REPOS = [
         # skip check
         goals=[DefaultGoals.tailor_update_build_files, "lint ::", DefaultGoals.test],
     ),
+    # other pants' managed repos
+    Repo(name="pantsbuild/scie-pants", python_version="3.9"),
     # public repos
     Repo(name="AlexTereshenkov/cheeseshop-query", python_version="3.9"),
     Repo(name="Ars-Linguistica/mlconjug3", goals=[DefaultGoals.package]),
