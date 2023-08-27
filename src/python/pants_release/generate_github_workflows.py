@@ -1389,7 +1389,7 @@ PUBLIC_REPOS = [
     Repo(name="komprenilo/liga", python_version="3.9", goals=[DefaultGoals.package]),
     Repo(
         name="lablup/backend.ai",
-        python_version="3.11.3",
+        python_version="3.11.4",
         setup_commands="mkdir .tmp",
         goals=[
             DefaultGoals.tailor_update_build_files,
