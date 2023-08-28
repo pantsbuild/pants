@@ -17,8 +17,8 @@ from typing import DefaultDict, Iterable, Mapping, Tuple
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.dependency_inference.default_module_mapping import (
-    DEFAULT_MODULE_PATTERN_MAPPING,
     DEFAULT_MODULE_MAPPING,
+    DEFAULT_MODULE_PATTERN_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -313,8 +313,8 @@ class ThirdPartyPythonModuleMapping:
 
 @functools.cache
 def generate_mappings_from_pattern(proj_name: str, fallback: str) -> Iterable[str]:
-    """
-    Generate a list of possible module mappings from a project name using a regex pattern.
+    """Generate a list of possible module mappings from a project name using a regex pattern.
+
     e.g. google-cloud-foo -> [google.cloud.foo, google.cloud.foo_v1, google.cloud.foo_v1beta1]
     Should eliminate the need to "manually" add a mapping for every service
     proj_name: The project name to generate mappings for e.g google-cloud-datastream

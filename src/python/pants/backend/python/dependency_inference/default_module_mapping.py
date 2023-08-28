@@ -5,8 +5,8 @@
 #  https://www.python.org/dev/peps/pep-0503/#normalized-names.
 
 import re
-from typing import Match
 from functools import partial
+from typing import Match
 
 
 def all_hyphen_to_dot(m: Match) -> str:
@@ -19,23 +19,17 @@ def first_group_hyphen_to_underscore(m: Match) -> str:
 
 # TODO: combine the following two functions by passing in the replacements?
 def first_group_hyphen_to_dot_second_hyphen_to_underscore(m: Match) -> str:
-    """
-    take two groups, the first will have '-' replaced with '.',
-    the second will have '-' replaced with '_'
-    e.g. opentelemetry-instrumentation-aio-pika ->
-         group1(opentelemtetry.instrumentation.)group2(aio_pika)
-    """
+    """take two groups, the first will have '-' replaced with '.', the second will have '-' replaced
+    with '_' e.g. opentelemetry-instrumentation-aio-pika ->
+    group1(opentelemtetry.instrumentation.)group2(aio_pika)"""
     prefix = m.string[m.start(1) : m.end(1)].replace("-", ".")
     suffix = m.string[m.start(2) : m.end(2)].replace("-", "_")
     return f"{prefix}{suffix}"
 
 
 def two_groups_hyphen_dot_concat_with_suffix(m: Match, custom_suffix: str = "") -> str:
-    """
-    take two groups, the first will have '-' replaced with '.',
-    the second will have '-' replaced with ''
-    e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
-    """
+    """take two groups, the first will have '-' replaced with '.', the second will have '-' replaced
+    with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)"""
     prefix = m.string[m.start(1) : m.end(1)].replace("-", ".")
     suffix = m.string[m.start(2) : m.end(2)].replace("-", "")
     return f"{prefix}{suffix}{custom_suffix}"
