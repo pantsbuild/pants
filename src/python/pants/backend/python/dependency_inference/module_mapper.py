@@ -326,8 +326,6 @@ def generate_mappings_from_pattern(proj_name: str, fallback: str) -> Iterable[st
                 match_pattern.sub(replace_pattern, proj_name)
                 for replace_pattern in replace_patterns
             ]
-    if proj_name.startswith("google.cloud"):
-        print(f"{proj_name} -> {fallback} ::: {pattern_values}")
     return pattern_values + [fallback]
 
 
