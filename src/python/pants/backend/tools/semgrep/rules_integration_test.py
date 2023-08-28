@@ -24,6 +24,7 @@ from .subsystem import SemgrepFieldSet, SemgrepSubsystem
 from .subsystem import rules as semgrep_subsystem_rules
 
 DIR = "src"
+FILE = "file.txt"
 
 # https://semgrep.dev/docs/cli-reference/#exit-codes
 SEMGREP_ERROR_FAILURE_RETURN_CODE = 1
@@ -64,18 +65,18 @@ RULES2 = dedent(
 )
 
 SINGLE_FILE_BUILD = dedent(
-    """\
-    file(name="f", source="file.txt")
+    f"""\
+    file(name="f", source="{FILE}")
     """
 )
 
 BAD_FILE_LAYOUT = {
-    f"{DIR}/file.txt": BAD_FILE,
+    f"{DIR}/{FILE}": BAD_FILE,
     f"{DIR}/.semgrep.yml": RULES,
     f"{DIR}/BUILD": SINGLE_FILE_BUILD,
 }
 GOOD_FILE_LAYOUT = {
-    f"{DIR}/file.txt": GOOD_FILE,
+    f"{DIR}/{FILE}": GOOD_FILE,
     f"{DIR}/.semgrep.yml": RULES,
     f"{DIR}/BUILD": SINGLE_FILE_BUILD,
 }
@@ -235,7 +236,7 @@ def test_multiple_configs(rule_runner: RuleRunner, files: dict[str, str]) -> Non
 
 
 def test_semgrepignore(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({**BAD_FILE_LAYOUT, ".semgrepignore": "file.txt"})
+    rule_runner.write_files({**BAD_FILE_LAYOUT, ".semgrepignore": FILE})
 
     tgt = rule_runner.get_target(Address(DIR, target_name="f"))
     results = run_semgrep(rule_runner, [tgt])
@@ -254,8 +255,8 @@ def test_partition_by_config(rule_runner: RuleRunner) -> None:
     def file___(dir: str) -> dict[str, str]:
         file_dirs.append(dir)
         return {
-            f"{dir}/file.txt": GOOD_FILE,
-            f"{dir}/BUILD": """file(name="f", source="file.txt")""",
+            f"{dir}/{FILE}": GOOD_FILE,
+            f"{dir}/BUILD": f"""file(name="f", source="{FILE}")""",
         }
 
     def semgrep(dir: str) -> dict[str, str]:
@@ -318,7 +319,9 @@ def test_skip(rule_runner: RuleRunner) -> None:
 @pytest.mark.xfail(
     reason=""" TODO: --semgrep-force does rerun the underlying process, but the LintResult's
     contents are the same (same stdout etc.), these are deduped, and thus we cannot detect the
-    rerun"""
+    rerun""",
+    # no point spending time on this
+    run=False,
 )
 def test_force(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(GOOD_FILE_LAYOUT)
