@@ -294,7 +294,7 @@ def test_partition_by_config(rule_runner: RuleRunner) -> None:
     sorted_partitions = sorted(
         (
             sorted(field_set.address.spec for field_set in partition.elements),
-            sorted(f.address.filename for f in partition.metadata.config_files),
+            sorted(str(f) for f in partition.metadata.config_files),
         )
         for partition in partitions
     )

@@ -15,17 +15,23 @@ from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+    Paths,
+    Snapshot,
+)
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
-from pants.engine.target import AllTargets, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 from .subsystem import SemgrepFieldSet, SemgrepSubsystem
-from .target_types import SemgrepRuleSourceField
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +43,23 @@ class SemgrepLintRequest(LintTargetsRequest):
 
 @dataclass(frozen=True)
 class PartitionMetadata:
-    config_files: frozenset[SemgrepRuleSourceField]
+    config_files: frozenset[Path]
     ignore_files: Snapshot
 
     @property
     def description(self) -> str:
-        return ", ".join(sorted(field.file_path for field in self.config_files))
+        return ", ".join(sorted(str(path) for path in self.config_files))
 
 
 _IGNORE_FILE_NAME = ".semgrepignore"
+
+_RULES_DIR_NAME = ".semgrep"
+_RULES_FILES_GLOBS = (
+    ".semgrep.yml",
+    ".semgrep.yaml",
+    f"{_RULES_DIR_NAME}/*.yml",
+    f"{_RULES_DIR_NAME}/*.yaml",
+)
 
 
 @dataclass
@@ -55,9 +69,9 @@ class SemgrepIgnoreFiles:
 
 @dataclass
 class AllSemgrepConfigs:
-    targets: dict[str, list[Target]]
+    configs_by_dir: dict[Path, list[Path]]
 
-    def ancestor_targets(self, address: Address) -> Iterable[Target]:
+    def ancestor_configs(self, address: Address) -> Iterable[Path]:
         # TODO: introspect the semgrep rules and determine which (if any) apply to the files, e.g. a
         # Python file shouldn't depend on a .semgrep.yml that doesn't have any 'python' or 'generic'
         # rules, and similarly if there's path inclusions/exclusions.
@@ -68,29 +82,43 @@ class AllSemgrepConfigs:
         spec = Path(address.spec_path)
 
         for ancestor in itertools.chain([spec], spec.parents):
-            spec_path = str(ancestor)
-            yield from self.targets.get("" if spec_path == "." else spec_path, [])
+            yield from self.configs_by_dir.get(ancestor, [])
+
+
+def _group_by_config(all_paths: Paths) -> AllSemgrepConfigs:
+    configs_by_dir = defaultdict(list)
+    for path_ in all_paths.files:
+        path = Path(path_)
+        # A rule like foo/bar/.semgrep/baz.yaml should behave like it's in in foo/bar, not
+        # foo/bar/.semgrep
+        parent = path.parent
+        config_directory = parent.parent if parent.name == _RULES_DIR_NAME else parent
+
+        configs_by_dir[config_directory].append(path)
+
+    return AllSemgrepConfigs(configs_by_dir)
 
 
 @rule
-async def find_all_semgrep_configs(all_targets: AllTargets) -> AllSemgrepConfigs:
-    targets = defaultdict(list)
-    for tgt in all_targets:
-        if tgt.has_field(SemgrepRuleSourceField):
-            targets[tgt.address.spec_path].append(tgt)
-    return AllSemgrepConfigs(targets)
+async def find_all_semgrep_configs() -> AllSemgrepConfigs:
+    all_paths = await Get(Paths, PathGlobs([f"**/{file_glob}" for file_glob in _RULES_FILES_GLOBS]))
+    return _group_by_config(all_paths)
 
 
 @dataclass(frozen=True)
-class InferSemgrepDependenciesRequest:
+class RelevantSemgrepConfigsRequest:
     field_set: SemgrepFieldSet
 
 
+class RelevantSemgrepConfigs(frozenset[Path]):
+    pass
+
+
 @rule
-async def infer_semgrep_dependencies(
-    request: InferSemgrepDependenciesRequest, all_semgrep: AllSemgrepConfigs
-) -> Targets:
-    return Targets(tuple(all_semgrep.ancestor_targets(request.field_set.address)))
+async def infer_relevant_semgrep_configs(
+    request: RelevantSemgrepConfigsRequest, all_semgrep: AllSemgrepConfigs
+) -> RelevantSemgrepConfigs:
+    return RelevantSemgrepConfigs(all_semgrep.ancestor_configs(request.field_set.address))
 
 
 @rule
@@ -108,19 +136,16 @@ async def partition(
     if semgrep.skip:
         return Partitions()
 
-    dependencies = await MultiGet(
-        Get(Targets, InferSemgrepDependenciesRequest(field_set)) for field_set in request.field_sets
+    all_configs = await MultiGet(
+        Get(RelevantSemgrepConfigs, RelevantSemgrepConfigsRequest(field_set))
+        for field_set in request.field_sets
     )
 
     # partition by the sets of configs that apply to each input
     by_config = defaultdict(list)
-    for field_set, deps in zip(request.field_sets, dependencies):
-        semgrep_configs = frozenset(
-            d[SemgrepRuleSourceField] for d in deps if d.has_field(SemgrepRuleSourceField)
-        )
-
-        if semgrep_configs:
-            by_config[semgrep_configs].append(field_set)
+    for field_set, configs in zip(request.field_sets, all_configs):
+        if configs:
+            by_config[configs].append(field_set)
 
     return Partitions(
         Partition(tuple(field_sets), PartitionMetadata(configs, ignore_files.snapshot))
@@ -143,7 +168,7 @@ async def lint(
     global_options: GlobalOptions,
 ) -> LintResult:
     config_files, semgrep_pex, input_files, settings = await MultiGet(
-        Get(SourceFiles, SourceFilesRequest(request.partition_metadata.config_files)),
+        Get(Snapshot, PathGlobs(str(s) for s in request.partition_metadata.config_files)),
         Get(VenvPex, PexRequest, semgrep.to_pex_request()),
         Get(SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)),
         Get(Digest, CreateDigest([_DEFAULT_SETTINGS])),
@@ -154,7 +179,7 @@ async def lint(
         MergeDigests(
             (
                 input_files.snapshot.digest,
-                config_files.snapshot.digest,
+                config_files.digest,
                 settings,
                 request.partition_metadata.ignore_files.digest,
             )
@@ -172,7 +197,7 @@ async def lint(
             semgrep_pex,
             argv=(
                 "scan",
-                *(f"--config={f}" for f in config_files.snapshot.files),
+                *(f"--config={f}" for f in config_files.files),
                 "--jobs={pants_concurrency}",
                 "--error",
                 *semgrep.args,
