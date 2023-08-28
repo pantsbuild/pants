@@ -124,6 +124,7 @@ all_python_tools = tuple(
             PythonTool(PythonProtobufMypyPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(Pytype, "pants.backend.python.typecheck.pytype", "CPython>=3.7,<3.11"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
+            PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff"),
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
