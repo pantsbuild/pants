@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import PurePath
 
 import pytest
 
@@ -14,7 +14,9 @@ from pants.engine.fs import Paths
 
 
 def configs(strs: dict[str, set[str]]) -> AllSemgrepConfigs:
-    return AllSemgrepConfigs({Path(d): {Path(f) for f in files} for d, files in strs.items()})
+    return AllSemgrepConfigs(
+        {PurePath(d): {PurePath(f) for f in files} for d, files in strs.items()}
+    )
 
 
 @pytest.mark.parametrize(
@@ -128,4 +130,4 @@ def test_all_semgrep_configs_ancestor_configs(
 ):
     result = config.ancestor_configs(address)
 
-    assert set(result) == {Path(p) for p in expected}
+    assert set(result) == {PurePath(p) for p in expected}
