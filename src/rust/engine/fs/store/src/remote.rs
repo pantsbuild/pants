@@ -21,6 +21,10 @@ mod reapi;
 #[cfg(test)]
 mod reapi_tests;
 
+mod base_opendal;
+#[cfg(test)]
+mod base_opendal_tests;
+
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
   /// Store the bytes readable from `file` into the remote store
