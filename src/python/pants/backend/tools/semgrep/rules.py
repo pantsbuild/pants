@@ -69,7 +69,7 @@ class SemgrepIgnoreFiles:
 
 @dataclass
 class AllSemgrepConfigs:
-    configs_by_dir: dict[Path, list[Path]]
+    configs_by_dir: dict[Path, set[Path]]
 
     def ancestor_configs(self, address: Address) -> Iterable[Path]:
         # TODO: introspect the semgrep rules and determine which (if any) apply to the files, e.g. a
@@ -85,8 +85,8 @@ class AllSemgrepConfigs:
             yield from self.configs_by_dir.get(ancestor, [])
 
 
-def _group_by_config(all_paths: Paths) -> AllSemgrepConfigs:
-    configs_by_dir = defaultdict(list)
+def _group_by_semgrep_dir(all_paths: Paths) -> AllSemgrepConfigs:
+    configs_by_dir = defaultdict(set)
     for path_ in all_paths.files:
         path = Path(path_)
         # A rule like foo/bar/.semgrep/baz.yaml should behave like it's in in foo/bar, not
@@ -94,7 +94,7 @@ def _group_by_config(all_paths: Paths) -> AllSemgrepConfigs:
         parent = path.parent
         config_directory = parent.parent if parent.name == _RULES_DIR_NAME else parent
 
-        configs_by_dir[config_directory].append(path)
+        configs_by_dir[config_directory].add(path)
 
     return AllSemgrepConfigs(configs_by_dir)
 
@@ -102,7 +102,7 @@ def _group_by_config(all_paths: Paths) -> AllSemgrepConfigs:
 @rule
 async def find_all_semgrep_configs() -> AllSemgrepConfigs:
     all_paths = await Get(Paths, PathGlobs([f"**/{file_glob}" for file_glob in _RULES_FILES_GLOBS]))
-    return _group_by_config(all_paths)
+    return _group_by_semgrep_dir(all_paths)
 
 
 @dataclass(frozen=True)
