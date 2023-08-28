@@ -30,7 +30,16 @@ class SemgrepFieldSet(FieldSet):
 class SemgrepSubsystem(PythonToolBase):
     name = "Semgrep"
     options_scope = "semgrep"
-    help = "Lightweight static analysis for many languages. Find bug variants with patterns that look like source code. (https://semgrep.dev/)"
+    help = softwrap(
+        """\
+        Lightweight static analysis for many languages. Find bug variants with patterns that look
+        like source code. (https://semgrep.dev/)
+
+        Pants automatically finds config files (`.semgrep.yml`, `.semgrep.yaml`, and `.yml` or
+        `.yaml` files within `.semgrep/` directories), and runs semgrep against all _targets_ known
+        to Pants.
+        """
+    )
 
     default_main = ConsoleScript("semgrep")
     default_requirements = ["semgrep>=1.20.0,<2"]
@@ -47,12 +56,6 @@ class SemgrepSubsystem(PythonToolBase):
     )
 
     skip = SkipOption("lint")
-
-    tailor_rule_targets = BoolOption(
-        default=True,
-        help="If true, add `semgrep_rule_sources` targets with the `tailor` goal.",
-        advanced=True,
-    )
 
     force = BoolOption(
         default=False,
