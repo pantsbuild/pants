@@ -2,12 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+import re
 
 from pathlib import PurePath
 from textwrap import dedent
+from types import FunctionType
 
 import pytest
 from packaging.utils import canonicalize_name as canonicalize_project_name
+from typing import Iterable
 
 from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
 from pants.backend.codegen.protobuf.python.additional_fields import (
@@ -19,6 +22,7 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
+    DEFAULT_MODULE_PATTERN_MAPPING,
 )
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
@@ -29,6 +33,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwnersRequest,
     ThirdPartyPythonModuleMapping,
     module_from_stripped_path,
+    generate_mappings_from_pattern,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import (
@@ -57,6 +62,18 @@ def test_default_module_mapping_uses_tuples() -> None:
     for modules in DEFAULT_MODULE_MAPPING.values():
         assert isinstance(modules, tuple)
         assert len(modules) > 0
+
+
+def test_default_module_pattern_mapping_keys_and_value_types() -> None:
+    for pattern, replacements in DEFAULT_MODULE_PATTERN_MAPPING.items():
+        assert isinstance(pattern, re.Pattern)
+        assert isinstance(replacements, Iterable)
+        for replacement in replacements:
+            assert (
+                isinstance(replacement, FunctionType)
+                or isinstance(replacement, str)
+                or callable(replacement)
+            )
 
 
 @pytest.mark.parametrize(
@@ -779,3 +796,40 @@ def test_issue_15111(rule_runner: RuleRunner) -> None:
             }
         )
     )
+
+
+def test_generate_mappings_from_pattern_matches(rule_runner: RuleRunner) -> None:
+    assert generate_mappings_from_pattern("google-cloud-hardyhar", "bar") == [
+        "google.cloud.hardyhar",
+        "google.cloud.hardyhar_v1",
+        "google.cloud.hardyhar_v2",
+        "google.cloud.hardyhar_v3",
+        "bar",
+    ]
+    assert generate_mappings_from_pattern("python-jose", "bar") == ["jose", "bar"]
+    assert generate_mappings_from_pattern("opentelemetry-instrumentation-tornado", "bar") == [
+        "opentelemetry.instrumentation.tornado",
+        "bar",
+    ]
+    assert generate_mappings_from_pattern("azure-mgmt-consumption", "bar") == [
+        "azure.mgmt.consumption",
+        "bar",
+    ]
+    assert generate_mappings_from_pattern("azure-keyvault", "bar") == ["azure.keyvault", "bar"]
+    assert generate_mappings_from_pattern("django-admin-cursor-paginator", "bar") == [
+        "admin_cursor_paginator",
+        "bar",
+    ]
+    assert generate_mappings_from_pattern("django-dotenv", "bar") == [
+        "dotenv",
+        "bar",
+    ]
+    assert generate_mappings_from_pattern("oslo-service", "bar") == ["oslo_service", "bar"]
+
+
+def test_generate_mappings_from_pattern_no_match(rule_runner: RuleRunner) -> None:
+    assert generate_mappings_from_pattern("pyopenssl", "bar") == ["bar"]
+    assert generate_mappings_from_pattern("", "bar") == ["bar"]
+
+
+# def generate_mappings_from_pattern(proj_name: str, fallback: str) -> Iterable[str]:
