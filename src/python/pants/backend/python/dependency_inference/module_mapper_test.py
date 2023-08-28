@@ -373,6 +373,80 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_my(rule_runner: RuleRunner) -> None:
+    def req(
+        tgt_name: str,
+        req_str: str,
+        *,
+        modules: list[str] | None = None,
+        stub_modules: list[str] | None = None,
+        resolve: str = "default",
+    ) -> str:
+        return dedent(
+            f"""\
+            python_requirement(name='{tgt_name}', requirements=['{req_str}'],
+            modules={modules or []},
+            type_stub_modules={stub_modules or []},
+            resolve={repr(resolve)})
+            """
+        )
+
+    build_file = "\n\n".join(
+        [
+            req("google-cloud-hardyhar", "google-cloud-hardyhar"),
+        ]
+    )
+
+    rule_runner.write_files({"BUILD": build_file})
+    rule_runner.set_options(["--python-resolves={'default': ''}", "--python-enable-resolves"])
+    result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
+    # assert False
+    expected = ThirdPartyPythonModuleMapping(
+        FrozenDict(
+            {
+                "default": FrozenDict(
+                    {
+                        "google.cloud.hardyhar": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.hardyhar_v1": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.hardyhar_v2": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.hardyhar_v3": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        # this is the fallback
+                        "google_cloud_hardyhar": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                    }
+                ),
+            }
+        )
+    )
+    print(result)
+    print(expected)
+    assert result == expected
+
+
 def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     def req(
         tgt_name: str,
@@ -410,6 +484,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("multiple_owners_types", "types-multiple_owners==1", resolve="another"),
             # Only assume it's a type stubs dep if we are certain it's not an implementation.
             req("looks_like_stubs", "looks-like-stubs-types", modules=["looks_like_stubs"]),
+            req("google-cloud-hardyhar", "google-cloud-hardyhar"),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
@@ -417,7 +492,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         ["--python-resolves={'default': '', 'another': ''}", "--python-enable-resolves"]
     )
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
-    assert result == ThirdPartyPythonModuleMapping(
+    expected = ThirdPartyPythonModuleMapping(
         FrozenDict(
             {
                 "another": FrozenDict(
@@ -438,6 +513,37 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                         "file_dist": (
                             ModuleProvider(
                                 Address("", target_name="file_dist"), ModuleProviderType.IMPL
+                            ),
+                        ),
+                        "google.cloud.hardyhar": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.hardyhar_v1": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.hardyhar_v2": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.hardyhar_v3": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        # this is the fallback
+                        "google_cloud_hardyhar": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
                             ),
                         ),
                         "looks_like_stubs": (
@@ -500,6 +606,9 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             }
         )
     )
+    print(result)
+    print(expected)
+    assert result == expected
 
 
 def test_map_module_to_address(rule_runner: RuleRunner) -> None:
