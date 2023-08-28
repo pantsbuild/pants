@@ -22,7 +22,6 @@ from .rules import PartitionMetadata, SemgrepLintRequest
 from .rules import rules as semgrep_rules
 from .subsystem import SemgrepFieldSet, SemgrepSubsystem
 from .subsystem import rules as semgrep_subsystem_rules
-from .target_types import SemgrepRuleSourcesGeneratorTarget, SemgrepRuleSourceTarget
 
 DIR = "src"
 
@@ -67,7 +66,6 @@ RULES2 = dedent(
 SINGLE_FILE_BUILD = dedent(
     """\
     file(name="f", source="file.txt")
-    semgrep_rule_sources(name="s")
     """
 )
 
@@ -94,7 +92,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(LintResult, (SemgrepLintRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[SemgrepRuleSourceTarget, SemgrepRuleSourcesGeneratorTarget, FileTarget],
+        target_types=[FileTarget],
     )
 
 
@@ -181,7 +179,6 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
                 """\
                 file(name="g", source="good.txt")
                 file(name="b", source="bad.txt")
-                semgrep_rule_sources(name="s")
                 """
             ),
         }
@@ -208,7 +205,6 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
             {
                 **BAD_FILE_LAYOUT,
                 ".semgrep.yml": RULES2,
-                "BUILD": """semgrep_rule_sources(name="s")""",
             },
             id="via nesting",
         ),
@@ -218,7 +214,6 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
                 f"{DIR}/BUILD": """file(name="f", source="bad.txt")""",
                 ".semgrep/one.yml": RULES,
                 ".semgrep/two.yml": RULES2,
-                "BUILD": """semgrep_rule_sources(name="s")""",
             },
             id="via .semgrep directory",
         ),
@@ -264,7 +259,7 @@ def test_partition_by_config(rule_runner: RuleRunner) -> None:
         }
 
     def semgrep(dir: str) -> dict[str, str]:
-        return {f"{dir}/.semgrep.yml": RULES, f"{dir}/BUILD": """semgrep_rule_sources(name="s")"""}
+        return {f"{dir}/.semgrep.yml": RULES}
 
     rule_runner.write_files(
         {
@@ -379,12 +374,7 @@ def test_semgrep_pex_contents_is_ignored(rule_runner: RuleRunner) -> None:
             # which will, naively, find the __main__.py in the PEX.
             "__main__.py": "",
             ".semgrep.yml": RULES,
-            "BUILD": dedent(
-                """\
-                file(name="f", source="__main__.py")
-                semgrep_rule_sources(name="s")
-                """
-            ),
+            "BUILD": """file(name="f", source="__main__.py")""",
         }
     )
 
