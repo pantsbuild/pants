@@ -43,7 +43,7 @@ def _group_by_semgrep_dir(paths: Iterable[str]) -> dict[str, set[str]]:
     return ret
 
 
-@rule(level=LogLevel.DEBUG, desc="Determine candidate Python targets to create")
+@rule(level=LogLevel.DEBUG, desc="Determine candidate Semgrep targets to create")
 async def find_putative_targets(
     req: PutativeSemgrepTargetsRequest,
     all_owned_sources: AllOwnedSources,

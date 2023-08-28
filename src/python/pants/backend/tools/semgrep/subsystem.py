@@ -6,14 +6,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.subsystems.python_tool_base import (
-    ExportToolOption,
-    LockfileRules,
-    PythonToolBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import Dependencies, FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
@@ -37,17 +32,13 @@ class SemgrepSubsystem(PythonToolBase):
     options_scope = "semgrep"
     help = "Lightweight static analysis for many languages. Find bug variants with patterns that look like source code. (https://semgrep.dev/)"
 
-    default_version = "semgrep>=1.20.0,<2"
     default_main = ConsoleScript("semgrep")
-    default_requirements = [default_version]
+    default_requirements = ["semgrep>=1.20.0,<2"]
 
     register_interpreter_constraints = True
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")
-    lockfile_rules_type = LockfileRules.SIMPLE
-
-    export = ExportToolOption()
 
     args = ArgsListOption(
         example="--verbose",
@@ -78,21 +69,5 @@ class SemgrepSubsystem(PythonToolBase):
     )
 
 
-class SemgrepExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule
-def semgrep_export(_: SemgrepExportSentinel, semgrep: SemgrepSubsystem) -> ExportPythonTool:
-    if not semgrep.export:
-        return ExportPythonTool(resolve_name=semgrep.options_scope, pex_request=None)
-    return ExportPythonTool(
-        resolve_name=semgrep.options_scope, pex_request=semgrep.to_pex_request()
-    )
-
-
 def rules() -> Iterable[Rule | UnionRule]:
-    return (
-        *collect_rules(),
-        UnionRule(ExportPythonToolSentinel, SemgrepExportSentinel),
-    )
+    return collect_rules()
