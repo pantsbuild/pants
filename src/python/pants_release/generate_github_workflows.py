@@ -1367,7 +1367,10 @@ PUBLIC_REPOS = [
         # skip check
         goals=[DefaultGoals.tailor_update_build_files, "lint ::", DefaultGoals.test],
     ),
+    # other pants' managed repos
+    Repo(name="pantsbuild/scie-pants", python_version="3.9"),
     # public repos
+    Repo(name="AlexTereshenkov/cheeseshop-query", python_version="3.9"),
     Repo(name="Ars-Linguistica/mlconjug3", goals=[DefaultGoals.package]),
     Repo(
         name="fucina/treb",
@@ -1388,12 +1391,12 @@ PUBLIC_REPOS = [
     Repo(name="komprenilo/liga", python_version="3.9", goals=[DefaultGoals.package]),
     Repo(
         name="lablup/backend.ai",
-        python_version="3.11.3",
+        python_version="3.11.4",
         setup_commands="mkdir .tmp",
         goals=[
             DefaultGoals.tailor_update_build_files,
             DefaultGoals.lint_check,
-            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::",
+            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::",
             DefaultGoals.package,
         ],
     ),
