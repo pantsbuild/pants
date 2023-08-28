@@ -560,9 +560,9 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::`
+      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::`
         with repo-default version (baseline)'
-      run: ' pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::'
+      run: ' pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::'
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -591,10 +591,10 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::`
+      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::`
         with ${{ github.event.inputs.pants_version }}'
       run: '${{ github.event.inputs.extra_env }} pants test :: -tests/agent/docker::
-        -tests/client/integration:: -tests/common/redis::'
+        -tests/client/integration:: -tests/common/redis_helper::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()

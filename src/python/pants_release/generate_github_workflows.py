@@ -1396,7 +1396,7 @@ PUBLIC_REPOS = [
         goals=[
             DefaultGoals.tailor_update_build_files,
             DefaultGoals.lint_check,
-            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::",
+            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::",
             DefaultGoals.package,
         ],
     ),
