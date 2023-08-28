@@ -2,17 +2,23 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import json
+import logging
 import os.path
+from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Iterable, Mapping
+from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
 
+import yaml
 from typing_extensions import Literal
 
 from pants.backend.project_info import dependencies
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.package import OutputPathField
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
@@ -20,8 +26,18 @@ from pants.core.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.fs import (
+    CreateDigest,
+    DigestContents,
+    FileContent,
+    GlobExpansionConjunction,
+    PathGlobs,
+)
 from pants.engine.internals import graph
+from pants.engine.internals.graph import (
+    ResolveAllTargetGeneratorRequests,
+    ResolvedTargetGeneratorRequests,
+)
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import Rule, collect_rules, rule
@@ -32,6 +48,8 @@ from pants.engine.target import (
     DependenciesRequest,
     GeneratedTargets,
     GenerateTargetsRequest,
+    InvalidFieldException,
+    ScalarField,
     SequenceField,
     SingleSourceField,
     SourcesField,
@@ -46,6 +64,8 @@ from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text, softwrap
 
+_logger = logging.getLogger(__name__)
+
 
 class NodePackageDependenciesField(Dependencies):
     pass
@@ -56,12 +76,18 @@ class PackageJsonSourceField(SingleSourceField):
     required = False
 
 
+class NodeScript(ABC):
+    entry_point: str
+    alias: ClassVar[str]
+
+
 @dataclass(frozen=True)
-class NodeBuildScript:
+class NodeBuildScript(NodeScript):
     entry_point: str
     output_directories: tuple[str, ...] = ()
     output_files: tuple[str, ...] = ()
     extra_caches: tuple[str, ...] = ()
+    extra_env_vars: tuple[str, ...] = ()
 
     alias: ClassVar[str] = "node_build_script"
 
@@ -72,18 +98,101 @@ class NodeBuildScript:
         output_directories: Iterable[str] = (),
         output_files: Iterable[str] = (),
         extra_caches: Iterable[str] = (),
+        extra_env_vars: Iterable[str] = (),
     ) -> NodeBuildScript:
+        """A build script, mapped from the `scripts` section of a package.json file.
+
+        Either the `output_directories` or the `output_files` argument has to be set to capture the
+        output artifacts of the build.
+        """
+
         return cls(
             entry_point=entry_point,
             output_directories=tuple(output_directories),
             output_files=tuple(output_files),
             extra_caches=tuple(extra_caches),
+            extra_env_vars=tuple(extra_env_vars),
         )
 
 
-class NodePackageScriptsField(SequenceField[NodeBuildScript]):
+@dataclass(frozen=True)
+class NodeTestScript(NodeScript):
+    entry_point: str = "test"
+    report_args: tuple[str, ...] = ()
+    report_output_files: tuple[str, ...] = ()
+    report_output_directories: tuple[str, ...] = ()
+    coverage_args: tuple[str, ...] = ()
+    coverage_output_files: tuple[str, ...] = ()
+    coverage_output_directories: tuple[str, ...] = ()
+    coverage_entry_point: str | None = None
+    extra_caches: tuple[str, ...] = ()
+
+    alias: ClassVar[str] = "node_test_script"
+
+    def __str__(self) -> str:
+        return f'{self.alias}(entry_point="{self.entry_point}", ...)'
+
+    @classmethod
+    def create(
+        cls,
+        entry_point: str = "test",
+        report_args: Iterable[str] = (),
+        report_output_files: Iterable[str] = (),
+        report_output_directories: Iterable[str] = (),
+        coverage_args: Iterable[str] = (),
+        coverage_output_files: Iterable[str] = (),
+        coverage_output_directories: Iterable[str] = (),
+        coverage_entry_point: str | None = None,
+    ) -> NodeTestScript:
+        """The test script for this package, mapped from the `scripts` section of a package.json
+        file. The pointed to script should accept a variadic number of ([ARG]...) path arguments.
+
+        This entry point is the "test" script, by default.
+        """
+        return cls(
+            entry_point=entry_point,
+            report_args=tuple(report_args),
+            report_output_files=tuple(report_output_files),
+            report_output_directories=tuple(report_output_directories),
+            coverage_args=tuple(coverage_args),
+            coverage_output_files=tuple(coverage_output_files),
+            coverage_output_directories=tuple(coverage_output_directories),
+            coverage_entry_point=coverage_entry_point,
+        )
+
+    def supports_coverage(self) -> bool:
+        return bool(self.coverage_entry_point) or bool(self.coverage_args)
+
+    def coverage_globs(self, working_directory: str) -> PathGlobs:
+        return self.coverage_globs_for(
+            working_directory,
+            self.coverage_output_files,
+            self.coverage_output_directories,
+            GlobMatchErrorBehavior.ignore,
+        )
+
+    @classmethod
+    def coverage_globs_for(
+        cls,
+        working_directory: str,
+        files: tuple[str, ...],
+        directories: tuple[str, ...],
+        error_behaviour: GlobMatchErrorBehavior,
+        conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
+        description_of_origin: str | None = None,
+    ) -> PathGlobs:
+        dir_globs = (os.path.join(directory, "*") for directory in directories)
+        return PathGlobs(
+            (os.path.join(working_directory, glob) for glob in itertools.chain(files, dir_globs)),
+            conjunction=conjunction,
+            glob_match_error_behavior=error_behaviour,
+            description_of_origin=description_of_origin,
+        )
+
+
+class NodePackageScriptsField(SequenceField[NodeScript]):
     alias = "scripts"
-    expected_element_type = NodeBuildScript
+    expected_element_type = NodeScript
 
     help = help_text(
         """
@@ -98,6 +207,45 @@ class NodePackageScriptsField(SequenceField[NodeBuildScript]):
     )
     default = ()
 
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[Any]], address: Address
+    ) -> Optional[Tuple[NodeScript, ...]]:
+        values = super().compute_value(raw_value, address)
+        test_scripts = [value for value in values or () if isinstance(value, NodeTestScript)]
+        if len(test_scripts) > 1:
+            entry_points = ", ".join(str(script) for script in test_scripts)
+            raise InvalidFieldException(
+                softwrap(
+                    f"""
+                    You can only specify one `{NodeTestScript.alias}` per `{PackageJsonTarget.alias}`,
+                    but the {cls.alias} contains {entry_points}.
+                    """
+                )
+            )
+        return values
+
+    def build_scripts(self) -> Iterable[NodeBuildScript]:
+        for script in self.value or ():
+            if isinstance(script, NodeBuildScript):
+                yield script
+
+    def get_test_script(self) -> NodeTestScript:
+        for script in self.value or ():
+            if isinstance(script, NodeTestScript):
+                return script
+        return NodeTestScript()
+
+
+class NodePackageTestScriptField(ScalarField[NodeTestScript]):
+    alias = "_node_test_script"
+    expected_type = NodeTestScript
+    expected_type_description = (
+        'node_test_script(entry_point="test", coverage_args="--coverage=true")'
+    )
+    default = NodeTestScript()
+    value: NodeTestScript
+
 
 class NodePackageVersionField(StringField):
     alias = "version"
@@ -108,8 +256,8 @@ class NodePackageVersionField(StringField):
         This field should not be overridden; use the value from target generation.
         """
     )
-    required = True
-    value: str
+    required = False
+    value: str | None
 
 
 class NodeThirdPartyPackageVersionField(NodePackageVersionField):
@@ -170,6 +318,26 @@ class NodePackageTarget(Target):
         NodePackageNameField,
         NodePackageVersionField,
         NodePackageDependenciesField,
+        NodePackageTestScriptField,
+    )
+
+
+class NPMDistributionTarget(Target):
+    alias = "npm_distribution"
+
+    help = help_text(
+        """
+        A publishable npm registry distribution, typically a gzipped tarball
+        of the sources and any resources, but omitting the lockfile.
+
+        Generated using the projects package manager `pack` implementation.
+        """
+    )
+
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PackageJsonSourceField,
+        OutputPathField,
     )
 
 
@@ -198,6 +366,7 @@ class PackageJsonTarget(TargetGenerator):
 class NodeBuildScriptEntryPointField(StringField):
     alias = "entry_point"
     required = True
+    value: str
 
 
 class NodeBuildScriptSourcesField(SourcesField):
@@ -239,6 +408,20 @@ class NodeBuildScriptOutputDirectoriesField(StringSequenceField):
 
         Relative paths (including `..`) may be used, as long as the path does not ascend further
         than the package.json parent directory.
+        """
+    )
+
+
+class NodeBuildScriptExtraEnvVarsField(StringSequenceField):
+    alias = "extra_env_vars"
+    required = False
+    default = ()
+    help = help_text(
+        """
+        Additional environment variables to include in environment when running a build script process.
+
+        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+        `ENV_VAR` to copy the value of a variable in Pants's own environment.
         """
     )
 
@@ -285,7 +468,9 @@ class NodeBuildScriptTarget(Target):
         NodeBuildScriptOutputFilesField,
         NodeBuildScriptSourcesField,
         NodeBuildScriptExtraCaches,
+        NodeBuildScriptExtraEnvVarsField,
         NodePackageDependenciesField,
+        OutputPathField,
     )
 
     alias = "_node_build_script"
@@ -293,9 +478,43 @@ class NodeBuildScriptTarget(Target):
     help = help_text(
         """
         A package.json script that is invoked by the configured package manager
-        to produce `resource` targets.
+        to produce `resource` targets or a packaged artifact.
         """
     )
+
+
+@dataclass(frozen=True)
+class PackageJsonImports:
+    """https://nodejs.org/api/packages.html#subpath-imports."""
+
+    imports: FrozenDict[str, tuple[str, ...]]
+    root_dir: str
+
+    @classmethod
+    def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonImports:
+        return cls(
+            imports=cls._import_from_package_json(pkg_json),
+            root_dir=pkg_json.root_dir,
+        )
+
+    @staticmethod
+    def _import_from_package_json(
+        pkg_json: PackageJson,
+    ) -> FrozenDict[str, tuple[str, ...]]:
+        imports: Mapping[str, Any] | None = pkg_json.content.get("imports")
+
+        def get_subpaths(value: str | Mapping[str, Any]) -> Iterable[str]:
+            if isinstance(value, str):
+                yield value
+            elif isinstance(value, Mapping):
+                for v in value.values():
+                    yield from get_subpaths(v)
+
+        if not imports:
+            return FrozenDict()
+        return FrozenDict(
+            {key: tuple(sorted(get_subpaths(subpath))) for key, subpath in imports.items()}
+        )
 
 
 @dataclass(frozen=True)
@@ -369,11 +588,12 @@ class PackageJsonScripts:
 class PackageJson:
     content: FrozenDict[str, Any]
     name: str
-    version: str
+    version: str | None
     snapshot: Snapshot
     workspaces: tuple[str, ...] = ()
     module: Literal["commonjs", "module"] | None = None
     dependencies: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    package_manager: str | None = None
 
     def __post_init__(self) -> None:
         if self.module not in (None, "commonjs", "module"):
@@ -444,7 +664,11 @@ async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePa
         ),
     )
     package_json_tgts = sorted(
-        (tgt for tgt in candidate_targets if tgt.has_field(PackageJsonSourceField)),
+        (
+            tgt
+            for tgt in candidate_targets
+            if tgt.has_field(PackageJsonSourceField) and tgt.has_field(NodePackageNameField)
+        ),
         key=lambda tgt: tgt.address.spec_path,
         reverse=True,
     )
@@ -463,7 +687,7 @@ async def parse_package_json(content: FileContent) -> PackageJson:
     return PackageJson(
         content=parsed_package_json,
         name=parsed_package_json["name"],
-        version=parsed_package_json["version"],
+        version=parsed_package_json.get("version"),
         snapshot=await Get(Snapshot, PathGlobs([content.path])),
         module=parsed_package_json.get("type"),
         workspaces=tuple(parsed_package_json.get("workspaces", ())),
@@ -474,6 +698,7 @@ async def parse_package_json(content: FileContent) -> PackageJson:
                 **parsed_package_json.get("peerDependencies", {}),
             }
         ),
+        package_manager=parsed_package_json.get("packageManager"),
     )
 
 
@@ -490,7 +715,69 @@ async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
 
 @rule
 async def all_package_json() -> AllPackageJson:
-    return AllPackageJson(await Get(PackageJsonForGlobs, PathGlobs(["**/package.json"])))
+    # Avoids using `AllTargets` due to a circular rule dependency.
+    # `generate_node_package_targets` requires knowledge of all
+    # first party package names.
+    description_of_origin = "The `AllPackageJson` rule"
+    requests = await Get(
+        ResolvedTargetGeneratorRequests,
+        ResolveAllTargetGeneratorRequests(
+            description_of_origin=description_of_origin, of_type=PackageJsonTarget
+        ),
+    )
+    globs = [
+        glob
+        for req in requests.requests
+        for glob in req.generator[PackageJsonSourceField]
+        .path_globs(UnmatchedBuildFileGlobs.error())
+        .globs
+    ]
+    return AllPackageJson(
+        await Get(
+            PackageJsonForGlobs,
+            PathGlobs(
+                globs, GlobMatchErrorBehavior.error, description_of_origin=description_of_origin
+            ),
+        )
+    )
+
+
+@dataclass(frozen=True)
+class PnpmWorkspaceGlobs:
+    packages: tuple[str, ...]
+    digest: Digest
+
+
+class PnpmWorkspaces(FrozenDict[PackageJson, PnpmWorkspaceGlobs]):
+    def for_root(self, root_dir: str) -> PnpmWorkspaceGlobs | None:
+        for pkg, workspaces in self.items():
+            if pkg.root_dir == root_dir:
+                return workspaces
+        return None
+
+
+@rule
+async def pnpm_workspace_files(pkgs: AllPackageJson) -> PnpmWorkspaces:
+    snapshot = await Get(
+        Snapshot, PathGlobs(os.path.join(pkg.root_dir, "pnpm-workspace.yaml") for pkg in pkgs)
+    )
+    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
+
+    async def parse_package_globs(content: FileContent) -> PnpmWorkspaceGlobs:
+        parsed = yaml.safe_load(content.content) or {"packages": ("**",)}
+        return PnpmWorkspaceGlobs(
+            tuple(parsed.get("packages", ("**",)) or ("**",)),
+            await Get(Digest, CreateDigest([content])),
+        )
+
+    globs_per_root = {
+        os.path.dirname(digest_content.path): await parse_package_globs(digest_content)
+        for digest_content in digest_contents
+    }
+
+    return PnpmWorkspaces(
+        {pkg: globs_per_root[pkg.root_dir] for pkg in pkgs if pkg.root_dir in globs_per_root}
+    )
 
 
 class AllPackageJsonNames(DeduplicatedCollection[str]):
@@ -520,8 +807,30 @@ async def script_entrypoints_for_source(
     )
 
 
+@rule
+async def subpath_imports_for_source(
+    source_field: PackageJsonSourceField,
+) -> PackageJsonImports:
+    return PackageJsonImports.from_package_json(
+        await Get(PackageJson, PackageJsonSourceField, source_field)
+    )
+
+
 class GenerateNodePackageTargets(GenerateTargetsRequest):
     generate_from = PackageJsonTarget
+
+
+def _script_missing_error(entry_point: str, scripts: Iterable[str], address: Address) -> ValueError:
+    return ValueError(
+        softwrap(
+            f"""
+            {entry_point} was not found in package.json#scripts section
+            of the `{PackageJsonTarget.alias}` target with address {address}.
+
+            Available scripts are: {', '.join(scripts)}.
+            """
+        )
+    )
 
 
 @rule
@@ -563,20 +872,23 @@ async def generate_node_package_targets(
     package_target = NodePackageTarget(
         {
             **request.template,
-            NodePackageNameField.alias: pkg_json.name.replace("@", "__"),
+            NodePackageNameField.alias: pkg_json.name,
             NodePackageVersionField.alias: pkg_json.version,
             NodePackageDependenciesField.alias: [
                 file_tgt.address.spec,
                 *(tgt.address.spec for tgt in third_party_tgts),
                 *request.template.get("dependencies", []),
             ],
+            NodePackageTestScriptField.alias: request.generator[
+                NodePackageScriptsField
+            ].get_test_script(),
         },
         request.generator.address.create_generated(pkg_json.name.replace("@", "__")),
         union_membership,
     )
     scripts = PackageJsonScripts.from_package_json(pkg_json).scripts
     build_script_tgts = []
-    for build_script in request.generator[NodePackageScriptsField].value:
+    for build_script in request.generator[NodePackageScriptsField].build_scripts():
         if build_script.entry_point in scripts:
             build_script_tgts.append(
                 NodeBuildScriptTarget(
@@ -585,6 +897,7 @@ async def generate_node_package_targets(
                         NodeBuildScriptEntryPointField.alias: build_script.entry_point,
                         NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
                         NodeBuildScriptOutputFilesField.alias: build_script.output_files,
+                        NodeBuildScriptExtraEnvVarsField.alias: build_script.extra_env_vars,
                         NodeBuildScriptExtraCaches.alias: build_script.extra_caches,
                         NodePackageDependenciesField.alias: [
                             file_tgt.address.spec,
@@ -598,16 +911,13 @@ async def generate_node_package_targets(
                 )
             )
         else:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    {build_script.entry_point} was not found in package.json#scripts section
-                    of the `{PackageJsonTarget.alias}` target with address {request.generator.address}.
-
-                    Available scripts are: {', '.join(scripts)}.
-                    """
-                )
+            raise _script_missing_error(
+                build_script.entry_point, scripts, request.generator.address
             )
+
+    coverage_script = package_target[NodePackageTestScriptField].value.coverage_entry_point
+    if coverage_script and coverage_script not in scripts:
+        raise _script_missing_error(coverage_script, scripts, request.generator.address)
 
     return GeneratedTargets(
         request.generator, [package_target, file_tgt, *third_party_tgts, *build_script_tgts]
@@ -630,4 +940,9 @@ def rules() -> Iterable[Rule | UnionRule]:
 
 
 def build_file_aliases() -> BuildFileAliases:
-    return BuildFileAliases(objects={NodeBuildScript.alias: NodeBuildScript.create})
+    return BuildFileAliases(
+        objects={
+            NodeBuildScript.alias: NodeBuildScript.create,
+            NodeTestScript.alias: NodeTestScript.create,
+        }
+    )

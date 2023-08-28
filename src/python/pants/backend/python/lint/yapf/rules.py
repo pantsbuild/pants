@@ -11,7 +11,7 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
@@ -40,7 +40,7 @@ class YapfRequest(FmtTargetsRequest):
 
 
 async def _run_yapf(
-    request: FmtRequest.Batch,
+    request: AbstractFmtRequest.Batch,
     yapf: Yapf,
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> FmtResult:

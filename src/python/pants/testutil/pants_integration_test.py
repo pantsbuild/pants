@@ -117,6 +117,13 @@ def run_pants_with_workdir_without_waiting(
             fp.write(TomlSerializer(config).serialize())
         args.append(f"--pants-config-files={toml_file_name}")
 
+    # The python backend requires setting ICs explicitly.
+    # We do this centrally here for convenience.
+    if any("pants.backend.python" in arg for arg in command) and not any(
+        "--python-interpreter-constraints" in arg for arg in command
+    ):
+        args.append("--python-interpreter-constraints=['>=3.7,<4']")
+
     pants_script = [sys.executable, "-m", "pants"]
 
     # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.
@@ -151,9 +158,10 @@ def run_pants_with_workdir_without_waiting(
                     env[h] = value
     else:
         env = os.environ.copy()
+
+    env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
     if extra_env:
         env.update(extra_env)
-    env.update(PYTHONPATH=os.pathsep.join(sys.path))
 
     # Pants command that was called from the test shouldn't have a parent.
     if "PANTS_PARENT_BUILD_ID" in env:

@@ -5,7 +5,7 @@ excerpt: "How to use third-party Python libraries in your project."
 hidden: false
 createdAt: "2020-04-30T20:06:43.633Z"
 ---
-Pants handles dependencies with more precision than traditional Python workflows. Traditionally, you have a single heavyweight [virtual environment](https://docs.python.org/3/tutorial/venv.html) that includes a large set of dependencies, whether or not you actually need them for your current task. 
+Pants handles dependencies with more precision than traditional Python workflows. Traditionally, you have a single heavyweight [virtual environment](https://docs.python.org/3/tutorial/venv.html) that includes a large set of dependencies, whether or not you actually need them for your current task.
 
 Instead, Pants understands exactly which dependencies every file in your project needs, and efficiently uses just that subset of dependencies needed for the task.
 
@@ -23,7 +23,7 @@ Among other benefits, this precise and automatic understanding of your dependenc
 Teaching Pants your "universe"(s) of dependencies
 -------------------------------------------------
 
-For Pants to know which dependencies each file uses, it must first know which specific dependencies are in your "universe", i.e. all the third-party dependencies your project directly uses. 
+For Pants to know which dependencies each file uses, it must first know which specific dependencies are in your "universe", that is, all the third-party dependencies your project directly uses.
 
 By default, Pants uses a single universe for your whole project, but it's possible to set up multiple. See the header "Multiple resolves" in the "Lockfiles" section.
 
@@ -36,16 +36,16 @@ python_requirement(
 )
 ```
 
-You do not need a `python_requirement` target for transitive dependencies, i.e. requirements that you do not directly import.
+You do not need a `python_requirement` target for transitive dependencies, that is, requirements that you do not directly import.
 
 To minimize boilerplate, Pants has target generators to generate `python_requirement` targets for you:
 
-- `python_requirements` for `requirements.txt`.
+- `python_requirements` for `requirements.txt` or [PEP 621](https://peps.python.org/pep-0621/)-compliant `pyproject.toml`.
 - `poetry_requirements` for Poetry projects.
 
 ### `requirements.txt`
 
-The `python_requirements()` target generator parses a [`requirements.txt`-style file](https://pip.pypa.io/en/stable/user_guide/#requirements-files) to produce a `python_requirement` target for each entry. 
+The `python_requirements()` target generator parses a [`requirements.txt`-style file](https://pip.pypa.io/en/stable/user_guide/#requirements-files) to produce a `python_requirement` target for each entry.
 
 For example:
 
@@ -84,12 +84,55 @@ python_requirements(source="reqs.txt")
 ```
 
 > 📘 Where should I put the `requirements.txt`?
-> 
+>
 > You can name the file whatever you want, and put it wherever makes the most sense for your project.
-> 
+>
 > In smaller repositories that only use Python, it's often convenient to put the file at the "build root" (top-level), as used on this page.
-> 
+>
 > For larger repositories or multilingual repositories, it's often useful to have a `3rdparty` or `3rdparty/python` directory. Rather than the target's address being `//:reqs#my_requirement`, its address would be `3rdparty/python:reqs#my_requirement`, for example; or `3rdparty/python#my_requirement` if you leave off the `name` field for `python_requirements`. See [Target Generation](doc:targets#target-generation).
+
+### PEP 621-compliant `pyproject.toml`
+
+The `python_requirements()` target generator also supports parsing dependencies from a [PEP 621](https://peps.python.org/pep-0621/)-compliant `pyproject.toml`. You must manually specify the source file if you want to use a `pyproject.toml` file to generate `python_requirement` targets. For example:
+
+```python
+python_requirements(source="pyproject.toml")
+```
+
+Further information about PEP 621 fields can be found in the PEP documentation. Pants will read dependencies from the `project.dependencies` list, as well as the `project.optional-dependencies` mappings. Pants makes no distinction between `dependencies` and `optional-dependencies`, all dependencies are treated in the same manner as though they were listed in the `dependencies` list. For example:
+
+```toml pyproject.toml
+[project]
+dependencies = [
+    "flask>=1.1.2,<1.3",
+    "requests[security]==2.23.0",
+]
+
+[project.optional-dependencies]
+dataclass = ["dataclasses ; python_version<'3.7'"]
+```
+```python BUILD
+# This will generate three targets:
+#
+#  - //:reqs#flask
+#  - //:reqs#requests
+#  - //:reqs#dataclasses
+python_requirements(source="pyproject.toml")
+
+# The above target generator is spiritually equivalent to this:
+python_requirement(
+    name="flask",
+    requirements=["flask>=1.1.2,<1.3"],
+)
+python_requirement(
+    name="requests",
+    requirements=["requests[security]==2.23.0"],
+)
+python_requirement(
+    name="dataclasses",
+    requirements=["dataclasses ; python_version<'3.7'"],
+)
+```
 
 ### Poetry
 
@@ -142,7 +185,7 @@ python_sources(
     dependencies=[
         # We don't have an import statement for this dep, so inference
         # won't add it automatically. We add it explicitly instead.
-        "3rdparty/python#psyscopg2-binary",
+        "3rdparty/python#psycopg2-binary",
     ],
 )
 ```
@@ -154,7 +197,7 @@ Some dependencies expose a module different than their project name, such as `be
 Pants already defines a [default module mapping](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/python/dependency_inference/default_module_mapping.py) for some common Python requirements, but you may need to augment this by teaching Pants additional mappings:
 
 ```python 3rdparty/python/BUILD
-# `modules` and `module_mapping` is only needed for requirements where 
+# `modules` and `module_mapping` is only needed for requirements where
 # the defaults do not work.
 
 python_requirement(
@@ -180,7 +223,7 @@ If the dependency is a type stub, and the default does not work, set `type_stub_
 
 It's invalid in Python to have conflicting versions of the same requirement, e.g. `Django==2` and `Django==3`. Instead, Pants supports "multiple resolves" (i.e. multiple lockfiles), as explained in the below section on lockfiles.
 
-When you have multiple targets for the same dependency and they belong to the same [resolve](doc:python-lockfiles), dependency inference will not work due to ambiguity. If you're using lockfiles—which we strongly recommend—the solution is to set the `resolve` field for problematic `python_requirement` targets so that each resolve has only one requirement and there is no ambiguity.  
+When you have multiple targets for the same dependency and they belong to the same [resolve](doc:python-lockfiles), dependency inference will not work due to ambiguity. If you're using lockfiles—which we strongly recommend—the solution is to set the `resolve` field for problematic `python_requirement` targets so that each resolve has only one requirement and there is no ambiguity.
 
 This ambiguity is often a problem when you have 2+ `requirements.txt` or `pyproject.toml` files in your project, such as `project1/requirements.txt` and `project2/requirements.txt` both specifying `django`. You may want to set up each `poetry_requirements`/`python_requirements` target generator to use a distinct resolve so that there is no overlap. Alternatively, if the versions are the same, you may want to consolidate the requirements into a common file.
 
@@ -204,7 +247,7 @@ ModuleNotFoundError: No module named 'pkg_resources'
 To work around this, you can use the `dependencies` field of `python_requirement`, so that anytime you depend on your requirement, you also bring in the undeclared dependency.
 
 ```python BUILD
-# First, make sure you have a `python_requirement` target for 
+# First, make sure you have a `python_requirement` target for
 # the undeclared dependency.
 python_requirement(
     name="setuptools",
@@ -247,15 +290,15 @@ You can install requirements from version control using two styles:
   - `Django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8`
 
 > 📘 Version control via SSH
-> 
+>
 > When using version controlled direct references hosted on private repositories with SSH access:
-> 
+>
 > ```
 > target@ git+ssh://git@github.com:/myorg/myrepo.git@myhash
 > ```
-> 
+>
 > ...you may see errors like:
-> 
+>
 > ```
 >  Complete output (5 lines):
 >   git@github.com: Permission denied (publickey).
@@ -264,9 +307,9 @@ You can install requirements from version control using two styles:
 >   and the repository exists.
 >   ----------------------------------------
 > ```
-> 
+>
 > To fix this, Pants needs to be configured to pass relevant SSH specific environment variables to processes by adding the following to `pants.toml`:
-> 
+>
 > ```
 > [subprocess-environment]
 > env_vars.add = [
@@ -307,7 +350,7 @@ find_links = [
 
 #### Authenticating to custom repos
 
-To authenticate to custom repos, you may need to provide credentials (such as a username and password) in the URL. 
+To authenticate to custom repos, you may need to provide credentials (such as a username and password) in the URL.
 
 You can use [config file `%(env.ENV_VAR)s` interpolation](doc:options#config-file-interpolation) to load the values via environment variables. This avoids checking in sensitive information to version control.
 
@@ -429,7 +472,7 @@ data-science = ["numpy"]
 
 [python.resolves_to_no_binary]
 pytest = ["pytest-xdist"]
-mypy_extra_type_stubs = ["django-stubs"]
+mypy = ["django-stubs"]
 ```
 
 You can also set the key `__default__` to apply the same value to every resolve by default.

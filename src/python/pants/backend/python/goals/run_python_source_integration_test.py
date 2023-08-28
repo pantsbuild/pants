@@ -22,7 +22,7 @@ from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGenerator
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import setup_py
+from pants.backend.python.goals import package_dists
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.goals.run_python_source import rules as run_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -39,19 +39,20 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.pants_integration_test import run_pants
-from pants.testutil.rule_runner import RuleRunner, mock_console
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import mock_console
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *run_rules(),
             *dependency_inference_rules.rules(),
             *target_types_rules.rules(),
             *local_dists.rules(),
             *pex_from_targets.rules(),
-            *setup_py.rules(),
+            *package_dists.rules(),
             *protobuf_subsystem_rules(),
             *protobuf_target_types_rules(),
             *protobuf_python_rules(),
@@ -71,7 +72,7 @@ def rule_runner() -> RuleRunner:
 
 
 def run_run_request(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     target: Target,
     test_debug_adapter: bool = True,
 ) -> Tuple[int, str, str]:
@@ -132,7 +133,7 @@ def test_run_sample_script(
     global_default_value: bool | None,
     field_value: bool | None,
     run_uses_sandbox: bool,
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
 ) -> None:
     """Test that we properly run a `python_source` target.
 
@@ -212,7 +213,7 @@ def test_run_sample_script(
     assert exit_code == 23
 
 
-def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
+def test_no_strip_pex_env_issues_12057(rule_runner: PythonRuleRunner) -> None:
     sources = {
         "src/app.py": dedent(
             """\
@@ -246,7 +247,7 @@ def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.parametrize("run_in_sandbox", [False, True])
-def test_pex_root_location(rule_runner: RuleRunner, run_in_sandbox: bool) -> None:
+def test_pex_root_location(rule_runner: PythonRuleRunner, run_in_sandbox: bool) -> None:
     # See issues #12055 and #17750.
     read_config_result = run_pants(["help-all"])
     read_config_result.assert_success()
@@ -286,7 +287,7 @@ def test_pex_root_location(rule_runner: RuleRunner, run_in_sandbox: bool) -> Non
     assert expected_pex_root == pex_root
 
 
-def test_local_dist(rule_runner: RuleRunner) -> None:
+def test_local_dist(rule_runner: PythonRuleRunner) -> None:
     sources = {
         "foo/bar.py": "BAR = 'LOCAL DIST'",
         "foo/setup.py": dedent(
@@ -329,7 +330,7 @@ def test_local_dist(rule_runner: RuleRunner) -> None:
     assert stdout == "LOCAL DIST\n", stderr
 
 
-def test_runs_in_venv(rule_runner: RuleRunner) -> None:
+def test_runs_in_venv(rule_runner: PythonRuleRunner) -> None:
     # NB: We aren't just testing an implementation detail, users can and should expect their code to
     # be run just as if they ran their code in a virtualenv (as is common in the Python ecosystem).
     sources = {

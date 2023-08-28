@@ -365,34 +365,34 @@ def test_resolve_address() -> None:
         assert rule_runner.request(Address, [address_input]) == expected
 
     assert_is_expected(
-        AddressInput("a/b/c.txt", description_of_origin="tests"),
+        AddressInput.parse("a/b/c.txt", description_of_origin="tests"),
         Address("a/b", target_name=None, relative_file_path="c.txt"),
     )
     assert_is_expected(
-        AddressInput("a/b", description_of_origin="tests"),
+        AddressInput.parse("a/b", description_of_origin="tests"),
         Address("a/b", target_name=None, relative_file_path=None),
     )
 
     assert_is_expected(
-        AddressInput("a/b", target_component="c", description_of_origin="tests"),
+        AddressInput.parse("a/b:c", description_of_origin="tests"),
         Address("a/b", target_name="c"),
     )
     assert_is_expected(
-        AddressInput("a/b/c.txt", target_component="c", description_of_origin="tests"),
+        AddressInput.parse("a/b/c.txt:c", description_of_origin="tests"),
         Address("a/b", relative_file_path="c.txt", target_name="c"),
     )
 
     # Top-level addresses will not have a path_component, unless they are a file address.
     assert_is_expected(
-        AddressInput("f.txt", target_component="original", description_of_origin="tests"),
+        AddressInput.parse("f.txt:original", description_of_origin="tests"),
         Address("", relative_file_path="f.txt", target_name="original"),
     )
     assert_is_expected(
-        AddressInput("", target_component="t", description_of_origin="tests"),
+        AddressInput.parse("//:t", description_of_origin="tests"),
         Address("", target_name="t"),
     )
 
-    bad_address_input = AddressInput("a/b/fake", description_of_origin="tests")
+    bad_address_input = AddressInput.parse("a/b/fake", description_of_origin="tests")
     expected_err = "'a/b/fake' does not exist on disk"
     with engine_error(ResolveError, contains=expected_err):
         rule_runner.request(Address, [bad_address_input])
@@ -802,3 +802,45 @@ def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRun
             ),
         ],
     )
+
+
+def test_build_file_parse_error(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/bad/BUILD": dedent(
+                """\
+                mock_tgt(
+                  name="foo"
+                  tags=[]
+                )
+                """
+            ),
+        },
+    )
+    with pytest.raises(ExecutionError, match='File "src/bad/BUILD", line 3'):
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [
+                TargetAdaptorRequest(
+                    Address("src/bad", target_name="foo"), description_of_origin="test"
+                )
+            ],
+        )
+
+
+def test_build_file_description_of_origin(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                # Define a target..
+                mock_tgt(name="foo")
+                """
+            ),
+        },
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
+    )
+    assert "src/BUILD:2" == target_adaptor.description_of_origin

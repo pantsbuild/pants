@@ -80,16 +80,14 @@ class AdhocToolOutputDirectoriesField(StringSequenceField):
 class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     supports_transitive_excludes = True
     alias: ClassVar[str] = "output_dependencies"
-    deprecated_alias = "dependencies"
-    deprecated_alias_removal_version = "2.17.0.dev1"
 
     help = help_text(
         lambda: f"""
-        Any dependencies that the output artifacts require in order to be effectively consumed.
+        Any dependencies that need to be present (as transitive dependencies) whenever the outputs
+        of this target are consumed (including as dependencies).
 
-        To enable legacy use cases, if `{AdhocToolExecutionDependenciesField.alias}` is `None`,
-        these dependencies will be materialized in the execution sandbox. This behavior is
-        deprecated, and will be removed in version 2.17.0.dev1.
+        See also `{AdhocToolExecutionDependenciesField.alias}` and
+        `{AdhocToolRunnableDependenciesField.alias}`.
         """
     )
 
@@ -105,12 +103,15 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
 
         Dependencies specified here are those required to make the command complete successfully
         (e.g. file inputs, packages compiled from other targets, etc), but NOT required to make
-        the output side-effects useful. Dependencies that are required to use the side-effects
+        the outputs of the command useful. Dependencies that are required to use the outputs
         produced by this command should be specified using the
         `{AdhocToolOutputDependenciesField.alias}` field.
 
         If this field is specified, dependencies from `{AdhocToolOutputDependenciesField.alias}`
         will not be added to the execution sandbox.
+
+        See also `{AdhocToolOutputDependenciesField.alias}` and
+        `{AdhocToolRunnableDependenciesField.alias}`.
         """
     )
 
@@ -122,14 +123,14 @@ class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
 
     help = help_text(
         lambda: f"""
-        The execution dependencies for this command.
+        The runnable dependencies for this command.
 
         Dependencies specified here are those required to exist on the `PATH` to make the command
         complete successfully (interpreters specified in a `#!` command, etc). Note that these
         dependencies will be made available on the `PATH` with the name of the target.
 
         See also `{AdhocToolOutputDependenciesField.alias}` and
-        `{AdhocToolExecutionDependenciesField.alias}.
+        `{AdhocToolExecutionDependenciesField.alias}`.
         """
     )
 
@@ -154,8 +155,9 @@ class AdhocToolStdoutFilenameField(StringField):
     default = None
     help = help_text(
         lambda: f"""
-        A filename to capture the contents of `stdout` to, relative to the value of
-        `{AdhocToolWorkdirField.alias}`.
+        A filename to capture the contents of `stdout` to. Relative paths are
+        relative to the value of `{AdhocToolWorkdirField.alias}`, absolute paths
+        start at the build root.
         """
     )
 
@@ -165,8 +167,9 @@ class AdhocToolStderrFilenameField(StringField):
     default = None
     help = help_text(
         lambda: f"""
-        A filename to capture the contents of `stderr` to, relative to the value of
-        `{AdhocToolWorkdirField.alias}`
+        A filename to capture the contents of `stderr` to. Relative paths are
+        relative to the value of `{AdhocToolWorkdirField.alias}`, absolute paths
+        start at the build root.
         """
     )
 
@@ -217,22 +220,21 @@ class AdhocToolOutputRootDirField(StringField):
     alias: ClassVar[str] = "root_output_directory"
     default = "/"
     help = help_text(
-        """Adjusts the location of files output by this target, when consumed as a dependency.
+        """
+        Adjusts the location of files output by this target, when consumed as a dependency.
 
         Values are relative to the build root, except in the following cases:
 
-        * `.` specifies the location of the `BUILD` file.
-        * Values beginning with `./` are relative to the location of the `BUILD` file.
-        * `/` or the empty string specifies the build root.
-        * Values beginning with `/` are also relative to the build root.
+          * `.` specifies the location of the `BUILD` file.
+          * Values beginning with `./` are relative to the location of the `BUILD` file.
+          * `/` or the empty string specifies the build root.
+          * Values beginning with `/` are also relative to the build root.
         """
     )
 
 
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
-    deprecated_alias = "experimental_run_in_sandbox"
-    deprecated_alias_removal_version = "2.17.0.dev1"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         AdhocToolRunnableField,
@@ -262,8 +264,8 @@ class AdhocToolTarget(Target):
                 {AdhocToolRunnableField.alias}=":python_source",
                 {AdhocToolArgumentsField.alias}=[""],
                 {AdhocToolExecutionDependenciesField.alias}=[":scripts"],
-                {AdhocToolOutputDirectoriesField.alias}=["logs/my-script.log"],
-                {AdhocToolOutputFilesField.alias}=["results/"],
+                {AdhocToolOutputDirectoriesField.alias}=["results/"],
+                {AdhocToolOutputFilesField.alias}=["logs/my-script.log"],
             )
 
             shell_sources(name="scripts")

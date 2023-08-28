@@ -27,3 +27,28 @@ def test_passthrough_args() -> None:
         ] + [f"arg{i}" for i in range(1, 4)]
         result = run_pants(args)
         assert "arg1 arg2 arg3" in result.stdout.strip()
+
+
+def test_external_env_vars() -> None:
+    sources = {
+        "src/BUILD": dedent(
+            """\
+            shell_command(
+                name="env-vars",
+                command='echo $ENVVAR',
+                extra_env_vars=["ENVVAR"],
+                log_output=True,
+            )
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.shell",
+            f"--source-root-patterns=['{tmpdir}/src']",
+            "export-codegen",
+            f"{tmpdir}/src:env-vars",
+        ]
+        extra_env = {"ENVVAR": "clang"}
+        result = run_pants(args, extra_env=extra_env)
+        assert extra_env["ENVVAR"] in result.stderr

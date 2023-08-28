@@ -17,7 +17,7 @@ class LogLevel(Enum):
 
     NB: The `logging` module uses the opposite integer ordering of levels from Rust's `log` crate,
     but the ordering implementation of this enum inverts its comparison to make its ordering align
-    with Rust's.
+    with Rust's. That is, TRACE > DEBUG > INFO > WARN > ERROR
     """
 
     TRACE = ("trace", TRACE)

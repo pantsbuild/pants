@@ -38,7 +38,7 @@ class AsdfPathString(str, Enum):
                 """
             )
         if self is self.LOCAL:
-            return f"the ASDF {tool} with the version in BUILD_ROOT/.tool-versions"
+            return f"the ASDF {tool} with the version in `BUILD_ROOT/.tool-versions`"
         raise NotImplementedError(f"{self} has no description.")
 
 

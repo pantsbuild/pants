@@ -16,9 +16,9 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.core.goals.fix import (
+    AbstractFixRequest,
     Fix,
     FixFilesRequest,
-    FixRequest,
     FixResult,
     FixTargetsRequest,
     Partitions,
@@ -28,7 +28,6 @@ from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules import source_files
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import (
-    EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
@@ -69,7 +68,11 @@ class FortranFixRequest(FixTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "FortranConditionallyDidChange"
+        return "Fortran Conditionally Did Change"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "fortranconditionallydidchange"
 
 
 class FortranFmtRequest(FmtTargetsRequest):
@@ -77,7 +80,11 @@ class FortranFmtRequest(FmtTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "FortranFormatter"
+        return "Fortran Formatter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "fortranformatter"
 
 
 @rule
@@ -138,7 +145,11 @@ class SmalltalkNoopRequest(FixTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "SmalltalkDidNotChange"
+        return "Smalltalk Did Not Change"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "smalltalkdidnotchange"
 
 
 @rule
@@ -163,7 +174,11 @@ class SmalltalkSkipRequest(FixTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "SmalltalkSkipped"
+        return "Smalltalk Skipped"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "smalltalkskipped"
 
 
 @rule
@@ -181,7 +196,11 @@ class BrickyBuildFileFixer(FixFilesRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "BrickyBobby"
+        return "Bricky Bobby"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "brickybobby"
 
 
 @rule
@@ -221,7 +240,7 @@ async def fix_with_bricky(request: BrickyBuildFileFixer.Batch) -> FixResult:
 
 def fix_rule_runner(
     target_types: List[Type[Target]],
-    request_types: List[Type[FixRequest]] = [],
+    request_types: List[Type[AbstractFixRequest]] = [],
 ) -> RuleRunner:
     return RuleRunner(
         rules=[
@@ -288,10 +307,10 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        + BrickyBobby made changes.
-        + FortranConditionallyDidChange made changes.
-        ✓ FortranFormatter made no changes.
-        ✓ SmalltalkDidNotChange made no changes.
+        + Bricky Bobby made changes.
+        + Fortran Conditionally Did Change made changes.
+        ✓ Fortran Formatter made no changes.
+        ✓ Smalltalk Did Not Change made no changes.
         """
     )
 
@@ -342,8 +361,8 @@ def test_fixers_first() -> None:
     assert stderr == dedent(
         """\
 
-        + FortranConditionallyDidChange made changes.
-        ✓ FortranFormatter made no changes.
+        + Fortran Conditionally Did Change made changes.
+        ✓ Fortran Formatter made no changes.
         """
     )
 
@@ -364,9 +383,9 @@ def test_only() -> None:
     stderr = run_fix(
         rule_runner,
         target_specs=["::"],
-        only=[SmalltalkNoopRequest.tool_name],
+        only=[SmalltalkNoopRequest.tool_id],
     )
-    assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
+    assert stderr.strip() == "✓ Smalltalk Did Not Change made no changes."
 
 
 def test_no_targets() -> None:
@@ -390,12 +409,8 @@ def test_no_targets() -> None:
 
 
 def test_message_lists_added_files() -> None:
-    input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
-    )
+    input_snapshot = Snapshot.create_for_testing(["f.ext", "dir/f.ext"], ["dir"])
+    output_snapshot = Snapshot.create_for_testing(["f.ext", "added.ext", "dir/f.ext"], ["dir"])
     result = FixResult(
         input=input_snapshot,
         output=output_snapshot,
@@ -407,12 +422,8 @@ def test_message_lists_added_files() -> None:
 
 
 def test_message_lists_removed_files() -> None:
-    input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
-    )
-    output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
+    input_snapshot = Snapshot.create_for_testing(["f.ext", "removed.ext", "dir/f.ext"], ["dir"])
+    output_snapshot = Snapshot.create_for_testing(["f.ext", "dir/f.ext"], ["dir"])
     result = FixResult(
         input=input_snapshot,
         output=output_snapshot,
@@ -424,14 +435,8 @@ def test_message_lists_removed_files() -> None:
 
 
 def test_message_lists_files() -> None:
-    # _unsafe_create() cannot be used to simulate changed files,
-    # so just make sure added and removed work together.
-    input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
-    )
-    output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
-    )
+    input_snapshot = Snapshot.create_for_testing(["f.ext", "removed.ext", "dir/f.ext"], ["dir"])
+    output_snapshot = Snapshot.create_for_testing(["f.ext", "added.ext", "dir/f.ext"], ["dir"])
     result = FixResult(
         input=input_snapshot,
         output=output_snapshot,
@@ -510,8 +515,7 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
 
 def test_streaming_output_changed(caplog) -> None:
     caplog.set_level(logging.DEBUG)
-    changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
-    changed_snapshot = Snapshot._unsafe_create(changed_digest, [], [])
+    changed_snapshot = Snapshot.create_for_testing(["other_file.txt"], [])
     result = FixResult(
         input=EMPTY_SNAPSHOT,
         output=changed_snapshot,
@@ -520,7 +524,7 @@ def test_streaming_output_changed(caplog) -> None:
         tool_name="fixer",
     )
     assert result.level() == LogLevel.WARN
-    assert result.message() == "fixer made changes."
+    assert result.message() == "fixer made changes.\n  other_file.txt"
     assert ["Output from fixer\nstdout\nstderr"] == [
         rec.message for rec in caplog.records if rec.levelno == logging.DEBUG
     ]

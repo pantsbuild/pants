@@ -59,13 +59,13 @@ class BatchSizeOption(IntOption):
 
                 {uppercase} processes are batched for a few reasons:
 
-                    1. to avoid OS argument length limits (in processes which don't support argument files)
-                    2. to support more stable cache keys than would be possible if all files were operated \
-                        on in a single batch.
-                    3. to allow for parallelism in {lowercase} processes which don't have internal \
-                    parallelism, or -- if they do support internal parallelism -- to improve scheduling \
-                    behavior when multiple processes are competing for cores and so internal \
-                    parallelism cannot be used perfectly.
+                  1. to avoid OS argument length limits (in processes which don't support argument files)
+                  2. to support more stable cache keys than would be possible if all files were operated \
+                     on in a single batch.
+                  3. to allow for parallelism in {lowercase} processes which don't have internal \
+                     parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+                     behavior when multiple processes are competing for cores and so internal \
+                     parallelism cannot be used perfectly.
 
                 In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
                 and so this value is only a "target" batch size (rather than an exact value).
@@ -74,17 +74,17 @@ class BatchSizeOption(IntOption):
         )
 
 
-def determine_specified_tool_names(
+def determine_specified_tool_ids(
     goal_name: str,
     only_option: Iterable[str],
     all_requests: Iterable[type],
 ) -> set[str]:
-    all_valid_names = {request.tool_name for request in all_requests}  # type: ignore[attr-defined]
+    all_valid_ids = {request.tool_id for request in all_requests}  # type: ignore[attr-defined]
     if not only_option:
-        return all_valid_names
+        return all_valid_ids
 
     specified = set(only_option)
-    unrecognized_names = specified - all_valid_names
+    unrecognized_names = specified - all_valid_ids
     if unrecognized_names:
         plural = (
             ("s", repr(sorted(unrecognized_names)))
@@ -96,7 +96,7 @@ def determine_specified_tool_names(
                 f"""
                 Unrecognized name{plural[0]} with the option `--{goal_name}-only`: {plural[1]}
 
-                All valid names: {sorted(all_valid_names)}
+                All valid names: {sorted(all_valid_ids)}
                 """
             )
         )

@@ -2,9 +2,8 @@
 version = "0.0.1"
 edition = "2021"
 name = "tryfuture"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-futures = "0.3"
-
+futures = { workspace = true }

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import functools
 from collections import defaultdict
 from dataclasses import dataclass
 from textwrap import dedent
@@ -16,14 +17,14 @@ from pants.base.specs import RawSpecsWithoutFileOwners, RecursiveGlobSpec
 from pants.core.target_types import FileTarget, GenericTarget, LockfilesGeneratorTarget
 from pants.engine.addresses import Address, Addresses
 from pants.engine.environment import EnvironmentName
-from pants.engine.internals.specs_rules_test import resolve_raw_specs_without_file_owners
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticTargetsRequest,
     SyntheticTargetsSpecPaths,
     rules,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor as _TargetAdaptor
+from pants.engine.internals.testutil import resolve_raw_specs_without_file_owners
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import (
     Dependencies,
@@ -37,6 +38,8 @@ from pants.engine.target import (
 )
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.strutil import softwrap
+
+TargetAdaptor = functools.partial(_TargetAdaptor, __description_of_origin__="BUILD")
 
 
 @dataclass(frozen=True)

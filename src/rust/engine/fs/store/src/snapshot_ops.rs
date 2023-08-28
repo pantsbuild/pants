@@ -228,7 +228,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
   ) -> Result<DirectoryDigest, Self::Error> {
     let input_tree = self.load_digest_trie(directory_digest.clone()).await?;
     let path_stats = input_tree
-      .expand_globs(params.globs, SymlinkBehavior::Oblivious, None)
+      .expand_globs(params.globs, SymlinkBehavior::Aware, None)
       .await
       .map_err(|err| format!("Error matching globs against {directory_digest:?}: {err}"))?;
 

@@ -42,6 +42,10 @@ class BufLintRequest(LintTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
+        return "buf lint"
+
+    @classproperty
+    def tool_id(cls) -> str:
         return "buf-lint"
 
 

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -22,7 +23,8 @@ from pants.jvm.resolve.common import (
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, git_url
+from pants.util.meta import classproperty
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
@@ -40,8 +42,6 @@ class JvmToolBase(Subsystem):
     # Default resource for the tool's lockfile. (Subclasses must set.)
     default_lockfile_resource: ClassVar[tuple[str, str]]
 
-    default_lockfile_url: ClassVar[str | None] = None
-
     version = StrOption(
         advanced=True,
         default=lambda cls: cls.default_version,
@@ -58,7 +58,7 @@ class JvmToolBase(Subsystem):
         help=lambda cls: softwrap(
             f"""
             Artifact requirements for this tool using specified as either the address of a `jvm_artifact`
-            target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version).
+            target or, alternatively, as a colon-separated Maven coordinates (e.g., `group:name:version`).
             For Maven coordinates, the string `{{version}}` version will be substituted with the value of the
             `[{cls.options_scope}].version` option.
             """
@@ -92,6 +92,17 @@ class JvmToolBase(Subsystem):
         ),
         advanced=True,
     )
+
+    @classproperty
+    def default_lockfile_url(cls) -> str:
+        return git_url(
+            os.path.join(
+                "src",
+                "python",
+                cls.default_lockfile_resource[0].replace(".", os.path.sep),
+                cls.default_lockfile_resource[1],
+            )
+        )
 
     @property
     def artifact_inputs(self) -> tuple[str, ...]:

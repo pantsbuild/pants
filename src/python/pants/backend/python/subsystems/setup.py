@@ -10,8 +10,8 @@ from typing import Iterable, List, Optional, TypeVar, cast
 
 from packaging.utils import canonicalize_name
 
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.option.errors import OptionsError
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -26,16 +26,6 @@ from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
-
-
-@enum.unique
-class PipVersion(enum.Enum):
-    V20_3_4 = "20.3.4-patched"
-    V22_2_2 = "22.2.2"
-    V22_3 = "22.3"
-    V22_3_1 = "22.3.1"
-    V23_0 = "23.0"
-    V23_0_1 = "23.0.1"
 
 
 @enum.unique
@@ -60,11 +50,20 @@ class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
 
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
-    default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
+    default_interpreter_universe = [
+        "2.7",
+        "3.5",
+        "3.6",
+        "3.7",
+        "3.8",
+        "3.9",
+        "3.10",
+        "3.11",
+        "3.12",
+    ]
 
     _interpreter_constraints = StrListOption(
-        default=default_interpreter_constraints,
+        default=None,
         help=softwrap(
             """
             The Python interpreters your codebase is compatible with.
@@ -72,8 +71,8 @@ class PythonSetup(Subsystem):
             These constraints are used as the default value for the `interpreter_constraints`
             field of Python targets.
 
-            Specify with requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with
-            version >=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple
+            Specify with requirement syntax, e.g. `'CPython>=2.7,<3'` (A CPython interpreter with
+            version >=2.7 AND version <3) or `'PyPy'` (A pypy interpreter of any version). Multiple
             constraint strings will be ORed together.
             """
         ),
@@ -83,26 +82,31 @@ class PythonSetup(Subsystem):
 
     @memoized_property
     def interpreter_constraints(self) -> tuple[str, ...]:
-        # TODO: In 2.17.0.dev1 we should set the default above to None and tweak the message here
-        #  appropriately.
-        if self.options.is_default("interpreter_constraints"):
-            warn_or_error(
-                "2.17.0.dev1",
-                "the factory default interpreter constraints value",
+        if not self._interpreter_constraints:
+            # TODO: This is a hacky affordance for Pants's own tests, dozens of which were
+            #  written when Pants provided default ICs, and implicitly rely on that assumption.
+            #  We'll probably want to find and modify all those tests to set an explicit IC, but
+            #  that will take time.
+            if "PYTEST_CURRENT_TEST" in os.environ:
+                return (">=3.7,<4",)
+            raise OptionsError(
                 softwrap(
                     f"""\
-                    You're relying on the default interpreter constraints that ship with Pants
-                    ({self._interpreter_constraints}). This default is deprecated, in favor of
-                    explicitly specifying the interpreter versions your code is actually intended to
-                    run against.
+                    You must explicitly specify the default Python interpreter versions your code
+                    is intended to run against.
 
-                    You specify interpreter constraints using the `interpreter_constraints` option in
-                    the `[python]` section of pants.toml. We recommend constraining to a single interpreter
-                    minor version if you can, e.g., `interpreter_constraints = ['==3.11.*']`, or at
-                    least a small number of interpreter minor versions, e.g., `interpreter_constraints
-                    = ['>=3.10,<3.12']`. See {doc_url("python-interpreter-compatibility")} for details.
+                    You specify these interpreter constraints using the `interpreter_constraints`
+                    option in the `[python]` section of pants.toml.
 
-                    Set explicit interpreter constraints now to get rid of this warning.
+                    We recommend constraining to a single interpreter minor version if you can,
+                    e.g., `interpreter_constraints = ['==3.11.*']`, or at least a small number of
+                    interpreter minor versions, e.g., `interpreter_constraints = ['>=3.10,<3.12']`.
+
+                    Individual targets can override these default interpreter constraints,
+                    if different parts of your codebase run against different python interpreter
+                    versions in a single repo.
+
+                    See {doc_url("python-interpreter-compatibility")} for details.
                     """
                 ),
             )
@@ -124,7 +128,7 @@ class PythonSetup(Subsystem):
             `[isort].interpreter_constraints` to tell Pants which interpreters your code
             actually uses. See {doc_url('python-interpreter-compatibility')}.
 
-            All elements must be the minor and major Python version, e.g. '2.7' or '3.10'. Do
+            All elements must be the minor and major Python version, e.g. `'2.7'` or `'3.10'`. Do
             not include the patch version.
             """
         ),
@@ -220,9 +224,19 @@ class PythonSetup(Subsystem):
             """
         ),
     )
-    pip_version = EnumOption(
-        default=PipVersion.V20_3_4,
-        help="Use this version of Pip for resolving requirements and generating lockfiles.",
+    pip_version = StrOption(
+        default="23.1.2",
+        help=softwrap(
+            f"""
+            Use this version of Pip for resolving requirements and generating lockfiles.
+
+            The value used here must be one of the Pip versions supported by the underlying PEX
+            version. See {doc_url("pex")} for details.
+
+            N.B.: The `latest` value selects the latest of the choices listed by PEX which is not
+            necessarily the latest Pip version released on PyPI.
+            """
+        ),
         advanced=True,
     )
     _resolves_to_interpreter_constraints = DictOption["list[str]"](
@@ -242,8 +256,8 @@ class PythonSetup(Subsystem):
 
             Pants will validate that the interpreter constraints of your code using a
             resolve are compatible with that resolve's own constraints. For example, if your
-            code is set to use ['==3.9.*'] via the `interpreter_constraints` field, but it's
-            using a resolve whose interpreter constraints are set to ['==3.7.*'], then
+            code is set to use `['==3.9.*']` via the `interpreter_constraints` field, but it's
+            using a resolve whose interpreter constraints are set to `['==3.7.*']`, then
             Pants will error explaining the incompatibility.
 
             The keys must be defined as resolves in `[python].resolves`.
@@ -450,7 +464,7 @@ class PythonSetup(Subsystem):
             """
             Whether to allow resolution of manylinux wheels when resolving requirements for
             foreign linux platforms. The value should be a manylinux platform upper bound,
-            e.g.: 'manylinux2010', or else the string 'no' to disallow.
+            e.g. `'manylinux2010'`, or else the string `'no'` to disallow.
             """
         ),
         advanced=True,
@@ -524,9 +538,9 @@ class PythonSetup(Subsystem):
         default=False,
         help=softwrap(
             """
-            If set, and if running on MacOS Big Sur, use macosx_10_16 as the platform
-            when building wheels. Otherwise, the default of macosx_11_0 will be used.
-            This may be required for pip to be able to install the resulting distribution
+            If set, and if running on macOS Big Sur, use `macosx_10_16` as the platform
+            when building wheels. Otherwise, the default of `macosx_11_0` will be used.
+            This may be required for `pip` to be able to install the resulting distribution
             on Big Sur.
             """
         ),
@@ -578,9 +592,8 @@ class PythonSetup(Subsystem):
         self,
         option_value: dict[str, _T],
         option_name: str,
-        all_python_tool_resolve_names: tuple[str, ...],
     ) -> dict[str, _T]:
-        all_valid_resolves = {*self.resolves, *all_python_tool_resolve_names}
+        all_valid_resolves = set(self.resolves)
         unrecognized_resolves = set(option_value.keys()) - {
             RESOLVE_OPTION_KEY__DEFAULT,
             *all_valid_resolves,
@@ -597,38 +610,29 @@ class PythonSetup(Subsystem):
         return {resolve: option_value.get(resolve, default_val) for resolve in all_valid_resolves}
 
     @memoized_method
-    def resolves_to_constraints_file(
-        self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, str]:
+    def resolves_to_constraints_file(self) -> dict[str, str]:
         return self._resolves_to_option_helper(
             self._resolves_to_constraints_file,
             "resolves_to_constraints_file",
-            all_python_tool_resolve_names,
         )
 
     @memoized_method
-    def resolves_to_no_binary(
-        self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[str]]:
+    def resolves_to_no_binary(self) -> dict[str, list[str]]:
         return {
             resolve: [canonicalize_name(v) for v in vals]
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_no_binary,
                 "resolves_to_no_binary",
-                all_python_tool_resolve_names,
             ).items()
         }
 
     @memoized_method
-    def resolves_to_only_binary(
-        self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[str]]:
+    def resolves_to_only_binary(self) -> dict[str, list[str]]:
         return {
             resolve: sorted([canonicalize_name(v) for v in vals])
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_only_binary,
                 "resolves_to_only_binary",
-                all_python_tool_resolve_names,
             ).items()
         }
 

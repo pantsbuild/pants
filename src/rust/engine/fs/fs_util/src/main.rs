@@ -48,7 +48,8 @@ use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use store::{
-  Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams, UploadSummary,
+  RemoteOptions, Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams,
+  UploadSummary,
 };
 use workunit_store::WorkunitStore;
 
@@ -342,7 +343,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       .map_err(|e| format!("Failed to open/create store for directory {store_dir:?}: {e}"))?;
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
-        let chunk_size = top_match
+        let chunk_size_bytes = top_match
           .value_of_t::<usize>("chunk-bytes")
           .expect("Bad chunk-bytes flag");
 
@@ -411,34 +412,33 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         }
 
         (
-          local_only.into_with_remote(
-            cas_address,
-            top_match
-              .value_of("remote-instance-name")
-              .map(str::to_owned),
-            tls_config,
-            headers,
-            chunk_size,
-            // This deadline is really only in place because otherwise DNS failures
-            // leave this hanging forever.
-            //
-            // Make fs_util have a very long deadline (because it's not configurable,
-            // like it is inside pants) until we switch to Tower (where we can more
-            // carefully control specific components of timeouts).
-            //
-            // See https://github.com/pantsbuild/pants/pull/6433 for more context.
-            Duration::from_secs(30 * 60),
-            top_match
-              .value_of_t::<usize>("rpc-attempts")
-              .expect("Bad rpc-attempts flag"),
-            top_match
-              .value_of_t::<usize>("rpc-concurrency-limit")
-              .expect("Bad rpc-concurrency-limit flag"),
-            None,
-            top_match
-              .value_of_t::<usize>("batch-api-size-limit")
-              .expect("Bad batch-api-size-limit flag"),
-          ),
+          local_only
+            .into_with_remote(RemoteOptions {
+              cas_address: cas_address.to_owned(),
+              instance_name: top_match
+                .value_of("remote-instance-name")
+                .map(str::to_owned),
+              tls_config,
+              headers,
+              chunk_size_bytes,
+              // This deadline is really only in place because otherwise DNS failures
+              // leave this hanging forever.
+              //
+              // Make fs_util have a very long deadline (because it's not configurable,
+              // like it is inside pants).
+              rpc_timeout: Duration::from_secs(30 * 60),
+              rpc_retries: top_match
+                .value_of_t::<usize>("rpc-attempts")
+                .expect("Bad rpc-attempts flag"),
+              rpc_concurrency_limit: top_match
+                .value_of_t::<usize>("rpc-concurrency-limit")
+                .expect("Bad rpc-concurrency-limit flag"),
+              capabilities_cell_opt: None,
+              batch_api_size_limit: top_match
+                .value_of_t::<usize>("batch-api-size-limit")
+                .expect("Bad batch-api-size-limit flag"),
+            })
+            .await,
           true,
         )
       }
@@ -476,7 +476,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               .ok_or_else(|| format!("File being saved must have parent but {path:?} did not"))?,
           );
           let file = posix_fs
-            .stat_sync(PathBuf::from(path.file_name().unwrap()))
+            .stat_sync(Path::new(path.file_name().unwrap()))
             .unwrap()
             .ok_or_else(|| format!("Tried to save file {path:?} but it did not exist"))?;
           match file {
@@ -523,8 +523,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .materialize_directory(
               destination,
               output_digest,
+              false,
               &BTreeSet::new(),
-              None,
               Permissions::Writable,
             )
             .await?,
@@ -547,8 +547,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .materialize_directory(
               destination,
               digest,
+              false,
               &BTreeSet::new(),
-              None,
               Permissions::Writable,
             )
             .await?,
@@ -686,6 +686,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       ("list", _) => {
         for digest in store
           .all_local_digests(::store::EntryType::Directory)
+          .await
           .expect("Error opening store")
         {
           println!("{} {}", digest.hash, digest.size_bytes);
@@ -698,7 +699,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       let target_size_bytes = args
         .value_of_t::<usize>("target-size-bytes")
         .expect("--target-size-bytes must be passed as a non-negative integer");
-      store.garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)?;
+      store
+        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)
+        .await?;
       Ok(())
     }
 

@@ -6,18 +6,11 @@ from __future__ import annotations
 import os.path
 from typing import Iterable
 
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.subsystems.python_tool_base import (
-    ExportToolOption,
-    LockfileRules,
-    PythonToolBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
-from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
@@ -26,19 +19,12 @@ class Yapf(PythonToolBase):
     name = "yapf"
     help = "A formatter for Python files (https://github.com/google/yapf)."
 
-    default_version = "yapf>=0.32.0,<1"
-    default_extra_requirements = ["toml"]
     default_main = ConsoleScript("yapf")
-    default_requirements = [default_version, *default_extra_requirements]
+    default_requirements = ["yapf>=0.32.0,<1", "toml"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.yapf", "yapf.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/yapf/yapf.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
@@ -51,7 +37,6 @@ class Yapf(PythonToolBase):
             """
         ),
     )
-    export = ExportToolOption()
     config = FileOption(
         default=None,
         advanced=True,
@@ -102,19 +87,5 @@ class Yapf(PythonToolBase):
         )
 
 
-class YapfExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule
-def yapf_export(_: YapfExportSentinel, yapf: Yapf) -> ExportPythonTool:
-    if not yapf.export:
-        return ExportPythonTool(resolve_name=yapf.options_scope, pex_request=None)
-    return ExportPythonTool(resolve_name=yapf.options_scope, pex_request=yapf.to_pex_request())
-
-
 def rules():
-    return (
-        *collect_rules(),
-        UnionRule(ExportPythonToolSentinel, YapfExportSentinel),
-    )
+    return collect_rules()

@@ -210,24 +210,24 @@ class AssetSourceField(SingleSourceField):
         If a string is provided, represents a path that is relative to the BUILD file's directory,
         e.g. `source='example.ext'`.
 
-        If an http_source is provided, represents the network location to download the source from.
+        If an `http_source` is provided, represents the network location to download the source from.
         The downloaded file will exist in the sandbox in the same directory as the target.
 
         `http_source` has the following signature:
 
             http_source(url: str, *, len: int, sha256: str, filename: str = "")
 
-        The filename defaults to the last part of the URL path (E.g. `example.ext`), but can also be
+        The filename defaults to the last part of the URL path (e.g. `example.ext`), but can also be
         specified if you wish to have control over the file name. You cannot, however, specify a
         path separator to download the file into a subdirectory (you must declare a target in desired
         subdirectory).
 
         You can easily get the len and checksum with the following command:
 
-            `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+            curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null
 
         If a `per_platform` is provided, represents a mapping from platform to `http_source`, where
-        the platform is one of (linux_arm64, linux_x86_64, macos_arm64, macos_x86_64) and is
+        the platform is one of (`linux_arm64`, `linux_x86_64`, `macos_arm64`, `macos_x86_64`) and is
         resolved in the execution target. Each `http_source` value MUST have the same filename provided.
         """
     )
@@ -651,21 +651,13 @@ class GenericTarget(Target):
 
 
 @dataclass(frozen=True)
-class AllAssetTargetsRequest:
-    pass
-
-
-@dataclass(frozen=True)
 class AllAssetTargets:
     resources: tuple[Target, ...]
     files: tuple[Target, ...]
 
 
 @rule(desc="Find all assets in project")
-def find_all_assets(
-    all_targets: AllTargets,
-    _: AllAssetTargetsRequest,
-) -> AllAssetTargets:
+def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
     resources = []
     files = []
     for tgt in all_targets:
@@ -744,7 +736,7 @@ class ArchivePackagesField(SpecialCasedDependencies):
         `["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`.
         It will include the results in your archive using the same name they would normally have,
         but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can
-        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_awslambda`, or even another
+        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_aws_lambda_function`, or even another
         `archive`.
         """
     )
@@ -893,7 +885,16 @@ class LockfileTarget(Target):
 
 
 class LockfilesGeneratorSourcesField(MultipleSourcesField):
+    """Sources field for synthesized `_lockfiles` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
     help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
 class LockfilesGeneratorTarget(TargetFilesGenerator):

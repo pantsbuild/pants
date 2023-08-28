@@ -2,10 +2,10 @@
 version = "0.0.1"
 edition = "2021"
 name = "stdio"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-log = "0.4"
-parking_lot = "0.12"
-tokio = { version = "1.21", features = ["rt"] }
+log = { workspace = true }
+parking_lot = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }

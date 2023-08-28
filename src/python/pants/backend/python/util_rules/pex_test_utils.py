@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Iterable, Iterator, Mapping
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import MainSpecification, PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
@@ -26,6 +25,7 @@ from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Pex
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 

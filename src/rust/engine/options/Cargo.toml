@@ -2,14 +2,14 @@
 version = "0.0.1"
 edition = "2021"
 name = "options"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-log = "0.4"
-peg = "0.8"
-shellexpand = "2.1"
-toml = "0.5"
+log = { workspace = true }
+peg = { workspace = true }
+shellexpand = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }

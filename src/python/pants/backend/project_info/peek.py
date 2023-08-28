@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import collections
 import json
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, Iterable, Mapping
 
 from typing_extensions import Protocol, runtime_checkable
@@ -19,6 +19,7 @@ from pants.engine.internals.build_files import _get_target_family_and_adaptor_fo
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
+    AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
     DependenciesRuleApplication,
@@ -134,7 +135,9 @@ class _PeekJsonEncoder(json.JSONEncoder):
         if o is None:
             return o
         if is_dataclass(o):
-            return asdict(o)
+            # NB: `dataclasses.asdict` creates a deep copy by default, which is unnecessary for
+            # this case.
+            return {field.name: getattr(o, field.name) for field in fields(o)}
         if isinstance(o, collections.abc.Mapping):
             return dict(o)
         if (
@@ -177,7 +180,9 @@ async def get_target_data(
     dependencies_per_target = await MultiGet(
         Get(
             Targets,
-            DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
+            DependenciesRequest(
+                tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
+            ),
         )
         for tgt in sorted_targets
     )

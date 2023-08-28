@@ -23,12 +23,7 @@ from pants.backend.go.util_rules.cgo_security import check_linker_flags
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.util_rules.system_binaries import (
-    BashBinary,
-    BashBinaryRequest,
-    BinaryPath,
-    BinaryPathTest,
-)
+from pants.core.util_rules.system_binaries import BashBinary, BinaryPath, BinaryPathTest
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
@@ -292,19 +287,12 @@ async def setup_compiler_cmd(
 
 
 @dataclass(frozen=True)
-class CGoCompilerWrapperScriptRequest:
-    pass
-
-
-@dataclass(frozen=True)
 class CGoCompilerWrapperScript:
     digest: Digest
 
 
 @rule
-async def make_cgo_compile_wrapper_script(
-    _: CGoCompilerWrapperScriptRequest,
-) -> CGoCompilerWrapperScript:
+async def make_cgo_compile_wrapper_script() -> CGoCompilerWrapperScript:
     digest = await Get(
         Digest,
         CreateDigest(
@@ -336,15 +324,17 @@ async def _cc(
     description: str,
     golang_env_aware: GolangSubsystem.EnvironmentAware,
 ) -> Process:
-    compiler_path = await Get(
-        BinaryPath,
-        CGoBinaryPathRequest(
-            binary_name=binary_name,
-            binary_path_test=BinaryPathTest(["--version"]),
+    compiler_path, bash, wrapper_script = await MultiGet(
+        Get(
+            BinaryPath,
+            CGoBinaryPathRequest(
+                binary_name=binary_name,
+                binary_path_test=BinaryPathTest(["--version"]),
+            ),
         ),
+        Get(BashBinary),
+        Get(CGoCompilerWrapperScript),
     )
-    bash = await Get(BashBinary, BashBinaryRequest())
-    wrapper_script = await Get(CGoCompilerWrapperScript, CGoCompilerWrapperScriptRequest())
     compiler_args_result, env, input_digest = await MultiGet(
         Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), dir_path)),
         Get(
@@ -383,17 +373,16 @@ async def _gccld(
     objs: Iterable[str],
     description: str,
 ) -> FallibleProcessResult:
-    compiler_path = await Get(
-        BinaryPath,
-        CGoBinaryPathRequest(
-            binary_name=binary_name,
-            binary_path_test=BinaryPathTest(["--version"]),
+    compiler_path, bash, wrapper_script = await MultiGet(
+        Get(
+            BinaryPath,
+            CGoBinaryPathRequest(
+                binary_name=binary_name,
+                binary_path_test=BinaryPathTest(["--version"]),
+            ),
         ),
-    )
-
-    bash, wrapper_script = await MultiGet(
-        Get(BashBinary, BashBinaryRequest()),
-        Get(CGoCompilerWrapperScript, CGoCompilerWrapperScriptRequest()),
+        Get(BashBinary),
+        Get(CGoCompilerWrapperScript),
     )
 
     compiler_args_result, env, input_digest = await MultiGet(

@@ -1,7 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.util.docutil import git_url
 
 
 class JavaProtobufGrpcSubsystem(JvmToolBase):
@@ -19,7 +18,3 @@ class JavaProtobufGrpcSubsystem(JvmToolBase):
         "pants.backend.codegen.protobuf.java",
         "grpc-java.default.lockfile.txt",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/codegen/protobuf/java/grpc-java.default.lockfile.txt"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)

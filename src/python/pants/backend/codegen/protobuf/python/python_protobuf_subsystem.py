@@ -10,17 +10,14 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
-from pants.backend.python.subsystems.python_tool_base import (
-    LockfileRules,
-    PythonToolRequirementsBase,
-)
+from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import doc_url
 from pants.util.strutil import help_text, softwrap
 
 
@@ -39,7 +36,7 @@ class PythonProtobufSubsystem(Subsystem):
         help=softwrap(
             """
             Use the `mypy-protobuf` plugin (https://github.com/dropbox/mypy-protobuf) to also
-            generate .pyi type stubs.
+            generate `.pyi` type stubs.
             """
         ),
     )
@@ -70,17 +67,11 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     options_scope = "mypy-protobuf"
     help = "Configuration of the mypy-protobuf type stub generation plugin."
 
-    default_version = "mypy-protobuf==3.4.0"
     default_requirements = ["mypy-protobuf>=3.4.0,<4"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "mypy_protobuf.lock")
-    default_lockfile_path = "src/python/pants/backend/codegen/protobuf/python/mypy_protobuf.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import sys
 from pathlib import Path
 from textwrap import dedent
 
@@ -13,16 +12,11 @@ def typecheck_file(path: str, filename: str) -> PantsResult:
         [
             "--backend-packages=pants.backend.python",
             "--backend-packages=pants.backend.python.typecheck.mypy",
+            "--python-interpreter-constraints=['==3.9.*']",
             "check",
             f"{path}/{filename}",
         ],
-        # Use the current interpreter, so we know the wheel files are compatible with it.
         config={
-            "python": {
-                "interpreter_constraints": [
-                    f"CPython=={sys.version_info[0]}.{sys.version_info[1]}.*"
-                ]
-            },
             "mypy": {"config": f"{path}/mypy.ini"},
         },
     )

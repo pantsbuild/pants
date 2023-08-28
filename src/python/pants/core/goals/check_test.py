@@ -34,6 +34,7 @@ from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -67,7 +68,11 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
 
 
 class SuccessfulRequest(MockCheckRequest):
-    tool_name = "SuccessfulChecker"
+    tool_name = "Successful Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "successfulchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -75,7 +80,11 @@ class SuccessfulRequest(MockCheckRequest):
 
 
 class FailingRequest(MockCheckRequest):
-    tool_name = "FailingChecker"
+    tool_name = "Failing Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "failingchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -83,7 +92,11 @@ class FailingRequest(MockCheckRequest):
 
 
 class ConditionallySucceedsRequest(MockCheckRequest):
-    tool_name = "ConditionallySucceedsChecker"
+    tool_name = "Conditionally Succeeds Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "conditionallysucceedschecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -93,7 +106,11 @@ class ConditionallySucceedsRequest(MockCheckRequest):
 
 
 class SkippedRequest(MockCheckRequest):
-    tool_name = "SkippedChecker"
+    tool_name = "Skipped Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "skippedchecker"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -114,7 +131,11 @@ class InvalidFieldSet(MockCheckFieldSet):
 
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    tool_name = "InvalidChecker"
+    tool_name = "Invalid Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "invalidchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -190,22 +211,22 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        ✕ ConditionallySucceedsChecker failed.
-        ✕ FailingChecker failed.
-        ✓ SuccessfulChecker succeeded.
+        ✕ Conditionally Succeeds Checker failed.
+        ✕ Failing Checker failed.
+        ✓ Successful Checker succeeded.
         """
     )
 
     exit_code, stderr = run_typecheck_rule(
         request_types=requests,
         targets=targets,
-        only=[FailingRequest.tool_name, SuccessfulRequest.tool_name],
+        only=[FailingRequest.tool_id, SuccessfulRequest.tool_id],
     )
     assert stderr == dedent(
         """\
 
-        ✕ FailingChecker failed.
-        ✓ SuccessfulChecker succeeded.
+        ✕ Failing Checker failed.
+        ✓ Successful Checker succeeded.
         """
     )
 

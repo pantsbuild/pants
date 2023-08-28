@@ -165,7 +165,9 @@ def test_visibility_rule(expected: bool, spec: str, path: str, relpath: str) -> 
     address = Address(
         os.path.dirname(path), relative_file_path=os.path.basename(path), target_name="tgt-name"
     )
-    assert expected == rule.match(address, TargetAdaptor("target", None), relpath)
+    assert expected == rule.match(
+        address, TargetAdaptor("target", None, __description_of_origin__="BUILD:1"), relpath
+    )
 
 
 @pytest.mark.parametrize(
@@ -249,7 +251,7 @@ def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> Non
 def test_visibility_rule_set_match(expected: bool, target: str, rule_spec: tuple) -> None:
     ruleset = parse_ruleset(rule_spec, "")
     assert expected == ruleset.match(
-        Address("", target_name="tgt-name"), TargetAdaptor(target, None), ""
+        Address("", target_name="tgt-name"), TargetAdaptor(target, None, "BUILD:1"), ""
     )
 
 
@@ -373,10 +375,12 @@ def test_check_dependency_rules(
         dependency_type=target_type,
     ) == BuildFileVisibilityRules.check_dependency_rules(
         origin_address=origin_address,
-        origin_adaptor=TargetAdaptor(target_type, "source"),
+        origin_adaptor=TargetAdaptor(target_type, "source", __description_of_origin__="BUILD:1"),
         dependencies_rules=dependencies_rules,
         dependency_address=dependency_address,
-        dependency_adaptor=TargetAdaptor(target_type, "target"),
+        dependency_adaptor=TargetAdaptor(
+            target_type, "target", __description_of_origin__="BUILD:1"
+        ),
         dependents_rules=dependents_rules,
     )
 
@@ -927,3 +931,24 @@ def test_single_rules_declaration_per_build_file(rule_runner: RuleRunner) -> Non
             rule_runner,
             "test",
         )
+
+
+def test_target_type_in_verbose_selector_issue_19390(rule_runner: RuleRunner) -> None:
+    """This test is logically a better fit in `./glob_test.py:test_target_glob_parse_spec` but I
+    want to avoid hard coding any assumptions regarding a target types representation in the BUILD
+    file (the `Registrar` type)."""
+    rule_runner.write_files(
+        {
+            "test/BUILD": dedent(
+                """
+                target(name="test")
+
+                __dependencies_rules__(
+                  ({"type": files}, "*"),
+                )
+                """
+            ),
+        },
+    )
+
+    assert_dependency_rules(rule_runner, "test")

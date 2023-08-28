@@ -3,16 +3,15 @@
 
 use std::cmp::max;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::convert::{Into, TryInto};
-use std::future::Future;
+use std::convert::Into;
 use std::io::Read;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::intrinsics::Intrinsics;
-use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, WrappedNode};
+use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult};
 use crate::python::{throw, Failure};
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
@@ -20,9 +19,9 @@ use crate::types::Types;
 
 use async_oncecell::OnceCell;
 use cache::PersistentCache;
-use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
-use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
+use graph::{Graph, InvalidationResult};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
@@ -34,13 +33,15 @@ use process_execution::{
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
-use remote::remote_cache::RemoteCacheWarningsBehavior;
+use remote::remote_cache::{
+  RemoteCacheProviderOptions, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
+};
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, Store};
+use store::{self, ImmutableInputs, RemoteOptions, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidationWatcher};
-use workunit_store::{Metric, RunId, RunningWorkunit};
+use workunit_store::{Metric, RunningWorkunit};
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -93,14 +94,14 @@ pub struct RemotingOptions {
   pub root_ca_certs_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
   pub store_chunk_bytes: usize,
-  pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_rpc_concurrency: usize,
+  pub store_rpc_timeout: Duration,
   pub store_batch_api_size_limit: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_content_behavior: CacheContentBehavior,
   pub cache_rpc_concurrency: usize,
-  pub cache_read_timeout: Duration,
+  pub cache_rpc_timeout: Duration,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
   pub execution_rpc_concurrency: usize,
@@ -143,7 +144,7 @@ impl From<&LocalStoreOptions> for store::LocalOptions {
 }
 
 impl Core {
-  fn make_store(
+  async fn make_store(
     executor: &Executor,
     local_store_options: &LocalStoreOptions,
     local_execution_root_dir: &Path,
@@ -160,21 +161,24 @@ impl Core {
       local_store_options.into(),
     )?;
     if enable_remote {
-      let remote_store_address = remote_store_address
+      let cas_address = remote_store_address
         .as_ref()
-        .ok_or("Remote store required, but none configured")?;
-      local_only.into_with_remote(
-        remote_store_address,
-        remoting_opts.instance_name.clone(),
-        grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
-        remoting_opts.store_headers.clone(),
-        remoting_opts.store_chunk_bytes,
-        remoting_opts.store_chunk_upload_timeout,
-        remoting_opts.store_rpc_retries,
-        remoting_opts.store_rpc_concurrency,
-        capabilities_cell_opt,
-        remoting_opts.store_batch_api_size_limit,
-      )
+        .ok_or("Remote store required, but none configured")?
+        .clone();
+      local_only
+        .into_with_remote(RemoteOptions {
+          cas_address,
+          instance_name: remoting_opts.instance_name.clone(),
+          tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
+          headers: remoting_opts.store_headers.clone(),
+          chunk_size_bytes: remoting_opts.store_chunk_bytes,
+          rpc_timeout: remoting_opts.store_rpc_timeout,
+          rpc_retries: remoting_opts.store_rpc_retries,
+          rpc_concurrency_limit: remoting_opts.store_rpc_concurrency,
+          capabilities_cell_opt,
+          batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
+        })
+        .await
     } else {
       Ok(local_only)
     }
@@ -184,7 +188,7 @@ impl Core {
   /// Make the innermost / leaf runner. Will have concurrency control and process pooling, but
   /// will not have caching.
   ///
-  fn make_leaf_runner(
+  async fn make_leaf_runner(
     full_store: &Store,
     local_runner_store: &Store,
     executor: &Executor,
@@ -267,21 +271,24 @@ impl Core {
       // We always create the remote execution runner if it is globally enabled, but it may not
       // actually be used thanks to the `SwitchedCommandRunner` below. Only one of local execution
       // or remote execution will be used for any particular process.
-      let remote_execution_runner = Box::new(remote::remote::CommandRunner::new(
-        // We unwrap because global_options.py will have already validated this is defined.
-        remoting_opts.execution_address.as_ref().unwrap(),
-        instance_name,
-        process_cache_namespace,
-        remoting_opts.append_only_caches_base_path.clone(),
-        root_ca_certs.clone(),
-        remoting_opts.execution_headers.clone(),
-        full_store.clone(),
-        executor.clone(),
-        remoting_opts.execution_overall_deadline,
-        Duration::from_millis(100),
-        remoting_opts.execution_rpc_concurrency,
-        capabilities_cell_opt,
-      )?);
+      let remote_execution_runner = Box::new(
+        remote::remote::CommandRunner::new(
+          // We unwrap because global_options.py will have already validated this is defined.
+          remoting_opts.execution_address.as_ref().unwrap(),
+          instance_name,
+          process_cache_namespace,
+          remoting_opts.append_only_caches_base_path.clone(),
+          root_ca_certs.clone(),
+          remoting_opts.execution_headers.clone(),
+          full_store.clone(),
+          executor.clone(),
+          remoting_opts.execution_overall_deadline,
+          Duration::from_millis(100),
+          remoting_opts.execution_rpc_concurrency,
+          capabilities_cell_opt,
+        )
+        .await?,
+      );
       let remote_execution_runner = Box::new(bounded::CommandRunner::new(
         executor,
         remote_execution_runner,
@@ -308,7 +315,7 @@ impl Core {
   /// The given cache read/write flags override the relevant cache flags to allow this method
   /// to be called with all cache reads disabled, regardless of their configured values.
   ///
-  fn make_cached_runner(
+  async fn make_cached_runner(
     mut runner: Arc<dyn CommandRunner>,
     full_store: &Store,
     executor: &Executor,
@@ -323,23 +330,31 @@ impl Core {
     local_cache_write: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
     if remote_cache_read || remote_cache_write {
-      runner = Arc::new(remote_cache::CommandRunner::new(
-        runner,
-        instance_name,
-        process_cache_namespace.clone(),
-        executor.clone(),
-        full_store.clone(),
-        remoting_opts.store_address.as_ref().unwrap(),
-        root_ca_certs.clone(),
-        remoting_opts.store_headers.clone(),
-        remote_cache_read,
-        remote_cache_write,
-        remoting_opts.cache_warnings_behavior,
-        remoting_opts.cache_content_behavior,
-        remoting_opts.cache_rpc_concurrency,
-        remoting_opts.cache_read_timeout,
-        remoting_opts.append_only_caches_base_path.clone(),
-      )?);
+      runner = Arc::new(
+        remote_cache::CommandRunner::from_provider_options(
+          RemoteCacheRunnerOptions {
+            inner: runner,
+            instance_name: instance_name.clone(),
+            process_cache_namespace: process_cache_namespace.clone(),
+            executor: executor.clone(),
+            store: full_store.clone(),
+            cache_read: remote_cache_read,
+            cache_write: remote_cache_write,
+            warnings_behavior: remoting_opts.cache_warnings_behavior,
+            cache_content_behavior: remoting_opts.cache_content_behavior,
+            append_only_caches_base_path: remoting_opts.append_only_caches_base_path.clone(),
+          },
+          RemoteCacheProviderOptions {
+            instance_name,
+            action_cache_address: remoting_opts.store_address.clone().unwrap(),
+            root_ca_certs: root_ca_certs.clone(),
+            headers: remoting_opts.store_headers.clone(),
+            concurrency_limit: remoting_opts.cache_rpc_concurrency,
+            rpc_timeout: remoting_opts.cache_rpc_timeout,
+          },
+        )
+        .await?,
+      );
     }
 
     if local_cache_read || local_cache_write {
@@ -359,7 +374,7 @@ impl Core {
   ///
   /// Creates the stack of CommandRunners for the purposes of backtracking.
   ///
-  fn make_command_runners(
+  async fn make_command_runners(
     full_store: &Store,
     local_runner_store: &Store,
     executor: &Executor,
@@ -387,14 +402,16 @@ impl Core {
       exec_strategy_opts,
       remoting_opts,
       capabilities_cell_opt,
-    )?;
+    )
+    .await?;
 
     let remote_cache_read = exec_strategy_opts.remote_cache_read;
     let remote_cache_write = exec_strategy_opts.remote_cache_write;
     let local_cache_read_write = exec_strategy_opts.local_cache;
 
-    let make_cached_runner = |should_cache_read: bool| -> Result<Arc<dyn CommandRunner>, String> {
-      Self::make_cached_runner(
+    // The first attempt is always with all caches.
+    let mut runners = {
+      let cached_runner = Self::make_cached_runner(
         leaf_runner.clone(),
         full_store,
         executor,
@@ -403,19 +420,35 @@ impl Core {
         process_cache_namespace.clone(),
         root_ca_certs,
         remoting_opts,
-        remote_cache_read && should_cache_read,
+        remote_cache_read,
         remote_cache_write,
-        local_cache_read_write && should_cache_read,
+        local_cache_read_write,
         local_cache_read_write,
       )
-    };
+      .await?;
 
-    // The first attempt is always with all caches.
-    let mut runners = vec![make_cached_runner(true)?];
+      vec![cached_runner]
+    };
     // If any cache is both readable and writable, we additionally add a backtracking attempt which
     // disables all cache reads.
     if (remote_cache_read && remote_cache_write) || local_cache_read_write {
-      runners.push(make_cached_runner(false)?);
+      let disabled_cached_runner = Self::make_cached_runner(
+        leaf_runner.clone(),
+        full_store,
+        executor,
+        local_cache,
+        instance_name.clone(),
+        process_cache_namespace.clone(),
+        root_ca_certs,
+        remoting_opts,
+        false,
+        remote_cache_write,
+        false,
+        local_cache_read_write,
+      )
+      .await?;
+
+      runners.push(disabled_cached_runner);
     }
 
     Ok(runners)
@@ -454,7 +487,7 @@ impl Core {
     Ok(certs)
   }
 
-  pub fn new(
+  pub async fn new(
     executor: Executor,
     tasks: Tasks,
     types: Types,
@@ -495,7 +528,7 @@ impl Core {
       None
     };
 
-    safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
+    std::fs::create_dir_all(&local_store_options.store_dir).map_err(|e| {
       format!(
         "Error making directory {:?}: {:?}",
         local_store_options.store_dir, e
@@ -511,6 +544,7 @@ impl Core {
       &root_ca_certs,
       capabilities_cell_opt.clone(),
     )
+    .await
     .map_err(|e| format!("Could not initialize Store: {e:?}"))?;
 
     let local_cache = PersistentCache::new(
@@ -554,7 +588,8 @@ impl Core {
       &exec_strategy_opts,
       &remoting_opts,
       capabilities_cell_opt,
-    )?;
+    )
+    .await?;
     log::debug!("Using {command_runners:?} for process execution.");
 
     let graph = Arc::new(InvalidatableGraph(Graph::new(executor.clone())));
@@ -572,18 +607,14 @@ impl Core {
       .map_err(|err| format!("Error building HTTP client: {err}"))?;
     let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
-    let gitignore_file = if use_gitignore {
-      let gitignore_path = build_root.join(".gitignore");
-      if Path::is_file(&gitignore_path) {
-        Some(gitignore_path)
-      } else {
-        None
-      }
+    let gitignore_files = if use_gitignore {
+      GitignoreStyleExcludes::gitignore_file_paths(&build_root)
     } else {
-      None
+      vec![]
     };
+
     let ignorer =
-      GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
+      GitignoreStyleExcludes::create_with_gitignore_files(ignore_patterns, gitignore_files)
         .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
     let watcher = if watch_filesystem {
@@ -688,12 +719,12 @@ impl Deref for InvalidatableGraph {
   }
 }
 
-#[derive(Clone)]
-pub struct Context {
-  entry_id: Option<EntryId>,
+pub type Context = graph::Context<NodeKey>;
+
+pub struct SessionCore {
+  // TODO: This field is also accessible via the Session: move to an accessor.
   pub core: Arc<Core>,
   pub session: Session,
-  run_id: RunId,
   /// The number of attempts which have been made to backtrack to a particular ExecuteProcess node.
   ///
   /// Presence in this map at process runtime indicates that the process is being retried, and that
@@ -702,37 +733,16 @@ pub struct Context {
   backtrack_levels: Arc<Mutex<HashMap<ExecuteProcess, usize>>>,
   /// The Digests that we have successfully invalidated a Node for.
   backtrack_digests: Arc<Mutex<HashSet<Digest>>>,
-  stats: Arc<Mutex<graph::Stats>>,
 }
 
-impl Context {
-  pub fn new(core: Arc<Core>, session: Session) -> Context {
-    let run_id = session.run_id();
-    Context {
-      entry_id: None,
-      core,
+impl SessionCore {
+  pub fn new(session: Session) -> Self {
+    Self {
+      core: session.core().clone(),
       session,
-      run_id,
       backtrack_levels: Arc::default(),
       backtrack_digests: Arc::default(),
-      stats: Arc::default(),
     }
-  }
-
-  ///
-  /// Get the future value for the given Node implementation.
-  ///
-  pub async fn get<N: WrappedNode>(&self, node: N) -> NodeResult<N::Item> {
-    let node_result = self
-      .core
-      .graph
-      .get(self.entry_id, self, node.into())
-      .await?;
-    Ok(
-      node_result
-        .try_into()
-        .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
-    )
   }
 
   ///
@@ -742,8 +752,12 @@ impl Context {
   /// If we successfully locate and restart the source of the Digest, converts the Result into a
   /// `Failure::Invalidated`, which will cause retry at some level above us.
   ///
+  /// TODO: This takes both `self` and `context: Context`, but could take `self: Context` after
+  /// the `arbitrary_self_types` feature has stabilized.
+  ///
   pub fn maybe_backtrack(
     &self,
+    context: &Context,
     result: NodeResult<NodeOutput>,
     workunit: &mut RunningWorkunit,
   ) -> NodeResult<NodeOutput> {
@@ -758,7 +772,7 @@ impl Context {
     // `invalidate_from_roots` cannot view `Node` results. Would be more efficient as a merged
     // method.
     let mut candidate_roots = Vec::new();
-    self.core.graph.visit_live(self, |k, v| match k {
+    self.core.graph.visit_live(context, |k, v| match k {
       NodeKey::ExecuteProcess(p) if v.digests().contains(&digest) => {
         if let NodeOutput::ProcessResult(pr) = v {
           candidate_roots.push((p.clone(), pr.backtrack_level));
@@ -847,45 +861,5 @@ impl Context {
   ///
   pub fn maybe_start_backtracking(&self, node: &ExecuteProcess) -> usize {
     self.backtrack_levels.lock().get(node).cloned().unwrap_or(0)
-  }
-}
-
-impl NodeContext for Context {
-  type Node = NodeKey;
-  type RunId = RunId;
-
-  fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = graph::Stats> + 'a> {
-    Box::new(self.stats.lock())
-  }
-
-  ///
-  /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
-  /// is a shallow clone.
-  ///
-  fn clone_for(&self, entry_id: EntryId) -> Context {
-    Context {
-      entry_id: Some(entry_id),
-      core: self.core.clone(),
-      session: self.session.clone(),
-      run_id: self.run_id,
-      backtrack_levels: self.backtrack_levels.clone(),
-      backtrack_digests: self.backtrack_digests.clone(),
-      stats: self.stats.clone(),
-    }
-  }
-
-  fn run_id(&self) -> &Self::RunId {
-    &self.run_id
-  }
-
-  fn graph(&self) -> &Graph<NodeKey> {
-    &self.core.graph
-  }
-
-  fn spawn<F>(&self, future: F)
-  where
-    F: Future<Output = ()> + Send + 'static,
-  {
-    let _join = self.core.executor.native_spawn(future);
   }
 }

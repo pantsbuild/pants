@@ -5,13 +5,13 @@ excerpt: "How to safely interact with the file system in your plugin."
 hidden: false
 createdAt: "2020-07-01T04:40:26.783Z"
 ---
-It is not safe to use functions like `open` or the non-pure operations of `pathlib.Path` like you normally might: this will break caching because they do not hook up to Pants's file watcher. 
+It is not safe to use functions like `open` or the non-pure operations of `pathlib.Path` like you normally might: this will break caching because they do not hook up to Pants's file watcher.
 
 Instead, Pants has several mechanisms to work with the file system in a safe and concurrent way.
 
 > 🚧 Missing certain file operations?
-> 
-> If it would help you to have a certain file operation, please let us know by either opening a new [GitHub issue](https://github.com/pantsbuild/pants/issues) or by messaging us on [Slack](doc:community) in the #plugins room.
+>
+> If it would help you to have a certain file operation, please let us know by either opening a new [GitHub issue](https://github.com/pantsbuild/pants/issues) or by messaging us on [Slack](doc:the-pants-community) in the #plugins room.
 
 Core abstractions: `Digest` and `Snapshot`
 ------------------------------------------
@@ -71,7 +71,7 @@ async def demo(...) -> Foo:
 
 The `CreateDigest` constructor expects an iterable including any of these types:
 
-- `FileContent` objects, which represent a file to create. It take a `path: str` parameter, `contents: bytes` parameter, and optional `is_executable: bool` parameter with a default of `False`.
+- `FileContent` objects, which represent a file to create. It takes a `path: str` parameter, `contents: bytes` parameter, and optional `is_executable: bool` parameter with a default of `False`.
 - `Directory` objects, which can be used to create empty directories. It takes a single parameter: `path: str`. You do not need to use this when creating a file inside a certain directory; this is only to create empty directories.
 - `FileEntry` objects, which are handles to existing files from `DigestEntries`. Do not manually create these.
 
@@ -155,15 +155,15 @@ async def demo(...) -> Foo:
 The result will be a sequence of `FileContent` objects, which each have a property `path: str` and a property `content: bytes`. You may want to call `content.decode()` to convert to `str`.
 
 > 🚧 You may not need `DigestContents`
-> 
+>
 > Only use `DigestContents` if you need to read and operate on the content of files directly in your rule.
-> 
+>
 > - If you are running a `Process`, you only need to pass the `Digest` as input and that process will be able to read all the files in its environment. If you only need a list of files included in the digest, use `Get(Snapshot, Digest)`.
-> 
+>
 > - If you just need to manipulate the directory structure of a `Digest`, such as renaming files,  use `DigestEntries` with `CreateDigest` or use `AddPrefix` and `RemovePrefix`. These avoid reading the file content into memory.
 
 > 🚧 Does not handle empty directories in a `Digest`
-> 
+>
 > `DigestContents` does not have a way to represent empty directories in a `Digest` since it is only a sequence of `FileContent` objects. That is, passing the `FileContent` objects to `CreateDigest` will not result in the original `Digest` if there were empty directories in that original `Digest`. Use `DigestEntries` instead if your rule needs to handle empty directories in a `Digest`.
 
 `DigestEntries`: light-weight handles to files
@@ -271,7 +271,7 @@ async def run_my_goal(..., workspace: Workspace) -> MyGoal:
 
 `Workspace` is a special type that can only be requested in `@goal_rule`s because it is only safe to write to disk in a `@goal_rule`. So, a common pattern is for "downstream" rules to return a `Digest` with the contents they want to write to disk, and then the `@goal_rule` aggregating all the results and writing them to disk. For example, for the `fmt` goal, each `FmtResult` includes a `digest` field.
 
-For better performance, avoid calling `workspace.write_digest` multiple times, such as in a `for` loop. Instead, first, merge all the digests, then write them in a single call. 
+For better performance, avoid calling `workspace.write_digest` multiple times, such as in a `for` loop. Instead, first, merge all the digests, then write them in a single call.
 
 Bad:
 
@@ -312,7 +312,7 @@ async def demo(...) -> Foo:
 Often, you will want to download a pre-compiled binary for a tool. When doing this, use `ExternalTool` instead for help with extracting the binary from the download. See [Installing tools](doc:rules-api-installing-tools).
 
 > 🚧 HTTP requests without digests are unsafe
-> 
+>
 > It is not safe to use `DownloadFile` for mutable HTTP requests, as it will never ping the server for updates once it is cached. It is also not safe to use the `requests` library or similar because it will not be cached safely.
-> 
+>
 > You can use a `Process` with uniquely identifying information in its arguments to run `/usr/bin/curl`.

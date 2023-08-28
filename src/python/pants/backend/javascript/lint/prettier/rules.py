@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
-from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
+from pants.backend.javascript.subsystems import nodejs_tool
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.javascript.target_types import JSSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
@@ -59,13 +61,9 @@ async def prettier_fmt(request: PrettierFmtRequest.Batch, prettier: Prettier) ->
 
     result = await Get(
         ProcessResult,
-        NodeJSToolProcess,
-        NodeJSToolProcess.npx(
-            npm_package=prettier.version,
-            args=(
-                "--write",
-                *request.files,
-            ),
+        NodeJSToolRequest,
+        prettier.request(
+            args=("--write", *(os.path.join("{chroot}", file) for file in request.files)),
             input_digest=input_digest,
             output_files=request.files,
             description=f"Run Prettier on {pluralize(len(request.files), 'file')}.",
@@ -78,5 +76,6 @@ async def prettier_fmt(request: PrettierFmtRequest.Batch, prettier: Prettier) ->
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
+        *nodejs_tool.rules(),
         *PrettierFmtRequest.rules(),
     )

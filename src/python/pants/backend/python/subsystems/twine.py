@@ -3,14 +3,14 @@
 
 from __future__ import annotations
 
-from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.fs import CreateDigest
 from pants.engine.rules import collect_rules
 from pants.option.global_options import ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
 
 
@@ -22,21 +22,18 @@ class TwineSubsystem(PythonToolBase):
     default_version = "twine>=4,<5"
     default_main = ConsoleScript("twine")
 
-    # This explicit dependency resolves a weird behavior in poetry, where it would include a sys
-    # platform constraint on "Windows" when this was included transitively from the twine
-    # requirements.
-    # See: https://github.com/pantsbuild/pants/pull/13594#issuecomment-968154931
-    default_extra_requirements = ["colorama>=0.4.3"]
-    default_requirements = ["twine>=3.7.1,<5", *default_extra_requirements]
+    default_requirements = [
+        "twine>=3.7.1,<5",
+        # This explicit dependency resolves a weird behavior in poetry, where it would include a
+        # sys platform constraint on "Windows" when this was included transitively from the twine
+        # requirements.
+        # See: https://github.com/pantsbuild/pants/pull/13594#issuecomment-968154931
+        "colorama>=0.4.3",
+    ]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "twine.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/twine.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("publish")
     args = ArgsListOption(example="--skip-existing")

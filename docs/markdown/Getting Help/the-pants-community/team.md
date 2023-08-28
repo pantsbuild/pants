@@ -24,7 +24,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Benjy Weinberger**       | "The options system — unifying our flags, config and env vars into a coherent, extensible framework." |
 | **Carina C. Zona**         | "Developing the #welcome channel on Pants community chat"                                             |
 | **Christopher Neugebauer** | Adding multi-architecture Mac support for Apple Silicon (M1s)                                         |
-| **Dan Moran**            | "Enabling batched `pytest` execution in `pants test`"                                          |
+| **Dan Moran**              | "Enabling batched `pytest` execution in `pants test`"                                          |
 | **Daniel Wagner-Hall**     | Laid the foundation for remote execution                                                              |
 | **Danny McClanahan**       | Implemented bounded runtime polymorphism with union rules and improved plugin UX with async/await     |
 | **Eric Arellano**          | "Migrating Pants to Python 3 for my internship project"                                               |
@@ -38,6 +38,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Patrick Lawson**         | Formalized targets, BUILD files, and fingerprinting in v.1                                            |
 | **Stu Hood**               | Helping to push the v2 engine forward, which eventually turned into Pants 2.0.                        |
 | **Suresh Joshi (SJ)**      | "Writing a post on the Pants Blog about my experimental PyOxidizer plugin"                            |
+| **Tobias Nilsson**         | "Implementing Javascript dependency inference and nodejs workspaces the Pants way"                    |
 | **Tom Dyas**               | Adding the Golang backend and getting remote execution to work with more servers.                     |
 | **Yi Cheng**               | Adding coursier integration to v.1                                                                    |
 

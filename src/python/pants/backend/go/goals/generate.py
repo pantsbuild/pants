@@ -69,7 +69,7 @@ class GoGenerateGoalSubsystem(GoalSubsystem):
         `go generate` on a Go package.
 
         Note: Just like with `go generate`, the `go-generate` goal is never run as part of the build and
-        must be run manually to invoke the commands described by the //go:generate directives.
+        must be run manually to invoke the commands described by the `//go:generate` directives.
 
         See https://go.dev/blog/generate for details.
         """

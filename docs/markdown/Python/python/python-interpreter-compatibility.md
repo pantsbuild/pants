@@ -26,6 +26,10 @@ The value can be any valid Requirement-style strings. You can use multiple strin
 
 As a shortcut, you can leave off `CPython` and just put the version specifier. For example, `==3.8` will be expanded automatically to `CPython==3.8`.
 
+> 📘 Using Apple Silicon (M1/M2)?
+>
+> If you use Python code on Apple's M1/M2 hardware you may need to set your interpreter constraints to Python 3.9+, as many tools, such as Black, will not install correctly on earlier Python versions on this platform.
+
 Using multiple Python versions in the same project
 --------------------------------------------------
 
@@ -51,6 +55,7 @@ python_sources(
         "py2.py": {"interpreter_constraints": ["==2.7.*"]},
         # You can use a tuple for multiple files:
         ("common.py", "f.py"): {"interpreter_constraints": ["==2.7.*"]},
+    }
 )
 ```
 

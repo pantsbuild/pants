@@ -46,6 +46,11 @@ _orgs = (
         "https://www.astranis.com/",
         "https://files.readme.io/e4989d4-astranis-small.png",
     ),
+    Org(
+        "Aviva Credito",
+        "https://www.avivacredito.com/",
+        "https://files.readme.io/dfc2801-aviva.png",
+    ),
     Org("Brand24", "https://brand24.com/", "https://files.readme.io/e3203d1-brand24-small.png"),
     Org(
         "Chartbeat", "https://chartbeat.com/", "https://files.readme.io/861ace7-chartbeat-small.png"
@@ -59,6 +64,11 @@ _orgs = (
         "Doctrine",
         "https://www.doctrine.fr/",
         "https://files.readme.io/8497e9c-doctrine-small.png",
+    ),
+    Org(
+        "Embark Studios",
+        "https://www.embark-studios.com/",
+        "https://files.readme.io/6ed9278-embark-small.png",
     ),
     Org(
         "ESL Gaming",
@@ -109,6 +119,11 @@ _orgs = (
         "Rippling",
         "https://www.rippling.com/",
         "https://files.readme.io/c8be3a1-rippling-small.png",
+    ),
+    Org(
+        "Salesforce",
+        "https://salesforce.com/",
+        "https://files.readme.io/d902211-small-salesforce-logo-small.png",
     ),
     Org(
         "Snowfall",

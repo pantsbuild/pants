@@ -107,8 +107,8 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             instance of the scalar type or `None`, but __must__ be provided.
             For Non-scalar types (like ListOption subclasses or DictOption) the default can't be
             `None`, but does have an "empty" default value.
-        :param help: The help message to use when users run `./pants help` or
-            `./pants help-advanced`
+        :param help: The help message to use when users run `pants help` or
+            `pants help-advanced`
         :param register_if: A callable (usually a lambda) which, if provided, can be used to
             specify if the option should be registered. This is useful for "Base" subsystem
             classes, who might/might not want to register options based on information provided
@@ -122,7 +122,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             to "#cores")
         :param fromfile: If True, allows the user to specify a string value (starting with "@")
             which represents a file to read the option's value from.
-        :param metavar: Sets what users see in `./pants help` as possible values for the flag.
+        :param metavar: Sets what users see in `pants help` as possible values for the flag.
             The default is based on the option type (E.g. "<str>" or "<int>").
         :param mutually_exclusive_group: If specified disallows all other options using the same
             value to also be specified by the user.
@@ -215,9 +215,9 @@ class _ListOptionBase(
     _OptionBase["tuple[_ListMemberT, ...]", "tuple[_ListMemberT, ...]"],
     Generic[_ListMemberT],
 ):
-    """Descriptor base for a  subsystem option of  ahomogenous list of some type.
+    """Descriptor base for a subsystem option of an homogenous list of some type.
 
-    Don't use this class directly, instead use one of the conrete classes below.
+    Don't use this class directly, instead use one of the concrete classes below.
 
     The default value will always be set as an empty list, and the Python property always returns
     a tuple (for immutability).

@@ -17,12 +17,18 @@ from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
 from pants.backend.scala.goals.check import ScalacCheckRequest
 from pants.backend.scala.goals.check import rules as scalac_check_rules
-from pants.backend.scala.target_types import ScalacPluginTarget, ScalaSourcesGeneratorTarget
+from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
+from pants.backend.scala.target_types import (
+    ScalaArtifactTarget,
+    ScalacPluginTarget,
+    ScalaSourcesGeneratorTarget,
+)
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Addresses
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
@@ -54,13 +60,22 @@ def rule_runner() -> RuleRunner:
             *testutil.rules(),
             *util_rules(),
             *scala_dep_inf_rules(),
+            *scala_artifact_rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
             QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
         ],
-        target_types=[JvmArtifactTarget, ScalaSourcesGeneratorTarget, ScalacPluginTarget],
+        target_types=[
+            JvmArtifactTarget,
+            ScalaArtifactTarget,
+            ScalaSourcesGeneratorTarget,
+            ScalacPluginTarget,
+        ],
+        objects={
+            "parametrize": Parametrize,
+        },
     )
     rule_runner.set_options(
         args=["--scala-version-for-resolve={'jvm-default':'2.13.8'}"],
@@ -872,3 +887,219 @@ def test_compile_no_deps_scala3(
     assert len(check_results.results) == 1
     check_result = check_results.results[0]
     assert check_result.exit_code == 0
+
+
+@pytest.fixture
+def cats_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "cats.test.lock",
+        [
+            "org.typelevel:cats-core_2.13:2.9.0",
+            "org.scala-lang:scala-library:2.13.8",
+        ],
+    )
+
+
+@pytest.fixture
+def cats_jvm_lockfile(
+    cats_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return cats_jvm_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_compile_dep_on_scala_artifact(
+    rule_runner: RuleRunner,
+    scala_stdlib_jvm_lockfile: JVMLockfileFixture,
+    cats_jvm_lockfile: JVMLockfileFixture,
+) -> None:
+    third_party_build_file = scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets() + dedent(
+        """\
+        scala_artifact(
+            name = "cats",
+            group = "org.typelevel",
+            artifact = "cats-core",
+            version = "2.9.0"
+        )
+        """
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                scala_sources(
+                    name = 'lib',
+                    dependencies = ["3rdparty/jvm:cats"]
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": third_party_build_file,
+            "3rdparty/jvm/default.lock": cats_jvm_lockfile.serialized_lockfile,
+            "ExampleLib.scala": dedent(
+                """
+                import cats._
+                import cats.implicits._
+
+                object ExampleLib {
+                    val values = Functor[List].map(List(1, 2, 3, 4))(_.toString)
+                }
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        args=[
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="lib")
+    )
+
+    classpath = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
+    )
+    assert classpath.content == {
+        ".ExampleLib.scala.lib.scalac.jar": {
+            "ExampleLib$.class",
+            "ExampleLib.class",
+            "META-INF/MANIFEST.MF",
+        }
+    }
+
+
+@pytest.fixture
+def acyclic_scala212_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "acyclic-scala212.test.lock",
+        [
+            "com.lihaoyi:acyclic_2.12:0.2.1",
+            "org.scala-lang:scala-library:2.12.15",
+        ],
+    )
+
+
+@pytest.fixture
+def acyclic_scala212_lockfile(
+    acyclic_scala212_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return acyclic_scala212_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_cross_compile_with_scalac_plugin(
+    rule_runner: RuleRunner,
+    acyclic_jvm_lockfile: JVMLockfileFixture,
+    acyclic_scala212_lockfile: JVMLockfileFixture,
+    scala_2_12_lockfile: JVMLockfileFixture,
+    scala_stdlib_jvm_lockfile: JVMLockfileFixture,
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                scala_artifact(
+                    name="acyclic",
+                    group="com.lihaoyi",
+                    artifact="acyclic",
+                    version="0.2.1",
+                    resolve=parametrize("scala2.12", "scala2.13"),
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD.2_12": scala_2_12_lockfile.requirements_as_jvm_artifact_targets(
+                version_in_target_name=True, resolve="scala2.12"
+            ),
+            "3rdparty/jvm/BUILD.2_13": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(
+                version_in_target_name=True, resolve="scala2.13"
+            ),
+            "3rdparty/jvm/scala213.lock": acyclic_jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/scala212.lock": acyclic_scala212_lockfile.serialized_lockfile,
+            "lib/BUILD": dedent(
+                """\
+                scalac_plugin(
+                    name = "acyclic",
+                    artifact = "3rdparty/jvm:acyclic",
+                )
+
+                scala_sources(
+                    name="main",
+                    scalac_plugins=["acyclic"],
+                    resolve=parametrize("scala2.12", "scala2.13")
+                )
+                """
+            ),
+            "lib/A.scala": dedent(
+                """
+                package lib
+                import acyclic.file
+
+                class A {
+                  val b: B = null
+                }
+                """
+            ),
+            "lib/B.scala": dedent(
+                """
+                package lib
+
+                class B {
+                  val a: A = null
+                }
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        [
+            '--scala-version-for-resolve={"scala2.12":"2.12.15","scala2.13":"2.13.8"}',
+            '--jvm-resolves={"scala2.12":"3rdparty/jvm/scala212.lock","scala2.13":"3rdparty/jvm/scala213.lock"}',
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    classpath_2_12 = rule_runner.request(
+        FallibleClasspathEntry,
+        [
+            CompileScalaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner,
+                    Address(
+                        spec_path="lib",
+                        target_name="main",
+                        relative_file_path="A.scala",
+                        parameters={"resolve": "scala2.12"},
+                    ),
+                ),
+                resolve=make_resolve(rule_runner, "scala2.12", "3rdparty/jvm/scala212.lock"),
+            )
+        ],
+    )
+
+    assert classpath_2_12.result == CompileResult.FAILED and classpath_2_12.stderr
+    assert "error: Unwanted cyclic dependency" in classpath_2_12.stderr
+
+    classpath_2_13 = rule_runner.request(
+        FallibleClasspathEntry,
+        [
+            CompileScalaSourceRequest(
+                component=expect_single_expanded_coarsened_target(
+                    rule_runner,
+                    Address(
+                        spec_path="lib",
+                        target_name="main",
+                        relative_file_path="A.scala",
+                        parameters={"resolve": "scala2.13"},
+                    ),
+                ),
+                resolve=make_resolve(rule_runner, "scala2.13", "3rdparty/jvm/scala213.lock"),
+            )
+        ],
+    )
+
+    assert classpath_2_13.result == CompileResult.FAILED and classpath_2_13.stderr
+    assert "error: Unwanted cyclic dependency" in classpath_2_13.stderr

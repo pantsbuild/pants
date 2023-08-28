@@ -34,9 +34,9 @@ use std::sync::Arc;
 use std::time::{self, Duration};
 
 use bytes::{BufMut, Bytes};
-use hashing::{sync_verified_copy, Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
+use hashing::{sync_verified_copy, AgedFingerprint, Digest, Fingerprint, FINGERPRINT_SIZE};
 use lmdb::{
-  self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
+  self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
 };
 use log::trace;
@@ -107,6 +107,8 @@ struct EnvironmentId(u8);
 // Each LMDB directory can have at most one concurrent writer.
 // We use this type to shard storage into 16 LMDB directories, based on the first 4 bits of the
 // fingerprint being stored, so that we can write to them in parallel.
+//
+// TODO: This should likely use an Arc around an inner struct, because it is frequently cloned.
 #[derive(Debug, Clone)]
 pub struct ShardedLmdb {
   // First Database is content, second is leases.
@@ -218,7 +220,7 @@ impl ShardedLmdb {
     let mut envs = Vec::with_capacity(shard_count as usize);
     for b in 0..shard_count {
       let dir = root_path.join(format!("{b:x}"));
-      fs::safe_create_dir_all(&dir)
+      std::fs::create_dir_all(&dir)
         .map_err(|err| format!("Error making directory for store at {dir:?}: {err:?}"))?;
       let fingerprint_prefix = b.rotate_left(shard_shift as u32);
       envs.push((
@@ -283,7 +285,7 @@ impl ShardedLmdb {
     &self.lmdbs[&EnvironmentId(fingerprint[0] & self.shard_fingerprint_mask)]
   }
 
-  pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
+  fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
     self
       .lmdbs
       .values()
@@ -298,9 +300,15 @@ impl ShardedLmdb {
       .spawn_blocking(
         move || {
           let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
-          let (env, db, _lease_database) = store.get(&fingerprint);
+          let (env, db, lease_database) = store.get(&fingerprint);
           let del_res = env.begin_rw_txn().and_then(|mut txn| {
             txn.del(db, &effective_key, None)?;
+            txn
+              .del(lease_database, &effective_key, None)
+              .or_else(|err| match err {
+                lmdb::Error::NotFound => Ok(()),
+                err => Err(err),
+              })?;
             txn.commit()
           });
 
@@ -388,6 +396,67 @@ impl ShardedLmdb {
           Ok(exists)
         },
         |e| Err(format!("`exists_batch` task failed: {e}")),
+      )
+      .await
+  }
+
+  ///
+  /// Returns all fingerprints and their ages.
+  ///
+  pub async fn all_fingerprints(&self) -> Result<Vec<AgedFingerprint>, String> {
+    let store = self.clone();
+    self
+      .executor
+      .spawn_blocking(
+        move || {
+          let mut fingerprints = Vec::new();
+          for (env, database, lease_database) in &store.all_lmdbs() {
+            let txn = env
+              .begin_ro_txn()
+              .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
+            let mut cursor = txn
+              .open_ro_cursor(*database)
+              .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
+            for key_res in cursor.iter() {
+              let (key, bytes) =
+                key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
+
+              // Random access into the lease_database is slower than iterating, but hopefully garbage
+              // collection is rare enough that we can get away with this, rather than do two passes
+              // here (either to populate leases into pre-populated AgedFingerprints, or to read sizes
+              // when we delete from lmdb to track how much we've freed).
+              let lease_until_unix_timestamp = txn
+                .get(*lease_database, &key)
+                .map(|b| {
+                  let mut array = [0_u8; 8];
+                  array.copy_from_slice(b);
+                  u64::from_le_bytes(array)
+                })
+                .unwrap_or_else(|e| match e {
+                  lmdb::Error::NotFound => 0,
+                  e => panic!("Error reading lease, probable lmdb corruption: {e:?}"),
+                });
+
+              let leased_until = time::UNIX_EPOCH + Duration::from_secs(lease_until_unix_timestamp);
+
+              let expired_seconds_ago = time::SystemTime::now()
+                .duration_since(leased_until)
+                .map(|t| t.as_secs())
+                // 0 indicates unexpired.
+                .unwrap_or(0);
+
+              let v = VersionedFingerprint::from_bytes_unsafe(key);
+              let fingerprint = v.get_fingerprint();
+              fingerprints.push(AgedFingerprint {
+                expired_seconds_ago,
+                fingerprint,
+                size_bytes: bytes.len(),
+              });
+            }
+          }
+          Ok(fingerprints)
+        },
+        |e| Err(format!("`all_fingerprints` task failed: {e}")),
       )
       .await
   }
@@ -492,8 +561,9 @@ impl ShardedLmdb {
     &self,
     initial_lease: bool,
     data_is_immutable: bool,
+    expected_digest: Digest,
     data_provider: F,
-  ) -> Result<Digest, String>
+  ) -> Result<(), String>
   where
     R: Read + Debug,
     F: Fn() -> Result<R, io::Error> + Send + 'static,
@@ -505,17 +575,9 @@ impl ShardedLmdb {
         move || {
           let mut attempts = 0;
           loop {
-            // First pass: compute the Digest.
-            let digest = {
-              let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
-              let mut hasher = WriterHasher::new(io::sink());
-              let _ = io::copy(&mut read, &mut hasher)
-                .map_err(|e| format!("Failed to read from {read:?}: {e}"))?;
-              hasher.finish().0
-            };
-
-            let effective_key = VersionedFingerprint::new(digest.hash, ShardedLmdb::SCHEMA_VERSION);
-            let (env, db, lease_database) = store.get(&digest.hash);
+            let effective_key =
+              VersionedFingerprint::new(expected_digest.hash, ShardedLmdb::SCHEMA_VERSION);
+            let (env, db, lease_database) = store.get(&expected_digest.hash);
             let put_res: Result<(), StoreError> = env
               .begin_rw_txn()
               .map_err(StoreError::Lmdb)
@@ -525,15 +587,16 @@ impl ShardedLmdb {
                   .reserve(
                     db,
                     &effective_key,
-                    digest.size_bytes,
+                    expected_digest.size_bytes,
                     WriteFlags::NO_OVERWRITE,
                   )?
                   .writer();
                 let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
                 let should_retry =
-                  !sync_verified_copy(digest, data_is_immutable, &mut read, &mut writer).map_err(
-                    |e| format!("Failed to copy from {read:?} or store in {env:?}: {e:?}"),
-                  )?;
+                  !sync_verified_copy(expected_digest, data_is_immutable, &mut read, &mut writer)
+                    .map_err(|e| {
+                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
+                  })?;
 
                 if should_retry {
                   let msg = format!("Input {read:?} changed while reading.");
@@ -554,7 +617,7 @@ impl ShardedLmdb {
               });
 
             match put_res {
-              Ok(()) => return Ok(digest),
+              Ok(()) => return Ok(()),
               Err(StoreError::Retry(msg)) => {
                 // Input changed during reading: maybe retry.
                 if attempts > 10 {
@@ -564,9 +627,13 @@ impl ShardedLmdb {
                   continue;
                 }
               }
-              Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(digest),
-              Err(StoreError::Lmdb(err)) => return Err(format!("Error storing {digest:?}: {err}")),
-              Err(StoreError::Io(err)) => return Err(format!("Error storing {digest:?}: {err}")),
+              Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(()),
+              Err(StoreError::Lmdb(err)) => {
+                return Err(format!("Error storing {expected_digest:?}: {err}"))
+              }
+              Err(StoreError::Io(err)) => {
+                return Err(format!("Error storing {expected_digest:?}: {err}"))
+              }
             };
           }
         },
