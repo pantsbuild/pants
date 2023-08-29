@@ -6,15 +6,15 @@
 
 import re
 from functools import partial
-from typing import Match
+from typing import Dict, Iterable, Match
 
 
 def all_hyphen_to_dot(m: Match) -> str:
-    return m.string.replace("-", ".")
+    return str(m.string).replace("-", ".")
 
 
 def first_group_hyphen_to_underscore(m: Match) -> str:
-    return m.groups()[0].replace("-", "_")
+    return str(m.groups()[0]).replace("-", "_")
 
 
 # TODO: combine the following two functions by passing in the replacements?
@@ -48,7 +48,7 @@ The match is either a string or a function that takes a re.Match and returns
 the replacement. see re.sub for more information
 ```
 """
-DEFAULT_MODULE_PATTERN_MAPPING = {
+DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, Iterable] = {
     re.compile(r"""^(google-cloud-)([^.]+)"""): [
         two_groups_hyphen_dot_concat_with_suffix,
         partial(two_groups_hyphen_dot_concat_with_suffix, custom_suffix="_v1"),

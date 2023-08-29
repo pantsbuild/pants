@@ -937,4 +937,11 @@ def test_generate_mappings_from_pattern_no_match(rule_runner: RuleRunner) -> Non
     assert generate_mappings_from_pattern("", "bar") == ["bar"]
 
 
-# def generate_mappings_from_pattern(proj_name: str, fallback: str) -> Iterable[str]:
+def test_number_of_capture_groups_for_functions() -> None:
+    # if m.re.groups == 0 or not m.groups():
+    #     raise ValueError("expected at least one group")
+    pass
+
+
+def test_group_using_verbose_backslash_g_format() -> None:
+    pass
