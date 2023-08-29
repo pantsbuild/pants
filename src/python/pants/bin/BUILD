@@ -92,17 +92,6 @@ target(
     ],
 )
 
-# This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
-# pip installers, ie: it is why this works to get `pants` on your PATH:
-# $ pip install pantsbuild.pants
-# $ pants
-pex_binary(
-    name="pants",
-    entry_point="pants.bin.pants_loader:main",
-    dependencies=[":pants_loader"],
-    strip_pex_env=False,
-)
-
 resources(
     name="native_client",
     sources=["native_client"],
