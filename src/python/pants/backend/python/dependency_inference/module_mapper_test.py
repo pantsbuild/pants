@@ -411,6 +411,11 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             # Only assume it's a type stubs dep if we are certain it's not an implementation.
             req("looks_like_stubs", "looks-like-stubs-types", modules=["looks_like_stubs"]),
             req("google-cloud-hardyhar", "google-cloud-hardyhar"),
+            req("google-cloud-secret-manager", "google-cloud-secret-manager"),
+            req("azure-keyvault-secrets", "azure-keyvault-secrets"),
+            req("django-model-utils", "model_utils"),
+            req("django-taggit", "taggit"),
+            req("opentelemetry-instrumentation-botocore", "opentelemetry-instrumentation-botocore"),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
@@ -436,6 +441,18 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 ),
                 "default": FrozenDict(
                     {
+                        "azure.keyvault.secrets": (
+                            ModuleProvider(
+                                Address("", target_name="azure-keyvault-secrets"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "azure_keyvault_secrets": (
+                            ModuleProvider(
+                                Address("", target_name="azure-keyvault-secrets"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
                         "file_dist": (
                             ModuleProvider(
                                 Address("", target_name="file_dist"), ModuleProviderType.IMPL
@@ -465,10 +482,41 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                                 ModuleProviderType.IMPL,
                             ),
                         ),
+                        "google.cloud.secretmanager": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.secretmanager_v1": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.secretmanager_v2": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "google.cloud.secretmanager_v3": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
                         # this is the fallback
                         "google_cloud_hardyhar": (
                             ModuleProvider(
                                 Address("", target_name="google-cloud-hardyhar"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        # this is the fallback
+                        "google_cloud_secret_manager": (
+                            ModuleProvider(
+                                Address("", target_name="google-cloud-secret-manager"),
                                 ModuleProviderType.IMPL,
                             ),
                         ),
@@ -482,14 +530,38 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                                 Address("", target_name="modules"), ModuleProviderType.IMPL
                             ),
                         ),
+                        "model_utils": (
+                            ModuleProvider(
+                                Address("", target_name="django-model-utils"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
                         "multiple_owners": (
                             ModuleProvider(
                                 Address("", target_name="multiple_owners1"), ModuleProviderType.IMPL
                             ),
                         ),
+                        "opentelemetry.instrumentation.botocore": (
+                            ModuleProvider(
+                                Address("", target_name="opentelemetry-instrumentation-botocore"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "opentelemetry_instrumentation_botocore": (
+                            ModuleProvider(
+                                Address("", target_name="opentelemetry-instrumentation-botocore"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
                         "req1": (
                             ModuleProvider(
                                 Address("", target_name="req1"), ModuleProviderType.IMPL
+                            ),
+                        ),
+                        "taggit": (
+                            ModuleProvider(
+                                Address("", target_name="django-taggit"),
+                                ModuleProviderType.IMPL,
                             ),
                         ),
                         "typed_dep1": (
