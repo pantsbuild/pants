@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::future;
 use hashing::{async_verified_copy, Digest, Fingerprint};
 use opendal::Operator;
 use std::collections::HashSet;
@@ -61,8 +62,19 @@ impl ByteStoreProvider for Provider {
 
   async fn list_missing_digests(
     &self,
-    _digests: &mut (dyn Iterator<Item = Digest> + Send),
+    digests: &mut (dyn Iterator<Item = Digest> + Send),
   ) -> Result<HashSet<Digest>, String> {
-    unimplemented!()
+    // NB. this is doing individual requests and thus may be expensive
+    let existences = future::try_join_all(digests.map(|digest| async move {
+      let path = self.path(digest.hash);
+      match self.op.is_exist(&path).await {
+        Ok(true) => Ok(None),
+        Ok(false) => Ok(Some(digest)),
+        Err(e) => Err(format!("failed to query {}: {}", path, e)),
+      }
+    }))
+    .await?;
+
+    Ok(existences.into_iter().flatten().collect())
   }
 }
