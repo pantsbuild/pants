@@ -1,0 +1,16 @@
+rules:
+  - id: use-pure-path
+    patterns:
+      - pattern: pathlib.Path
+    message: >-
+      Don't use pathlib.Path, use pathlib.PurePath instead: file IO should happen via the engine, not Python
+    languages:
+      - python
+    severity: ERROR
+    paths:
+      # this only matters in code that runs as part of `pants ...`
+      exclude:
+        - "*_test.py"
+      include:
+        - src/python/pants/
+        - pants-plugins/
