@@ -14,3 +14,19 @@ rules:
       include:
         - src/python/pants/
         - pants-plugins/
+
+  - id: use-pants-softwrap
+    patterns:
+      - pattern: textwrap.dedent
+    message: >-
+      Don't use `textwrap.dedent`, use `pants.util.strutil.softwrap` instead
+    languages:
+      - python
+    severity: ERROR
+    paths:
+      # this only matters in code that runs as part of `pants ...`
+      exclude:
+        - "*_test.py"
+      include:
+        - src/python/pants/
+        - pants-plugins/
