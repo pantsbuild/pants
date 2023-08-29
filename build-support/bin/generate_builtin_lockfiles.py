@@ -51,6 +51,7 @@ from pants.backend.python.typecheck.pytype.subsystem import Pytype
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.backend.tools.semgrep.subsystem import SemgrepSubsystem
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.base.build_environment import get_buildroot
 from pants.jvm.resolve.jvm_tool import JvmToolBase
@@ -124,6 +125,7 @@ all_python_tools = tuple(
             PythonTool(Pytype, "pants.backend.python.typecheck.pytype", "CPython>=3.7,<3.11"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
             PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff"),
+            PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
             PythonTool(TerraformHcl2Parser, "pants.backend.experimental.terraform"),
