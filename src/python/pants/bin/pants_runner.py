@@ -87,39 +87,40 @@ class PantsRunner:
             stderr_fileno=stderr_fileno,
         ):
             run_via_scie = "SCIE" in os.environ
-            enable_scie_warning = "NO_SCIE_WARNING" not in os.environ
+            enable_scie_warnings = "NO_SCIE_WARNING" not in os.environ
             scie_pants_version = os.environ.get("SCIE_PANTS_VERSION")
 
-            if not run_via_scie and enable_scie_warning:
-                raise RuntimeError(
-                    softwrap(
-                        f"""
-                        The `pants` launcher binary is now the only supported way of running Pants.
-                        See {doc_url("installation")} for details.
-                        """
-                    ),
-                )
+            if enable_scie_warnings:
+                if not run_via_scie:
+                    raise RuntimeError(
+                        softwrap(
+                            f"""
+                            The `pants` launcher binary is now the only supported way of running Pants.
+                            See {doc_url("installation")} for details.
+                            """
+                        ),
+                    )
 
-            if run_via_scie and (
-                # either scie-pants is too old to communicate its version:
-                scie_pants_version is None
-                # or the version itself is too old:
-                or Version(scie_pants_version) < MINIMUM_SCIE_PANTS_VERSION
-            ):
-                current_version_text = (
-                    f"The current version of the `pants` launcher binary is {scie_pants_version}"
-                    if scie_pants_version
-                    else "Run `PANTS_BOOTSTRAP_VERSION=report pants` to see the current version of the `pants` launcher binary"
-                )
-                warn_or_error(
-                    "2.18.0.dev6",
-                    f"using a `pants` launcher binary older than {MINIMUM_SCIE_PANTS_VERSION}",
-                    softwrap(
-                        f"""
-                        {current_version_text}, and see {doc_url("installation")} for how to upgrade.
-                        """
-                    ),
-                )
+                if run_via_scie and (
+                    # either scie-pants is too old to communicate its version:
+                    scie_pants_version is None
+                    # or the version itself is too old:
+                    or Version(scie_pants_version) < MINIMUM_SCIE_PANTS_VERSION
+                ):
+                    current_version_text = (
+                        f"The current version of the `pants` launcher binary is {scie_pants_version}"
+                        if scie_pants_version
+                        else "Run `PANTS_BOOTSTRAP_VERSION=report pants` to see the current version of the `pants` launcher binary"
+                    )
+                    warn_or_error(
+                        "2.18.0.dev6",
+                        f"using a `pants` launcher binary older than {MINIMUM_SCIE_PANTS_VERSION}",
+                        softwrap(
+                            f"""
+                            {current_version_text}, and see {doc_url("installation")} for how to upgrade.
+                            """
+                        ),
+                    )
 
             # N.B. We inline imports to speed up the python thin client run, and avoids importing
             # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
