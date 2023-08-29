@@ -23,6 +23,8 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
     DEFAULT_MODULE_PATTERN_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
+    first_group_hyphen_to_underscore,
+    two_groups_hyphens_two_replacements_with_suffix,
 )
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
@@ -938,9 +940,10 @@ def test_generate_mappings_from_pattern_no_match(rule_runner: RuleRunner) -> Non
 
 
 def test_number_of_capture_groups_for_functions() -> None:
-    # if m.re.groups == 0 or not m.groups():
-    #     raise ValueError("expected at least one group")
-    pass
+    with pytest.raises(ValueError):
+        re.sub("foo", first_group_hyphen_to_underscore, "foo")
+    with pytest.raises(ValueError):
+        re.sub("foo", two_groups_hyphens_two_replacements_with_suffix, "foo")
 
 
 def test_group_using_verbose_backslash_g_format() -> None:

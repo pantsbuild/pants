@@ -9,29 +9,32 @@ from functools import partial
 from typing import Dict, Iterable, Match
 
 
-def all_hyphen_to_dot(m: Match) -> str:
-    return str(m.string).replace("-", ".")
+def all_hyphen_to_dot(m: Match[str]) -> str:
+    return m.string.replace("-", ".")
 
 
-def first_group_hyphen_to_underscore(m: Match) -> str:
+def first_group_hyphen_to_underscore(m: Match[str]) -> str:
+    if m.re.groups == 0 or not m.groups():
+        raise ValueError(f"expected at least one group in the pattern{m.re.pattern} but got none.")
     return str(m.groups()[0]).replace("-", "_")
 
 
-# TODO: combine the following two functions by passing in the replacements?
-def first_group_hyphen_to_dot_second_hyphen_to_underscore(m: Match) -> str:
-    """take two groups, the first will have '-' replaced with '.', the second will have '-' replaced
-    with '_' e.g. opentelemetry-instrumentation-aio-pika ->
-    group1(opentelemtetry.instrumentation.)group2(aio_pika)"""
-    prefix = m.string[m.start(1) : m.end(1)].replace("-", ".")
-    suffix = m.string[m.start(2) : m.end(2)].replace("-", "_")
-    return f"{prefix}{suffix}"
+def first_group_hyphen_to_dot_second_hyphen_to_underscore(m: Match[str]) -> str:
+    return two_groups_hyphens_two_replacements_with_suffix(m, second_group_replacement="_")
 
 
-def two_groups_hyphen_dot_concat_with_suffix(m: Match, custom_suffix: str = "") -> str:
+def two_groups_hyphens_two_replacements_with_suffix(
+    m: Match[str],
+    first_group_replacement: str = ".",
+    second_group_replacement: str = "",
+    custom_suffix: str = "",
+) -> str:
     """take two groups, the first will have '-' replaced with '.', the second will have '-' replaced
     with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)"""
-    prefix = m.string[m.start(1) : m.end(1)].replace("-", ".")
-    suffix = m.string[m.start(2) : m.end(2)].replace("-", "")
+    if m.re.groups < 2 or not m.groups():
+        raise ValueError(f"expected at least two groups in the pattern{m.re.pattern}.")
+    prefix = m.string[m.start(1) : m.end(1)].replace("-", first_group_replacement)
+    suffix = m.string[m.start(2) : m.end(2)].replace("-", second_group_replacement)
     return f"{prefix}{suffix}{custom_suffix}"
 
 
@@ -50,10 +53,10 @@ the replacement. see re.sub for more information
 """
 DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, Iterable] = {
     re.compile(r"""^(google-cloud-)([^.]+)"""): [
-        two_groups_hyphen_dot_concat_with_suffix,
-        partial(two_groups_hyphen_dot_concat_with_suffix, custom_suffix="_v1"),
-        partial(two_groups_hyphen_dot_concat_with_suffix, custom_suffix="_v2"),
-        partial(two_groups_hyphen_dot_concat_with_suffix, custom_suffix="_v3"),
+        two_groups_hyphens_two_replacements_with_suffix,
+        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix="_v1"),
+        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix="_v2"),
+        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix="_v3"),
     ],
     re.compile(r"""^azure-.+"""): [all_hyphen_to_dot],
     re.compile(r"""^django-((.+(-.+)?))"""): [first_group_hyphen_to_underscore],
