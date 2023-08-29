@@ -117,7 +117,7 @@ def format_notes(entries: list[Entry]) -> str:
 def main(tag) -> None:
     repo = github_repo()
 
-    # NBL This assumes the tag (and relevant history) is already pulled
+    # NB: This assumes the tag (and relevant history) is already pulled
     entries = [prepare_sha(sha, repo) for sha in relevant_shas(tag)]
     notes = format_notes(entries)
 
