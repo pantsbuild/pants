@@ -604,8 +604,6 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             }
         )
     )
-    print(result)
-    print(expected)
     assert result == expected
 
 
