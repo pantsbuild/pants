@@ -2,15 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
-import re
 
+import re
 from pathlib import PurePath
 from textwrap import dedent
 from types import FunctionType
+from typing import Iterable
 
 import pytest
 from packaging.utils import canonicalize_name as canonicalize_project_name
-from typing import Iterable
 
 from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
 from pants.backend.codegen.protobuf.python.additional_fields import (
@@ -21,8 +21,8 @@ from pants.backend.codegen.protobuf.target_types import rules as protobuf_target
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
-    DEFAULT_TYPE_STUB_MODULE_MAPPING,
     DEFAULT_MODULE_PATTERN_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
@@ -32,8 +32,8 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
     ThirdPartyPythonModuleMapping,
-    module_from_stripped_path,
     generate_mappings_from_pattern,
+    module_from_stripped_path,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import (
