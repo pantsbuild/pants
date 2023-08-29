@@ -6,7 +6,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.python.util_rules import pex
@@ -43,7 +43,7 @@ class SemgrepLintRequest(LintTargetsRequest):
 
 @dataclass(frozen=True)
 class PartitionMetadata:
-    config_files: frozenset[Path]
+    config_files: frozenset[PurePath]
     ignore_files: Snapshot
 
     @property
@@ -69,9 +69,9 @@ class SemgrepIgnoreFiles:
 
 @dataclass
 class AllSemgrepConfigs:
-    configs_by_dir: dict[Path, set[Path]]
+    configs_by_dir: dict[PurePath, set[PurePath]]
 
-    def ancestor_configs(self, address: Address) -> Iterable[Path]:
+    def ancestor_configs(self, address: Address) -> Iterable[PurePath]:
         # TODO: introspect the semgrep rules and determine which (if any) apply to the files, e.g. a
         # Python file shouldn't depend on a .semgrep.yml that doesn't have any 'python' or 'generic'
         # rules, and similarly if there's path inclusions/exclusions.
@@ -79,7 +79,7 @@ class AllSemgrepConfigs:
         # addition/exclusion), but that can only infer 'full' dependencies and it is wrong (e.g. JVM
         # things break) for real code files to depend on this sort of non-code linter config; requires
         # dependency scopes or similar (https://github.com/pantsbuild/pants/issues/12794)
-        spec = Path(address.spec_path)
+        spec = PurePath(address.spec_path)
 
         for ancestor in itertools.chain([spec], spec.parents):
             yield from self.configs_by_dir.get(ancestor, [])
@@ -88,7 +88,7 @@ class AllSemgrepConfigs:
 def _group_by_semgrep_dir(all_paths: Paths) -> AllSemgrepConfigs:
     configs_by_dir = defaultdict(set)
     for path_ in all_paths.files:
-        path = Path(path_)
+        path = PurePath(path_)
         # A rule like foo/bar/.semgrep/baz.yaml should behave like it's in in foo/bar, not
         # foo/bar/.semgrep
         parent = path.parent
@@ -110,7 +110,7 @@ class RelevantSemgrepConfigsRequest:
     field_set: SemgrepFieldSet
 
 
-class RelevantSemgrepConfigs(frozenset[Path]):
+class RelevantSemgrepConfigs(frozenset[PurePath]):
     pass
 
 

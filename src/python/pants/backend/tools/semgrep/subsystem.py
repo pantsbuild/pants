@@ -31,7 +31,7 @@ class SemgrepSubsystem(PythonToolBase):
     name = "Semgrep"
     options_scope = "semgrep"
     help = softwrap(
-        """\
+        """
         Lightweight static analysis for many languages. Find bug variants with patterns that look
         like source code. (https://semgrep.dev/)
 
@@ -60,7 +60,7 @@ class SemgrepSubsystem(PythonToolBase):
     force = BoolOption(
         default=False,
         help=softwrap(
-            """\
+            """
             If true, semgrep is always run, even if the input files haven't changed. This can be
             used to run cloud rulesets like `pants lint --semgrep-force
             --semgrep-args='--config=p/python' ::`. Without `--semgrep-force`, using the cloud
