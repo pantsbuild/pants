@@ -17,6 +17,7 @@ pub struct Provider {
 impl Provider {
   pub fn new(op: Operator, base_path: String) -> Provider {
     // FIXME: validate base_path
+    // FIXME: set up retries, timeouts, concurrency limits via layers
     Provider { op, base_path }
   }
 
@@ -41,12 +42,12 @@ impl ByteStoreProvider for Provider {
     destination: &mut dyn LoadDestination,
   ) -> Result<bool, String> {
     let path = self.path(digest.hash);
-    let mut reader = self
-      .op
-      .reader(&path)
-      .await
-      .map_err(|e| format!("failed to read {}: {}", path, e))?;
-    // FIXME: retries
+    let mut reader = match self.op.reader(&path).await {
+      Ok(reader) => reader,
+      Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
+      Err(e) => return Err(format!("failed to read {}: {}", path, e)),
+    };
+
     async_verified_copy(digest, false, &mut reader, destination)
       .await
       .map_err(|e| format!("failed to read {}: {}", path, e))

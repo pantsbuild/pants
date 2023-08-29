@@ -11,7 +11,7 @@ fn new_provider() -> Provider {
 }
 
 #[tokio::test]
-async fn load_existing_less_than_one_chunk() {
+async fn load_existing() {
   let testdata = TestData::roland();
   let provider = new_provider();
   provider
@@ -30,4 +30,18 @@ async fn load_existing_less_than_one_chunk() {
     .unwrap();
   assert!(found);
   assert_eq!(destination, testdata.bytes())
+}
+
+#[tokio::test]
+async fn load_missing() {
+  let testdata = TestData::roland();
+  let provider = new_provider();
+
+  let mut destination = Vec::new();
+  let found = provider
+    .load(testdata.digest(), &mut destination)
+    .await
+    .unwrap();
+  assert!(!found);
+  assert!(destination.is_empty())
 }
