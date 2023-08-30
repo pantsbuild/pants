@@ -320,6 +320,61 @@ class ReferenceGenerator:
         url_safe_scope = scope.replace(".", "-")
         return f"reference-{url_safe_scope}" if sync else f"{url_safe_scope}.md"
 
+    @staticmethod
+    def _generate_toml_snippet(option_data) -> str:
+        """Generate TOML snippet for a single option."""
+
+        # Generate a toml block for the option to help users fill out their `pants.toml`.  For
+        # scalars and arrays, we put them inline directly in the scope, while for maps we put
+        # them in a nested table. Since the metadata doesn't contain type info, we'll need to
+        # parse command line args a bit.
+
+        if not option_data.get("config_key", None):
+            # This option is not configurable.
+            return ""
+
+        toml_lines = []
+        example_cli = option_data["display_args"][0]
+        scope = option_data["scope"] or "GLOBAL"
+
+        config_key = option_data["config_key"]
+
+        if "[no-]" in example_cli:
+            val = "<bool>"
+        else:
+            _, val = example_cli.split("=", 1)
+
+        is_map = val.startswith('"{') and val.endswith('}"')
+        is_array = val.startswith('"[') and val.endswith(']"')
+        if is_map:
+            toml_lines.append(f"[{scope}.{config_key}]")
+            val = val[2:-2]  # strip the quotes and brackets
+
+            pairs = val.split(", ")
+            for pair in pairs:
+                if ":" in pair:
+                    k, v = pair.split(": ", 1)
+                    if k.startswith('"') or k.startswith("'"):
+                        k = k[1:-1]
+
+                    toml_lines.append(f"{k} = {v}")
+                else:
+                    # generally just the trailing ...
+                    toml_lines.append(pair)
+
+        elif is_array:
+            toml_lines.append(f"[{scope}]")
+            toml_lines.append(f"{config_key} = [")
+            val = val[2:-2]
+            for item in val.split(", "):
+                toml_lines.append(f"  {item},")
+            toml_lines.append("]")
+        else:
+            toml_lines.append(f"[{scope}]")
+            toml_lines.append(f"{config_key} = {val}")
+
+        return "\n".join(toml_lines)
+
     @classmethod
     def process_options_input(cls, help_info: dict[str, Any], *, sync: bool) -> dict:
         scope_to_help_info = help_info["scope_to_help_info"]
@@ -368,6 +423,8 @@ class ReferenceGenerator:
                 option_data["marked_up_default"] = f"<pre>{escaped_default_str}</pre>"
             else:
                 option_data["marked_up_default"] = f"<code>{escaped_default_str}</code>"
+
+            option_data["toml"] = cls._generate_toml_snippet(option_data)
 
         for shi in scope_to_help_info.values():
             for opt in shi["basic"]:
