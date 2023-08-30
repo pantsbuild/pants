@@ -368,8 +368,8 @@ jobs:
         subject: file://${{ runner.temp }}/email_announcement_subject.txt
         to: pants-devel@googlegroups.com
     - name: Get release notes
-      run: './pants run src/python/pants_release/generate_github_workflows.py -- "${{
-        needs.release_info.outputs.build-ref }}" > notes.txt
+      run: './pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref
+        }}" > notes.txt
 
         '
     - env:
