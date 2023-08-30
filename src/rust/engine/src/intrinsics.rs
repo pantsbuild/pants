@@ -12,8 +12,8 @@ use crate::context::Context;
 use crate::externs;
 use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
 use crate::nodes::{
-  lift_directory_digest, task_side_effected, DownloadedFile, ExecuteProcess, NodeResult, Paths,
-  RunId, SessionValues, Snapshot,
+  lift_directory_digest, task_side_effected, unmatched_globs_additional_context, DownloadedFile,
+  ExecuteProcess, NodeResult, RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
@@ -32,7 +32,10 @@ use pyo3::{IntoPy, PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
 use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
-use fs::{DigestTrie, DirectoryDigest, Entry, RelativePath, SymlinkBehavior, TypedPath};
+use fs::{
+  DigestTrie, DirectoryDigest, Entry, GlobMatching, PathStat, RelativePath, SymlinkBehavior,
+  TypedPath,
+};
 use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
@@ -398,10 +401,41 @@ fn path_globs_to_paths(
       Snapshot::lift_path_globs(py_path_globs)
     })
     .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
-    let paths = context.get(Paths::from_path_globs(path_globs)).await?;
-    Ok(Python::with_gil(|py| {
-      Paths::store_paths(py, &core, &paths)
-    })?)
+
+    let path_globs = path_globs.parse().map_err(throw)?;
+    let path_stats = context
+      .expand_globs(
+        path_globs,
+        SymlinkBehavior::Oblivious,
+        unmatched_globs_additional_context(),
+      )
+      .await?;
+
+    Python::with_gil(|py| {
+      let mut files = Vec::new();
+      let mut dirs = Vec::new();
+      for ps in path_stats.iter() {
+        match ps {
+          PathStat::File { path, .. } => {
+            files.push(Snapshot::store_path(py, path)?);
+          }
+          PathStat::Link { path, .. } => {
+            panic!("Paths shouldn't be symlink-aware {path:?}");
+          }
+          PathStat::Dir { path, .. } => {
+            dirs.push(Snapshot::store_path(py, path)?);
+          }
+        }
+      }
+      Ok(externs::unsafe_call(
+        py,
+        core.types.paths,
+        &[
+          externs::store_tuple(py, files),
+          externs::store_tuple(py, dirs),
+        ],
+      ))
+    })
   }
   .boxed()
 }
