@@ -110,11 +110,11 @@ def main() -> None:
         die(
             softwrap(
                 """
-            This script shouldn't be used for releases pre-2.18.x.
-            Follow the release docs for the relevant release.
+                This script shouldn't be used for releases pre-2.18.x.
+                Follow the release docs for the relevant release.
 
-            E.g. https://www.pantsbuild.org/v2.17/docs/release-process
-            """
+                E.g. https://www.pantsbuild.org/v2.17/docs/release-process
+                """
             )
         )
 
