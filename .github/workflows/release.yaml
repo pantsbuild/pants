@@ -333,7 +333,10 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download wheels
+    - env:
+        GH_REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+      name: Download wheels
       run: gh release download ${{ needs.release_info.outputs.build-ref }} -p '*.whl'
         --dir dest/pypi_release
     - name: Publish to PyPI

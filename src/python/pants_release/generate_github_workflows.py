@@ -1178,6 +1178,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 {
                     "name": "Download wheels",
                     "run": f"gh release download {gha_expr('needs.release_info.outputs.build-ref')} -p '*.whl' --dir {pypi_release_dir}",
+                    "env": {
+                        "GH_TOKEN": "${{ github.token }}",
+                        "GH_REPO": "${{ github.repository }}",
+                    },
                 },
                 {
                     "name": "Publish to PyPI",
