@@ -342,8 +342,4 @@ impl ByteStoreProvider for Provider {
       .map(|digest| digest.try_into())
       .collect::<Result<HashSet<_>, _>>()
   }
-
-  fn chunk_size_bytes(&self) -> usize {
-    self.chunk_size_bytes
-  }
 }

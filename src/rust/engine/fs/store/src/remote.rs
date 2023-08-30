@@ -42,8 +42,6 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
     &self,
     digests: &mut (dyn Iterator<Item = Digest> + Send),
   ) -> Result<HashSet<Digest>, String>;
-
-  fn chunk_size_bytes(&self) -> usize;
 }
 
 // TODO: Consider providing `impl Default`, similar to `super::LocalOptions`.
@@ -111,11 +109,6 @@ impl ByteStore {
     let instance_name = options.instance_name.clone();
     let provider = Arc::new(reapi::Provider::new(options).await?);
     Ok(ByteStore::new(instance_name, provider))
-  }
-
-  #[allow(dead_code)]
-  pub(crate) fn chunk_size_bytes(&self) -> usize {
-    self.provider.chunk_size_bytes()
   }
 
   pub async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {

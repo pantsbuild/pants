@@ -386,10 +386,6 @@ impl ByteStoreProvider for TestProvider {
     let blobs = self.blobs.lock();
     Ok(digests.filter(|d| !blobs.contains_key(&d.hash)).collect())
   }
-
-  fn chunk_size_bytes(&self) -> usize {
-    1234
-  }
 }
 
 struct AlwaysErrorProvider;
@@ -417,9 +413,5 @@ impl ByteStoreProvider for AlwaysErrorProvider {
     _: &mut (dyn Iterator<Item = Digest> + Send),
   ) -> Result<HashSet<Digest>, String> {
     Err("AlwaysErrorProvider always fails".to_owned())
-  }
-
-  fn chunk_size_bytes(&self) -> usize {
-    unreachable!("shouldn't call this")
   }
 }
