@@ -1234,7 +1234,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "name": "Get release notes",
                     "run": dedent(
                         """\
-                        ./pants run src/python/pants_release/generate_github_workflows.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
+                        ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
                         """
                     ),
                 },
