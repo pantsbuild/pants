@@ -367,7 +367,7 @@ class ReferenceGenerator:
             toml_lines.append(f"{config_key} = [")
             val = val[2:-2]
             for item in val.split(", "):
-                toml_lines.append(f"  {item},")
+                toml_lines.append(f"    {item},")
             toml_lines.append("]")
         else:
             toml_lines.append(f"[{scope}]")
