@@ -28,8 +28,8 @@ use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeI
 use crate::tasks::{self, Rule};
 use fs::{
   self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
-  GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs,
-  RelativePath, StrictGlobMatching, SymlinkBehavior, SymlinkEntry, Vfs,
+  GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PreparedPathGlobs, RelativePath,
+  StrictGlobMatching, SymlinkBehavior, SymlinkEntry, Vfs,
 };
 use process_execution::{
   self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessExecutionStrategy,
@@ -639,7 +639,7 @@ impl From<Scandir> for NodeKey {
   }
 }
 
-fn unmatched_globs_additional_context() -> Option<String> {
+pub fn unmatched_globs_additional_context() -> Option<String> {
   let url = Python::with_gil(|py| {
     externs::doc_url(
       py,
@@ -651,75 +651,6 @@ fn unmatched_globs_additional_context() -> Option<String> {
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
     they exist on disk. Refer to {url}."
   ))
-}
-
-///
-/// A node that captures Vec<PathStat> for resolved files/dirs from PathGlobs.
-///
-/// This is similar to the Snapshot node, but avoids digesting the files and writing to LMDB store
-/// as a performance optimization.
-///
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct Paths {
-  path_globs: PathGlobs,
-}
-
-impl Paths {
-  pub fn from_path_globs(path_globs: PathGlobs) -> Paths {
-    Paths { path_globs }
-  }
-
-  async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
-    context
-      .expand_globs(
-        path_globs,
-        SymlinkBehavior::Oblivious,
-        unmatched_globs_additional_context(),
-      )
-      .await
-  }
-
-  pub fn store_paths(py: Python, core: &Arc<Core>, item: &[PathStat]) -> Result<Value, String> {
-    let mut files = Vec::new();
-    let mut dirs = Vec::new();
-    for ps in item.iter() {
-      match ps {
-        PathStat::File { path, .. } => {
-          files.push(Snapshot::store_path(py, path)?);
-        }
-        PathStat::Link { path, .. } => {
-          panic!("Paths shouldn't be symlink-aware {path:?}");
-        }
-        PathStat::Dir { path, .. } => {
-          dirs.push(Snapshot::store_path(py, path)?);
-        }
-      }
-    }
-    Ok(externs::unsafe_call(
-      py,
-      core.types.paths,
-      &[
-        externs::store_tuple(py, files),
-        externs::store_tuple(py, dirs),
-      ],
-    ))
-  }
-
-  async fn run_node(self, context: Context) -> NodeResult<Arc<Vec<PathStat>>> {
-    let path_globs = self.path_globs.parse().map_err(throw)?;
-    let path_stats = Self::create(context, path_globs).await?;
-    Ok(Arc::new(path_stats))
-  }
-}
-
-impl CompoundNode<NodeKey> for Paths {
-  type Item = Arc<Vec<PathStat>>;
-}
-
-impl From<Paths> for NodeKey {
-  fn from(n: Paths) -> Self {
-    NodeKey::Paths(n)
-  }
 }
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
@@ -828,7 +759,7 @@ impl Snapshot {
     Ok(Value::new(py_snapshot.into_py(py)))
   }
 
-  fn store_path(py: Python, item: &Path) -> Result<Value, String> {
+  pub fn store_path(py: Python, item: &Path) -> Result<Value, String> {
     if let Some(p) = item.as_os_str().to_str() {
       Ok(externs::store_utf8(py, p))
     } else {
@@ -1301,7 +1232,6 @@ pub enum NodeKey {
   Scandir(Scandir),
   Select(Box<Select>),
   Snapshot(Snapshot),
-  Paths(Paths),
   SessionValues(SessionValues),
   RunId(RunId),
   Task(Box<Task>),
@@ -1323,7 +1253,6 @@ impl NodeKey {
       | &NodeKey::SessionValues { .. }
       | &NodeKey::RunId { .. }
       | &NodeKey::Snapshot { .. }
-      | &NodeKey::Paths { .. }
       | &NodeKey::Task { .. }
       | &NodeKey::DownloadedFile { .. } => None,
     }
@@ -1352,7 +1281,6 @@ impl NodeKey {
       NodeKey::Task(ref task) => &task.task.as_ref().display_info.name,
       NodeKey::ExecuteProcess(..) => "process",
       NodeKey::Snapshot(..) => "snapshot",
-      NodeKey::Paths(..) => "paths",
       NodeKey::DigestFile(..) => "digest_file",
       NodeKey::DownloadedFile(..) => "downloaded_file",
       NodeKey::ReadLink(..) => "read_link",
@@ -1394,7 +1322,6 @@ impl NodeKey {
         Some(desc)
       }
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
-      NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
       NodeKey::ExecuteProcess(epr) => {
         // NB: See Self::workunit_level for more information on why this is prefixed.
         Some(format!("Scheduling: {}", epr.process.description))
@@ -1495,7 +1422,6 @@ impl Node for NodeKey {
           NodeKey::Scandir(n) => n.run_node(context).await.map(NodeOutput::DirectoryListing),
           NodeKey::Select(n) => n.run_node(context).await.map(NodeOutput::Value),
           NodeKey::Snapshot(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
-          NodeKey::Paths(n) => n.run_node(context).await.map(NodeOutput::Paths),
           NodeKey::SessionValues(n) => n.run_node(context).await.map(NodeOutput::Value),
           NodeKey::RunId(n) => n.run_node(context).await.map(NodeOutput::Value),
           NodeKey::Task(n) => n.run_node(context, workunit).await.map(NodeOutput::Value),
@@ -1615,7 +1541,6 @@ impl Display for NodeKey {
       NodeKey::Snapshot(s) => write!(f, "Snapshot({})", s.path_globs),
       &NodeKey::SessionValues(_) => write!(f, "SessionValues"),
       &NodeKey::RunId(_) => write!(f, "RunId"),
-      NodeKey::Paths(s) => write!(f, "Paths({})", s.path_globs),
     }
   }
 }
@@ -1637,10 +1562,6 @@ pub enum NodeOutput {
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
-  // Allow clippy::rc_buffer due to non-trivial issues that would arise in using the
-  // suggested Arc<[PathStat]> type. See https://github.com/rust-lang/rust-clippy/issues/6170
-  #[allow(clippy::rc_buffer)]
-  Paths(Arc<Vec<PathStat>>),
   Value(Value),
 }
 
@@ -1661,10 +1582,7 @@ impl NodeOutput {
         digests.push(p.result.stderr_digest);
         digests
       }
-      NodeOutput::DirectoryListing(_)
-      | NodeOutput::LinkDest(_)
-      | NodeOutput::Paths(_)
-      | NodeOutput::Value(_) => vec![],
+      NodeOutput::DirectoryListing(_) | NodeOutput::LinkDest(_) | NodeOutput::Value(_) => vec![],
     }
   }
 }
@@ -1697,17 +1615,6 @@ impl TryFrom<NodeOutput> for store::Snapshot {
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
       NodeOutput::Snapshot(v) => Ok(v),
-      _ => Err(()),
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for Arc<Vec<PathStat>> {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
-      NodeOutput::Paths(v) => Ok(v),
       _ => Err(()),
     }
   }
