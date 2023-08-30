@@ -578,7 +578,7 @@ async def find_valid_field_sets_for_target_roots(
             logger.warning(str(no_applicable_exception))
 
     # NB: Remove when SecondaryOwnerMixin is removed
-    if targets_to_applicable_field_sets:
+    if targets_to_applicable_field_sets and request.warn_on_deprecated_secondary_owner_semantics:
         _maybe_warn_deprecated_secondary_owner_semantics(
             # NB: All of these should be memoized, so it's not inappropriate to request simply for warning sake.
             *(
