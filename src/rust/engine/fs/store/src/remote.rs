@@ -24,16 +24,22 @@ pub type StoreSource = Box<dyn AsyncRead + Send + Sync + Unpin + 'static>;
 
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
+  /// Store the bytes readable from `source` into the remote store
   async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String>;
 
+  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store` when the bytes
+  /// are already in memory
   async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String>;
 
+  /// Load the data stored (if any) in the remote store for `digest` into `destination`. Returns
+  /// true when found, false when not.
   async fn load(
     &self,
     digest: Digest,
     destination: &mut dyn LoadDestination,
   ) -> Result<bool, String>;
 
+  /// Return any digests from `digests` that are not (currently) available in the remote store.
   async fn list_missing_digests(
     &self,
     digests: &mut (dyn Iterator<Item = Digest> + Send),
@@ -107,21 +113,27 @@ impl ByteStore {
     Ok(ByteStore::new(instance_name, provider))
   }
 
+  /// Store the bytes readable from `source` into the remote store
   pub async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {
     self
-      .store_tracking(digest, || self.provider.store(digest, source))
+      .store_tracking("store", digest, || self.provider.store(digest, source))
       .await
   }
 
+  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store` when the bytes
+  /// are already in memory
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
     self
-      .store_tracking(digest, || self.provider.store_bytes(digest, bytes))
+      .store_tracking("store_bytes", digest, || {
+        self.provider.store_bytes(digest, bytes)
+      })
       .await
   }
 
   async fn store_tracking<DoStore, Fut>(
     &self,
+    workunit: &'static str,
     digest: Digest,
     do_store: DoStore,
   ) -> Result<(), String>
@@ -130,7 +142,7 @@ impl ByteStore {
     Fut: Future<Output = Result<(), String>> + Send,
   {
     in_workunit!(
-      "store_bytes",
+      workunit,
       Level::Trace,
       desc = Some(format!("Storing {digest:?}")),
       |workunit| async move {
