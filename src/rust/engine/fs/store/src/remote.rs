@@ -113,17 +113,18 @@ impl ByteStore {
     Ok(ByteStore::new(instance_name, provider))
   }
 
+  #[allow(dead_code)]
   pub(crate) fn chunk_size_bytes(&self) -> usize {
     self.provider.chunk_size_bytes()
   }
 
-  #[allow(dead_code)]
   pub async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {
     self
       .store_tracking(digest, || self.provider.store(digest, source))
       .await
   }
 
+  #[allow(dead_code)]
   pub async fn store_buffered<WriteToBuffer, WriteResult>(
     &self,
     digest: Digest,
