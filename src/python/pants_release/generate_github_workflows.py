@@ -1073,10 +1073,8 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
 
 def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
-    """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
     inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
-    pypi_release_dir = "dest/pypi_release"
     helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
         needs=["release_info"], for_deploy_ref=gha_expr("needs.release_info.outputs.build-ref")
@@ -1175,23 +1173,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
-                {
-                    "name": "Download wheels",
-                    "run": f"gh release download {gha_expr('needs.release_info.outputs.build-ref')} -p '*.whl' --dir {pypi_release_dir}",
-                    "env": {
-                        "GH_TOKEN": "${{ github.token }}",
-                        "GH_REPO": "${{ github.repository }}",
-                    },
-                },
-                {
-                    "name": "Publish to PyPI",
-                    "uses": "pypa/gh-action-pypi-publish@release/v1",
-                    "with": {
-                        "password": gha_expr("secrets.PANTSBUILD_PYPI_API_TOKEN"),
-                        "packages-dir": pypi_release_dir,
-                        "skip-existing": True,
-                    },
-                },
                 {
                     "name": "Generate announcement",
                     "run": dedent(
