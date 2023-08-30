@@ -875,15 +875,28 @@ def build_wheels_job(
                             #   support. `curl` is a good lowest-common-denominator way to upload the assets.
                             "run": dedent(
                                 """\
-                                LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
-                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
+                                PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+                                PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+                                PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+
+                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
                                 curl -L --fail \\
                                     -X POST \\
                                     -H "Authorization: Bearer ${{ github.token }}" \\
                                     -H "Content-Type: application/octet-stream" \\
-                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$LOCAL_TAG.pex \\
-                                    --data-binary "@dist/src.python.pants/pants.$LOCAL_TAG.pex"
+                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \\
+                                    --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+                                # NB: Also upload under an unversioned name throughout the 2.18.x release series.
+                                # See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$PY_VER-$PLAT.pex \\
+                                    --data-binary "@dist/src.python.pants/$PEX_FILENAME"
 
                                 WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
                                 curl -L --fail \\
