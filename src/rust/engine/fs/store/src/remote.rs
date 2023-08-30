@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
-use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -21,14 +20,13 @@ mod reapi;
 #[cfg(test)]
 mod reapi_tests;
 
-pub type ByteSource = Arc<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
 pub type StoreSource = Box<dyn AsyncRead + Send + Sync + Unpin + 'static>;
 
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
   async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String>;
 
-  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String>;
+  async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String>;
 
   async fn load(
     &self,
@@ -118,11 +116,7 @@ impl ByteStore {
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
     self
-      .store_tracking(digest, || {
-        self
-          .provider
-          .store_bytes(digest, Arc::new(move |range| bytes.slice(range)))
-      })
+      .store_tracking(digest, || self.provider.store_bytes(digest, bytes))
       .await
   }
 

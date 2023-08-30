@@ -35,6 +35,7 @@ task_executor = { path = "../../task_executor" }
 tempfile = { workspace = true }
 tokio-rustls = { workspace = true }
 tokio = { workspace = true, features = ["fs"] }
+tokio-util = { workspace = true, features = ["io"] }
 tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = { workspace = true }
 tryfuture = { path = "../../tryfuture" }

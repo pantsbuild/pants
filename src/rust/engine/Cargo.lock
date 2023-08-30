@@ -3368,6 +3368,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls",
+ "tokio-util 0.7.8",
  "tonic",
  "tower-service",
  "tryfuture",

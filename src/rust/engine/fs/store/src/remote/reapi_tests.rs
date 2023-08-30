@@ -1,7 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -15,7 +14,6 @@ use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
 use crate::MEGABYTES;
 
 use super::reapi::Provider;
-use super::ByteSource;
 
 fn remote_options(
   cas_address: String,
@@ -44,10 +42,6 @@ async fn new_provider(cas: &StubCAS) -> Provider {
   ))
   .await
   .unwrap()
-}
-
-fn byte_source(bytes: Bytes) -> ByteSource {
-  Arc::new(move |r| bytes.slice(r))
 }
 
 async fn load_test(chunk_size: usize) {
@@ -174,7 +168,7 @@ async fn store_bytes_one_chunk() {
   let provider = new_provider(&cas).await;
 
   provider
-    .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .unwrap();
 
@@ -197,7 +191,7 @@ async fn store_bytes_multiple_chunks() {
   let digest = Digest::new(fingerprint, all_the_henries.len());
 
   provider
-    .store_bytes(digest, byte_source(all_the_henries.clone()))
+    .store_bytes(digest, all_the_henries.clone())
     .await
     .unwrap();
 
@@ -211,7 +205,7 @@ async fn store_bytes_empty_file() {
   let provider = new_provider(&cas).await;
 
   provider
-    .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .unwrap();
 
@@ -225,7 +219,7 @@ async fn store_bytes_grpc_error() {
   let provider = new_provider(&cas).await;
 
   let error = provider
-    .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .expect_err("Want err");
   assert!(
@@ -246,7 +240,7 @@ async fn store_bytes_connection_error() {
   .unwrap();
 
   let error = provider
-    .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .expect_err("Want err");
   assert!(

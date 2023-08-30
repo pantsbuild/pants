@@ -13,9 +13,7 @@ use testutil::data::TestData;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
-use crate::remote::{
-  ByteSource, ByteStore, ByteStoreProvider, LoadDestination, RemoteOptions, StoreSource,
-};
+use crate::remote::{ByteStore, ByteStoreProvider, LoadDestination, RemoteOptions, StoreSource};
 use crate::tests::new_cas;
 use crate::MEGABYTES;
 
@@ -307,11 +305,8 @@ impl TestProvider {
 
 #[async_trait::async_trait]
 impl ByteStoreProvider for TestProvider {
-  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
-    self
-      .blobs
-      .lock()
-      .insert(digest.hash, bytes(0..digest.size_bytes));
+  async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String> {
+    self.blobs.lock().insert(digest.hash, bytes);
     Ok(())
   }
 
@@ -355,7 +350,7 @@ impl AlwaysErrorProvider {
 }
 #[async_trait::async_trait]
 impl ByteStoreProvider for AlwaysErrorProvider {
-  async fn store_bytes(&self, _: Digest, _: ByteSource) -> Result<(), String> {
+  async fn store_bytes(&self, _: Digest, _: Bytes) -> Result<(), String> {
     Err("AlwaysErrorProvider always fails".to_owned())
   }
 
