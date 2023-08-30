@@ -14,7 +14,7 @@ use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ServerCapabilities;
-use tokio::io::{AsyncSeekExt, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncSeekExt, AsyncWrite};
 use workunit_store::{in_workunit, ObservationMetric};
 
 use crate::StoreError;
@@ -24,9 +24,12 @@ mod reapi;
 mod reapi_tests;
 
 pub type ByteSource = Arc<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
+pub type StoreSource = Box<dyn AsyncRead + Send + Sync + Unpin + 'static>;
 
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
+  async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String>;
+
   async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String>;
 
   async fn load(

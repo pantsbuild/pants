@@ -29,7 +29,7 @@ use workunit_store::{Metric, ObservationMetric};
 
 use crate::RemoteOptions;
 
-use super::{ByteSource, ByteStoreProvider, LoadDestination};
+use super::{ByteSource, ByteStoreProvider, LoadDestination, StoreSource};
 
 pub struct Provider {
   instance_name: Option<String>,
@@ -230,6 +230,10 @@ impl ByteStoreProvider for Provider {
       self.store_bytes_source_stream(digest, bytes).await
     };
     result.map_err(|e| e.to_string())
+  }
+
+  async fn store(&self, _digest: Digest, _source: StoreSource) -> Result<(), String> {
+    unimplemented!()
   }
 
   async fn load(
