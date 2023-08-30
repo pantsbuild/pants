@@ -1537,6 +1537,7 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
+    warn_on_deprecated_secondary_owner_semantics: bool
     shard: int
     num_shards: int
 
@@ -1546,12 +1547,18 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         *,
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
+        warn_on_deprecated_secondary_owner_semantics: bool = True,
         shard: int = 0,
         num_shards: int = -1,
     ) -> None:
         object.__setattr__(self, "field_set_superclass", field_set_superclass)
         object.__setattr__(self, "goal_description", goal_description)
         object.__setattr__(self, "no_applicable_targets_behavior", no_applicable_targets_behavior)
+        object.__setattr__(
+            self,
+            "warn_on_deprecated_secondary_owner_semantics",
+            warn_on_deprecated_secondary_owner_semantics,
+        )
         object.__setattr__(self, "shard", shard)
         object.__setattr__(self, "num_shards", num_shards)
 

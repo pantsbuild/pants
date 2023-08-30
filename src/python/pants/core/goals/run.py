@@ -233,6 +233,7 @@ async def _find_what_to_run(
             RunFieldSet,
             goal_description=goal_description,
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
+            warn_on_deprecated_secondary_owner_semantics=False,
         ),
     )
 
