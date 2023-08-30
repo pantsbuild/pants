@@ -17,8 +17,6 @@ use remexec::ServerCapabilities;
 use tokio::io::{AsyncRead, AsyncSeekExt, AsyncWrite};
 use workunit_store::{in_workunit, ObservationMetric};
 
-use super::StoreError;
-
 mod reapi;
 #[cfg(test)]
 mod reapi_tests;
@@ -115,59 +113,6 @@ impl ByteStore {
     self
       .store_tracking(digest, || self.provider.store(digest, source))
       .await
-  }
-
-  #[allow(dead_code)]
-  pub async fn store_buffered<WriteToBuffer, WriteResult>(
-    &self,
-    digest: Digest,
-    write_to_buffer: WriteToBuffer,
-  ) -> Result<(), StoreError>
-  where
-    WriteToBuffer: FnOnce(std::fs::File) -> WriteResult,
-    WriteResult: Future<Output = Result<(), StoreError>>,
-  {
-    let write_buffer = tempfile::tempfile().map_err(|e| {
-      format!("Failed to create a temporary blob upload buffer for {digest:?}: {e}")
-    })?;
-    let read_buffer = write_buffer.try_clone().map_err(|e| {
-      format!("Failed to create a read handle for the temporary upload buffer for {digest:?}: {e}")
-    })?;
-    write_to_buffer(write_buffer).await?;
-
-    // Unsafety: Mmap presents an immutable slice of bytes, but the underlying file that is mapped
-    // could be mutated by another process. We guard against this by creating an anonymous
-    // temporary file and ensuring it is written to and closed via the only other handle to it in
-    // the code just above.
-    let mmap = Arc::new(unsafe {
-      let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
-        format!("Failed to memory map the temporary file buffer for {digest:?}: {e}")
-      })?;
-      if let Err(err) = madvise::madvise(
-        mapping.as_ptr(),
-        mapping.len(),
-        madvise::AccessPattern::Sequential,
-      ) {
-        log::warn!(
-          "Failed to madvise(MADV_SEQUENTIAL) for the memory map of the temporary file buffer for \
-          {digest:?}. Continuing with possible reduced performance: {err}",
-          digest = digest,
-          err = err
-        )
-      }
-      Ok(mapping) as Result<memmap::Mmap, String>
-    }?);
-
-    self
-      .store_tracking(digest, || {
-        self.provider.store_bytes(
-          digest,
-          Arc::new(move |range| Bytes::copy_from_slice(&mmap[range])),
-        )
-      })
-      .await?;
-
-    Ok(())
   }
 
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {

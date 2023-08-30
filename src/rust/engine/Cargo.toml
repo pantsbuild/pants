@@ -244,7 +244,6 @@ lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552a
 log = "0.4.17"
 madvise = "0.1"
 maplit = "1.0.1"
-memmap = "0.7"
 nails = "0.13"
 nix = "0.25"
 notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bfd534941386ba2f3b3a022df7" }
