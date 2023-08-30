@@ -1,7 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -200,6 +200,35 @@ async fn store_buffered_provider_error() {
 }
 
 #[tokio::test]
+async fn store() {
+  let _ = WorkunitStore::setup_for_tests();
+  let testdata = TestData::roland();
+
+  let (store, provider) = empty_byte_store();
+  assert_eq!(
+    store
+      .store(testdata.digest(), Box::new(Cursor::new(testdata.bytes())))
+      .await,
+    Ok(())
+  );
+
+  let blobs = provider.blobs.lock();
+  assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
+}
+
+#[tokio::test]
+async fn store_provider_error() {
+  let _ = WorkunitStore::setup_for_tests();
+  let testdata = TestData::roland();
+  let store = byte_store_always_error_provider();
+  assert_error(
+    store
+      .store(testdata.digest(), Box::new(Cursor::new(testdata.bytes())))
+      .await,
+  );
+}
+
+#[tokio::test]
 async fn list_missing_digests_none_missing() {
   let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
@@ -327,8 +356,12 @@ impl ByteStoreProvider for TestProvider {
     Ok(())
   }
 
-  async fn store(&self, _digest: Digest, _file: StoreSource) -> Result<(), String> {
-    unimplemented!("shouldn't call this (yet)")
+  async fn store(&self, digest: Digest, mut file: StoreSource) -> Result<(), String> {
+    // just pull it all into memory
+    let mut bytes = Vec::new();
+    tokio::io::copy(&mut file, &mut bytes).await.unwrap();
+    self.blobs.lock().insert(digest.hash, Bytes::from(bytes));
+    Ok(())
   }
 
   async fn load(

@@ -17,7 +17,7 @@ use remexec::ServerCapabilities;
 use tokio::io::{AsyncRead, AsyncSeekExt, AsyncWrite};
 use workunit_store::{in_workunit, ObservationMetric};
 
-use crate::StoreError;
+use super::StoreError;
 
 mod reapi;
 #[cfg(test)]
@@ -117,6 +117,13 @@ impl ByteStore {
     self.provider.chunk_size_bytes()
   }
 
+  #[allow(dead_code)]
+  pub async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {
+    self
+      .store_tracking(digest, || self.provider.store(digest, source))
+      .await
+  }
+
   pub async fn store_buffered<WriteToBuffer, WriteResult>(
     &self,
     digest: Digest,
@@ -158,10 +165,12 @@ impl ByteStore {
     }?);
 
     self
-      .store_bytes_source(
-        digest,
-        Arc::new(move |range| Bytes::copy_from_slice(&mmap[range])),
-      )
+      .store_tracking(digest, || {
+        self.provider.store_bytes(
+          digest,
+          Arc::new(move |range| Bytes::copy_from_slice(&mmap[range])),
+        )
+      })
       .await?;
 
     Ok(())
@@ -170,17 +179,29 @@ impl ByteStore {
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
     self
-      .store_bytes_source(digest, Arc::new(move |range| bytes.slice(range)))
+      .store_tracking(digest, || {
+        self
+          .provider
+          .store_bytes(digest, Arc::new(move |range| bytes.slice(range)))
+      })
       .await
   }
 
-  async fn store_bytes_source(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
+  async fn store_tracking<DoStore, Fut>(
+    &self,
+    digest: Digest,
+    do_store: DoStore,
+  ) -> Result<(), String>
+  where
+    DoStore: FnOnce() -> Fut + Send,
+    Fut: Future<Output = Result<(), String>> + Send,
+  {
     in_workunit!(
       "store_bytes",
       Level::Trace,
       desc = Some(format!("Storing {digest:?}")),
       |workunit| async move {
-        let result = self.provider.store_bytes(digest, bytes).await;
+        let result = do_store().await;
 
         if result.is_ok() {
           workunit.record_observation(
