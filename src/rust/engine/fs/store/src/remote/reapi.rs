@@ -270,8 +270,13 @@ impl ByteStoreProvider for Provider {
     result.map_err(|e| e.to_string())
   }
 
-  async fn store(&self, _digest: Digest, _source: StoreSource) -> Result<(), String> {
-    unimplemented!()
+  async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {
+    // an arbitrary source (e.g. file) might be small enough to write via the batch API, but we
+    // ignore that possibility for now
+    self
+      .store_source_stream(digest, source)
+      .await
+      .map_err(|e| e.to_string())
   }
 
   async fn load(

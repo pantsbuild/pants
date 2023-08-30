@@ -8,12 +8,14 @@ use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use mock::StubCAS;
 use testutil::data::TestData;
+use testutil::stub_io::EventuallyFailingReader;
 
 use crate::remote::{ByteStoreProvider, RemoteOptions};
 use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
 use crate::MEGABYTES;
 
 use super::reapi::Provider;
+use super::StoreSource;
 
 fn remote_options(
   cas_address: String,
@@ -159,6 +161,132 @@ fn assert_cas_store(
       chunk_size
     );
   }
+}
+
+fn store_source(data: Bytes) -> StoreSource {
+  Box::new(std::io::Cursor::new(data))
+}
+
+#[tokio::test]
+async fn store_one_chunk() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::empty();
+  let provider = new_provider(&cas).await;
+
+  provider
+    .store(testdata.digest(), store_source(testdata.bytes()))
+    .await
+    .unwrap();
+
+  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+}
+#[tokio::test]
+async fn store_multiple_chunks() {
+  let cas = StubCAS::empty();
+  let chunk_size = 10 * 1024;
+  let provider = Provider::new(remote_options(
+    cas.address(),
+    chunk_size,
+    0, // disable batch API, force streaming API
+  ))
+  .await
+  .unwrap();
+
+  let all_the_henries = big_file_bytes();
+  let fingerprint = big_file_fingerprint();
+  let digest = Digest::new(fingerprint, all_the_henries.len());
+
+  provider
+    .store(digest, store_source(all_the_henries.clone()))
+    .await
+    .unwrap();
+
+  assert_cas_store(&cas, fingerprint, all_the_henries, 98, chunk_size)
+}
+
+#[tokio::test]
+async fn store_empty_file() {
+  let testdata = TestData::empty();
+  let cas = StubCAS::empty();
+  let provider = new_provider(&cas).await;
+
+  provider
+    .store(testdata.digest(), store_source(testdata.bytes()))
+    .await
+    .unwrap();
+
+  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+}
+
+#[tokio::test]
+async fn store_grpc_error() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::cas_always_errors();
+  let provider = new_provider(&cas).await;
+
+  let error = provider
+    .store(testdata.digest(), store_source(testdata.bytes()))
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("StubCAS is configured to always fail"),
+    "Bad error message, got: {error}"
+  );
+}
+
+#[tokio::test]
+async fn store_connection_error() {
+  let testdata = TestData::roland();
+  let provider = Provider::new(remote_options(
+    "http://doesnotexist.example".to_owned(),
+    10 * MEGABYTES,
+    crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+  ))
+  .await
+  .unwrap();
+
+  let error = provider
+    .store(testdata.digest(), store_source(testdata.bytes()))
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("Unavailable: \"error trying to connect: dns error"),
+    "Bad error message, got: {error}"
+  );
+}
+
+#[tokio::test]
+async fn store_source_read_error_immediately() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::empty();
+  let provider = new_provider(&cas).await;
+
+  let source = EventuallyFailingReader::new(0);
+  let error = provider
+    .store(testdata.digest(), Box::new(source))
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("EventuallyFailingReader hit its limit"),
+    "Bad error message, got: {error}",
+  )
+}
+
+#[tokio::test]
+async fn store_source_read_error_later() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::empty();
+  let provider = new_provider(&cas).await;
+
+  let source = EventuallyFailingReader::new(5);
+  let error = provider
+    .store(testdata.digest(), Box::new(source))
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("EventuallyFailingReader hit its limit"),
+    "Bad error message, got: {error}",
+  )
 }
 
 #[tokio::test]
