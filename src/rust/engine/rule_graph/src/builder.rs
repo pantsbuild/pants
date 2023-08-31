@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
+use crate::rules::{DependencyKey, ParamTypes, Query, Rule, RuleId};
 use crate::{
   params_str, Entry, EntryWithDeps, Reentry, RootEntry, RuleEdges, RuleEntry, RuleGraph,
 };
@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, VecDeque};
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use indexmap::IndexSet;
 use internment::Intern;
+use itertools::Itertools;
 use petgraph::graph::{DiGraph, EdgeReference, NodeIndex};
 use petgraph::visit::{DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable};
 use petgraph::Direction;
@@ -256,6 +257,8 @@ impl<R: Rule> Builder<R> {
   }
 
   pub fn graph(self) -> Result<RuleGraph<R>, String> {
+    // 0. validate that the rules all have unique rule ids.
+    self.validate_rule_ids()?;
     // 1. build a polymorphic graph, where nodes might have multiple legal sources of dependencies
     let initial_polymorphic_graph = self.initial_polymorphic();
     // 2. run live variable analysis on the polymorphic graph to gather a conservative (ie, overly
@@ -270,6 +273,36 @@ impl<R: Rule> Builder<R> {
     let pruned_edges_graph = self.prune_edges(monomorphic_live_params_graph)?;
     // 5. generate the final graph for nodes reachable from queries
     self.finalize(pruned_edges_graph)
+  }
+
+  ///
+  /// Validate that all rules have unique RuleIds.
+  ///
+  fn validate_rule_ids(&self) -> Result<(), String> {
+    let mut invalid_rule_ids: Vec<&RuleId> = self
+      .rules
+      .values()
+      .flatten()
+      .group_by(|rule| rule.id())
+      .into_iter()
+      .filter_map(|(rule_id, group)| {
+        if group.count() > 1 {
+          Some(rule_id)
+        } else {
+          None
+        }
+      })
+      .collect();
+    match invalid_rule_ids.len() {
+      0 => Ok(()),
+      _ => {
+        invalid_rule_ids.sort();
+        Err(format!(
+          "Multiple rules have these names: {}",
+          invalid_rule_ids.iter().join(", ")
+        ))
+      }
+    }
   }
 
   ///
@@ -362,16 +395,36 @@ impl<R: Rule> Builder<R> {
           }
 
           let mut candidates = Vec::new();
-          if dependency_key.provided_params.is_empty()
-            && graph[node_id].1.contains(&dependency_key.product())
-            && params.contains_key(&dependency_key.product())
-          {
-            candidates.push(Node::Param(dependency_key.product()));
-          }
+          if let Some(rule_id) = &dependency_key.rule_id {
+            if let Some(rules) = self.rules.get(&dependency_key.product()) {
+              candidates.extend(rules.iter().filter_map(|r| {
+                if r.id() == rule_id {
+                  Some(Node::Rule(r.clone()))
+                } else {
+                  None
+                }
+              }));
+            };
+            if candidates.len() > 1 {
+              // If there is more than one candidate with the same id (which should never happen)
+              // trigger the unsatisfiable keys logic below.
+              candidates.clear();
+              // TODO: This is a bit janky. We'd like to propagate a message saying that there
+              // is more than one candidate with the same id, but there is no way to do that
+              // here. We can validate this elsewhere instead.
+            }
+          } else {
+            if dependency_key.provided_params.is_empty()
+              && graph[node_id].1.contains(&dependency_key.product())
+              && params.contains_key(&dependency_key.product())
+            {
+              candidates.push(Node::Param(dependency_key.product()));
+            }
 
-          if let Some(rules) = self.rules.get(&dependency_key.product()) {
-            candidates.extend(rules.iter().map(|r| Node::Rule(r.clone())));
-          };
+            if let Some(rules) = self.rules.get(&dependency_key.product()) {
+              candidates.extend(rules.iter().map(|r| Node::Rule(r.clone())));
+            };
+          }
 
           (dependency_key, candidates)
         })

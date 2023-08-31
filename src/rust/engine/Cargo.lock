@@ -2991,6 +2991,7 @@ dependencies = [
  "fnv",
  "indexmap",
  "internment",
+ "itertools",
  "log",
  "petgraph",
  "smallvec",

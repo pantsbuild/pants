@@ -5,7 +5,7 @@ use std::fmt;
 use indexmap::{indexset, IndexSet};
 
 use crate::builder::combinations_of_one;
-use crate::{DependencyKey, Palette, Query, RuleGraph};
+use crate::{DependencyKey, Palette, Query, RuleGraph, RuleId};
 
 #[test]
 fn combinations_of_one_test() {
@@ -30,6 +30,22 @@ fn combinations_of_one_test() {
     vec![vec![1, 2, 4], vec![1, 3, 4]],
     combo(vec![vec![1], vec![2, 3], vec![4]])
   );
+}
+
+#[test]
+fn validation() {
+  let rules = indexset![
+    Rule::new("a", "get_a", vec![DependencyKey::new("b")]),
+    Rule::new("a", "get_a", vec![DependencyKey::new("c")]),
+    Rule::new("b", "get_b", vec![DependencyKey::new("c")]),
+    Rule::new("t", "get_t", vec![DependencyKey::new("u")]),
+    Rule::new("t", "get_t", vec![DependencyKey::new("v")])
+  ];
+  let queries = indexset![Query::new("a", vec!["b"])];
+  assert!(RuleGraph::new(rules, queries)
+    .err()
+    .unwrap()
+    .contains("Multiple rules have these names: get_a, get_t"));
 }
 
 #[test]
@@ -86,6 +102,23 @@ fn ambiguity() {
     .err()
     .unwrap()
     .contains("Encountered 1 rule graph error:\n  Too many"));
+}
+
+#[test]
+fn by_name_simple() {
+  let rules = indexset![
+    Rule::new(
+      "a",
+      "a_from_b",
+      vec![DependencyKey::for_known_rule(RuleId::new("b_from_c"), "b")]
+    ),
+    Rule::new("b", "b_from_c", vec![DependencyKey::new("c")]),
+    Rule::new("b", "b_from_d", vec![DependencyKey::new("d")]),
+  ];
+  let queries = indexset![Query::new("a", vec!["c", "d"])];
+  let graph = RuleGraph::new(rules, queries).unwrap();
+  graph.validate_reachability().unwrap();
+  graph.find_root_edges(vec!["c", "d"], "a").unwrap();
 }
 
 #[test]
@@ -506,27 +539,27 @@ fn reduced_source_roots() {
     ),
     Rule::new(
       "Digest",
-      "<intrinsic>",
+      "remove_digest_prefix",
       vec![DependencyKey::new("RemovePrefix")],
     ),
     Rule::new(
       "Snapshot",
-      "<intrinsic>",
+      "snapshot_from_digest",
       vec![DependencyKey::new("Digest")],
     ),
     Rule::new(
       "Digest",
-      "<intrinsic>",
+      "digest_subset",
       vec![DependencyKey::new("DigestSubset")],
     ),
     Rule::new(
       "Digest",
-      "<intrinsic>",
+      "digest_from_pathglobs",
       vec![DependencyKey::new("PathGlobs")],
     ),
     Rule::new(
       "Digest",
-      "<intrinsic>",
+      "merge_digests",
       vec![DependencyKey::new("MergeDigests")],
     ),
     Rule::new(
@@ -722,7 +755,7 @@ fn full_scale_target() {
     ),
     Rule::new(
       "Digest",
-      "<intrinsic>",
+      "merge_digests",
       vec![DependencyKey::new("MergeDigests")],
     ),
     Rule::new(
@@ -775,7 +808,7 @@ fn full_scale_target() {
     ),
     Rule::new(
       "Digest",
-      "<intrinsic>",
+      "download_file",
       vec![DependencyKey::new("DownloadFile")],
     ),
     Rule::new(
@@ -840,7 +873,7 @@ fn full_scale_target() {
     ),
     Rule::new(
       "Digest",
-      "<intrinsic>",
+      "digest_subset",
       vec![DependencyKey::new("DigestSubset")],
     ),
     Rule::new(
@@ -889,7 +922,7 @@ fn full_scale_target() {
     ),
     Rule::new(
       "FallibleProcessResultWithPlatform",
-      "<intrinsic>",
+      "run_multiplaform_process",
       vec![DependencyKey::new("MultiPlatformProcess")],
     ),
     Rule::new(
@@ -1000,6 +1033,7 @@ impl super::TypeId for &'static str {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct Rule {
+  id: RuleId,
   product: &'static str,
   name: &'static str,
   dependency_keys: Vec<DependencyKey<&'static str>>,
@@ -1013,6 +1047,7 @@ impl Rule {
     dependency_keys: Vec<DependencyKey<&'static str>>,
   ) -> Self {
     Self {
+      id: RuleId::new(name),
       product,
       name,
       dependency_keys,
@@ -1028,6 +1063,10 @@ impl Rule {
 
 impl super::Rule for Rule {
   type TypeId = &'static str;
+
+  fn id(&self) -> &RuleId {
+    &self.id
+  }
 
   fn product(&self) -> Self::TypeId {
     self.product

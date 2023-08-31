@@ -207,6 +207,19 @@ impl Function {
     });
     format!("{module}:{line_no}:{name}")
   }
+
+  /// The function represented as `path.to.module:func_name`. Used to identify a
+  /// rule when called by name.
+  pub fn identifier(&self) -> String {
+    let (module, name) = Python::with_gil(|py| {
+      let val = self.0.to_value();
+      let obj = (*val).as_ref(py);
+      let module: String = externs::getattr(obj, "__module__").unwrap();
+      let name: String = externs::getattr(obj, "__name__").unwrap();
+      (module, name)
+    });
+    format!("{module}:{name}")
+  }
 }
 
 impl fmt::Debug for Function {
