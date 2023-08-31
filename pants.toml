@@ -36,6 +36,7 @@ backend_packages.add = [
   "pants.backend.experimental.visibility",
   "pants.backend.tools.preamble",
   "pants.backend.tools.taplo",
+  "pants.backend.plugin_development",
   "pants_explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
@@ -148,6 +149,7 @@ pip_version = "latest"
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
+python-plugins = "3rdparty/python/plugins.lock"
 flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"

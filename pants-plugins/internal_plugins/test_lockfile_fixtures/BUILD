@@ -2,3 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources()
+
+python_requirements(
+    name="requirements",
+    source="requirements.txt",
+)

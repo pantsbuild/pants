@@ -4,3 +4,4 @@ fastapi==0.78.0
 starlette==0.19.1
 strawberry-graphql[fastapi]==0.114.0
 uvicorn[standard]==0.17.6
+requests[security]>=2.28.1
