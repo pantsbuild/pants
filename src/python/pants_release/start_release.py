@@ -17,7 +17,7 @@ from pathlib import Path
 import github
 import requests
 from packaging.version import Version
-from pants_release.common import CONTRIBUTORS_PATH, VERSION_PATH, sorted_contributors
+from pants_release.common import CONTRIBUTORS_PATH, VERSION_PATH, die, sorted_contributors
 from pants_release.git import git, git_fetch, github_repo
 
 from pants.util.strutil import softwrap
@@ -319,6 +319,18 @@ def commit_and_pr(
 def main() -> None:
     args = create_parser().parse_args()
     logging.basicConfig(level=args.log_level)
+
+    if args.new < Version("2.18.0.dev0"):
+        die(
+            softwrap(
+                """
+                This script shouldn't be used for releases pre-2.18.x.
+                Follow the release docs for the relevant release.
+
+                E.g. https://www.pantsbuild.org/v2.17/docs/release-process
+                """
+            )
+        )
 
     # connect to github first, to fail faster if credentials are wrong, etc.
     gh_repo = github_repo() if args.publish else None
