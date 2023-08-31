@@ -9,7 +9,7 @@ from typing import cast
 from strawberry.types import Info
 
 from pants.engine.explorer import RequestState
-from pants.explorer.server.uvicorn import UvicornServer
+from pants_explorer.server.uvicorn import UvicornServer
 
 
 @dataclass(frozen=True)

@@ -15,7 +15,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
-from pants.explorer.server.browser import BrowserRequest
+from pants_explorer.server.browser import BrowserRequest
 
 logger = logging.getLogger(__name__)
 

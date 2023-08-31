@@ -11,11 +11,11 @@ from starlette.responses import JSONResponse
 from strawberry.fastapi import GraphQLRouter
 
 from pants.backend.project_info.peek import _PeekJsonEncoder
-from pants.explorer.server.browser import Browser
-from pants.explorer.server.graphql.context import GraphQLContext
-from pants.explorer.server.graphql.query.root import Query
-from pants.explorer.server.graphql.subsystem import GraphQLSubsystem
-from pants.explorer.server.uvicorn import UvicornServer
+from pants_explorer.server.browser import Browser
+from pants_explorer.server.graphql.context import GraphQLContext
+from pants_explorer.server.graphql.query.root import Query
+from pants_explorer.server.graphql.subsystem import GraphQLSubsystem
+from pants_explorer.server.uvicorn import UvicornServer
 
 
 class ExplorerJSONResponse(JSONResponse):

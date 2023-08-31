@@ -10,8 +10,8 @@ from typing import Iterable, Iterator, List, Optional, cast
 import strawberry
 from strawberry.types import Info
 
-from pants.explorer.server.graphql.context import GraphQLContext
 from pants.help import help_info_extracter
+from pants_explorer.server.graphql.context import GraphQLContext
 
 
 @strawberry.type(description=cast(str, help_info_extracter.RuleInfo.__doc__))

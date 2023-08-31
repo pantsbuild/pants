@@ -13,10 +13,10 @@ from strawberry.types import Info
 from pants.backend.project_info.peek import TargetData, TargetDatas
 from pants.base.specs_parser import SpecsParser
 from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
-from pants.explorer.server.graphql.context import GraphQLContext
-from pants.explorer.server.graphql.field_types import JSONScalar
 from pants.help.help_info_extracter import TargetTypeHelpInfo
 from pants.util.strutil import softwrap
+from pants_explorer.server.graphql.context import GraphQLContext
+from pants_explorer.server.graphql.field_types import JSONScalar
 
 specs_parser = SpecsParser()
 

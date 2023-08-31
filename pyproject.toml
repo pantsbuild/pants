@@ -18,7 +18,7 @@ exclude = '''
 profile = "black"
 line_length = 100
 color_output = true
-known_first_party = ["internal_plugins", "pants", "pants_test"]
+known_first_party = ["internal_plugins", "pants_explorer", "pants", "pants_test"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
