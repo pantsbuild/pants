@@ -404,10 +404,8 @@ jobs:
         subject: file://${{ runner.temp }}/email_announcement_subject.txt
         to: pants-devel@googlegroups.com
     - name: Get release notes
-      run: 'REF="${{ needs.release_info.outputs.build-ref }}"
-
-        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"}
-        > notes.txt
+      run: './pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref
+        }}" > notes.txt
 
         '
     - env:
