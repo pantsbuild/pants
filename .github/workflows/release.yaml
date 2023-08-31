@@ -369,18 +369,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - env:
-        GH_REPO: ${{ github.repository }}
-        GH_TOKEN: ${{ github.token }}
-      name: Download wheels
-      run: gh release download ${{ needs.release_info.outputs.build-ref }} -p '*.whl'
-        --dir dest/pypi_release
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        packages-dir: dest/pypi_release
-        password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
-        skip-existing: true
     - name: Generate announcement
       run: './pants run src/python/pants_release/generate_release_announcement.py                         --
         --output-dir=${{ runner.temp }}
