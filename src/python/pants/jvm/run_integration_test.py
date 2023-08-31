@@ -6,10 +6,7 @@ from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 EMPTY_RESOLVE = """

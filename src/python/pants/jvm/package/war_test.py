@@ -8,10 +8,6 @@ from io import BytesIO
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
 from pants.backend.java.target_types import rules as target_types_rules
@@ -24,6 +20,7 @@ from pants.core.util_rules.archive import ExtractedArchive, MaybeExtractArchiveR
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.rules import QueryRule
 from pants.jvm import classpath, jdk_rules
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.package import war
 from pants.jvm.package.war import PackageWarFileFieldSet
 from pants.jvm.resolve import jvm_tool

@@ -6,10 +6,6 @@ from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.kotlin.compile import kotlinc_plugins
 from pants.backend.kotlin.compile.kotlinc import CompileKotlinSourceRequest
 from pants.backend.kotlin.compile.kotlinc import rules as kotlinc_rules
@@ -26,6 +22,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules

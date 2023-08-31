@@ -5,8 +5,7 @@ from __future__ import annotations
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Iterable
 
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
@@ -15,6 +14,7 @@ from pants.util.docutil import bin_name
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
+
 
 @dataclass(frozen=True)
 class JVMLockfileFixtureDefinition:
@@ -90,7 +90,7 @@ class JVMLockfileFixture:
         for requirement in self.requirements:
             maybe_version = f"_{requirement.coordinate.version}" if version_in_target_name else ""
             maybe_resolve = f'resolve="{resolve}",' if resolve else ""
-            targets += textwrap.dedent(
+            targets += textwrap.dedent(  # noqa: PNT20
                 f"""\
             jvm_artifact(
               name="{requirement.coordinate.group}_{requirement.coordinate.artifact}{maybe_version}",

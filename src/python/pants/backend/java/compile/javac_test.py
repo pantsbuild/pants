@@ -7,10 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
@@ -27,6 +23,7 @@ from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
 from pants.jvm.strip_jar import strip_jar

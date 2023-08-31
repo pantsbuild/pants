@@ -7,10 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
 from pants.backend.codegen.protobuf.java.rules import rules as java_protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
@@ -24,6 +20,7 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSour
 from pants.engine.addresses import Address
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm import testutil
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,

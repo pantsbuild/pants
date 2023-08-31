@@ -7,10 +7,6 @@ import os
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import archive
@@ -21,6 +17,7 @@ from pants.jvm import classpath
 from pants.jvm import compile as jvm_compile
 from pants.jvm import jdk_rules, non_jvm_dependencies
 from pants.jvm.compile import ClasspathEntry
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest

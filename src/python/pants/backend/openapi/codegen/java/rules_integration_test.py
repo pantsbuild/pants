@@ -7,10 +7,6 @@ from typing import Iterable
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.openapi.codegen.java.rules import GenerateJavaFromOpenAPIRequest
 from pants.backend.openapi.codegen.java.rules import rules as java_codegen_rules
 from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
@@ -30,6 +26,7 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
 )
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner

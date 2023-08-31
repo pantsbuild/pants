@@ -7,10 +7,6 @@ from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.kotlin.compile import kotlinc, kotlinc_plugins
@@ -27,6 +23,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as java_util_rules
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.non_jvm_dependencies import rules as non_jvm_dependencies_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules

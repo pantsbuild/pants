@@ -9,10 +9,6 @@ from urllib.parse import urlparse
 import pytest
 from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import]
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.java.bsp.rules import rules as java_bsp_rules
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
@@ -44,6 +40,7 @@ from pants.core.util_rules import config_files, source_files, stripped_source_fi
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.jvm import classpath, jdk_rules, testutil
 from pants.jvm.goals import lockfile
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar

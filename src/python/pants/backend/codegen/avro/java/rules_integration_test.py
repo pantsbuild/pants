@@ -7,10 +7,6 @@ from typing import Iterable
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.codegen.avro.java.rules import GenerateJavaFromAvroRequest
 from pants.backend.codegen.avro.java.rules import rules as avro_java_rules
 from pants.backend.codegen.avro.rules import rules as avro_rules
@@ -37,6 +33,10 @@ from pants.engine.target import (
 from pants.jvm import classpath
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import rules as jdk_rules
+from pants.jvm.lockfile_fixture import (  # pants: no-infer-dep
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar

@@ -8,10 +8,6 @@ from typing import Iterable, Mapping
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import (
@@ -30,6 +26,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as jdk_util_rules
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.non_jvm_dependencies import rules as non_jvm_dependencies_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules

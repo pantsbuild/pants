@@ -7,10 +7,6 @@ from typing import Iterable
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.codegen.protobuf.scala.rules import GenerateScalaFromProtobufRequest
 from pants.backend.codegen.protobuf.scala.rules import rules as scala_protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
@@ -32,6 +28,7 @@ from pants.engine.target import GeneratedSources, HydratedSources, HydrateSource
 from pants.jvm import classpath, testutil
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.jdk_rules import rules as jdk_rules
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar

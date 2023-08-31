@@ -9,10 +9,6 @@ from typing import Iterable
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.codegen.soap.java.jaxws import JaxWsTools
 from pants.backend.codegen.soap.java.rules import GenerateJavaFromWsdlRequest
 from pants.backend.codegen.soap.java.rules import rules as java_wsdl_rules
@@ -31,6 +27,7 @@ from pants.engine.target import GeneratedSources, HydratedSources, HydrateSource
 from pants.jvm import classpath, testutil
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import rules as jdk_rules
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget

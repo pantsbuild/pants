@@ -17,10 +17,6 @@ from typing import Sequence, Type, cast
 import chevron
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
 from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
@@ -67,6 +63,7 @@ from pants.jvm.compile import (
     ClasspathSourceMissing,
 )
 from pants.jvm.goals import lockfile
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules

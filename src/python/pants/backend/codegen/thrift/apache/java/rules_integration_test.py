@@ -6,10 +6,6 @@ from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
-    JVMLockfileFixture,
-    JVMLockfileFixtureDefinition,
-)
 from pants.backend.codegen.thrift.apache.java.rules import GenerateJavaFromThriftRequest
 from pants.backend.codegen.thrift.apache.java.rules import rules as apache_thrift_java_rules
 from pants.backend.codegen.thrift.apache.rules import rules as apache_thrift_rules
@@ -30,6 +26,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm import classpath, jdk_rules, testutil, util_rules
 from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm.lockfile_fixture import JVMLockfileFixture, JVMLockfileFixtureDefinition
 from pants.jvm.resolve import coursier_fetch, coursier_setup
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget

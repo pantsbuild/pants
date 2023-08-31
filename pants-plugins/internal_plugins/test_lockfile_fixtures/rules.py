@@ -8,7 +8,6 @@ import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixtureDefinition
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
@@ -30,6 +29,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.jvm.lockfile_fixture import JVMLockfileFixtureDefinition
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
