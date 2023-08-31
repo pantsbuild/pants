@@ -26,6 +26,8 @@ use remexec::{
 use tonic::metadata::{AsciiMetadataKey, KeyAndValueRef};
 use tonic::{Request, Response, Status};
 
+use crate::cas::{RequestCounter, RequestType};
+
 #[derive(Clone, Debug)]
 pub(crate) struct StubCASResponder {
   pub chunk_size_bytes: usize,
@@ -33,7 +35,7 @@ pub(crate) struct StubCASResponder {
   pub blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
   pub always_errors: bool,
   pub required_auth_header: Option<String>,
-  pub read_request_count: Arc<Mutex<usize>>,
+  pub request_counts: Arc<RequestCounter>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
 }
 
@@ -217,10 +219,7 @@ impl ByteStream for StubCASResponder {
     &self,
     request: Request<ReadRequest>,
   ) -> Result<Response<Self::ReadStream>, Status> {
-    {
-      let mut request_count = self.read_request_count.lock();
-      *request_count += 1;
-    }
+    RequestType::BSRead.record(&self.request_counts);
     check_auth!(self, request);
 
     let request = request.into_inner();
@@ -236,6 +235,7 @@ impl ByteStream for StubCASResponder {
     &self,
     request: Request<tonic::Streaming<WriteRequest>>,
   ) -> Result<Response<WriteResponse>, Status> {
+    RequestType::BSWrite.record(&self.request_counts);
     check_auth!(self, request);
 
     let always_errors = self.always_errors;
@@ -351,6 +351,7 @@ impl ContentAddressableStorage for StubCASResponder {
     &self,
     request: Request<FindMissingBlobsRequest>,
   ) -> Result<Response<FindMissingBlobsResponse>, Status> {
+    RequestType::CASFindMissingBlobs.record(&self.request_counts);
     check_auth!(self, request);
 
     if self.always_errors {
@@ -379,6 +380,7 @@ impl ContentAddressableStorage for StubCASResponder {
     &self,
     request: Request<BatchUpdateBlobsRequest>,
   ) -> Result<Response<BatchUpdateBlobsResponse>, Status> {
+    RequestType::CASBatchUpdateBlobs.record(&self.request_counts);
     check_auth!(self, request);
 
     if self.always_errors {
@@ -446,6 +448,7 @@ impl ContentAddressableStorage for StubCASResponder {
     &self,
     request: Request<BatchReadBlobsRequest>,
   ) -> Result<Response<BatchReadBlobsResponse>, Status> {
+    RequestType::CASBatchReadBlobs.record(&self.request_counts);
     check_auth!(self, request);
 
     if self.always_errors {
