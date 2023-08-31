@@ -69,13 +69,11 @@ from pants.engine.target import (
     InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
-    SecondaryOwnerMixin,
     StringField,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import bin_name
 from pants.util.strutil import help_text, softwrap
@@ -83,7 +81,7 @@ from pants.util.strutil import help_text, softwrap
 logger = logging.getLogger(__name__)
 
 
-class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
+class PythonFaaSHandlerField(StringField, AsyncFieldMixin):
     alias = "handler"
     required = True
     value: str
@@ -92,8 +90,6 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
         You can specify a full module like `'path.to.module:handler_func'` or use a shorthand to
         specify a file name, using the same syntax as the `sources` field, e.g.
         `'cloud_function.py:handler_func'`.
-
-        You must use the file name shorthand for file arguments to work with this target.
         """
     )
 
@@ -106,14 +102,6 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
                 f"format `:my_handler_func`, but was {value}."
             )
         return value
-
-    @property
-    def filespec(self) -> Filespec:
-        path, _, func = self.value.partition(":")
-        if not path.endswith(".py"):
-            return {"includes": []}
-        full_glob = os.path.join(self.address.spec_path, path)
-        return {"includes": [full_glob]}
 
 
 @dataclass(frozen=True)

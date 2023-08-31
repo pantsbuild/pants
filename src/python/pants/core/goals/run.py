@@ -3,23 +3,11 @@
 
 from __future__ import annotations
 
-import dataclasses
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from enum import Enum
-from itertools import filterfalse, tee
-from typing import (
-    Callable,
-    ClassVar,
-    Iterable,
-    Mapping,
-    NamedTuple,
-    Optional,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import ClassVar, Iterable, Mapping, Optional, Tuple, TypeVar, Union
 
 from typing_extensions import final
 
@@ -39,7 +27,6 @@ from pants.engine.target import (
     BoolField,
     FieldSet,
     NoApplicableTargetsBehavior,
-    SecondaryOwnerMixin,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -212,18 +199,6 @@ class Run(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
-class RankedFieldSets(NamedTuple):
-    primary: tuple[RunFieldSet, ...]
-    secondary: tuple[RunFieldSet, ...]
-
-
-def _partition(
-    iterable: Iterable[_T], pred: Callable[[_T], bool]
-) -> tuple[tuple[_T, ...], tuple[_T, ...]]:
-    t1, t2 = tee(iterable)
-    return tuple(filter(pred, t2)), tuple(filterfalse(pred, t1))
-
-
 async def _find_what_to_run(
     goal_description: str,
 ) -> tuple[RunFieldSet, Target]:
@@ -233,49 +208,22 @@ async def _find_what_to_run(
             RunFieldSet,
             goal_description=goal_description,
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-            warn_on_deprecated_secondary_owner_semantics=False,
         ),
     )
+    mapping = targets_to_valid_field_sets.mapping
 
-    primary_target: Target | None = None
-    primary_target_rfs: RankedFieldSets | None = None
+    if len(mapping) > 1:
+        raise TooManyTargetsException(mapping, goal_description=goal_description)
 
-    for target, field_sets in targets_to_valid_field_sets.mapping.items():
-        rfs = RankedFieldSets(
-            *_partition(
-                field_sets,
-                lambda field_set: not any(
-                    isinstance(getattr(field_set, field.name), SecondaryOwnerMixin)
-                    for field in dataclasses.fields(field_set)
-                ),
-            )
-        )
-        # In the case of multiple Targets/FieldSets, prefer the "primary" ones to the "secondary" ones.
-        if (
-            primary_target is None
-            or primary_target_rfs is None  # impossible, but satisfies mypy
-            or (rfs.primary and not primary_target_rfs.primary)
-        ):
-            primary_target = target
-            primary_target_rfs = rfs
-        elif (rfs.primary and primary_target_rfs.primary) or (
-            rfs.secondary and primary_target_rfs.secondary
-        ):
-            raise TooManyTargetsException(
-                targets_to_valid_field_sets.mapping, goal_description=goal_description
-            )
-
-    assert primary_target is not None
-    assert primary_target_rfs is not None
-    field_sets = primary_target_rfs.primary or primary_target_rfs.secondary
+    target, field_sets = next(iter(mapping.items()))
     if len(field_sets) > 1:
         raise AmbiguousImplementationsException(
-            primary_target,
-            primary_target_rfs.primary + primary_target_rfs.secondary,
+            target,
+            field_sets,
             goal_description=goal_description,
         )
 
-    return field_sets[0], primary_target
+    return field_sets[0], target
 
 
 @goal_rule
