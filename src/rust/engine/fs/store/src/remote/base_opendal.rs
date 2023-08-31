@@ -21,10 +21,9 @@ pub struct Provider {
 impl Provider {
   pub fn new<B: Builder>(
     builder: B,
-    base_path: String,
+    scope: String,
     options: RemoteOptions,
   ) -> Result<Provider, String> {
-    // FIXME: validate base_path
     let operator = Operator::new(builder)
       .map_err(|e| {
         format!(
@@ -40,6 +39,11 @@ impl Provider {
       )
       .layer(RetryLayer::new().with_max_times(options.rpc_retries + 1))
       .finish();
+
+    let base_path = match options.instance_name {
+      Some(instance_name) => format!("{instance_name}/{scope}"),
+      None => scope,
+    };
 
     Ok(Provider {
       operator,
