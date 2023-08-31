@@ -10,7 +10,6 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
 )
 from pants.engine.console import Console
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.options_parsing import _Options
 from pants.engine.internals.session import SessionValues
