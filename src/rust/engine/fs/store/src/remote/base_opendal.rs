@@ -1,25 +1,50 @@
+// Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 #![allow(dead_code)]
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
 use hashing::{async_verified_copy, Digest, Fingerprint};
-use opendal::Operator;
+use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
+use opendal::{Builder, Operator};
 use std::collections::HashSet;
 use tokio::fs::File;
 
-use super::{ByteStoreProvider, LoadDestination};
+use super::{ByteStoreProvider, LoadDestination, RemoteOptions};
 
 pub struct Provider {
-  pub(crate) op: Operator,
+  pub(crate) operator: Operator,
   base_path: String,
 }
 
 impl Provider {
-  pub fn new(op: Operator, base_path: String) -> Provider {
+  pub fn new<B: Builder>(
+    builder: B,
+    base_path: String,
+    options: RemoteOptions,
+  ) -> Result<Provider, String> {
     // FIXME: validate base_path
-    // FIXME: set up retries, timeouts, concurrency limits via layers
-    Provider { op, base_path }
+    let operator = Operator::new(builder)
+      .map_err(|e| {
+        format!(
+          "failed to initialise {} remote store provider: {e}",
+          B::SCHEME
+        )
+      })?
+      .layer(ConcurrentLimitLayer::new(options.rpc_concurrency_limit))
+      .layer(
+        TimeoutLayer::new()
+          .with_timeout(options.rpc_timeout)
+          .with_speed(1),
+      )
+      .layer(RetryLayer::new().with_max_times(options.rpc_retries + 1))
+      .finish();
+
+    Ok(Provider {
+      operator,
+      base_path,
+    })
   }
 
   fn path(&self, fingerprint: Fingerprint) -> String {
@@ -33,7 +58,7 @@ impl ByteStoreProvider for Provider {
     let path = self.path(digest.hash);
 
     self
-      .op
+      .operator
       .write(&path, bytes)
       .await
       .map_err(|e| format!("failed to write {}: {}", path, e))
@@ -49,7 +74,7 @@ impl ByteStoreProvider for Provider {
     destination: &mut dyn LoadDestination,
   ) -> Result<bool, String> {
     let path = self.path(digest.hash);
-    let mut reader = match self.op.reader(&path).await {
+    let mut reader = match self.operator.reader(&path).await {
       Ok(reader) => reader,
       Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
       Err(e) => return Err(format!("failed to read {}: {}", path, e)),
@@ -67,7 +92,7 @@ impl ByteStoreProvider for Provider {
     // NB. this is doing individual requests and thus may be expensive
     let existences = future::try_join_all(digests.map(|digest| async move {
       let path = self.path(digest.hash);
-      match self.op.is_exist(&path).await {
+      match self.operator.is_exist(&path).await {
         Ok(true) => Ok(None),
         Ok(false) => Ok(Some(digest)),
         Err(e) => Err(format!("failed to query {}: {}", path, e)),

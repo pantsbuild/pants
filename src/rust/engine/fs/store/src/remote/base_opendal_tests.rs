@@ -1,10 +1,14 @@
-use std::collections::HashSet;
+// Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::collections::{BTreeMap, HashSet};
+use std::time::Duration;
 
-use opendal::{services::Memory, Operator};
+use grpc_util::tls;
+use opendal::services::Memory;
 use testutil::data::TestData;
 
 use super::base_opendal::Provider;
-use super::ByteStoreProvider;
+use super::{ByteStoreProvider, RemoteOptions};
 
 const BASE: &str = "opendal-testing-base";
 
@@ -12,14 +16,28 @@ fn test_path(data: &TestData) -> String {
   format!("{}/{}", BASE, data.fingerprint())
 }
 
+fn remote_options() -> RemoteOptions {
+  RemoteOptions {
+    cas_address: "".to_owned(),
+    instance_name: None,
+    tls_config: tls::Config::default(),
+    headers: BTreeMap::new(),
+    chunk_size_bytes: 10000,
+    rpc_timeout: Duration::from_secs(5),
+    rpc_retries: 1,
+    rpc_concurrency_limit: 256,
+    capabilities_cell_opt: None,
+    batch_api_size_limit: 10000,
+  }
+}
+
 fn new_provider() -> Provider {
-  let op = Operator::new(Memory::default()).unwrap().finish();
-  Provider::new(op, BASE.to_owned())
+  Provider::new(Memory::default(), BASE.to_owned(), remote_options()).unwrap()
 }
 
 async fn write_test_data(provider: &Provider, data: &TestData) {
   provider
-    .op
+    .operator
     .write(&test_path(&data), data.bytes())
     .await
     .unwrap();
@@ -65,7 +83,7 @@ async fn store_bytes_data() {
     .unwrap();
 
   let result = provider
-    .op
+    .operator
     .read(&format!("{}/{}", BASE, testdata.fingerprint()))
     .await
     .unwrap();
@@ -83,7 +101,7 @@ async fn store_bytes_empty() {
     .unwrap();
 
   let result = provider
-    .op
+    .operator
     .read(&format!("{}/{}", BASE, testdata.fingerprint()))
     .await
     .unwrap();
