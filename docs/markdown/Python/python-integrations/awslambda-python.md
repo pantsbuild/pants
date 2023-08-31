@@ -154,7 +154,7 @@ def example_handler(event, context):
     print("Hello AWS!")
 ```
 
-Then, use  `pants package project:lambda`, and upload the resulting `project/lambdex.pex` to AWS.  The handler will need to be configured in AWS as `__pex__.lambda_example.example_handler` (assuming `project` is a [source root](doc:source-roots)).
+Then, use  `pants package project:lambda`, and upload the resulting `project/lambda.pex` to AWS.  The handler will need to be configured in AWS as `__pex__.lambda_example.example_handler` (assuming `project` is a [source root](doc:source-roots)).
 
 Migrating from Pants 2.16 and earlier
 -------------------------------------
