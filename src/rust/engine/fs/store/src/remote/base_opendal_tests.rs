@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::time::Duration;
 
+use bytes::Bytes;
 use grpc_util::tls;
 use opendal::services::Memory;
 use testutil::data::TestData;
@@ -70,6 +71,28 @@ async fn load_missing() {
     .unwrap();
   assert!(!found);
   assert!(destination.is_empty())
+}
+
+#[tokio::test]
+async fn load_existing_wrong_digest_eror() {
+  let testdata = TestData::roland();
+  let provider = new_provider();
+  provider
+    .operator
+    .write(&test_path(&testdata), Bytes::from_static(b"not roland"))
+    .await
+    .unwrap();
+
+  let mut destination = Vec::new();
+  let error = provider
+    .load(testdata.digest(), &mut destination)
+    .await
+    .expect_err("Want error");
+
+  assert!(
+    error.contains("Remote CAS gave wrong digest"),
+    "Bad error message, got: {error}"
+  )
 }
 
 #[tokio::test]

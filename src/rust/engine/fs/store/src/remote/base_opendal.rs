@@ -84,9 +84,16 @@ impl ByteStoreProvider for Provider {
       Err(e) => return Err(format!("failed to read {}: {}", path, e)),
     };
 
-    async_verified_copy(digest, false, &mut reader, destination)
+    let correct_digest = async_verified_copy(digest, false, &mut reader, destination)
       .await
-      .map_err(|e| format!("failed to read {}: {}", path, e))
+      .map_err(|e| format!("failed to read {}: {}", path, e))?;
+
+    if !correct_digest {
+      // TODO: include the actual digest here
+      Err(format!("Remote CAS gave wrong digest: expected {digest:?}"))
+    } else {
+      Ok(true)
+    }
   }
 
   async fn list_missing_digests(
