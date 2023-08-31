@@ -17,5 +17,5 @@ def test_this_repo_only_uses_baked_backends_or_internal():
     """
     pants_toml = toml.load("pants.toml")
     for package in pants_toml["GLOBAL"]["backend_packages"]["add"]:
-        if package.startswith("pants"):
+        if package.startswith("pants."):
             importlib.import_module(package + ".register")
