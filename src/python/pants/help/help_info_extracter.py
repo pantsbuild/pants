@@ -104,7 +104,6 @@ class OptionHelpInfo:
     """
 
     display_args: tuple[str, ...]
-    scope: str
     comma_separated_display_args: str
     scoped_cmd_line_args: tuple[str, ...]
     unscoped_cmd_line_args: tuple[str, ...]
@@ -1034,7 +1033,6 @@ class HelpInfoExtracter:
         ret = OptionHelpInfo(
             display_args=tuple(display_args),
             comma_separated_display_args=", ".join(display_args),
-            scope=self._scope,
             scoped_cmd_line_args=tuple(scoped_cmd_line_args),
             unscoped_cmd_line_args=tuple(unscoped_cmd_line_args),
             env_var=env_var,

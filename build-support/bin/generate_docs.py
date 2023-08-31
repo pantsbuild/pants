@@ -321,7 +321,7 @@ class ReferenceGenerator:
         return f"reference-{url_safe_scope}" if sync else f"{url_safe_scope}.md"
 
     @staticmethod
-    def _generate_toml_snippet(option_data) -> str:
+    def _generate_toml_snippet(option_data, scope) -> str:
         """Generate TOML snippet for a single option."""
 
         # Generate a toml block for the option to help users fill out their `pants.toml`.  For
@@ -335,8 +335,6 @@ class ReferenceGenerator:
 
         toml_lines = []
         example_cli = option_data["display_args"][0]
-        scope = option_data["scope"] or "GLOBAL"
-
         config_key = option_data["config_key"]
 
         if "[no-]" in example_cli:
@@ -397,7 +395,7 @@ class ReferenceGenerator:
 
         # Process the option data.
 
-        def munge_option(option_data):
+        def munge_option(option_data, scope):
             # Munge the default so we can display it nicely when it's multiline, while
             # still displaying it inline if it's not.
             default_help_repr = option_data.get("default_help_repr")
@@ -424,15 +422,15 @@ class ReferenceGenerator:
             else:
                 option_data["marked_up_default"] = f"<code>{escaped_default_str}</code>"
 
-            option_data["toml"] = cls._generate_toml_snippet(option_data)
+            option_data["toml"] = cls._generate_toml_snippet(option_data, scope)
 
-        for shi in scope_to_help_info.values():
+        for scope, shi in scope_to_help_info.items():
             for opt in shi["basic"]:
-                munge_option(opt)
+                munge_option(opt, scope)
             for opt in shi["advanced"]:
-                munge_option(opt)
+                munge_option(opt, scope)
             for opt in shi["deprecated"]:
-                munge_option(opt)
+                munge_option(opt, scope)
 
         return help_info
 
