@@ -1,0 +1,6 @@
+# These dependencies must only be used from the explorer backend, and no code outside that backend
+# may import anything from it, so these libraries are not ending up as requirements of Pants itself.
+fastapi==0.78.0
+starlette==0.19.1
+strawberry-graphql[fastapi]==0.114.0
+uvicorn[standard]==0.17.6

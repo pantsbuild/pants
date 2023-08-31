@@ -5,15 +5,16 @@ from __future__ import annotations
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, TYPE_CHECKING
 
-from _pytest.fixtures import FixtureRequest
 
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import LockfileContext
 from pants.util.docutil import bin_name
 
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
 
 @dataclass(frozen=True)
 class JVMLockfileFixtureDefinition:
