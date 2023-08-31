@@ -32,9 +32,7 @@ class PantsSetupKwargsRequest(SetupKwargsRequest):
 
 
 @rule
-async def pants_setup_kwargs(
-    request: PantsSetupKwargsRequest
-) -> SetupKwargs:
+async def pants_setup_kwargs(request: PantsSetupKwargsRequest) -> SetupKwargs:
     kwargs = request.explicit_kwargs.copy()
 
     if request.target.address.path_safe_spec.startswith("testprojects"):
