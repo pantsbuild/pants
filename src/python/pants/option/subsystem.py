@@ -202,7 +202,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             input_selectors=(),
             input_gets=(
                 AwaitableConstraints(
-                    output_type=ScopedOptions, input_types=(Scope,), is_effect=False
+                    callee=None, output_type=ScopedOptions, input_types=(Scope,), is_effect=False
                 ),
             ),
             masked_types=(),
@@ -232,6 +232,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             input_selectors=(cls, EnvironmentTarget),
             input_gets=(
                 AwaitableConstraints(
+                    callee=None,
                     output_type=EnvironmentVars,
                     input_types=(EnvironmentVarsRequest,),
                     is_effect=False,
