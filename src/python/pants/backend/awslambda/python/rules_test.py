@@ -217,7 +217,7 @@ def test_create_hello_world_lambda_with_lambdex(
     ), "Using include_requirements=False should exclude third-party deps"
 
 
-def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) -> None:
+def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -266,9 +266,8 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
             "    Runtime: python3.7",
-            "    Handler: lambdex_handler.handler",
+            "    Handler: lambda_function.handler",
         ),
-        extra_args=["--lambdex-layout=lambdex"],
     )
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath

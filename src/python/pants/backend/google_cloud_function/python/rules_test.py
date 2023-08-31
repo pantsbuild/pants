@@ -236,7 +236,6 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
             "    Runtime: python37",
             "    Handler: handler",
         ),
-        extra_args=["--lambdex-layout=lambdex"],
     )
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
