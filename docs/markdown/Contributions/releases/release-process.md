@@ -71,7 +71,6 @@ If this is the first dev release in a new series:
 
 1. Create a new file in ` src/python/pants/notes`, e.g. create  `src/python/pants/notes/2.9.x.md`.
    1. Copy the title and template over from the prior release, e.g. `2.8.x.md`.
-2. Add the new file to `pants.toml` in the `release_notes` section.
 
 ### Generate the release notes
 From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
