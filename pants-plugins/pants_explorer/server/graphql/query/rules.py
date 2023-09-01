@@ -8,9 +8,9 @@ from dataclasses import asdict
 from typing import Iterable, Iterator, List, Optional, cast
 
 import strawberry
+from pants_explorer.server.graphql.context import GraphQLContext
 from strawberry.types import Info
 
-from pants.explorer.server.graphql.context import GraphQLContext
 from pants.help import help_info_extracter
 
 
