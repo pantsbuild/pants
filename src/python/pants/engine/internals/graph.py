@@ -11,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, NewType, Sequence, Type, cast
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -68,7 +68,6 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     RegisteredTargetTypes,
-    SecondaryOwnerMixin,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -899,15 +898,7 @@ class OwnersRequest:
     match_if_owning_build_file_included_in_sources: bool = False
 
 
-# NB: This was changed from:
-# class Owners(Collection[Address]):
-#     pass
-# In https://github.com/pantsbuild/pants/pull/19191 to facilitate surgical warning of deprecation
-# of SecondaryOwnerMixin. After the Deprecation ends, it can be changed back.
-IsPrimary = NewType("IsPrimary", bool)
-
-
-class Owners(FrozenDict[Address, IsPrimary]):
+class Owners(FrozenOrderedSet[Address]):
     pass
 
 
@@ -962,7 +953,7 @@ async def find_owners(
     )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
-    result = {}
+    result = set()
     unmatched_sources = set(owners_request.sources)
     for live in (True, False):
         candidate_tgts: Sequence[Target]
@@ -987,20 +978,6 @@ async def find_owners(
             matching_files = set(
                 candidate_tgt.get(SourcesField).filespec_matcher.matches(list(sources_set))
             )
-            is_primary = bool(matching_files)
-
-            # Also consider secondary ownership, meaning it's not a `SourcesField` field with
-            # primary ownership, but the target still should match the file. We can't use
-            # `tgt.get()` because this is a mixin, and there technically may be >1 field.
-            secondary_owner_fields = tuple(
-                field  # type: ignore[misc]
-                for field in candidate_tgt.field_values.values()
-                if isinstance(field, SecondaryOwnerMixin)
-            )
-            for secondary_owner_field in secondary_owner_fields:
-                matching_files.update(
-                    secondary_owner_field.filespec_matcher.matches(list(sources_set))
-                )
 
             if not matching_files and not (
                 owners_request.match_if_owning_build_file_included_in_sources
@@ -1009,7 +986,7 @@ async def find_owners(
                 continue
 
             unmatched_sources -= matching_files
-            result[candidate_tgt.address] = IsPrimary(is_primary)
+            result.add(candidate_tgt.address)
 
     if (
         unmatched_sources

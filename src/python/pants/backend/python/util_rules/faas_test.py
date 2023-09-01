@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import List, Optional
+from typing import Optional
 
 import pytest
 
@@ -64,15 +64,6 @@ def rule_runner() -> RuleRunner:
 def test_handler_validation(invalid_handler: str) -> None:
     with pytest.raises(InvalidFieldException):
         PythonFaaSHandlerField(invalid_handler, Address("", target_name="t"))
-
-
-@pytest.mark.parametrize(
-    ["handler", "expected"],
-    (("path.to.module:func", []), ("lambda.py:func", ["project/dir/lambda.py"])),
-)
-def test_handler_filespec(handler: str, expected: List[str]) -> None:
-    field = PythonFaaSHandlerField(handler, Address("project/dir"))
-    assert field.filespec == {"includes": expected}
 
 
 def test_resolve_handler(rule_runner: RuleRunner) -> None:
