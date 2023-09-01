@@ -4,6 +4,11 @@
 
   <code>{{comma_separated_display_args}}</code><br>
   <code>{{env_var}}</code><br>
+  {{#toml}}
+  ```toml pants.toml
+  {{{toml}}}
+  ```
+  {{/toml}}
 </div>
 <div style="padding-left: 2em;">
 {{#comma_separated_choices}}
@@ -22,4 +27,3 @@ Can be overriden by field `{{target_field_name}}` on `local_environment`, `docke
 {{/target_field_name}}
 </div>
 <br>
-

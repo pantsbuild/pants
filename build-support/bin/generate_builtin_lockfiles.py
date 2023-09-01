@@ -40,7 +40,6 @@ from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.ipython import IPython
-from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setuptools import Setuptools
@@ -115,7 +114,6 @@ all_python_tools = tuple(
             PythonTool(HelmPostRendererSubsystem, "pants.backend.experimental.helm"),
             PythonTool(IPython, "pants.backend.python"),
             PythonTool(Isort, "pants.backend.python.lint.isort"),
-            PythonTool(Lambdex, "pants.backend.awslambda.python", "CPython>=3.7,<3.12"),
             PythonTool(MyPy, "pants.backend.python.typecheck.mypy"),
             PythonTool(Pydocstyle, "pants.backend.python.lint.pydocstyle"),
             PythonTool(PyTest, "pants.backend.python"),

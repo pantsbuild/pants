@@ -61,6 +61,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
       - name: Prepare cherry-pick branch
         if: ${{ !env.ACT }}
         run: |
