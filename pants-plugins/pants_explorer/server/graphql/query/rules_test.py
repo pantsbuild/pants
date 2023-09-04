@@ -10,10 +10,10 @@ import pytest
     "variables, expected_data",
     [
         (
-            {"name": r"\.explorer\."},
+            {"name": r"pants_explorer\."},
             {
                 "rules": [
-                    {"name": "pants.explorer.server.graphql.rules.get_graphql_uvicorn_setup"},
+                    {"name": "pants_explorer.server.graphql.rules.get_graphql_uvicorn_setup"},
                 ]
             },
         ),
@@ -21,7 +21,7 @@ import pytest
             {"name": r"\.graphql\."},
             {
                 "rules": [
-                    {"name": "pants.explorer.server.graphql.rules.get_graphql_uvicorn_setup"},
+                    {"name": "pants_explorer.server.graphql.rules.get_graphql_uvicorn_setup"},
                 ]
             },
         ),

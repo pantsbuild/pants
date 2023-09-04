@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from fastapi import FastAPI
+from pants_explorer.server.browser import BrowserRequest
 from uvicorn import Config, Server  # type: ignore
 
 from pants.base.exiter import ExitCode
@@ -15,7 +16,6 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
-from pants.explorer.server.browser import BrowserRequest
 
 logger = logging.getLogger(__name__)
 

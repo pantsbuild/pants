@@ -77,7 +77,7 @@ __dependents_rules__(
     ),
     (
         "[/project_info/peek.py]",
-        "src/python/pants/explorer/server/graphql/**",
+        "pants-plugins/pants_explorer/server/graphql/**",
         DEFAULT_DEPENDENTS_RULES,
     ),
     (
@@ -97,7 +97,7 @@ __dependents_rules__(
     ),
     (
         "[/docker/target_types.py]",
-        "src/python/pants/explorer/server/graphql/query/conftest.py",
+        "pants-plugins/pants_explorer/server/graphql/query/conftest.py",
         DEFAULT_DEPENDENTS_RULES,
     ),
     (
