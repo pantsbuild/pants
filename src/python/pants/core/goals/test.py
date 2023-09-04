@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
+from typing import Any, ClassVar, Iterable, List, Optional, Sequence, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -889,7 +889,7 @@ async def run_tests(
         )
 
     to_test = list(zip(test_batches, environment_names))
-    results = []
+    results: List[TestResult] = []
     attempt = 0
     while to_test:
         attempt += 1
@@ -897,14 +897,22 @@ async def run_tests(
             break
         print(f"begin round of tests n={len(to_test)} attempt={attempt}")
         new_results = await MultiGet(
-            Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName, attempt: int, "aaa": str})
+            Get(
+                TestResult,
+                {
+                    batch: TestRequest.Batch,
+                    environment_name: EnvironmentName,
+                    attempt: int,
+                },
+            )
             for batch, environment_name in to_test
         )
         results += new_results
         failed = any(e for e in new_results if e.exit_code != 0)
         if failed:
-            to_test = [(b,e) for (b,e), t in zip(to_test, results)]
+            to_test = [(b, e) for (b, e), t in zip(to_test, results)]
             import time
+
             time.sleep(1)
         else:
             break

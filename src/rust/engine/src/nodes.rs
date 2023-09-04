@@ -376,6 +376,8 @@ impl ExecuteProcess {
         .map_err(|e| format!("Failed to get `name` for field: {e}"))? as u64,
     );
 
+    let extra = externs::getattr_from_str_frozendict(value, "extra");
+
     Ok(Process {
       argv: externs::getattr(value, "argv").unwrap(),
       env,
@@ -393,6 +395,7 @@ impl ExecuteProcess {
       cache_scope,
       execution_environment: process_config.environment,
       remote_cache_speculation_delay,
+      extra,
     })
   }
 

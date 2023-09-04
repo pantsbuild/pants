@@ -71,6 +71,7 @@ from pants.engine.process import (
     InteractiveProcess,
     Process,
     ProcessCacheScope,
+    RunProcWithRetry,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -509,7 +510,7 @@ async def run_python_tests(
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
     )
-    result = await Get(FallibleProcessResult, Process, setup.process)
+    result = await Get(FallibleProcessResult, RunProcWithRetry(setup.process))
 
     def warning_description() -> str:
         description = batch.elements[0].address.spec

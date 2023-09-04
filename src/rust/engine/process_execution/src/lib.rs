@@ -584,6 +584,8 @@ pub struct Process {
   pub execution_environment: ProcessExecutionEnvironment,
 
   pub remote_cache_speculation_delay: std::time::Duration,
+
+  pub extra: BTreeMap<String, String>,
 }
 
 impl Process {
@@ -620,6 +622,7 @@ impl Process {
         strategy: ProcessExecutionStrategy::Local,
       },
       remote_cache_speculation_delay: std::time::Duration::from_millis(0),
+      extra: BTreeMap::new(),
     }
   }
 
