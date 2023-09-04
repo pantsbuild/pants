@@ -405,14 +405,13 @@ impl<R: Rule> Builder<R> {
                 }
               }));
             };
-            if candidates.len() > 1 {
-              // If there is more than one candidate with the same id (which should never happen)
-              // trigger the unsatisfiable keys logic below.
-              candidates.clear();
-              // TODO: This is a bit janky. We'd like to propagate a message saying that there
-              // is more than one candidate with the same id, but there is no way to do that
-              // here. We can validate this elsewhere instead.
-            }
+            // We've already validated that no two rules have the same RuleId,
+            // so this assert should never trigger.
+            // We assert here to demonstrate that once we are entirely call-by-name,
+            // we can get rid of the entire edifice of multiple candidates and the
+            // unsatisfiable_nodes mechanism, and modify this function to return a Result,
+            // which will be Err if there is no rule with a matching RuleId for some node.
+            assert!(candidates.len() < 2);
           } else {
             if dependency_key.provided_params.is_empty()
               && graph[node_id].1.contains(&dependency_key.product())
