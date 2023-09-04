@@ -45,7 +45,7 @@ fn validation() {
   assert!(RuleGraph::new(rules, queries)
     .err()
     .unwrap()
-    .contains("Multiple rules have these names: get_a, get_t"));
+    .contains("The following rule ids were each used by more than one rule: get_a, get_t"));
 }
 
 #[test]
@@ -694,7 +694,8 @@ fn full_scale_target() {
       vec![
         DependencyKey::new("InferPythonDependencies"),
         DependencyKey::new("StrippedSourceFiles").provided_params(vec!["SourceFilesRequest"]),
-        DependencyKey::new("PythonModuleOwner").provided_params(vec!["PythonModule"]),
+        DependencyKey::for_known_rule(RuleId::new("map_module_to_address"), "PythonModuleOwner")
+          .provided_params(vec!["PythonModule"]),
       ],
     ),
     Rule::new(
