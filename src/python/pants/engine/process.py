@@ -14,6 +14,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
     ProcessExecutionEnvironment as ProcessExecutionEnvironment,
 )
+from pants.engine.internals.selectors import Get
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
@@ -141,6 +142,11 @@ class Process:
         object.__setattr__(
             self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
         )
+
+
+@dataclass(frozen=True)
+class RunProcWithRetry:
+    proc: Process
 
 
 @dataclass(frozen=True)
@@ -294,6 +300,13 @@ def fallible_to_exec_result_or_raise(
         description.value,
         keep_sandboxes=keep_sandboxes,
     )
+
+
+@rule
+async def run_proc_with_retry(req: RunProcWithRetry, attempt: int) -> FallibleProcessResult:
+    proc = req.proc
+    # proc = dataclasses.replace(proc, env=FrozenDict({"PANTS_TEST_ATTEMPT": str(attempt), **proc.env}))
+    return await Get(FallibleProcessResult, Process, proc)
 
 
 @dataclass(frozen=True)

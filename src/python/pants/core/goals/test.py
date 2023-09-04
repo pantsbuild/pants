@@ -888,10 +888,26 @@ async def run_tests(
             test_batches, environment_names, test_subsystem, debug_adapter
         )
 
-    results = await MultiGet(
-        Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName})
-        for batch, environment_name in zip(test_batches, environment_names)
-    )
+    to_test = list(zip(test_batches, environment_names))
+    results = []
+    attempt = 0
+    while to_test:
+        attempt += 1
+        if attempt > 5:
+            break
+        print(f"begin round of tests n={len(to_test)} attempt={attempt}")
+        new_results = await MultiGet(
+            Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName, attempt: int, "aaa": str})
+            for batch, environment_name in to_test
+        )
+        results += new_results
+        failed = any(e for e in new_results if e.exit_code != 0)
+        if failed:
+            to_test = [(b,e) for (b,e), t in zip(to_test, results)]
+            import time
+            time.sleep(1)
+        else:
+            break
 
     # Print summary.
     exit_code = 0
