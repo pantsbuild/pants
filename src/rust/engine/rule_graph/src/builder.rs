@@ -298,7 +298,7 @@ impl<R: Rule> Builder<R> {
       _ => {
         invalid_rule_ids.sort();
         Err(format!(
-          "Multiple rules have these names: {}",
+          "The following rule ids were each used by more than one rule: {}",
           invalid_rule_ids.iter().join(", ")
         ))
       }
