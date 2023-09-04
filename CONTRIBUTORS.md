@@ -121,6 +121,7 @@ Created as part of the release process.
 + In-Ho Yi
 + Itay Donanhirsh
 + Ity Kaul
++ JC (Jonathan Chen)
 + Jackson Davis
 + Jacob Floyd
 + Jake Donham
@@ -210,6 +211,7 @@ Created as part of the release process.
 + Michael Doherty
 + Michael Glass
 + Michal Bryc
++ Mikael Souza
 + Mike Cripps
 + Mike Geeves
 + Mike Lindsey
@@ -253,6 +255,7 @@ Created as part of the release process.
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Ryan Despain
 + Ryan King
 + Ryan Scott Brown
 + Ryan Williams
