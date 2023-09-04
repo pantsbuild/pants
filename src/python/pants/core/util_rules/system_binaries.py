@@ -45,10 +45,10 @@ class SystemBinariesSubsystem(Subsystem):
     class EnvironmentAware(Subsystem.EnvironmentAware):
         env_vars_used_by_options = ("PATH",)
 
-        _SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
+        _DEFAULT_SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
         _system_binary_paths = StrListOption(
-            default=[*_SEARCH_PATHS],
+            default=[*_DEFAULT_SEARCH_PATHS],
             help=softwrap(
                 """
                 The PATH value that will searched for executables.
