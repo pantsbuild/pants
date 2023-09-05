@@ -136,7 +136,7 @@ def test_hello_world_java(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixt
                 public class HelloWorldBenchmark {
 
                     @Benchmark
-                    public void wellHelloThere() {
+                    public void javaHelloThere() {
                         // this method was intentionally left blank.
                     }
 
@@ -160,7 +160,7 @@ def test_hello_world_java(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFixt
     report = _read_json_report(rule_runner, bench_result)
     assert len(report) == 1
     assert report[0]["jmhVersion"] == _JMH_VERSION
-    assert report[0]["benchmark"] == "example.HelloWorldBenchmark.wellHelloThere"
+    assert report[0]["benchmark"] == "example.HelloWorldBenchmark.javaHelloThere"
 
 
 @maybe_skip_jdk_test
@@ -248,7 +248,7 @@ def test_hello_world_scala(rule_runner: RuleRunner, jmh_lockfile: JVMLockfileFix
                 class HelloWorldBenchmark {
 
                     @Benchmark
-                    def kotlinHelloThere() {
+                    def scalaHelloThere() {
                         // this method was intentionally left blank.
                     }
 
