@@ -895,8 +895,8 @@ async def run_tests(
         attempt += 1
         if attempt > 5:
             break
-        print(f"begin round of tests n={len(to_test)} attempt={attempt}")
-        new_results = await MultiGet(
+        print(f"Begin round of testing n_batches={len(to_test)} attempt={attempt}")
+        new_results = await MultiGet(  # noqa: PNT30: We only know that we need to rerun the test after we run it
             Get(
                 TestResult,
                 {
@@ -908,14 +908,11 @@ async def run_tests(
             for batch, environment_name in to_test
         )
         results += new_results
-        failed = any(e for e in new_results if e.exit_code != 0)
-        if failed:
-            to_test = [(b, e) for (b, e), t in zip(to_test, results)]
-            import time
 
-            time.sleep(1)
-        else:
-            break
+        def should_retry(result: TestResult):
+            return result.exit_code != 0 and b"Exceeded timeout" in result.stderr_bytes
+
+        to_test = [(b, e) for (b, e), t in zip(to_test, new_results) if should_retry(t)]
 
     # Print summary.
     exit_code = 0
