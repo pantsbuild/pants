@@ -193,8 +193,8 @@ async def inject_deployment_dependencies(
     )
 
     dependencies: OrderedSet[Address] = OrderedSet()
-    if chart_address:
-        dependencies.add(chart_address)
+    dependencies.add(chart_address)
+    
     for imager_ref, candidate_address in mapping.indexed_docker_addresses.values():
         matches = frozenset([candidate_address]).difference(explicitly_provided_deps.includes)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
