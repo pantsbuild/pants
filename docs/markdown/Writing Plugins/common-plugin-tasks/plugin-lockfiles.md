@@ -7,7 +7,7 @@ createdAt: "2023-08-013T00:00:00.000Z"
 ---
 Lockfiles are a way to pin to exact versions of dependencies, often including hashes to guarantee integrity between the version pinned and the version downloaded.
 
-This guide will walk you through implementing lockfiles, hooking them into the `generate-lockfiles` goal, and implementing the `export` goal which will allow you to export dependencies for use outside of Pants.
+This guide will walk you through implementing lockfiles, hooking them into the `generate-lockfiles` goal, and implementing the `export` goal which will allow you to export dependencies for use outside of Pants. It assumes that your language has a tool that supports generating and using lockfiles or that you have written code which does these. 
 
 # 1. Expose your lockfiles to Pants
 
@@ -127,3 +127,24 @@ def rules():
         *lockfiles.rules()
     ]
 ```
+
+# 5. Use lockfiles for fetching dependencies
+
+If you have a tool that supports lockfiles, the easiest way to get the lockfile to it is to simply use a glob to pull the file into a digest.
+
+```python
+from pathlib import Path
+
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.native_engine import Snapshot
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import rule
+
+
+@rule
+async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse:
+    ...
+    Get(Snapshot, PathGlobs([(Path(request.root_module.address.spec_path) / ".terraform.lock.hcl").as_posix()])),
+```
+
+TODO: You can also reference this in the dependency inference. This dependency link will result in the lockfile being imported through the standard dependency request, and it will also cause all dependent source files to be marked as transitively changed

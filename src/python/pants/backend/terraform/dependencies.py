@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from pants.backend.terraform.target_types import (
     TerraformBackendConfigField,
@@ -12,7 +13,8 @@ from pants.backend.terraform.target_types import (
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -23,6 +25,7 @@ from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTarge
 class TerraformDependenciesRequest:
     chdir: str
     backend_config: SourceFiles
+    lockfile: Snapshot
     dependencies_files: SourceFiles
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
@@ -52,11 +55,16 @@ async def get_terraform_providers(
 
     args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
+    # If we have a lockfile, don't modify it
+    if req.lockfile.files:
+        args.append("-lockfile=readonly")
+
     with_backend_config = await Get(
         Digest,
         MergeDigests(
             [
                 backend_digest,
+                req.lockfile.digest,
                 req.dependencies_files.snapshot.digest,
             ]
         ),
@@ -101,8 +109,14 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
     )
 
-    backend_config, dependencies_files = await MultiGet(
+    backend_config, lockfile, dependencies_files = await MultiGet(
         Get(SourceFiles, SourceFilesRequest([request.backend_config])),
+        Get(
+            Snapshot,
+            PathGlobs(
+                [(Path(request.root_module.address.spec_path) / ".terraform.lock.hcl").as_posix()]
+            ),
+        ),
         Get(
             SourceFiles,
             SourceFilesRequest([tgt.get(SourcesField) for tgt in module_dependencies.dependencies]),
@@ -113,6 +127,7 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         TerraformDependenciesRequest(
             request.root_module.address.spec_path,
             backend_config,
+            lockfile,
             dependencies_files,
             initialise_backend=request.initialise_backend,
         ),
@@ -123,10 +138,10 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
     )
 
     return TerraformInitResponse(
-        fetched_deps.digest,
-        dependencies_files,  # TODO: I think this includes the wrong files (all the dependencies, not just TF ones). It's now a bit muddled which files are actually TF files
-        all_terraform_files,
-        request.root_module.address.spec_path,
+        terraform_dependencies=fetched_deps.digest,
+        terraform_files=dependencies_files,  # TODO: I think this includes the wrong files (all the dependencies, not just TF ones). It's now a bit muddled which files are actually TF files
+        sources_and_deps=all_terraform_files,
+        chdir=request.root_module.address.spec_path,
     )
 
 
