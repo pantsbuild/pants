@@ -14,7 +14,6 @@ from itertools import chain
 from typing import Any, Iterable
 
 from pants.backend.helm.subsystems import post_renderer
-from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
@@ -254,7 +253,7 @@ async def _sort_value_file_names_for_evaluation(
 
 @rule(desc="Prepare Helm deployment renderer")
 async def setup_render_helm_deployment_process(
-    request: HelmDeploymentRequest, helm_subsystem: HelmSubsystem
+    request: HelmDeploymentRequest,
 ) -> _HelmDeploymentProcessWrapper:
     value_files_prefix = "__values"
     chart, value_files = await MultiGet(
