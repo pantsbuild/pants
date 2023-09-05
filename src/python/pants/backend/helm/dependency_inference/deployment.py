@@ -183,9 +183,8 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
 ) -> InferredDependencies:
-    chart_address = await Get(Address, AddressInput, request.field_set.chart.to_address_input())
-
-    explicitly_provided_deps, mapping = await MultiGet(
+    chart_address, explicitly_provided_deps, mapping = await MultiGet(
+        Get(Address, AddressInput, request.field_set.chart.to_address_input()),
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
         Get(
             FirstPartyHelmDeploymentMapping,

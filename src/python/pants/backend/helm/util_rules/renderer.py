@@ -24,11 +24,9 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.backend.helm.value_interpolation import HelmEnvironmentInterpolationValue
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -47,7 +45,6 @@ from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope,
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
-from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 logger = logging.getLogger(__name__)
 
@@ -195,15 +192,6 @@ class RenderedHelmFiles(EngineAwareReturnType):
         # When using post-renderers it may not be safe to cache the generated files as the final result
         # may contain secrets or other kind of sensitive information.
         return not self.post_processed
-
-
-async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> InterpolationContext:
-    interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
-
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(helm_subsystem.extra_env_vars))
-    interpolation_context["env"] = HelmEnvironmentInterpolationValue(env)
-
-    return InterpolationContext.from_dict(interpolation_context)
 
 
 async def _sort_value_file_names_for_evaluation(
