@@ -187,14 +187,14 @@ class TestResult(EngineAwareReturnType):
 
     @memoized_property
     @deprecated(
-        removal_version="2.19.0.dev0", hint="Use `TestResult.stdout_bytes` instead of `stdout`."
+        removal_version="2.19.0.dev1", hint="Use `TestResult.stdout_bytes` instead of `stdout`."
     )
     def stdout(self) -> str:
         return self.stdout_bytes.decode(errors="replace")
 
     @memoized_property
     @deprecated(
-        removal_version="2.19.0.dev0", hint="Use `TestResult.stderr_bytes` instead of `stderr`."
+        removal_version="2.19.0.dev1", hint="Use `TestResult.stderr_bytes` instead of `stderr`."
     )
     def stderr(self) -> str:
         return self.stderr_bytes.decode(errors="replace")
