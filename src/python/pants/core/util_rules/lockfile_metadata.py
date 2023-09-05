@@ -44,7 +44,6 @@ def lockfile_metadata_registrar(scope: LockfileScope) -> Callable[[int], Registe
         """
 
         def _dec(cls: Type[LockfileMetadata]) -> Type[LockfileMetadata]:
-
             # Only frozen dataclasses may be registered as lockfile metadata:
             cls_dataclass_params = getattr(cls, "__dataclass_params__", None)
             if not cls_dataclass_params or not cls_dataclass_params.frozen:

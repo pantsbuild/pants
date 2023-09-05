@@ -4,7 +4,6 @@ slug: "code-of-conduct"
 excerpt: "Our expectations for participants in the Pants community."
 hidden: false
 createdAt: "2020-05-16T22:54:21.817Z"
-updatedAt: "2021-03-17T04:23:56.115Z"
 ---
 We are committed to providing a welcoming and inspiring community for all and expect our code of conduct to be honored. Anyone who violates this code of conduct may be banned from contributing to the project or participating in community discussion.
 
@@ -29,7 +28,14 @@ If you have experienced or witnessed unacceptable behavior—or have any other c
 - Names (real, nicknames, or pseudonyms) of any individuals involved. If there are additional witnesses, please include them as well. Your account of what occurred, and if you believe the incident is ongoing. If there is a publicly available record (e.g. a mailing list archive or a slack history), please include a link.
 - Any additional information that may be helpful.
 
-After filing a report, a representative will contact you personally, review the incident, follow up with any additional questions, and make a decision as to how to respond. If the person who is harassing you is part of the response team, they are required to be excluded from handling your incident. If the complaint originates from a member of the response team, it will be handled by a different member of the response team. We will respect confidentiality requests for the purpose of protecting victims of abuse. We will endeavor to make an alternative reporting chain available in the event you need to report a project lead or a member of the response team. The members of the response team can be found [here](https://github.com/pantsbuild/pants/blob/master/COMMITTERS.md#active-committers).
+After filing a report, a representative will contact you personally, review the incident, follow up with any additional questions, and make a decision as to how to respond. If the person who is harassing you is part of the response team, they are required to be excluded from handling your incident. If the complaint originates from a member of the response team, it will be handled by a different member of the response team. We will respect confidentiality requests for the purpose of protecting victims of abuse. We will endeavor to make an alternative reporting chain available in the event you need to report a project lead or a member of the response team. The members of the response team are currently:
+
++ Benjy Weinberger
++ Carina C. Zona
++ Daniel Wagner-Hall
++ Eric Arellano
++ Nora Howard
++ Joshua Cannon
 
 Attribution and acknowledgements
 --------------------------------

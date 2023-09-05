@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -187,6 +188,15 @@ class KotlincPluginArtifactField(StringField, AsyncFieldMixin):
     value: str
     help = "The address of a `jvm_artifact` that defines a plugin for `kotlinc`."
 
+    def to_address_input(self) -> AddressInput:
+        return AddressInput.parse(
+            self.value,
+            relative_to=self.address.spec_path,
+            description_of_origin=(
+                f"the `{self.alias}` field in the `{KotlincPluginTarget.alias}` target {self.address}"
+            ),
+        )
+
 
 class KotlincPluginIdField(StringField):
     alias = "plugin_id"
@@ -225,11 +235,12 @@ class KotlincPluginTarget(Target):
         plugin if that name cannot be inferred from the `name` of this target.
 
         The standard `kotlinc` plugins are available via the following artifact coordinates and IDs:
+
         * All-open: `org.jetbrains.kotlin:kotlin-allopen:VERSION` (ID: `all-open`)
         * No-arg: `org.jetbrains.kotlin:kotlin-noarg:VERSION` (ID: `no-arg`)
         * SAM with receiver: `org.jetbrains.kotlin:kotlin-sam-with-receiver:VERSION` (ID: `sam-with-receiver`)
         * kapt (annotation processor): `org.jetbrains.kotlin:org.jetbrains.kotlin:kotlin-annotation-processing-embeddable:VERSION` (ID: `kapt3`)
-        * Seralization: `org.jetbrains.kotlin:kotlin-serialization:VERSION` (ID: `serialization`)
+        * Serialization: `org.jetbrains.kotlin:kotlin-serialization:VERSION` (ID: `serialization`)
         """
     )
 

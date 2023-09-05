@@ -37,21 +37,12 @@ class BuildFileDefaults(FrozenDict[str, FrozenDict[str, ImmutableValue]]):
     """Map target types to default field values."""
 
 
-@dataclass(frozen=True)
 class ParametrizeDefault(Parametrize):
-    """A frozen version of `Parametrize` for defaults.
+    """Parametrize for default field values.
 
-    This is needed since all defaults must be hashable, which the `Parametrize` class is not nor can
-    it be as it may get unhashable data as input and is unaware of the field type it is being
-    applied to.
+    This is to have eager validation on the field values rather than erroring first when applied on
+    an actual target.
     """
-
-    args: tuple[str, ...]
-    kwargs: FrozenDict[str, ImmutableValue]  # type: ignore[assignment]
-
-    def __init__(self, *args: str, **kwargs: ImmutableValue) -> None:
-        object.__setattr__(self, "args", args)
-        object.__setattr__(self, "kwargs", FrozenDict(kwargs))
 
     @classmethod
     def create(
@@ -123,7 +114,7 @@ class BuildFileDefaultsParserState:
         all: SetDefaultsValueT | None = None,
         extend: bool = False,
         ignore_unknown_fields: bool = False,
-        **kwargs,
+        ignore_unknown_targets: bool = False,
     ) -> None:
         defaults: dict[str, dict[str, Any]] = (
             {} if not extend else {k: dict(v) for k, v in self.defaults.items()}
@@ -134,10 +125,16 @@ class BuildFileDefaultsParserState:
                 defaults,
                 {tuple(self.registered_target_types.aliases): all},
                 ignore_unknown_fields=True,
+                ignore_unknown_targets=ignore_unknown_targets,
             )
 
         for arg in args:
-            self._process_defaults(defaults, arg, ignore_unknown_fields=ignore_unknown_fields)
+            self._process_defaults(
+                defaults,
+                arg,
+                ignore_unknown_fields=ignore_unknown_fields,
+                ignore_unknown_targets=ignore_unknown_targets,
+            )
 
         # Update with new defaults, dropping targets without any default values.
         for tgt, default in defaults.items():
@@ -157,6 +154,7 @@ class BuildFileDefaultsParserState:
         defaults: dict[str, dict[str, Any]],
         targets_defaults: SetDefaultsT,
         ignore_unknown_fields: bool = False,
+        ignore_unknown_targets: bool = False,
     ):
         if not isinstance(targets_defaults, dict):
             raise ValueError(
@@ -177,6 +175,8 @@ class BuildFileDefaultsParserState:
             for target_alias in map(str, targets):
                 if target_alias in types:
                     target_type = types[target_alias]
+                elif ignore_unknown_targets:
+                    continue
                 else:
                     raise ValueError(f"Unrecognized target type {target_alias} in {self.address}.")
 

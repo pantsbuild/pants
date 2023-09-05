@@ -5,14 +5,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Mapping
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
+from pants.base.deprecated import deprecated, warn_or_error
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
+    AsyncFieldMixin,
     BoolField,
     Dependencies,
     DescriptionField,
@@ -34,7 +39,8 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
-from pants.util.strutil import help_text
+from pants.util.memo import memoized_method
+from pants.util.strutil import help_text, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 logger = logging.getLogger(__name__)
@@ -53,7 +59,7 @@ class HelmRegistriesField(StringSequenceField):
         built chart.
 
         The address is an `oci://` prefixed domain name with optional port for your registry, and any registry
-        aliases are prefixed with `@` for addresses in the [helm].registries configuration
+        aliases are prefixed with `@` for addresses in the `[helm].registries` configuration
         section.
 
         By default, all configured registries with `default = true` are used.
@@ -178,6 +184,18 @@ class HelmChartRepositoryField(StringField):
     )
 
 
+class HelmChartVersionField(StringField):
+    alias = "version"
+    help = help_text(
+        """
+        Version number for the given Helm chart.
+
+        When specified, the version provided in the source Chart.yaml file will be overriden by the value
+        given to this field.
+        """
+    )
+
+
 class HelmChartTarget(Target):
     alias = "helm_chart"
     core_fields = (
@@ -188,6 +206,7 @@ class HelmChartTarget(Target):
         HelmChartOutputPathField,
         HelmChartLintStrictField,
         HelmChartRepositoryField,
+        HelmChartVersionField,
         HelmRegistriesField,
         HelmSkipPushField,
         HelmSkipLintField,
@@ -205,6 +224,8 @@ class HelmChartFieldSet(FieldSet):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
+    description: DescriptionField
+    version: HelmChartVersionField
 
 
 class AllHelmChartTargets(Targets):
@@ -270,7 +291,7 @@ def all_helm_unittest_test_targets(all_targets: AllTargets) -> AllHelmUnitTestTe
 
 
 class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
-    default = ("*_test.yaml",)
+    default = ("*_test.yaml", "*_test.yml")
     expected_file_extensions = (
         ".yaml",
         ".yml",
@@ -303,7 +324,6 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = HelmUnitTestTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
-        HelmUnitTestDependenciesField,
         HelmUnitTestStrictField,
         HelmUnitTestTimeoutField,
     )
@@ -385,6 +405,39 @@ def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets
 # -----------------------------------------------------------------------------------------------
 
 
+class HelmDeploymentChartField(StringField, AsyncFieldMixin):
+    alias = "chart"
+    # TODO Will be made required in next release
+    required = False
+    help = help_text(
+        f"""
+        The address of the `{HelmChartTarget.alias}` or `{HelmArtifactTarget.alias}`
+        that will be used for this deployment.
+        """
+    )
+
+    def to_address_input(self) -> AddressInput | None:
+        if self.value:
+            return AddressInput.parse(
+                self.value,
+                relative_to=self.address.spec_path,
+                description_of_origin=f"the `{self.alias}` field in the `{HelmDeploymentTarget.alias}` target {self.address}",
+            )
+
+        warn_or_error(
+            "2.19.0.dev0",
+            "chart address in `dependencies`",
+            softwrap(
+                f"""
+                You should specify the chart address in the new `{self.alias}` field in
+                {HelmDeploymentTarget.alias}. In future versions this will be mandatory.
+                """
+            ),
+            start_version="2.18.0.dev1",
+        )
+        return None
+
+
 class HelmDeploymentReleaseNameField(StringField):
     alias = "release_name"
     help = "Name of the release used in the deployment. If not set, the target name will be used instead."
@@ -392,7 +445,7 @@ class HelmDeploymentReleaseNameField(StringField):
 
 class HelmDeploymentNamespaceField(StringField):
     alias = "namespace"
-    help = "Kubernetes namespace for the given deployment."
+    help = help_text("""Kubernetes namespace for the given deployment.""")
 
 
 class HelmDeploymentDependenciesField(Dependencies):
@@ -408,10 +461,11 @@ class HelmDeploymentSkipCrdsField(BoolField):
 class HelmDeploymentSourcesField(MultipleSourcesField):
     default = ("*.yaml", "*.yml")
     expected_file_extensions = (".yaml", ".yml")
+    default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
     help = "Helm configuration files for a given deployment."
 
 
-class HelmDeploymentValuesField(DictStringToStringField):
+class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
     alias = "values"
     required = False
     help = help_text(
@@ -420,35 +474,75 @@ class HelmDeploymentValuesField(DictStringToStringField):
 
         Value names should be defined using dot-syntax as in the following example:
 
-        ```
-        helm_deployment(
-            values={
-                "nameOverride": "my_custom_name",
-                "image.pullPolicy": "Always",
-            },
-        )
-        ```
+            helm_deployment(
+                values={
+                    "nameOverride": "my_custom_name",
+                    "image.pullPolicy": "Always",
+                },
+            )
 
         Values can be dynamically calculated using interpolation as shown in the following example:
 
-        ```
-        helm_deployment(
-            values={
-                "configmap.deployedAt": "{env.DEPLOY_TIME}",
-            },
-        )
-        ```
+            helm_deployment(
+                values={
+                    "configmap.deployedAt": f"{env('DEPLOY_TIME')}",
+                },
+            )
 
         Check the Helm backend documentation on what are the options available and its caveats when making
         usage of dynamic values in your deployments.
         """
     )
 
+    @memoized_method
+    @deprecated("2.19.0.dev0", start_version="2.18.0.dev0")
+    def format_with(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> dict[str, str]:
+        source = InterpolationContext.TextSource(
+            self.address,
+            target_alias=HelmDeploymentTarget.alias,
+            field_alias=HelmDeploymentValuesField.alias,
+        )
+
+        def format_value(text: str) -> str | None:
+            try:
+                return interpolation_context.format(
+                    text,
+                    source=source,
+                )
+            except InterpolationError as err:
+                if ignore_missing:
+                    return None
+                raise err
+
+        result = {}
+        default_curr_value: dict[str, str] = {}
+        current_value: Mapping[str, str] = self.value or default_curr_value
+        for key, value in current_value.items():
+            formatted_value = format_value(value)
+            if formatted_value is not None:
+                result[key] = formatted_value
+
+        if result != current_value:
+            warn_or_error(
+                "2.19.0.dev0",
+                "Using the {env.VAR_NAME} interpolation syntax",
+                "Use the new `f\"prefix-{env('VAR_NAME')}\" syntax for interpolating values from environment variables.",
+                start_version="2.18.0.dev0",
+            )
+
+        return result
+
 
 class HelmDeploymentCreateNamespaceField(BoolField):
     alias = "create_namespace"
     default = False
     help = "If true, the namespace will be created if it doesn't exist."
+
+    removal_version = "2.19.0.dev0"
+    # TODO This causes and error in the parser as it believes it is using it as the `removal_version` attribute.
+    # removal_hint = "Use the passthrough argument `--create-namespace` instead."
 
 
 class HelmDeploymentNoHooksField(BoolField):
@@ -479,10 +573,17 @@ class HelmDeploymentPostRenderersField(SpecialCasedDependencies):
     )
 
 
+class HelmDeploymentEnableDNSField(BoolField):
+    alias = "enable_dns"
+    default = False
+    help = "Enables DNS lookups when using the `getHostByName` template function."
+
+
 class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        HelmDeploymentChartField,
         HelmDeploymentReleaseNameField,
         HelmDeploymentDependenciesField,
         HelmDeploymentSourcesField,
@@ -493,6 +594,7 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentNoHooksField,
         HelmDeploymentTimeoutField,
         HelmDeploymentPostRenderersField,
+        HelmDeploymentEnableDNSField,
     )
     help = "A Helm chart deployment."
 
@@ -504,6 +606,7 @@ class HelmDeploymentFieldSet(FieldSet):
         HelmDeploymentSourcesField,
     )
 
+    chart: HelmDeploymentChartField
     description: DescriptionField
     release_name: HelmDeploymentReleaseNameField
     namespace: HelmDeploymentNamespaceField
@@ -514,34 +617,15 @@ class HelmDeploymentFieldSet(FieldSet):
     dependencies: HelmDeploymentDependenciesField
     values: HelmDeploymentValuesField
     post_renderers: HelmDeploymentPostRenderersField
+    enable_dns: HelmDeploymentEnableDNSField
 
+    @deprecated(
+        "2.19.0.dev0", "Use `field_set.values.format_with()` instead.", start_version="2.18.0.dev0"
+    )
     def format_values(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
     ) -> dict[str, str]:
-        source = InterpolationContext.TextSource(
-            self.address,
-            target_alias=HelmDeploymentTarget.alias,
-            field_alias=HelmDeploymentValuesField.alias,
-        )
-
-        def format_value(text: str) -> str | None:
-            try:
-                return interpolation_context.format(
-                    text,
-                    source=source,
-                )
-            except InterpolationError as err:
-                if ignore_missing:
-                    return None
-                raise err
-
-        result = {}
-        for key, value in (self.values.value or {}).items():
-            formatted_value = format_value(value)
-            if formatted_value is not None:
-                result[key] = formatted_value
-
-        return result
+        return self.values.format_with(interpolation_context, ignore_missing=ignore_missing)
 
 
 class AllHelmDeploymentTargets(Targets):

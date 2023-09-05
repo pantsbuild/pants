@@ -4,7 +4,6 @@ slug: "docker"
 excerpt: "How to build Docker images containing artifacts built by Pants"
 hidden: false
 createdAt: "2021-09-03T15:28:55.877Z"
-updatedAt: "2022-05-13T12:34:06.323Z"
 ---
 Docker images typically bundle build artifacts, such as PEX files, wheels, loose files, and so on, with other runtime requirements, such as a Python interpreter.
 
@@ -71,7 +70,7 @@ When you run `docker build` directly, the context is usually a directory within 
 
 Pants, however, takes care of assembling the context for you. It does so using the dependencies of the [`docker_image`](doc:reference-docker_image) target, which can include:
 
-- Loose files specified using  [`file` / `files` targets](doc:resources#files).
+- Loose files specified using  [`file` / `files` targets](doc:assets#files).
 - Artifacts packaged from a variety of targets, such as [`pex_binary`](doc:reference-pex_binary) , [`python_distribution`](doc:reference-python_distribution), [`archive`](doc:reference-archive), and any other target that can be built via the [package](doc:reference-package) goal, including other docker images.
 
 The context is assembled as follows:
@@ -207,7 +206,7 @@ python_sources(name="lib")
 
 pex_binary(name="bin", entry_point="main.py")
 ```
-```python src/py/hw/main.py
+```python src/python/hw/main.py
 import os
 
 msg = "Hello"
@@ -312,7 +311,7 @@ Most authentication mechanisms will also require tools exposed on the `$PATH` to
 [docker]
 env_vars = ["DOCKER_CONFIG=%(homedir)s/.docker"]
 tools = [
-  "docker-credential-gcloud",
+  "docker-credential-gcr", # or docker-credential-gcloud when using artifact registry
   "dirname",
   "readlink",
   "python3",
@@ -332,7 +331,7 @@ You may need to set additional environment variables with `[docker].env_vars`.
 > It can help to simulate a hermetic environment by using `env -i`. With credential helpers, it also helps to directly invoke the helper without Docker and Pants. For example, you can symlink the tools you think you need into a directory like `/some/isolated/directory`, then run the below:
 > 
 > ```
-> ❯ echo europe-north1-docker.pkg.dev | env -i PATH=/some/isolated/directory docker-credential-gcloud get
+> ❯ echo europe-north1-docker.pkg.dev | env -i PATH=/some/isolated/directory docker-credential-gcr get
 > {
 >   "Secret": "ya29.A0ARrdaM-...-ZhScVscwTVtQ",
 >   "Username": "_dcgcloud_token"

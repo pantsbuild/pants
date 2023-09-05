@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-from dataclasses import FrozenInstanceError, dataclass
 
 import pytest
 
-from pants.util.meta import SingletonMetaclass, classproperty, frozen_after_init
+from pants.util.meta import SingletonMetaclass, classproperty
 from pants.util.strutil import softwrap
 
 
@@ -73,7 +72,6 @@ class WithShadowingInstanceMethod(OverridingValueInit):
 
 
 class OverridingMethodDefSuper(WithProp):
-
     _other_value = "o0"
 
     @classproperty
@@ -216,86 +214,3 @@ def test_abstract_classproperty():
             return "hello"
 
     assert Concrete2.f == "hello"
-
-
-def test_no_init() -> None:
-    @frozen_after_init
-    class Test:
-        pass
-
-    test = Test()
-    with pytest.raises(FrozenInstanceError):
-        test.x = 1  # type: ignore[attr-defined]
-
-
-def test_init_still_works() -> None:
-    @frozen_after_init
-    class Test:
-        def __init__(self, x: int) -> None:
-            self.x = x
-            self.y = "abc"
-
-    test = Test(x=0)
-    assert test.x == 0
-    assert test.y == "abc"
-
-
-def test_modify_preexisting_field_after_init() -> None:
-    @frozen_after_init
-    class Test:
-        def __init__(self, x: int) -> None:
-            self.x = x
-
-    test = Test(x=0)
-    with pytest.raises(FrozenInstanceError):
-        test.x = 1
-
-
-def test_add_new_field_after_init() -> None:
-    @frozen_after_init
-    class Test:
-        def __init__(self, x: int) -> None:
-            self.x = x
-
-    test = Test(x=0)
-    with pytest.raises(FrozenInstanceError):
-        test.y = "abc"  # type: ignore[attr-defined]
-
-    with test._unfrozen():  # type: ignore[attr-defined]
-        test.y = "abc"  # type: ignore[attr-defined]
-
-    with pytest.raises(FrozenInstanceError):
-        test.z = "abc"  # type: ignore[attr-defined]
-
-
-def test_explicitly_call_setattr_after_init() -> None:
-    @frozen_after_init
-    class Test:
-        def __init__(self, x: int) -> None:
-            self.x = x
-
-    test = Test(x=0)
-    with pytest.raises(FrozenInstanceError):
-        setattr(test, "x", 1)
-
-    with test._unfrozen():  # type: ignore[attr-defined]
-        setattr(test, "x", 1)
-
-    with pytest.raises(FrozenInstanceError):
-        test.y = "abc"  # type: ignore[attr-defined]
-
-
-def test_works_with_dataclass() -> None:
-    @frozen_after_init
-    @dataclass(frozen=False)
-    class Test:
-        x: int
-        y: str
-
-        def __init__(self, x: int) -> None:
-            self.x = x
-            self.y = "abc"
-
-    test = Test(x=0)
-    with pytest.raises(FrozenInstanceError):
-        test.x = 1

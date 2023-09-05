@@ -20,19 +20,30 @@ class Affected(enum.Enum):
     other = "other"
 
 
-_docs_globs = ["README.md", "**/README.md", "docs/*", "build-support/bin/generate_user_list.py"]
-_rust_globs = ["src/rust/engine/*", "rust-toolchain", "build-support/bin/rust/*"]
+_docs_globs = [
+    "*.md",
+    "**/*.md",
+    "docs/*",
+    "build-support/bin/generate_user_list.py",
+]
+_rust_globs = [
+    "src/rust/engine/*",
+    "rust-toolchain",
+    "build-support/bin/rust/*",
+]
 _release_globs = [
+    # Any changes to these files should trigger wheel building. Notes too, as they are included in
+    # the wheel.
     "pants.toml",
     "src/python/pants/VERSION",
-    "src/python/pants/notes/*",
     "src/python/pants/init/BUILD",
-    "build-support/bin/release.sh",
-    "build-support/bin/_release_helper.py",
+    "src/python/pants/notes/*",
+    "src/python/pants_release/release.py",
+    "src/python/pants_release/reversion.py",
 ]
 _ci_config_globs = [
     "build-support/bin/classify_changed_files.py",
-    "build-support/bin/generate_github_workflows.py",
+    "src/python/pants_release/generate_github_workflows.py",
 ]
 
 
@@ -56,9 +67,7 @@ def classify(changed_files: list[str]) -> set[Affected]:
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        return
-    affecteds = classify(sys.argv[1].split("|"))
+    affecteds = classify(sys.stdin.read().splitlines())
     for affected in sorted([a.name for a in affecteds]):
         print(affected)
 

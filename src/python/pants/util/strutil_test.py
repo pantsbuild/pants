@@ -2,12 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import textwrap
+from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
 
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import (
     bullet_list,
+    comma_separated_list,
+    docstring,
     ensure_binary,
     ensure_text,
     first_paragraph,
@@ -16,6 +20,7 @@ from pants.util.strutil import (
     path_safe,
     pluralize,
     softwrap,
+    stable_hash,
     strip_prefix,
     strip_v2_chroot_path,
 )
@@ -30,6 +35,13 @@ def test_pluralize() -> None:
     assert "0 bosses" == pluralize(0, "boss")
     assert "1 dependency" == pluralize(1, "dependency")
     assert "2 dependencies" == pluralize(2, "dependency")
+
+
+def test_comma_separated_list() -> None:
+    assert "" == comma_separated_list([])
+    assert "foo" == comma_separated_list(["foo"])
+    assert "salt and pepper" == comma_separated_list(["salt", "pepper"])
+    assert "snap, crackle, and pop" == comma_separated_list(["snap", "crackle", "pop"])
 
 
 def test_ensure_text() -> None:
@@ -374,3 +386,30 @@ _TEST_MEMORY_SIZES_PARAMS = [
 @pytest.mark.parametrize("mem_size, expected", _TEST_MEMORY_SIZES_PARAMS)
 def test_fmt_memory_sizes(mem_size: int, expected: str) -> None:
     assert fmt_memory_size(mem_size) == expected
+
+
+def test_docstring_decorator() -> None:
+    @docstring(f"calc 1 + 1 = {1 + 1}")
+    def document_me():
+        pass
+
+    assert document_me.__doc__ == "calc 1 + 1 = 2"
+
+    def show_why_this_is_needed() -> None:
+        f"""calc 1 + 1 = {1 + 1}"""
+
+    with pytest.raises(AssertionError):
+        assert show_why_this_is_needed.__doc__ == "calc 1 + 1 = 2"
+
+
+def test_stable_hash() -> None:
+    @dataclass(frozen=True)
+    class Data:
+        mapping: FrozenDict[str, str]
+
+    data = Data(
+        FrozenDict(
+            {alpha: alpha.lower() for alpha in [chr(a) for a in range(ord("A"), ord("Z") + 1)]}
+        )
+    )
+    assert stable_hash(data) == "1f2a0caa2588274fa99dc7397c1687dbbe6159be0de646a37ba7af241ecf1add"

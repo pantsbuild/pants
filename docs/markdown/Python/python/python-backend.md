@@ -4,7 +4,6 @@ slug: "python-backend"
 excerpt: "How to enable Pants's bundled Python backend package."
 hidden: false
 createdAt: "2020-03-02T22:39:55.355Z"
-updatedAt: "2022-05-16T05:07:38.169Z"
 ---
 > 📘 Example Python repository
 >

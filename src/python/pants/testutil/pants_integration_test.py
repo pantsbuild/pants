@@ -91,10 +91,13 @@ def run_pants_with_workdir_without_waiting(
     shell: bool = False,
     set_pants_ignore: bool = True,
 ) -> PantsJoinHandle:
-    args = ["--no-pantsrc", f"--pants-workdir={workdir}"]
+    args = [
+        "--no-pantsrc",
+        f"--pants-workdir={workdir}",
+    ]
     if set_pants_ignore:
-        # FIXME: For some reason, Pants's CI adds this file and it is not ignored by default. Why?
-        args.append("--pants-ignore=+['.coverage.*']")
+        # FIXME: For some reason, Pants's CI adds the coverage file and it is not ignored by default. Why?
+        args.append("--pants-ignore=+['.coverage.*', '.python-build-standalone']")
 
     pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
     pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
@@ -113,6 +116,13 @@ def run_pants_with_workdir_without_waiting(
         with safe_open(toml_file_name, mode="w") as fp:
             fp.write(TomlSerializer(config).serialize())
         args.append(f"--pants-config-files={toml_file_name}")
+
+    # The python backend requires setting ICs explicitly.
+    # We do this centrally here for convenience.
+    if any("pants.backend.python" in arg for arg in command) and not any(
+        "--python-interpreter-constraints" in arg for arg in command
+    ):
+        args.append("--python-interpreter-constraints=['>=3.7,<4']")
 
     pants_script = [sys.executable, "-m", "pants"]
 
@@ -148,9 +158,10 @@ def run_pants_with_workdir_without_waiting(
                     env[h] = value
     else:
         env = os.environ.copy()
+
+    env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
     if extra_env:
         env.update(extra_env)
-    env.update(PYTHONPATH=os.pathsep.join(sys.path))
 
     # Pants command that was called from the test shouldn't have a parent.
     if "PANTS_PARENT_BUILD_ID" in env:

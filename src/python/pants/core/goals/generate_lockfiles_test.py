@@ -22,7 +22,6 @@ from pants.backend.python.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
-    NO_TOOL_LOCKFILE,
     AmbiguousResolveNamesError,
     GenerateLockfile,
     GenerateLockfileWithEnvironments,
@@ -101,22 +100,23 @@ def test_determine_tool_sentinels_to_generate() -> None:
     with pytest.raises(UnrecognizedResolveNamesError):
         assert_chosen({"fake"}, expected_user_resolves=[], expected_tools=[])
 
-    # Error if same resolve name used for tool lockfiles and user lockfiles.
     class AmbiguousTool(GenerateToolLockfileSentinel):
         resolve_name = "ambiguous"
 
-    with pytest.raises(AmbiguousResolveNamesError):
-        determine_resolves_to_generate(
-            [
-                KnownUserResolveNames(
-                    ("ambiguous",),
-                    "[lang].resolves",
-                    requested_resolve_names_cls=Lang1Requested,
-                )
-            ],
-            [AmbiguousTool],
-            set(),
-        )
+    # Let a user resolve shadow a tool resolve with the same name.
+    assert determine_resolves_to_generate(
+        [
+            KnownUserResolveNames(
+                ("ambiguous",),
+                "[lang].resolves",
+                requested_resolve_names_cls=Lang1Requested,
+            )
+        ],
+        [AmbiguousTool],
+        set(),
+    ) == ([Lang1Requested(["ambiguous"])], [])
+
+    # Error if same resolve name used for multiple user lockfiles.
     with pytest.raises(AmbiguousResolveNamesError):
         determine_resolves_to_generate(
             [
@@ -144,7 +144,6 @@ def test_filter_tool_lockfile_requests() -> None:
 
     tool1 = create_request("tool1")
     tool2 = create_request("tool2")
-    disabled_tool = create_request("none", lockfile_dest=NO_TOOL_LOCKFILE)
     default_tool = create_request("default", lockfile_dest=DEFAULT_TOOL_LOCKFILE)
 
     def assert_filtered(
@@ -162,13 +161,6 @@ def test_filter_tool_lockfile_requests() -> None:
 
     assert_filtered(None, resolve_specified=False)
     assert_filtered(None, resolve_specified=True)
-
-    assert_filtered(disabled_tool, resolve_specified=False)
-    with pytest.raises(ValueError) as exc:
-        assert_filtered(disabled_tool, resolve_specified=True)
-    assert f"`[{disabled_tool.resolve_name}].lockfile` is set to `{NO_TOOL_LOCKFILE}`" in str(
-        exc.value
-    )
 
     assert_filtered(default_tool, resolve_specified=False)
     with pytest.raises(ValueError) as exc:
@@ -303,7 +295,6 @@ def test_preferred_environment(
     not_in_output: str | None,
     caplog,
 ):
-
     resolve_name = "boop"
     resolve_dest = "beep"
     if not env_names:

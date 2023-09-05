@@ -4,7 +4,6 @@ slug: "rules-api-unions"
 excerpt: "Polymorphism for the engine."
 hidden: false
 createdAt: "2020-05-08T04:15:07.104Z"
-updatedAt: "2022-04-26T22:37:59.286Z"
 ---
 Union rules solve the same problem that polymorphism solves in general: how to write generic code that operates on types not known about at the time of writing.
 
@@ -35,16 +34,20 @@ async def lint(..., targets: Targets, union_membership: UnionMembership) -> Lint
         for concrete_request in concrete_requests
     )
 ```
-```python pants-plugins/bash/shellcheck.py
-from pants.core.goals.lint import LintRequest
 
-class ShellcheckRequest(LintRequest):
+```python pants-plugins/bash/shellcheck.py
+from pants.core.goals.lint import LintTargetsRequest
+
+
+class ShellcheckRequest(LintTargetsRequest):
     ...
 
+
 ...
-  
+
+
 def rules():
-    return [UnionRule(LintRequest, ShellcheckRequest)
+    return [*ShellcheckRequest.rules()]
 ```
 
 This example will find all registered linter implementations by looking up `union_membership[LintTargetsRequest]`, which returns a tuple of all `LintTargetsRequest ` types that were registered with a `UnionRule`, such as `ShellcheckRequest` and `Flake8Request`.

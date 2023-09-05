@@ -3,13 +3,12 @@ title: "Installing Pants"
 slug: "installation"
 hidden: false
 createdAt: "2020-02-21T17:44:53.022Z"
-updatedAt: "2022-07-12T00:00:00.000Z"
 ---
 
-You can download an installer script that will install the Pants binary with this command:
+You can download and run an installer script that will install the Pants binary with this command:
 
 ```
-curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash
 ```
 
 This script will install `pants` into `~/bin`, which must be on your PATH. The installer script will warn you if it is not.
@@ -20,6 +19,12 @@ Alternatively, on macOS you can also use homebrew to install `pants`:
 
 ```
 brew install pantsbuild/tap/pants
+```
+
+You can also use the [`bin`](https://github.com/marcosnils/bin) tool to install `pants`:
+
+```
+bin i github.com/pantsbuild/scie-pants ~/.local/bin/pants
 ```
 
 `pants` is a launcher binary that delegates to the underlying version of Pants in each repo. This allows you to have multiple repos, each using an independent version of Pants.
@@ -38,15 +43,6 @@ If you have difficulty installing Pants, see our [getting help](doc:getting-help
 > ```
 > SCIE_BOOT=update pants
 > ```
-
-Running Pants from unreleased builds
-------------------------------------
-
-To use an unreleased build of Pants from the [pantsbuild/pants](https://github.com/pantsbuild/pants) main branch, locate the main branch SHA, set `PANTS_SHA=<SHA>` in the environment, and run `pants` as usual:
-
-```
-PANTS_SHA=8553e8cbc5a1d9da3f84dcfc5e7bf3139847fb5f pants --version
-```
 
 Running Pants from sources
 --------------------------

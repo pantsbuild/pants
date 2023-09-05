@@ -28,6 +28,7 @@
 pub mod directory;
 #[cfg(test)]
 mod directory_tests;
+pub mod gitignore;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
@@ -38,6 +39,7 @@ pub use crate::directory::{
   DigestTrie, DirectoryDigest, Entry, SymlinkBehavior, TypedPath, EMPTY_DIGEST_TREE,
   EMPTY_DIRECTORY_DIGEST,
 };
+pub use crate::gitignore::GitignoreStyleExcludes;
 pub use crate::glob_matching::{
   FilespecMatcher, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
@@ -50,19 +52,10 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
-use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use async_trait::async_trait;
 use bytes::Bytes;
 use deepsize::DeepSizeOf;
-use lazy_static::lazy_static;
 use serde::Serialize;
-
-lazy_static! {
-  static ref EMPTY_IGNORE: Arc<GitignoreStyleExcludes> = Arc::new(GitignoreStyleExcludes {
-    patterns: vec![],
-    gitignore: Gitignore::empty(),
-  });
-}
 
 const TARGET_NOFILE_LIMIT: u64 = 10000;
 
@@ -185,6 +178,23 @@ impl Stat {
   pub fn link(path: PathBuf, target: PathBuf) -> Stat {
     Stat::Link(Link { path, target })
   }
+
+  pub fn within(&self, directory: &Path) -> Stat {
+    match self {
+      Stat::Dir(Dir(p)) => Stat::Dir(Dir(directory.join(p))),
+      Stat::File(File {
+        path,
+        is_executable,
+      }) => Stat::File(File {
+        path: directory.join(path),
+        is_executable: *is_executable,
+      }),
+      Stat::Link(Link { path, target }) => Stat::Link(Link {
+        path: directory.join(path),
+        target: target.to_owned(),
+      }),
+    }
+  }
 }
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
@@ -248,76 +258,6 @@ impl PathStat {
 
 #[derive(Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct DirectoryListing(pub Vec<Stat>);
-
-#[derive(Debug)]
-pub struct GitignoreStyleExcludes {
-  patterns: Vec<String>,
-  gitignore: Gitignore,
-}
-
-impl GitignoreStyleExcludes {
-  pub fn create(patterns: Vec<String>) -> Result<Arc<Self>, String> {
-    Self::create_with_gitignore_file(patterns, None)
-  }
-
-  pub fn empty() -> Arc<Self> {
-    EMPTY_IGNORE.clone()
-  }
-
-  pub fn create_with_gitignore_file(
-    patterns: Vec<String>,
-    gitignore_path: Option<PathBuf>,
-  ) -> Result<Arc<Self>, String> {
-    if patterns.is_empty() && gitignore_path.is_none() {
-      return Ok(EMPTY_IGNORE.clone());
-    }
-
-    let mut ignore_builder = GitignoreBuilder::new("");
-
-    if let Some(path) = gitignore_path {
-      if let Some(err) = ignore_builder.add(path) {
-        return Err(format!("Error adding .gitignore path: {err:?}"));
-      }
-    }
-    for pattern in &patterns {
-      ignore_builder
-        .add_line(None, pattern)
-        .map_err(|e| format!("Could not parse glob exclude pattern `{pattern:?}`: {e:?}"))?;
-    }
-
-    let gitignore = ignore_builder
-      .build()
-      .map_err(|e| format!("Could not build ignore patterns: {e:?}"))?;
-
-    Ok(Arc::new(Self {
-      patterns: patterns,
-      gitignore,
-    }))
-  }
-
-  fn exclude_patterns(&self) -> &[String] {
-    self.patterns.as_slice()
-  }
-
-  fn is_ignored(&self, stat: &Stat) -> bool {
-    let is_dir = matches!(stat, &Stat::Dir(_));
-    self.is_ignored_path(stat.path(), is_dir)
-  }
-
-  pub fn is_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
-    match self.gitignore.matched(path, is_dir) {
-      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
-      ::ignore::Match::Ignore(_) => true,
-    }
-  }
-
-  pub fn is_ignored_or_child_of_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
-    match self.gitignore.matched_path_or_any_parents(path, is_dir) {
-      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
-      ::ignore::Match::Ignore(_) => true,
-    }
-  }
-}
 
 #[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
@@ -481,7 +421,6 @@ impl PosixFS {
 
   fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
     let dir_abs = self.root.0.join(&dir_relative_to_root.0);
-    let root = self.root.0.clone();
     let mut stats: Vec<Stat> = dir_abs
       .read_dir()?
       .map(|readdir| {
@@ -499,14 +438,18 @@ impl PosixFS {
             }
           };
         PosixFS::stat_internal(
-          &root,
-          dir_relative_to_root.0.join(dir_entry.file_name()),
+          &dir_abs.join(dir_entry.file_name()),
           file_type,
           compute_metadata,
         )
       })
       .filter_map(|s| match s {
-        Ok(Some(s)) if !self.ignore.is_ignored(&s) => {
+        Ok(Some(s))
+          if !self.ignore.is_ignored_path(
+            &dir_relative_to_root.0.join(s.path()),
+            matches!(s, Stat::Dir(_)),
+          ) =>
+        {
           // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
           // git-style ignore patterns, we need to know whether a path represents a directory.
           Some(Ok(s))
@@ -559,7 +502,7 @@ impl PosixFS {
   }
 
   ///
-  /// Makes a Stat for path_for_stat relative to absolute_path_to_root.
+  /// Makes a Stat for path_to_stat relative to its containing directory.
   ///
   /// This method takes both a `FileType` and a getter for `Metadata` because on Unixes,
   /// directory walks cheaply return the `FileType` without extra syscalls, but other
@@ -567,64 +510,69 @@ impl PosixFS {
   /// Dirs and Links.
   ///
   fn stat_internal<F>(
-    absolute_path_to_root: &Path,
-    path_for_stat: PathBuf,
+    path_to_stat: &Path,
     file_type: std::fs::FileType,
     compute_metadata: F,
   ) -> Result<Option<Stat>, io::Error>
   where
     F: FnOnce() -> Result<std::fs::Metadata, io::Error>,
   {
-    if !path_for_stat.is_relative() {
+    let Some(file_name) = path_to_stat.file_name() else {
+      return Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        "Argument path_to_stat to PosixFS::stat_internal must have a file name.",
+      ));
+    };
+    if cfg!(debug_assertions) && !path_to_stat.is_absolute() {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-          "Argument path_for_stat to PosixFS::stat must be relative path, got {path_for_stat:?}"
+          "Argument path_to_stat to PosixFS::stat_internal must be absolute path, got {path_to_stat:?}"
         ),
       ));
     }
-    // TODO: Make this an instance method, and stop having to check this every call.
-    if !absolute_path_to_root.is_absolute() {
-      return Err(io::Error::new(
-        io::ErrorKind::InvalidInput,
-        format!(
-          "Argument absolute_path_to_root to PosixFS::stat must be absolute path, got {absolute_path_to_root:?}"
-        ),
-      ));
-    }
+    let path = file_name.to_owned().into();
     if file_type.is_symlink() {
       Ok(Some(Stat::Link(Link {
-        path: path_for_stat.clone(),
-        target: std::fs::read_link(absolute_path_to_root.join(path_for_stat))?,
+        path,
+        target: std::fs::read_link(path_to_stat)?,
       })))
     } else if file_type.is_file() {
       let is_executable = compute_metadata()?.permissions().mode() & 0o100 == 0o100;
       Ok(Some(Stat::File(File {
-        path: path_for_stat,
+        path,
         is_executable: is_executable,
       })))
     } else if file_type.is_dir() {
-      Ok(Some(Stat::Dir(Dir(path_for_stat))))
+      Ok(Some(Stat::Dir(Dir(path))))
     } else {
       Ok(None)
     }
   }
 
+  ///
+  /// Returns a Stat relative to its containing directory.
+  ///
   /// NB: This method is synchronous because it is used to stat all files in a directory as one
   /// blocking operation as part of `scandir_sync` (as recommended by the `tokio` documentation, to
   /// avoid many small spawned tasks).
-  pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Option<Stat>, io::Error> {
-    let abs_path = self.root.0.join(&relative_path);
+  ///
+  pub fn stat_sync(&self, relative_path: &Path) -> Result<Option<Stat>, io::Error> {
+    if cfg!(debug_assertions) && relative_path.is_absolute() {
+      return Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!(
+          "Argument relative_path to PosixFS::stat_sync must be relative path, got {relative_path:?}"
+        ),
+      ));
+    }
+    let abs_path = self.root.0.join(relative_path);
     let metadata = match self.symlink_behavior {
-      SymlinkBehavior::Aware => fs::symlink_metadata(abs_path),
-      SymlinkBehavior::Oblivious => fs::metadata(abs_path),
+      SymlinkBehavior::Aware => fs::symlink_metadata(&abs_path),
+      SymlinkBehavior::Oblivious => fs::metadata(&abs_path),
     };
     metadata
-      .and_then(|metadata| {
-        PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
-          Ok(metadata)
-        })
-      })
+      .and_then(|metadata| PosixFS::stat_internal(&abs_path, metadata.file_type(), || Ok(metadata)))
       .or_else(|err| match err.kind() {
         io::ErrorKind::NotFound => Ok(None),
         _ => Err(err),
@@ -676,11 +624,10 @@ impl Vfs<String> for DigestTrie {
   }
 
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {
-    // TODO(#14890): Change interface to take a reference to an Entry, and to avoid absolute paths.
-    // That would avoid both the need to handle this root case, and the need to recurse in `entry`
-    // down into children.
-    let directory = if dir.0.components().next().is_none() {
-      directory::Directory::new(directory::Name::new(""), self.entries().into())
+    // TODO(#14890): Change interface to take a reference to an Entry. That would avoid both the
+    // need to handle this root case, and the need to recurse in `entry` down into children.
+    let entries = if dir.0.components().next().is_none() {
+      self.entries()
     } else {
       let entry = self
         .entry(&dir.0)?
@@ -698,25 +645,23 @@ impl Vfs<String> for DigestTrie {
             dir.0.display()
           ))
         }
-        directory::Entry::Directory(d) => d.clone(),
+        directory::Entry::Directory(d) => d.tree().entries(),
       }
     };
 
     Ok(Arc::new(DirectoryListing(
-      directory
-        .tree()
-        .entries()
+      entries
         .iter()
         .map(|child| match child {
           directory::Entry::File(f) => Stat::File(File {
-            path: dir.0.join(f.name().as_ref()),
+            path: f.name().as_ref().into(),
             is_executable: f.is_executable(),
           }),
           directory::Entry::Symlink(s) => Stat::Link(Link {
-            path: dir.0.join(s.name().as_ref()),
+            path: s.name().as_ref().into(),
             target: s.target().to_path_buf(),
           }),
-          directory::Entry::Directory(d) => Stat::Dir(Dir(dir.0.join(d.name().as_ref()))),
+          directory::Entry::Directory(d) => Stat::Dir(Dir(d.name().as_ref().into())),
         })
         .collect(),
     )))
@@ -830,41 +775,6 @@ pub fn increase_limits() -> Result<String, String> {
     } else {
       return Ok(format!("File handle limit is: {cur}"));
     };
-  }
-}
-
-///
-/// Like std::fs::create_dir_all, except handles concurrent calls among multiple
-/// threads or processes. Originally lifted from rustc.
-///
-pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
-  match fs::create_dir(path) {
-    Ok(()) => return Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => return Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::NotFound => {}
-    Err(e) => return Err(e),
-  }
-  match path.parent() {
-    Some(p) => safe_create_dir_all_ioerror(p)?,
-    None => return Ok(()),
-  }
-  match fs::create_dir(path) {
-    Ok(()) => Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-    Err(e) => Err(e),
-  }
-}
-
-pub fn safe_create_dir_all(path: &Path) -> Result<(), String> {
-  safe_create_dir_all_ioerror(path)
-    .map_err(|e| format!("Failed to create dir {path:?} due to {e:?}"))
-}
-
-pub fn safe_create_dir(path: &Path) -> Result<(), String> {
-  match fs::create_dir(path) {
-    Ok(()) => Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-    Err(err) => Err(format!("{err}")),
   }
 }
 

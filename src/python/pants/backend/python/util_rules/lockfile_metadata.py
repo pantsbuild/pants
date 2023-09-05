@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, Set, cast
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.lockfile_metadata import (
     LockfileMetadata,
@@ -16,6 +15,7 @@ from pants.core.util_rules.lockfile_metadata import (
     _get_metadata,
     lockfile_metadata_registrar,
 )
+from pants.util.pip_requirement import PipRequirement
 
 _python_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.PYTHON)
 
@@ -32,7 +32,6 @@ class InvalidPythonLockfileReason(Enum):
 
 @dataclass(frozen=True)
 class PythonLockfileMetadata(LockfileMetadata):
-
     scope = LockfileScope.PYTHON
 
     valid_for_interpreter_constraints: InterpreterConstraints
@@ -94,7 +93,6 @@ class PythonLockfileMetadata(LockfileMetadata):
 @_python_lockfile_metadata(1)
 @dataclass(frozen=True)
 class PythonLockfileMetadataV1(PythonLockfileMetadata):
-
     requirements_invalidation_digest: str
 
     @classmethod

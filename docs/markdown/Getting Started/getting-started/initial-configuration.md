@@ -4,7 +4,6 @@ slug: "initial-configuration"
 excerpt: "Creating the configuration necessary to run Pants."
 hidden: false
 createdAt: "2020-02-21T17:44:29.297Z"
-updatedAt: "2022-05-02T20:58:57.689Z"
 ---
 To get started in a new repository, follow these steps, and then visit one of the language-specific overview pages.
 
@@ -100,7 +99,7 @@ To ignore false positives, set `[tailor].ignore_paths` and `[tailor].ignore_addi
 
 > 📘 Run `pants tailor --check ::` in CI
 > 
-> We recommend running `pants tailor --check ::` in your [continuous integration](doc:doc:using-pants-in-ci) so that you don't forget to add any targets and BUILD files (which might mean that tests aren't run or code isn't validated).
+> We recommend running `pants tailor --check ::` in your [continuous integration](doc:using-pants-in-ci) so that you don't forget to add any targets and BUILD files (which might mean that tests aren't run or code isn't validated).
 > 
 > ```
 > ❯ pants tailor --check ::

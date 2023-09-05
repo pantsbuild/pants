@@ -12,7 +12,6 @@ from pants.backend.python.lint.pylint import subsystem
 from pants.backend.python.lint.pylint.rules import PartitionMetadata, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -29,13 +28,16 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_all_pythons_present,
+    skip_unless_python37_and_python39_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
+from pants.util.resources import read_resource, read_sibling_resource
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *pylint_rules(),
             *subsystem.rules(),
@@ -58,7 +60,7 @@ BAD_FILE = "'''docstring'''\nlowercase_constant = ''\n"
 
 
 def run_pylint(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
@@ -86,7 +88,7 @@ def run_pylint(
 
 
 def assert_success(
-    rule_runner: RuleRunner, target: Target, *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, target: Target, *, extra_args: list[str] | None = None
 ) -> None:
     result = run_pylint(rule_runner, [target], extra_args=extra_args)
     assert len(result) == 1
@@ -98,9 +100,9 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
-def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     assert_success(
@@ -110,7 +112,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint(rule_runner, [tgt])
@@ -120,7 +122,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_report_file(rule_runner: RuleRunner) -> None:
+def test_report_file(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint(
@@ -134,7 +136,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/f.py:2:0: C0103" in report_files[0].content.decode()
 
 
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
+def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/good.py": GOOD_FILE,
@@ -154,57 +156,58 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-@skip_unless_all_pythons_present("2.7", "3.7")
-def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
+@skip_unless_python37_and_python39_present
+def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
-            f"{PACKAGE}/f.py": "'''docstring'''\nCONSTANT: str = ''\n",
+            f"{PACKAGE}/f.py": "'''docstring'''\ny = (x := '')\n",
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_sources(name='py2', interpreter_constraints=['==2.7.*'])
-                python_sources(name='py3', interpreter_constraints=['CPython==3.7.*'])
+                python_sources(name='py37', interpreter_constraints=['CPython==3.7.*'])
+                python_sources(name='py39', interpreter_constraints=['CPython==3.9.*'])
                 """
             ),
         }
     )
 
-    extra_args = [
-        "--pylint-version=pylint<2",
-        "--pylint-extra-requirements=['setuptools<45', 'isort>=4.3.21,<4.4']",
-        "--pylint-lockfile=<none>",
-    ]
-    py2_tgt = rule_runner.get_target(Address(PACKAGE, target_name="py2", relative_file_path="f.py"))
-    py2_result = run_pylint(rule_runner, [py2_tgt], extra_args=extra_args)
-    assert len(py2_result) == 1
-    assert py2_result[0].exit_code == 2
-    assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
+    py37_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py37", relative_file_path="f.py")
+    )
+    py37_result = run_pylint(rule_runner, [py37_tgt])
+    assert len(py37_result) == 1
+    assert py37_result[0].exit_code == 2
+    assert "invalid syntax (<unknown>, line 2) (syntax-error)" in py37_result[0].stdout
 
-    py3_tgt = rule_runner.get_target(Address(PACKAGE, target_name="py3", relative_file_path="f.py"))
-    py3_result = run_pylint(rule_runner, [py3_tgt])
-    assert len(py3_result) == 1
-    assert py3_result[0].exit_code == 0
-    assert "Your code has been rated at 10.00/10" in py3_result[0].stdout.strip()
+    py39_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py39", relative_file_path="f.py")
+    )
+    py39_result = run_pylint(rule_runner, [py39_tgt])
+    assert len(py39_result) == 1
+    assert py39_result[0].exit_code == 0
+    assert "Your code has been rated at 10.00/10" in py39_result[0].stdout.strip()
 
-    combined_result = run_pylint(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
+    combined_result = run_pylint(rule_runner, [py37_tgt, py39_tgt])
     assert len(combined_result) == 2
-    batched_py3_result, batched_py2_result = sorted(
+    batched_py39_result, batched_py37_result = sorted(
         combined_result, key=lambda result: result.exit_code
     )
 
-    assert batched_py2_result.exit_code == 2
-    assert batched_py2_result.partition_description == "['CPython==2.7.*']"
-    assert "invalid syntax (<string>, line 2) (syntax-error)" in batched_py2_result.stdout
+    assert batched_py37_result.exit_code == 2
+    assert batched_py37_result.partition_description == "['CPython==3.7.*']"
+    assert "invalid syntax (<unknown>, line 2) (syntax-error)" in batched_py37_result.stdout
 
-    assert batched_py3_result.exit_code == 0
-    assert batched_py3_result.partition_description == "['CPython==3.7.*']"
-    assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
+    assert batched_py39_result.exit_code == 0
+    assert batched_py39_result.partition_description == "['CPython==3.9.*']"
+    assert "Your code has been rated at 10.00/10" in batched_py39_result.stdout.strip()
 
 
 @pytest.mark.parametrize(
     "config_path,extra_args",
     (["pylintrc", []], ["custom_config.ini", ["--pylint-config=custom_config.ini"]]),
 )
-def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
+def test_config_file(
+    rule_runner: PythonRuleRunner, config_path: str, extra_args: list[str]
+) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": BAD_FILE,
@@ -216,20 +219,20 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
-def test_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--pylint-args='--disable=C0103'"])
 
 
-def test_skip(rule_runner: RuleRunner) -> None:
+def test_skip(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pylint(rule_runner, [tgt], extra_args=["--pylint-skip"])
     assert not result
 
 
-def test_includes_transitive_dependencies(rule_runner: RuleRunner) -> None:
+def test_includes_transitive_dependencies(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -295,7 +298,7 @@ def test_includes_transitive_dependencies(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
+def test_pep420_namespace_packages(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": GOOD_FILE,
@@ -323,7 +326,7 @@ def test_pep420_namespace_packages(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_type_stubs(rule_runner: RuleRunner) -> None:
+def test_type_stubs(rule_runner: PythonRuleRunner) -> None:
     # If an implementation file shares the same name as a type stub, Pylint will only check the
     # implementation file. So, here, we only check running directly on a type stub.
     rule_runner.write_files({f"{PACKAGE}/f.pyi": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
@@ -335,7 +338,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
+def test_3rdparty_plugin(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": dedent(
@@ -353,6 +356,9 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
                 """
             ),
             f"{PACKAGE}/BUILD": "python_sources()",
+            "pylint.lock": read_resource(
+                "pants.backend.python.lint.pylint", "pylint_3rdparty_plugin_test.lock"
+            ),
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -360,9 +366,9 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
         extra_args=[
-            "--pylint-extra-requirements=pylint-unittest>=0.1.3,<0.2",
+            "--python-resolves={'pylint':'pylint.lock'}",
+            "--pylint-install-from-resolve=pylint",
             "--pylint-args='--load-plugins=pylint_unittest'",
-            "--pylint-lockfile=<none>",
         ],
     )
     assert len(result) == 1
@@ -371,7 +377,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_source_plugin(rule_runner: RuleRunner) -> None:
+def test_source_plugin(rule_runner: PythonRuleRunner) -> None:
     # NB: We make this source plugin fairly complex by having it use transitive dependencies.
     # This is to ensure that we can correctly support plugins with dependencies.
     # The plugin bans `print()`.
@@ -383,6 +389,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
                 python_requirement(name='colors', requirements=['ansicolors'])
                 """
             ),
+            "pylint.lock": read_sibling_resource(__name__, "pylint_source_plugin_test.lock"),
             "pants-plugins/plugins/subdir/dep.py": dedent(
                 """\
                 from colors import red
@@ -443,7 +450,8 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
             extra_args=[
                 "--pylint-source-plugins=['pants-plugins/plugins']",
                 f"--source-root-patterns=['pants-plugins/plugins', '{PACKAGE}']",
-                "--pylint-lockfile=<none>",
+                "--python-resolves={'pylint':'pylint.lock'}",
+                "--pylint-install-from-resolve=pylint",
             ],
         )
         assert len(res) == 1
@@ -467,7 +475,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_all_pythons_present("3.8", "3.9")
-def test_partition_targets(rule_runner: RuleRunner) -> None:
+def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
     def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
         return {
             f"{folder}/dep.py": "",

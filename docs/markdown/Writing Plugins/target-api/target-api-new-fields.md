@@ -4,7 +4,6 @@ slug: "target-api-new-fields"
 excerpt: "How to create a Field, including the available templates."
 hidden: false
 createdAt: "2020-05-07T22:38:40.352Z"
-updatedAt: "2021-11-16T03:05:31.721Z"
 ---
 Before creating a new target type, the first step is to create all of the target type's fields.
 
@@ -221,7 +220,7 @@ class VersionField(Field):
 
 > 👍 Asking for help
 > 
-> Have a tricky field you're trying to write? We would love to help! See [Getting Help](doc:community).
+> Have a tricky field you're trying to write? We would love to help! See [Getting Help](doc:the-pants-community).
 
 Examples
 --------

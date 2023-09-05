@@ -4,7 +4,6 @@ slug: "python-package-goal"
 excerpt: "Create a deployable artifact."
 hidden: false
 createdAt: "2020-03-16T16:19:56.574Z"
-updatedAt: "2022-02-09T01:17:29.094Z"
 ---
 The `package` goal creates an artifact that can be deployed or distributed.
 
@@ -31,7 +30,7 @@ You can run `pants package ::` to build all artifacts in your project. Pants wil
 Creating a PEX file from a `pex_binary` target
 ----------------------------------------------
 
-Running `package` on a `pex_binary` target will create an executable [PEX file](doc:pex-files).
+Running `package` on a `pex_binary` target will create an executable [PEX file](doc:pex).
 
 The PEX file will contain all the code needed to run the binary, namely:
 

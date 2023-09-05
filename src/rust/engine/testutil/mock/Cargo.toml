@@ -2,21 +2,21 @@
 name = "mock"
 version = "0.0.1"
 edition = "2021"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-async-stream = "0.3"
-bytes = "1.2"
-futures = "0.3"
+async-stream = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
-hyper = { version = "0.14", features = ["stream", "tcp"] }
-log = "0.4"
-parking_lot = "0.12"
-prost = "0.9"
-prost-types = "0.9"
+hyper = { workspace = true, features = ["stream", "tcp"] }
+log = { workspace = true }
+parking_lot = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
 protos = { path = "../../protos" }
 testutil = { path = ".." }
-tokio = { version = "1.21", features = ["time"] }
-tonic = { version = "0.6" }
+tokio = { workspace = true, features = ["time"] }
+tonic = { workspace = true }

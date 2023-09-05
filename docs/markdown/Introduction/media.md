@@ -4,7 +4,6 @@ slug: "media"
 excerpt: "Learn more about Pants and related topics from these talks, posts and podcasts featuring Pants contributors and users."
 hidden: false
 createdAt: "2021-04-18T17:27:18.361Z"
-updatedAt: "2023-01-04T22:02:38.457Z"
 ---
 
 ## Case Studies
@@ -46,7 +45,7 @@ August 24, 2022
 "Incrementally migrating a Python monorepo from Bazel to Pants"  
 <https://developer.ibm.com/blogs/case-study-incrementally-migrating-a-python-monorepo-from-bazel-to-pants/>  
 
-> Watson Orders is an IBM Silicon Valley based technology development group targeting the development of world-class conversational AI. This posts walks through the process of migrating off Bazel, where they maintained 19,000 lines of BUILD file metadata, to Pants where that was slashed to 2,400 lines thanks to [dependency inference](doc:/how-does-pants-work#dependency-inference). CI build time for PRs dropped from 10-12 minutes with Bazel to under 4 minutes with Pants.
+> Watson Orders is an IBM Silicon Valley based technology development group targeting the development of world-class conversational AI. This posts walks through the process of migrating off Bazel, where they maintained 19,000 lines of BUILD file metadata, to Pants where that was slashed to 2,400 lines thanks to [dependency inference](doc:how-does-pants-work#dependency-inference). CI build time for PRs dropped from 10-12 minutes with Bazel to under 4 minutes with Pants.
 
 ### Astranis Space Technologies
 

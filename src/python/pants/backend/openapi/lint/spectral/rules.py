@@ -1,10 +1,11 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import os
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.javascript.subsystems.nodejs import NpxProcess
+from pants.backend.javascript.subsystems import nodejs_tool
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.openapi.lint.spectral.skip_field import SkipSpectralField
 from pants.backend.openapi.lint.spectral.subsystem import SpectralSubsystem
 from pants.backend.openapi.target_types import (
@@ -89,15 +90,15 @@ async def run_spectral(
 
     process_result = await Get(
         FallibleProcessResult,
-        NpxProcess(
-            npm_package=spectral.version,
+        NodeJSToolRequest,
+        spectral.request(
             args=(
                 "lint",
                 "--display-only-failures",
                 "--ruleset",
                 ".spectral.yaml",
                 *spectral.args,
-                *target_sources.snapshot.files,
+                *(os.path.join("{chroot}", file) for file in target_sources.snapshot.files),
             ),
             input_digest=input_digest,
             description=f"Run Spectral on {pluralize(len(request.elements), 'file')}.",
@@ -111,5 +112,6 @@ async def run_spectral(
 def rules():
     return [
         *collect_rules(),
+        *nodejs_tool.rules(),
         *SpectralRequest.rules(),
     ]

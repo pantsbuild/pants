@@ -4,7 +4,6 @@ slug: "restricted-internet-access"
 excerpt: "How to use Pants when you have restricted access to the Internet"
 hidden: false
 createdAt: "2020-10-23T19:49:45.143Z"
-updatedAt: "2022-02-07T05:57:27.289Z"
 ---
 Some organizations place restrictions on their users' Internet access, for security or compliance reasons.  Such restrictions may prevent Pants from downloading various underlying tools it uses, and it may interfere with bootstrapping Pants itself. 
 
@@ -114,4 +113,4 @@ Occasionally, new Pants releases will upgrade to new versions of these binaries,
 > 
 > It's possible that Pants does not yet have all the mechanisms it'll need to work with your organization's specific networking setup, which we'd love to fix.
 > 
-> Please reach out on [Slack](doc:community) or open a [GitHub issue](https://github.com/pantsbuild/pants/issues) for any help.
+> Please reach out on [Slack](doc:the-pants-community) or open a [GitHub issue](https://github.com/pantsbuild/pants/issues) for any help.

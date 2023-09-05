@@ -3,11 +3,10 @@ title: "Tips and debugging"
 slug: "rules-api-tips"
 hidden: false
 createdAt: "2020-05-08T04:15:06.256Z"
-updatedAt: "2022-02-10T19:52:27.560Z"
 ---
 > 📘 Reminder: ask for help
 > 
-> We would love to help you with your plugin. Please reach out through [Slack](doc:community).
+> We would love to help you with your plugin. Please reach out through [Slack](doc:the-pants-community).
 > 
 > We also appreciate any feedback on the Rules API. If you find certain things confusing or are looking for additional mechanisms, please let us know.
 

@@ -250,7 +250,9 @@ impl Executor {
   /// This method has no effect for "borrowed" Executors: see the `Executor` rustdoc.
   ///
   pub fn shutdown(&self, timeout: Duration) {
-    let Some(runtime) = self.runtime.lock().take() else { return };
+    let Some(runtime) = self.runtime.lock().take() else {
+      return;
+    };
 
     let start = Instant::now();
     runtime.shutdown_timeout(timeout + Duration::from_millis(250));

@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Set, Union
+from typing import Callable, Dict, Iterable, Optional, Set, Union
 
 import pytest
 
@@ -1185,6 +1185,66 @@ def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     assert path2.read_text() == "goodbye"
 
 
+def test_write_digest_workspace_clear_paths(rule_runner: RuleRunner) -> None:
+    workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
+    digest_a = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/a.txt", b"hello")])],
+    )
+    digest_b = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/b.txt", b"goodbye")])],
+    )
+    digest_c = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/c.txt", b"hello again")])],
+    )
+    digest_c_root = rule_runner.request(
+        Digest, [CreateDigest([FileContent("c.txt", b"hello again")])]
+    )
+    digest_d = rule_runner.request(
+        Digest, [CreateDigest([SymlinkEntry("newdir/d.txt", "newdir/a.txt")])]
+    )
+    all_paths = {name: Path(rule_runner.build_root, f"newdir/{name}.txt") for name in "abcd"}
+
+    def check(expected_names: set[str]) -> None:
+        for name, path in all_paths.items():
+            expected = name in expected_names
+            assert path.exists() == expected
+
+    workspace.write_digest(digest_a, clear_paths=())
+    workspace.write_digest(digest_b, clear_paths=())
+    check({"a", "b"})
+
+    # clear a file
+    workspace.write_digest(digest_d, clear_paths=("newdir/b.txt",))
+    check({"a", "d"})
+
+    # clear a symlink (doesn't remove target file)
+    workspace.write_digest(digest_b, clear_paths=("newdir/d.txt",))
+    check({"a", "b"})
+
+    # clear a directory
+    workspace.write_digest(digest_c, clear_paths=("newdir",))
+    check({"c"})
+
+    # path prefix, and clearing the 'current' directory
+    workspace.write_digest(digest_c_root, path_prefix="newdir", clear_paths=("",))
+    check({"c"})
+
+    # clear multiple paths
+    workspace.write_digest(digest_b, clear_paths=())
+    check({"b", "c"})
+    workspace.write_digest(digest_a, clear_paths=("newdir/b.txt", "newdir/c.txt"))
+    check({"a"})
+
+    # clearing non-existent paths is fine
+    workspace.write_digest(
+        digest_b, clear_paths=("not-here", "newdir/not-here", "not-here/also-not-here")
+    )
+    check({"a", "b"})
+
+
 @dataclass(frozen=True)
 class DigestRequest:
     create_digest: CreateDigest
@@ -1339,49 +1399,20 @@ def test_digest_is_not_file_digest() -> None:
 
 
 def test_snapshot_properties() -> None:
-    digest = Digest("691638f4d58abaa8cfdc9af2e00682f13f07f96ad1d177f146216a7341ca4982", 154)
-    snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot.digest == digest
+    snapshot = Snapshot.create_for_testing(["f.ext", "dir/f.ext"], ["dir"])
+    assert snapshot.digest is not None
     assert snapshot.files == ("dir/f.ext", "f.ext")
     assert snapshot.dirs == ("dir",)
 
 
-def test_snapshot_hash() -> None:
-    def assert_hash(
-        expected: int,
-        *,
-        digest_char: str = "a",
-        files: Optional[List[str]] = None,
-        dirs: Optional[List[str]] = None,
-    ) -> None:
-        digest = Digest(digest_char * 64, 1000)
-        snapshot = Snapshot._unsafe_create(digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"])
-        assert hash(snapshot) == expected
-
-    # The digest's fingerprint is used for the hash, so all other properties are irrelevant.
-    assert_hash(-6148914691236517206)
-    assert_hash(-6148914691236517206, files=["f.ext"])
-    assert_hash(-6148914691236517206, dirs=["foo"])
-    assert_hash(-6148914691236517206, dirs=["foo"])
-    assert_hash(-4919131752989213765, digest_char="b")
-
-
-def test_snapshot_equality() -> None:
-    # Only the digest is used for equality.
-    snapshot = Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot == Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    assert snapshot == Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
-    )
-    assert snapshot == Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext"], ["dir"])
-    assert snapshot != Snapshot._unsafe_create(Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot != Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    with pytest.raises(TypeError):
-        snapshot < snapshot  # type: ignore[operator]
+def test_snapshot_hash_and_eq() -> None:
+    one = Snapshot.create_for_testing(["f.ext"], ["dir"])
+    two = Snapshot.create_for_testing(["f.ext"], ["dir"])
+    assert hash(one) == hash(two)
+    assert one == two
+    three = Snapshot.create_for_testing(["f.ext"], [])
+    assert hash(two) != hash(three)
+    assert two != three
 
 
 @pytest.mark.parametrize(

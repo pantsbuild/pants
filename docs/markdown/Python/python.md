@@ -3,7 +3,6 @@ title: "Python overview"
 slug: "python"
 hidden: false
 createdAt: "2020-07-29T01:27:07.529Z"
-updatedAt: "2022-05-03T23:52:11.823Z"
 ---
 The Python ecosystem has a great many tools for various features. Pants installs, configures, and invokes those tools for you, while taking care of orchestrating the workflow, caching results, and running concurrently.
 
@@ -25,5 +24,5 @@ There are also [goals](doc:project-introspection) for querying and understanding
 - [Third-party dependencies](doc:python-third-party-dependencies) 
 - [Interpreter compatibility](doc:python-interpreter-compatibility) 
 - [Linters and formatters](doc:python-linters-and-formatters) 
-- [Pex files](doc:pex-files) 
+- [Pex files](doc:pex) 
 - [Building distributions](doc:python-distributions)

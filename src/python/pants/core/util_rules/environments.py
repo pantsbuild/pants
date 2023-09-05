@@ -17,7 +17,7 @@ from pants.engine.environment import ChosenLocalEnvironmentName as ChosenLocalEn
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.graph import WrappedTargetForBootstrap
-from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
+from pants.engine.internals.native_engine import ProcessExecutionEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
@@ -269,6 +269,11 @@ class DockerEnvironmentTarget(Target):
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
         the `environment` field defined on other targets.
+
+        Before running Pants using this environment, if you are using Docker Desktop, make sure the option
+        **Enable default Docker socket** is enabled, you can find it in **Docker Desktop Settings > Advanced**
+        panel. That option tells Docker to create a socket at `/var/run/docker.sock` which Pants can use to
+        communicate with Docker.
         """
         # TODO(#17096) Add a link to the environments docs once they land.
     )
@@ -289,7 +294,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
         """
         Platform properties to set on remote execution requests.
 
-        Format: property=value. Multiple values should be specified as multiple
+        Format: `property=value`. Multiple values should be specified as multiple
         occurrences of this flag.
 
         Pants itself may add additional platform properties.
@@ -308,7 +313,7 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
         Python value `None` to error when remote execution is disabled.
 
         Tip: if you are using a Docker image with your remote execution environment (usually
-        enabled by setting the field {RemoteExtraPlatformPropertiesField.alias}`), then it can be
+        enabled by setting the field `{RemoteExtraPlatformPropertiesField.alias}`), then it can be
         useful to fallback to an equivalent `docker_image` target so that you have a consistent
         execution environment.
         """
@@ -414,7 +419,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
         if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget)
     ]
 
-    for (env_name, tgts, env_tgt) in error_cases:
+    for env_name, tgts, env_tgt in error_cases:
         # "Blah was called with target `//foo` which specifies…"
         # "Blah was called with targets `//foo`, `//bar` which specify…"
         # "Blah was called with targets including `//foo`, `//bar`, `//baz` (and others) which specify…"
@@ -463,6 +468,7 @@ class AllEnvironmentTargets(FrozenDict[str, Target]):
 
 @dataclass(frozen=True)
 class EnvironmentTarget:
+    name: str | None
     val: Target | None
 
     def executable_search_path_cache_scope(
@@ -692,7 +698,7 @@ async def resolve_environment_name(
     global_options: GlobalOptions,
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
-        local_env_name = await Get(ChosenLocalEnvironmentName, {})
+        local_env_name = await Get(ChosenLocalEnvironmentName)
         return local_env_name.val
     if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
@@ -799,7 +805,7 @@ async def get_target_for_environment_name(
     env_name: EnvironmentName, environments_subsystem: EnvironmentsSubsystem
 ) -> EnvironmentTarget:
     if env_name.val is None:
-        return EnvironmentTarget(None)
+        return EnvironmentTarget(None, None)
     if env_name.val not in environments_subsystem.names:
         raise AssertionError(
             softwrap(
@@ -840,7 +846,7 @@ async def get_target_for_environment_name(
                 """
             )
         )
-    return EnvironmentTarget(tgt)
+    return EnvironmentTarget(env_name.val, tgt)
 
 
 async def _maybe_add_docker_image_id(image_name: str, platform: Platform, address: Address) -> str:
@@ -880,7 +886,7 @@ async def extract_process_config_from_environment(
     platform: Platform,
     global_options: GlobalOptions,
     environments_subsystem: EnvironmentsSubsystem,
-) -> ProcessConfigFromEnvironment:
+) -> ProcessExecutionEnvironment:
     docker_image = None
     remote_execution = False
     raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
@@ -919,7 +925,8 @@ async def extract_process_config_from_environment(
                     )
                 )
 
-    return ProcessConfigFromEnvironment(
+    return ProcessExecutionEnvironment(
+        environment_name=tgt.name,
         platform=platform.value,
         docker_image=docker_image,
         remote_execution=remote_execution,

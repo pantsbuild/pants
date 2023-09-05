@@ -49,6 +49,7 @@ target(
         "src/python/pants/backend/experimental/kotlin/debug_goals",
         "src/python/pants/backend/experimental/kotlin/lint/ktlint",
         "src/python/pants/backend/experimental/openapi",
+        "src/python/pants/backend/experimental/openapi/lint/openapi_format",
         "src/python/pants/backend/experimental/openapi/lint/spectral",
         "src/python/pants/backend/experimental/python",
         "src/python/pants/backend/experimental/python/framework/stevedore",
@@ -62,7 +63,9 @@ target(
         "src/python/pants/backend/experimental/scala/debug_goals",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",
         "src/python/pants/backend/experimental/terraform",
+        "src/python/pants/backend/experimental/tools/semgrep",
         "src/python/pants/backend/experimental/tools/yamllint",
+        "src/python/pants/backend/experimental/tools/workunit_logger",
         "src/python/pants/backend/experimental/visibility",
         "src/python/pants/backend/google_cloud_function/python",
         "src/python/pants/backend/plugin_development",
@@ -77,25 +80,21 @@ target(
         "src/python/pants/backend/python/lint/pylint",
         "src/python/pants/backend/python/lint/yapf",
         "src/python/pants/backend/python/mixed_interpreter_constraints",
+        "src/python/pants/backend/python/providers/experimental/pyenv",
         "src/python/pants/backend/python/typecheck/mypy",
         "src/python/pants/backend/shell",
         "src/python/pants/backend/shell/lint/shellcheck",
         "src/python/pants/backend/shell/lint/shfmt",
         "src/python/pants/backend/tools/preamble",
+        "src/python/pants/backend/tools/taplo",
+        "src/python/pants/backend/url_handlers/s3",
         "src/python/pants/core",
     ],
 )
 
-# This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
-# pip installers, ie: it is why this works to get `pants` on your PATH:
-# $ pip install pantsbuild.pants
-# $ pants
-pex_binary(
-    name="pants",
-    entry_point="pants.bin.pants_loader:main",
-    dependencies=[":pants_loader"],
-    strip_pex_env=False,
+resources(
+    name="native_client",
+    sources=["native_client"],
 )
-
 
 python_tests(name="tests")

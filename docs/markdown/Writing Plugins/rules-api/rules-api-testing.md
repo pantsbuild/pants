@@ -4,7 +4,6 @@ slug: "rules-api-testing"
 excerpt: "How to verify your plugin works."
 hidden: false
 createdAt: "2020-07-01T17:25:36.570Z"
-updatedAt: "2021-12-07T21:22:03.170Z"
 ---
 There are four main approaches to testing your plugin, ranging in terms of scope (unit vs. integration test). You may mix-and-match between these approaches.
 
@@ -214,7 +213,7 @@ This means that you must register the rules you directly wrote, and also any rul
 > 
 > It can be confusing figuring out what's wrong when setting up a `RuleRunner`. We know the error messages are not ideal and are working on improving them.
 > 
-> Please feel free to reach out on [Slack](doc:community) for help with figuring out how to get things working.
+> Please feel free to reach out on [Slack](doc:the-pants-community) for help with figuring out how to get things working.
 
 ```python
 from pants.backend.python.goals import pytest_runner
@@ -454,7 +453,7 @@ def test_bandit(rule_runner: RuleRunner) -> None:
 
 Note that our `@rule` takes 3 parameters, but we only explicitly included `BanditRequest` in the inputs. This is possible because the engine knows how to compute all [Subsystems](doc:rules-api-subsystems) based on the initial input to the graph.  See [Concepts](doc:rules-api-concepts).
 
-We are happy [to help](doc:community) figure out what rules to register, and what inputs to pass to `rule_runner.request()`. It can also help to [visualize the rule graph](doc:rules-api-tips) when running your code in production. If you're missing an input that you need, the engine will error explaining that there is no way to compute your `OutputType`.
+We are happy [to help](doc:the-pants-community) figure out what rules to register, and what inputs to pass to `rule_runner.request()`. It can also help to [visualize the rule graph](doc:rules-api-tips) when running your code in production. If you're missing an input that you need, the engine will error explaining that there is no way to compute your `OutputType`.
 
 ### Testing `@goal_rule`s
 

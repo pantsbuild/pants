@@ -4,13 +4,12 @@ slug: "jvm-overview"
 excerpt: "Pants's support for Java and Scala."
 hidden: false
 createdAt: "2022-01-10T20:58:57.450Z"
-updatedAt: "2022-06-01T20:31:40.944Z"
 ---
 > 🚧 Java and Scala support is beta stage
 > 
 > We are done implementing most functionality for Pants's Java and Scala support ([tracked here](https://github.com/pantsbuild/pants/labels/lang-jvm)). However, there may be use cases that we aren't yet handling.
 > 
-> Please share feedback for what you need to use Pants with your JVM project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:community)!
+> Please share feedback for what you need to use Pants with your JVM project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:the-pants-community)!
 
 > 📘 Example Java and Scala repository
 > 
@@ -95,6 +94,19 @@ jvm_artifact(
     packages=["com.google.common.**"],
 )
 ```
+
+If your third party dependency is a Scala library, you should use the `scala_artifact` target instead like follows:
+
+```python BUILD
+scala_artifact(
+    group="org.typelevel",
+    artifact="cats-core",
+    version="2.9.0",
+    packages=["cats.**"],
+)
+```
+
+Pants will use the right artifact for the Scala version corresponding for the resolve specified (or the default one).
 
 Pants requires use of a lockfile for thirdparty dependencies. After adding or editing `jvm_artifact` targets, you will need to update affected lockfiles by running `pants generate-lockfiles`. The default lockfile is located at `3rdparty/jvm/default.lock`, but it can be relocated (as well as additional resolves declared) via the [`[jvm].resolves` option](doc:reference-jvm#section-resolves).
 

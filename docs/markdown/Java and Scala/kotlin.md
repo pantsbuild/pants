@@ -4,14 +4,13 @@ slug: "kotlin"
 excerpt: "Kotlin support for Pants."
 hidden: false
 createdAt: "2022-07-26T02:02:59.962Z"
-updatedAt: "2022-07-26T02:02:59.962Z"
 ---
 
 > 🚧 Kotlin support is alpha stage
 >
 > Kotlin support in Pants is still under active development, but currently supports compilation and testing. It has been tested with Kotlin v1.6.20.
 >
-> Please share feedback for what you need to use Pants with your Kotlin project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:community)!
+> Please share feedback for what you need to use Pants with your Kotlin project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:the-pants-community)!
 
 > 📘 Example Kotlin repository
 >

@@ -3,7 +3,6 @@ title: "Manual installation"
 slug: "manual-installation"
 hidden: false
 createdAt: "2022-07-12T00:00:00.000Z"
-updatedAt: "2022-07-12T00:00:00.000Z"
 ---
 
 > 🚧 This page describes an old, deprecated method for installing Pants. 
@@ -43,15 +42,6 @@ Now, run this to bootstrap Pants and to verify the version it installs:
 > 👍 Upgrading Pants
 > 
 > The `./pants` script will automatically install and use the Pants version specified in `pants.toml`, so upgrading Pants is as simple as editing `pants_version` in that file.
-
-Running Pants from unreleased builds
-------------------------------------
-
-To use an unreleased build of Pants from the [pantsbuild/pants](https://github.com/pantsbuild/pants) main branch, locate the main branch SHA, set `PANTS_SHA=<SHA>` in the environment, and run `./pants` as usual:
-
-```
-PANTS_SHA=8553e8cbc5a1d9da3f84dcfc5e7bf3139847fb5f ./pants --version
-```
 
 Building Pants from sources
 ---------------------------

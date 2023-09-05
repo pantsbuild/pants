@@ -3,6 +3,7 @@
 
 import difflib
 import json
+import re
 import textwrap
 from itertools import cycle
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
@@ -47,6 +48,7 @@ class HelpPrinter(MaybeColor):
             "global",
             "goals",
             "subsystems",
+            "symbols",
             "targets",
             "tools",
         }
@@ -120,10 +122,14 @@ class HelpPrinter(MaybeColor):
             **_help_table(
                 self._all_help_info.name_to_target_type_info.keys(), self._print_target_help
             ),
+            **_help_table(self._symbol_names(include_targets=False), self._print_symbol_help),
             **_help_table(
                 self._all_help_info.name_to_api_type_info.keys(), self._print_api_type_help
             ),
             **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_rule_help),
+            **_help_table(
+                self._all_help_info.env_var_to_help_info.keys(), self._print_env_var_help
+            ),
         }
 
     @staticmethod
@@ -224,7 +230,9 @@ class HelpPrinter(MaybeColor):
         elif thing == "api-types":
             self._print_all_api_types()
         elif thing == "backends":
-            self._print_all_backends()
+            self._print_all_backends(show_advanced)
+        elif thing == "symbols":
+            self._print_all_symbols(show_advanced)
 
     def _print_all_goals(self) -> None:
         goal_descriptions: Dict[str, str] = {}
@@ -245,8 +253,16 @@ class HelpPrinter(MaybeColor):
 
         for name, description in sorted(goal_descriptions.items()):
             print(format_goal(name, first_paragraph(description)))
-        specific_help_cmd = f"{bin_name()} help $goal"
-        print(f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal.\n")
+        specific_help_cmd = f"{bin_name()} help <goal>"
+        print(
+            softwrap(
+                f"""
+                Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal. If
+                you expect to see more goals listed, you may need to activate backends; run
+                `{bin_name()} help backends`.
+                """
+            )
+        )
 
     def _print_all_subsystems(self) -> None:
         self._print_title("Subsystems")
@@ -338,7 +354,7 @@ class HelpPrinter(MaybeColor):
             f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type or rule.\n"
         )
 
-    def _print_all_backends(self) -> None:
+    def _print_all_backends(self, include_experimental: bool) -> None:
         self._print_title("Backends")
         print(
             softwrap(
@@ -355,6 +371,8 @@ class HelpPrinter(MaybeColor):
         provider_col_width = 3 + max(map(len, (info.provider for info in backends.values())))
         enabled_col_width = 4
         for info in backends.values():
+            if not (include_experimental or info.enabled) and ".experimental." in info.name:
+                continue
             enabled = "[*] " if info.enabled else "[ ] "
             name_col_width = max(
                 len(info.name) + 1, self._width - enabled_col_width - provider_col_width
@@ -372,6 +390,29 @@ class HelpPrinter(MaybeColor):
                         )
                     )
                 )
+
+    def _symbol_names(self, include_targets: bool) -> Iterable[str]:
+        return sorted(
+            {
+                symbol.name
+                for symbol in self._all_help_info.name_to_build_file_info.values()
+                if (include_targets or not symbol.is_target) and not re.match("_[^_]", symbol.name)
+            }
+        )
+
+    def _print_all_symbols(self, include_targets: bool) -> None:
+        self._print_title("BUILD file symbols")
+        symbols = self._all_help_info.name_to_build_file_info
+        names = self._symbol_names(include_targets)
+        longest_symbol_name = max(len(name) for name in names)
+        chars_before_description = longest_symbol_name + 2
+
+        for name in sorted(names):
+            name_str = self.maybe_cyan(f"{name}".ljust(chars_before_description))
+            summary = self._format_summary_description(
+                first_paragraph(symbols[name].documentation or ""), chars_before_description
+            )
+            print(f"{name_str}{summary}\n")
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
@@ -391,6 +432,11 @@ class HelpPrinter(MaybeColor):
         print_cmd("help tools", "List all external tools.")
         print_cmd("help backends", "List all available backends.")
         print_cmd("help-advanced backends", "List all backends, including experimental/preview.")
+        print_cmd("help symbols", "List available BUILD file symbols.")
+        print_cmd(
+            "help-advanced symbols",
+            "List all available BUILD file symbols, including target types.",
+        )
         print_cmd("help api-types", "List all plugin API types.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
@@ -469,6 +515,13 @@ class HelpPrinter(MaybeColor):
                 print("\n" + formatted_desc)
         print()
 
+    def _print_symbol_help(self, name: str, _: bool) -> None:
+        self._print_title(f"`{name}` BUILD file symbol")
+        symbol = self._all_help_info.name_to_build_file_info[name]
+        if symbol.signature:
+            print(self.maybe_magenta(f"Signature: {symbol.name}{symbol.signature}\n"))
+        print("\n".join(hard_wrap(symbol.documentation or "Undocumented.", width=self._width)))
+
     def _print_api_type_help(self, name: str, show_advanced: bool) -> None:
         self._print_title(f"`{name}` api type")
         type_info = self._all_help_info.name_to_api_type_info[name]
@@ -525,6 +578,18 @@ class HelpPrinter(MaybeColor):
                 else None,
             }
         )
+        print()
+
+    def _print_env_var_help(self, env_var: str, show_advanced_and_deprecated: bool) -> None:
+        ohi = self._all_help_info.env_var_to_help_info[env_var]
+        help_formatter = HelpFormatter(
+            show_advanced=show_advanced_and_deprecated,
+            show_deprecated=show_advanced_and_deprecated,
+            color=self.color,
+        )
+        for line in help_formatter.format_option(ohi):
+            print(line)
+
         print()
 
     def _get_help_json(self) -> str:

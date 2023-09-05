@@ -5,6 +5,7 @@ from pants.backend.build_files.fmt.base import FmtBuildFilesRequest
 from pants.backend.python.lint.black import subsystem as black_subsystem
 from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
 from pants.core.goals.fmt import FmtResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
@@ -16,7 +17,7 @@ class BlackRequest(FmtBuildFilesRequest):
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
 async def black_fmt(request: BlackRequest.Batch, black: Black) -> FmtResult:
-    black_ics = await Black._find_python_interpreter_constraints_from_lockfile(black)
+    black_ics = await get_lockfile_interpreter_constraints(black)
     return await _run_black(request, black, black_ics)
 
 

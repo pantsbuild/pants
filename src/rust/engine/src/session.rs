@@ -7,13 +7,13 @@ use std::sync::atomic::{self, AtomicU32};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
-use crate::context::Core;
+use crate::context::{Core, SessionCore};
 use crate::nodes::{NodeKey, Select};
 use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
 use futures::future::{self, FutureExt};
-use graph::LastObserved;
+use graph::{Context, LastObserved};
 use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
@@ -175,7 +175,7 @@ impl Session {
       display,
     });
     core.sessions.add(&handle)?;
-    let run_id = core.sessions.generate_run_id();
+    let run_id = core.graph.generate_run_id();
     let preceding_graph_size = core.graph.len();
     Ok(Session {
       handle,
@@ -189,6 +189,16 @@ impl Session {
         tail_tasks: TailTasks::new(),
       }),
     })
+  }
+
+  ///
+  /// Return a `graph::Context` for this Session.
+  ///
+  pub fn graph_context(&self) -> Context<NodeKey> {
+    self
+      .core()
+      .graph
+      .context_with_run_id(SessionCore::new(self.clone()), self.run_id())
   }
 
   ///
@@ -286,7 +296,7 @@ impl Session {
 
   pub fn new_run_id(&self) {
     self.state.run_id.store(
-      self.state.core.sessions.generate_run_id().0,
+      self.state.core.graph.generate_run_id().0,
       atomic::Ordering::SeqCst,
     );
   }
@@ -394,9 +404,6 @@ pub struct Sessions {
   sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>>,
   /// Handle to kill the signal monitoring task when this object is killed.
   signal_task_handle: JoinHandle<()>,
-  /// A generator for RunId values. Although this is monotonic, there is no meaning assigned to
-  /// ordering: only equality is relevant.
-  run_id_generator: AtomicU32,
 }
 
 impl Sessions {
@@ -433,7 +440,6 @@ impl Sessions {
     Ok(Sessions {
       sessions,
       signal_task_handle,
-      run_id_generator: AtomicU32::new(0),
     })
   }
 
@@ -446,10 +452,6 @@ impl Sessions {
     } else {
       Err("The scheduler is shutting down: no new sessions may be created.".to_string())
     }
-  }
-
-  fn generate_run_id(&self) -> RunId {
-    RunId(self.run_id_generator.fetch_add(1, atomic::Ordering::SeqCst))
   }
 
   ///

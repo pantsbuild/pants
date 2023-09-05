@@ -4,7 +4,6 @@ slug: "project-introspection"
 excerpt: "Finding insights in your project."
 hidden: false
 createdAt: "2020-05-11T09:10:16.427Z"
-updatedAt: "2022-04-05T03:00:53.427Z"
 ---
 Pants provides several goals to provide insights into your project's structure.
 

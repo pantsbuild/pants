@@ -3,19 +3,11 @@
 
 from __future__ import annotations
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import EntryPoint
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption
-from pants.util.docutil import git_url
 
 
 class DebugPy(PythonToolBase):
@@ -23,16 +15,12 @@ class DebugPy(PythonToolBase):
     name = options_scope
     help = "An implementation of the Debug Adapter Protocol for Python (https://github.com/microsoft/debugpy)."
 
-    default_version = "debugpy==1.6.0"
     default_main = EntryPoint("debugpy")
+    default_requirements = ["debugpy>=1.6.5,<1.7"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "debugpy.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/debugpy.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="--log-to-stderr")
 
@@ -50,18 +38,5 @@ class DebugPy(PythonToolBase):
         )
 
 
-class DebugPyLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = DebugPy.options_scope
-
-
-@rule
-def setup_debugpy_lockfile(_: DebugPyLockfileSentinel, debugpy: DebugPy) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(debugpy)
-
-
 def rules():
-    return (
-        *collect_rules(),
-        *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, DebugPyLockfileSentinel),
-    )
+    return collect_rules()

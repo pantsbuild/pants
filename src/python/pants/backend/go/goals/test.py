@@ -574,8 +574,8 @@ async def run_go_tests(
     if fallible_test_binary.exit_code != 0:
         return TestResult(
             exit_code=fallible_test_binary.exit_code,
-            stdout=fallible_test_binary.stdout,
-            stderr=fallible_test_binary.stderr,
+            stdout_bytes=fallible_test_binary.stdout.encode(),
+            stderr_bytes=fallible_test_binary.stderr.encode(),
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=(field_set.address,),

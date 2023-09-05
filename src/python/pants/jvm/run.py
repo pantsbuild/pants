@@ -133,7 +133,6 @@ async def create_run_request(
     request: GenericJvmRunRequest,
     unzip: UnzipBinary,
 ) -> RunRequest:
-
     field_set = request.field_set
 
     jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version))

@@ -10,7 +10,7 @@ python_tests(
     sources=["*_test.py", "!scheduler_integration_test.py"],
     timeout=90,
     overrides={
-        "platform_rules_test.py": {"tags": ["platform_specific_behavior"]},
+        "platform_rules_test.py": {"tags": ["platform_specific_behavior"], "timeout": 120},
     },
 )
 
@@ -18,7 +18,6 @@ python_tests(
     name="scheduler_integration_test",
     sources=["scheduler_integration_test.py"],
     dependencies=[
-        "pants-plugins/internal_plugins/rules_for_testing",
         "testprojects/src/python:hello_directory",
     ],
     timeout=180,

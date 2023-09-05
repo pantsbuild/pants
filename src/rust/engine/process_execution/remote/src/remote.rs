@@ -43,8 +43,8 @@ use workunit_store::{
 
 use process_execution::{
   make_execute_request, populate_fallible_execution_result, Context, EntireExecuteRequest,
-  FallibleProcessResultWithPlatform, Platform, Process, ProcessError, ProcessResultMetadata,
-  ProcessResultSource,
+  FallibleProcessResultWithPlatform, Process, ProcessError, ProcessExecutionEnvironment,
+  ProcessResultMetadata, ProcessResultSource,
 };
 
 #[derive(Debug)]
@@ -159,7 +159,7 @@ impl Drop for RunningOperation {
 
 impl CommandRunner {
   /// Construct a new CommandRunner
-  pub fn new(
+  pub async fn new(
     execution_address: &str,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
@@ -181,15 +181,14 @@ impl CommandRunner {
       None
     };
 
-    let mut execution_headers = headers;
-    let execution_endpoint = grpc_util::create_endpoint(
+    let execution_endpoint = grpc_util::create_channel(
       execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
-      &mut execution_headers,
-    )?;
-    let execution_http_headers = headers_to_http_header_map(&execution_headers)?;
+    )
+    .await?;
+    let execution_http_headers = headers_to_http_header_map(&headers)?;
     let execution_channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
+      execution_endpoint,
       execution_concurrency_limit,
       execution_http_headers,
       None,
@@ -568,7 +567,7 @@ impl CommandRunner {
   pub(crate) async fn extract_execute_response(
     &self,
     run_id: RunId,
-    platform: Platform,
+    environment: ProcessExecutionEnvironment,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
@@ -626,13 +625,13 @@ impl CommandRunner {
             self.store.clone(),
             run_id,
             action_result,
-            platform,
             false,
             if execute_response.cached_result {
               ProcessResultSource::HitRemotely
             } else {
-              ProcessResultSource::RanRemotely
+              ProcessResultSource::Ran
             },
+            environment,
           )
           .await
           .map_err(|e| ExecutionError::Fatal(e.into()));
@@ -831,7 +830,11 @@ impl CommandRunner {
       };
 
       match self
-        .extract_execute_response(context.run_id, process.platform, actionable_result)
+        .extract_execute_response(
+          context.run_id,
+          process.execution_environment.clone(),
+          actionable_result,
+        )
         .await
       {
         Ok(result) => return Ok(result),
@@ -872,7 +875,7 @@ impl CommandRunner {
               &process.description,
               process.timeout,
               start_time.elapsed(),
-              process.platform,
+              process.execution_environment,
             )
             .await?;
             return Ok(result);
@@ -1024,7 +1027,7 @@ async fn populate_fallible_execution_result_for_timeout(
   description: &str,
   timeout: Option<Duration>,
   elapsed: Duration,
-  platform: Platform,
+  environment: ProcessExecutionEnvironment,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let timeout_msg = if let Some(timeout) = timeout {
     format!("user timeout of {timeout:?} after {elapsed:?}")
@@ -1039,10 +1042,10 @@ async fn populate_fallible_execution_result_for_timeout(
     stderr_digest: hashing::EMPTY_DIGEST,
     exit_code: -libc::SIGTERM,
     output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
-    platform,
     metadata: ProcessResultMetadata::new(
       Some(elapsed.into()),
-      ProcessResultSource::RanRemotely,
+      ProcessResultSource::Ran,
+      environment,
       context.run_id,
     ),
   })
@@ -1062,7 +1065,7 @@ pub(crate) fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Reque
   let md = request.metadata_mut();
   md.insert_bin(
     "google.devtools.remoteexecution.v1test.requestmetadata-bin",
-    BinaryMetadataValue::try_from_bytes(&reapi_request_metadata.to_bytes()).unwrap(),
+    BinaryMetadataValue::try_from(reapi_request_metadata.to_bytes()).unwrap(),
   );
 
   request

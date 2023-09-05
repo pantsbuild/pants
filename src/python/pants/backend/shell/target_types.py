@@ -15,6 +15,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolRunnableDependenciesField,
     AdhocToolTimeoutField,
     AdhocToolWorkdirField,
 )
@@ -265,23 +266,15 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
 class ShellCommandCommandField(StringField):
     alias = "command"
     required = True
-    help = "Shell command to execute.\n\nThe command is executed as 'bash -c <command>' by default."
-
-
-class ShellCommandOutputsField(StringSequenceField):
-    alias = "outputs"
     help = help_text(
         """
-        Specify the shell command output files and directories, relative to the value of `workdir`.
+        Shell command to execute.
 
-        Use a trailing slash on directory names, i.e. `my_dir/`.
-
-        Relative paths (including `..`) may be used, as long as the path does not ascend further
-        than the build root.
+        The command is executed as `'bash -c <command>'` by default. If you want to invoke a binary
+        use `exec -a $0 <binary> <args>` as the command so that the binary gets the correct `argv[0]`
+        set.
         """
     )
-    removal_hint = "To fix, use `output_files` and `output_directories` instead."
-    removal_version = "2.17.0.dev0"
 
 
 class ShellCommandOutputFilesField(AdhocToolOutputFilesField):
@@ -298,6 +291,38 @@ class ShellCommandOutputDependenciesField(AdhocToolOutputDependenciesField):
 
 class ShellCommandExecutionDependenciesField(AdhocToolExecutionDependenciesField):
     pass
+
+
+class RunShellCommandExecutionDependenciesField(ShellCommandExecutionDependenciesField):
+    help = help_text(
+        lambda: f"""
+        The execution dependencies for this command.
+
+        Dependencies specified here are those required to make the command complete successfully
+        (e.g. file inputs, packages compiled from other targets, etc), but NOT required to make
+        the outputs of the command useful.
+
+        See also `{RunShellCommandRunnableDependenciesField.alias}`.
+        """
+    )
+
+
+class ShellCommandRunnableDependenciesField(AdhocToolRunnableDependenciesField):
+    pass
+
+
+class RunShellCommandRunnableDependenciesField(ShellCommandRunnableDependenciesField):
+    help = help_text(
+        lambda: f"""
+        The runnable dependencies for this command.
+
+        Dependencies specified here are those required to exist on the `PATH` to make the command
+        complete successfully (interpreters specified in a `#!` command, etc). Note that these
+        dependencies will be made available on the `PATH` with the name of the target.
+
+        See also `{RunShellCommandExecutionDependenciesField.alias}`.
+        """
+    )
 
 
 class ShellCommandSourcesField(MultipleSourcesField):
@@ -320,7 +345,7 @@ class ShellCommandToolsField(StringSequenceField):
 
         Only the tools explicitly provided will be available on the search PATH,
         and these tools must be found on the paths provided by
-        [shell-setup].executable_search_paths (which defaults to the system PATH).
+        `[shell-setup].executable_search_paths` (which defaults to the system PATH).
         """
     )
 
@@ -337,14 +362,8 @@ class ShellCommandWorkdirField(AdhocToolWorkdirField):
     pass
 
 
-class RunShellCommandWorkdirField(StringField):
-    alias = "workdir"
-    default = "."
-    help = help_text(
-        "Sets the current working directory of the command that is `run`. Values that begin with "
-        "`.` are relative to the directory you are running Pants from. Values that begin with `/` "
-        "are from your project root."
-    )
+class RunShellCommandWorkdirField(AdhocToolWorkdirField):
+    pass
 
 
 class ShellCommandOutputRootDirField(AdhocToolOutputRootDirField):
@@ -363,15 +382,13 @@ class SkipShellCommandTestsField(BoolField):
 
 class ShellCommandTarget(Target):
     alias = "shell_command"
-    deprecated_alias = "experimental_shell_command"
-    deprecated_alias_removal_version = "2.18.0.dev0"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandOutputDependenciesField,
         ShellCommandExecutionDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
-        ShellCommandOutputsField,
         ShellCommandOutputFilesField,
         ShellCommandOutputDirectoriesField,
         ShellCommandSourcesField,
@@ -409,11 +426,10 @@ class ShellCommandTarget(Target):
 
 class ShellCommandRunTarget(Target):
     alias = "run_shell_command"
-    deprecated_alias = "experimental_run_shell_command"
-    deprecated_alias_removal_version = "2.18.0.dev0"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ShellCommandExecutionDependenciesField,
+        RunShellCommandExecutionDependenciesField,
+        RunShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         RunShellCommandWorkdirField,
     )

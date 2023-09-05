@@ -38,13 +38,14 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
   local::KeepSandboxes, CacheContentBehavior, Context, InputDigests, NamedCaches, Platform,
-  ProcessCacheScope, ProcessExecutionStrategy,
+  ProcessCacheScope, ProcessExecutionEnvironment, ProcessExecutionStrategy,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
-use store::{ImmutableInputs, Store};
+use remote::remote_cache::{RemoteCacheProviderOptions, RemoteCacheRunnerOptions};
+use store::{ImmutableInputs, RemoteOptions, Store};
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(Clone, Debug, Default)]
@@ -251,18 +252,21 @@ async fn main() {
         );
       }
 
-      local_only_store.into_with_remote(
-        cas_server,
-        args.remote_instance_name.clone(),
-        grpc_util::tls::Config::new_without_mtls(root_ca_certs),
-        headers,
-        args.upload_chunk_bytes,
-        Duration::from_secs(30),
-        args.store_rpc_retries,
-        args.store_rpc_concurrency,
-        None,
-        args.store_batch_api_size_limit,
-      )
+      local_only_store
+        .into_with_remote(RemoteOptions {
+          cas_address: cas_server.to_owned(),
+          instance_name: args.remote_instance_name.clone(),
+          tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs),
+          headers,
+          chunk_size_bytes: args.upload_chunk_bytes,
+          rpc_timeout: Duration::from_secs(30),
+          rpc_retries: args.store_rpc_retries,
+          rpc_concurrency_limit: args.store_rpc_concurrency,
+
+          capabilities_cell_opt: None,
+          batch_api_size_limit: args.store_batch_api_size_limit,
+        })
+        .await
     }
     (None, None) => Ok(local_only_store),
     _ => panic!("Can't specify --server without --cas-server"),
@@ -311,29 +315,36 @@ async fn main() {
         args.execution_rpc_concurrency,
         None,
       )
+      .await
       .expect("Failed to make remote command runner");
 
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
-          remote::remote_cache::CommandRunner::new(
-            Arc::new(remote_runner),
-            process_metadata.instance_name.clone(),
-            process_metadata.cache_key_gen_version.clone(),
-            executor,
-            store.clone(),
-            &address,
-            root_ca_certs,
-            headers,
-            true,
-            true,
-            remote::remote_cache::RemoteCacheWarningsBehavior::Backoff,
-            CacheContentBehavior::Defer,
-            args.cache_rpc_concurrency,
-            Duration::from_secs(2),
-            args
-              .named_cache_path
-              .map(|p| p.to_string_lossy().to_string()),
+          remote::remote_cache::CommandRunner::from_provider_options(
+            RemoteCacheRunnerOptions {
+              inner: Arc::new(remote_runner),
+              instance_name: process_metadata.instance_name.clone(),
+              process_cache_namespace: process_metadata.cache_key_gen_version.clone(),
+              executor,
+              store: store.clone(),
+              cache_read: true,
+              cache_write: true,
+              warnings_behavior: remote::remote_cache::RemoteCacheWarningsBehavior::Backoff,
+              cache_content_behavior: CacheContentBehavior::Defer,
+              append_only_caches_base_path: args
+                .named_cache_path
+                .map(|p| p.to_string_lossy().to_string()),
+            },
+            RemoteCacheProviderOptions {
+              instance_name: process_metadata.instance_name.clone(),
+              action_cache_address: address,
+              root_ca_certs,
+              headers,
+              concurrency_limit: args.cache_rpc_concurrency,
+              rpc_timeout: Duration::from_secs(2),
+            },
           )
+          .await
           .expect("Failed to make remote cache command runner"),
         )
       };
@@ -365,8 +376,8 @@ async fn main() {
       .materialize_directory(
         output,
         result.output_directory,
+        false,
         &BTreeSet::new(),
-        None,
         Permissions::Writable,
       )
       .await
@@ -392,16 +403,22 @@ async fn make_request(
   store: &Store,
   args: &Opt,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
-  let (execution_strategy, platform) = if args.server.is_some() {
+  let execution_environment = if args.server.is_some() {
     let strategy = ProcessExecutionStrategy::RemoteExecution(collection_from_keyvalues(
       args.command.extra_platform_property.iter(),
     ));
-    (strategy, Platform::Linux_x86_64)
+    ProcessExecutionEnvironment {
+      name: None,
+      // TODO: Make configurable.
+      platform: Platform::Linux_x86_64,
+      strategy,
+    }
   } else {
-    (
-      ProcessExecutionStrategy::Local,
-      Platform::current().unwrap(),
-    )
+    ProcessExecutionEnvironment {
+      name: None,
+      platform: Platform::current().unwrap(),
+      strategy: ProcessExecutionStrategy::Local,
+    }
   };
 
   match (
@@ -412,15 +429,13 @@ async fn make_request(
     args.buildbarn_url.as_ref(),
   ) {
     (Some(input_digest), Some(input_digest_length), None, None, None) => {
-      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_strategy, platform).await
-
+      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_environment).await
     }
     (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
       extract_request_from_action_digest(
         store,
         Digest::new(action_fingerprint, action_digest_length),
-        execution_strategy,
-        platform,
+        execution_environment,
         args.remote_instance_name.clone(),
         args.command.cache_key_gen_version.clone(),
       ).await
@@ -429,8 +444,7 @@ async fn make_request(
       extract_request_from_buildbarn_url(
         store,
         buildbarn_url,
-        execution_strategy,
-        platform,
+        execution_environment,
         args.command.cache_key_gen_version.clone()
       ).await
     }
@@ -447,8 +461,7 @@ async fn make_request_from_flat_args(
   store: &Store,
   args: &Opt,
   input_files: Digest,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let output_files = args
     .command
@@ -495,11 +508,10 @@ async fn make_request_from_flat_args(
     level: Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.command.jdk.clone(),
-    platform,
     execution_slot_variable: None,
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy,
+    execution_environment,
     remote_cache_speculation_delay: Duration::from_millis(0),
   };
   let metadata = ProcessMetadata {
@@ -513,8 +525,7 @@ async fn make_request_from_flat_args(
 async fn extract_request_from_action_digest(
   store: &Store,
   action_digest: Digest,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
@@ -588,9 +599,8 @@ async fn extract_request_from_action_digest(
     level: Level::Error,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy,
+    execution_environment,
     remote_cache_speculation_delay: Duration::from_millis(0),
   };
 
@@ -605,8 +615,7 @@ async fn extract_request_from_action_digest(
 async fn extract_request_from_buildbarn_url(
   store: &Store,
   buildbarn_url: &str,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
   cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let url_parts: Vec<&str> = buildbarn_url.trim_end_matches('/').split('/').collect();
@@ -653,8 +662,7 @@ async fn extract_request_from_buildbarn_url(
   extract_request_from_action_digest(
     store,
     action_digest,
-    execution_strategy,
-    platform,
+    execution_environment,
     Some(instance.to_owned()),
     cache_key_gen_version,
   )

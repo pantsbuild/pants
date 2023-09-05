@@ -12,11 +12,6 @@ from typing import Any, MutableMapping, cast
 
 import toml
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
@@ -24,7 +19,6 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -61,7 +55,6 @@ from pants.option.option_types import (
     StrOption,
 )
 from pants.source.source_root import AllSourceRoots
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -115,16 +108,12 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=6.5,<6.6"
     default_main = ConsoleScript("coverage")
+    default_requirements = ["coverage[toml]>=6.5,<8"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/coverage_py.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     filter = StrListOption(
         help=softwrap(
@@ -199,7 +188,7 @@ class CoverageSubsystem(PythonToolBase):
             Fail if the total combined coverage percentage for all tests is less than this
             number.
 
-            Use this instead of setting fail_under in a coverage.py config file,
+            Use this instead of setting `fail_under` in a coverage.py config file,
             as the config will apply to each test separately, while you typically want this
             to apply to the combined coverage for all tests run.
 
@@ -207,7 +196,7 @@ class CoverageSubsystem(PythonToolBase):
             check to trigger.
 
             Note also that if you specify a non-integral value, you must
-            also set [report] precision properly in the coverage.py config file to make use
+            also set `[report] precision` properly in the coverage.py config file to make use
             of the decimal places. See https://coverage.readthedocs.io/en/latest/config.html.
             """
         ),
@@ -230,17 +219,6 @@ class CoverageSubsystem(PythonToolBase):
                 "pyproject.toml": b"[tool.coverage",
             },
         )
-
-
-class CoveragePyLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = CoverageSubsystem.options_scope
-
-
-@rule
-def setup_coverage_lockfile(
-    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(coverage)
 
 
 @dataclass(frozen=True)
@@ -625,7 +603,5 @@ def _get_coverage_report(
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
-        UnionRule(GenerateToolLockfileSentinel, CoveragePyLockfileSentinel),
     ]

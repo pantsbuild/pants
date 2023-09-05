@@ -43,10 +43,10 @@ class GetParseError(ValueError):
             if isinstance(expr, ast.Call):
                 # Check if it's a top-level function call.
                 if hasattr(expr.func, "id"):
-                    return f"{expr.func.id}()"  # type: ignore[attr-defined]
+                    return f"{expr.func.id}()"
                 # Check if it's a method call.
                 if hasattr(expr.func, "attr") and hasattr(expr.func, "value"):
-                    return f"{expr.func.value.id}.{expr.func.attr}()"  # type: ignore[attr-defined]
+                    return f"{expr.func.value.id}.{expr.func.attr}()"
 
             # Fall back to the name of the ast node's class.
             return str(type(expr))
@@ -132,7 +132,10 @@ class Effect(Generic[_Output], Awaitable[_Output]):
 class Get(Generic[_Output], Awaitable[_Output]):
     """Asynchronous generator API for side-effect-free types.
 
-    A Get can be constructed in 3 ways:
+    A Get can be constructed in 4 ways:
+
+    + No arguments:
+        Get(<OutputType>)
 
     + Long form:
         Get(<OutputType>, <InputType>, input)
@@ -145,8 +148,8 @@ class Get(Generic[_Output], Awaitable[_Output]):
 
     The long form supports providing type information to the rule engine that it could not otherwise
     infer from the input variable [1]. Likewise, the short form must use inline construction of the
-    input in order to convey the input type to the engine. The dict form supports providing zero or
-    more inputs to the engine for the Get request.
+    input in order to convey the input type to the engine. The dict form supports providing >1
+    inputs to the engine for the Get request.
 
     [1] The engine needs to determine all rule and Get input and output types statically before
     executing any rules. Since Gets are declared inside function bodies, the only way to extract this

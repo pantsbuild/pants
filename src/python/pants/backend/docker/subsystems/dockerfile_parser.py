@@ -9,16 +9,10 @@ from pathlib import PurePath
 
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
@@ -30,8 +24,6 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
 )
-from pants.engine.unions import UnionRule
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 
@@ -43,26 +35,11 @@ class DockerfileParser(PythonToolRequirementsBase):
     options_scope = "dockerfile-parser"
     help = "Used to parse Dockerfile build specs to infer their dependencies."
 
-    default_version = "dockerfile==3.2.0"
+    default_requirements = ["dockerfile>=3.2.0,<4"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile.lock")
-    default_lockfile_path = f"src/python/{_DOCKERFILE_PACKAGE.replace('.', '/')}/dockerfile.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-
-
-class DockerfileParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = DockerfileParser.options_scope
-
-
-@rule
-def setup_lockfile_request(
-    _: DockerfileParserLockfileSentinel, dockerfile_parser: DockerfileParser
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(dockerfile_parser)
 
 
 @dataclass(frozen=True)
@@ -204,7 +181,5 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
         *pex.rules(),
-        UnionRule(GenerateToolLockfileSentinel, DockerfileParserLockfileSentinel),
     )

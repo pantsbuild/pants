@@ -12,7 +12,7 @@ from typing import Iterable, Mapping
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
-    ProcessConfigFromEnvironment as ProcessConfigFromEnvironment,
+    ProcessExecutionEnvironment as ProcessExecutionEnvironment,
 )
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
@@ -156,8 +156,11 @@ class ProcessResult:
     stderr: bytes
     stderr_digest: FileDigest
     output_digest: Digest
-    platform: Platform
     metadata: ProcessResultMetadata = field(compare=False, hash=False)
+
+    @property
+    def platform(self) -> Platform:
+        return self.metadata.platform
 
 
 @dataclass(frozen=True)
@@ -173,8 +176,11 @@ class FallibleProcessResult:
     stderr_digest: FileDigest
     exit_code: int
     output_digest: Digest
-    platform: Platform
     metadata: ProcessResultMetadata = field(compare=False, hash=False)
+
+    @property
+    def platform(self) -> Platform:
+        return self.metadata.platform
 
 
 @dataclass(frozen=True)
@@ -182,8 +188,7 @@ class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
     class Source(Enum):
-        RAN_LOCALLY = "ran_locally"
-        RAN_REMOTELY = "ran_remotely"
+        RAN = "ran"
         HIT_LOCALLY = "hit_locally"
         HIT_REMOTELY = "hit_remotely"
         MEMOIZED = "memoized"
@@ -191,11 +196,17 @@ class ProcessResultMetadata:
     # The execution time of the process, in milliseconds, or None if it could not be captured
     # (since remote execution does not guarantee its availability).
     total_elapsed_ms: int | None
+    # The environment that the process ran in (or would have run in, if it was not a cache hit).
+    execution_environment: ProcessExecutionEnvironment
     # Whether the ProcessResult (when it was created in the attached run_id) came from the local
     # or remote cache, or ran locally or remotely. See the `self.source` method.
     _source: str
     # The run_id in which a ProcessResult was created. See the `self.source` method.
     source_run_id: int
+
+    @property
+    def platform(self) -> Platform:
+        return Platform[self.execution_environment.platform]
 
     def source(self, current_run_id: RunId) -> Source:
         """Given the current run_id, return the calculated "source" of the ProcessResult.
@@ -274,7 +285,6 @@ def fallible_to_exec_result_or_raise(
             stderr=fallible_result.stderr,
             stderr_digest=fallible_result.stderr_digest,
             output_digest=fallible_result.output_digest,
-            platform=fallible_result.platform,
             metadata=fallible_result.metadata,
         )
     raise ProcessExecutionFailure(

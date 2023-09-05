@@ -26,10 +26,6 @@ source "${HERE}/build-support/common.sh"
 PY="$(determine_python)"
 export PY
 
-if is_macos_arm; then
-  export PANTS_PYTHON_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_INTERPRETER_CONSTRAINTS:-"['==3.9.*']"}"
-fi
-
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
 # shellcheck source=build-support/pants_venv
@@ -41,27 +37,12 @@ source "${HERE}/build-support/pants_venv"
 source "${HERE}/build-support/bin/rust/bootstrap_code.sh"
 
 function exec_pants_bare() {
-  PANTS_NATIVE_EXE="${HERE}/.pants"
   PANTS_PY_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
   PANTS_SRCPATH="${HERE}/src/python"
 
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
-
-  if [ -n "${USE_NATIVE_PANTS}" ]; then
-    set +e
-    "${PANTS_NATIVE_EXE}" "$@"
-    result=$?
-    # N.B.: The native pants client currently relies on pantsd being up. If it's not, it will fail
-    # with exit code 75 (EX_TEMPFAIL in /usr/include/sysexits.h) and we should fall through to the
-    # python pants client which knows how to start up pantsd. This failure takes O(1ms); so has no
-    # appreciable impact on --no-pantsd runs.
-    if ((result != 75)); then
-      exit ${result}
-    fi
-    set -e
-  fi
 
   if [ -n "${PANTS_DEBUG}" ]; then
     if [[ "$*" != *"--no-pantsd"* ]]; then
@@ -72,8 +53,26 @@ function exec_pants_bare() {
     echo "Will launch debugpy server at '127.0.0.1:5678' waiting for client connection."
   fi
 
+  if [ -z "${PANTS_NO_NATIVE_CLIENT}" ]; then
+    set +e
+    "${NATIVE_CLIENT_BINARY}" "$@"
+    result=$?
+    # N.B.: The native pants client currently relies on pantsd being up. If it's not, it will fail
+    # with exit code 75 (EX_TEMPFAIL in /usr/include/sysexits.h) and we should fall through to the
+    # python pants client which knows how to start up pantsd. This failure takes O(1ms); so has no
+    # appreciable impact on --no-pantsd runs.
+    #
+    # TODO: Split out a `pants_server` or `pants_legacy_entrypoint` from this script, and then use
+    # the native client's support for fallback to the legacy entrypoint to remove the special
+    # exit code case.
+    if ((result != 75)); then
+      exit ${result}
+    fi
+    set -e
+  fi
+
   # shellcheck disable=SC2086
-  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 NO_SCIE_WARNING=1 \
     exec ${PANTS_PREPEND_ARGS:-} "$(venv_dir)/bin/python" ${DEBUG_ARGS} "${PANTS_PY_EXE}" "$@"
 }
 

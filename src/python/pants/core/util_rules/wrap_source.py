@@ -101,7 +101,6 @@ async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
 def wrap_source_rule_and_target(
     source_field_type: type[SourcesField], target_name_suffix: str
 ) -> WrapSource:
-
     if source_field_type.expected_file_extensions:
         outputs_help = (
             "If `outputs` is not specified, all files with the following extensions will be "
@@ -109,7 +108,7 @@ def wrap_source_rule_and_target(
             + ", ".join(ext for ext in source_field_type.expected_file_extensions if ext)
         )
     else:
-        outputs_help = "If `outputs` is not specified, all files from `inputs` will be matched"
+        outputs_help = "If `outputs` is not specified, all files from `inputs` will be matched."
 
     class ActivateWrapSourceTargetField(ActivateWrapSourceTargetFieldBase):
         pass

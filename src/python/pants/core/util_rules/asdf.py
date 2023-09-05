@@ -6,7 +6,9 @@ import logging
 import re
 from collections import OrderedDict
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path, PurePath
+from typing import Collection
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -17,6 +19,27 @@ from pants.engine.rules import _uncacheable_rule, collect_rules
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class AsdfPathString(str, Enum):
+    STANDARD = "<ASDF>"
+    LOCAL = "<ASDF_LOCAL>"
+
+    @staticmethod
+    def contains_strings(search_paths: Collection[str]) -> tuple[bool, bool]:
+        return AsdfPathString.STANDARD in search_paths, AsdfPathString.LOCAL in search_paths
+
+    def description(self, tool: str) -> str:
+        if self is self.STANDARD:
+            return softwrap(
+                f"""
+                all {tool} versions currently configured by ASDF `(asdf shell, ${{HOME}}/.tool-versions)`,
+                with a fallback to all installed versions
+                """
+            )
+        if self is self.LOCAL:
+            return f"the ASDF {tool} with the version in `BUILD_ROOT/.tool-versions`"
+        raise NotImplementedError(f"{self} has no description.")
 
 
 @dataclass(frozen=True)
@@ -36,6 +59,34 @@ class AsdfToolPathsResult:
     standard_tool_paths: tuple[str, ...] = ()
     local_tool_paths: tuple[str, ...] = ()
 
+    @classmethod
+    async def get_un_cachable_search_paths(
+        cls,
+        search_paths: Collection[str],
+        env_tgt: EnvironmentTarget,
+        tool_name: str,
+        tool_description: str,
+        paths_option_name: str,
+        bin_relpath: str = "bin",
+    ) -> AsdfToolPathsResult:
+        resolve_standard, resolve_local = AsdfPathString.contains_strings(search_paths)
+
+        if resolve_standard or resolve_local:
+            # AsdfToolPathsResult is not cacheable, so only request it if absolutely necessary.
+            return await Get(
+                AsdfToolPathsResult,
+                AsdfToolPathsRequest(
+                    env_tgt=env_tgt,
+                    tool_name=tool_name,
+                    tool_description=tool_description,
+                    resolve_standard=resolve_standard,
+                    resolve_local=resolve_local,
+                    paths_option_name=paths_option_name,
+                    bin_relpath=bin_relpath,
+                ),
+            )
+        return AsdfToolPathsResult(tool_name)
+
 
 async def _resolve_asdf_tool_paths(
     env_tgt: EnvironmentTarget,
@@ -47,7 +98,6 @@ async def _resolve_asdf_tool_paths(
     env: EnvironmentVars,
     local: bool,
 ) -> tuple[str, ...]:
-
     if not (isinstance(env_tgt.val, LocalEnvironmentTarget) or env_tgt.val is None):
         return ()
 

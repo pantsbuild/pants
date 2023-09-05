@@ -439,10 +439,20 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     workdir="/",
                 )
 
-                # Fails because runtime dependencies are not fetched transitively
-                # even if the root is requested through `output_dependencies`
+                # Fails because `output_dependencies` are not available at runtime
                 shell_command(
                     name="expect_fail_3",
+                    tools=["cat"],
+                    command="cat msg.txt",
+                    output_dependencies=[":a1"],
+                    workdir="/",
+                )
+
+
+                # Fails because execution dependencies are not fetched transitively
+                # even if the root is requested through `output_dependencies`
+                shell_command(
+                    name="expect_fail_4",
                     tools=["cat"],
                     command="cat msg.txt",
                     output_dependencies=[":a2"],
@@ -465,6 +475,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     name="expect_success_2",
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
+                    execution_dependencies=[":a1", ":a2",],
                     output_dependencies=[":a1", ":a2",],
                     output_files=["output.txt"],
                     workdir="/",
@@ -474,18 +485,11 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
         }
     )
 
-    with engine_error(ProcessExecutionFailure):
-        assert_shell_command_result(
-            rule_runner, Address("src", target_name="expect_fail_1"), expected_contents={}
-        )
-    with engine_error(ProcessExecutionFailure):
-        assert_shell_command_result(
-            rule_runner, Address("src", target_name="expect_fail_2"), expected_contents={}
-        )
-    with engine_error(ProcessExecutionFailure):
-        assert_shell_command_result(
-            rule_runner, Address("src", target_name="expect_fail_3"), expected_contents={}
-        )
+    for i in range(1, 5):
+        with engine_error(ProcessExecutionFailure):
+            assert_shell_command_result(
+                rule_runner, Address("src", target_name=f"expect_fail_{i}"), expected_contents={}
+            )
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success_1"),
@@ -498,83 +502,43 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
     )
 
 
-def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
-    caplog.set_level(logging.INFO)
-    caplog.clear()
-
+@pytest.mark.parametrize(
+    ("workdir", "expected_boot"),
+    [
+        (None, "cd src; "),
+        (".", "cd src; "),
+        ("/", ""),
+        ("src/with space'n quote", """cd 'src/with space'\"'\"'n quote'; """),
+        ("./with space'n quote", """cd 'src/with space'\"'\"'n quote'; """),
+    ],
+)
+def test_run_shell_command_request(
+    rule_runner: RuleRunner, workdir: None | str, expected_boot: str
+) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
-                """\
-                shell_command(
-                  name="a1",
-                  command="echo message > msg.txt",
-                  outputs=["msg.txt"],
-                  workdir="/",\
-                )
-
-                shell_command(
-                    name="a2",
-                    tools=["cat"],
-                    command="cat msg.txt > msg2.txt",
-                    dependencies=[":a1",],
-                    outputs=["msg2.txt",],
-                    workdir="/",
-                )
-
-                shell_command(
-                    name="expect_success",
-                    tools=["cat"],
-                    command="cat msg.txt msg2.txt > output.txt",
-                    dependencies=[":a1", ":a2",],
-                    outputs=["output.txt"],
-                    workdir="/",
-                )
-                """
-            ),
-        }
-    )
-
-    assert_shell_command_result(
-        rule_runner,
-        Address("src", target_name="expect_success"),
-        expected_contents={"output.txt": "message\nmessage\n"},
-    )
-
-
-def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/BUILD": dedent(
-                """\
+                f"""\
                 run_shell_command(
                   name="test",
                   command="some cmd string",
-                )
-
-                run_shell_command(
-                  name="cd-test",
-                  command="some cmd string",
-                  workdir="src/with space'n quote",
+                  workdir={workdir!r},
                 )
                 """
             ),
         }
     )
 
-    def assert_run_args(target: str, args: tuple[str, ...]) -> None:
-        tgt = rule_runner.get_target(Address("src", target_name=target))
-        run = RunShellCommand.create(tgt)
-        request = rule_runner.request(RunRequest, [run])
-        assert len(args) == len(request.args)
-        for arg, request_arg in zip(args, request.args):
-            arg in request_arg
+    args = ("bash", "-c", expected_boot + "some cmd string", "pants run src:test --")
 
-    assert_run_args("test", ("bash", "-c", "some cmd string", "src:test"))
-    assert_run_args(
-        "cd-test",
-        ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string", "src:cd-test"),
-    )
+    tgt = rule_runner.get_target(Address("src", target_name="test"))
+    run = RunShellCommand.create(tgt)
+    request = rule_runner.request(RunRequest, [run])
+    assert len(args) == len(request.args)
+    # handle the binary name specially, because the path may differ
+    assert args[0] in request.args[0]
+    for arg, request_arg in zip(args[1:], request.args[1:]):
+        assert arg == request_arg
 
 
 @pytest.mark.parametrize(
@@ -803,3 +767,73 @@ def test_missing_tool_called(
         )
 
     assert "requires the names of any external commands" in caplog.text
+
+
+def test_env_vars(rule_runner: RuleRunner) -> None:
+    envvar_value = "clang"
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+                shell_command(
+                  name="envvars",
+                  tools=[],
+                  command='echo $ENVVAR > out.log',
+                  output_files=["out.log"],
+                  extra_env_vars=["ENVVAR={envvar_value}"],
+                  root_output_directory=".",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="envvars"),
+        expected_contents={"out.log": f"{envvar_value}\n"},
+    )
+
+
+_DEFAULT = object()
+
+
+@pytest.mark.parametrize(
+    ("workdir", "expected_dir"),
+    [
+        ("src", "/src"),
+        (".", "/src"),
+        ("./", "/src"),
+        ("./dst", "/src/dst"),
+        ("/", ""),
+        ("", ""),
+        ("/src", "/src"),
+        ("/dst", "/dst"),
+        (None, "/src"),
+    ],
+)
+def test_working_directory_special_values(
+    rule_runner: RuleRunner, workdir: str | None, expected_dir: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+                shell_command(
+                  name="workdir",
+                  tools=['sed'],
+                  command='echo $PWD | sed s@^{{chroot}}@@ > out.log',
+                  workdir={workdir!r},
+                  output_files=["out.log"],
+                  root_output_directory=".",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="workdir"),
+        expected_contents={"out.log": f"{expected_dir}\n"},
+    )

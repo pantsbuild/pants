@@ -4,7 +4,6 @@ slug: "rules-api-concepts"
 excerpt: "The core concepts of the Rules API."
 hidden: false
 createdAt: "2020-05-07T22:38:44.027Z"
-updatedAt: "2022-07-25T20:57:40.743Z"
 ---
 Rules
 -----

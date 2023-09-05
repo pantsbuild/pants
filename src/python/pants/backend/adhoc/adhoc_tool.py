@@ -7,11 +7,12 @@ import logging
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
     AdhocToolExecutionDependenciesField,
+    AdhocToolExtraEnvVarsField,
     AdhocToolLogOutputField,
-    AdhocToolOutputDependenciesField,
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolRunnableDependenciesField,
     AdhocToolRunnableField,
     AdhocToolSourcesField,
     AdhocToolStderrFilenameField,
@@ -24,6 +25,8 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
+    ExtraSandboxContents,
+    MergeExtraSandboxContents,
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
 )
@@ -31,7 +34,8 @@ from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_s
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
+from pants.engine.fs import Digest, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -99,10 +103,44 @@ async def run_in_sandbox_request(
         ResolveExecutionDependenciesRequest(
             target.address,
             target.get(AdhocToolExecutionDependenciesField).value,
-            target.get(AdhocToolOutputDependenciesField).value,
+            target.get(AdhocToolRunnableDependenciesField).value,
         ),
     )
     dependencies_digest = execution_environment.digest
+    runnable_dependencies = execution_environment.runnable_dependencies
+
+    extra_env: dict[str, str] = dict(run_request.extra_env or {})
+    extra_path = extra_env.pop("PATH", None)
+
+    extra_sandbox_contents = []
+
+    extra_sandbox_contents.append(
+        ExtraSandboxContents(
+            EMPTY_DIGEST,
+            extra_path,
+            run_request.immutable_input_digests or FrozenDict(),
+            run_request.append_only_caches or FrozenDict(),
+            run_request.extra_env or FrozenDict(),
+        )
+    )
+
+    if runnable_dependencies:
+        extra_sandbox_contents.append(
+            ExtraSandboxContents(
+                EMPTY_DIGEST,
+                f"{{chroot}}/{runnable_dependencies.path_component}",
+                runnable_dependencies.immutable_input_digests,
+                runnable_dependencies.append_only_caches,
+                runnable_dependencies.extra_env,
+            )
+        )
+
+    merged_extras = await Get(
+        ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
+    )
+    extra_env = dict(merged_extras.extra_env)
+    if merged_extras.path:
+        extra_env["PATH"] = merged_extras.path
 
     input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
 
@@ -119,14 +157,16 @@ async def run_in_sandbox_request(
         argv=tuple(run_request.args + extra_args),
         timeout=None,
         input_digest=input_digest,
-        immutable_input_digests=FrozenDict(run_request.immutable_input_digests or {}),
-        append_only_caches=FrozenDict(run_request.append_only_caches or {}),
+        immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
+        append_only_caches=FrozenDict.frozen(merged_extras.append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
-        fetch_env_vars=(),
-        supplied_env_var_values=FrozenDict(**run_request.extra_env),
+        fetch_env_vars=target.get(AdhocToolExtraEnvVarsField).value or (),
+        supplied_env_var_values=FrozenDict(extra_env),
         log_on_process_errors=None,
         log_output=target[AdhocToolLogOutputField].value,
+        capture_stderr_file=target[AdhocToolStderrFilenameField].value,
+        capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
     )
 
     adhoc_result = await Get(
@@ -137,23 +177,7 @@ async def run_in_sandbox_request(
         },
     )
 
-    result = adhoc_result.process_result
-    adjusted = adhoc_result.adjusted_digest
-
-    extras = (
-        (target[AdhocToolStdoutFilenameField].value, result.stdout),
-        (target[AdhocToolStderrFilenameField].value, result.stderr),
-    )
-    extra_contents = {i: j for i, j in extras if i}
-
-    if extra_contents:
-        extra_digest = await Get(
-            Digest,
-            CreateDigest(FileContent(name, content) for name, content in extra_contents.items()),
-        )
-        adjusted = await Get(Digest, MergeDigests((adjusted, extra_digest)))
-
-    output = await Get(Snapshot, Digest, adjusted)
+    output = await Get(Snapshot, Digest, adhoc_result.adjusted_digest)
     return GeneratedSources(output)
 
 

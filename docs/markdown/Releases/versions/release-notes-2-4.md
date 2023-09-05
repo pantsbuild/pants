@@ -3,7 +3,6 @@ title: "2.4.x"
 slug: "release-notes-2-4"
 hidden: true
 createdAt: "2021-02-28T01:52:21.946Z"
-updatedAt: "2021-04-06T22:46:47.865Z"
 ---
 Some highlights:
 

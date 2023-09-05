@@ -4,7 +4,6 @@ slug: "targets"
 excerpt: "Metadata for your code."
 hidden: false
 createdAt: "2020-02-25T17:44:15.007Z"
-updatedAt: "2022-04-29T23:51:48.029Z"
 ---
 Most goals require metadata about your code. For example, to run a test, you need to know about all the transitive dependencies of that test. You may also want to set a timeout on that test.
 
@@ -39,7 +38,7 @@ pex_binary(
 )
 ```
 
-Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults. See [Field default values](doc:targets#field-default-values) for how you may override a fields default value.
+Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults. See [Field default values](doc:targets#field-default-values) for how you may override a field's default value.
 
 All target types have a `name` field, which is used to identify the target. Target names must be unique within a directory.
 
@@ -84,7 +83,7 @@ Addresses are used in the `dependencies` field to depend on other targets. Addre
 
 > 📘 Use `//:tgt` for the root of your repository
 >
-> Addressed defined in the `BUILD` file at the root of your repository are prefixed with `//`, e.g. `//:my_tgt`.
+> Addresses defined in the `BUILD` file at the root of your repository are prefixed with `//`, e.g. `//:my_tgt`.
 
 `source` and `sources` field
 ============================
@@ -169,7 +168,7 @@ You only need to declare direct dependencies. Pants will pull in _transitive dep
 >
 > You can use the prefix `!!` to transitively exclude a dependency, meaning that even if a target's dependencies include the bad dependency, the final result will not include the value.
 >
-> Transitive excludes can only be used in target types that conventionally are not dependend upon by other targets, such as `pex_binary` and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
+> Transitive excludes can only be used in target types that conventionally are not depended upon by other targets, such as `pex_binary`, `python_distribution`, and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
 
 Field default values
 ====================
@@ -187,6 +186,10 @@ The `extend=True` keyword argument allows to add to any existing default field v
 Default fields and values are validated against their target types, except when provided using the `all` keyword, in which case only values for fields applicable to each target are validated. Use `ignore_unknown_fields=True` to ignore invalid fields.
 
 This means, that it is legal to provide a default value for `all` targets, even if it is only a subset of targets that actually supports that particular field.
+
+> 📘 `__defaults__` does not apply to environment targets.
+>
+> The environment targets (such as `local_environment` and `docker_environment` etc) are special and used during a bootstrap phase before any targets are defined and as such can not be targeted by the `__defaults__` construct.
 
 Examples:
 

@@ -9,7 +9,6 @@ import sys
 import time
 import warnings
 
-from pants import ox
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
@@ -103,7 +102,6 @@ class PantsLoader:
         sys.setrecursionlimit(int(os.environ.get(RECURSION_LIMIT, "10000")))
 
         entrypoint = os.environ.pop(DAEMON_ENTRYPOINT, None)
-
         if entrypoint:
             cls.run_alternate_entrypoint(entrypoint)
         else:
@@ -111,15 +109,6 @@ class PantsLoader:
 
 
 def main() -> None:
-    ox.bootstrap_pyoxidizer()
-
-    # In our `PyOxidizer`-generated binary, sometimes we'll be attempting to load this
-    # like a Python interpreter in order to run `pex` and its child processes. If we
-    # detect such an invocation, we'll try to run it, and then quit this process before
-    # getting into Pants itself.
-    if ox.is_oxidized and ox.pex_main():
-        return
-
     PantsLoader.main()
 
 

@@ -4,7 +4,6 @@ slug: "contributions-debugging"
 excerpt: "Some techniques to figure out why Pants is behaving the way it is."
 hidden: false
 createdAt: "2020-09-04T23:43:34.260Z"
-updatedAt: "2022-03-09T16:40:50.789Z"
 ---
 Benchmarking with `hyperfine`
 -----------------------------

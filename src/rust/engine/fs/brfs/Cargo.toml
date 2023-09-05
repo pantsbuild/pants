@@ -2,30 +2,30 @@
 name = "brfs"
 version = "0.0.1"
 edition = "2021"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-protos = { path = "../../protos" }
-clap = "3"
-dirs-next = "2"
-env_logger = "0.9.0"
-errno = "0.2.8"
-fuser = "0.11.1"
-futures = "0.3"
+clap = { workspace = true }
+dirs-next = { workspace = true }
+env_logger = { workspace = true }
+errno = { workspace = true }
+fuser = { workspace = true }
+futures = { workspace = true }
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
-libc = "0.2.137"
-log = "0.4.17"
-parking_lot = "0.12"
+libc = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
+protos = { path = "../../protos" }
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
-time = "0.3"
-tokio = { version = "1.21", features = ["rt-multi-thread", "macros", "signal"] }
-tokio-stream = { version = "0.1", features = ["signal"] }
+time = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+tokio-stream = { workspace = true, features = ["signal"] }
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
-bytes = "1.2"
-tempfile = "3"
+bytes = { workspace = true }
+tempfile = { workspace = true }
 testutil = { path = "../../testutil" }

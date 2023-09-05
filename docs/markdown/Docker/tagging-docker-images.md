@@ -4,7 +4,6 @@ slug: "tagging-docker-images"
 excerpt: "How to set registry, repository and tag names on your images"
 hidden: false
 createdAt: "2021-10-04T15:50:36.840Z"
-updatedAt: "2022-04-22T08:17:48.824Z"
 ---
 Configuring registries
 ----------------------

@@ -1,15 +1,10 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::ffi::OsStr;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug};
-use std::fs::create_dir_all;
 use std::io::Write;
 use std::ops::Neg;
-use std::os::unix::{
-  fs::{symlink, OpenOptionsExt},
-  process::ExitStatusExt,
-};
+use std::os::unix::{fs::OpenOptionsExt, process::ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
@@ -19,8 +14,9 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
-  self, DirectoryDigest, GlobExpansionConjunction, GlobMatching, PathGlobs, Permissions,
-  RelativePath, StrictGlobMatching, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
+  self, DigestTrie, DirectoryDigest, GlobExpansionConjunction, GlobMatching, PathGlobs,
+  Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior, TypedPath,
+  EMPTY_DIRECTORY_DIGEST,
 };
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{try_join, FutureExt, TryFutureExt};
@@ -28,18 +24,19 @@ use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::bash;
 use store::{
-  ImmutableInputs, OneOffStoreFileByDigest, Snapshot, Store, StoreError, WorkdirSymlink,
+  ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, StoreError,
+  WorkdirSymlink,
 };
 use task_executor::Executor;
 use tempfile::TempDir;
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
+  Context, FallibleProcessResultWithPlatform, ManagedChild, NamedCaches, Process, ProcessError,
   ProcessResultMetadata, ProcessResultSource,
 };
 
@@ -60,7 +57,6 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
-  platform: Platform,
   spawn_lock: RwLock<()>,
 }
 
@@ -80,13 +76,8 @@ impl CommandRunner {
       named_caches,
       immutable_inputs,
       keep_sandboxes,
-      platform: Platform::current().unwrap(),
       spawn_lock: RwLock::new(()),
     }
-  }
-
-  fn platform(&self) -> Platform {
-    self.platform
   }
 
   async fn construct_output_snapshot(
@@ -152,66 +143,6 @@ impl Debug for CommandRunner {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("local::CommandRunner")
       .finish_non_exhaustive()
-  }
-}
-
-pub struct HermeticCommand {
-  inner: Command,
-}
-
-///
-/// A command that accepts no input stream and does not consult the `PATH`.
-///
-impl HermeticCommand {
-  fn new<S: AsRef<OsStr>>(program: S) -> HermeticCommand {
-    let mut inner = Command::new(program);
-    inner
-      // TODO: This will not universally prevent child processes continuing to run in the
-      // background, because killing a pantsd client with Ctrl+C kills the server with a signal,
-      // which won't currently result in an orderly dropping of everything in the graph. See #10004.
-      .kill_on_drop(true)
-      .env_clear()
-      // It would be really nice not to have to manually set PATH but this is sadly the only way
-      // to stop automatic PATH searching.
-      .env("PATH", "");
-    HermeticCommand { inner }
-  }
-
-  fn args<I, S>(&mut self, args: I) -> &mut HermeticCommand
-  where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-  {
-    self.inner.args(args);
-    self
-  }
-
-  fn envs<I, K, V>(&mut self, vars: I) -> &mut HermeticCommand
-  where
-    I: IntoIterator<Item = (K, V)>,
-    K: AsRef<OsStr>,
-    V: AsRef<OsStr>,
-  {
-    self.inner.envs(vars);
-    self
-  }
-
-  fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut HermeticCommand {
-    self.inner.current_dir(dir);
-    self
-  }
-
-  fn spawn<O: Into<Stdio>, E: Into<Stdio>>(
-    &mut self,
-    stdout: O,
-    stderr: E,
-  ) -> std::io::Result<Child> {
-    self
-      .inner
-      .stdin(Stdio::null())
-      .stdout(stdout)
-      .stderr(stderr)
-      .spawn()
   }
 }
 
@@ -281,9 +212,8 @@ impl super::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           workdir.path().to_owned(),
           &req,
-          req.input_digests.input_files.clone(),
-          self.store.clone(),
-          self.executor.clone(),
+          req.input_digests.inputs.clone(),
+          &self.store,
           &self.named_caches,
           &self.immutable_inputs,
           None,
@@ -292,6 +222,10 @@ impl super::CommandRunner for CommandRunner {
         .await?;
 
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
+        // NB: The constraint on `CapturedWorkdir` is that any child processes spawned here have
+        // exited (or been killed in their `Drop` handlers), so this function can rely on the usual
+        // Drop order of local variables to assume that the sandbox is cleaned up after the process
+        // is.
         let res = self
           .run_and_capture_workdir(
             req.clone(),
@@ -301,7 +235,6 @@ impl super::CommandRunner for CommandRunner {
             workdir.path().to_owned(),
             (),
             exclusive_spawn,
-            self.platform(),
           )
           .map_err(|msg| {
             // Processes that experience no infrastructure issues should result in an "Ok" return,
@@ -358,8 +291,18 @@ impl CapturedWorkdir for CommandRunner {
     } else {
       workdir_path.to_owned()
     };
-    let mut command = HermeticCommand::new(&req.argv[0]);
-    command.args(&req.argv[1..]).current_dir(cwd).envs(&req.env);
+    let mut command = Command::new(&req.argv[0]);
+    command
+      .env_clear()
+      // It would be really nice not to have to manually set PATH but this is sadly the only way
+      // to stop automatic PATH searching.
+      .env("PATH", "")
+      .args(&req.argv[1..])
+      .current_dir(cwd)
+      .envs(&req.env)
+      .stdin(Stdio::null())
+      .stdout(Stdio::piped())
+      .stderr(Stdio::piped());
 
     // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
     // indicates the binary we're spawning was written out by the current thread, and, as such,
@@ -378,7 +321,7 @@ impl CapturedWorkdir for CommandRunner {
     //
     // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
     // unix problem.
-    let mut fork_exec = move || command.spawn(Stdio::piped(), Stdio::piped());
+    let mut fork_exec = move || ManagedChild::spawn(&mut command, None);
     let mut child = {
       if exclusive_spawn {
         let _write_locked = self.spawn_lock.write().await;
@@ -468,7 +411,6 @@ pub trait CapturedWorkdir {
     workdir_path: PathBuf,
     workdir_token: Self::WorkdirToken,
     exclusive_spawn: bool,
-    platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
     let mut stdout = BytesMut::with_capacity(8192);
@@ -535,7 +477,8 @@ pub trait CapturedWorkdir {
     let elapsed = start_time.elapsed();
     let result_metadata = ProcessResultMetadata::new(
       Some(elapsed.into()),
-      ProcessResultSource::RanLocally,
+      ProcessResultSource::Ran,
+      req.execution_environment,
       context.run_id,
     );
 
@@ -550,7 +493,6 @@ pub trait CapturedWorkdir {
           stderr_digest,
           exit_code,
           output_directory: output_snapshot.into(),
-          platform,
           metadata: result_metadata,
         })
       }
@@ -574,7 +516,6 @@ pub trait CapturedWorkdir {
           stderr_digest,
           exit_code: -libc::SIGTERM,
           output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
-          platform,
           metadata: result_metadata,
         })
       }
@@ -584,6 +525,11 @@ pub trait CapturedWorkdir {
 
   ///
   /// Spawn the given process in a working directory prepared with its expected input digest.
+  ///
+  /// NB: The implementer of this method must guarantee that the spawned process has completely
+  /// exited when the returned BoxStream is Dropped. Otherwise it might be possible for the process
+  /// to observe the working directory that it is running in being torn down. In most cases, this
+  /// requires Drop handlers to synchronously wait for their child processes to exit.
   ///
   /// If the process to be executed has an `argv[0]` that points into its input digest then
   /// `exclusive_spawn` will be `true` and the spawn implementation should account for the
@@ -640,52 +586,43 @@ pub fn apply_chroot(chroot_path: &str, req: &mut Process) {
   }
 }
 
-/// Prepares the given workdir for use by the given Process.
-///
-/// Returns true if the executable for the Process was created in the workdir, indicating that
-/// `exclusive_spawn` is required.
-///
-/// TODO: Both the symlinks for named_caches/immutable_inputs and the empty output directories
-/// required by the spec should be created via a synthetic Digest containing SymlinkNodes and
-/// the empty output directories. That would:
-///   1. improve validation that nothing we create collides.
-///   2. allow for materialization to safely occur fully in parallel, rather than partially
-///      synchronously in the background.
-///
-pub async fn prepare_workdir(
-  workdir_path: PathBuf,
+/// Creates a Digest for the entire input sandbox contents of the given Process, including absolute
+/// symlinks to immutable inputs, named caches, and JDKs (if configured).
+pub async fn prepare_workdir_digest(
   req: &Process,
-  materialized_input_digest: DirectoryDigest,
-  store: Store,
-  executor: Executor,
+  input_digest: DirectoryDigest,
+  store: &Store,
   named_caches: &NamedCaches,
-  immutable_inputs: &ImmutableInputs,
+  immutable_inputs: Option<&ImmutableInputs>,
   named_caches_prefix: Option<&Path>,
   immutable_inputs_prefix: Option<&Path>,
-) -> Result<bool, StoreError> {
-  // Collect the symlinks to create for immutable inputs or named caches.
-  let immutable_inputs_symlinks = {
-    let symlinks = immutable_inputs
-      .local_paths(&req.input_digests.immutable_inputs)
-      .await?;
+) -> Result<DirectoryDigest, StoreError> {
+  let mut paths = Vec::new();
 
-    match immutable_inputs_prefix {
-      Some(prefix) => symlinks
-        .into_iter()
-        .map(|symlink| WorkdirSymlink {
-          src: symlink.src,
-          dst: prefix.join(
-            symlink
-              .dst
-              .strip_prefix(immutable_inputs.workdir())
-              .unwrap(),
-          ),
-        })
-        .collect::<Vec<_>>(),
-      None => symlinks,
+  // Symlinks for immutable inputs and named caches.
+  let mut workdir_symlinks = Vec::new();
+  {
+    if let Some(immutable_inputs) = immutable_inputs {
+      let symlinks = immutable_inputs
+        .local_paths(&req.input_digests.immutable_inputs)
+        .await?;
+
+      match immutable_inputs_prefix {
+        Some(prefix) => workdir_symlinks.extend(symlinks.into_iter().map(|symlink| {
+          WorkdirSymlink {
+            src: symlink.src,
+            dst: prefix.join(
+              symlink
+                .dst
+                .strip_prefix(immutable_inputs.workdir())
+                .unwrap(),
+            ),
+          }
+        })),
+        None => workdir_symlinks.extend(symlinks),
+      }
     }
-  };
-  let named_caches_symlinks = {
+
     let symlinks = named_caches
       .paths(&req.append_only_caches)
       .await
@@ -695,21 +632,59 @@ pub async fn prepare_workdir(
         ))
       })?;
     match named_caches_prefix {
-      Some(prefix) => symlinks
-        .into_iter()
-        .map(|symlink| WorkdirSymlink {
-          src: symlink.src,
-          dst: prefix.join(symlink.dst.strip_prefix(named_caches.base_path()).unwrap()),
-        })
-        .collect::<Vec<_>>(),
-      None => symlinks,
+      Some(prefix) => workdir_symlinks.extend(symlinks.into_iter().map(|symlink| WorkdirSymlink {
+        src: symlink.src,
+        dst: prefix.join(symlink.dst.strip_prefix(named_caches.base_path()).unwrap()),
+      })),
+      None => workdir_symlinks.extend(symlinks),
     }
-  };
-  let workdir_symlinks = immutable_inputs_symlinks
-    .into_iter()
-    .chain(named_caches_symlinks.into_iter())
-    .collect::<Vec<_>>();
+  }
+  paths.extend(workdir_symlinks.iter().map(|symlink| TypedPath::Link {
+    path: &symlink.src,
+    target: &symlink.dst,
+  }));
 
+  // Symlink for JDK.
+  if let Some(jdk_home) = &req.jdk_home {
+    paths.push(TypedPath::Link {
+      path: Path::new(".jdk"),
+      target: jdk_home,
+    });
+  }
+
+  // The bazel remote execution API specifies that the parent directories for output files and
+  // output directories should be created before execution completes.
+  let parent_paths_to_create: HashSet<_> = req
+    .output_files
+    .iter()
+    .chain(req.output_directories.iter())
+    .filter_map(|rel_path| rel_path.as_ref().parent())
+    .filter(|parent| !parent.as_os_str().is_empty())
+    .collect();
+  paths.extend(parent_paths_to_create.into_iter().map(TypedPath::Dir));
+
+  // Finally, create a tree for all of the additional paths, and merge it with the input
+  // Digest.
+  let additions = DigestTrie::from_unique_paths(paths, &HashMap::new())?;
+
+  store.merge(vec![input_digest, additions.into()]).await
+}
+
+/// Prepares the given workdir for use by the given Process.
+///
+/// Returns true if the executable for the Process was created in the workdir, indicating that
+/// `exclusive_spawn` is required.
+///
+pub async fn prepare_workdir(
+  workdir_path: PathBuf,
+  req: &Process,
+  materialized_input_digest: DirectoryDigest,
+  store: &Store,
+  named_caches: &NamedCaches,
+  immutable_inputs: &ImmutableInputs,
+  named_caches_prefix: Option<&Path>,
+  immutable_inputs_prefix: Option<&Path>,
+) -> Result<bool, StoreError> {
   // Capture argv0 as the executable path so that we can test whether we have created it in the
   // sandbox.
   let maybe_executable_path = {
@@ -718,89 +693,44 @@ pub async fn prepare_workdir(
       if let Some(working_directory) = &req.working_directory {
         executable_path = working_directory.as_ref().join(executable_path)
       }
-      Some(executable_path)
+      Some(workdir_path.join(executable_path))
     } else {
       None
     }
   };
 
-  // Start with async materialization of input snapshots, followed by synchronous materialization
-  // of other configured inputs. Note that we don't do this in parallel, as that might cause
-  // non-determinism when paths overlap: see the method doc.
-  let store2 = store.clone();
-  let workdir_path_2 = workdir_path.clone();
-  let mut mutable_paths = req.output_files.clone();
-  mutable_paths.extend(req.output_directories.clone());
+  // Prepare the digest to use, and then materialize it.
   in_workunit!("setup_sandbox", Level::Debug, |_workunit| async move {
-    store2
-      .materialize_directory(
-        workdir_path_2,
-        materialized_input_digest,
-        &mutable_paths,
-        Some(immutable_inputs),
-        Permissions::Writable,
-      )
-      .await
-  })
-  .await?;
-
-  let workdir_path2 = workdir_path.clone();
-  let output_file_paths = req.output_files.clone();
-  let output_dir_paths = req.output_directories.clone();
-  let maybe_jdk_home = req.jdk_home.clone();
-  let exclusive_spawn = executor
-    .spawn_blocking(
-      move || {
-        if let Some(jdk_home) = maybe_jdk_home {
-          symlink(jdk_home, workdir_path2.join(".jdk"))
-            .map_err(|err| format!("Error making JDK symlink for local execution: {err:?}"))?
-        }
-
-        // The bazel remote execution API specifies that the parent directories for output files and
-        // output directories should be created before execution completes: see the method doc.
-        let parent_paths_to_create: HashSet<_> = output_file_paths
-          .iter()
-          .chain(output_dir_paths.iter())
-          .map(|relative_path| relative_path.as_ref())
-          .chain(workdir_symlinks.iter().map(|s| s.src.as_path()))
-          .filter_map(|rel_path| rel_path.parent())
-          .map(|parent_relpath| workdir_path2.join(parent_relpath))
-          .collect();
-        for path in parent_paths_to_create {
-          create_dir_all(path.clone()).map_err(|err| {
-            format!("Error making parent directory {path:?} for local execution: {err:?}")
-          })?;
-        }
-
-        for workdir_symlink in workdir_symlinks {
-          let src = workdir_path2.join(&workdir_symlink.src);
-          symlink(&workdir_symlink.dst, &src).map_err(|err| {
-            format!(
-              "Error linking {} -> {} for local execution: {:?}",
-              src.display(),
-              workdir_symlink.dst.display(),
-              err
-            )
-          })?;
-        }
-
-        let exe_was_materialized = maybe_executable_path
-          .as_ref()
-          .map_or(false, |p| workdir_path2.join(p).exists());
-        if exe_was_materialized {
-          debug!(
-            "Obtaining exclusive spawn lock for process since \
-               we materialized its executable {:?}.",
-            maybe_executable_path
-          );
-        }
-        let res: Result<_, String> = Ok(exe_was_materialized);
-        res
-      },
-      |e| Err(format!("Directory materialization task failed: {e}")),
+    let complete_input_digest = prepare_workdir_digest(
+      req,
+      materialized_input_digest,
+      store,
+      named_caches,
+      Some(immutable_inputs),
+      named_caches_prefix,
+      immutable_inputs_prefix,
     )
     .await?;
-  Ok(exclusive_spawn)
+
+    let mut mutable_paths = req.output_files.clone();
+    mutable_paths.extend(req.output_directories.clone());
+    store
+      .materialize_directory(
+        workdir_path,
+        complete_input_digest,
+        false,
+        &mutable_paths,
+        Permissions::Writable,
+      )
+      .await?;
+
+    if let Some(executable_path) = maybe_executable_path {
+      Ok(tokio::fs::metadata(executable_path).await.is_ok())
+    } else {
+      Ok(false)
+    }
+  })
+  .await
 }
 
 ///
@@ -904,11 +834,10 @@ pub fn setup_run_sh_script(
 
   let stringified_command_line: String = full_command_line.join(" ");
   let full_script = format!(
-    "#!/bin/bash
+    "#!/usr/bin/env bash
 # This command line should execute the same process as pants did internally.
-export {stringified_env_vars}
 cd {stringified_cwd}
-{stringified_command_line}
+env -i {stringified_env_vars} {stringified_command_line}
 ",
   );
 

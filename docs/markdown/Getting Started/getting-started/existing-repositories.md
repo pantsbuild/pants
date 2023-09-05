@@ -4,7 +4,6 @@ slug: "existing-repositories"
 excerpt: "How to incrementally add Pants to an existing repository."
 hidden: false
 createdAt: "2020-09-28T23:03:33.586Z"
-updatedAt: "2022-03-12T22:33:31.603Z"
 ---
 Recommended steps
 -----------------
@@ -68,7 +67,7 @@ You may want to [speed up your CI](doc:using-pants-in-ci) by having Pants only r
 
 ### 4. Set up `pants package`
 
-You can use `pants package` to package your code into various formats, such as a [PEX binary](doc:python-package-goal), a [wheel](doc:python-setup-py-goal), an [AWS Lambda](doc:awslambda-python), or a [zip/tar archive](doc:resources).
+You can use `pants package` to package your code into various formats, such as a [PEX binary](doc:python-package-goal), a [wheel](doc:python-package-goal#create-a-setuptools-distribution), an [AWS Lambda](doc:awslambda-python), or a [zip/tar archive](doc:assets).
 
 We recommend manually verifying that this step is working how you'd like by inspecting the built packages. Alternatively, you can [write automated tests](doc:python-test-goal) that will call the equivalent of `pants package` for you, and insert the built package into your test environment.
 
@@ -76,7 +75,7 @@ We recommend manually verifying that this step is working how you'd like by insp
 
 Pants is highly extensible. In fact, all of Pants's core functionality is implemented using the exact same API used by plugins.
 
-Check out [Plugins Overview](doc:plugins-overview). We'd also love to help in the #plugins channel on [Slack](doc:community).
+Check out [Plugins Overview](doc:plugins-overview). We'd also love to help in the #plugins channel on [Slack](doc:the-pants-community).
 
 Some example plugins that users have written:
 

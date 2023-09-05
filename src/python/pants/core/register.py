@@ -15,6 +15,7 @@ from pants.core.goals import (
     fix,
     fmt,
     generate_lockfiles,
+    generate_snapshots,
     lint,
     package,
     publish,
@@ -40,6 +41,7 @@ from pants.core.target_types import (
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
+    adhoc_binaries,
     archive,
     config_files,
     external_tool,
@@ -58,6 +60,7 @@ from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
 from pants.vcs import git
+from pants.version import PANTS_SEMVER
 
 wrap_as_resources = wrap_source_rule_and_target(ResourceSourceField, "resources")
 
@@ -72,6 +75,7 @@ def rules():
         *fmt.rules(),
         *fix.rules(),
         *generate_lockfiles.rules(),
+        *generate_snapshots.rules(),
         *lint.rules(),
         *update_build_files.rules(),
         *package.rules(),
@@ -82,6 +86,7 @@ def rules():
         *test.rules(),
         *bsp_rules(),
         # util_rules
+        *adhoc_binaries.rules(),
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
@@ -119,6 +124,7 @@ def target_types():
 def build_file_aliases():
     return BuildFileAliases(
         objects={
+            "PANTS_VERSION": PANTS_SEMVER,
             "http_source": http_source,
             "per_platform": per_platform,
             "parametrize": Parametrize,

@@ -9,7 +9,7 @@ import logging
 import sys
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Iterator, List
+from typing import Any, Callable, Iterator, List, get_type_hints
 
 import typing_extensions
 
@@ -21,11 +21,12 @@ from pants.engine.internals.selectors import (
     GetParseError,
     MultiGet,
 )
-from pants.util.backport import get_annotations
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
+from pants.util.typing import patch_forward_ref
 
 logger = logging.getLogger(__name__)
+patch_forward_ref()
 
 
 def _get_starting_indent(source: str) -> int:
@@ -87,17 +88,16 @@ class _TypeStack:
 
 
 def _lookup_annotation(obj: Any, attr: str) -> Any:
-    """Get type assocated with a particular attribute on object. This can get hairy, especially on
+    """Get type associated with a particular attribute on object. This can get hairy, especially on
     Python <3.10.
 
     https://docs.python.org/3/howto/annotations.html#accessing-the-annotations-dict-of-an-object-in-python-3-9-and-older
-    For this reason, we've copied the `inspect.get_annotations` method from CPython `main` branch.
     """
     if hasattr(obj, attr):
         return getattr(obj, attr)
     else:
         try:
-            return get_annotations(obj, eval_str=True).get(attr)
+            return get_type_hints(obj).get(attr)
         except (NameError, TypeError):
             return None
 
@@ -113,7 +113,7 @@ def _lookup_return_type(func: Callable, check: bool = False) -> Any:
         func_file = inspect.getsourcefile(func)
         func_line = func.__code__.co_firstlineno
         raise TypeError(
-            f"Return type annotation required for `{func.__name__}` in {func_file}:{func_line}"
+            f"Failed to look up return type hint for `{func.__name__}` in {func_file}:{func_line}"
         )
     return ret
 
@@ -197,12 +197,12 @@ class _AwaitableCollector(ast.NodeVisitor):
         get_args = call_node.args
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
 
-        if len(get_args) not in (2, 3):
+        if len(get_args) not in (1, 2, 3):
             # TODO: fix parse error message formatting... (TODO: create ticket)
             raise parse_error(
                 self._format(
                     call_node,
-                    f"Expected either two or three arguments, but got {len(get_args)} arguments.",
+                    f"Expected one to three arguments, but got {len(get_args)} arguments.",
                 )
             )
 
@@ -211,7 +211,9 @@ class _AwaitableCollector(ast.NodeVisitor):
 
         input_nodes = get_args[1:]
         input_types: List[Any]
-        if len(input_nodes) == 1:
+        if not input_nodes:
+            input_types = []
+        elif len(input_nodes) == 1:
             input_constructor = input_nodes[0]
             if isinstance(input_constructor, ast.Call):
                 cls_or_func = self._lookup(input_constructor.func)

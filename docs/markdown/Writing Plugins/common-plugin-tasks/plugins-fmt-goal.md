@@ -4,7 +4,6 @@ slug: "plugins-fmt-goal"
 excerpt: "How to add a new formatter to the `fmt` and `lint` goals."
 hidden: false
 createdAt: "2020-07-01T04:52:28.820Z"
-updatedAt: "2022-04-27T18:37:11.334Z"
 ---
 In Pants, every formatter is also a linter, meaning that if you can run a tool with `pants fmt`, you can run the same tool in check-only mode with `pants lint`. Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work.
 
@@ -82,10 +81,11 @@ class ShfmtFieldSet(FieldSet):
     sources: ShellSourceField
 ```
 
-Then, hook this up to a new subclass of `FmtRequest`.
+Then, hook this up to a new subclass of `FmtTargetsRequest`.
 
 ```python
-from pants.core.goals.fmt import FmtRequest
+from pants.core.goals.fmt import FmtTargetsRequest
+
 
 class ShfmtRequest(FmtTargetsRequest):
     field_set_type = ShfmtFieldSet
@@ -145,7 +145,7 @@ async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platfor
     return await FmtResult.create(request, result, output_snapshot)
 ```
 
-The `FmtRequest.Batch` has `.snapshot`, which stores the list of files and the `Digest` for each source file.
+The `ShfmtRequest.Batch` object has `.snapshot`, which stores the list of files and the `Digest` for each source file.
 
 If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to ensure that the tool is fetched.
 

@@ -6,24 +6,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.lint.pydocstyle.skip_field import SkipPydocstyleField
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript, PythonSourceField
-from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
-from pants.util.docutil import bin_name, git_url
-from pants.util.logging import LogLevel
+from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
 
 
@@ -43,20 +33,15 @@ class Pydocstyle(PythonToolBase):
     name = "Pydocstyle"
     help = "A tool for checking compliance with Python docstring conventions (http://www.pydocstyle.org/en/stable/)."
 
-    default_version = "pydocstyle[toml]>=6.1.1,<7.0"
     default_main = ConsoleScript("pydocstyle")
+    default_requirements = ["pydocstyle[toml]>=6.1.1,<7.0"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.pydocstyle", "pydocstyle.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/pydocstyle/pydocstyle.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--select=D101,D102")
-    export = ExportToolOption()
     config = FileOption(
         default=None,
         advanced=True,
@@ -102,58 +87,8 @@ class Pydocstyle(PythonToolBase):
         )
 
 
-class PydocstyleLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = Pydocstyle.options_scope
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by Pydocstyle in your project
-        (for lockfile generation)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def setup_pydocstyle_lockfile(
-    _: PydocstyleLockfileSentinel, pydocstyle: Pydocstyle, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    if not pydocstyle.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(pydocstyle)
-
-    constraints = await _find_all_unique_interpreter_constraints(python_setup, PydocstyleFieldSet)
-    return GeneratePythonLockfile.from_tool(pydocstyle, constraints)
-
-
-class PydocstyleExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by Pydocstyle in your project
-        (for `export` goal)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def pydocstyle_export(
-    _: PydocstyleExportSentinel,
-    pydocstyle: Pydocstyle,
-) -> ExportPythonTool:
-    if not pydocstyle.export:
-        return ExportPythonTool(resolve_name=pydocstyle.options_scope, pex_request=None)
-    return ExportPythonTool(
-        resolve_name=pydocstyle.options_scope,
-        pex_request=pydocstyle.to_pex_request(),
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, PydocstyleLockfileSentinel),
-        UnionRule(ExportPythonToolSentinel, PydocstyleExportSentinel),
     )

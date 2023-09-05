@@ -4,17 +4,16 @@ slug: "contributions-rust"
 excerpt: "Hacking on the Pants engine in Rust."
 hidden: false
 createdAt: "2020-05-16T23:11:31.121Z"
-updatedAt: "2022-02-08T20:56:52.599Z"
 ---
 We welcome contributions to Rust! We use Rust to implement the Pants engine in a performant, safe, and ergonomic way.
 
 > 📘 Still learning Rust? Ask to get added to reviews
 > 
-> We'd be happy to ping you on Rust changes we make for you to see how Rust is used in the wild. Please message us on the #engine channel in [Slack](doc:community) to let us know your interest.
+> We'd be happy to ping you on Rust changes we make for you to see how Rust is used in the wild. Please message us on the #engine channel in [Slack](doc:the-pants-community) to let us know your interest.
 
 > 🚧 Recommendation: share your plan first
 > 
-> Because changes to Rust deeply impact how Pants runs, it is especially helpful to share any plans to work on Rust before making changes. Please message us on [Slack](doc:community) in the #engine channel or open a [GitHub issue](https://github.com/pantsbuild/pants/issues).
+> Because changes to Rust deeply impact how Pants runs, it is especially helpful to share any plans to work on Rust before making changes. Please message us on [Slack](doc:the-pants-community) in the #engine channel or open a [GitHub issue](https://github.com/pantsbuild/pants/issues).
 
 Code organization
 -----------------

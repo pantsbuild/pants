@@ -6,10 +6,26 @@ python_requirements(
         "strawberry-graphql": ["strawberry"],
         "beautifulsoup4": ["bs4"],
         "python-gnupg": ["gnupg"],
+        "node-semver": ["nodesemver"],
     },
-    overrides={
-        "humbug": {"dependencies": ["#setuptools"]},
-    },
+)
+
+python_requirements(
+    name="flake8",
+    source="flake8-requirements.txt",
+    resolve="flake8",
+)
+
+python_requirements(
+    name="mypy",
+    source="mypy-requirements.txt",
+    resolve="mypy",
+)
+
+python_requirements(
+    name="pytest",
+    source="pytest-requirements.txt",
+    resolve="pytest",
 )
 
 # Useful when using IntelliJ/PyCharm remote debugging. Importing `pydevd_pycharm` at
@@ -25,7 +41,7 @@ __dependents_rules__(
             "[strawberry-graphql]",
             "[uvicorn]",
         ),
-        "src/python/pants/explorer/server/**",
+        "pants-plugins/pants_explorer/server/**",
         "!*",
     ),
     # Free for all on the rest

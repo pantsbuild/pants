@@ -2,33 +2,33 @@
 version = "0.0.1"
 edition = "2021"
 name = "fs"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-async-trait = "0.1"
-bytes = "1.2"
-# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
-dirs-next = "2"
-futures = "0.3"
-glob = "0.3.0"
+async-trait = { workspace = true }
+bytes = { workspace = true }
+deepsize = { workspace = true }
+dirs-next = { workspace = true }
+futures = { workspace = true }
+glob = { workspace = true }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
-ignore = "0.4.18"
-internment = "0.6"
-itertools = "0.10"
-lazy_static = "1"
-log = "0.4"
-parking_lot = "0.12"
+# TODO: Waiting on https://github.com/BurntSushi/ripgrep/pull/2482.
+ignore = { workspace = true }
+internment = { workspace = true }
+itertools = { workspace = true }
+lazy_static = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
 protos = { path = "../protos" }
-rlimit = "0.8"
-serde = "1.0.136"
+rlimit = { workspace = true }
+serde = { workspace = true }
 task_executor = { path = "../task_executor" }
-tokio = { version = "1.21", features = ["fs"] }
+tokio = { workspace = true, features = ["fs"] }
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }
 testutil = { path = "../testutil" }
-tokio = { version = "1.21", features = ["rt", "macros"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
