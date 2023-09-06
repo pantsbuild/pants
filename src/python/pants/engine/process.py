@@ -7,7 +7,7 @@ import dataclasses
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, Mapping
+from typing import Iterable, List, Mapping
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
@@ -194,6 +194,15 @@ class FallibleProcessResult:
 
 
 @dataclass(frozen=True)
+class ProcessResultWithRetries:
+    results: List[FallibleProcessResult]
+
+    @property
+    def last(self):
+        return self.results[-1]
+
+
+@dataclass(frozen=True)
 class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
@@ -307,9 +316,19 @@ def fallible_to_exec_result_or_raise(
 
 
 @rule
-async def run_proc_with_retry(req: RunProcWithRetry, attempt: int) -> FallibleProcessResult:
-    proc = dataclasses.replace(req.proc, attempt=attempt)
-    return await Get(FallibleProcessResult, Process, proc)
+async def run_proc_with_retry(req: RunProcWithRetry) -> ProcessResultWithRetries:
+    results: List[FallibleProcessResult] = []
+    for attempt in range(0, req.attempts):
+        proc = dataclasses.replace(req.proc, attempt=attempt)
+        result = (
+            await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
+                FallibleProcessResult, Process, proc
+            )
+        )
+        results.append(result)
+        if result.exit_code == 0:
+            break
+    return ProcessResultWithRetries(results)
 
 
 @dataclass(frozen=True)

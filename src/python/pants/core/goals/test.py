@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, List, Optional, Sequence, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -889,30 +889,18 @@ async def run_tests(
         )
 
     to_test = list(zip(test_batches, environment_names))
-    results: List[TestResult] = []
-    attempt = 0
-    while to_test:
-        attempt += 1
-        if attempt > 5:
-            break
-        print(f"Begin round of testing n_batches={len(to_test)} attempt={attempt}")
-        new_results = await MultiGet(  # noqa: PNT30: We only know that we need to rerun the test after we run it
+    results = (
+        await MultiGet(  # noqa: PNT30: We only know that we need to rerun the test after we run it
             Get(
                 TestResult,
                 {
                     batch: TestRequest.Batch,
                     environment_name: EnvironmentName,
-                    attempt: int,
                 },
             )
             for batch, environment_name in to_test
         )
-        results += new_results
-
-        def should_retry(result: TestResult):
-            return result.exit_code != 0 and b"Exceeded timeout" in result.stderr_bytes
-
-        to_test = [(b, e) for (b, e), t in zip(to_test, new_results) if should_retry(t)]
+    )
 
     # Print summary.
     exit_code = 0

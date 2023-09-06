@@ -67,10 +67,10 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import (
-    FallibleProcessResult,
     InteractiveProcess,
     Process,
     ProcessCacheScope,
+    ProcessResultWithRetries,
     RunProcWithRetry,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -510,7 +510,11 @@ async def run_python_tests(
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
     )
-    result = await Get(FallibleProcessResult, RunProcWithRetry(setup.process, 0))
+    HARDCODED_RETRY_COUNT = 5  # TODO: get from global option or batch
+    results = await Get(
+        ProcessResultWithRetries, RunProcWithRetry(setup.process, HARDCODED_RETRY_COUNT)
+    )
+    result = results.last  # TODO: report all for digestion
 
     def warning_description() -> str:
         description = batch.elements[0].address.spec
