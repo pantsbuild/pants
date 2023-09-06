@@ -569,7 +569,7 @@ async fn make_request_from_flat_args(
     cache_scope: ProcessCacheScope::Always,
     execution_environment,
     remote_cache_speculation_delay: Duration::from_millis(0),
-    extra: BTreeMap::new(),
+    attempt: 0,
   };
   let metadata = ProcessMetadata {
     instance_name: args.remote_instance_name.clone(),
@@ -659,7 +659,7 @@ async fn extract_request_from_action_digest(
     cache_scope: ProcessCacheScope::Always,
     execution_environment,
     remote_cache_speculation_delay: Duration::from_millis(0),
-    extra: BTreeMap::new(),
+    attempt: 0,
   };
 
   let metadata = ProcessMetadata {

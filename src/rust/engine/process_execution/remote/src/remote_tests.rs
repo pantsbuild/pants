@@ -103,7 +103,7 @@ async fn make_execute_request() {
     cache_scope: ProcessCacheScope::Always,
     execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
-    extra: BTreeMap::new(),
+    attempt: 0,
   };
 
   let want_command = remexec::Command {
@@ -203,7 +203,7 @@ async fn make_execute_request_with_instance_name() {
       )]),
     },
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
-    extra: BTreeMap::new(),
+    attempt: 0,
   };
 
   let want_command = remexec::Command {
@@ -309,7 +309,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     cache_scope: ProcessCacheScope::Always,
     execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
-    extra: BTreeMap::new(),
+    attempt: 0,
   };
 
   let mut want_command = remexec::Command {
@@ -583,7 +583,7 @@ async fn make_execute_request_with_timeout() {
     cache_scope: ProcessCacheScope::Always,
     execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
-    extra: BTreeMap::new(),
+    attempt: 0,
   };
 
   let want_command = remexec::Command {
@@ -683,7 +683,7 @@ async fn make_execute_request_with_append_only_caches() {
     cache_scope: ProcessCacheScope::Always,
     execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
-    extra: BTreeMap::new(),
+    attempt: 0,
   };
 
   let want_command = remexec::Command {
@@ -838,7 +838,7 @@ async fn make_execute_request_using_immutable_inputs() {
     cache_scope: ProcessCacheScope::Always,
     execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
-    extra: BTreeMap::new(),
+    attempt: 0,
   };
 
   let want_command = remexec::Command {

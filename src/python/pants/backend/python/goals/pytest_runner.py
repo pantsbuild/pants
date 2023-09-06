@@ -510,7 +510,7 @@ async def run_python_tests(
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
     )
-    result = await Get(FallibleProcessResult, RunProcWithRetry(setup.process))
+    result = await Get(FallibleProcessResult, RunProcWithRetry(setup.process, 0))
 
     def warning_description() -> str:
         description = batch.elements[0].address.spec

@@ -65,7 +65,7 @@ class Process:
     concurrency_available: int
     cache_scope: ProcessCacheScope
     remote_cache_speculation_delay_millis: int
-    extra: FrozenDict[str, str]
+    attempt: int
 
     def __init__(
         self,
@@ -87,7 +87,7 @@ class Process:
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         remote_cache_speculation_delay_millis: int = 0,
-        extra: Mapping[str, str] | None = None,
+        attempt: int = 0,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -144,12 +144,13 @@ class Process:
         object.__setattr__(
             self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
         )
-        object.__setattr__(self, "extra", FrozenDict(extra or {}))
+        object.__setattr__(self, "attempt", attempt)
 
 
 @dataclass(frozen=True)
 class RunProcWithRetry:
     proc: Process
+    attempts: int
 
 
 @dataclass(frozen=True)
@@ -307,7 +308,7 @@ def fallible_to_exec_result_or_raise(
 
 @rule
 async def run_proc_with_retry(req: RunProcWithRetry, attempt: int) -> FallibleProcessResult:
-    proc = dataclasses.replace(req.proc, extra=FrozenDict({"PANTS_TEST_ATTEMPT": str(attempt)}))
+    proc = dataclasses.replace(req.proc, attempt=attempt)
     return await Get(FallibleProcessResult, Process, proc)
 
 

@@ -585,7 +585,7 @@ pub struct Process {
 
   pub remote_cache_speculation_delay: std::time::Duration,
 
-  pub extra: BTreeMap<String, String>,
+  pub attempt: usize,
 }
 
 impl Process {
@@ -622,7 +622,7 @@ impl Process {
         strategy: ProcessExecutionStrategy::Local,
       },
       remote_cache_speculation_delay: std::time::Duration::from_millis(0),
-      extra: BTreeMap::new(),
+      attempt: 0,
     }
   }
 
