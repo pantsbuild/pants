@@ -6,10 +6,10 @@ from __future__ import annotations
 import itertools
 import logging
 from abc import ABC, ABCMeta
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
+from typing import Any, ClassVar, Iterable, List, Optional, Sequence, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -96,6 +96,8 @@ class TestResult(EngineAwareReturnType):
     extra_output: Snapshot | None = None
     # True if the core test rules should log that extra output was written.
     log_extra_output: bool = False
+    # All results including failed attempts
+    all_results: List[FallibleProcessResult] = field(default_factory=list)
 
     output_simplifier: Simplifier = Simplifier()
 
@@ -143,6 +145,7 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
         log_extra_output: bool = False,
+        all_results: List[FallibleProcessResult] | None = None,
         output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
         return TestResult(
@@ -158,6 +161,7 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
             log_extra_output=log_extra_output,
+            all_results=all_results or [process_result],
             output_simplifier=output_simplifier,
         )
 
@@ -171,6 +175,7 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
         log_extra_output: bool = False,
+        all_results: List[FallibleProcessResult] | None = None,
         output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
         return TestResult(
@@ -188,6 +193,7 @@ class TestResult(EngineAwareReturnType):
             log_extra_output=log_extra_output,
             output_simplifier=output_simplifier,
             partition_description=batch.partition_metadata.description,
+            all_results=all_results or [process_result],
         )
 
     @property
