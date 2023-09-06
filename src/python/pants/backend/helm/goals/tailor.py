@@ -50,11 +50,7 @@ async def find_putative_helm_targets(
 ) -> PutativeTargets:
     putative_targets = []
 
-    tailor_charts = helm_subsystem.tailor_charts
-    if not tailor_charts and helm_subsystem.options.is_default("tailor_charts"):
-        tailor_charts = helm_subsystem.tailor
-
-    if tailor_charts:
+    if helm_subsystem.tailor_charts:
         all_chart_files = await Get(
             Paths, PathGlobs, request.path_globs(*HELM_CHART_METADATA_FILENAMES)
         )
