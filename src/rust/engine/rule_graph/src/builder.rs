@@ -283,15 +283,8 @@ impl<R: Rule> Builder<R> {
       .rules
       .values()
       .flatten()
-      .group_by(|rule| rule.id())
-      .into_iter()
-      .filter_map(|(rule_id, group)| {
-        if group.count() > 1 {
-          Some(rule_id)
-        } else {
-          None
-        }
-      })
+      .map(|rule| rule.id())
+      .duplicates()
       .collect();
     match invalid_rule_ids.len() {
       0 => Ok(()),
