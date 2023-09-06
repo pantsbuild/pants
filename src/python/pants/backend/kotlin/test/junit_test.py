@@ -135,9 +135,10 @@ def test_vintage_kotlin_simple_success(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.kt")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test
