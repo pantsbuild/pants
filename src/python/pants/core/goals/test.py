@@ -85,7 +85,7 @@ class TestResult(EngineAwareReturnType):
     # A None result_metadata indicates a backend that performs its own test discovery/selection
     # and either discovered no tests, or encounted an error, such as a compilation error, in
     # the attempt.
-    result_metadata: ProcessResultMetadata | None
+    result_metadata: ProcessResultMetadata | None  # TODO: Merge elapsed MS of all subproceses
     partition_description: str | None = None
 
     coverage_data: CoverageData | None = None
@@ -1017,12 +1017,23 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
     assert (
         result.result_metadata is not None
     ), "Skipped test results should not be outputted in the test summary"
-    if result.exit_code == 0:
-        sigil = console.sigil_succeeded()
+    succeeded = result.exit_code == 0
+    retried = len(result.all_results) > 1
+
+    if succeeded:
+        if not retried:
+            sigil = console.sigil_succeeded()
+        else:
+            sigil = console.sigil_succeeded_with_edits()
         status = "succeeded"
     else:
         sigil = console.sigil_failed()
         status = "failed"
+
+    if retried:
+        attempt_msg = f" after {len(result.all_results)} attempts"
+    else:
+        attempt_msg = ""
 
     environment = result.result_metadata.execution_environment.name
     environment_type = result.result_metadata.execution_environment.environment_type
@@ -1044,8 +1055,8 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    suffix = f" {elapsed_print}{source_desc}"
-    return f"{sigil} {result.description} {status}{suffix}."
+    suffix = f"{elapsed_print}{source_desc}"
+    return f"{sigil} {result.description} {status}{attempt_msg} {suffix}."
 
 
 @dataclass(frozen=True)
