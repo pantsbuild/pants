@@ -49,7 +49,7 @@ inspect variables, run code in a REPL, and break-on-exceptions in your `rule` co
 
 NOTE: `PANTS_DEBUG` doesn't work with the pants daemon, so `--no-pantsd` must be specified.
 
-Debugging with PyCharm
+Debugging `rule` code with a debugger in PyCharm
 ----------------------
 
 You'll have to follow a different procedure until Pycharm adds Debug-Adapter support:
