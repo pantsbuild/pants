@@ -196,21 +196,18 @@ def example_handler(event, context):
     print("Hello AWS!")
 ```
 
-Then, use  `pants package project:lambda`, and upload the resulting `project/lambdex.pex` to AWS.  The handler will need to be configured in AWS as `__pex__.lambda_example.example_handler` (assuming `project` is a [source root](doc:source-roots)).
+Then, use  `pants package project:lambda`, and upload the resulting `project/lambda.pex` to AWS.  The handler will need to be configured in AWS as `__pex__.lambda_example.example_handler` (assuming `project` is a [source root](doc:source-roots)).
 
 Migrating from Pants 2.16 and earlier
 -------------------------------------
 
-Pants has implemented a new way to package Lambda functions in 2.17, which is now the default in 2.18, resulting in smaller packages and faster cold starts. This involves some changes:
+Pants implemented a new way to package Lambda functions in 2.17, which became the only option in 2.19, resulting in smaller packages and faster cold starts. This involves some changes:
 
-- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](doc:pex-files) and then use Lambdex to adapt this to be better understood by AWS by adding a shim handler at the path `lambdex_handler.handler`. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during the "INIT" phase.
+- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](doc:pex) and then use Lambdex to adapt this to be better understood by AWS by adding a shim handler at the path `lambdex_handler.handler`. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during the "INIT" phase.
 - In Pants 2.17, the use of Lambdex was deprecated, in favour of choosing the appropriate dependencies ahead of time, as described above, without needing to do this on each cold start. This results in a zip file laid out in the format recommended by AWS, and includes a re-export of the handler at the path `lambda_function.handler`.
 - In Pants 2.18, the new behaviour is now the default behaviour. Layers can now be built using Pants, and this addition includes renaming the `python_awslambda` target to `python_aws_lambda_function`.
-- In Pants 2.19, the old Lambdex behaviour will be entirely removed.
+- In Pants 2.19 and later, the old Lambdex behaviour has been entirely removed.
 
-When upgrading to Pants 2.18, any existing `python_awslambda` targets will need to be renamed to `python_aws_lambda_function`, which can be done via `pants update-build-files ::`. Additional changes may be required:
-
-- If you already use Pants 2.17 and set `layout = "zip"` in the `[lambdex]` section of `pants.toml`, you already use the new behaviour: nice one! All you need to do is delete the whole `[lambdex]` section.
-- If you use Pants 2.16 or earlier, or use Pants 2.17 with `layout = "lambdex"`, upgrading will change how these targets are built. To migrate, we suggest you first migrate to using `layout = "zip"` in Pants 2.17, by [following its instructions](/v2.17/docs/awslambda-python#migrating-from-pants-216-and-earlier), and upgrade to Pants 2.18 after that.
+If your code can be packaged without warnings using Pants 2.18, no change is required when upgrading to Pants 2.19 (except removing the `[lambdex]` section in `pants.toml` if that still remains). If not, [follow its instructions](/v2.18/docs/awslambda-python#migrating-from-pants-216-and-earlier) to upgrade to Pants 2.18 fully first, and upgrade to Pants 2.19 after that.
 
 If you encounter a bug with the new behaviour, [please let us know](https://github.com/pantsbuild/pants/issues/new/choose). If you require advanced PEX features, [switch to using `pex_binary` directly](#advanced-using-pex-directly).

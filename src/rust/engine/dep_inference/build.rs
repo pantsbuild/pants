@@ -26,10 +26,18 @@
 #![allow(clippy::mutex_atomic)]
 
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::{collections::HashSet, io::Write, path::Path};
 use std::{env, fs};
 use walkdir::WalkDir;
 
+/// The tree-sitter interfaces don't have nice constants that allow us to reference their magic numbers by name.
+/// We generate those constants here.
+/// Tree-sitter grammars don't have to give symbols unique names (in `ts_symbol_names`),
+/// and there can be multiple symbols mapped to the same name.
+/// For example, they might map both `block` and `_match_block` to "block" because one of those in internal
+/// For most names, there will only be 1 symbol; for those, we create a const u16 for convenience.
+/// For the names with multiple symbols, we generate a const array (hashmaps would have been nice, but I couldn't figure out how to make them const)
 fn gen_constants_file(language: &tree_sitter::Language, out_dir: &Path) {
   let mut file = std::fs::File::create(out_dir.join("constants.rs")).unwrap();
 
@@ -47,19 +55,43 @@ impl KindID {
     )
     .unwrap();
 
-  let mut kinds_seen = HashSet::new();
+  let mut kinds_to_ids: HashMap<String, HashSet<u16>> = HashMap::new();
 
+  // Collect the mapping of name->symbols
   for id in (0_u16..(language.node_kind_count() as u16))
     .chain([language.id_for_node_kind("ERROR", true)].iter().cloned())
   {
     if language.node_kind_is_named(id) {
       let kind = language.node_kind_for_id(id).unwrap().to_uppercase();
-      if kinds_seen.insert(kind.clone()) {
-        file
-          .write_all(format!("  pub const {kind}: u16 = {id};\n").as_bytes())
-          .unwrap();
-      }
+      kinds_to_ids
+        .entry(kind)
+        .or_insert_with(HashSet::new)
+        .insert(id);
     }
+  }
+
+  // Codegen for each name->symbol mapping
+  for (kind, ids) in kinds_to_ids {
+    let text = match ids.len() {
+      1 => {
+        let single = ids.iter().next().unwrap();
+        format!("  pub const {kind}: u16 = {single};\n")
+      }
+      _ => {
+        let items: String = ids
+          .iter()
+          .map(|id| id.to_string())
+          .collect::<Vec<String>>()
+          .join(", ");
+        format!(
+          "  pub const {}: [u16; {}]  = [{}];\n",
+          kind,
+          ids.len(),
+          items
+        )
+      }
+    };
+    file.write_all(text.as_bytes()).unwrap();
   }
 
   file.write_all(b"}\n").unwrap();

@@ -24,5 +24,5 @@ There are also [goals](doc:project-introspection) for querying and understanding
 - [Third-party dependencies](doc:python-third-party-dependencies) 
 - [Interpreter compatibility](doc:python-interpreter-compatibility) 
 - [Linters and formatters](doc:python-linters-and-formatters) 
-- [Pex files](doc:pex-files) 
+- [Pex files](doc:pex) 
 - [Building distributions](doc:python-distributions)

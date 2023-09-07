@@ -590,7 +590,9 @@ async fn check_action_cache(
       let response = provider
         .get_action_result(action_digest, context)
         .and_then(|action_result| async move {
-          let Some(action_result) = action_result else { return Ok(None) };
+          let Some(action_result) = action_result else {
+            return Ok(None);
+          };
 
           let response = populate_fallible_execution_result(
             store.clone(),

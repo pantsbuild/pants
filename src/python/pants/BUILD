@@ -37,7 +37,7 @@ python_distribution(
         # N.B.: Must match [python] interpreter_constraints in pants.toml.
         python_requires="==3.9.*",
     ),
-    entry_points={"console_scripts": {"pants": "src/python/pants/bin:pants"}},
+    entry_points={"console_scripts": {"pants": "pants.bin.pants_loader:main"}},
 )
 
 pex_binary(

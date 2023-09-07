@@ -16,7 +16,6 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
@@ -109,6 +108,7 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         PythonFaaSKnownRuntime(3, 8, "3.8-x86_64"),
         PythonFaaSKnownRuntime(3, 9, "3.9-x86_64"),
         PythonFaaSKnownRuntime(3, 10, "3.10-x86_64"),
+        PythonFaaSKnownRuntime(3, 11, "3.11-x86_64"),
     )
 
     @classmethod
@@ -162,25 +162,20 @@ class _AWSLambdaBaseTarget(Target):
         complete_platforms_alias = self[PexCompletePlatformsField].alias
 
         if has_runtime and has_complete_platforms:
-            warn_or_error(
-                "2.19.0.dev0",
-                f"using both `{runtime_alias}` and `{complete_platforms_alias}` in the `{self.alias}` target {self.address}",
+            raise ValueError(
                 softwrap(
                     f"""
-                    The `{complete_platforms_alias}` now takes precedence over the `{runtime_alias}` field, if
+                    The `{complete_platforms_alias}` takes precedence over the `{runtime_alias}` field, if
                     it is set. Remove the `{runtime_alias}` field to only use the `{complete_platforms_alias}`
                     value, or remove the `{complete_platforms_alias}` field to use the default platform
                     implied by `{runtime_alias}`.
                     """
-                ),
+                )
             )
 
 
 class PythonAWSLambda(_AWSLambdaBaseTarget):
     alias = "python_aws_lambda_function"
-
-    deprecated_alias = "python_awslambda"
-    deprecated_alias_removal_version = "2.19.0.dev0"
 
     core_fields = (
         *_AWSLambdaBaseTarget.core_fields,

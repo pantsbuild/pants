@@ -61,20 +61,28 @@ jobs:
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         path: .pants.d/*.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      name: Deploy wheels to S3
-      run: ./pants run src/python/pants_release/deploy_to_s3.py
     - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Pants PEX
-      run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
-        import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
-        )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
-        \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+      name: Upload Wheel and Pex
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n\n# NB: Also upload under an unversioned name throughout the 2.18.x release\
+        \ series.\n# See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875\n\
+        curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
-        \n"
+        \ }}?name=pants.$PY_VER-$PLAT.pex \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -120,10 +128,12 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: 1.19.5
-    - env: {}
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
-    - env: {}
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -133,20 +143,35 @@ jobs:
       with:
         name: logs-wheels-and-pex-Linux-x86_64
         path: .pants.d/*.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      name: Deploy wheels to S3
-      run: ./pants run src/python/pants_release/deploy_to_s3.py
     - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Pants PEX
-      run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
-        import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
-        )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
-        \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+      name: Upload Wheel and Pex
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n\n# NB: Also upload under an unversioned name throughout the 2.18.x release\
+        \ series.\n# See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875\n\
+        curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
-        \n"
+        \ }}?name=pants.$PY_VER-$PLAT.pex \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload testutil Wheel
+      run: "WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants.testutil*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -174,7 +199,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.71.1-*
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -211,20 +236,28 @@ jobs:
       with:
         name: logs-wheels-and-pex-macOS10-15-x86_64
         path: .pants.d/*.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      name: Deploy wheels to S3
-      run: ./pants run src/python/pants_release/deploy_to_s3.py
     - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Pants PEX
-      run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
-        import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
-        )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
-        \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+      name: Upload Wheel and Pex
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n\n# NB: Also upload under an unversioned name throughout the 2.18.x release\
+        \ series.\n# See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875\n\
+        curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
-        \n"
+        \ }}?name=pants.$PY_VER-$PLAT.pex \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -252,7 +285,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.71.1-*
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -289,22 +322,32 @@ jobs:
       with:
         name: logs-wheels-and-pex-macOS11-ARM64
         path: .pants.d/*.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      name: Deploy wheels to S3
-      run: ./pants run src/python/pants_release/deploy_to_s3.py
     - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload Pants PEX
-      run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
-        import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
-        )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
-        \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+      name: Upload Wheel and Pex
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n\n# NB: Also upload under an unversioned name throughout the 2.18.x release\
+        \ series.\n# See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875\n\
+        curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
-        \n"
+        \ }}?name=pants.$PY_VER-$PLAT.pex \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
+        )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
+        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
+        \ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)\"\
+        \ \\\n    --data-binary \"@$WHL\";\n"
     timeout-minutes: 90
   publish:
+    env:
+      MODE: debug
     if: github.repository_owner == 'pantsbuild' && needs.release_info.outputs.is-release
       == 'true'
     needs:
@@ -326,30 +369,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - env:
-        MODE: debug
-      name: Fetch and stabilize wheels
-      run: ./pants run src/python/pants_release/release.py -- fetch-and-stabilize
-        --dest=dest/pypi_release
-    - name: Create Release -> Commit Mapping
-      run: 'tag="${{ needs.release_info.outputs.build-ref }}"
-
-        commit="$(git rev-parse ${tag}^{commit})"
-
-
-        echo "Recording tag ${tag} is of commit ${commit}"
-
-        mkdir -p dist/deploy/tags/pantsbuild.pants
-
-        echo "${commit}" > "dist/deploy/tags/pantsbuild.pants/${tag}"
-
-        '
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        packages-dir: dest/pypi_release
-        password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
-        skip-existing: true
     - name: Generate announcement
       run: './pants run src/python/pants_release/generate_release_announcement.py                         --
         --output-dir=${{ runner.temp }}
@@ -372,25 +391,16 @@ jobs:
         secure: true
         subject: file://${{ runner.temp }}/email_announcement_subject.txt
         to: pants-devel@googlegroups.com
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      name: Deploy commit mapping to S3
-      run: ./pants run src/python/pants_release/deploy_to_s3.py -- --scope tags/pantsbuild.pants
     - name: Get release notes
-      run: 'REF="${{ needs.release_info.outputs.build-ref }}"
-
-        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"}
-        > notes.txt
+      run: './pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref
+        }}" > notes.txt
 
         '
     - env:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
       name: Publish GitHub Release
-      run: 'gh release upload ${{ needs.release_info.outputs.build-ref }} dest/pypi_release/*
-
-        gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
+      run: 'gh release edit ${{ needs.release_info.outputs.build-ref }} --draft=false
         --notes-file notes.txt
 
         '

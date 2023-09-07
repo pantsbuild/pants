@@ -330,24 +330,6 @@ def install_protoc() -> Step:
     }
 
 
-def deploy_to_s3(
-    name: str,
-    *,
-    scope: str | None = None,
-) -> Step:
-    run = "./pants run src/python/pants_release/deploy_to_s3.py"
-    if scope:
-        run = f"{run} -- --scope {scope}"
-    return {
-        "name": name,
-        "run": run,
-        "env": {
-            "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
-            "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
-        },
-    }
-
-
 def download_apache_thrift() -> Step:
     return {
         "name": "Download Apache `thrift` binary (Linux)",
@@ -405,6 +387,14 @@ class Helper:
             ret["ARCHFLAGS"] = "-arch arm64"
         if self.platform == Platform.LINUX_ARM64:
             ret["PANTS_CONFIG_FILES"] = "+['pants.ci.toml','pants.ci.aarch64.toml']"
+        if self.platform == Platform.LINUX_X86_64:
+            # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
+            # these are weak dual-core machines. Default parallelism on those machines
+            # leads to many test timeouts. This parallelism reduction appears to lead
+            # to test shard runs that are 50% slower on average, but more likely to
+            # complete without timeouts.
+            # TODO: If we add a "redo timed out tests" feature, we can kill this.
+            ret["PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM"] = "1"
         return ret
 
     def maybe_append_cargo_test_parallelism(self, cmd: str) -> str:
@@ -874,11 +864,10 @@ def build_wheels_job(
                     "env": helper.platform_env(),
                 },
                 helper.upload_log_artifacts(name="wheels-and-pex"),
-                *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
                 *(
                     [
                         {
-                            "name": "Upload Pants PEX",
+                            "name": "Upload Wheel and Pex",
                             "if": "needs.release_info.outputs.is-release == 'true'",
                             # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
                             #   in this job. Certain variations run on docker images without `gh`,
@@ -886,18 +875,61 @@ def build_wheels_job(
                             #   support. `curl` is a good lowest-common-denominator way to upload the assets.
                             "run": dedent(
                                 """\
-                                LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
-                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
+                                PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+                                PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+                                PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+
+                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
                                 curl -L --fail \\
                                     -X POST \\
                                     -H "Authorization: Bearer ${{ github.token }}" \\
                                     -H "Content-Type: application/octet-stream" \\
-                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$LOCAL_TAG.pex \\
-                                    --data-binary "@dist/src.python.pants/pants.$LOCAL_TAG.pex"
+                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \\
+                                    --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+                                # NB: Also upload under an unversioned name throughout the 2.18.x release series.
+                                # See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$PY_VER-$PLAT.pex \\
+                                    --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+                                WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \\
+                                    --data-binary "@$WHL";
                                 """
                             ),
-                        }
+                        },
+                        *(
+                            [
+                                {
+                                    "name": "Upload testutil Wheel",
+                                    "if": "needs.release_info.outputs.is-release == 'true'",
+                                    # NB: See above about curl
+                                    "run": dedent(
+                                        """\
+                                        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants.testutil*.whl")
+                                        curl -L --fail \\
+                                            -X POST \\
+                                            -H "Authorization: Bearer ${{ github.token }}" \\
+                                            -H "Content-Type: application/octet-stream" \\
+                                            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \\
+                                            --data-binary "@$WHL";
+                                """
+                                    ),
+                                },
+                            ]
+                            if platform == Platform.LINUX_X86_64
+                            else []
+                        ),
                     ]
                     if for_deploy_ref
                     else []
@@ -1054,10 +1086,8 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
 
 def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
-    """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
     inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
-    pypi_release_dir = "dest/pypi_release"
     helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
         needs=["release_info"], for_deploy_ref=gha_expr("needs.release_info.outputs.build-ref")
@@ -1139,6 +1169,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "runs-on": "ubuntu-latest",
             "needs": [*wheels_job_names, "release_info"],
             "if": f"{IS_PANTS_OWNER} && needs.release_info.outputs.is-release == 'true'",
+            "env": {
+                # This job does not actually build anything: only download wheels from S3.
+                "MODE": "debug",
+            },
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
@@ -1152,41 +1186,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
-                {
-                    "name": "Fetch and stabilize wheels",
-                    "run": f"./pants run src/python/pants_release/release.py -- fetch-and-stabilize --dest={pypi_release_dir}",
-                    "env": {
-                        # This step does not actually build anything: only download wheels from S3.
-                        "MODE": "debug",
-                    },
-                },
-                {
-                    "name": "Create Release -> Commit Mapping",
-                    # The `git rev-parse` subshell below is used to obtain the tagged commit sha.
-                    # The syntax it uses is tricky, but correct. The literal suffix `^{commit}` gets
-                    # the sha of the commit object that is the tag's target (as opposed to the sha
-                    # of the tag object itself). Due to Python f-strings, the nearness of shell
-                    # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
-                    "run": dedent(
-                        f"""\
-                        tag="{gha_expr("needs.release_info.outputs.build-ref")}"
-                        commit="$(git rev-parse ${{tag}}^{{commit}})"
-
-                        echo "Recording tag ${{tag}} is of commit ${{commit}}"
-                        mkdir -p dist/deploy/tags/pantsbuild.pants
-                        echo "${{commit}}" > "dist/deploy/tags/pantsbuild.pants/${{tag}}"
-                        """
-                    ),
-                },
-                {
-                    "name": "Publish to PyPI",
-                    "uses": "pypa/gh-action-pypi-publish@release/v1",
-                    "with": {
-                        "password": gha_expr("secrets.PANTSBUILD_PYPI_API_TOKEN"),
-                        "packages-dir": pypi_release_dir,
-                        "skip-existing": True,
-                    },
-                },
                 {
                     "name": "Generate announcement",
                     "run": dedent(
@@ -1225,16 +1224,11 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         "convert_markdown": True,
                     },
                 },
-                deploy_to_s3(
-                    "Deploy commit mapping to S3",
-                    scope="tags/pantsbuild.pants",
-                ),
                 {
                     "name": "Get release notes",
                     "run": dedent(
                         """\
-                        REF="${{ needs.release_info.outputs.build-ref }}"
-                        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"} > notes.txt
+                        ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
                         """
                     ),
                 },
@@ -1246,7 +1240,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "run": dedent(
                         f"""\
-                        gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}/*
                         gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false --notes-file notes.txt
                         """
                     ),
@@ -1367,7 +1360,10 @@ PUBLIC_REPOS = [
         # skip check
         goals=[DefaultGoals.tailor_update_build_files, "lint ::", DefaultGoals.test],
     ),
+    # other pants' managed repos
+    Repo(name="pantsbuild/scie-pants", python_version="3.9"),
     # public repos
+    Repo(name="AlexTereshenkov/cheeseshop-query", python_version="3.9"),
     Repo(name="Ars-Linguistica/mlconjug3", goals=[DefaultGoals.package]),
     Repo(
         name="fucina/treb",
@@ -1388,12 +1384,12 @@ PUBLIC_REPOS = [
     Repo(name="komprenilo/liga", python_version="3.9", goals=[DefaultGoals.package]),
     Repo(
         name="lablup/backend.ai",
-        python_version="3.11.3",
+        python_version="3.11.4",
         setup_commands="mkdir .tmp",
         goals=[
             DefaultGoals.tailor_update_build_files,
             DefaultGoals.lint_check,
-            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::",
+            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::",
             DefaultGoals.package,
         ],
     ),

@@ -40,7 +40,6 @@ from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.ipython import IPython
-from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setuptools import Setuptools
@@ -51,6 +50,7 @@ from pants.backend.python.typecheck.pytype.subsystem import Pytype
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.backend.tools.semgrep.subsystem import SemgrepSubsystem
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.base.build_environment import get_buildroot
 from pants.jvm.resolve.jvm_tool import JvmToolBase
@@ -114,7 +114,6 @@ all_python_tools = tuple(
             PythonTool(HelmPostRendererSubsystem, "pants.backend.experimental.helm"),
             PythonTool(IPython, "pants.backend.python"),
             PythonTool(Isort, "pants.backend.python.lint.isort"),
-            PythonTool(Lambdex, "pants.backend.awslambda.python", "CPython>=3.7,<3.12"),
             PythonTool(MyPy, "pants.backend.python.typecheck.mypy"),
             PythonTool(Pydocstyle, "pants.backend.python.lint.pydocstyle"),
             PythonTool(PyTest, "pants.backend.python"),
@@ -124,6 +123,7 @@ all_python_tools = tuple(
             PythonTool(Pytype, "pants.backend.python.typecheck.pytype", "CPython>=3.7,<3.11"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
             PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff"),
+            PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
             PythonTool(TerraformHcl2Parser, "pants.backend.experimental.terraform"),

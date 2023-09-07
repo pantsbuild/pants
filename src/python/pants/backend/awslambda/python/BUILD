@@ -11,6 +11,4 @@ python_tests(
     name="rules_test",
     sources=["rules_test.py"],
     timeout=300,
-    # We want to make sure the default lockfile works for both macOS and Linux.
-    tags=["platform_specific_behavior"],
 )

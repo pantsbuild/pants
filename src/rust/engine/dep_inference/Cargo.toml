@@ -1,28 +1,28 @@
 [package]
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 name = "dep_inference"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [build-dependencies]
-sha2 = "0.10"
-walkdir = "2"
-hex = "0.4.3"
+hex = { workspace = true }
+sha2 = { workspace = true }
+walkdir = { workspace = true }
 
 # NB: If a change to these versions requires cache busting, bump this package's version
-tree-sitter = "0.20.10"
-tree-sitter-python = "0.20.2"
-tree-sitter-javascript = "0.20.0"
+tree-sitter = { workspace = true }
+tree-sitter-javascript = { workspace = true }
+tree-sitter-python = { workspace = true }
 
 [dependencies]
-fnv = "1.0.5"
+fnv = { workspace = true }
 protos = { path = "../protos" }
-serde = "1.0.136"
-serde_derive = "1.0"
-itertools = "0.10.0"
+serde = { workspace = true }
+serde_derive = { workspace = true }
+itertools = { workspace = true }
 
 # NB: If a change to these versions requires cache busting, bump this package's version
-tree-sitter = "0.20.10"
-tree-sitter-python = "0.20.2"
-tree-sitter-javascript = "0.20.0"
+tree-sitter = { workspace = true }
+tree-sitter-javascript = { workspace = true }
+tree-sitter-python = { workspace = true }

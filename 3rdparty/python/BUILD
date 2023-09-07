@@ -41,7 +41,7 @@ __dependents_rules__(
             "[strawberry-graphql]",
             "[uvicorn]",
         ),
-        "src/python/pants/explorer/server/**",
+        "pants-plugins/pants_explorer/server/**",
         "!*",
     ),
     # Free for all on the rest

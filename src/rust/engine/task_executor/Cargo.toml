@@ -6,10 +6,10 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-futures = "0.3"
-itertools = "0.10"
-log = "0.4"
-parking_lot = "0.12"
+futures = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
 stdio = { path = "../stdio" }
-tokio = { version = "1.28", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 workunit_store = { path = "../workunit_store" }

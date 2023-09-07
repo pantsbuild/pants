@@ -6,33 +6,33 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-async-stream = "0.3"
-async-trait = "0.1"
-async-lock = "2.5"
-futures = "0.3"
-log = "0.4"
-nails = "0.13"
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+nails = { workspace = true }
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
-tokio = { version = "1.28", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-rustls = "0.23"
-tokio-util = { version = "0.7", features = ["codec"] }
+tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
-itertools = "0.10"
+itertools = { workspace = true }
 process_execution = { path = ".." }
-lazy_static = "1"
-regex = "1"
-tempfile = "3.5.0"
+lazy_static = { workspace = true }
+regex = { workspace = true }
+tempfile = { workspace = true }
 hashing = { path = "../../hashing" }
 
 
 [dev-dependencies]
-env_logger = "0.10.0"
-maplit = "1.0.1"
+env_logger = { workspace = true }
+maplit = { workspace = true }
 mock = { path = "../../testutil/mock" }
-parking_lot = "0.12"
+parking_lot = { workspace = true }
 sharded_lmdb = { path = "../../sharded_lmdb" }
-tempfile = "3.5.0"
+tempfile = { workspace = true }
 testutil = { path = "../../testutil" }
-tokio = { version = "1.28", features = ["macros"] }
+tokio = { workspace = true, features = ["macros"] }
 process_execution = { path = ".." }

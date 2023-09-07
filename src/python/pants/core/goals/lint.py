@@ -8,6 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Iterable, Iterator, Sequence, TypeVar, cast
 
+import colors
 from typing_extensions import Protocol, final
 
 from pants.base.specs import Specs
@@ -68,9 +69,12 @@ class LintResult(EngineAwareReturnType):
         *,
         strip_chroot_path: bool = False,
         report: Digest = EMPTY_DIGEST,
+        strip_formatting: bool = False,
     ) -> LintResult:
         def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
+            chroot = strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
+            formatting = cast(str, colors.strip_color(chroot)) if strip_formatting else chroot
+            return formatting
 
         return cls(
             exit_code=process_result.exit_code,
