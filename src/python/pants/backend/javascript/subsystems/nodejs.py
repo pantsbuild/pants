@@ -601,6 +601,15 @@ async def setup_node_tool_process(
     )
 
 
+class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
+    pass
+
+
+@rule(level=LogLevel.DEBUG)
+async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolveAliases:
+    return UserChosenNodeJSResolveAliases((value, key) for key, value in nodejs.resolves.items())
+
+
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),

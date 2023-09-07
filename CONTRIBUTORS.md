@@ -48,6 +48,7 @@ Created as part of the release process.
 + Chris Pesto
 + Chris Targett
 + Chris Williams
++ Christoph Proeschel
 + Christopher Livingston
 + Christopher Maier
 + Christopher Neugebauer
@@ -102,6 +103,7 @@ Created as part of the release process.
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Gautham Nair
 + Gerald Spencer
 + Gordon Cassie
 + Greg Shuflin
@@ -202,6 +204,7 @@ Created as part of the release process.
 + Matt Landis
 + Matt Olsen
 + Matthew Jeffryes
++ Matthias Berndt
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty

@@ -23,7 +23,7 @@ from pants.engine.fs import (
     RemovePrefix,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult, ProductDescription
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
@@ -35,7 +35,6 @@ from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
-from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -293,23 +292,18 @@ async def analyze_scala_source_dependencies(
 @rule(level=LogLevel.DEBUG)
 async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleScalaSourceDependencyAnalysisResult,
-    keep_sandboxes: KeepSandboxes,
 ) -> ScalaSourceDependencyAnalysis:
-    # TODO(#12725): Just convert directly to a ProcessResult like this:
-    # result = await Get(ProcessResult, FallibleProcessResult, fallible_result.process_result)
-    if fallible_result.process_result.exit_code == 0:
-        analysis_contents = await Get(
-            DigestContents, Digest, fallible_result.process_result.output_digest
-        )
-        analysis = json.loads(analysis_contents[0].content)
-        return ScalaSourceDependencyAnalysis.from_json_dict(analysis)
-    raise ProcessExecutionFailure(
-        fallible_result.process_result.exit_code,
-        fallible_result.process_result.stdout,
-        fallible_result.process_result.stderr,
-        "Scala source dependency analysis failed.",
-        keep_sandboxes=keep_sandboxes,
+    description = ProductDescription("Scala source dependency analysis failed.")
+    result = await Get(
+        ProcessResult,
+        {
+            fallible_result.process_result: FallibleProcessResult,
+            description: ProductDescription,
+        },
     )
+    analysis_contents = await Get(DigestContents, Digest, result.output_digest)
+    analysis = json.loads(analysis_contents[0].content)
+    return ScalaSourceDependencyAnalysis.from_json_dict(analysis)
 
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
@@ -409,7 +403,7 @@ def generate_scala_parser_lockfile_request(
     return GenerateJvmLockfileFromTool(
         artifact_inputs=FrozenOrderedSet(
             {
-                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.4.30",
+                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.8.7",
                 f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
                 f"org.scala-lang:scala-library:{_PARSER_SCALA_VERSION}",
             }

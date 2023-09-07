@@ -323,7 +323,9 @@ async def export_virtualenv_for_resolve(
     resolve = request.resolve
     lockfile_path = python_setup.resolves.get(resolve)
     if not lockfile_path:
-        raise ExportError(f"No resolve named {resolve} found in [python_setup].resolves.")
+        raise ExportError(
+            f"No resolve named {resolve} found in [{python_setup.options_scope}].resolves."
+        )
     lockfile = Lockfile(
         url=lockfile_path,
         url_description_of_origin=f"the resolve `{resolve}`",

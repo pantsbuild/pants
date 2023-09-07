@@ -16,7 +16,7 @@ from pants.backend.javascript.package_json import (
     PnpmWorkspaces,
 )
 from pants.backend.javascript.subsystems import nodejs
-from pants.backend.javascript.subsystems.nodejs import NodeJS
+from pants.backend.javascript.subsystems.nodejs import NodeJS, UserChosenNodeJSResolveAliases
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.collection import Collection
@@ -25,7 +25,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, softwrap
 
 
 @dataclass(frozen=True)
@@ -123,7 +123,10 @@ class NodeJSProject:
 
     @classmethod
     def from_tentative(
-        cls, project: _TentativeProject, nodejs: NodeJS, pnpm_workspaces: PnpmWorkspaces
+        cls,
+        project: _TentativeProject,
+        nodejs: NodeJS,
+        pnpm_workspaces: PnpmWorkspaces,
     ) -> NodeJSProject:
         root_ws = project.root_workspace()
         package_manager: str | None = None
@@ -163,7 +166,7 @@ class NodeJSProject:
         return NodeJSProject(
             root_dir=project.root_dir,
             workspaces=project.workspaces,
-            default_resolve_name=project.default_resolve_name,
+            default_resolve_name=project.default_resolve_name or "nodejs-default",
             package_manager=package_manager_command,
             package_manager_version=package_manager_version,
             pnpm_workspace=pnpm_workspaces.for_root(project.root_dir),
@@ -206,7 +209,10 @@ async def _get_default_resolve_name(path: str) -> str:
 
 @rule
 async def find_node_js_projects(
-    package_workspaces: AllPackageJson, pnpm_workspaces: PnpmWorkspaces, nodejs: NodeJS
+    package_workspaces: AllPackageJson,
+    pnpm_workspaces: PnpmWorkspaces,
+    nodejs: NodeJS,
+    resolve_names: UserChosenNodeJSResolveAliases,
 ) -> AllNodeJSProjects:
     project_paths = (
         ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
@@ -224,9 +230,41 @@ async def find_node_js_projects(
         for paths in project_paths
     }
     merged_projects = _merge_workspaces(node_js_projects)
-    return AllNodeJSProjects(
+    all_projects = AllNodeJSProjects(
         NodeJSProject.from_tentative(p, nodejs, pnpm_workspaces) for p in merged_projects
     )
+    _ensure_resolve_names_are_unique(all_projects, resolve_names)
+
+    return all_projects
+
+
+_AMBIGUOUS_RESOLVE_SOLUTIONS = [
+    f"Configure [{NodeJS.options_scope}].resolves to grant the package.json directories different names.",
+    "Make one package a workspace of the other.",
+    "Re-configure your source root(s).",
+]
+
+
+def _ensure_resolve_names_are_unique(
+    all_projects: AllNodeJSProjects, resolve_names: UserChosenNodeJSResolveAliases
+) -> None:
+    seen: dict[str, NodeJSProject] = {}
+    for project in all_projects:
+        resolve_name = resolve_names.get(project.root_dir, project.default_resolve_name)
+        seen_project = seen.get(resolve_name)
+        if seen_project:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Projects with root directories '{project.root_dir}' and '{seen_project.root_dir}'
+                    have the same resolve name {resolve_name}. This will cause ambiguities.
+
+                    To disambiguate, either:\n\n
+                    {bullet_list(_AMBIGUOUS_RESOLVE_SOLUTIONS)}
+                    """
+                )
+            )
+        seen[resolve_name] = project
 
 
 def _project_to_parents(

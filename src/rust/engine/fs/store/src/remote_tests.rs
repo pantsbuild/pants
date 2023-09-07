@@ -251,7 +251,7 @@ async fn vec_as_load_destination_reset() {
   let mut vec: Vec<u8> = b"initial".to_vec();
 
   vec.reset().await.unwrap();
-  assert_eq!(vec, []);
+  assert!(vec.is_empty());
 }
 
 fn new_byte_store(data: &TestData) -> ByteStore {

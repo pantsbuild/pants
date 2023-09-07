@@ -188,7 +188,7 @@ async def parse_python_dependencies(
     if not python_infer_subsystem.options.is_default("use_rust_parser"):
         # NB: In 2.19, we remove the option altogether and remove the old code.
         warn_or_error(
-            removal_version="2.19.0.dev0",
+            removal_version="2.19.0.dev2",
             entity="Explicitly providing [python-infer].use_rust_parser",
             hint=softwrap(
                 f"""

@@ -183,12 +183,8 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
 ) -> InferredDependencies:
-    chart_address = None
-    chart_address_input = request.field_set.chart.to_address_input()
-    if chart_address_input:
-        chart_address = await Get(Address, AddressInput, chart_address_input)
-
-    explicitly_provided_deps, mapping = await MultiGet(
+    chart_address, explicitly_provided_deps, mapping = await MultiGet(
+        Get(Address, AddressInput, request.field_set.chart.to_address_input()),
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
         Get(
             FirstPartyHelmDeploymentMapping,
@@ -197,8 +193,8 @@ async def inject_deployment_dependencies(
     )
 
     dependencies: OrderedSet[Address] = OrderedSet()
-    if chart_address:
-        dependencies.add(chart_address)
+    dependencies.add(chart_address)
+
     for imager_ref, candidate_address in mapping.indexed_docker_addresses.values():
         matches = frozenset([candidate_address]).difference(explicitly_provided_deps.includes)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(

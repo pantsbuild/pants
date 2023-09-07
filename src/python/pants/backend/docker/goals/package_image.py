@@ -313,6 +313,7 @@ def get_build_options(
     field_set: DockerPackageFieldSet,
     global_target_stage_option: str | None,
     global_build_hosts_options: dict | None,
+    global_build_no_cache_option: bool | None,
     target: Target,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
@@ -354,6 +355,9 @@ def get_build_options(
 
     if target_stage:
         yield from ("--target", target_stage)
+
+    if global_build_no_cache_option:
+        yield "--no-cache"
 
 
 @rule
@@ -418,6 +422,7 @@ async def build_docker_image(
                 field_set=field_set,
                 global_target_stage_option=options.build_target_stage,
                 global_build_hosts_options=options.build_hosts,
+                global_build_no_cache_option=options.build_no_cache,
                 target=wrapped_target.target,
             )
         ),

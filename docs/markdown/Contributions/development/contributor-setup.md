@@ -28,6 +28,14 @@ Step 2: Bootstrap the Rust engine
 
 Pants uses Rustup to install Rust. Run the command from <https://rustup.rs> to install Rustup; ensure that `rustup` is on your `$PATH`.
 
+If your system Python is not the version Pants expects (currently Python 3.9), you'll need to provide one.  Python interpreters from Linux or Mac distributions sometimes have quirks that can cause headaches with bootstrapping the dev venv.  Some examples of Pythons that work well with Pants are those provided by:
+- [Fedora](https://packages.fedoraproject.org/pkgs/python3.9/python3.9/)
+- [ASDF](https://github.com/asdf-community/asdf-python)
+- [PyEnv](https://github.com/pyenv/pyenv)
+Providers that sometimes cause issues include:
+- Ubuntu Deadsnakes
+You also need to have the protobuf compiler and LLVM clang installed. On Debian derivatives, these can be installed using `apt install clang protobuf-compiler`.
+
 Then, run `pants` to set up the Python virtual environment and compile the engine.
 
 > 🚧 This will take several minutes

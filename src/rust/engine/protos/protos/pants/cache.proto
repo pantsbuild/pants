@@ -22,7 +22,10 @@ message DependencyInferenceRequest {
   oneof metadata {
     JavascriptInferenceMetadata js = 2;
   }
+  // Ensure using this as a cache key reflects everything that might influence the output: inference
+  // implementation inside Pants, and the input's file location (if there's any relative imports)
   string impl_hash = 3;
+  string input_file_path = 4;
 }
 
 
