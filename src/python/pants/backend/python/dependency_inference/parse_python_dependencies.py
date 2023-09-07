@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
@@ -11,8 +10,6 @@ from typing import Iterable
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_environment import PythonExecutable
-from pants.base.deprecated import warn_or_error
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.collection import DeduplicatedCollection
@@ -20,10 +17,8 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 from pants.engine.internals.native_engine import NativeDependenciesRequest
-from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -177,90 +172,39 @@ async def general_parser_script(
 @rule(level=LogLevel.DEBUG)
 async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
-    parser_script: ParserScript,
-    union_membership: UnionMembership,
     python_infer_subsystem: PythonInferSubsystem,
 ) -> ParsedPythonDependencies:
     stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.source]))
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
 
-    if not python_infer_subsystem.options.is_default("use_rust_parser"):
-        # NB: In 2.19, we remove the option altogether and remove the old code.
-        warn_or_error(
-            removal_version="2.19.0.dev2",
-            entity="Explicitly providing [python-infer].use_rust_parser",
-            hint=softwrap(
-                f"""
-                Read the help for [python-infer].use_rust_parser
-                <{doc_url('reference-python-infer#use_rust_parser')}>, then stop setting the value
-                in pants.toml.
-                """
-            ),
-        )
-
-    has_custom_dep_inferences = len(union_membership[PythonDependencyVisitorRequest]) > 1
-    if python_infer_subsystem.use_rust_parser and not has_custom_dep_inferences:
-        native_result = await Get(
-            NativeParsedPythonDependencies,
-            NativeDependenciesRequest(stripped_sources.snapshot.digest),
-        )
-        imports = dict(native_result.imports)
-        assets = set()
-
-        if python_infer_subsystem.string_imports or python_infer_subsystem.assets:
-            for string, line in native_result.string_candidates.items():
-                slash_count = string.count("/")
-                if (
-                    python_infer_subsystem.string_imports
-                    and not slash_count
-                    and string.count(".") >= python_infer_subsystem.string_imports_min_dots
-                ):
-                    imports.setdefault(string, (line, True))
-                if (
-                    python_infer_subsystem.assets
-                    and slash_count >= python_infer_subsystem.assets_min_slashes
-                ):
-                    assets.add(string)
-
-        return ParsedPythonDependencies(
-            ParsedPythonImports(
-                (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
-            ),
-            ParsedPythonAssetPaths(sorted(assets)),
-        )
-
-    file = stripped_sources.snapshot.files[0]
-
-    python_interpreter, input_digest = await MultiGet(
-        Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
-        Get(Digest, MergeDigests([parser_script.digest, stripped_sources.snapshot.digest])),
+    native_result = await Get(
+        NativeParsedPythonDependencies,
+        NativeDependenciesRequest(stripped_sources.snapshot.digest),
     )
-    process_result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                python_interpreter.path,
-                "pants/backend/python/dependency_inference/scripts/main.py",
-                file,
-            ],
-            input_digest=input_digest,
-            append_only_caches=python_interpreter.append_only_caches,
-            description=f"Determine Python dependencies for {request.source.address}",
-            env=parser_script.env,
-            level=LogLevel.DEBUG,
-        ),
-    )
-    # See in script for where we explicitly encoded as utf8. Even though utf8 is the
-    # default for decode(), we make that explicit here for emphasis.
-    process_output = process_result.stdout.decode("utf8") or "{}"
-    output = json.loads(process_output)
+    imports = dict(native_result.imports)
+    assets = set()
+
+    if python_infer_subsystem.string_imports or python_infer_subsystem.assets:
+        for string, line in native_result.string_candidates.items():
+            slash_count = string.count("/")
+            if (
+                python_infer_subsystem.string_imports
+                and not slash_count
+                and string.count(".") >= python_infer_subsystem.string_imports_min_dots
+            ):
+                imports.setdefault(string, (line, True))
+            if (
+                python_infer_subsystem.assets
+                and slash_count >= python_infer_subsystem.assets_min_slashes
+            ):
+                assets.add(string)
 
     return ParsedPythonDependencies(
-        imports=ParsedPythonImports(
-            (key, ParsedPythonImportInfo(**val)) for key, val in output.get("imports", {}).items()
+        ParsedPythonImports(
+            (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
         ),
-        assets=ParsedPythonAssetPaths(output.get("assets", [])),
+        ParsedPythonAssetPaths(sorted(assets)),
     )
 
 
