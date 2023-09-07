@@ -5,7 +5,6 @@ pkgs.mkShell {
     curl
     git
     python39
-    clang
     rustup
     protobuf
   ];
