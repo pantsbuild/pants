@@ -52,7 +52,7 @@ NOTE: `PANTS_DEBUG` doesn't work with the pants daemon, so `--no-pantsd` must be
 Debugging `rule` code with a debugger in PyCharm
 ----------------------
 
-You'll have to follow a different procedure until Pycharm adds Debug-Adapter support:
+You'll have to follow a different procedure until PyCharm adds Debug-Adapter support:
 
 1. Add a requirement on `pydevd-pycharm` in your local clone of the pants source in [3rdpart/python/requirements.txt](https://github.com/pantsbuild/pants/blob/main/3rdparty/python/requirements.txt)
 2. Add this snippet where you want to break:
