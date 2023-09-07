@@ -363,10 +363,10 @@ jobs:
       with:
         fetch-depth: '0'
         ref: ${{ needs.release_info.outputs.build-ref }}
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Generate announcement

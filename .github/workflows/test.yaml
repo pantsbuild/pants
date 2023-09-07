@@ -113,10 +113,10 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -215,10 +215,10 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -611,10 +611,10 @@ jobs:
         \                 --max_size 30\necho \"PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092\" >> \"$GITHUB_ENV\"\necho\
         \ \"PANTS_REMOTE_CACHE_READ=true\" >> \"$GITHUB_ENV\"\necho \"PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}\" >> \"$GITHUB_ENV\"\
         \n"
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Download native binaries
       uses: actions/download-artifact@v3
       with:
@@ -786,10 +786,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -877,10 +877,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -968,10 +968,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1059,10 +1059,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1150,10 +1150,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1241,10 +1241,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1332,10 +1332,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1423,10 +1423,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1514,10 +1514,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1605,10 +1605,10 @@ jobs:
         echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
@@ -1663,10 +1663,10 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Set up Python 3.9
+    - name: Set up Python 3.9.18
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9.18
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries

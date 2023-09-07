@@ -78,9 +78,9 @@ NATIVE_FILES = [
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
 
-# We don't specify a patch version so that we get the latest, which comes pre-installed:
-#  https://github.com/actions/setup-python#available-versions-of-python
-PYTHON_VERSION = "3.9"
+# We specify a patch version because Github runners upgrade their versions incrementally: some
+# runners might be on 3.9.17 while others are on 3.9.18
+PYTHON_VERSION = "3.9.18"
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "needs.classify_changes.outputs.release == 'true'"
