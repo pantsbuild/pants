@@ -66,7 +66,7 @@ DEFAULT_MODULE_MAPPING = {
     "azure-synapse-accesscontrol": ("azure.synapse.accesscontrol",),
     "beautifulsoup4": ("bs4",),
     "bitvector": ("BitVector",),
-    "cattrs": ("cattr",),
+    "cattrs": ("cattr", "cattrs"),
     "django-admin-cursor-paginator": ("admin_cursor_paginator",),
     "django-cors-headers": ("corsheaders",),
     "django-csp": ("csp",),
