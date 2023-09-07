@@ -29,6 +29,7 @@ function calculate_current_hash() {
   # Assumes that PY is set to the path to the interpreter that will be used to build the
   # native engine. We only use this to extract the full Python version, so this can point
   # to a raw interpreter, not necessarily one in a venv with Pants requirements installed.
+  echo "calculate_current_hash" 1>&2
   (
     cd "${REPO_ROOT}" || exit 1
     (
@@ -42,6 +43,6 @@ function calculate_current_hash() {
         "${REPO_ROOT}/build-support/bin/rust" |
         grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" |
         git hash-object --stdin-paths
-    ) | fingerprint_data
+    ) | tee /dev/stderr | fingerprint_data
   )
 }

@@ -50,9 +50,11 @@ function bootstrap_native_code() {
   # Bootstraps the native code only if needed.
   local engine_version_calculated
   engine_version_calculated="$(calculate_current_hash)"
+  echo "engine_version_calculated=$engine_version_calculated"
   local engine_version_in_metadata
   if [[ -f "${NATIVE_ENGINE_RESOURCE_METADATA}" ]]; then
-    engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
+      engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
+      echo "engine_version_in_metadata=$engine_version_in_metadata"
   fi
 
   if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f "${NATIVE_CLIENT_BINARY}" &&
@@ -85,8 +87,8 @@ function bootstrap_native_code() {
 
   # Create the accompanying metadata file.
   local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
-  echo "engine_version: ${engine_version_calculated}" > "${metadata_file}"
-  echo "repo_version: $(git describe --dirty)" >> "${metadata_file}"
+  echo "engine_version: ${engine_version_calculated}" | tee "${metadata_file}"
+  echo "repo_version: $(git describe --dirty)" | tee -a "${metadata_file}"
 
   # Here we set up a file lock via bash tricks to avoid concurrent `mv` failing.
   if {
