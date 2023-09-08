@@ -17,7 +17,7 @@ use fs::{
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
-use mock::StubCAS;
+use mock::{RequestType, StubCAS};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
@@ -151,7 +151,7 @@ async fn load_file_prefers_local() {
     .await,
     Ok(testdata.bytes())
   );
-  assert_eq!(0, cas.read_request_count());
+  assert_eq!(0, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -179,7 +179,7 @@ async fn load_directory_prefers_local() {
       .unwrap(),
     testdir.directory()
   );
-  assert_eq!(0, cas.read_request_count());
+  assert_eq!(0, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -198,7 +198,7 @@ async fn load_file_falls_back_and_backfills() {
     Ok(testdata.bytes()),
     "Read from CAS"
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert_eq!(
     crate::local_tests::load_file_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -232,7 +232,7 @@ async fn load_file_falls_back_and_backfills_for_huge_file() {
     .unwrap(),
     testdata.bytes()
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert!(
     crate::local_tests::load_file_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -260,7 +260,7 @@ async fn load_directory_falls_back_and_backfills() {
       .unwrap(),
     testdir.directory()
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert_eq!(
     crate::local_tests::load_directory_proto_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -336,7 +336,7 @@ async fn load_file_missing_is_none() {
   )
   .await;
   assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -349,7 +349,7 @@ async fn load_directory_missing_errors() {
     .load_directory(TestDirectory::containing_roland().digest())
     .await;
   assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -365,9 +365,9 @@ async fn load_file_remote_error_is_error() {
   .await
   .expect_err("Want error");
   assert!(
-    cas.read_request_count() > 0,
+    cas.request_count(RequestType::BSRead) > 0,
     "Want read_request_count > 0 but got {}",
-    cas.read_request_count()
+    cas.request_count(RequestType::BSRead)
   );
   assert!(
     error
@@ -389,9 +389,9 @@ async fn load_directory_remote_error_is_error() {
     .await
     .expect_err("Want error");
   assert!(
-    cas.read_request_count() > 0,
+    cas.request_count(RequestType::BSRead) > 0,
     "Want read_request_count > 0 but got {}",
-    cas.read_request_count()
+    cas.request_count(RequestType::BSRead)
   );
   assert!(
     error

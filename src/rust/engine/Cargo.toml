@@ -297,11 +297,14 @@ tonic-build = "0.9"
 tower = "0.4"
 tower-layer = "0.3"
 tower-service = "0.3"
-tree-sitter = "0.20.10"
-tree-sitter-javascript = "0.20.0"
-tree-sitter-python = "0.20.4"
 uname = "0.1.1"
 url = "2.4"
 uuid = "1.1.2"
 walkdir = "2"
 webpki = "0.22"
+
+# NB: If a change to these versions requires cache busting, bump the version of
+# `src/rust/engine/dep_inference/Cargo.toml`.
+tree-sitter = "0.20.10"
+tree-sitter-javascript = "0.20.0"
+tree-sitter-python = "0.20.4"
