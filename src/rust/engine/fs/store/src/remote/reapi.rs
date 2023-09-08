@@ -144,45 +144,45 @@ impl Provider {
     let error_occurred = Arc::new(parking_lot::Mutex::new(None));
     let error_occurred_stream = error_occurred.clone();
 
-    let stream = if len == 0 {
-      // if the reader is empty, the ReaderStream gives no elements, but we have to write at least
-      // one.
-      futures::stream::once(futures::future::ready(
-        protos::gen::google::bytestream::WriteRequest {
+    let chunk_size_bytes = self.chunk_size_bytes;
+    let stream = async_stream::stream! {
+      if len == 0 {
+        // if the reader is empty, the ReaderStream gives no elements, but we have to write at least
+        // one.
+        yield protos::gen::google::bytestream::WriteRequest {
           resource_name: resource_name.clone(),
           write_offset: 0,
           finish_write: true,
           data: Bytes::new(),
-        },
-      ))
-      .boxed()
-    } else {
-      // Read the source in appropriately sized chunks.
-      // NB. it is possible that this doesn't fill each chunk fully (i.e. may not send
-      // `chunk_size_bytes` in each request). For the usual sources, this should be unlikely.
-      tokio_util::io::ReaderStream::with_capacity(source, self.chunk_size_bytes)
-        .scan(0, move |num_seen_bytes, read_result| {
-          futures::future::ready(match read_result {
-            Ok(data) => {
-              let write_offset = *num_seen_bytes as i64;
-              *num_seen_bytes += data.len();
+        };
+      } else {
+        // Read the source in appropriately sized chunks.
+        // NB. it is possible that this doesn't fill each chunk fully (i.e. may not send
+        // `chunk_size_bytes` in each request). For the usual sources, this should be unlikely.
+        let reader_stream = tokio_util::io::ReaderStream::with_capacity(source, chunk_size_bytes);
+        let mut num_seen_bytes = 0;
 
-              Some(protos::gen::google::bytestream::WriteRequest {
+        for await read_result in reader_stream {
+          match read_result {
+            Ok(data) => {
+              let write_offset = num_seen_bytes as i64;
+              num_seen_bytes += data.len();
+              yield protos::gen::google::bytestream::WriteRequest {
                 resource_name: resource_name.clone(),
                 write_offset,
-                finish_write: *num_seen_bytes == len,
+                finish_write: num_seen_bytes == len,
                 data,
-              })
-            }
+              }
+            },
             Err(err) => {
               // reading locally hit an error, so store it for re-processing below
               *error_occurred_stream.lock() = Some(err);
               // cut off here, no point continuing
-              None
+              break;
             }
-          })
-        })
-        .boxed()
+          }
+        }
+      }
     };
 
     // NB: We must box the future to avoid a stack overflow.

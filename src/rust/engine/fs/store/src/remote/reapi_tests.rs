@@ -387,7 +387,7 @@ async fn store_bytes_write_stream_grpc_error() {
   let digest = Digest::new(fingerprint, all_the_henries.len());
 
   let error = provider
-    .store_bytes(digest, byte_source(all_the_henries))
+    .store_bytes(digest, all_the_henries)
     .await
     .expect_err("Want err");
   assert!(
