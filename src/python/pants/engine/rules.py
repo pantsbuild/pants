@@ -11,7 +11,6 @@ from enum import Enum
 from types import FrameType, ModuleType
 from typing import (
     Any,
-    Awaitable,
     Callable,
     Coroutine,
     Iterable,
@@ -61,7 +60,7 @@ class RuleType(Enum):
 P = ParamSpec("P")
 R = TypeVar("R")
 SyncRuleT = Callable[P, R]
-AsyncRuleT = Callable[P, Awaitable[R]]
+AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
 RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
 
 
@@ -368,7 +367,9 @@ def rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
 
 
 @overload
-def rule(func: None = None, **kwargs: Any) -> RuleDecorator:
+def rule(
+    *args, func: None = None, **kwargs: Any
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
     ...
 
 
@@ -376,7 +377,24 @@ def rule(*args, **kwargs):
     return inner_rule(*args, **kwargs, rule_type=RuleType.rule, cacheable=True)
 
 
-def goal_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
+@overload
+def goal_rule(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+
+@overload
+def goal_rule(func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
+    ...
+
+
+@overload
+def goal_rule(
+    *args, func: None = None, **kwargs: Any
+) -> Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]:
+    ...
+
+
+def goal_rule(*args, **kwargs):
     if "level" not in kwargs:
         kwargs["level"] = LogLevel.DEBUG
     return inner_rule(*args, **kwargs, rule_type=RuleType.goal_rule, cacheable=False)
