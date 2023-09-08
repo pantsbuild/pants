@@ -121,10 +121,9 @@ def generate_argv(
     isort: Isort,
     *,
     is_isort5: bool,
-    source_roots,
     direct_dep_modules: set[str],
 ) -> Tuple[str, ...]:
-    args = [*isort.args, "-p=pants"]
+    args = [*isort.args]
     if is_isort5 and len(isort.config) == 1:
         explicitly_configured_config_args = [
             arg
@@ -140,9 +139,7 @@ def generate_argv(
         #  `[isort].config` to be a string rather than list[str] option.
         if not explicitly_configured_config_args:
             args.append(f"--settings={isort.config[0]}")
-    #args.extend(f"-p={mod}" for mod in direct_dep_modules)
-    print(source_roots)
-    #args.extend(f"--src={source_root.path}" for source_root in source_roots)
+    args.extend(f"-p={mod}" for mod in direct_dep_modules)
     args.extend(source_files)
     return tuple(args)
 
@@ -177,7 +174,7 @@ async def isort_fmt(
         ProcessResult,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(request.files, isort, is_isort5=is_isort5, direct_dep_modules=direct_dep_modules, source_roots=all_source_roots),
+            argv=generate_argv(request.files, isort, is_isort5=is_isort5, direct_dep_modules=direct_dep_modules),
             input_digest=input_digest,
             output_files=request.files,
             description=description,
