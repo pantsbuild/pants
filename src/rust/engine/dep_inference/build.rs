@@ -25,8 +25,8 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::env;
 use std::{collections::HashSet, io::Write, path::Path};
 
 /// The tree-sitter interfaces don't have nice constants that allow us to reference their magic numbers by name.
@@ -161,7 +161,7 @@ pub trait Visitor {
 fn main() {
   let out_dir = env::var_os("OUT_DIR").unwrap();
   let out_dir = Path::new(&out_dir);
-  gen_constants_file(out_dir);
+  gen_constants_file(&tree_sitter_python::language(), out_dir);
   gen_visitor_file(out_dir);
   println!("cargo:rerun-if-env-changed=build.rs");
 }
