@@ -30,5 +30,5 @@ mod cas;
 mod cas_service;
 pub mod execution_server;
 
-pub use crate::cas::{StubCAS, StubCASBuilder};
+pub use crate::cas::{RequestType, StubCAS, StubCASBuilder};
 pub use crate::execution_server::MockExecution;

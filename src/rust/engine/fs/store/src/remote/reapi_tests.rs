@@ -6,7 +6,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
-use mock::StubCAS;
+use mock::{RequestType, StubCAS};
 use testutil::data::TestData;
 use testutil::stub_io::EventuallyFailingReader;
 
@@ -114,7 +114,12 @@ async fn load_grpc_error() {
   assert!(
     error.contains("StubCAS is configured to always fail"),
     "Bad error message, got: {error}"
-  )
+  );
+  // retries:
+  assert_eq!(
+    cas.request_counts.lock().get(&RequestType::BSRead),
+    Some(&3)
+  );
 }
 
 #[tokio::test]
@@ -341,7 +346,7 @@ async fn store_bytes_empty_file() {
 }
 
 #[tokio::test]
-async fn store_bytes_grpc_error() {
+async fn store_bytes_batch_grpc_error() {
   let testdata = TestData::roland();
   let cas = StubCAS::cas_always_errors();
   let provider = new_provider(&cas).await;
@@ -353,6 +358,47 @@ async fn store_bytes_grpc_error() {
   assert!(
     error.contains("StubCAS is configured to always fail"),
     "Bad error message, got: {error}"
+  );
+
+  // retries:
+  assert_eq!(
+    cas
+      .request_counts
+      .lock()
+      .get(&RequestType::CASBatchUpdateBlobs),
+    Some(&3)
+  );
+}
+
+#[tokio::test]
+async fn store_bytes_write_stream_grpc_error() {
+  let cas = StubCAS::cas_always_errors();
+  let chunk_size = 10 * 1024;
+  let provider = Provider::new(remote_options(
+    cas.address(),
+    chunk_size,
+    0, // disable batch API, force streaming API
+  ))
+  .await
+  .unwrap();
+
+  let all_the_henries = big_file_bytes();
+  let fingerprint = big_file_fingerprint();
+  let digest = Digest::new(fingerprint, all_the_henries.len());
+
+  let error = provider
+    .store_bytes(digest, byte_source(all_the_henries))
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("StubCAS is configured to always fail"),
+    "Bad error message, got: {error}"
+  );
+
+  // retries:
+  assert_eq!(
+    cas.request_counts.lock().get(&RequestType::BSWrite),
+    Some(&3)
   );
 }
 
@@ -421,5 +467,13 @@ async fn list_missing_digests_grpc_error() {
   assert!(
     error.contains("StubCAS is configured to always fail"),
     "Bad error message, got: {error}"
+  );
+  // retries:
+  assert_eq!(
+    cas
+      .request_counts
+      .lock()
+      .get(&RequestType::CASFindMissingBlobs),
+    Some(&3)
   );
 }

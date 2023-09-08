@@ -260,14 +260,24 @@ impl ByteStoreProvider for Provider {
     let batch_api_allowed_by_server_config =
       max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
 
-    let result = if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
-      self.store_bytes_batch(digest, bytes).await
-    } else {
-      self
-        .store_source_stream(digest, Box::new(Cursor::new(bytes)))
-        .await
-    };
-    result.map_err(|e| e.to_string())
+    retry_call(
+      bytes,
+      move |bytes| async move {
+        if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+          self.store_bytes_batch(digest, bytes).await
+        } else {
+          self
+            .store_source_stream(digest, Box::new(Cursor::new(bytes)))
+            .await
+        }
+      },
+      |err| match err {
+        ByteStoreError::Grpc(status) => status_is_retryable(status),
+        ByteStoreError::Other(_) => false,
+      },
+    )
+    .await
+    .map_err(|e| e.to_string())
   }
 
   async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {
