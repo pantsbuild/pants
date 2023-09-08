@@ -230,7 +230,7 @@ December 1, 2022
 #### Modernizing development workflow for a 7-year old 74K LoC Python project using Pantsbuild
 
 October 15, 2022
-<https://www.youtube.com/watch?v=nZr1Wks07vc&t=3459s>
+<https://www.youtube.com/watch?v=SwaaQoHdqPM>
 
 > Mono-repository or not? That is a boggling question for many medium-to-large-sized development teams. As a growing company, Lablup had to onboard new hires quickly while coping with flooding customer requests and increasing codebase complexity. They merged 7 repositories into a single one and migrated to the Pantsbuild system, a Python-friendly modern build system. Here is the story, as told by CTO Joongi Kim.
 
