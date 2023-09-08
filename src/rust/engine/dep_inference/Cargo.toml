@@ -1,5 +1,5 @@
 [package]
-version = "0.0.1"
+version = "2.18.0"
 edition = "2021"
 name = "dep_inference"
 authors = ["Pants Build <pantsbuild@gmail.com>"]
@@ -9,8 +9,6 @@ publish = false
 hex = { workspace = true }
 sha2 = { workspace = true }
 walkdir = { workspace = true }
-
-# NB: If a change to these versions requires cache busting, bump this package's version
 tree-sitter = { workspace = true }
 tree-sitter-javascript = { workspace = true }
 tree-sitter-python = { workspace = true }
@@ -21,8 +19,6 @@ protos = { path = "../protos" }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 itertools = { workspace = true }
-
-# NB: If a change to these versions requires cache busting, bump this package's version
 tree-sitter = { workspace = true }
 tree-sitter-javascript = { workspace = true }
 tree-sitter-python = { workspace = true }
