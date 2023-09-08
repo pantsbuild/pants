@@ -130,7 +130,10 @@ def test_simple_success(rule_runner: RuleRunner, scalatest_lockfile: JVMLockfile
     test_result = run_scalatest_test(rule_runner, "example-test", "SimpleSpec.scala")
 
     assert test_result.exit_code == 0
-    assert "Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0" in test_result.stdout
+    assert (
+        b"Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
+        in test_result.stdout_bytes
+    )
     assert test_result.xml_results and test_result.xml_results.files
 
 
@@ -201,7 +204,10 @@ def test_file_deps_success(rule_runner: RuleRunner, scalatest_lockfile: JVMLockf
     test_result = run_scalatest_test(rule_runner, "example-test", "SimpleSpec.scala")
 
     assert test_result.exit_code == 0
-    assert "Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0" in test_result.stdout
+    assert (
+        b"Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0"
+        in test_result.stdout_bytes
+    )
     assert test_result.xml_results and test_result.xml_results.files
 
 

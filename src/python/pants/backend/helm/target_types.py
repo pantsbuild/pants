@@ -5,10 +5,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Mapping
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
-from pants.base.deprecated import deprecated, warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import TestTimeoutField
@@ -39,9 +37,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
-from pants.util.memo import memoized_method
-from pants.util.strutil import help_text, softwrap
-from pants.util.value_interpolation import InterpolationContext, InterpolationError
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
@@ -407,8 +403,8 @@ def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets
 
 class HelmDeploymentChartField(StringField, AsyncFieldMixin):
     alias = "chart"
-    # TODO Will be made required in next release
-    required = False
+    required = True
+    value: str
     help = help_text(
         f"""
         The address of the `{HelmChartTarget.alias}` or `{HelmArtifactTarget.alias}`
@@ -416,26 +412,12 @@ class HelmDeploymentChartField(StringField, AsyncFieldMixin):
         """
     )
 
-    def to_address_input(self) -> AddressInput | None:
-        if self.value:
-            return AddressInput.parse(
-                self.value,
-                relative_to=self.address.spec_path,
-                description_of_origin=f"the `{self.alias}` field in the `{HelmDeploymentTarget.alias}` target {self.address}",
-            )
-
-        warn_or_error(
-            "2.19.0.dev0",
-            "chart address in `dependencies`",
-            softwrap(
-                f"""
-                You should specify the chart address in the new `{self.alias}` field in
-                {HelmDeploymentTarget.alias}. In future versions this will be mandatory.
-                """
-            ),
-            start_version="2.18.0.dev1",
+    def to_address_input(self) -> AddressInput:
+        return AddressInput.parse(
+            self.value,
+            relative_to=self.address.spec_path,
+            description_of_origin=f"the `{self.alias}` field in the `{HelmDeploymentTarget.alias}` target {self.address}",
         )
-        return None
 
 
 class HelmDeploymentReleaseNameField(StringField):
@@ -494,56 +476,6 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
         """
     )
 
-    @memoized_method
-    @deprecated("2.19.0.dev0", start_version="2.18.0.dev0")
-    def format_with(
-        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
-    ) -> dict[str, str]:
-        source = InterpolationContext.TextSource(
-            self.address,
-            target_alias=HelmDeploymentTarget.alias,
-            field_alias=HelmDeploymentValuesField.alias,
-        )
-
-        def format_value(text: str) -> str | None:
-            try:
-                return interpolation_context.format(
-                    text,
-                    source=source,
-                )
-            except InterpolationError as err:
-                if ignore_missing:
-                    return None
-                raise err
-
-        result = {}
-        default_curr_value: dict[str, str] = {}
-        current_value: Mapping[str, str] = self.value or default_curr_value
-        for key, value in current_value.items():
-            formatted_value = format_value(value)
-            if formatted_value is not None:
-                result[key] = formatted_value
-
-        if result != current_value:
-            warn_or_error(
-                "2.19.0.dev0",
-                "Using the {env.VAR_NAME} interpolation syntax",
-                "Use the new `f\"prefix-{env('VAR_NAME')}\" syntax for interpolating values from environment variables.",
-                start_version="2.18.0.dev0",
-            )
-
-        return result
-
-
-class HelmDeploymentCreateNamespaceField(BoolField):
-    alias = "create_namespace"
-    default = False
-    help = "If true, the namespace will be created if it doesn't exist."
-
-    removal_version = "2.19.0.dev0"
-    # TODO This causes and error in the parser as it believes it is using it as the `removal_version` attribute.
-    # removal_hint = "Use the passthrough argument `--create-namespace` instead."
-
 
 class HelmDeploymentNoHooksField(BoolField):
     alias = "no_hooks"
@@ -590,7 +522,6 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentNamespaceField,
         HelmDeploymentSkipCrdsField,
         HelmDeploymentValuesField,
-        HelmDeploymentCreateNamespaceField,
         HelmDeploymentNoHooksField,
         HelmDeploymentTimeoutField,
         HelmDeploymentPostRenderersField,
@@ -610,7 +541,6 @@ class HelmDeploymentFieldSet(FieldSet):
     description: DescriptionField
     release_name: HelmDeploymentReleaseNameField
     namespace: HelmDeploymentNamespaceField
-    create_namespace: HelmDeploymentCreateNamespaceField
     sources: HelmDeploymentSourcesField
     skip_crds: HelmDeploymentSkipCrdsField
     no_hooks: HelmDeploymentNoHooksField
@@ -618,14 +548,6 @@ class HelmDeploymentFieldSet(FieldSet):
     values: HelmDeploymentValuesField
     post_renderers: HelmDeploymentPostRenderersField
     enable_dns: HelmDeploymentEnableDNSField
-
-    @deprecated(
-        "2.19.0.dev0", "Use `field_set.values.format_with()` instead.", start_version="2.18.0.dev0"
-    )
-    def format_values(
-        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
-    ) -> dict[str, str]:
-        return self.values.format_with(interpolation_context, ignore_missing=ignore_missing)
 
 
 class AllHelmDeploymentTargets(Targets):

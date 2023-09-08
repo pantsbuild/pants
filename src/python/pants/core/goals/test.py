@@ -11,7 +11,6 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
 
-from pants.base.deprecated import deprecated
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -65,7 +64,7 @@ from pants.option.option_types import BoolOption, EnumOption, IntOption, StrList
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized, memoized_property
+from pants.util.memo import memoized
 from pants.util.meta import classproperty
 from pants.util.strutil import help_text, softwrap
 
@@ -184,20 +183,6 @@ class TestResult(EngineAwareReturnType):
             log_extra_output=log_extra_output,
             partition_description=batch.partition_metadata.description,
         )
-
-    @memoized_property
-    @deprecated(
-        removal_version="2.19.0.dev0", hint="Use `TestResult.stdout_bytes` instead of `stdout`."
-    )
-    def stdout(self) -> str:
-        return self.stdout_bytes.decode(errors="replace")
-
-    @memoized_property
-    @deprecated(
-        removal_version="2.19.0.dev0", hint="Use `TestResult.stderr_bytes` instead of `stderr`."
-    )
-    def stderr(self) -> str:
-        return self.stderr_bytes.decode(errors="replace")
 
     @property
     def description(self) -> str:

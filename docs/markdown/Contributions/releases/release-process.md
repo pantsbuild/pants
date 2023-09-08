@@ -72,7 +72,8 @@ If this is the first dev release in a new series:
 1. Create a new file in ` src/python/pants/notes`, e.g. create  `src/python/pants/notes/2.9.x.md`.
    1. Copy the title and template over from the prior release, e.g. `2.8.x.md`.
 
-### Generate the release notes
+### Bump the VERSION
+
 From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
 
 This will create a pull request that:
@@ -110,7 +111,7 @@ See the `docs/NOTES.md` for instructions setting up the necessary Node tooling y
 You'll need to 1st login as outlined there via some variant of `npx rdme login --2fa --project pants ...`.
 On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>`; e.g: `npx rdme docs docs/markdown --version v2.8`.
 
-### Regenerate the references
+### Regenerate the reference docs
 
 Still on the relevant release branch, run `./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 

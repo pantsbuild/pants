@@ -156,7 +156,7 @@ def test_jest_tests_are_successful(
     tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.js"))
     package = rule_runner.get_target(Address("foo", generated_name="pkg"))
     result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
-    assert "Test Suites: 1 passed, 1 total" in result.stderr
+    assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
     assert result.exit_code == 0
 
 
@@ -210,7 +210,7 @@ def test_batched_jest_tests_are_successful(
     tgt_2 = rule_runner.get_target(Address("foo/src/tests", relative_file_path="another.test.js"))
     package = rule_runner.get_target(Address("foo", generated_name="pkg"))
     result = rule_runner.request(TestResult, [given_request_for(tgt_1, tgt_2, package=package)])
-    assert "Test Suites: 2 passed, 2 total" in result.stderr
+    assert b"Test Suites: 2 passed, 2 total" in result.stderr_bytes
     assert result.exit_code == 0
 
 
@@ -243,7 +243,7 @@ def test_mocha_tests_are_successful(
     tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.mjs"))
     package = rule_runner.get_target(Address("foo", generated_name="pkg"))
     result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
-    assert "1 passing" in result.stdout
+    assert b"1 passing" in result.stdout_bytes
     assert result.exit_code == 0
 
 
