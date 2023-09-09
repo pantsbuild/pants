@@ -97,6 +97,7 @@ async def generate_lockfile_from_sources(
             lockfile_request.target[TerraformBackendConfigField],
             lockfile_request.target[TerraformDependenciesField],
             initialise_backend=False,
+            upgrade=True,
         ),
     )
 

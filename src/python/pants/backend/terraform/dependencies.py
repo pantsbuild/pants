@@ -30,6 +30,8 @@ class TerraformDependenciesRequest:
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
+    # Upgrade the dependencies, necessary for upgrading the lockfile
+    upgrade: bool = False
 
 
 @dataclass(frozen=True)
@@ -55,9 +57,12 @@ async def get_terraform_providers(
 
     args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
-    # If we have a lockfile, don't modify it
-    if req.lockfile.files:
+    # If we have a lockfile and aren't regenerating it, don't modify it
+    if req.lockfile.files and not req.upgrade:
         args.append("-lockfile=readonly")
+
+    if req.upgrade:
+        args.append("-upgrade")
 
     with_backend_config = await Get(
         Digest,
@@ -93,6 +98,7 @@ class TerraformInitRequest:
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
+    upgrade: bool = False
 
 
 @dataclass(frozen=True)
@@ -130,6 +136,7 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
             lockfile,
             dependencies_files,
             initialise_backend=request.initialise_backend,
+            upgrade=request.upgrade,
         ),
     )
 
