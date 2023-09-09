@@ -1096,6 +1096,74 @@ def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  cache_to={"type": "local", "dest": "/tmp/docker/pants-test-cache"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--cache-to=type=local,dest=/tmp/docker/pants-test-cache",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  cache_from={"type": "local", "dest": "/tmp/docker/pants-test-cache"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
 def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
