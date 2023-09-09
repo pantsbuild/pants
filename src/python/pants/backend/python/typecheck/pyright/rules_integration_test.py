@@ -147,16 +147,14 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
         "BUILD": "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])",
         f"{PACKAGE}/f.py": dedent(
             """\
-            from more_itertools import flatten
+            from more_itertools import is_sorted
 
-            assert flatten(42) == [4, 2]
+            assert is_sorted([1, 2, 3]) is True
             """
         ),
         f"{PACKAGE}/BUILD": "python_sources()",
     })
-    print("Rule runner is running from directory: ", rule_runner.build_root)
     with temporary_dir() as named_caches:
-        print("Temporary cache dir located at: ", named_caches)
         tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
         assert len(result) == 1
