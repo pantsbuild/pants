@@ -266,7 +266,7 @@ async fn store_source_read_error_immediately() {
   let cas = StubCAS::empty();
   let provider = new_provider(&cas).await;
 
-  let source = EventuallyFailingReader::new(0);
+  let source = EventuallyFailingReader::new(0, 10);
   let error = provider
     .store(testdata.digest(), Box::new(source))
     .await
@@ -283,7 +283,7 @@ async fn store_source_read_error_later() {
   let cas = StubCAS::empty();
   let provider = new_provider(&cas).await;
 
-  let source = EventuallyFailingReader::new(5);
+  let source = EventuallyFailingReader::new(5, testdata.len());
   let error = provider
     .store(testdata.digest(), Box::new(source))
     .await
