@@ -4,6 +4,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use temp_env::with_var;
 use tempfile::TempDir;
 
 use crate::build_root::BuildRoot;
@@ -54,4 +55,12 @@ fn test_find_subdir() {
     &buildroot_path,
     BuildRoot::find_from(&subdir).unwrap().deref()
   );
+}
+
+#[test]
+fn test_build_root_override() {
+  let buildroot = "/tmp/root";
+  with_var("PANTS_BUILDROOT_OVERRIDE", Some(buildroot), || {
+    assert_eq!(Some(buildroot), BuildRoot::find().unwrap().deref().to_str());
+  });
 }

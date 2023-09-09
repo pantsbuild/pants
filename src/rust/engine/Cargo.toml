@@ -79,6 +79,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 task_executor = { path = "task_executor" }
 tempfile = { workspace = true }
+temp-env = { workspace = true }
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
@@ -284,6 +285,7 @@ strum = "0.24"
 strum_macros = "0.24"
 sysinfo = "0.20.0"
 tempfile = "3.5.0"
+temp-env = "0.3.5"
 terminal_size = "0.1.15"
 time = "0.3.20"
 tokio = "1.28"

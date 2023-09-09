@@ -13,3 +13,4 @@ toml = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+temp-env = { workspace = true }

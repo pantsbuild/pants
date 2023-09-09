@@ -115,7 +115,7 @@ impl Metadata {
   }
 }
 
-pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
+pub fn probe(root_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
   let pantsd_metadata = Metadata::mount(metadata_dir)?;
 
   // Grab the purported port early. If we can't get that, then none of the following checks
@@ -129,10 +129,10 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
   match system.process(pid) {
     None => Err(format!(
       "\
-        The last pid for the pantsd controlling {working_dir} was {pid} but it no longer appears \
+        The last pid for the pantsd controlling {root_dir} was {pid} but it no longer appears \
         to be running.\
         ",
-      working_dir = working_dir.display(),
+      root_dir = root_dir.display(),
       pid = pid,
     )),
     Some(process) => {
@@ -151,7 +151,7 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
           &actual_command_line[0]
         }
       };
-      // It appears the the daemon only records a prefix of the process name, so we just check that.
+      // It appears the daemon only records a prefix of the process name, so we just check that.
       if actual_argv0.starts_with(&expected_process_name_prefix) {
         Ok(port)
       } else {

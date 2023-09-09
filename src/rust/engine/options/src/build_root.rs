@@ -14,8 +14,13 @@ impl BuildRoot {
   const SENTINEL_FILES: &'static [&'static str] = &["pants.toml", "BUILDROOT", "BUILD_ROOT"];
 
   pub fn find() -> Result<BuildRoot, String> {
-    let cwd = env::current_dir().map_err(|e| format!("Failed to determine $CWD: {e}"))?;
-    Self::find_from(&cwd)
+    match env::var("PANTS_BUILDROOT_OVERRIDE") {
+      Ok(buildroot) => Ok(BuildRoot(PathBuf::from(buildroot))),
+      _ => {
+        let cwd = env::current_dir().map_err(|e| format!("Failed to determine $CWD: {e}"))?;
+        Self::find_from(&cwd)
+      }
+    }
   }
 
   pub(crate) fn find_from(start: &Path) -> Result<BuildRoot, String> {

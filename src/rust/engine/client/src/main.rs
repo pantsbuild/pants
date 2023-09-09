@@ -39,7 +39,7 @@ use strum::VariantNames;
 use strum_macros::{AsRefStr, EnumString, EnumVariantNames};
 
 use client::pantsd;
-use options::{option_id, render_choice, OptionParser};
+use options::{option_id, render_choice, BuildRoot, OptionParser};
 
 // TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/engine/logging/src/lib.rs.
 #[derive(AsRefStr, EnumString, EnumVariantNames)]
@@ -82,16 +82,16 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   })?;
   env_logger::init_from_env(env_logger::Env::new().filter_or("__PANTS_LEVEL__", level.as_ref()));
 
-  let working_dir =
-    env::current_dir().map_err(|e| format!("Could not detect current working directory: {e}"))?;
-  let pantsd_settings = find_pantsd(&working_dir, &options_parser)?;
+  let root_dir =
+    BuildRoot::find().map_err(|e| format!("Could not detect project root directory: {e}"))?;
+  let pantsd_settings = find_pantsd(&root_dir, &options_parser)?;
   let env = env::vars().collect::<Vec<(_, _)>>();
   let argv = env::args().collect::<Vec<_>>();
   client::execute_command(start, pantsd_settings, env, argv).await
 }
 
 fn find_pantsd(
-  working_dir: &Path,
+  root_dir: &Path,
   options_parser: &OptionParser,
 ) -> Result<client::ConnectionSettings, String> {
   let pants_subprocessdir = option_id!("pants", "subprocessdir");
@@ -101,7 +101,7 @@ fn find_pantsd(
     if path.is_absolute() {
       path
     } else {
-      match working_dir.join(&path) {
+      match root_dir.join(&path) {
         p if p.is_absolute() => p,
         p => p.canonicalize().map_err(|e| {
           format!(
@@ -124,7 +124,7 @@ fn find_pantsd(
     value = option_value.value,
     source = option_value.source
   );
-  let port = pantsd::probe(working_dir, &metadata_dir)?;
+  let port = pantsd::probe(root_dir, &metadata_dir)?;
   let mut pantsd_settings = client::ConnectionSettings::new(port);
   pantsd_settings.timeout_limit = options_parser
     .parse_float(
