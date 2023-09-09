@@ -1,4 +1,5 @@
 [toolchain]
+# NB: If you change this, change 3rdparty/tools/cargo/BUILD as well
 channel = "1.72.0"
 components = [
   "cargo",
