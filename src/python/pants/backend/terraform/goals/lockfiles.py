@@ -12,6 +12,7 @@ from pants.backend.terraform.target_types import (
     TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformProcess
+from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -20,8 +21,6 @@ from pants.core.goals.generate_lockfiles import (
     RequestedUserResolveNames,
     UserGenerateLockfiles,
 )
-from pants.engine.addresses import Addresses
-from pants.engine.internals.native_engine import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
@@ -63,7 +62,14 @@ async def identify_user_resolves_from_terraform_files(
 async def setup_user_lockfile_requests(
     requested: RequestedTerraformResolveNames,
 ) -> UserGenerateLockfiles:
-    [tgt] = await Get(Targets, Addresses([Address(requested[0])]))
+    targets_in_dir = await Get(
+        Targets,
+        RawSpecs(
+            description_of_origin="setup Terraform lockfiles",
+            dir_globs=(DirGlobSpec(requested[0]),),
+        ),
+    )
+    [tgt] = [t for t in targets_in_dir if isinstance(t, TerraformDeploymentTarget)]
     assert isinstance(tgt, TerraformDeploymentTarget)
 
     return UserGenerateLockfiles(
