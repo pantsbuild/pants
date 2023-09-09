@@ -62,24 +62,24 @@ async def identify_user_resolves_from_terraform_files(
 async def setup_user_lockfile_requests(
     requested: RequestedTerraformResolveNames,
 ) -> UserGenerateLockfiles:
-    targets_in_dir = await Get(
+    targets_in_dirs = await Get(
         Targets,
         RawSpecs(
             description_of_origin="setup Terraform lockfiles",
-            dir_globs=(DirGlobSpec(requested[0]),),
+            dir_globs=tuple(DirGlobSpec(d) for d in requested),
         ),
     )
-    [tgt] = [t for t in targets_in_dir if isinstance(t, TerraformDeploymentTarget)]
-    assert isinstance(tgt, TerraformDeploymentTarget)
+    deployment_targets = [t for t in targets_in_dirs if isinstance(t, TerraformDeploymentTarget)]
 
     return UserGenerateLockfiles(
         [
             GenerateTerraformLockfile(
                 target=tgt,
-                resolve_name=requested[0],
+                resolve_name=tgt.residence_dir,
                 lockfile_dest=(Path(tgt.residence_dir) / ".terraform.lock.hcl").as_posix(),
                 diff=False,
             )
+            for tgt in deployment_targets
         ]
     )
 
