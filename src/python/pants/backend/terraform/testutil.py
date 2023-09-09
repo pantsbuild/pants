@@ -73,6 +73,12 @@ def standard_deployment(tmpdir) -> StandardDeployment:
                     backend "local" {
                         path = "/tmp/will/not/exist"
                     }
+                    required_providers {
+                        null = {
+                          source = "hashicorp/null"
+                          version = "~>3.2.0" # there are later versions, so we can lock it to this version to check lockfile use
+                        }
+                    }
                 }
                 variable "var0" {}
                 resource "null_resource" "dep" {}
