@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 from textwrap import dedent
 from typing import Iterable
 
@@ -138,38 +139,6 @@ def test_passing(rule_runner: PythonRuleRunner) -> None:
     assert result[0].exit_code == 0
     assert "0 errors" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
-
-
-def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
-    # Ensure that the requirements venv must be created, by adding in a third-party
-    # requirement to the test code.
-    rule_runner.write_files({
-        "BUILD": "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])",
-        f"{PACKAGE}/f.py": dedent(
-            """\
-            from more_itertools import is_sorted
-
-            assert is_sorted([1, 2, 3]) is True
-            """
-        ),
-        f"{PACKAGE}/BUILD": "python_sources()",
-    })
-    with temporary_dir() as named_caches:
-        tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
-        assert len(result) == 1
-        assert result[0].exit_code == 0
-        assert "0 errors" in result[0].stdout
-        assert result[0].report == EMPTY_DIGEST
-        # Remove the cache dir and run the tests again - should yield the same result
-        safe_rmtree(named_caches)
-        # On the second run, the result should be the same as the first even though the cache directory
-        # has been deleted.
-        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
-        assert len(result) == 1
-        assert result[0].exit_code == 0
-        assert "0 errors" in result[0].stdout
-        assert result[0].report == EMPTY_DIGEST
 
 
 def test_failing(rule_runner: PythonRuleRunner) -> None:
@@ -319,6 +288,49 @@ def test_skip(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pyright(rule_runner, [tgt], extra_args=["--pyright-skip"])
     assert not result
+
+
+def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
+    # Ensure that the requirements venv must be created, by adding in a third-party
+    # requirement to the test code.
+    rule_runner.write_files({
+        "BUILD": "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])",
+        f"{PACKAGE}/f.py": dedent(
+            """\
+            from more_itertools import is_sorted
+
+            assert is_sorted([1, 2, 3]) is True
+            """
+        ),
+        f"{PACKAGE}/BUILD": dedent("""\
+            python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])
+
+            python_sources(dependencies=[':more-itertools'])
+            """
+        ),
+    })
+    with temporary_dir() as named_caches:
+        for dirpath, dirnames, filenames in os.walk(rule_runner.build_root):
+            for filename in filenames:
+                print(os.path.join(dirpath, filename))
+
+        tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
+        assert len(result) == 1
+        print(result[0].stdout)
+        print(result[0].stderr)
+        assert result[0].exit_code == 0
+        assert "0 errors" in result[0].stdout
+        assert result[0].report == EMPTY_DIGEST
+        # Remove the cache dir and run the tests again - should yield the same result
+        safe_rmtree(named_caches)
+        # On the second run, the result should be the same as the first even though the cache directory
+        # has been deleted.
+        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "0 errors" in result[0].stdout
+        assert result[0].report == EMPTY_DIGEST
 
 
 @pytest.mark.parametrize(
