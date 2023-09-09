@@ -262,7 +262,7 @@ impl ByteStoreProvider for Provider {
 
     retry_call(
       bytes,
-      move |bytes| async move {
+      move |bytes, _| async move {
         if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
           self.store_bytes_batch(digest, bytes).await
         } else {
@@ -315,7 +315,7 @@ impl ByteStoreProvider for Provider {
 
     retry_call(
       (client, request, destination),
-      move |(mut client, request, destination)| {
+      move |(mut client, request, destination), retry_attempt| {
         async move {
           let mut start_opt = Some(Instant::now());
           let response = client.read(request).await?;
@@ -337,7 +337,11 @@ impl ByteStoreProvider for Provider {
 
           let mut writer = destination.lock().await;
           let mut hasher = Hasher::new();
-          writer.reset().await?;
+          if retry_attempt > 0 {
+            // if we're retrying, we need to clear out the destination to start the whole write
+            // fresh
+            writer.reset().await?;
+          }
           while let Some(response) = stream.next().await {
             let response = response?;
             writer.write_all(&response.data).await?;
@@ -379,7 +383,7 @@ impl ByteStoreProvider for Provider {
     let client = self.cas_client.as_ref().clone();
     let response = retry_call(
       client,
-      move |mut client| {
+      move |mut client, _| {
         let request = request.clone();
         async move { client.find_missing_blobs(request).await }
       },
