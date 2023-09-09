@@ -23,7 +23,7 @@ use remexec::{
   content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
   ServerCapabilities,
 };
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
@@ -51,6 +51,15 @@ enum ByteStoreError {
 
   /// Other errors
   Other(String),
+}
+
+impl ByteStoreError {
+  fn is_retryable(&self) -> bool {
+    match self {
+      ByteStoreError::Grpc(status) => status_is_retryable(status),
+      ByteStoreError::Other(_) => false,
+    }
+  }
 }
 
 impl fmt::Display for ByteStoreError {
@@ -159,7 +168,8 @@ impl Provider {
         // Read the source in appropriately sized chunks.
         // NB. it is possible that this doesn't fill each chunk fully (i.e. may not send
         // `chunk_size_bytes` in each request). For the usual sources, this should be unlikely.
-        let reader_stream = tokio_util::io::ReaderStream::with_capacity(source, chunk_size_bytes);
+        let mut source = source.lock().await;
+        let reader_stream = tokio_util::io::ReaderStream::with_capacity(&mut *source, chunk_size_bytes);
         let mut num_seen_bytes = 0;
 
         for await read_result in reader_stream {
@@ -267,26 +277,38 @@ impl ByteStoreProvider for Provider {
           self.store_bytes_batch(digest, bytes).await
         } else {
           self
-            .store_source_stream(digest, Box::new(Cursor::new(bytes)))
+            .store_source_stream(digest, Arc::new(Mutex::new(Cursor::new(bytes))))
             .await
         }
       },
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        ByteStoreError::Other(_) => false,
-      },
+      ByteStoreError::is_retryable,
     )
     .await
     .map_err(|e| e.to_string())
   }
 
   async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {
-    // an arbitrary source (e.g. file) might be small enough to write via the batch API, but we
-    // ignore that possibility for now
-    self
-      .store_source_stream(digest, source)
-      .await
-      .map_err(|e| e.to_string())
+    retry_call(
+      source,
+      move |source, retry_attempt| async move {
+        if retry_attempt > 0 {
+          // if we're retrying, we need to go back to the start of the source to start the whole
+          // read fresh
+          source.lock().await.rewind().await.map_err(|err| {
+            ByteStoreError::Other(format!(
+              "Uploading file with digest {digest:?}: failed to rewind before retry {retry_attempt}: {err}"
+            ))
+          })?;
+        }
+
+        // an arbitrary source (e.g. file) might be small enough to write via the batch API, but we
+        // ignore that possibility for now
+        self.store_source_stream(digest, source).await
+      },
+      ByteStoreError::is_retryable,
+    )
+    .await
+    .map_err(|e| e.to_string())
   }
 
   async fn load(

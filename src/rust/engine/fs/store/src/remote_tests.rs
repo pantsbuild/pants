@@ -156,6 +156,10 @@ async fn store_bytes_provider_error() {
   assert_error(store.store_bytes(TestData::roland().bytes()).await)
 }
 
+fn store_source(data: Bytes) -> StoreSource {
+  Arc::new(tokio::sync::Mutex::new(Cursor::new(data)))
+}
+
 #[tokio::test]
 async fn store() {
   let _ = WorkunitStore::setup_for_tests();
@@ -164,7 +168,7 @@ async fn store() {
   let (store, provider) = empty_byte_store();
   assert_eq!(
     store
-      .store(testdata.digest(), Box::new(Cursor::new(testdata.bytes())))
+      .store(testdata.digest(), store_source(testdata.bytes()))
       .await,
     Ok(())
   );
@@ -180,7 +184,7 @@ async fn store_provider_error() {
   let store = byte_store_always_error_provider();
   assert_error(
     store
-      .store(testdata.digest(), Box::new(Cursor::new(testdata.bytes())))
+      .store(testdata.digest(), store_source(testdata.bytes()))
       .await,
   );
 }
@@ -310,10 +314,10 @@ impl ByteStoreProvider for TestProvider {
     Ok(())
   }
 
-  async fn store(&self, digest: Digest, mut file: StoreSource) -> Result<(), String> {
+  async fn store(&self, digest: Digest, file: StoreSource) -> Result<(), String> {
     // just pull it all into memory
     let mut bytes = Vec::new();
-    tokio::io::copy(&mut file, &mut bytes).await.unwrap();
+    file.lock().await.read_to_end(&mut bytes).await.unwrap();
     self.blobs.lock().insert(digest.hash, Bytes::from(bytes));
     Ok(())
   }

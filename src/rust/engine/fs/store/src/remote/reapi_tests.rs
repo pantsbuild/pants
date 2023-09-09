@@ -1,6 +1,7 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -9,6 +10,7 @@ use hashing::{Digest, Fingerprint};
 use mock::{RequestType, StubCAS};
 use testutil::data::TestData;
 use testutil::stub_io::EventuallyFailingReader;
+use tokio::sync::Mutex;
 
 use crate::remote::{ByteStoreProvider, RemoteOptions};
 use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
@@ -169,7 +171,7 @@ fn assert_cas_store(
 }
 
 fn store_source(data: Bytes) -> StoreSource {
-  Box::new(std::io::Cursor::new(data))
+  Arc::new(Mutex::new(std::io::Cursor::new(data)))
 }
 
 #[tokio::test]
@@ -237,6 +239,12 @@ async fn store_grpc_error() {
     error.contains("StubCAS is configured to always fail"),
     "Bad error message, got: {error}"
   );
+
+  // retries:
+  assert_eq!(
+    cas.request_counts.lock().get(&RequestType::BSWrite),
+    Some(&3)
+  );
 }
 
 #[tokio::test]
@@ -268,7 +276,7 @@ async fn store_source_read_error_immediately() {
 
   let source = EventuallyFailingReader::new(0, 10);
   let error = provider
-    .store(testdata.digest(), Box::new(source))
+    .store(testdata.digest(), Arc::new(Mutex::new(source)))
     .await
     .expect_err("Want err");
   assert!(
@@ -285,11 +293,30 @@ async fn store_source_read_error_later() {
 
   let source = EventuallyFailingReader::new(5, testdata.len());
   let error = provider
-    .store(testdata.digest(), Box::new(source))
+    .store(testdata.digest(), Arc::new(Mutex::new(source)))
     .await
     .expect_err("Want err");
   assert!(
-    error.contains("EventuallyFailingReader hit its limit"),
+    error.contains("failed to read local source")
+      && error.contains("EventuallyFailingReader hit its limit"),
+    "Bad error message, got: {error}",
+  )
+}
+
+#[tokio::test]
+async fn store_source_read_error_later_rewind() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::cas_always_errors();
+  let provider = new_provider(&cas).await;
+
+  // fail to rewind after the second attempt
+  let source = EventuallyFailingReader::new(2 * testdata.len() + 3, testdata.len());
+  let error = provider
+    .store(testdata.digest(), Arc::new(Mutex::new(source)))
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("failed to rewind") && error.contains("EventuallyFailingReader hit its limit"),
     "Bad error message, got: {error}",
   )
 }
