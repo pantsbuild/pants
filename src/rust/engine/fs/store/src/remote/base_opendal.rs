@@ -119,11 +119,33 @@ impl ByteStoreProvider for Provider {
       .operator
       .write(&path, bytes)
       .await
-      .map_err(|e| format!("failed to write {}: {}", path, e))
+      .map_err(|e| format!("failed to write bytes to {path}: {e}"))
   }
 
-  async fn store_file(&self, _digest: Digest, _file: File) -> Result<(), String> {
-    unimplemented!()
+  async fn store_file(&self, digest: Digest, mut file: File) -> Result<(), String> {
+    let path = self.path(digest.hash);
+
+    let mut writer = self
+      .operator
+      .writer_with(&path)
+      .content_length(digest.size_bytes as u64)
+      .await
+      .map_err(|e| format!("failed to start write to {path}: {e}"))?;
+
+    // TODO: it would be good to pass through options.chunk_size_bytes here
+    match tokio::io::copy(&mut file, &mut writer).await {
+      Ok(_) => writer.close().await.map_err(|e| {
+        format!("Uploading file with digest {digest:?} to {path}: failed to commit: {e}")
+      }),
+      Err(e) => {
+        let abort_err = writer.abort().await.err().map_or("".to_owned(), |e| {
+          format!(" (additional error while aborting = {e})")
+        });
+        Err(format!(
+          "Uploading file with digest {digest:?} to {path}: failed to copy: {e}{abort_err}"
+        ))
+      }
+    }
   }
 
   async fn load(

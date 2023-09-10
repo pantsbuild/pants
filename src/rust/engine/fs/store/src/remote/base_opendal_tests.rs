@@ -5,8 +5,11 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
+use hashing::{Digest, Fingerprint};
 use opendal::services::Memory;
 use testutil::data::TestData;
+
+use crate::tests::{big_file_bytes, big_file_fingerprint, mk_tempfile};
 
 use super::base_opendal::Provider;
 use super::{ByteStoreProvider, RemoteOptions};
@@ -16,7 +19,6 @@ const BASE: &str = "opendal-testing-base";
 fn test_path(data: &TestData) -> String {
   format!("{}/{}", BASE, data.fingerprint())
 }
-
 fn remote_options() -> RemoteOptions {
   RemoteOptions {
     cas_address: "".to_owned(),
@@ -71,6 +73,21 @@ async fn load_missing() {
     .unwrap();
   assert!(!found);
   assert!(destination.is_empty())
+}
+
+#[tokio::test]
+async fn load_empty() {
+  // the empty file can be loaded even when it's not "physically" in the remote provider
+  let testdata = TestData::empty();
+  let provider = new_provider();
+
+  let mut destination = Vec::new();
+  let found = provider
+    .load(testdata.digest(), &mut destination)
+    .await
+    .unwrap();
+  assert!(found);
+  assert_eq!(destination, testdata.bytes());
 }
 
 #[tokio::test]
@@ -129,6 +146,15 @@ async fn load_without_validation_missing() {
   assert!(destination.is_empty())
 }
 
+async fn assert_store(provider: &Provider, fingerprint: Fingerprint, bytes: Bytes) {
+  let result = provider
+    .operator
+    .read(&format!("{}/{}", BASE, fingerprint))
+    .await
+    .unwrap();
+  assert_eq!(result, bytes);
+}
+
 #[tokio::test]
 async fn store_bytes_data() {
   let testdata = TestData::roland();
@@ -139,12 +165,7 @@ async fn store_bytes_data() {
     .await
     .unwrap();
 
-  let result = provider
-    .operator
-    .read(&format!("{}/{}", BASE, testdata.fingerprint()))
-    .await
-    .unwrap();
-  assert_eq!(result, testdata.bytes());
+  assert_store(&provider, testdata.fingerprint(), testdata.bytes()).await;
 }
 
 #[tokio::test]
@@ -157,12 +178,66 @@ async fn store_bytes_empty() {
     .await
     .unwrap();
 
-  let result = provider
+  // we don't actually store an empty file
+  assert!(!provider
     .operator
-    .read(&format!("{}/{}", BASE, testdata.fingerprint()))
+    .is_exist(&test_path(&testdata))
+    .await
+    .unwrap());
+}
+
+#[tokio::test]
+async fn store_file_one_chunk() {
+  let testdata = TestData::roland();
+  let provider = new_provider();
+
+  provider
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .unwrap();
-  assert_eq!(result, testdata.bytes());
+  assert_store(&provider, testdata.fingerprint(), testdata.bytes()).await;
+}
+
+#[tokio::test]
+async fn store_file_multiple_chunks() {
+  let provider = new_provider();
+
+  let all_the_henries = big_file_bytes();
+  // our current chunk size is the tokio::io::copy default (8KiB at
+  // the time of writing)
+  assert!(all_the_henries.len() > 8 * 1024);
+  let fingerprint = big_file_fingerprint();
+  let digest = Digest::new(fingerprint, all_the_henries.len());
+
+  provider
+    .store_file(digest, mk_tempfile(Some(&all_the_henries)).await)
+    .await
+    .unwrap();
+  assert_store(&provider, fingerprint, all_the_henries).await;
+}
+
+#[tokio::test]
+async fn store_file_empty_file() {
+  let testdata = TestData::empty();
+  let provider = new_provider();
+
+  provider
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
+    .await
+    .unwrap();
+
+  // we don't actually store an empty file
+  assert!(!provider
+    .operator
+    .is_exist(&test_path(&testdata))
+    .await
+    .unwrap());
 }
 
 #[tokio::test]
