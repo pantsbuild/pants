@@ -2,14 +2,17 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 #![allow(dead_code)]
 
+use std::collections::HashSet;
+use std::time::Instant;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
 use hashing::{async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
 use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
 use opendal::{Builder, Operator};
-use std::collections::HashSet;
 use tokio::fs::File;
+use workunit_store::ObservationMetric;
 
 use super::{ByteStoreProvider, LoadDestination, RemoteOptions};
 
@@ -40,6 +43,7 @@ impl Provider {
       })?
       .layer(ConcurrentLimitLayer::new(options.rpc_concurrency_limit))
       .layer(
+        // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
         TimeoutLayer::new()
           .with_timeout(options.rpc_timeout)
           .with_speed(1),
@@ -86,11 +90,23 @@ impl Provider {
     }
 
     let path = self.path(digest.hash);
+    let start = Instant::now();
     let mut reader = match self.operator.reader(&path).await {
       Ok(reader) => reader,
       Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
       Err(e) => return Err(format!("failed to read {}: {}", path, e)),
     };
+
+    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      // TODO: this pretends that the time-to-first-byte can be approximated by "time to create
+      // reader", which is often not really true.
+      let timing: Result<u64, _> = Instant::now().duration_since(start).as_micros().try_into();
+      if let Ok(obs) = timing {
+        workunit_store_handle
+          .store
+          .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
+      }
+    }
 
     match mode {
       LoadMode::Validate => {
