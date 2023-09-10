@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
-use hashing::{async_verified_copy, Digest, Fingerprint};
+use hashing::{async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
 use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
 use opendal::{Builder, Operator};
 use std::collections::HashSet;
@@ -67,6 +67,13 @@ impl Provider {
     destination: &mut dyn LoadDestination,
     mode: LoadMode,
   ) -> Result<bool, String> {
+    // some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we just magic
+    // it up here, and ignore it when storing
+    if digest == EMPTY_DIGEST {
+      // destination starts off empty, so is already in the right state
+      return Ok(true);
+    }
+
     let path = self.path(digest.hash);
     let mut reader = match self.operator.reader(&path).await {
       Ok(reader) => reader,
@@ -113,6 +120,12 @@ impl Provider {
 #[async_trait]
 impl ByteStoreProvider for Provider {
   async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String> {
+    // some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
+    // store it here, and magic it up when loading
+    if digest == EMPTY_DIGEST {
+      return Ok(());
+    }
+
     let path = self.path(digest.hash);
 
     self
@@ -123,6 +136,12 @@ impl ByteStoreProvider for Provider {
   }
 
   async fn store_file(&self, digest: Digest, mut file: File) -> Result<(), String> {
+    // some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
+    // store it here, and magic it up when loading
+    if digest == EMPTY_DIGEST {
+      return Ok(());
+    }
+
     let path = self.path(digest.hash);
 
     let mut writer = self
