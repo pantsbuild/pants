@@ -107,10 +107,13 @@ mod tests {
     let mut expected_attempt = 0;
     let result = retry_call(
       client.clone(),
-      |client, attempt| async move {
+      |client, attempt| {
+        // check `attempt` is being passed through as expected: starting with 0 for the first
+        // call, and incriminating for each one after
         assert_eq!(attempt, expected_attempt);
         expected_attempt += 1;
-        client.next().await
+
+        async move { client.next().await }
       },
       |err| err.0,
     )
