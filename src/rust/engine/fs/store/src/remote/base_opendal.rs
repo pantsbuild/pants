@@ -13,6 +13,12 @@ use tokio::fs::File;
 
 use super::{ByteStoreProvider, LoadDestination, RemoteOptions};
 
+#[derive(Debug, Clone, Copy)]
+pub enum LoadMode {
+  Validate,
+  NoValidate,
+}
+
 pub struct Provider {
   pub(crate) operator: Operator,
   base_path: String,
@@ -54,6 +60,54 @@ impl Provider {
   fn path(&self, fingerprint: Fingerprint) -> String {
     format!("{}/{}", self.base_path, fingerprint)
   }
+
+  async fn load_raw(
+    &self,
+    digest: Digest,
+    destination: &mut dyn LoadDestination,
+    mode: LoadMode,
+  ) -> Result<bool, String> {
+    let path = self.path(digest.hash);
+    let mut reader = match self.operator.reader(&path).await {
+      Ok(reader) => reader,
+      Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
+      Err(e) => return Err(format!("failed to read {}: {}", path, e)),
+    };
+
+    match mode {
+      LoadMode::Validate => {
+        let correct_digest = async_verified_copy(digest, false, &mut reader, destination)
+          .await
+          .map_err(|e| format!("failed to read {}: {}", path, e))?;
+
+        if !correct_digest {
+          // TODO: include the actual digest here
+          return Err(format!("Remote CAS gave wrong digest: expected {digest:?}"));
+        }
+      }
+      LoadMode::NoValidate => {
+        tokio::io::copy(&mut reader, destination)
+          .await
+          .map_err(|e| format!("failed to read {}: {}", path, e))?;
+      }
+    }
+    Ok(true)
+  }
+
+  /// Load `digest` trusting the contents from the remote, without validating that the digest
+  /// matches the downloaded bytes.
+  ///
+  /// This can/should be used for cases where the digest isn't the digest of the contents
+  /// (e.g. action cache).
+  pub async fn load_without_validation(
+    &self,
+    digest: Digest,
+    destination: &mut dyn LoadDestination,
+  ) -> Result<bool, String> {
+    self
+      .load_raw(digest, destination, LoadMode::NoValidate)
+      .await
+  }
 }
 
 #[async_trait]
@@ -77,23 +131,7 @@ impl ByteStoreProvider for Provider {
     digest: Digest,
     destination: &mut dyn LoadDestination,
   ) -> Result<bool, String> {
-    let path = self.path(digest.hash);
-    let mut reader = match self.operator.reader(&path).await {
-      Ok(reader) => reader,
-      Err(e) if e.kind() == opendal::ErrorKind::NotFound => return Ok(false),
-      Err(e) => return Err(format!("failed to read {}: {}", path, e)),
-    };
-
-    let correct_digest = async_verified_copy(digest, false, &mut reader, destination)
-      .await
-      .map_err(|e| format!("failed to read {}: {}", path, e))?;
-
-    if !correct_digest {
-      // TODO: include the actual digest here
-      Err(format!("Remote CAS gave wrong digest: expected {digest:?}"))
-    } else {
-      Ok(true)
-    }
+    self.load_raw(digest, destination, LoadMode::Validate).await
   }
 
   async fn list_missing_digests(

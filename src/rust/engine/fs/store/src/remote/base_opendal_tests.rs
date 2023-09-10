@@ -96,6 +96,40 @@ async fn load_existing_wrong_digest_eror() {
 }
 
 #[tokio::test]
+async fn load_without_validation_existing() {
+  let testdata = TestData::roland();
+  let bytes = Bytes::from_static(b"not roland");
+  let provider = new_provider();
+  provider
+    .operator
+    .write(&test_path(&testdata), bytes.clone())
+    .await
+    .unwrap();
+
+  let mut destination = Vec::new();
+  let found = provider
+    .load_without_validation(testdata.digest(), &mut destination)
+    .await
+    .unwrap();
+  assert!(found);
+  assert_eq!(destination, bytes)
+}
+
+#[tokio::test]
+async fn load_without_validation_missing() {
+  let testdata = TestData::roland();
+  let provider = new_provider();
+
+  let mut destination = Vec::new();
+  let found = provider
+    .load_without_validation(testdata.digest(), &mut destination)
+    .await
+    .unwrap();
+  assert!(!found);
+  assert!(destination.is_empty())
+}
+
+#[tokio::test]
 async fn store_bytes_data() {
   let testdata = TestData::roland();
   let provider = new_provider();
