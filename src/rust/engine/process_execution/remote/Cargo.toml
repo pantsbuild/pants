@@ -36,6 +36,7 @@ process_execution = { path = ".." }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 parking_lot = { workspace = true }
+opendal = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }

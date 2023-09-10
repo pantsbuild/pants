@@ -20,7 +20,8 @@ pub enum LoadMode {
 }
 
 pub struct Provider {
-  pub(crate) operator: Operator,
+  /// This is public for easier testing
+  pub operator: Operator,
   base_path: String,
 }
 

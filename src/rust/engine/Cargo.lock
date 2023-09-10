@@ -2964,6 +2964,7 @@ dependencies = [
  "maplit",
  "mock",
  "once_cell",
+ "opendal",
  "parking_lot 0.12.1",
  "process_execution",
  "prost",

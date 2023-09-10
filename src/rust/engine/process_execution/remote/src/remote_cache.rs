@@ -26,6 +26,9 @@ use process_execution::{
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
 
+mod base_opendal;
+#[cfg(test)]
+mod base_opendal_tests;
 mod reapi;
 #[cfg(test)]
 mod reapi_tests;
