@@ -16,8 +16,18 @@ use super::{ByteStoreProvider, RemoteOptions};
 
 const BASE: &str = "opendal-testing-base";
 
+fn test_path_fingerprint(fingerprint: Fingerprint) -> String {
+  let fingerprint = fingerprint.to_string();
+  format!(
+    "{}/{}/{}/{}",
+    BASE,
+    &fingerprint[0..2],
+    &fingerprint[2..4],
+    fingerprint
+  )
+}
 fn test_path(data: &TestData) -> String {
-  format!("{}/{}", BASE, data.fingerprint())
+  test_path_fingerprint(data.fingerprint())
 }
 fn remote_options() -> RemoteOptions {
   RemoteOptions {
@@ -149,7 +159,7 @@ async fn load_without_validation_missing() {
 async fn assert_store(provider: &Provider, fingerprint: Fingerprint, bytes: Bytes) {
   let result = provider
     .operator
-    .read(&format!("{}/{}", BASE, fingerprint))
+    .read(&test_path_fingerprint(fingerprint))
     .await
     .unwrap();
   assert_eq!(result, bytes);

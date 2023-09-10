@@ -65,7 +65,11 @@ impl Provider {
   }
 
   fn path(&self, fingerprint: Fingerprint) -> String {
-    format!("{}/{}", self.base_path, fingerprint)
+    // include the first byte as a parent directory to make listings less wide
+    format!(
+      "{}/{:02x}/{:02x}/{}",
+      self.base_path, fingerprint.0[0], fingerprint.0[1], fingerprint
+    )
   }
 
   async fn load_raw(
