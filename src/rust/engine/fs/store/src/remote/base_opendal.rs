@@ -28,8 +28,14 @@ impl Provider {
 
 #[async_trait]
 impl ByteStoreProvider for Provider {
-  async fn store_bytes(&self, _digest: Digest, _bytes: Bytes) -> Result<(), String> {
-    unimplemented!()
+  async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String> {
+    let path = self.path(digest.hash);
+
+    self
+      .op
+      .write(&path, bytes)
+      .await
+      .map_err(|e| format!("failed to write {}: {}", path, e))
   }
 
   async fn store_file(&self, _digest: Digest, _file: File) -> Result<(), String> {
