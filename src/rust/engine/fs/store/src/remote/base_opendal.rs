@@ -58,6 +58,12 @@ impl Provider {
     })
   }
 
+  pub fn fs(path: &str, scope: String, options: RemoteOptions) -> Result<Provider, String> {
+    let mut builder = opendal::services::Fs::default();
+    builder.root(path).enable_path_check();
+    Provider::new(builder, scope, options)
+  }
+
   fn path(&self, fingerprint: Fingerprint) -> String {
     format!("{}/{}", self.base_path, fingerprint)
   }

@@ -166,7 +166,8 @@ class AuthPluginResult:
 
     def __post_init__(self) -> None:
         def assert_valid_address(addr: str | None, field_name: str) -> None:
-            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
+            # TODO: document additional schemes and validate experimental-ness
+            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs", "file")]
             if addr and not any(addr.startswith(scheme) for scheme in valid_schemes):
                 name = self.plugin_name or ""
                 raise ValueError(
@@ -1780,7 +1781,8 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             )
 
         def validate_remote_address(opt_name: str) -> None:
-            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
+            # TODO: document additional schemes and validate experimental-ness
+            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs", "file")]
             address = getattr(opts, opt_name)
             if address and not any(address.startswith(scheme) for scheme in valid_schemes):
                 raise OptionsError(

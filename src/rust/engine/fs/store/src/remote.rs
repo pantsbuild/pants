@@ -21,7 +21,7 @@ mod reapi;
 #[cfg(test)]
 mod reapi_tests;
 
-mod base_opendal;
+pub mod base_opendal;
 #[cfg(test)]
 mod base_opendal_tests;
 
@@ -62,6 +62,28 @@ pub struct RemoteOptions {
   pub rpc_concurrency_limit: usize,
   pub capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   pub batch_api_size_limit: usize,
+}
+
+// TODO: this is probably better positioned somewhere else
+pub const REAPI_ADDRESS_SCHEMAS: [&str; 3] = ["grpc://", "grpcs://", "http://"];
+
+async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProvider>, String> {
+  let address = options.cas_address.clone();
+  if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
+    Ok(Arc::new(reapi::Provider::new(options).await?))
+  } else if let Some(path) = address.strip_prefix("file://") {
+    // supporting local "file://" for a 'remote' store is a bit weird... but this is handy for
+    // testing
+    Ok(Arc::new(base_opendal::Provider::fs(
+      path,
+      "byte-store".to_owned(),
+      options,
+    )?))
+  } else {
+    Err(format!(
+      "Cannot initialise remote byte store provider with address {address}",
+    ))
+  }
 }
 
 #[derive(Clone)]
@@ -112,7 +134,7 @@ impl ByteStore {
 
   pub async fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
     let instance_name = options.instance_name.clone();
-    let provider = Arc::new(reapi::Provider::new(options).await?);
+    let provider = choose_provider(options).await?;
     Ok(ByteStore::new(instance_name, provider))
   }
 
