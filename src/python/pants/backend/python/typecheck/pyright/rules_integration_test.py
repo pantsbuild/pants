@@ -305,28 +305,21 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
         f"{PACKAGE}/BUILD": "python_sources()",
     })
 
-    with temporary_dir(root_dir=rule_runner.build_root) as named_caches:
-        print("Build root directory:", rule_runner.build_root)
-        for root, _, files in os.walk(rule_runner.build_root):
-            for f in files:
-                print(os.path.join(root, f))
-        print("\n\n\n\n")
+    # On the first run, it should work as advertised with no modifications.
+    result = run_pyright(rule_runner, [tgt])
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "0 errors" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
+    # On the second run, it should fail because the venv cannot be found in the cache directory.
+    with temporary_dir() as named_caches:
         # Test should fail, as the cache directory is empty
         tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
         assert len(result) == 1
         assert result[0].exit_code == 1
-
-        # Remove the cache dir and run the tests again - should yield the same result
-        safe_rmtree(named_caches)
-
-        # On the second run, it should work (theoretically) as the cache dir is now deleted and not empty.
-        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
-        assert len(result) == 1
-        assert result[0].exit_code == 0
-        assert "0 errors" in result[0].stdout
-        assert result[0].report == EMPTY_DIGEST
+        assert 'Import "more_itertools" could not be resolved' in result[0].stdout
 
 
 @pytest.mark.parametrize(
