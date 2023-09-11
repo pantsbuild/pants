@@ -257,9 +257,12 @@ impl RemoteStore {
     let remote_store = self.store.clone();
     self
       .maybe_download(digest, async move {
-        let store_into_fsdb =
-          f_remote.is_none() && ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
+        let store_into_fsdb = ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
         if store_into_fsdb {
+          assert!(
+            f_remote.is_none(),
+            "Entries to be stored in FSDB should never need validation via f_remote, found {digest:?} of type {entry_type:?} that does"
+          );
           local_store
             .get_file_fsdb()
             .write_using(digest.hash, |file| {

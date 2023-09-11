@@ -1,6 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use grpc_util::prost::MessageExt;
+use hashing::EMPTY_DIGEST;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 #[derive(Clone)]
@@ -249,6 +250,25 @@ impl TestDirectory {
           ..remexec::FileNode::default()
         },
       ],
+      ..remexec::Directory::default()
+    };
+    TestDirectory { directory }
+  }
+
+  // Directory structure
+  //
+  // 100k empty files: /00000.ext up to /99999.ext
+  pub fn many_files() -> TestDirectory {
+    let files = (0..100000)
+      .map(|idx| remexec::FileNode {
+        name: format!("{idx:05}.ext"),
+        digest: Some(EMPTY_DIGEST.into()),
+        is_executable: false,
+        ..remexec::FileNode::default()
+      })
+      .collect();
+    let directory = remexec::Directory {
+      files,
       ..remexec::Directory::default()
     };
     TestDirectory { directory }
