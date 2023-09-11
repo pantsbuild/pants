@@ -68,6 +68,7 @@ pants_ignore.add = [
   "/docs/node_modules",
   # We have Pants stuff in here
   "!.github/",
+  "!/src/rust/engine/.cargo",
 ]
 
 build_ignore.add = [

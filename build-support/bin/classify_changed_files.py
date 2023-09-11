@@ -28,7 +28,6 @@ _docs_globs = [
 ]
 _rust_globs = [
     "src/rust/engine/*",
-    "rust-toolchain",
     "build-support/bin/rust/*",
 ]
 _release_globs = [
