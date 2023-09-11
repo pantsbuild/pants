@@ -8,6 +8,7 @@ files(
         "build.rs",
         "**/Cargo.toml",
         "**/*.rs",
+        "!**/*tests.rs",
         "**/*.proto",
         ".cargo/config",
         "rust-toolchain",
@@ -25,7 +26,7 @@ shell_command(
         "3rdparty/tools/python3:python3",
     ],
     extra_env_vars=["CHROOT={chroot}", "MODE"],
-    tools=["cc", "ld", "as", "ar", "cargo", "protoc", "python3.9"],
+    tools=["cc", "ld", "as", "ar", "cargo", "protoc", "python3.9", "sccache"],
     output_files=[
         f"target/debug/libengine.so",
         f"target/debug/pants",
