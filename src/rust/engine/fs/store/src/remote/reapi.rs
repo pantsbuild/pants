@@ -165,32 +165,33 @@ impl Provider {
           finish_write: true,
           data: Bytes::new(),
         };
-      } else {
-        // Read the source in appropriately sized chunks.
-        // NB. it is possible that this doesn't fill each chunk fully (i.e. may not send
-        // `chunk_size_bytes` in each request). For the usual sources, this should be unlikely.
-        let mut source = source.lock().await;
-        let reader_stream = tokio_util::io::ReaderStream::with_capacity(&mut *source, chunk_size_bytes);
-        let mut num_seen_bytes = 0;
+        return;
+      }
 
-        for await read_result in reader_stream {
-          match read_result {
-            Ok(data) => {
-              let write_offset = num_seen_bytes as i64;
-              num_seen_bytes += data.len();
-              yield protos::gen::google::bytestream::WriteRequest {
-                resource_name: resource_name.clone(),
-                write_offset,
-                finish_write: num_seen_bytes == len,
-                data,
-              }
-            },
-            Err(err) => {
-              // reading locally hit an error, so store it for re-processing below
-              *error_occurred_stream.lock() = Some(err);
-              // cut off here, no point continuing
-              break;
+      // Read the source in appropriately sized chunks.
+      // NB. it is possible that this doesn't fill each chunk fully (i.e. may not send
+      // `chunk_size_bytes` in each request). For the usual sources, this should be unlikely.
+      let mut source = source.lock().await;
+      let reader_stream = tokio_util::io::ReaderStream::with_capacity(&mut *source, chunk_size_bytes);
+      let mut num_seen_bytes = 0;
+
+      for await read_result in reader_stream {
+        match read_result {
+          Ok(data) => {
+            let write_offset = num_seen_bytes as i64;
+            num_seen_bytes += data.len();
+            yield protos::gen::google::bytestream::WriteRequest {
+              resource_name: resource_name.clone(),
+              write_offset,
+              finish_write: num_seen_bytes == len,
+              data,
             }
+          },
+          Err(err) => {
+            // reading locally hit an error, so store it for re-processing below
+            *error_occurred_stream.lock() = Some(err);
+            // cut off here, no point continuing
+            break;
           }
         }
       }
