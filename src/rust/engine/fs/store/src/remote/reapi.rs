@@ -23,14 +23,15 @@ use remexec::{
   content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
   ServerCapabilities,
 };
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::fs::File;
+use tokio::io::{AsyncRead, AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
 
 use crate::RemoteOptions;
 
-use super::{ByteStoreProvider, LoadDestination, StoreSource};
+use super::{ByteStoreProvider, LoadDestination};
 
 pub struct Provider {
   instance_name: Option<String>,
@@ -134,7 +135,7 @@ impl Provider {
   async fn store_source_stream(
     &self,
     digest: Digest,
-    source: StoreSource,
+    source: Arc<Mutex<dyn AsyncRead + Send + Sync + Unpin + 'static>>,
   ) -> Result<(), ByteStoreError> {
     let len = digest.size_bytes;
     let instance_name = self.instance_name.clone().unwrap_or_default();
@@ -287,7 +288,8 @@ impl ByteStoreProvider for Provider {
     .map_err(|e| e.to_string())
   }
 
-  async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {
+  async fn store_file(&self, digest: Digest, file: File) -> Result<(), String> {
+    let source = Arc::new(Mutex::new(file));
     retry_call(
       source,
       move |source, retry_attempt| async move {

@@ -13,23 +13,18 @@ use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ServerCapabilities;
-use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite};
-use tokio::sync::Mutex;
+use tokio::fs::File;
+use tokio::io::{AsyncSeekExt, AsyncWrite};
 use workunit_store::{in_workunit, ObservationMetric};
 
 mod reapi;
 #[cfg(test)]
 mod reapi_tests;
 
-// this uses a Arc/Mutex because we need to have mutable access without losing ownership, due to
-// retries and REAPI's ByteStreamClient::write requiring 'static (via tonic::IntoStreamingRequest),
-// thus outlawing &mut
-pub type StoreSource = Arc<Mutex<dyn StoreSource_>>;
-
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
-  /// Store the bytes readable from `source` into the remote store
-  async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String>;
+  /// Store the bytes readable from `file` into the remote store
+  async fn store_file(&self, digest: Digest, file: File) -> Result<(), String>;
 
   /// Store the bytes in `bytes` into the remote store, as an optimisation of `store` when the bytes
   /// are already in memory
@@ -100,10 +95,6 @@ impl LoadDestination for Vec<u8> {
   }
 }
 
-/// Blanket-implemented trait to approximate a `dyn AsyncRead + AsyncSeek + ...` trait object
-pub trait StoreSource_: AsyncRead + AsyncSeek + Send + Sync + Unpin + 'static {}
-impl<T: AsyncRead + AsyncSeek + Send + Sync + Unpin + 'static> StoreSource_ for T {}
-
 impl ByteStore {
   pub fn new(
     instance_name: Option<String>,
@@ -121,10 +112,10 @@ impl ByteStore {
     Ok(ByteStore::new(instance_name, provider))
   }
 
-  /// Store the bytes readable from `source` into the remote store
-  pub async fn store(&self, digest: Digest, source: StoreSource) -> Result<(), String> {
+  /// Store the bytes readable from `file` into the remote store
+  pub async fn store_file(&self, digest: Digest, file: File) -> Result<(), String> {
     self
-      .store_tracking("store", digest, || self.provider.store(digest, source))
+      .store_tracking("store", digest, || self.provider.store_file(digest, file))
       .await
   }
 

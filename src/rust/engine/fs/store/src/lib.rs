@@ -874,9 +874,7 @@ impl Store {
     let file = tokio::fs::File::open(&path)
       .await
       .map_err(|e| format!("failed to read {digest:?} from {path:?}: {e}"))?;
-    remote
-      .store(digest, Arc::new(tokio::sync::Mutex::new(file)))
-      .await?;
+    remote.store_file(digest, file).await?;
     Ok(())
   }
 

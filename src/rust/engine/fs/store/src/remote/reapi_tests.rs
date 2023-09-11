@@ -1,23 +1,21 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use mock::{RequestType, StubCAS};
+use tempfile::TempDir;
 use testutil::data::TestData;
-use testutil::stub_io::EventuallyFailingReader;
-use tokio::sync::Mutex;
+use tokio::fs::File;
 
 use crate::remote::{ByteStoreProvider, RemoteOptions};
-use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
+use crate::tests::{big_file_bytes, big_file_fingerprint, mk_tempfile, new_cas};
 use crate::MEGABYTES;
 
 use super::reapi::Provider;
-use super::StoreSource;
 
 fn remote_options(
   cas_address: String,
@@ -170,10 +168,6 @@ fn assert_cas_store(
   }
 }
 
-fn store_source(data: Bytes) -> StoreSource {
-  Arc::new(Mutex::new(std::io::Cursor::new(data)))
-}
-
 #[tokio::test]
 async fn store_one_chunk() {
   let testdata = TestData::roland();
@@ -181,7 +175,10 @@ async fn store_one_chunk() {
   let provider = new_provider(&cas).await;
 
   provider
-    .store(testdata.digest(), store_source(testdata.bytes()))
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .unwrap();
 
@@ -204,7 +201,7 @@ async fn store_multiple_chunks() {
   let digest = Digest::new(fingerprint, all_the_henries.len());
 
   provider
-    .store(digest, store_source(all_the_henries.clone()))
+    .store_file(digest, mk_tempfile(Some(&all_the_henries)).await)
     .await
     .unwrap();
 
@@ -218,7 +215,10 @@ async fn store_empty_file() {
   let provider = new_provider(&cas).await;
 
   provider
-    .store(testdata.digest(), store_source(testdata.bytes()))
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .unwrap();
 
@@ -232,7 +232,10 @@ async fn store_grpc_error() {
   let provider = new_provider(&cas).await;
 
   let error = provider
-    .store(testdata.digest(), store_source(testdata.bytes()))
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .expect_err("Want err");
   assert!(
@@ -259,7 +262,10 @@ async fn store_connection_error() {
   .unwrap();
 
   let error = provider
-    .store(testdata.digest(), store_source(testdata.bytes()))
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .expect_err("Want err");
   assert!(
@@ -274,52 +280,21 @@ async fn store_source_read_error_immediately() {
   let cas = StubCAS::empty();
   let provider = new_provider(&cas).await;
 
-  let source = EventuallyFailingReader::new(0, 10);
+  let temp_dir = TempDir::new().unwrap();
+  let file_that_is_a_dir = File::open(temp_dir.path()).await.unwrap();
+
   let error = provider
-    .store(testdata.digest(), Arc::new(Mutex::new(source)))
+    .store_file(testdata.digest(), file_that_is_a_dir)
     .await
     .expect_err("Want err");
   assert!(
-    error.contains("EventuallyFailingReader hit its limit"),
+    error.contains("Is a directory"),
     "Bad error message, got: {error}",
   )
 }
 
-#[tokio::test]
-async fn store_source_read_error_later() {
-  let testdata = TestData::roland();
-  let cas = StubCAS::empty();
-  let provider = new_provider(&cas).await;
-
-  let source = EventuallyFailingReader::new(5, testdata.len());
-  let error = provider
-    .store(testdata.digest(), Arc::new(Mutex::new(source)))
-    .await
-    .expect_err("Want err");
-  assert!(
-    error.contains("failed to read local source")
-      && error.contains("EventuallyFailingReader hit its limit"),
-    "Bad error message, got: {error}",
-  )
-}
-
-#[tokio::test]
-async fn store_source_read_error_later_rewind() {
-  let testdata = TestData::roland();
-  let cas = StubCAS::cas_always_errors();
-  let provider = new_provider(&cas).await;
-
-  // fail to rewind after the second attempt
-  let source = EventuallyFailingReader::new(2 * testdata.len() + 3, testdata.len());
-  let error = provider
-    .store(testdata.digest(), Arc::new(Mutex::new(source)))
-    .await
-    .expect_err("Want err");
-  assert!(
-    error.contains("failed to rewind") && error.contains("EventuallyFailingReader hit its limit"),
-    "Bad error message, got: {error}",
-  )
-}
+// TODO: it would also be good to validate the behaviour if the file reads start failing later
+// (e.g. read 10 bytes, and then fail), if that's a thing that is possible.
 
 #[tokio::test]
 async fn store_bytes_one_chunk() {
