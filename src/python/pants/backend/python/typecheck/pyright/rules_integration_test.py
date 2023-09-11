@@ -304,6 +304,7 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
         ),
         f"{PACKAGE}/BUILD": "python_sources()",
     })
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
 
     # On the first run, it should work as advertised with no modifications.
     result = run_pyright(rule_runner, [tgt])
@@ -314,8 +315,6 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
 
     # On the second run, it should fail because the venv cannot be found in the cache directory.
     with temporary_dir() as named_caches:
-        # Test should fail, as the cache directory is empty
-        tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
         assert len(result) == 1
         assert result[0].exit_code == 1
