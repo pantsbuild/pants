@@ -35,7 +35,6 @@ use fs::RelativePath;
 pub mod data;
 pub mod file;
 pub mod path;
-pub mod stub_io;
 
 pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
   args.iter().map(<&str>::to_string).collect()
