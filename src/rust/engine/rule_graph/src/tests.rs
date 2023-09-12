@@ -370,13 +370,13 @@ fn ambiguous_cycle() {
   let rules = indexset![
     Rule::new(
       "Root",
-      "me",
+      "me1",
       vec![
         DependencyKey::new("ME").provided_params(vec!["P"]),
         DependencyKey::new("ME").provided_params(vec!["MPP"]),
       ],
     ),
-    Rule::new("ME", "me", vec![DependencyKey::new("FERR")]),
+    Rule::new("ME", "me2", vec![DependencyKey::new("FERR")]),
     Rule::new(
       "FERR",
       "ferr",
