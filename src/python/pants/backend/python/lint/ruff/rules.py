@@ -64,7 +64,8 @@ async def run_ruff(
     )
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
-    initial_args = ("--force-exclude","--fix",) if request.is_fix else ("--force-exclude",)
+    # We must set `--force-exclude` so ruff applies excludes from config as designed by ruff
+    initial_args = ("--force-exclude", "--fix") if request.is_fix else ("--force-exclude",)
 
     result = await Get(
         FallibleProcessResult,
