@@ -169,7 +169,7 @@ fn assert_cas_store(
 }
 
 #[tokio::test]
-async fn store_one_chunk() {
+async fn store_file_one_chunk() {
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
   let provider = new_provider(&cas).await;
@@ -185,7 +185,7 @@ async fn store_one_chunk() {
   assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
 }
 #[tokio::test]
-async fn store_multiple_chunks() {
+async fn store_file_multiple_chunks() {
   let cas = StubCAS::empty();
   let chunk_size = 10 * 1024;
   let provider = Provider::new(remote_options(
@@ -209,7 +209,7 @@ async fn store_multiple_chunks() {
 }
 
 #[tokio::test]
-async fn store_empty_file() {
+async fn store_file_empty_file() {
   let testdata = TestData::empty();
   let cas = StubCAS::empty();
   let provider = new_provider(&cas).await;
@@ -226,7 +226,7 @@ async fn store_empty_file() {
 }
 
 #[tokio::test]
-async fn store_grpc_error() {
+async fn store_file_grpc_error() {
   let testdata = TestData::roland();
   let cas = StubCAS::cas_always_errors();
   let provider = new_provider(&cas).await;
@@ -251,7 +251,7 @@ async fn store_grpc_error() {
 }
 
 #[tokio::test]
-async fn store_connection_error() {
+async fn store_file_connection_error() {
   let testdata = TestData::roland();
   let provider = Provider::new(remote_options(
     "http://doesnotexist.example".to_owned(),
@@ -275,7 +275,7 @@ async fn store_connection_error() {
 }
 
 #[tokio::test]
-async fn store_source_read_error_immediately() {
+async fn store_file_source_read_error_immediately() {
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
   let provider = new_provider(&cas).await;

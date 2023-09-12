@@ -26,8 +26,8 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
   /// Store the bytes readable from `file` into the remote store
   async fn store_file(&self, digest: Digest, file: File) -> Result<(), String>;
 
-  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store` when the bytes
-  /// are already in memory
+  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store_file` when the
+  /// bytes are already in memory
   async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String>;
 
   /// Load the data stored (if any) in the remote store for `digest` into `destination`. Returns
@@ -119,8 +119,8 @@ impl ByteStore {
       .await
   }
 
-  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store` when the bytes
-  /// are already in memory
+  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store_file` when the
+  /// bytes are already in memory
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
     self

@@ -304,8 +304,8 @@ impl ByteStoreProvider for Provider {
           })?;
         }
 
-        // an arbitrary source (e.g. file) might be small enough to write via the batch API, but we
-        // ignore that possibility for now
+        // A file might be small enough to write via the batch API, but we ignore that possibility
+        // for now, because these are expected to stored in the FSDB, and thus large
         self.store_source_stream(digest, source).await
       },
       ByteStoreError::is_retryable,

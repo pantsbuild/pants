@@ -157,7 +157,7 @@ async fn store_bytes_provider_error() {
 }
 
 #[tokio::test]
-async fn store() {
+async fn store_file() {
   let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
 
@@ -177,7 +177,7 @@ async fn store() {
 }
 
 #[tokio::test]
-async fn store_provider_error() {
+async fn store_file_provider_error() {
   let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
   let store = byte_store_always_error_provider();
