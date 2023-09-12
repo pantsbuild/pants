@@ -216,7 +216,6 @@ impl Provider {
         Err(err) => Err(ByteStoreError::Grpc(err)),
         Ok(response) => {
           let response = response.into_inner();
-
           if response.committed_size == len as i64 {
             Ok(())
           } else {

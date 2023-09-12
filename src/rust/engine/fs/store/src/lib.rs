@@ -845,10 +845,10 @@ impl Store {
     digest: Digest,
   ) -> Result<(), StoreError> {
     // We need to copy the bytes into memory so that they may be used safely in an async
-    // future. While this unfortunately increases memory consumption, we prioritize being
-    // able to run `remote.store_bytes()` as async. In addition, this is only used for
-    // blobs in the LMDB store, most of which are small: large blobs end up in the FSDB
-    // store.
+    // future. While this unfortunately increases memory consumption, we prioritize
+    // being able to run `remote.store_bytes()` as async. In addition, this is only used
+    // for blobs in the LMDB store, most of which are small: large blobs end up in the
+    // FSDB store.
     //
     // See https://github.com/pantsbuild/pants/pull/9793 for an earlier implementation
     // that used `Executor.block_on`, which avoided the clone but was blocking.
