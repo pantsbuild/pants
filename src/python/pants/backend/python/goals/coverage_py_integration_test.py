@@ -69,6 +69,8 @@ def sources(batched: bool) -> dict[str, str]:
         "src/python/core/BUILD": "python_sources()",
         "src/python/core/__init__.py": "",
         "src/python/core/untested.py": "CONSTANT = 42",
+        "src/python/core/namespace/BUILD": "python_sources()",
+        "src/python/core/namespace/baz.py": "QUX = True",
         "foo/bar.py": "BAZ = True",
         # Test that a `tests/` source root accurately gets coverage data for the `src/`
         # root.
@@ -227,6 +229,7 @@ def test_coverage_global(batched: bool) -> None:
             ---------------------------------------------------------------------------------
             {tmpdir}/foo/bar.py                                            1      1     0%
             {tmpdir}/src/python/core/__init__.py                           0      0   100%
+            {tmpdir}/src/python/core/namespace/baz.py                      1      1     0%
             {tmpdir}/src/python/core/untested.py                           1      1     0%
             {tmpdir}/src/python/project/__init__.py                        0      0   100%
             {tmpdir}/src/python/project/lib.py                             6      0   100%
@@ -239,7 +242,7 @@ def test_coverage_global(batched: bool) -> None:
             {tmpdir}/tests/python/project_test/test_arithmetic.py          3      0   100%
             {tmpdir}/tests/python/project_test/test_multiply.py            3      0   100%
             ---------------------------------------------------------------------------------
-            TOTAL                                                            22      5    77%
+            TOTAL                                                            23      6    74%
             """
         )
         in result.stderr
