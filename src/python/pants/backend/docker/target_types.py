@@ -298,7 +298,7 @@ class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStri
 
 
 class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
-    """Inherit this mixin class to provide options in the form of `--flag=key2=value1,key2=value2`
+    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2`
     to `docker build`."""
 
     docker_build_option: ClassVar[str]
@@ -347,7 +347,19 @@ class DockerImageBuildImageCacheFromField(
         f"""
         Use an external cache source when building the image.
 
-        See the `cache_to` field help for example usage.
+        Example:
+
+            docker_image(
+                name="example-local-cache-backend",
+                cache_to={{
+                    "type": "local",
+                    "dest": "/tmp/docker-cache/example"
+                }},
+                cache_from={{
+                    "type": "local",
+                    "src": "/tmp/docker-cache/example"
+                }}
+            )
 
         {_interpolation_help.format(kind="Values")}
         """
