@@ -275,7 +275,7 @@ async def run(
 def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
     """Returns a rule that implements DebugAdapterRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def get_run_debug_adapter_request(request: RunFieldSet) -> RunDebugAdapterRequest:
         raise NotImplementedError(
             "Running this target type with a debug adapter is not yet supported."
@@ -297,17 +297,17 @@ def _run_in_sandbox_behavior_rule(cls: type[RunFieldSet]) -> Iterable:
     a `RunInSandboxRequest`.
     """
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def not_supported(request: RunFieldSet) -> RunInSandboxRequest:
         raise NotImplementedError(
             "Running this target type within the sandbox is not yet supported."
         )
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def run_request_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
-    @_uncacheable_rule(_param_type_overrides={"request": cls})
+    @_uncacheable_rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def run_request_not_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 

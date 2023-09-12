@@ -205,7 +205,7 @@ pub struct Tasks {
 ///   2. add_*() - zero or more times per task to add input clauses
 ///   3. task_end() - once per task
 ///
-/// (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
+/// (This protocol was originally defined in a Builder, but that complicated the C lifecycle.)
 ///
 impl Tasks {
   pub fn new() -> Tasks {
@@ -255,7 +255,7 @@ impl Tasks {
     let args = arg_types.into_iter().map(DependencyKey::new).collect();
 
     self.preparing = Some(Task {
-      id: RuleId::from_string(func.identifier()),
+      id: RuleId::new(&name),
       cacheable,
       product: return_type,
       side_effecting,
