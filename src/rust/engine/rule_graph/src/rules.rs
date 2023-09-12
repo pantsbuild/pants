@@ -30,7 +30,7 @@ pub struct RuleId(String);
 
 impl RuleId {
   pub fn new(id: &str) -> Self {
-    Self(String::from(id))
+    Self(id.into())
   }
 
   pub fn from_string(s: String) -> Self {
@@ -159,7 +159,7 @@ impl<T: TypeId> Display for DependencyKey<T> {
     if let Some(rule_id) = &self.rule_id {
       write!(
         f,
-        "{}({:?}) -> {}",
+        "{}({:?}, ...) -> {}",
         rule_id, self.provided_params, self.product
       )
     } else if self.provided_params.is_empty() {

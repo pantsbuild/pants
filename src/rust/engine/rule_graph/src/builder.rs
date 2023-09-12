@@ -334,6 +334,9 @@ impl<R: Rule> Builder<R> {
       })
       .collect::<HashMap<_, _>>();
 
+    let rules_by_id: HashMap<&RuleId, &R> =
+      self.rules.values().flatten().map(|r| (r.id(), r)).collect();
+
     // Rules and Reentries are created on the fly based on the out_set of dependents.
     let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::default();
     #[allow(clippy::type_complexity)]
@@ -389,23 +392,15 @@ impl<R: Rule> Builder<R> {
 
           let mut candidates = Vec::new();
           if let Some(rule_id) = &dependency_key.rule_id {
-            if let Some(rules) = self.rules.get(&dependency_key.product()) {
-              candidates.extend(rules.iter().filter_map(|r| {
-                if r.id() == rule_id {
-                  Some(Node::Rule(r.clone()))
-                } else {
-                  None
-                }
-              }));
-            };
-            // We've already validated that no two rules have the same RuleId,
-            // so this assert should never trigger.
-            // We assert here to demonstrate that once we are entirely call-by-name,
-            // we can get rid of the entire edifice of multiple candidates and the
-            // unsatisfiable_nodes mechanism, and modify this function to return a Result,
-            // which will be Err if there is no rule with a matching RuleId for some node.
+            // New call-by-name semantics.
+            candidates.extend(rules_by_id.get(rule_id).map(|&r| Node::Rule(r.clone())));
+            // TODO: Once we are entirely call-by-name, we can get rid of the entire edifice
+            // of multiple candidates and the unsatisfiable_nodes mechanism, and modify this
+            // function to return a Result, which will be Err if there is no rule with a
+            // matching RuleId for some node.
             assert!(candidates.len() < 2);
           } else {
+            // Old call-by-type semantics.
             if dependency_key.provided_params.is_empty()
               && graph[node_id].1.contains(&dependency_key.product())
               && params.contains_key(&dependency_key.product())
