@@ -64,6 +64,23 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./build-support/bin/deploy_to_s3.py
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - if: needs.determine_ref.outputs.is-release == 'true'
+      name: Upload Wheel and Pex
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.determine_ref.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n"
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -126,6 +143,22 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./build-support/bin/deploy_to_s3.py
+    - env: {}
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - if: needs.determine_ref.outputs.is-release == 'true'
+      name: Upload Wheel and Pex
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.determine_ref.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n"
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -188,6 +221,23 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./build-support/bin/deploy_to_s3.py
+    - env:
+        ARCHFLAGS: -arch x86_64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - if: needs.determine_ref.outputs.is-release == 'true'
+      name: Upload Wheel and Pex
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.determine_ref.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n"
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -246,6 +296,23 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       name: Deploy wheels to S3
       run: ./build-support/bin/deploy_to_s3.py
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
+    - if: needs.determine_ref.outputs.is-release == 'true'
+      name: Upload Wheel and Pex
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.determine_ref.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
+        \n"
     timeout-minutes: 90
   determine_ref:
     if: github.repository_owner == 'pantsbuild'

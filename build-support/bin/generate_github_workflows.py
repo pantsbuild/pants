@@ -858,6 +858,42 @@ def build_wheels_job(
                 *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
                 *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
+                *(
+                    [
+                        {
+                            "name": "Build Pants PEX",
+                            "run": "./pants package src/python/pants:pants-pex",
+                            "env": helper.platform_env(),
+                        },
+                        {
+                            "name": "Upload Wheel and Pex",
+                            "if": "needs.determine_ref.outputs.is-release == 'true'",
+                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
+                            #   in this job. Certain variations run on docker images without `gh`,
+                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
+                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
+                            "run": dedent(
+                                """\
+                                PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+                                PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+                                PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+
+                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    ${{ needs.determine_ref.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \\
+                                    --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+                                """
+                            ),
+                        },
+                    ]
+                    if for_deploy_ref
+                    else []
+                ),
             ],
         },
     }
