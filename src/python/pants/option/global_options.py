@@ -82,7 +82,6 @@ _EXPERIMENTAL_SCHEME = "experimental:"
 class _RemoteScheme:
     schemes: tuple[str, ...]
     supports_execution: bool
-    # TODO: when schemes start to stablise, we should improve the reporting to
     experimental: bool
     description: str
 
