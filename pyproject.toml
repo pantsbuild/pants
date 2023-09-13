@@ -29,7 +29,6 @@ markers = ["platform_specific_behavior"]
 # coverage will gather stats for it, but it doesn't correspond to a real source file,
 # so reporting will fail, unless we omit it here.
 omit = ["src/python/pants/__init__.py"]
-include_namespace_packages = true
 
 [tool.mypy]
 namespace_packages = true

@@ -18,6 +18,12 @@ from pants.testutil.python_interpreter_selection import all_major_minor_python_v
 
 def sources(batched: bool) -> dict[str, str]:
     return {
+        "pyproject.toml": dedent(
+            """\
+        [tool.coverage.report]
+        include_namespace_packages = true
+        """
+        ),
         # Only `lib.py` will actually be tested, but we still expect `random.py` t`o show up in
         # the final report correctly.
         "src/python/project/__init__.py": "",
@@ -221,7 +227,9 @@ def test_coverage_fail_under(batched: bool) -> None:
 @pytest.mark.parametrize("batched", (True, False))
 def test_coverage_global(batched: bool) -> None:
     with setup_tmpdir(sources(batched)) as tmpdir:
-        result = run_coverage(tmpdir, "--coverage-py-global-report")
+        result = run_coverage(
+            tmpdir, "--coverage-py-global-report", f"--coverage-py-config={tmpdir}/pyproject.toml"
+        )
     assert (
         dedent(
             f"""\
