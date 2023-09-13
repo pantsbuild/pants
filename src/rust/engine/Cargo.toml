@@ -79,7 +79,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 task_executor = { path = "task_executor" }
 tempfile = { workspace = true }
-temp-env = { workspace = true }
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
@@ -207,7 +206,7 @@ bytes = "1.2"
 chrono = "0.4.22"
 clap = "3"
 colored = "2.0.0"
-console = "0.15.2"
+console = "0.15.7"
 criterion = "0.4"
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
@@ -245,7 +244,6 @@ lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552a
 log = "0.4.17"
 madvise = "0.1"
 maplit = "1.0.1"
-memmap = "0.7"
 nails = "0.13"
 nix = "0.25"
 notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bfd534941386ba2f3b3a022df7" }

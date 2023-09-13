@@ -952,9 +952,10 @@ class BootstrapOptions:
         default=False,
         help=softwrap(
             """
-            Enable concurrent runs of Pants. Without this enabled, Pants will
+            Enable concurrent runs of Pants. With this enabled, Pants will
             start up all concurrent invocations (e.g. in other terminals) without pantsd.
-            Enabling this option requires parallel Pants invocations to block on the first.
+            As a result, enabling this option will increase the per-run startup cost, but
+            will not block subsequent invocations.
             """
         ),
     )

@@ -14,6 +14,8 @@ The best place to become acquainted with Pants community members, exchange infor
 
 We encourage you to introduce yourself in the `#welcome` channel!
 
+The primary public channels of community chat also have a [searchable public archive](https://chat.pantsbuild.org/). No login is required.
+
 Discussions
 ----
 
