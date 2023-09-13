@@ -77,13 +77,15 @@ _G = TypeVar("_G", bound="_GlobMatchErrorBehaviorOptionBase")
 
 _EXPERIMENTAL_SCHEME = "experimental:"
 
+
 def normalize_remote_address(addr: str | None) -> str | None:
     if addr is None:
         return None
     return addr.removeprefix(_EXPERIMENTAL_SCHEME)
 
+
 @dataclass(frozen=True)
-class _RemoteScheme:
+class _RemoteAddressScheme:
     schemes: tuple[str, ...]
     supports_execution: bool
     experimental: bool
@@ -105,7 +107,7 @@ class _RemoteScheme:
 
     @staticmethod
     def _validate_address(
-        schemes: tuple[_RemoteScheme, ...],
+        schemes: tuple[_RemoteAddressScheme, ...],
         addr: str,
         require_execution: bool,
         context_for_diagnostics: str,
@@ -197,8 +199,8 @@ class _RemoteScheme:
 
     @staticmethod
     def validate_address(addr: str, require_execution: bool, context_for_diagnostics: str) -> None:
-        _RemoteScheme._validate_address(
-            _REMOTE_SCHEMES,
+        _RemoteAddressScheme._validate_address(
+            _REMOTE_ADDRESS_SCHEMES,
             addr=addr,
             require_execution=require_execution,
             context_for_diagnostics=context_for_diagnostics,
@@ -213,7 +215,7 @@ class _RemoteScheme:
         def renderer(_: object) -> str:
             supported_schemes = [
                 (scheme.rendered_schemes(), scheme.description)
-                for scheme in _REMOTE_SCHEMES
+                for scheme in _REMOTE_ADDRESS_SCHEMES
                 if not requires_execution or (requires_execution and scheme.supports_execution)
             ]
             if requires_execution:
@@ -223,7 +225,7 @@ class _RemoteScheme:
                     (
                         tuple(
                             scheme_str
-                            for scheme in _REMOTE_SCHEMES
+                            for scheme in _REMOTE_ADDRESS_SCHEMES
                             if not scheme.supports_execution
                             for scheme_str in scheme.rendered_schemes()
                         ),
@@ -253,8 +255,8 @@ class _RemoteScheme:
 # remote execution) provider: it'd be nice to have it in one place, but huonw thinks we do the
 # validation before starting the engine, and, in any case, we can refactor our way there (the remote
 # providers aren't configured in one place yet)
-_REMOTE_SCHEMES = (
-    _RemoteScheme(
+_REMOTE_ADDRESS_SCHEMES = (
+    _RemoteAddressScheme(
         schemes=("grpc", "grpcs"),
         supports_execution=True,
         experimental=False,
@@ -266,7 +268,7 @@ _REMOTE_SCHEMES = (
             """
         ),
     ),
-    _RemoteScheme(
+    _RemoteAddressScheme(
         schemes=("file",),
         supports_execution=False,
         experimental=True,
@@ -374,13 +376,13 @@ class AuthPluginResult:
         plugin_context = f"in `AuthPluginResult` returned from `[GLOBAL].remote_auth_plugin` {name}"
 
         if self.store_address:
-            _RemoteScheme.validate_address(
+            _RemoteAddressScheme.validate_address(
                 self.store_address,
                 require_execution=False,
                 context_for_diagnostics=f"`store_address` {plugin_context}",
             )
         if self.execution_address:
-            _RemoteScheme.validate_address(
+            _RemoteAddressScheme.validate_address(
                 self.execution_address,
                 require_execution=True,
                 context_for_diagnostics=f"`execution_address` {plugin_context}",
@@ -1615,7 +1617,7 @@ class BootstrapOptions:
     remote_store_address = StrOption(
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_store_address),
-        help=_RemoteScheme.address_help(
+        help=_RemoteAddressScheme.address_help(
             "remote file store",
             extra="",
             requires_execution=False,
@@ -1687,7 +1689,7 @@ class BootstrapOptions:
     remote_execution_address = StrOption(
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_execution_address),
-        help=_RemoteScheme.address_help(
+        help=_RemoteAddressScheme.address_help(
             "remote execution scheduler",
             extra="You must also set `[GLOBAL].remote_store_address`, which will often be the same value.",
             requires_execution=True,
@@ -1977,13 +1979,13 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             )
 
         if opts.remote_execution_address:
-            _RemoteScheme.validate_address(
+            _RemoteAddressScheme.validate_address(
                 opts.remote_execution_address,
                 require_execution=True,
                 context_for_diagnostics="The `[GLOBAL].remote_execution_address` option",
             )
         if opts.remote_store_address:
-            _RemoteScheme.validate_address(
+            _RemoteAddressScheme.validate_address(
                 opts.remote_store_address,
                 require_execution=False,
                 context_for_diagnostics="The `[GLOBAL].remote_store_address` option",

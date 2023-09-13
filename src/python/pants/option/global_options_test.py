@@ -17,10 +17,10 @@ from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.errors import OptionsError
 from pants.option.global_options import (
-    _REMOTE_SCHEMES,
+    _REMOTE_ADDRESS_SCHEMES,
     DynamicRemoteOptions,
     GlobalOptions,
-    _RemoteScheme,
+    _RemoteAddressScheme,
 )
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil import rule_runner
@@ -167,8 +167,8 @@ def _scheme(
     schemes: tuple[str, ...] = ("foo",),
     supports_execution: bool = False,
     experimental: bool = False,
-) -> _RemoteScheme:
-    return _RemoteScheme(
+) -> _RemoteAddressScheme:
+    return _RemoteAddressScheme(
         schemes=schemes,
         supports_execution=supports_execution,
         experimental=experimental,
@@ -190,7 +190,7 @@ def _scheme(
 def test_remote_schemes_validate_address_should_pass_for_various_good_addresses_without_execution(
     address: str, execution: bool
 ) -> None:
-    _RemoteScheme._validate_address(
+    _RemoteAddressScheme._validate_address(
         (
             _scheme(schemes=("foo", "foos"), experimental=True, supports_execution=execution),
             # (smoke test require_execution=False supports_execution=True)
@@ -211,7 +211,7 @@ def test_remote_schemes_validate_address_should_error_when_bad_address(address: 
         OptionsError,
         match=f"(?s)CONTEXT has invalid value `{address}`: it does not have a supported scheme.*start with one of: `foo://`, `foos://`, `bar://`",
     ):
-        _RemoteScheme._validate_address(
+        _RemoteAddressScheme._validate_address(
             (
                 _scheme(schemes=("foo", "foos")),
                 _scheme(schemes=("bar",)),
@@ -227,7 +227,7 @@ def test_remote_schemes_validate_address_should_error_when_missing_experimental(
         OptionsError,
         match="(?s)CONTEXT has invalid value `foo://bar`: the scheme `foo` is experimental.*Specify the value as `experimental:foo://bar`",
     ):
-        _RemoteScheme._validate_address(
+        _RemoteAddressScheme._validate_address(
             (_scheme(experimental=True),),
             "foo://bar",
             require_execution=False,
@@ -237,7 +237,7 @@ def test_remote_schemes_validate_address_should_error_when_missing_experimental(
 
 def test_remote_schemes_validate_address_should_warn_when_unnecessary_experimental(caplog) -> None:
     with caplog.at_level("WARNING"):
-        _RemoteScheme._validate_address(
+        _RemoteAddressScheme._validate_address(
             (_scheme(experimental=False),),
             "experimental:foo://bar",
             require_execution=False,
@@ -256,7 +256,7 @@ def test_remote_schemes_validate_address_should_error_when_execution_required_bu
         OptionsError,
         match="(?s)CONTEXT has invalid value `foo://bar`: the scheme `foo` does not support remote execution.*starting with one of: `bar://`",
     ):
-        _RemoteScheme._validate_address(
+        _RemoteAddressScheme._validate_address(
             (
                 _scheme(supports_execution=False),
                 _scheme(schemes=("bar",), supports_execution=True),
@@ -270,5 +270,7 @@ def test_remote_schemes_validate_address_should_error_when_execution_required_bu
 def test_remote_schemes_should_have_unique_schemes():
     # the raw schemes supported for remoting (not with experimental: prefix, etc.) should be unique,
     # so there's no accidental ambiguity about, for instance, `http://` configured more than once
-    counts = Counter(scheme_str for scheme in _REMOTE_SCHEMES for scheme_str in scheme.schemes)
+    counts = Counter(
+        scheme_str for scheme in _REMOTE_ADDRESS_SCHEMES for scheme_str in scheme.schemes
+    )
     assert [scheme for scheme, count in counts.items() if count > 1] == []
