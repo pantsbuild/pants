@@ -246,6 +246,10 @@ class _RemoteScheme:
         return renderer
 
 
+# This duplicates logic/semantics around choosing a byte store/action cache (and, even, technically,
+# remote execution) provider: it'd be nice to have it in one place, but huonw thinks we do the
+# validation before starting the engine, and, in any case, we can refactor our way there (the remote
+# providers aren't configured in one place yet)
 _REMOTE_SCHEMES = (
     _RemoteScheme(
         schemes=("grpc", "grpcs"),

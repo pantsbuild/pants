@@ -52,6 +52,8 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
 // TODO: Consider providing `impl Default`, similar to `super::LocalOptions`.
 #[derive(Clone)]
 pub struct RemoteOptions {
+  // TODO: this is currently framed for the REAPI provider, with some options used by others, would
+  // be good to generalise
   pub cas_address: String,
   pub instance_name: Option<String>,
   pub headers: BTreeMap<String, String>,

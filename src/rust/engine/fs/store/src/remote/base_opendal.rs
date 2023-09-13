@@ -23,7 +23,8 @@ pub enum LoadMode {
 }
 
 pub struct Provider {
-  /// This is public for easier testing
+  /// This is public for easier testing of the action cache provider
+  // TODO: move all the providers into a single crate so that the pub isn't necessary
   pub operator: Operator,
   base_path: String,
 }
@@ -46,8 +47,10 @@ impl Provider {
         // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
         TimeoutLayer::new()
           .with_timeout(options.rpc_timeout)
+          // TimeoutLayer requires specifying a non-zero minimum transfer speed too
           .with_speed(1),
       )
+      // TODO: RetryLayer doesn't seem to retry stores, but we should
       .layer(RetryLayer::new().with_max_times(options.rpc_retries + 1))
       .finish();
 
@@ -69,7 +72,7 @@ impl Provider {
   }
 
   fn path(&self, fingerprint: Fingerprint) -> String {
-    // include the first byte as a parent directory to make listings less wide
+    // include the two bytes as parent directories to make listings less wide
     format!(
       "{}/{:02x}/{:02x}/{}",
       self.base_path, fingerprint.0[0], fingerprint.0[1], fingerprint
