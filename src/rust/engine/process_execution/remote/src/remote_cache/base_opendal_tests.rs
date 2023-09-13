@@ -20,7 +20,14 @@ use super::ActionCacheProvider;
 const BASE: &str = "opendal-testing-base";
 
 fn test_path(digest: Digest) -> String {
-  format!("{}/{}", BASE, digest.hash)
+  let fingerprint = digest.hash.to_string();
+  format!(
+    "{}/{}/{}/{}",
+    BASE,
+    &fingerprint[0..2],
+    &fingerprint[2..4],
+    fingerprint
+  )
 }
 
 fn remote_options() -> RemoteOptions {
