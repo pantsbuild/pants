@@ -35,6 +35,7 @@ use std::{fmt, fs};
 
 use libc::pid_t;
 use log::debug;
+use options::{option_id, BuildRoot, OptionId, OptionType};
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
 use sysinfo::{ProcessExt, ProcessStatus, System, SystemExt};
@@ -144,6 +145,22 @@ impl Metadata {
   }
 }
 
+pub struct FingerprintedOption {
+  _id: OptionId,
+  _option_type: OptionType,
+}
+
+impl FingerprintedOption {
+  pub fn new(id: OptionId, option_type: impl Into<OptionType>) -> Self {
+    Self {
+      _id: id,
+      _option_type: option_type.into(),
+    }
+  }
+}
+
+/// If there is a live `pantsd` process for a valid fingerprint in the given directory, return the
+/// port to use to connect to it.
 pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
   let pantsd_metadata = Metadata::mount(metadata_dir)?;
 
@@ -193,4 +210,34 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
       }
     }
   }
+}
+
+/// The options which are fingerprinted to decide when to restart `pantsd`.
+///
+/// These options are a subset of the bootstrap options which are consumed during `pantsd` startup,
+/// but _before_ creating a Scheduler. The options used to create a Scheduler are fingerprinted
+/// using a different mechanism in `PantsDaemonCore`, to decide when to create new Schedulers
+/// (without restarting `pantsd`).
+pub fn fingerprinted_options(build_root: &BuildRoot) -> Result<Vec<FingerprintedOption>, String> {
+  Ok(vec![
+    FingerprintedOption::new(option_id!(-'l', "level"), "info"),
+    FingerprintedOption::new(option_id!("show_log_target"), false),
+    // TODO: No support for parsing dictionaries, so not fingerprinted. But should be.
+    // FingerprintedOption::new(option_id!("log_levels_by_target"), ...),
+    FingerprintedOption::new(option_id!("log_show_rust_3rdparty"), false),
+    FingerprintedOption::new(option_id!("pants_version"), include_str!("../../VERSION")),
+    FingerprintedOption::new(
+      option_id!("pants_workdir"),
+      build_root
+        .join(".pants.d")
+        .into_os_string()
+        .into_string()
+        .map_err(|e| format!("Build root was not UTF8: {e:?}"))?,
+    ),
+    FingerprintedOption::new(option_id!("pants_physical_workdir_base"), None),
+    FingerprintedOption::new(option_id!("logdir"), None),
+    FingerprintedOption::new(option_id!("pantsd"), true),
+    FingerprintedOption::new(option_id!("pantsd_pailgun_port"), 0),
+    FingerprintedOption::new(option_id!("pantsd_invalidation_globs"), vec![]),
+  ])
 }

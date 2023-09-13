@@ -49,6 +49,8 @@ mod parse;
 #[cfg(test)]
 mod parse_tests;
 
+mod types;
+
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
@@ -60,6 +62,7 @@ use self::config::Config;
 use self::env::Env;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
+pub use types::OptionType;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ListEditAction {
