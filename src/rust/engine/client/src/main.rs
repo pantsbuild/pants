@@ -38,7 +38,6 @@ use nix::unistd::execv;
 use strum::VariantNames;
 use strum_macros::{AsRefStr, EnumString, EnumVariantNames};
 
-use client::pantsd;
 use options::{option_id, render_choice, OptionParser};
 
 // TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/engine/logging/src/lib.rs.

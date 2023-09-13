@@ -29,12 +29,6 @@ mod client;
 #[cfg(test)]
 mod client_tests;
 
-pub mod pantsd;
-#[cfg(test)]
-mod pantsd_testing;
-#[cfg(test)]
-mod pantsd_tests;
-
 pub use crate::client::{execute_command, ConnectionSettings};
 
 #[cfg(test)]
