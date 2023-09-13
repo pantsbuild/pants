@@ -15,6 +15,7 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
+from pants.option.errors import OptionsError
 from pants.option.global_options import (
     _REMOTE_SCHEMES,
     DynamicRemoteOptions,
@@ -207,7 +208,7 @@ def test_remote_schemes_validate_address_should_pass_for_various_good_addresses_
 )
 def test_remote_schemes_validate_address_should_error_when_bad_address(address: str) -> None:
     with pytest.raises(
-        ValueError,
+        OptionsError,
         match=f"(?s)CONTEXT has invalid value `{address}`: it does not have a supported scheme.*start with one of: `foo://`, `foos://`, `bar://`",
     ):
         _RemoteScheme._validate_address(
@@ -223,7 +224,7 @@ def test_remote_schemes_validate_address_should_error_when_bad_address(address: 
 
 def test_remote_schemes_validate_address_should_error_when_missing_experimental() -> None:
     with pytest.raises(
-        ValueError,
+        OptionsError,
         match="(?s)CONTEXT has invalid value `foo://bar`: the scheme `foo` is experimental.*Specify the value as `experimental:foo://bar`",
     ):
         _RemoteScheme._validate_address(
@@ -252,7 +253,7 @@ def test_remote_schemes_validate_address_should_error_when_execution_required_bu
     None
 ):
     with pytest.raises(
-        ValueError,
+        OptionsError,
         match="(?s)CONTEXT has invalid value `foo://bar`: the scheme `foo` does not support remote execution.*starting with one of: `bar://`",
     ):
         _RemoteScheme._validate_address(

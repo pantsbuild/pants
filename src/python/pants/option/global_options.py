@@ -77,6 +77,10 @@ _G = TypeVar("_G", bound="_GlobMatchErrorBehaviorOptionBase")
 
 _EXPERIMENTAL_SCHEME = "experimental:"
 
+def normalize_remote_address(addr: str | None) -> str | None:
+    if addr is None:
+        return None
+    return addr.removeprefix(_EXPERIMENTAL_SCHEME)
 
 @dataclass(frozen=True)
 class _RemoteScheme:
@@ -124,7 +128,7 @@ class _RemoteScheme:
             supported_schemes = ", ".join(
                 f"`{rendered}`" for scheme in schemes for rendered in scheme.rendered_schemes()
             )
-            raise ValueError(
+            raise OptionsError(
                 softwrap(
                     f"""
                     {context_for_diagnostics} has invalid value `{addr}`: it does not have a
@@ -140,7 +144,7 @@ class _RemoteScheme:
         if scheme.experimental and not addr_is_experimental:
             # Got a URL like `some-scheme://` for a scheme that IS experimental. Tell the user they
             # need to specify it as `experimental:some-scheme://`.
-            raise ValueError(
+            raise OptionsError(
                 softwrap(
                     f"""
                     {context_for_diagnostics} has invalid value `{addr}`: the scheme `{scheme_str}`
@@ -177,7 +181,7 @@ class _RemoteScheme:
                 if scheme.supports_execution
                 for rendered in scheme.rendered_schemes()
             )
-            raise ValueError(
+            raise OptionsError(
                 softwrap(
                     f"""
                     {context_for_diagnostics} has invalid value `{addr}`: the scheme `{scheme_str}`
