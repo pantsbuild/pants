@@ -86,7 +86,7 @@ async fn choose_provider(
     instance_name: options.instance_name.clone(),
     headers: options.headers.clone(),
     tls_config: tls::Config::new_without_mtls(options.root_ca_certs.clone()),
-    rpc_timeout: options.rpc_timeout.clone(),
+    rpc_timeout: options.rpc_timeout,
     rpc_concurrency_limit: options.concurrency_limit,
     // TODO: these should either be passed through or not synthesized here
     chunk_size_bytes: 0,
