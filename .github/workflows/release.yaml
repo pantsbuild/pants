@@ -73,11 +73,6 @@ jobs:
         \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
         \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
         \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
-        \n\n# NB: Also upload under an unversioned name throughout the 2.18.x release\
-        \ series.\n# See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875\n\
-        curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$PY_VER-$PLAT.pex \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
         \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
         )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
@@ -155,11 +150,6 @@ jobs:
         \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
         \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
         \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
-        \n\n# NB: Also upload under an unversioned name throughout the 2.18.x release\
-        \ series.\n# See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875\n\
-        curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$PY_VER-$PLAT.pex \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
         \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
         )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
@@ -248,11 +238,6 @@ jobs:
         \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
         \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
         \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
-        \n\n# NB: Also upload under an unversioned name throughout the 2.18.x release\
-        \ series.\n# See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875\n\
-        curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$PY_VER-$PLAT.pex \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
         \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
         )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
@@ -334,11 +319,6 @@ jobs:
         \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
         \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
         \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
-        \n\n# NB: Also upload under an unversioned name throughout the 2.18.x release\
-        \ series.\n# See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875\n\
-        curl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$PY_VER-$PLAT.pex \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
         \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
         )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
