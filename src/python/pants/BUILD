@@ -40,6 +40,16 @@ python_distribution(
     entry_points={"console_scripts": {"pants": "src/python/pants/bin:pants"}},
 )
 
+pex_binary(
+    name="pants-pex",
+    dependencies=[":pants-packaged"],
+    script="pants",
+    execution_mode="venv",
+    shebang="/usr/bin/env python",
+    strip_pex_env=False,
+    layout="zipapp",
+)
+
 # NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building
 # `:pants-packaged`. We don't actually need to use any meaningful file here, though, because we
 # use `entry_points` to link to the actual native code, so clang/gcc do not need to build any
