@@ -65,7 +65,7 @@ async def run_ruff(
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
     # `--force-exclude` applies file excludes from config to files provided explicitly
-    initial_args = ("--force-exclude", "--fix") if request.is_fix else ("--force-exclude",)
+    initial_args = ("--force-exclude",) + (( "--fix",) if request.is_fix else ())
 
     result = await Get(
         FallibleProcessResult,
