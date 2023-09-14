@@ -36,6 +36,7 @@ from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -299,16 +300,17 @@ async def _do_fix(
         partition_infos: Sequence[Tuple[Type[AbstractFixRequest], Any]]
         files: Sequence[str]
 
-        partition_infos_by_files = defaultdict(set)
+        partition_infos_by_files = defaultdict(list)
         for request_type, partitions_list in partitions_by_request_type.items():
             for partitions in partitions_list:
                 for partition in partitions:
                     for file in partition.elements:
-                        partition_infos_by_files[file].add((request_type, partition.metadata))
+                        partition_infos_by_files[file].append((request_type, partition.metadata))
 
         files_by_partition_info = defaultdict(list)
         for file, partition_infos in partition_infos_by_files.items():
-            files_by_partition_info[tuple(partition_infos)].append(file)
+            deduped_partition_infos = FrozenOrderedSet(partition_infos)
+            files_by_partition_info[deduped_partition_infos].append(file)
 
         for partition_infos, files in files_by_partition_info.items():
             for batch in batch_by_size(files):

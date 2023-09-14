@@ -376,8 +376,6 @@ def test_summary() -> None:
         """
     )
 
-    assert False
-
 
 def test_skip_formatters() -> None:
     rule_runner = fix_rule_runner(
@@ -550,6 +548,7 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
         QueryRule(Partitions, [FixKitchenRequest.PartitionRequest]),
     ]
     rule_runner = RuleRunner(rules=rules)
+    rule_runner.write_files({"BUILD": "", "knife.utensil": "", "bowl.utensil": ""})
     partitions = rule_runner.request(Partitions, [FixKitchenRequest.PartitionRequest(field_sets)])
     assert len(partitions) == 1
     assert partitions[0].elements == ("bowl.utensil", "knife.utensil")
