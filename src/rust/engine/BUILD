@@ -29,8 +29,10 @@ shell_command(
     tools=["cc", "ld", "as", "ar", "cargo", "protoc", "python3.9", "sccache"],
     output_files=[
         f"target/debug/libengine.so",
+        f"target/debug/libengine.dylib",
         f"target/debug/pants",
         f"target/release/libengine.so",
+        f"target/release/libengine.dylib",
         f"target/release/pants",
     ],
     timeout=600,
