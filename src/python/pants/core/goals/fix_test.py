@@ -304,7 +304,7 @@ def write_files(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_batches() -> None:
+def test_batches(capfd) -> None:
     rule_runner = fix_rule_runner(
         target_types=[SmalltalkTarget],
         request_types=[SmalltalkNoopRequest],
@@ -314,18 +314,18 @@ def test_batches() -> None:
         {
             "BUILD": dedent(
                 """\
-                smalltalk(name='s1-1', source="st1.st")
-                smalltalk(name='s1-2', source="st1.st")
-                smalltalk(name='s2-1', source="st1.st")
-                smalltalk(name='s2-2', source="st2.st")
+                smalltalk(name='s1-1', source="duplicate1.st")
+                smalltalk(name='s1-2', source="duplicate1.st")
+                smalltalk(name='s2-1', source="duplicate1.st")
+                smalltalk(name='s2-2', source="duplicate2.st")
                 """,
             ),
-            "st1.st": "",
-            "st2.st": "",
+            "duplicate1.st": "",
+            "duplicate2.st": "",
         },
     )
-    stderr = run_fix(rule_runner, target_specs=["::"])
-    assert stderr.count("Smalltalk Did Not Change made no changes.") == 1
+    run_fix(rule_runner, target_specs=["::"])
+    assert capfd.readouterr().err.count("Smalltalk Did Not Change made no changes.") == 1
 
 
 def test_summary() -> None:
