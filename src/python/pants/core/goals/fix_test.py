@@ -36,10 +36,17 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
-from pants.engine.target import FieldSet, MultipleSourcesField, SingleSourceField, Target
+from pants.engine.target import (
+    FieldSet,
+    MultipleSourcesField,
+    SingleSourceField,
+    StringField,
+    Target,
+)
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import logging as log_this
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -128,9 +135,13 @@ class SmalltalkSource(SingleSourceField):
     pass
 
 
+class SmalltalkExtraField(StringField):
+    alias = "extra"
+
+
 class SmalltalkTarget(Target):
     alias = "smalltalk"
-    core_fields = (SmalltalkSource,)
+    core_fields = (SmalltalkSource, SmalltalkExtraField)
 
 
 @dataclass(frozen=True)
@@ -140,8 +151,16 @@ class SmalltalkFieldSet(FieldSet):
     source: SmalltalkSource
 
 
+@dataclass(frozen=True)
+class SmalltalkExtraFieldSet(FieldSet):
+    required_fields = (SmalltalkSource, SmalltalkExtraField)
+
+    source: SmalltalkSource
+
+
 class SmalltalkNoopRequest(FixTargetsRequest):
-    field_set_type = SmalltalkFieldSet
+    # NB: We use this extra field set to test https://github.com/pantsbuild/pants/issues/17403
+    field_set_type = SmalltalkExtraFieldSet
 
     @classproperty
     def tool_name(cls) -> str:
@@ -253,6 +272,7 @@ def fix_rule_runner(
     )
 
 
+@log_this(level=LogLevel.INFO)
 def run_fix(
     rule_runner: RuleRunner,
     *,
@@ -286,6 +306,31 @@ def write_files(rule_runner: RuleRunner) -> None:
             "fixed.st": "y := self size + super size.')\n",
         },
     )
+
+
+def test_batches(capfd) -> None:
+    rule_runner = fix_rule_runner(
+        target_types=[SmalltalkTarget],
+        request_types=[SmalltalkNoopRequest],
+    )
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                smalltalk(name='s1-1', source="st1.st")
+                smalltalk(name='s1-2', source="st1.st", extra="extra")
+                smalltalk(name='s2-1', source="st1.st")
+                smalltalk(name='s2-2', source="st2.st", extra="extra")
+                """,
+            ),
+            "st1.st": "",
+            "st2.st": "",
+        },
+    )
+    run_fix(rule_runner, target_specs=["::"])
+
+    assert capfd.readouterr().err.count("Smalltalk Did Not Change made no changes.") == 1
 
 
 def test_summary() -> None:
@@ -330,6 +375,8 @@ def test_summary() -> None:
         brick(brick='brick2', brick="brick.brick")
         """
     )
+
+    assert False
 
 
 def test_skip_formatters() -> None:
@@ -503,7 +550,6 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
         QueryRule(Partitions, [FixKitchenRequest.PartitionRequest]),
     ]
     rule_runner = RuleRunner(rules=rules)
-    print(rule_runner.write_files({"BUILD": "", "knife.utensil": "", "bowl.utensil": ""}))
     partitions = rule_runner.request(Partitions, [FixKitchenRequest.PartitionRequest(field_sets)])
     assert len(partitions) == 1
     assert partitions[0].elements == ("bowl.utensil", "knife.utensil")

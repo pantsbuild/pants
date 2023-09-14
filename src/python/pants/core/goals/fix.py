@@ -126,6 +126,8 @@ class AbstractFixRequest(AbstractLintRequest):
 
         @property
         def files(self) -> tuple[str, ...]:
+            # NB: self.elements might have duplicates, so use `self.snapshot.files` which is already
+            # the right value. See https://github.com/pantsbuild/pants/pull/19796.
             return self.snapshot.files
 
     @classmethod
