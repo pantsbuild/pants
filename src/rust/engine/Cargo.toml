@@ -244,7 +244,6 @@ lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552a
 log = "0.4.17"
 madvise = "0.1"
 maplit = "1.0.1"
-memmap = "0.7"
 nails = "0.13"
 nix = "0.25"
 notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bfd534941386ba2f3b3a022df7" }
@@ -297,11 +296,14 @@ tonic-build = "0.9"
 tower = "0.4"
 tower-layer = "0.3"
 tower-service = "0.3"
-tree-sitter = "0.20.10"
-tree-sitter-javascript = "0.20.0"
-tree-sitter-python = "0.20.4"
 uname = "0.1.1"
 url = "2.4"
 uuid = "1.1.2"
 walkdir = "2"
 webpki = "0.22"
+
+# NB: If a change to these versions requires cache busting, bump the version of
+# `src/rust/engine/dep_inference/Cargo.toml`.
+tree-sitter = "0.20.10"
+tree-sitter-javascript = "0.20.0"
+tree-sitter-python = "0.20.4"
