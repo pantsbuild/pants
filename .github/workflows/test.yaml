@@ -35,7 +35,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
@@ -125,7 +125,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
@@ -227,7 +227,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        key: macOS11-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
@@ -434,7 +434,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
@@ -499,7 +499,7 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
         path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
