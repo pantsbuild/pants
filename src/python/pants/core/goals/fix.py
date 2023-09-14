@@ -127,7 +127,7 @@ class AbstractFixRequest(AbstractLintRequest):
 
         @property
         def files(self) -> tuple[str, ...]:
-            return tuple(FrozenOrderedSet(self.snapshot.files))
+            return tuple(FrozenOrderedSet(self.elements))
 
     @classmethod
     def _get_rules(cls) -> Iterable[UnionRule]:
