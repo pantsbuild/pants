@@ -135,6 +135,10 @@ class SmalltalkSource(SingleSourceField):
     pass
 
 
+# NB: This extra field is required to help us in `test_batches` below.
+#   With it, each `SmalltalkTarget` we instantiate will produce a different `SmalltalkFieldSet`
+#   (even with the same `source` field value), which then results in https://github.com/pantsbuild/pants/issues/17403.
+#   See https://github.com/pantsbuild/pants/pull/19796.
 class SmalltalkExtraField(StringField):
     alias = "extra"
 
@@ -151,16 +155,8 @@ class SmalltalkFieldSet(FieldSet):
     source: SmalltalkSource
 
 
-@dataclass(frozen=True)
-class SmalltalkExtraFieldSet(FieldSet):
-    required_fields = (SmalltalkSource, SmalltalkExtraField)
-
-    source: SmalltalkSource
-
-
 class SmalltalkNoopRequest(FixTargetsRequest):
-    # NB: We use this extra field set to test https://github.com/pantsbuild/pants/issues/17403
-    field_set_type = SmalltalkExtraFieldSet
+    field_set_type = SmalltalkFieldSet
 
     @classproperty
     def tool_name(cls) -> str:
@@ -319,9 +315,9 @@ def test_batches(capfd) -> None:
             "BUILD": dedent(
                 """\
                 smalltalk(name='s1-1', source="st1.st")
-                smalltalk(name='s1-2', source="st1.st", extra="extra")
+                smalltalk(name='s1-2', source="st1.st")
                 smalltalk(name='s2-1', source="st1.st")
-                smalltalk(name='s2-2', source="st2.st", extra="extra")
+                smalltalk(name='s2-2', source="st2.st")
                 """,
             ),
             "st1.st": "",

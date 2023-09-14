@@ -297,7 +297,7 @@ async def _do_fix(
             yield tuple(batch)
 
     def _make_disjoint_batch_requests() -> Iterable[_FixBatchRequest]:
-        partition_infos: Sequence[Tuple[Type[AbstractFixRequest], Any]]
+        partition_infos: Iterable[Tuple[Type[AbstractFixRequest], Any]]
         files: Sequence[str]
 
         partition_infos_by_files = defaultdict(list)
