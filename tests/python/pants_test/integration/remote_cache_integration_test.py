@@ -58,7 +58,7 @@ def test_warns_on_remote_cache_errors() -> None:
 
     def write_err(i: int) -> str:
         return (
-            f'Failed to write to remote cache ({i} occurrences so far): InvalidArgument: "StubCAS is '
+            f'Failed to write to remote cache ({i} occurrences so far): Internal: "StubCAS is '
             f'configured to always fail"'
         )
 

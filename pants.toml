@@ -36,7 +36,7 @@ backend_packages.add = [
   "pants.backend.experimental.visibility",
   "pants.backend.tools.preamble",
   "pants.backend.tools.taplo",
-  "pants.explorer.server",
+  "pants_explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]

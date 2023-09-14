@@ -1,21 +1,21 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
-use mock::StubCAS;
+use mock::{RequestType, StubCAS};
+use tempfile::TempDir;
 use testutil::data::TestData;
+use tokio::fs::File;
 
 use crate::remote::{ByteStoreProvider, RemoteOptions};
-use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
+use crate::tests::{big_file_bytes, big_file_fingerprint, mk_tempfile, new_cas};
 use crate::MEGABYTES;
 
 use super::reapi::Provider;
-use super::ByteSource;
 
 fn remote_options(
   cas_address: String,
@@ -44,10 +44,6 @@ async fn new_provider(cas: &StubCAS) -> Provider {
   ))
   .await
   .unwrap()
-}
-
-fn byte_source(bytes: Bytes) -> ByteSource {
-  Arc::new(move |r| bytes.slice(r))
 }
 
 async fn load_test(chunk_size: usize) {
@@ -118,7 +114,12 @@ async fn load_grpc_error() {
   assert!(
     error.contains("StubCAS is configured to always fail"),
     "Bad error message, got: {error}"
-  )
+  );
+  // retries:
+  assert_eq!(
+    cas.request_counts.lock().get(&RequestType::BSRead),
+    Some(&3)
+  );
 }
 
 #[tokio::test]
@@ -168,13 +169,141 @@ fn assert_cas_store(
 }
 
 #[tokio::test]
+async fn store_file_one_chunk() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::empty();
+  let provider = new_provider(&cas).await;
+
+  provider
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
+    .await
+    .unwrap();
+
+  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+}
+#[tokio::test]
+async fn store_file_multiple_chunks() {
+  let cas = StubCAS::empty();
+  let chunk_size = 10 * 1024;
+  let provider = Provider::new(remote_options(
+    cas.address(),
+    chunk_size,
+    0, // disable batch API, force streaming API
+  ))
+  .await
+  .unwrap();
+
+  let all_the_henries = big_file_bytes();
+  let fingerprint = big_file_fingerprint();
+  let digest = Digest::new(fingerprint, all_the_henries.len());
+
+  provider
+    .store_file(digest, mk_tempfile(Some(&all_the_henries)).await)
+    .await
+    .unwrap();
+
+  assert_cas_store(&cas, fingerprint, all_the_henries, 98, chunk_size)
+}
+
+#[tokio::test]
+async fn store_file_empty_file() {
+  let testdata = TestData::empty();
+  let cas = StubCAS::empty();
+  let provider = new_provider(&cas).await;
+
+  provider
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
+    .await
+    .unwrap();
+
+  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+}
+
+#[tokio::test]
+async fn store_file_grpc_error() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::cas_always_errors();
+  let provider = new_provider(&cas).await;
+
+  let error = provider
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("StubCAS is configured to always fail"),
+    "Bad error message, got: {error}"
+  );
+
+  // retries:
+  assert_eq!(
+    cas.request_counts.lock().get(&RequestType::BSWrite),
+    Some(&3)
+  );
+}
+
+#[tokio::test]
+async fn store_file_connection_error() {
+  let testdata = TestData::roland();
+  let provider = Provider::new(remote_options(
+    "http://doesnotexist.example".to_owned(),
+    10 * MEGABYTES,
+    crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+  ))
+  .await
+  .unwrap();
+
+  let error = provider
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("Unavailable: \"error trying to connect: dns error"),
+    "Bad error message, got: {error}"
+  );
+}
+
+#[tokio::test]
+async fn store_file_source_read_error_immediately() {
+  let testdata = TestData::roland();
+  let cas = StubCAS::empty();
+  let provider = new_provider(&cas).await;
+
+  let temp_dir = TempDir::new().unwrap();
+  let file_that_is_a_dir = File::open(temp_dir.path()).await.unwrap();
+
+  let error = provider
+    .store_file(testdata.digest(), file_that_is_a_dir)
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("Is a directory"),
+    "Bad error message, got: {error}",
+  )
+}
+
+// TODO: it would also be good to validate the behaviour if the file reads start failing later
+// (e.g. read 10 bytes, and then fail), if that's a thing that is possible.
+
+#[tokio::test]
 async fn store_bytes_one_chunk() {
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
   let provider = new_provider(&cas).await;
 
   provider
-    .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .unwrap();
 
@@ -197,7 +326,7 @@ async fn store_bytes_multiple_chunks() {
   let digest = Digest::new(fingerprint, all_the_henries.len());
 
   provider
-    .store_bytes(digest, byte_source(all_the_henries.clone()))
+    .store_bytes(digest, all_the_henries.clone())
     .await
     .unwrap();
 
@@ -211,7 +340,7 @@ async fn store_bytes_empty_file() {
   let provider = new_provider(&cas).await;
 
   provider
-    .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .unwrap();
 
@@ -219,18 +348,59 @@ async fn store_bytes_empty_file() {
 }
 
 #[tokio::test]
-async fn store_bytes_grpc_error() {
+async fn store_bytes_batch_grpc_error() {
   let testdata = TestData::roland();
   let cas = StubCAS::cas_always_errors();
   let provider = new_provider(&cas).await;
 
   let error = provider
-    .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .expect_err("Want err");
   assert!(
     error.contains("StubCAS is configured to always fail"),
     "Bad error message, got: {error}"
+  );
+
+  // retries:
+  assert_eq!(
+    cas
+      .request_counts
+      .lock()
+      .get(&RequestType::CASBatchUpdateBlobs),
+    Some(&3)
+  );
+}
+
+#[tokio::test]
+async fn store_bytes_write_stream_grpc_error() {
+  let cas = StubCAS::cas_always_errors();
+  let chunk_size = 10 * 1024;
+  let provider = Provider::new(remote_options(
+    cas.address(),
+    chunk_size,
+    0, // disable batch API, force streaming API
+  ))
+  .await
+  .unwrap();
+
+  let all_the_henries = big_file_bytes();
+  let fingerprint = big_file_fingerprint();
+  let digest = Digest::new(fingerprint, all_the_henries.len());
+
+  let error = provider
+    .store_bytes(digest, all_the_henries)
+    .await
+    .expect_err("Want err");
+  assert!(
+    error.contains("StubCAS is configured to always fail"),
+    "Bad error message, got: {error}"
+  );
+
+  // retries:
+  assert_eq!(
+    cas.request_counts.lock().get(&RequestType::BSWrite),
+    Some(&3)
   );
 }
 
@@ -246,7 +416,7 @@ async fn store_bytes_connection_error() {
   .unwrap();
 
   let error = provider
-    .store_bytes(testdata.digest(), byte_source(testdata.bytes()))
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .expect_err("Want err");
   assert!(
@@ -299,5 +469,13 @@ async fn list_missing_digests_grpc_error() {
   assert!(
     error.contains("StubCAS is configured to always fail"),
     "Bad error message, got: {error}"
+  );
+  // retries:
+  assert_eq!(
+    cas
+      .request_counts
+      .lock()
+      .get(&RequestType::CASFindMissingBlobs),
+    Some(&3)
   );
 }

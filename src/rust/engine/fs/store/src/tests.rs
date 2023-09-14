@@ -17,10 +17,12 @@ use fs::{
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
-use mock::StubCAS;
+use mock::{RequestType, StubCAS};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
+use crate::local::ByteStore;
 use crate::{
   EntryType, FileContent, RemoteOptions, Snapshot, Store, StoreError, StoreFileByDigest,
   UploadSummary, MEGABYTES,
@@ -67,6 +69,21 @@ pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, Sto
   store
     .load_file_bytes_with(digest, Bytes::copy_from_slice)
     .await
+}
+
+pub async fn mk_tempfile(contents: Option<&[u8]>) -> tokio::fs::File {
+  let file = tokio::task::spawn_blocking(tempfile::tempfile)
+    .await
+    .unwrap()
+    .unwrap();
+  let mut file = tokio::fs::File::from_std(file);
+
+  if let Some(contents) = contents {
+    file.write_all(contents).await.unwrap();
+    file.rewind().await.unwrap();
+  }
+
+  file
 }
 
 ///
@@ -151,7 +168,7 @@ async fn load_file_prefers_local() {
     .await,
     Ok(testdata.bytes())
   );
-  assert_eq!(0, cas.read_request_count());
+  assert_eq!(0, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -179,7 +196,7 @@ async fn load_directory_prefers_local() {
       .unwrap(),
     testdir.directory()
   );
-  assert_eq!(0, cas.read_request_count());
+  assert_eq!(0, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -198,7 +215,7 @@ async fn load_file_falls_back_and_backfills() {
     Ok(testdata.bytes()),
     "Read from CAS"
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert_eq!(
     crate::local_tests::load_file_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -232,7 +249,7 @@ async fn load_file_falls_back_and_backfills_for_huge_file() {
     .unwrap(),
     testdata.bytes()
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert!(
     crate::local_tests::load_file_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -245,7 +262,7 @@ async fn load_file_falls_back_and_backfills_for_huge_file() {
 }
 
 #[tokio::test]
-async fn load_directory_falls_back_and_backfills() {
+async fn load_directory_small_falls_back_and_backfills() {
   let dir = TempDir::new().unwrap();
 
   let cas = new_cas(1024);
@@ -260,7 +277,45 @@ async fn load_directory_falls_back_and_backfills() {
       .unwrap(),
     testdir.directory()
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
+  assert_eq!(
+    crate::local_tests::load_directory_proto_bytes(
+      &crate::local_tests::new_store(dir.path()),
+      testdir.digest(),
+    )
+    .await,
+    Ok(Some(testdir.bytes()))
+  );
+}
+
+#[tokio::test]
+async fn load_directory_huge_falls_back_and_backfills() {
+  let dir = TempDir::new().unwrap();
+
+  let testdir = TestDirectory::many_files();
+  let digest = testdir.digest();
+  // this test is ensuring that "huge" directories don't fall into the FSDB code paths, so let's
+  // ensure we're actually testing that, by validating that a _file_ of this size would use FSDB
+  assert!(ByteStore::should_use_fsdb(
+    EntryType::File,
+    digest.size_bytes
+  ));
+
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder()
+    .directory(&testdir)
+    .file(&TestData::empty())
+    .build();
+
+  assert_eq!(
+    new_store(dir.path(), &cas.address())
+      .await
+      .load_directory(digest)
+      .await
+      .unwrap(),
+    testdir.directory()
+  );
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert_eq!(
     crate::local_tests::load_directory_proto_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -336,7 +391,7 @@ async fn load_file_missing_is_none() {
   )
   .await;
   assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -349,7 +404,7 @@ async fn load_directory_missing_errors() {
     .load_directory(TestDirectory::containing_roland().digest())
     .await;
   assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -365,9 +420,9 @@ async fn load_file_remote_error_is_error() {
   .await
   .expect_err("Want error");
   assert!(
-    cas.read_request_count() > 0,
+    cas.request_count(RequestType::BSRead) > 0,
     "Want read_request_count > 0 but got {}",
-    cas.read_request_count()
+    cas.request_count(RequestType::BSRead)
   );
   assert!(
     error
@@ -389,9 +444,9 @@ async fn load_directory_remote_error_is_error() {
     .await
     .expect_err("Want error");
   assert!(
-    cas.read_request_count() > 0,
+    cas.request_count(RequestType::BSRead) > 0,
     "Want read_request_count > 0 but got {}",
-    cas.read_request_count()
+    cas.request_count(RequestType::BSRead)
   );
   assert!(
     error
