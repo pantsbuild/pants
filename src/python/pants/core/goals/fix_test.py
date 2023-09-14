@@ -304,7 +304,7 @@ def write_files(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_batches(capfd) -> None:
+def test_batches() -> None:
     rule_runner = fix_rule_runner(
         target_types=[SmalltalkTarget],
         request_types=[SmalltalkNoopRequest],
@@ -324,9 +324,8 @@ def test_batches(capfd) -> None:
             "st2.st": "",
         },
     )
-    run_fix(rule_runner, target_specs=["::"])
-
-    assert capfd.readouterr().err.count("Smalltalk Did Not Change made no changes.") == 1
+    stderr = run_fix(rule_runner, target_specs=["::"])
+    assert stderr.count("Smalltalk Did Not Change made no changes.") == 1
 
 
 def test_summary() -> None:
