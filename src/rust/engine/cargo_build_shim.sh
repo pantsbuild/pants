@@ -4,8 +4,8 @@
 # This simply exists because `shell_command` at the time of writing doesn't know how to merge `PATH`
 # from the rule's env and the `extra_env_vars`.
 
-PYTHON_PATH=${CHROOT}/3rdparty/tools/python3/python/bin
-export PATH=$PATH:$PYTHON_PATH
+PYTHON_PATH="${CHROOT}/3rdparty/tools/python3/python/bin"
+export PATH="$PATH:$PYTHON_PATH"
 
 RELTYPE_FLAG=""
 [ "$MODE" == "debug" ] || RELTYPE_FLAG="--release"
