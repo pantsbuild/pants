@@ -10,7 +10,6 @@ pub enum OptionType {
   Int(i64),
   Float(f64),
   String(String),
-  StringOption(Option<String>),
   StringList(Vec<String>),
   // NB: Notably missing is `Dict`: but that type is not yet supported by the Rust parser.
 }
@@ -42,12 +41,6 @@ impl From<&str> for OptionType {
 impl From<String> for OptionType {
   fn from(v: String) -> Self {
     OptionType::String(v)
-  }
-}
-
-impl From<Option<&str>> for OptionType {
-  fn from(v: Option<&str>) -> Self {
-    OptionType::StringOption(v.map(|s| s.to_owned()))
   }
 }
 

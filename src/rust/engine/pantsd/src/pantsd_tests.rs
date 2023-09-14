@@ -17,7 +17,7 @@ fn assert_connect(port: u16) {
 
 #[test]
 fn test_address_integration() {
-  let (_, pants_subprocessdir) = launch_pantsd();
+  let (_, _, pants_subprocessdir) = launch_pantsd();
 
   let pantsd_metadata = crate::Metadata::mount(&pants_subprocessdir).unwrap();
   let port = pantsd_metadata.port().unwrap();
@@ -25,9 +25,9 @@ fn test_address_integration() {
 }
 
 #[test]
-fn test_probe() {
-  let (build_root, pants_subprocessdir) = launch_pantsd();
+fn test_find_pantsd() {
+  let (build_root, options_parser, _tmpdir) = launch_pantsd();
 
-  let port = crate::probe(&build_root, pants_subprocessdir.path()).unwrap();
-  assert_connect(port);
+  let connection_settings = crate::find_pantsd(&build_root, &options_parser).unwrap();
+  assert_connect(connection_settings.port);
 }

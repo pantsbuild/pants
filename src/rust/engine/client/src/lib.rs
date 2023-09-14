@@ -29,7 +29,7 @@ mod client;
 #[cfg(test)]
 mod client_tests;
 
-pub use crate::client::{execute_command, ConnectionSettings};
+pub use crate::client::execute_command;
 
 #[cfg(test)]
 mod lib_tests;

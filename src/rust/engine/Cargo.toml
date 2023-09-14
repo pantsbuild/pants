@@ -64,6 +64,8 @@ log = { workspace = true }
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
 num_enum = { workspace = true }
+options = { path = "options" }
+pantsd = { path = "pantsd" }
 parking_lot = { workspace = true }
 petgraph = { workspace = true }
 process_execution = { path = "process_execution" }

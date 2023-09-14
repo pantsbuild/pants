@@ -997,6 +997,8 @@ dependencies = [
  "mock",
  "nailgun",
  "num_enum",
+ "options",
+ "pantsd",
  "parking_lot 0.12.1",
  "pe_nailgun",
  "petgraph",

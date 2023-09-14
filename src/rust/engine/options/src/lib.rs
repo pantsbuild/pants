@@ -57,9 +57,9 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::rc::Rc;
 
-use self::args::Args;
+pub use self::args::Args;
 use self::config::Config;
-use self::env::Env;
+pub use self::env::Env;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 pub use types::OptionType;
@@ -102,6 +102,28 @@ pub(crate) trait OptionsSource {
   /// Errors when this source has an option value for `id` but that value is not a boolean.
   ///
   fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String>;
+
+  ///
+  /// Get the int option identified by `id` from this source.
+  /// Errors when this source has an option value for `id` but that value is not an int.
+  ///
+  /// The default implementation looks for a string value for `id` and then attempts to parse it as
+  /// a int value.
+  ///
+  fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
+    if let Some(value) = self.get_string(id)? {
+      value.parse().map(Some).map_err(|e| {
+        format!(
+          "Problem parsing {} value {} as an int value: {}",
+          self.display(id),
+          value,
+          e
+        )
+      })
+    } else {
+      Ok(None)
+    }
+  }
 
   ///
   /// Get the float option identified by `id` from this source.
@@ -159,10 +181,10 @@ pub struct OptionParser {
 }
 
 impl OptionParser {
-  pub fn new() -> Result<OptionParser, String> {
+  pub fn new(env: Env, args: Args) -> Result<OptionParser, String> {
     let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
-    sources.insert(Source::Env, Rc::new(Env::capture()));
-    sources.insert(Source::Flag, Rc::new(Args::argv()));
+    sources.insert(Source::Env, Rc::new(env));
+    sources.insert(Source::Flag, Rc::new(args));
     let mut parser = OptionParser {
       sources: sources.clone(),
     };
@@ -205,6 +227,21 @@ impl OptionParser {
   pub fn parse_bool(&self, id: &OptionId, default: bool) -> Result<OptionValue<bool>, String> {
     for (source_type, source) in self.sources.iter() {
       if let Some(value) = source.get_bool(id)? {
+        return Ok(OptionValue {
+          source: *source_type,
+          value,
+        });
+      }
+    }
+    Ok(OptionValue {
+      source: Source::Default,
+      value: default,
+    })
+  }
+
+  pub fn parse_int(&self, id: &OptionId, default: i64) -> Result<OptionValue<i64>, String> {
+    for (source_type, source) in self.sources.iter() {
+      if let Some(value) = source.get_int(id)? {
         return Ok(OptionValue {
           source: *source_type,
           value,

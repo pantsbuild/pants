@@ -154,6 +154,18 @@ impl OptionsSource for Config {
     }
   }
 
+  fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
+    if let Some(value) = self.get_value(id) {
+      if let Some(int) = value.as_integer() {
+        Ok(Some(int))
+      } else {
+        Err(format!("Expected {id} to be an int but given {value}."))
+      }
+    } else {
+      Ok(None)
+    }
+  }
+
   fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
     if let Some(value) = self.get_value(id) {
       if let Some(float) = value.as_float() {
