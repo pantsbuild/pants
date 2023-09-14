@@ -105,6 +105,14 @@ async fn choose_provider(
       "action-cache".to_owned(),
       remote_options,
     )?))
+  } else if let Some(url) = address.strip_prefix("github-actions-cache+") {
+    // TODO: this is relying on python validating that it was set as
+    // `github-actions-cache+https://...`
+    Ok(Arc::new(base_opendal::Provider::github_actions_cache(
+      url,
+      "action-cache".to_owned(),
+      remote_options,
+    )?))
   } else {
     Err(format!(
       "Cannot initialise remote action cache provider with address {address}, as the scheme is not supported",

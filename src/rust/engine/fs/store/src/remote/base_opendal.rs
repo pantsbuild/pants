@@ -9,12 +9,15 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
 use hashing::{async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
+use http::header::AUTHORIZATION;
 use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
 use opendal::{Builder, Operator};
 use tokio::fs::File;
 use workunit_store::ObservationMetric;
 
 use super::{ByteStoreProvider, LoadDestination, RemoteOptions};
+
+const GITHUB_ACTIONS_CACHE_VERSION: &str = "pants-1";
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoadMode {
@@ -68,6 +71,44 @@ impl Provider {
   pub fn fs(path: &str, scope: String, options: RemoteOptions) -> Result<Provider, String> {
     let mut builder = opendal::services::Fs::default();
     builder.root(path).enable_path_check();
+    Provider::new(builder, scope, options)
+  }
+
+  pub fn github_actions_cache(
+    url: &str,
+    scope: String,
+    options: RemoteOptions,
+  ) -> Result<Provider, String> {
+    let mut builder = opendal::services::Ghac::default();
+
+    builder.version(GITHUB_ACTIONS_CACHE_VERSION);
+    builder.endpoint(url);
+
+    // extract the token from the `authorization: Bearer ...` header because OpenDAL's Ghac service
+    // reasons about it separately (although does just stick it in its own `authorization: Bearer
+    // ...` header internally).
+    let header_help_blurb = "Using GitHub Actions Cache remote cache requires a token set in a `authorization: Bearer ...` header, set via [GLOBAL].remote_store_headers or [GLOBAL].remote_oauth_bearer_token_path";
+    let Some(auth_header_value) = options.headers.get(AUTHORIZATION.as_str()) else {
+      let existing_headers = options.headers.keys().collect::<Vec<_>>();
+      return Err(format!(
+        "Expected to find '{}' header, but only found: {:?}. {}",
+        AUTHORIZATION, existing_headers, header_help_blurb,
+      ));
+    };
+
+    let Some(token) = auth_header_value.strip_prefix("Bearer ") else {
+      return Err(format!(
+        "Expected '{}' header to start with `Bearer `, found value starting with {:?}. {}",
+        AUTHORIZATION,
+        // only show the first few characters to not accidentally leak (all of) a secret, but
+        // still give the user something to start debugging
+        &auth_header_value[..4],
+        header_help_blurb,
+      ));
+    };
+
+    builder.runtime_token(token);
+
     Provider::new(builder, scope, options)
   }
 
