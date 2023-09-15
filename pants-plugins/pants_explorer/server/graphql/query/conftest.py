@@ -6,6 +6,8 @@ from __future__ import annotations
 from textwrap import dedent  # noqa: PNT20
 
 import pytest
+from pants_explorer.server.graphql.rules import rules
+from pants_explorer.server.graphql.setup import create_schema
 
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.project_info import peek
@@ -14,8 +16,6 @@ from pants.engine.explorer import RequestState
 from pants.engine.internals.parser import BuildFileSymbolsInfo
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
-from pants.explorer.server.graphql.rules import rules
-from pants.explorer.server.graphql.setup import create_schema
 from pants.help.help_info_extracter import AllHelpInfo, HelpInfoExtracter
 from pants.testutil.rule_runner import RuleRunner
 

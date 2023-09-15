@@ -195,6 +195,48 @@ fn pragma_ignore() {
         *  # pants: no-infer-dep",
     &[],
   );
+  // Imports nested within other constructs
+  assert_imports(
+    r"
+    if x:
+        import a  # pants: no-infer-dep
+    ",
+    &[],
+  );
+  assert_imports(
+    r"
+    if x:
+        import a  # pants: no-infer-dep
+        import b
+    ",
+    &["b"],
+  );
+  assert_imports(
+    r"
+    class X: def method(): if True: while True: class Y: def f(): import a  # pants: no-infer-dep
+    ",
+    &[],
+  );
+  assert_imports(
+    r"
+    if x:
+        import \
+            a  # pants: no-infer-dep
+    ",
+    &[],
+  );
+
+  // https://github.com/pantsbuild/pants/issues/19751
+  assert_imports(
+    r"
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from a import ClassA  # pants: no-infer-dep
+
+    print('Hello, world!')",
+    &["typing.TYPE_CHECKING"],
+  );
 }
 
 #[test]

@@ -27,7 +27,6 @@ from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.sources import HelmChartRoot, HelmChartRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.generate_snapshots import GenerateSnapshotsFieldSet, GenerateSnapshotsResult
 from pants.core.goals.test import TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField, ResourceSourceField
@@ -163,20 +162,9 @@ async def setup_helm_unittest(
     # Cache test runs only if they are successful, or not at all if `--test-force`.
     cache_scope = ProcessCacheScope.PER_SESSION if request.force else ProcessCacheScope.SUCCESSFUL
 
-    uses_legacy = unittest_subsystem._is_legacy
-    if uses_legacy:
-        warn_or_error(
-            "2.19.0.dev0",
-            f"[{unittest_subsystem.options_scope}].version < {unittest_subsystem.default_version}",
-            "You should upgrade your test suites to work with latest version.",
-            start_version="2.18.0.dev1",
-        )
-
     process = HelmProcess(
         argv=[
             unittest_subsystem.plugin_name,
-            # TODO remove this flag once support for legacy unittest tool is dropped.
-            *(("--helm3",) if uses_legacy else ()),
             *(("--color",) if unittest_subsystem.color else ()),
             *(("--strict",) if field_set.strict.value else ()),
             *(("--update-snapshot",) if request.update_snapshots else ()),

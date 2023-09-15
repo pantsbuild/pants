@@ -151,15 +151,8 @@ class HelmSubsystem(TemplatedExternalTool):
         ),
         advanced=True,
     )
-    tailor = BoolOption(
-        default=True,
-        help="If true, add `helm_chart` targets with the `tailor` goal.",
-        advanced=True,
-        removal_hint="Use `[helm].tailor_charts` instead.",
-        removal_version="2.19.0.dev0",
-    )
     tailor_charts = BoolOption(
-        default=None,
+        default=True,
         help="If true, add `helm_chart` targets with the `tailor` goal.",
         advanced=True,
     )

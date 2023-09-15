@@ -6,10 +6,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
+from pants_explorer.server.uvicorn import UvicornServer
 from strawberry.types import Info
 
 from pants.engine.explorer import RequestState
-from pants.explorer.server.uvicorn import UvicornServer
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from enum import Enum
-from typing import ClassVar
 
 from pants.backend.helm.util_rules.tool import (
     ExternalHelmPlugin,
@@ -47,11 +46,6 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         "macos_x86_64": "macos-amd64",
     }
 
-    # TODO Remove after dropping support for the legacy tool
-    legacy_url_template: ClassVar[
-        str
-    ] = "https://github.com/quintush/helm-unittest/releases/download/v{version}/helm-unittest-{platform}-{version}.tgz"
-
     color = BoolOption(
         "--color",
         default=False,
@@ -64,17 +58,6 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
     )
 
     skip = SkipOption("test")
-
-    @property
-    def _is_legacy(self) -> bool:
-        version_parts = self.version.split(".")
-        return len(version_parts) >= 2 and version_parts[1] == "2"
-
-    def generate_url(self, plat: Platform) -> str:
-        if self._is_legacy:
-            platform = self.url_platform_mapping.get(plat.value, "")
-            return self.legacy_url_template.format(version=self.version, platform=platform)
-        return super().generate_url(plat)
 
     def generate_exe(self, _: Platform) -> str:
         return "./untt"

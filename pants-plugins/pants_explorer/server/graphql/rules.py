@@ -3,16 +3,17 @@
 
 from __future__ import annotations
 
+from pants_explorer.server.browser import Browser, BrowserRequest
+from pants_explorer.server.graphql.setup import graphql_uvicorn_setup
+from pants_explorer.server.graphql.subsystem import GraphQLSubsystem
+from pants_explorer.server.uvicorn import UvicornServerSetup, UvicornServerSetupRequest
+
 from pants.backend.project_info.peek import TargetDatas
 from pants.base.specs import Specs
 from pants.engine.environment import EnvironmentName
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
 from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
 from pants.engine.unions import UnionRule
-from pants.explorer.server.browser import Browser, BrowserRequest
-from pants.explorer.server.graphql.setup import graphql_uvicorn_setup
-from pants.explorer.server.graphql.subsystem import GraphQLSubsystem
-from pants.explorer.server.uvicorn import UvicornServerSetup, UvicornServerSetupRequest
 
 
 class GraphQLUvicornServerSetupRequest(UvicornServerSetupRequest):

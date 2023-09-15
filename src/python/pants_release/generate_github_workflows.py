@@ -875,15 +875,19 @@ def build_wheels_job(
                             #   support. `curl` is a good lowest-common-denominator way to upload the assets.
                             "run": dedent(
                                 """\
-                                LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
-                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
+                                PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+                                PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+                                PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+
+                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
 
                                 curl -L --fail \\
                                     -X POST \\
                                     -H "Authorization: Bearer ${{ github.token }}" \\
                                     -H "Content-Type: application/octet-stream" \\
-                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$LOCAL_TAG.pex \\
-                                    --data-binary "@dist/src.python.pants/pants.$LOCAL_TAG.pex"
+                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \\
+                                    --data-binary "@dist/src.python.pants/$PEX_FILENAME"
 
                                 WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
                                 curl -L --fail \\
@@ -1073,10 +1077,8 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
 
 def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
-    """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
     inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
-    pypi_release_dir = "dest/pypi_release"
     helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
         needs=["release_info"], for_deploy_ref=gha_expr("needs.release_info.outputs.build-ref")
@@ -1176,23 +1178,6 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
                 {
-                    "name": "Download wheels",
-                    "run": f"gh release download {gha_expr('needs.release_info.outputs.build-ref')} -p '*.whl' --dir {pypi_release_dir}",
-                    "env": {
-                        "GH_TOKEN": "${{ github.token }}",
-                        "GH_REPO": "${{ github.repository }}",
-                    },
-                },
-                {
-                    "name": "Publish to PyPI",
-                    "uses": "pypa/gh-action-pypi-publish@release/v1",
-                    "with": {
-                        "password": gha_expr("secrets.PANTSBUILD_PYPI_API_TOKEN"),
-                        "packages-dir": pypi_release_dir,
-                        "skip-existing": True,
-                    },
-                },
-                {
                     "name": "Generate announcement",
                     "run": dedent(
                         """\
@@ -1234,8 +1219,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "name": "Get release notes",
                     "run": dedent(
                         """\
-                        REF="${{ needs.release_info.outputs.build-ref }}"
-                        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"} > notes.txt
+                        ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
                         """
                     ),
                 },

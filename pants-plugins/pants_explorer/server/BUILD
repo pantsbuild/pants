@@ -6,13 +6,13 @@ python_sources()
 python_distribution(
     name="dist",
     provides=python_artifact(
-        name="pantsbuild.pants.explorer-server",
+        name="pantsbuild.pants_explorer-server",
         description="Backend API server implementation for the Pants Explorer UI.",
         classifiers=["Topic :: Software Development"],
     ),
     entry_points={
         "pantsbuild.plugin": {
-            "rules": "pants.explorer.server.register:rules",
+            "rules": "pants_explorer.server.register:rules",
         }
     },
 )

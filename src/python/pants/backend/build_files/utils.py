@@ -19,10 +19,11 @@ def _get_build_file_partitioner_rules(cls) -> Iterable:
     """Returns the BUILD file partitioner rule."""
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partition_build_files(
         request: FixFilesRequest.PartitionRequest,
