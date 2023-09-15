@@ -889,15 +889,6 @@ def build_wheels_job(
                                     ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \\
                                     --data-binary "@dist/src.python.pants/$PEX_FILENAME"
 
-                                # NB: Also upload under an unversioned name throughout the 2.18.x release series.
-                                # See https://github.com/pantsbuild/pants/pull/19683#discussion_r1308094875
-                                curl -L --fail \\
-                                    -X POST \\
-                                    -H "Authorization: Bearer ${{ github.token }}" \\
-                                    -H "Content-Type: application/octet-stream" \\
-                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=pants.$PY_VER-$PLAT.pex \\
-                                    --data-binary "@dist/src.python.pants/$PEX_FILENAME"
-
                                 WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
                                 curl -L --fail \\
                                     -X POST \\
