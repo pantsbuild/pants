@@ -45,7 +45,7 @@ use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };
 use process_execution::{ManagedChild, Platform, ProcessExecutionStrategy};
-use rule_graph::DependencyKey;
+use rule_graph::{DependencyKey, RuleId};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, Store, SubsetParams};
 
@@ -65,47 +65,80 @@ impl Intrinsics {
   pub fn new(types: &Types) -> Intrinsics {
     let mut intrinsics: IndexMap<Intrinsic, IntrinsicFn> = IndexMap::new();
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.create_digest),
+      Intrinsic::new(
+        "create_digest_to_digest",
+        types.directory_digest,
+        types.create_digest,
+      ),
       Box::new(create_digest_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.path_globs),
+      Intrinsic::new(
+        "path_globs_to_digest",
+        types.directory_digest,
+        types.path_globs,
+      ),
       Box::new(path_globs_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.paths, types.path_globs),
+      Intrinsic::new("path_globs_to_paths", types.paths, types.path_globs),
       Box::new(path_globs_to_paths),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.native_download_file),
+      Intrinsic::new(
+        "download_file_to_digest",
+        types.directory_digest,
+        types.native_download_file,
+      ),
       Box::new(download_file_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.snapshot, types.directory_digest),
+      Intrinsic::new("digest_to_snapshot", types.snapshot, types.directory_digest),
       Box::new(digest_to_snapshot),
     );
     intrinsics.insert(
-      Intrinsic::new(types.digest_contents, types.directory_digest),
+      Intrinsic::new(
+        "directory_digest_to_digest_contents",
+        types.digest_contents,
+        types.directory_digest,
+      ),
       Box::new(directory_digest_to_digest_contents),
     );
     intrinsics.insert(
-      Intrinsic::new(types.digest_entries, types.directory_digest),
+      Intrinsic::new(
+        "directory_digest_to_digest_entries",
+        types.digest_entries,
+        types.directory_digest,
+      ),
       Box::new(directory_digest_to_digest_entries),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.merge_digests),
+      Intrinsic::new(
+        "merge_digests_request_to_digest",
+        types.directory_digest,
+        types.merge_digests,
+      ),
       Box::new(merge_digests_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.remove_prefix),
+      Intrinsic::new(
+        "remove_prefix_request_to_digest",
+        types.directory_digest,
+        types.remove_prefix,
+      ),
       Box::new(remove_prefix_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.add_prefix),
+      Intrinsic::new(
+        "add_prefix_request_to_digest",
+        types.directory_digest,
+        types.add_prefix,
+      ),
       Box::new(add_prefix_request_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("process_request_to_process_result"),
         product: types.process_result,
         inputs: vec![
           DependencyKey::new(types.process),
@@ -115,11 +148,16 @@ impl Intrinsics {
       Box::new(process_request_to_process_result),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.digest_subset),
+      Intrinsic::new(
+        "digest_subset_to_digest",
+        types.directory_digest,
+        types.digest_subset,
+      ),
       Box::new(digest_subset_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("session_values"),
         product: types.session_values,
         inputs: vec![],
       },
@@ -127,6 +165,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("run_id"),
         product: types.run_id,
         inputs: vec![],
       },
@@ -134,6 +173,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("interactive_process"),
         product: types.interactive_process_result,
         inputs: vec![
           DependencyKey::new(types.interactive_process),
@@ -144,6 +184,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("docker_resolve_image"),
         product: types.docker_resolve_image_result,
         inputs: vec![DependencyKey::new(types.docker_resolve_image_request)],
       },
@@ -151,6 +192,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("parse_python_deps"),
         product: types.parsed_python_deps_result,
         inputs: vec![DependencyKey::new(types.deps_request)],
       },
@@ -158,6 +200,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("parse_javascript_deps"),
         product: types.parsed_javascript_deps_result,
         inputs: vec![DependencyKey::new(types.deps_request)],
       },
