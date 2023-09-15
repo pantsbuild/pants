@@ -253,8 +253,6 @@ def rule_decorator(func, **kwargs) -> Callable:
         pants_rules[effective_name] = func
     else:
         prev_func = pants_rules[effective_name]
-        # TODO: Remove this check? We also check for uniqueness of effective_name in Rust code,
-        #  and that check is more comprehensive, as it also covers intrinsics.
         if prev_func.__code__ != func.__code__:
             raise DuplicateRuleError(
                 softwrap(
