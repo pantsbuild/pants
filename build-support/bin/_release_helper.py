@@ -29,7 +29,7 @@ from common import banner, die, green
 from packaging.version import Version
 from reversion import reversion
 
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap, strip_prefix
 
@@ -816,6 +816,7 @@ def publish() -> None:
     check_clean_git_branch()
     prompt_artifact_freshness()
     check_pgp()
+    check_gh_cli()
 
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
@@ -828,8 +829,91 @@ def publish() -> None:
     create_twine_venv()
     upload_wheels_via_twine()
     tag_release()
+    do_github_release()
     banner("Successfully released to PyPI and GitHub")
     prompt_to_generate_docs()
+
+
+def do_github_release() -> None:
+    version = CONSTANTS.pants_stable_version
+
+    def get_notes() -> str:
+        maj, min = version.split(".")[:2]
+        notes_path = Path("src/python/pants/notes", maj).with_suffix(f".{min}.x.md")
+        notes_contents = notes_path.read_text()
+        for section in notes_contents.split("\n## "):
+            if section.startswith(version):
+                section = section.replace("##", "#")
+                return section.split("\n", 2)[-1]
+        assert False
+
+    with temporary_file_path() as notes_file:
+        Path(notes_file).write_text(get_notes())
+
+        subprocess.run(
+            [
+                "gh",
+                "release",
+                "create",
+                f"release_{version}",
+                "--notes-file",
+                notes_file,
+                "--draft",
+            ],
+            check=True,
+        )
+
+    stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / version
+    for whl in stable_wheel_dir.glob("*.whl"):
+        subprocess.run(
+            ["gh", "release", f"release_{version}", "upload", f"{whl}#{whl.name}"],
+            check=True,
+        )
+
+    def build_local_pex(pex_name, platform):
+        with download_pex_bin() as pex_bin:
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(pex_bin),
+                    "--disable-cache",
+                    "--python-shebang",
+                    "/usr/bin/env python",
+                    "-o",
+                    pex_name,
+                    "-f",
+                    str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
+                    "-f",
+                    str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
+                    f"pantsbuild.pants=={version}",
+                    "--no-build",
+                    "--no-pypi",
+                    "--disable-cache",
+                    "--no-strip-pex-env",
+                    "--console-script=pants",
+                    "--venv",
+                    f"--platform={platform}-cp-39-cp39",
+                ],
+                check=True,
+            )
+        subprocess.run(
+            ["gh", "release", f"release_{version}", "upload", pex_name],
+            check=True,
+        )
+
+    build_local_pex(f"pants.{version}-cp39-darwin_arm64.pex", "darwin_arm64")
+    build_local_pex(f"pants.{version}-cp39-darwin_x86_64.pex", "darwin_x86_64")
+    build_local_pex(f"pants.{version}-cp39-linux_aarch64.pex", "linux_aarch64")
+    build_local_pex(f"pants.{version}-cp39-linux_x86_64.pex ", "linux_x86_64")
+
+    subprocess.run(["gh", "release", f"release_{version}", "edit", "--draft=false"], check=True)
+
+
+def check_gh_cli() -> None:
+    banner("Checking for the GH CLI")
+    result = subprocess.run(["gh", "auth", "status"], stdout=subprocess.PIPE, check=False)
+    if result.returncode:
+        die("Please install the GH CLI: https://cli.github.com/ and run `gh auth login`.")
 
 
 def check_clean_git_branch() -> None:
