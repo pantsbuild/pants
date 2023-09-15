@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
+use crate::rules::{DependencyKey, ParamTypes, Query, Rule, RuleId};
 use crate::{
   params_str, Entry, EntryWithDeps, Reentry, RootEntry, RuleEdges, RuleEntry, RuleGraph,
 };
@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, VecDeque};
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use indexmap::IndexSet;
 use internment::Intern;
+use itertools::Itertools;
 use petgraph::graph::{DiGraph, EdgeReference, NodeIndex};
 use petgraph::visit::{DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable};
 use petgraph::Direction;
@@ -256,6 +257,8 @@ impl<R: Rule> Builder<R> {
   }
 
   pub fn graph(self) -> Result<RuleGraph<R>, String> {
+    // 0. validate that the rules all have unique rule ids.
+    self.validate_rule_ids()?;
     // 1. build a polymorphic graph, where nodes might have multiple legal sources of dependencies
     let initial_polymorphic_graph = self.initial_polymorphic();
     // 2. run live variable analysis on the polymorphic graph to gather a conservative (ie, overly
@@ -270,6 +273,29 @@ impl<R: Rule> Builder<R> {
     let pruned_edges_graph = self.prune_edges(monomorphic_live_params_graph)?;
     // 5. generate the final graph for nodes reachable from queries
     self.finalize(pruned_edges_graph)
+  }
+
+  ///
+  /// Validate that all rules have unique RuleIds.
+  ///
+  fn validate_rule_ids(&self) -> Result<(), String> {
+    let mut invalid_rule_ids: Vec<&RuleId> = self
+      .rules
+      .values()
+      .flatten()
+      .map(|rule| rule.id())
+      .duplicates()
+      .collect();
+    match invalid_rule_ids.len() {
+      0 => Ok(()),
+      _ => {
+        invalid_rule_ids.sort();
+        Err(format!(
+          "The following rule ids were each used by more than one rule: {}",
+          invalid_rule_ids.iter().join(", ")
+        ))
+      }
+    }
   }
 
   ///
@@ -307,6 +333,9 @@ impl<R: Rule> Builder<R> {
         )
       })
       .collect::<HashMap<_, _>>();
+
+    let rules_by_id: HashMap<&RuleId, &R> =
+      self.rules.values().flatten().map(|r| (r.id(), r)).collect();
 
     // Rules and Reentries are created on the fly based on the out_set of dependents.
     let mut rules: HashMap<(R, ParamTypes<R::TypeId>), NodeIndex<u32>> = HashMap::default();
@@ -362,16 +391,27 @@ impl<R: Rule> Builder<R> {
           }
 
           let mut candidates = Vec::new();
-          if dependency_key.provided_params.is_empty()
-            && graph[node_id].1.contains(&dependency_key.product())
-            && params.contains_key(&dependency_key.product())
-          {
-            candidates.push(Node::Param(dependency_key.product()));
-          }
+          if let Some(rule_id) = &dependency_key.rule_id {
+            // New call-by-name semantics.
+            candidates.extend(rules_by_id.get(rule_id).map(|&r| Node::Rule(r.clone())));
+            // TODO: Once we are entirely call-by-name, we can get rid of the entire edifice
+            // of multiple candidates and the unsatisfiable_nodes mechanism, and modify this
+            // function to return a Result, which will be Err if there is no rule with a
+            // matching RuleId for some node.
+            assert!(candidates.len() < 2);
+          } else {
+            // Old call-by-type semantics.
+            if dependency_key.provided_params.is_empty()
+              && graph[node_id].1.contains(&dependency_key.product())
+              && params.contains_key(&dependency_key.product())
+            {
+              candidates.push(Node::Param(dependency_key.product()));
+            }
 
-          if let Some(rules) = self.rules.get(&dependency_key.product()) {
-            candidates.extend(rules.iter().map(|r| Node::Rule(r.clone())));
-          };
+            if let Some(rules) = self.rules.get(&dependency_key.product()) {
+              candidates.extend(rules.iter().map(|r| Node::Rule(r.clone())));
+            };
+          }
 
           (dependency_key, candidates)
         })

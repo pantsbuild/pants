@@ -37,7 +37,7 @@ use internment::Intern;
 
 pub use crate::builder::Builder;
 pub use crate::rules::{
-  DependencyKey, DisplayForGraph, DisplayForGraphArgs, ParamTypes, Query, Rule, TypeId,
+  DependencyKey, DisplayForGraph, DisplayForGraphArgs, ParamTypes, Query, Rule, RuleId, TypeId,
 };
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]

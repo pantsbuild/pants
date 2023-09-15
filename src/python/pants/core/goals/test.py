@@ -1032,7 +1032,7 @@ async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAwar
 def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
     """Returns a rule that implements TestDebugRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls.Batch})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls.Batch})
     async def get_test_debug_request(request: TestRequest.Batch) -> TestDebugRequest:
         raise NotImplementedError("Testing this target with --debug is not yet supported.")
 
@@ -1043,7 +1043,7 @@ def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
 def _unsupported_debug_adapter_rules(cls: type[TestRequest]) -> Iterable:
     """Returns a rule that implements TestDebugAdapterRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls.Batch})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls.Batch})
     async def get_test_debug_adapter_request(request: TestRequest.Batch) -> TestDebugAdapterRequest:
         raise NotImplementedError(
             "Testing this target type with a debug adapter is not yet supported."
