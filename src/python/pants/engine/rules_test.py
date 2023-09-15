@@ -67,6 +67,7 @@ def fmt_rule(
     line_sep = "\n" if multiline else " "
     optional_line_sep = "\n" if multiline else ""
 
+    rule = rule.rule.func  # type: ignore[attr-defined]
     type_hints = get_type_hints(rule)
     product = type_hints.pop("return").__name__
     params = f",{line_sep}".join(t.__name__ for t in type_hints.values())
