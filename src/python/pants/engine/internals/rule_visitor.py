@@ -271,6 +271,7 @@ class _AwaitableCollector(ast.NodeVisitor):
             len(call_node.keywords) == 1
             and not call_node.keywords[0].arg
             and isinstance(implicitly_call := call_node.keywords[0].value, ast.Call)
+            and self._lookup(implicitly_call.func).__name__ == "implicitly"
         ):
             input_nodes, input_type_nodes = self._get_inputs(implicitly_call.args)
             input_types = tuple(
