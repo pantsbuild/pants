@@ -278,7 +278,6 @@ class _AwaitableCollector(ast.NodeVisitor):
                 for input_type, input_node in zip(input_type_nodes, input_nodes)
             )
         else:
-            print(f">>> call_node.keywords: {call_node.keywords}")
             raise parse_error(
                 self._format(
                     call_node,
