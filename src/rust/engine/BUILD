@@ -26,7 +26,7 @@ shell_command(
         "3rdparty/tools/python3:python3",
     ],
     extra_env_vars=["CHROOT={chroot}", "MODE"],
-    tools=["cc", "ld", "as", "ar", "cargo", "protoc", "python3.9"],
+    tools=["bash", "cc", "ld", "as", "ar", "cargo", "protoc", "python3.9"],
     output_files=[
         f"target/debug/libengine.so",
         f"target/debug/libengine.dylib",
