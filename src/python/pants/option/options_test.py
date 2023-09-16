@@ -20,7 +20,6 @@ from packaging.version import Version
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import CodeRemovedError, warn_or_error
-from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, shell_str, target_option
@@ -44,6 +43,7 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_types import StrOption
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.options_fingerprinter import OptionEncoder
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -1574,7 +1574,7 @@ class OptionsTest(unittest.TestCase):
         # We serialize options to JSON e.g., when uploading stats.
         # This test spot-checks that enum types can be serialized.
         options = self._parse(flags="enum-opt --some-enum=another-value")
-        json.dumps({"foo": [options.for_scope("enum-opt").as_dict()]}, cls=CoercingEncoder)
+        json.dumps({"foo": [options.for_scope("enum-opt").as_dict()]}, cls=OptionEncoder)
 
     def test_list_of_enum_single_value(self) -> None:
         options = self._parse(flags="other-enum-scope --some-list-enum=another-value")
