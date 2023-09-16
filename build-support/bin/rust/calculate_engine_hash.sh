@@ -5,6 +5,8 @@
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
+echo
+
 # Exposes:
 # + fingerprint_data: Fingerprints the data on stdin.
 # shellcheck source=build-support/common.sh
@@ -37,7 +39,7 @@ function calculate_current_hash() {
       git ls-files --cached --others --exclude-standard \
         "${NATIVE_ROOT}" \
         "${REPO_ROOT}/build-support/bin/rust" |
-        grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" -e "/${NATIVE_ROOT}[^/]*\.sh$" |
+        grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" -e "src/rust/engine/cargo_build_shim.sh$" |
         git hash-object --stdin-paths
     ) | fingerprint_data
   )
