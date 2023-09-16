@@ -11,7 +11,6 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
 
-from pants.base.deprecated import deprecated
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -65,7 +64,7 @@ from pants.option.option_types import BoolOption, EnumOption, IntOption, StrList
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized, memoized_property
+from pants.util.memo import memoized
 from pants.util.meta import classproperty
 from pants.util.strutil import help_text, softwrap
 
@@ -184,20 +183,6 @@ class TestResult(EngineAwareReturnType):
             log_extra_output=log_extra_output,
             partition_description=batch.partition_metadata.description,
         )
-
-    @memoized_property
-    @deprecated(
-        removal_version="2.19.0.dev0", hint="Use `TestResult.stdout_bytes` instead of `stdout`."
-    )
-    def stdout(self) -> str:
-        return self.stdout_bytes.decode(errors="replace")
-
-    @memoized_property
-    @deprecated(
-        removal_version="2.19.0.dev0", hint="Use `TestResult.stderr_bytes` instead of `stderr`."
-    )
-    def stderr(self) -> str:
-        return self.stderr_bytes.decode(errors="replace")
 
     @property
     def description(self) -> str:
@@ -733,10 +718,10 @@ class TestsBatchCompatibilityTagField(StringField, metaclass=ABCMeta):
         `{target_name}`, then the two targets are explicitly compatible and _may_ run in the same
         test runner process. Compatible tests may not end up in the same test runner batch if:
 
-            * There are "too many" compatible tests in a partition, as determined by the \
-                `[test].batch_size` config parameter, or
-            * Compatible tests have some incompatibility in Pants metadata (i.e. different \
-                `resolve`s or `extra_env_vars`).
+          * There are "too many" compatible tests in a partition, as determined by the \
+            `[test].batch_size` config parameter, or
+          * Compatible tests have some incompatibility in Pants metadata (i.e. different \
+            `resolve`s or `extra_env_vars`).
 
         When tests with the same `batch_compatibility_tag` have incompatibilities in some other
         Pants metadata, they will be automatically split into separate batches. This way you can
@@ -1047,7 +1032,7 @@ async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAwar
 def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
     """Returns a rule that implements TestDebugRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls.Batch})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls.Batch})
     async def get_test_debug_request(request: TestRequest.Batch) -> TestDebugRequest:
         raise NotImplementedError("Testing this target with --debug is not yet supported.")
 
@@ -1058,7 +1043,7 @@ def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
 def _unsupported_debug_adapter_rules(cls: type[TestRequest]) -> Iterable:
     """Returns a rule that implements TestDebugAdapterRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls.Batch})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls.Batch})
     async def get_test_debug_adapter_request(request: TestRequest.Batch) -> TestDebugAdapterRequest:
         raise NotImplementedError(
             "Testing this target type with a debug adapter is not yet supported."

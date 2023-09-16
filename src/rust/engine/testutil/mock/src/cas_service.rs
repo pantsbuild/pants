@@ -26,6 +26,8 @@ use remexec::{
 use tonic::metadata::{AsciiMetadataKey, KeyAndValueRef};
 use tonic::{Request, Response, Status};
 
+use crate::cas::{RequestCounter, RequestType};
+
 #[derive(Clone, Debug)]
 pub(crate) struct StubCASResponder {
   pub chunk_size_bytes: usize,
@@ -33,7 +35,7 @@ pub(crate) struct StubCASResponder {
   pub blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
   pub always_errors: bool,
   pub required_auth_header: Option<String>,
-  pub read_request_count: Arc<Mutex<usize>>,
+  pub request_counts: Arc<RequestCounter>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
 }
 
@@ -179,6 +181,17 @@ impl StubCASResponder {
     self.instance_name.clone().unwrap_or_default()
   }
 
+  /// Returns an Err to propagate if this CAS responder is configured to always give an error
+  fn check_always_errors(&self) -> Result<(), Status> {
+    if self.always_errors {
+      Err(Status::internal(
+        "StubCAS is configured to always fail".to_owned(),
+      ))
+    } else {
+      Ok(())
+    }
+  }
+
   fn read_internal(&self, req: &ReadRequest) -> Result<Vec<ReadResponse>, Status> {
     let parsed_resource_name = parse_read_resource_name(&req.resource_name)
       .map_err(|err| Status::invalid_argument(format!("Failed to parse resource name: {err}")))?;
@@ -186,11 +199,7 @@ impl StubCASResponder {
     let digest = parsed_resource_name.hash;
     let fingerprint = Fingerprint::from_hex_string(digest)
       .map_err(|e| Status::invalid_argument(format!("Bad digest {digest}: {e}")))?;
-    if self.always_errors {
-      return Err(Status::internal(
-        "StubCAS is configured to always fail".to_owned(),
-      ));
-    }
+    self.check_always_errors()?;
     let blobs = self.blobs.lock();
     let maybe_bytes = blobs.get(&fingerprint);
     match maybe_bytes {
@@ -217,10 +226,7 @@ impl ByteStream for StubCASResponder {
     &self,
     request: Request<ReadRequest>,
   ) -> Result<Response<Self::ReadStream>, Status> {
-    {
-      let mut request_count = self.read_request_count.lock();
-      *request_count += 1;
-    }
+    RequestType::BSRead.record(&self.request_counts);
     check_auth!(self, request);
 
     let request = request.into_inner();
@@ -236,9 +242,9 @@ impl ByteStream for StubCASResponder {
     &self,
     request: Request<tonic::Streaming<WriteRequest>>,
   ) -> Result<Response<WriteResponse>, Status> {
+    RequestType::BSWrite.record(&self.request_counts);
     check_auth!(self, request);
 
-    let always_errors = self.always_errors;
     let write_message_sizes = self.write_message_sizes.clone();
     let blobs = self.blobs.clone();
 
@@ -318,11 +324,7 @@ impl ByteStream for StubCASResponder {
           )));
         }
 
-        if always_errors {
-          return Err(Status::invalid_argument(
-            "StubCAS is configured to always fail".to_owned(),
-          ));
-        }
+        self.check_always_errors()?;
 
         {
           let mut blobs = blobs.lock();
@@ -351,13 +353,10 @@ impl ContentAddressableStorage for StubCASResponder {
     &self,
     request: Request<FindMissingBlobsRequest>,
   ) -> Result<Response<FindMissingBlobsResponse>, Status> {
+    RequestType::CASFindMissingBlobs.record(&self.request_counts);
     check_auth!(self, request);
 
-    if self.always_errors {
-      return Err(Status::internal(
-        "StubCAS is configured to always fail".to_owned(),
-      ));
-    }
+    self.check_always_errors()?;
 
     let request = request.into_inner();
 
@@ -379,13 +378,10 @@ impl ContentAddressableStorage for StubCASResponder {
     &self,
     request: Request<BatchUpdateBlobsRequest>,
   ) -> Result<Response<BatchUpdateBlobsResponse>, Status> {
+    RequestType::CASBatchUpdateBlobs.record(&self.request_counts);
     check_auth!(self, request);
 
-    if self.always_errors {
-      return Err(Status::invalid_argument(
-        "StubCAS is configured to always fail".to_owned(),
-      ));
-    }
+    self.check_always_errors()?;
 
     let request = request.into_inner();
 
@@ -446,13 +442,10 @@ impl ContentAddressableStorage for StubCASResponder {
     &self,
     request: Request<BatchReadBlobsRequest>,
   ) -> Result<Response<BatchReadBlobsResponse>, Status> {
+    RequestType::CASBatchReadBlobs.record(&self.request_counts);
     check_auth!(self, request);
 
-    if self.always_errors {
-      return Err(Status::invalid_argument(
-        "StubCAS is configured to always fail".to_owned(),
-      ));
-    }
+    self.check_always_errors()?;
 
     let request = request.into_inner();
 

@@ -8,14 +8,14 @@ import sys
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 
-from pants.core.subsystems.python_bootstrap import PythonBootstrapSubsystem  # noqa: PNT20
+from pants.core.subsystems.python_bootstrap import PythonBootstrapSubsystem
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.core.util_rules.system_binaries import SystemBinariesSubsystem, TarBinary
+from pants.core.util_rules.system_binaries import BashBinary, SystemBinariesSubsystem, TarBinary
 from pants.engine.fs import DownloadFile
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, FileDigest
+from pants.engine.internals.native_engine import Digest, FileDigest
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -30,14 +30,11 @@ class PythonBuildStandaloneBinary:
     scripts being run by Python Build Standalone should avoid third-party sdists.
     """
 
-    SYMLINK_DIRNAME = ".python-build-standalone"
+    _CACHE_DIRNAME = "python_build_standalone"
+    _SYMLINK_DIRNAME = ".python-build-standalone"
+    APPEND_ONLY_CACHES = FrozenDict({_CACHE_DIRNAME: _SYMLINK_DIRNAME})
 
-    path: str
-    _digest: Digest
-
-    @property
-    def immutable_input_digests(self) -> FrozenDict[str, Digest]:
-        return FrozenDict({PythonBuildStandaloneBinary.SYMLINK_DIRNAME: self._digest})
+    path: str  # The absolute path to a Python executable
 
 
 # NB: These private types are solely so we can test the docker-path using the local
@@ -53,11 +50,11 @@ class _DownloadPythonBuildStandaloneBinaryRequest:
 @rule
 async def get_python_for_scripts(env_tgt: EnvironmentTarget) -> PythonBuildStandaloneBinary:
     if env_tgt.val is None or isinstance(env_tgt.val, LocalEnvironmentTarget):
-        return PythonBuildStandaloneBinary(sys.executable, EMPTY_DIGEST)
+        return PythonBuildStandaloneBinary(sys.executable)
 
     result = await Get(_PythonBuildStandaloneBinary, _DownloadPythonBuildStandaloneBinaryRequest())
 
-    return PythonBuildStandaloneBinary(result.path, result._digest)
+    return PythonBuildStandaloneBinary(result.path)
 
 
 @rule(desc="Downloading Python for scripts", level=LogLevel.TRACE)
@@ -65,6 +62,7 @@ async def download_python_binary(
     _: _DownloadPythonBuildStandaloneBinaryRequest,
     platform: Platform,
     tar_binary: TarBinary,
+    bash_binary: BashBinary,
     python_bootstrap: PythonBootstrapSubsystem,
     system_binaries: SystemBinariesSubsystem,
 ) -> _PythonBuildStandaloneBinary:
@@ -84,21 +82,48 @@ async def download_python_binary(
         ),
     )
 
-    result = await Get(
+    download_result = await Get(
         ProcessResult,
         Process(
             argv=[tar_binary.path, "-xvf", filename],
             input_digest=python_archive,
             env={"PATH": os.pathsep.join(system_binaries.system_binary_paths)},
-            description="Extract Python",
+            description="Extract Pants' execution Python",
             level=LogLevel.DEBUG,
             output_directories=("python",),
         ),
     )
 
-    return _PythonBuildStandaloneBinary(
-        f"{PythonBuildStandaloneBinary.SYMLINK_DIRNAME}/python/bin/python3", result.output_digest
+    installation_root = f"{PythonBuildStandaloneBinary._SYMLINK_DIRNAME}/{download_result.output_digest.fingerprint}"
+
+    # NB: This is similar to what we do for every Python provider. We should refactor these into
+    # some shared code to centralize the behavior.
+    installation_script = dedent(
+        f"""\
+        if [ ! -f "{installation_root}/DONE" ]; then
+            cp -r python "{installation_root}"
+            touch "{installation_root}/DONE"
+        fi
+    """
     )
+
+    await Get(
+        ProcessResult,
+        Process(
+            [bash_binary.path, "-c", installation_script],
+            level=LogLevel.DEBUG,
+            input_digest=download_result.output_digest,
+            description="Install Python for Pants usage",
+            env={"PATH": os.pathsep.join(system_binaries.system_binary_paths)},
+            append_only_caches=PythonBuildStandaloneBinary.APPEND_ONLY_CACHES,
+            # Don't cache, we want this to always be run so that we can assume for the rest of the
+            # session the named_cache destination for this Python is valid, as the Python ecosystem
+            # mainly assumes absolute paths for Python interpreters.
+            cache_scope=ProcessCacheScope.PER_SESSION,
+        ),
+    )
+
+    return _PythonBuildStandaloneBinary(f"{installation_root}/bin/python3")
 
 
 @dataclass(frozen=True)

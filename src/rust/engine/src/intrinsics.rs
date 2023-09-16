@@ -12,8 +12,8 @@ use std::time::Duration;
 use crate::context::Context;
 use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
 use crate::nodes::{
-  lift_directory_digest, task_side_effected, DownloadedFile, ExecuteProcess, NodeResult, Paths,
-  RunId, SessionValues, Snapshot,
+  lift_directory_digest, task_side_effected, unmatched_globs_additional_context, DownloadedFile,
+  ExecuteProcess, NodeResult, RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
@@ -36,13 +36,16 @@ use pyo3::{IntoPy, PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
 use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
-use fs::{DigestTrie, DirectoryDigest, Entry, RelativePath, SymlinkBehavior, TypedPath};
+use fs::{
+  DigestTrie, DirectoryDigest, Entry, GlobMatching, PathStat, RelativePath, SymlinkBehavior,
+  TypedPath,
+};
 use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };
 use process_execution::{ManagedChild, Platform, ProcessExecutionStrategy};
-use rule_graph::DependencyKey;
+use rule_graph::{DependencyKey, RuleId};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, Store, SubsetParams};
 
@@ -62,47 +65,80 @@ impl Intrinsics {
   pub fn new(types: &Types) -> Intrinsics {
     let mut intrinsics: IndexMap<Intrinsic, IntrinsicFn> = IndexMap::new();
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.create_digest),
+      Intrinsic::new(
+        "create_digest_to_digest",
+        types.directory_digest,
+        types.create_digest,
+      ),
       Box::new(create_digest_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.path_globs),
+      Intrinsic::new(
+        "path_globs_to_digest",
+        types.directory_digest,
+        types.path_globs,
+      ),
       Box::new(path_globs_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.paths, types.path_globs),
+      Intrinsic::new("path_globs_to_paths", types.paths, types.path_globs),
       Box::new(path_globs_to_paths),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.native_download_file),
+      Intrinsic::new(
+        "download_file_to_digest",
+        types.directory_digest,
+        types.native_download_file,
+      ),
       Box::new(download_file_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.snapshot, types.directory_digest),
+      Intrinsic::new("digest_to_snapshot", types.snapshot, types.directory_digest),
       Box::new(digest_to_snapshot),
     );
     intrinsics.insert(
-      Intrinsic::new(types.digest_contents, types.directory_digest),
+      Intrinsic::new(
+        "directory_digest_to_digest_contents",
+        types.digest_contents,
+        types.directory_digest,
+      ),
       Box::new(directory_digest_to_digest_contents),
     );
     intrinsics.insert(
-      Intrinsic::new(types.digest_entries, types.directory_digest),
+      Intrinsic::new(
+        "directory_digest_to_digest_entries",
+        types.digest_entries,
+        types.directory_digest,
+      ),
       Box::new(directory_digest_to_digest_entries),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.merge_digests),
+      Intrinsic::new(
+        "merge_digests_request_to_digest",
+        types.directory_digest,
+        types.merge_digests,
+      ),
       Box::new(merge_digests_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.remove_prefix),
+      Intrinsic::new(
+        "remove_prefix_request_to_digest",
+        types.directory_digest,
+        types.remove_prefix,
+      ),
       Box::new(remove_prefix_request_to_digest),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.add_prefix),
+      Intrinsic::new(
+        "add_prefix_request_to_digest",
+        types.directory_digest,
+        types.add_prefix,
+      ),
       Box::new(add_prefix_request_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("process_request_to_process_result"),
         product: types.process_result,
         inputs: vec![
           DependencyKey::new(types.process),
@@ -112,11 +148,16 @@ impl Intrinsics {
       Box::new(process_request_to_process_result),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.digest_subset),
+      Intrinsic::new(
+        "digest_subset_to_digest",
+        types.directory_digest,
+        types.digest_subset,
+      ),
       Box::new(digest_subset_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("session_values"),
         product: types.session_values,
         inputs: vec![],
       },
@@ -124,6 +165,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("run_id"),
         product: types.run_id,
         inputs: vec![],
       },
@@ -131,6 +173,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("interactive_process"),
         product: types.interactive_process_result,
         inputs: vec![
           DependencyKey::new(types.interactive_process),
@@ -141,6 +184,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("docker_resolve_image"),
         product: types.docker_resolve_image_result,
         inputs: vec![DependencyKey::new(types.docker_resolve_image_request)],
       },
@@ -148,6 +192,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("parse_python_deps"),
         product: types.parsed_python_deps_result,
         inputs: vec![DependencyKey::new(types.deps_request)],
       },
@@ -155,6 +200,7 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        id: RuleId::new("parse_javascript_deps"),
         product: types.parsed_javascript_deps_result,
         inputs: vec![DependencyKey::new(types.deps_request)],
       },
@@ -411,10 +457,41 @@ fn path_globs_to_paths(
       Snapshot::lift_path_globs(py_path_globs)
     })
     .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
-    let paths = context.get(Paths::from_path_globs(path_globs)).await?;
-    Ok(Python::with_gil(|py| {
-      Paths::store_paths(py, &core, &paths)
-    })?)
+
+    let path_globs = path_globs.parse().map_err(throw)?;
+    let path_stats = context
+      .expand_globs(
+        path_globs,
+        SymlinkBehavior::Oblivious,
+        unmatched_globs_additional_context(),
+      )
+      .await?;
+
+    Python::with_gil(|py| {
+      let mut files = Vec::new();
+      let mut dirs = Vec::new();
+      for ps in path_stats.iter() {
+        match ps {
+          PathStat::File { path, .. } => {
+            files.push(Snapshot::store_path(py, path)?);
+          }
+          PathStat::Link { path, .. } => {
+            panic!("Paths shouldn't be symlink-aware {path:?}");
+          }
+          PathStat::Dir { path, .. } => {
+            dirs.push(Snapshot::store_path(py, path)?);
+          }
+        }
+      }
+      Ok(externs::unsafe_call(
+        py,
+        core.types.paths,
+        &[
+          externs::store_tuple(py, files),
+          externs::store_tuple(py, dirs),
+        ],
+      ))
+    })
   }
   .boxed()
 }
@@ -765,26 +842,36 @@ fn docker_resolve_image(
 }
 
 struct PreparedInferenceRequest {
-  pub path: PathBuf,
-  pub digest: Digest,
+  digest: Digest,
+  /// The request that's guaranteed to have been constructed via ::prepare().
+  ///
+  /// NB. this `inner` value is used as the cache key, so anything that can influence the dep
+  /// inference should (also) be inside it, not just a key on the outer struct
   inner: DependencyInferenceRequest,
 }
 
 impl PreparedInferenceRequest {
-  pub async fn prepare(args: Vec<Value>, store: &Store, backend: &str) -> NodeResult<Self> {
+  pub async fn prepare(
+    args: Vec<Value>,
+    store: &Store,
+    backend: &str,
+    impl_hash: &str,
+  ) -> NodeResult<Self> {
     let PyNativeDependenciesRequest {
       directory_digest,
       metadata,
     } = Python::with_gil(|py| (*args[0]).as_ref(py).extract())?;
 
     let (path, digest) = Self::find_one_file(directory_digest, store, backend).await?;
+    let str_path = path.display().to_string();
 
     Ok(Self {
-      path,
       digest,
       inner: DependencyInferenceRequest {
+        input_file_path: str_path,
         input_file_digest: Some(digest.into()),
         metadata,
+        impl_hash: impl_hash.to_string(),
       },
     })
   }
@@ -839,20 +926,22 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
     let core = &context.core;
     let store = core.store();
     let prepared_inference_request =
-      PreparedInferenceRequest::prepare(args, &store, "Python").await?;
+      PreparedInferenceRequest::prepare(args, &store, "Python", python::IMPL_HASH).await?;
     in_workunit!(
       "parse_python_dependencies",
       Level::Debug,
       desc = Some(format!(
         "Determine Python dependencies for {:?}",
-        &prepared_inference_request.path
+        &prepared_inference_request.inner.input_file_path
       )),
       |_workunit| async move {
         let result: ParsedPythonDependencies = get_or_create_inferred_dependencies(
           core,
           &store,
           prepared_inference_request,
-          |content, request| python::get_dependencies(content, request.path),
+          |content, request| {
+            python::get_dependencies(content, request.inner.input_file_path.into())
+          },
         )
         .await?;
 
@@ -883,14 +972,14 @@ fn parse_javascript_deps(
     let core = &context.core;
     let store = core.store();
     let prepared_inference_request =
-      PreparedInferenceRequest::prepare(args, &store, "Javascript").await?;
+      PreparedInferenceRequest::prepare(args, &store, "Javascript", javascript::IMPL_HASH).await?;
 
     in_workunit!(
       "parse_javascript_dependencies",
       Level::Debug,
       desc = Some(format!(
         "Determine Javascript dependencies for {:?}",
-        prepared_inference_request.path
+        prepared_inference_request.inner.input_file_path
       )),
       |_workunit| async move {
         let result: ParsedJavascriptDependencies = get_or_create_inferred_dependencies(
@@ -901,7 +990,7 @@ fn parse_javascript_deps(
             if let Some(dependency_inference_request::Metadata::Js(metadata)) =
               request.inner.metadata
             {
-              javascript::get_dependencies(content, request.path, metadata)
+              javascript::get_dependencies(content, request.inner.input_file_path.into(), metadata)
             } else {
               Err(format!(
                 "{:?} is not valid metadata for Javascript dependency inference",

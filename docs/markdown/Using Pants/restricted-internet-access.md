@@ -113,4 +113,4 @@ Occasionally, new Pants releases will upgrade to new versions of these binaries,
 > 
 > It's possible that Pants does not yet have all the mechanisms it'll need to work with your organization's specific networking setup, which we'd love to fix.
 > 
-> Please reach out on [Slack](doc:community) or open a [GitHub issue](https://github.com/pantsbuild/pants/issues) for any help.
+> Please reach out on [Slack](doc:the-pants-community) or open a [GitHub issue](https://github.com/pantsbuild/pants/issues) for any help.

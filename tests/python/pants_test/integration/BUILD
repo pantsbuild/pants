@@ -56,3 +56,12 @@ python_tests(
         "src/python/pants/testutil:testutil_wheel",
     ],
 )
+
+python_tests(
+    name="plugin_requirements_integration",
+    sources=["plugin_requirements_integration_test.py"],
+    timeout=240,
+    dependencies=[
+        "testprojects:pants_plugins_directory",
+    ],
+)

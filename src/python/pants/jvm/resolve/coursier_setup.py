@@ -159,7 +159,7 @@ class Coursier:
     coursier: DownloadedExternalTool
     _digest: Digest
     repos: FrozenOrderedSet[str]
-    _immutable_input_digests: FrozenDict[str, Digest]
+    _append_only_caches: FrozenDict[str, str]
 
     bin_dir: ClassVar[str] = "__coursier"
     fetch_wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_fetch_wrapper_script.sh"
@@ -203,11 +203,11 @@ class Coursier:
 
     @property
     def append_only_caches(self) -> dict[str, str]:
-        return {self.cache_name: self.cache_dir}
+        return {self.cache_name: self.cache_dir, **self._append_only_caches}
 
     @property
     def immutable_input_digests(self) -> dict[str, Digest]:
-        return {self.bin_dir: self._digest, **self._immutable_input_digests}
+        return {self.bin_dir: self._digest}
 
 
 @dataclass(frozen=True)
@@ -303,7 +303,7 @@ async def setup_coursier(
             ),
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
-        _immutable_input_digests=python.immutable_input_digests,
+        _append_only_caches=python.APPEND_ONLY_CACHES,
     )
 
 

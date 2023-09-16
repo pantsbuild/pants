@@ -1273,7 +1273,7 @@ pub async fn make_execute_request(
   };
 
   if let Some(timeout) = req.timeout {
-    action.timeout = Some(prost_types::Duration::from(timeout));
+    action.timeout = Some(prost_types::Duration::try_from(timeout).unwrap());
   }
 
   let execute_request = remexec::ExecuteRequest {

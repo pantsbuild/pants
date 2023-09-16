@@ -270,7 +270,7 @@ class ShellCommandCommandField(StringField):
         """
         Shell command to execute.
 
-        The command is executed as 'bash -c <command>' by default. If you want to invoke a binary
+        The command is executed as `'bash -c <command>'` by default. If you want to invoke a binary
         use `exec -a $0 <binary> <args>` as the command so that the binary gets the correct `argv[0]`
         set.
         """
@@ -293,8 +293,36 @@ class ShellCommandExecutionDependenciesField(AdhocToolExecutionDependenciesField
     pass
 
 
+class RunShellCommandExecutionDependenciesField(ShellCommandExecutionDependenciesField):
+    help = help_text(
+        lambda: f"""
+        The execution dependencies for this command.
+
+        Dependencies specified here are those required to make the command complete successfully
+        (e.g. file inputs, packages compiled from other targets, etc), but NOT required to make
+        the outputs of the command useful.
+
+        See also `{RunShellCommandRunnableDependenciesField.alias}`.
+        """
+    )
+
+
 class ShellCommandRunnableDependenciesField(AdhocToolRunnableDependenciesField):
     pass
+
+
+class RunShellCommandRunnableDependenciesField(ShellCommandRunnableDependenciesField):
+    help = help_text(
+        lambda: f"""
+        The runnable dependencies for this command.
+
+        Dependencies specified here are those required to exist on the `PATH` to make the command
+        complete successfully (interpreters specified in a `#!` command, etc). Note that these
+        dependencies will be made available on the `PATH` with the name of the target.
+
+        See also `{RunShellCommandExecutionDependenciesField.alias}`.
+        """
+    )
 
 
 class ShellCommandSourcesField(MultipleSourcesField):
@@ -317,7 +345,7 @@ class ShellCommandToolsField(StringSequenceField):
 
         Only the tools explicitly provided will be available on the search PATH,
         and these tools must be found on the paths provided by
-        [shell-setup].executable_search_paths (which defaults to the system PATH).
+        `[shell-setup].executable_search_paths` (which defaults to the system PATH).
         """
     )
 
@@ -400,8 +428,8 @@ class ShellCommandRunTarget(Target):
     alias = "run_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ShellCommandExecutionDependenciesField,
-        ShellCommandRunnableDependenciesField,
+        RunShellCommandExecutionDependenciesField,
+        RunShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         RunShellCommandWorkdirField,
     )

@@ -69,6 +69,15 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
             "3rdparty/Pipfile.lock": "{}",
             "3rdparty/pyproject.toml": "[tool.poetry]",
             "3rdparty/requirements-test.txt": "",
+            "pep621/pyproject.toml": textwrap.dedent(
+                """\
+                [project]
+                dependencies = [
+                    "ansicolors>=1.18.0",
+                ]
+            """
+            ),
+            "pep621/requirements.txt": "",  # requirements in same dir as pep621 pyproject.toml causes conflict for name
             "already_owned/requirements.txt": "",
             "already_owned/Pipfile.lock": "",
             "already_owned/pyproject.toml": "[tool.poetry]",
@@ -92,7 +101,14 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets,
         [
             PutativePythonTargetsRequest(
-                ("3rdparty", "already_owned", "no_match", "src/python/foo", "src/python/foo/bar")
+                (
+                    "3rdparty",
+                    "already_owned",
+                    "no_match",
+                    "src/python/foo",
+                    "src/python/foo/bar",
+                    "pep621",
+                )
             ),
             AllOwnedSources(
                 [
@@ -126,6 +142,19 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     name="reqs",
                     triggering_sources=["3rdparty/requirements-test.txt"],
                     kwargs={"source": "requirements-test.txt"},
+                ),
+                PutativeTarget.for_target_type(
+                    PythonRequirementsTargetGenerator,
+                    path="pep621",
+                    name="reqs",
+                    triggering_sources=["pep621/pyproject.toml"],
+                    kwargs={"source": "pyproject.toml"},
+                ),
+                PutativeTarget.for_target_type(
+                    PythonRequirementsTargetGenerator,
+                    path="pep621",
+                    name="reqs",
+                    triggering_sources=["pep621/requirements.txt"],
                 ),
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget, "src/python/foo", None, ["__init__.py"]

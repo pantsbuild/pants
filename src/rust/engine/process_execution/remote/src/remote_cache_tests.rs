@@ -16,12 +16,14 @@ use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use store::Store;
+use store::{RemoteOptions, Store};
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::ensure_action_stored_locally;
-use crate::remote_cache::RemoteCacheWarningsBehavior;
+use crate::remote_cache::{
+  RemoteCacheProviderOptions, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
+};
 use process_execution::{
   make_execute_request, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
@@ -95,28 +97,29 @@ struct StoreSetup {
 }
 
 impl StoreSetup {
-  pub fn new() -> Self {
-    Self::new_with_stub_cas(StubCAS::builder().build())
+  pub async fn new() -> Self {
+    Self::new_with_stub_cas(StubCAS::builder().build()).await
   }
 
-  pub fn new_with_stub_cas(cas: StubCAS) -> Self {
+  pub async fn new_with_stub_cas(cas: StubCAS) -> Self {
     let executor = task_executor::Executor::new();
     let store_temp_dir = TempDir::new().unwrap();
     let store_dir = store_temp_dir.path().join("store_dir");
     let store = Store::local_only(executor.clone(), store_dir)
       .unwrap()
-      .into_with_remote(
-        &cas.address(),
-        None,
-        tls::Config::default(),
-        BTreeMap::new(),
-        10 * 1024 * 1024,
-        Duration::from_secs(1),
-        1,
-        256,
-        None,
-        4 * 1024 * 1024,
-      )
+      .into_with_remote(RemoteOptions {
+        cas_address: cas.address(),
+        instance_name: None,
+        tls_config: tls::Config::default(),
+        headers: BTreeMap::new(),
+        chunk_size_bytes: 10 * 1024 * 1024,
+        rpc_timeout: Duration::from_secs(1),
+        rpc_retries: 1,
+        rpc_concurrency_limit: 256,
+        capabilities_cell_opt: None,
+        batch_api_size_limit: 4 * 1024 * 1024,
+      })
+      .await
       .unwrap();
     Self {
       store,
@@ -140,29 +143,35 @@ fn create_local_runner(
   (local_runner, call_counter)
 }
 
-fn create_cached_runner(
+async fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
   store_setup: &StoreSetup,
   cache_content_behavior: CacheContentBehavior,
 ) -> Box<dyn CommandRunnerTrait> {
   Box::new(
-    crate::remote_cache::CommandRunner::new(
-      local.into(),
-      None,
-      None,
-      store_setup.executor.clone(),
-      store_setup.store.clone(),
-      &store_setup.cas.address(),
-      None,
-      BTreeMap::default(),
-      true,
-      true,
-      RemoteCacheWarningsBehavior::FirstOnly,
-      cache_content_behavior,
-      256,
-      CACHE_READ_TIMEOUT,
-      None,
+    crate::remote_cache::CommandRunner::from_provider_options(
+      RemoteCacheRunnerOptions {
+        inner: local.into(),
+        instance_name: None,
+        process_cache_namespace: None,
+        executor: store_setup.executor.clone(),
+        store: store_setup.store.clone(),
+        cache_read: true,
+        cache_write: true,
+        warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
+        cache_content_behavior,
+        append_only_caches_base_path: None,
+      },
+      RemoteCacheProviderOptions {
+        instance_name: None,
+        action_cache_address: store_setup.cas.address(),
+        root_ca_certs: None,
+        headers: BTreeMap::default(),
+        concurrency_limit: 256,
+        rpc_timeout: CACHE_READ_TIMEOUT,
+      },
     )
+    .await
     .expect("caching command runner"),
   )
 }
@@ -188,9 +197,10 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
 #[tokio::test]
 async fn cache_read_success() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
 
   let (process, action_digest) = create_process(&store_setup).await;
   store_setup
@@ -212,9 +222,10 @@ async fn cache_read_success() {
 #[tokio::test]
 async fn cache_read_skipped_on_action_cache_errors() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
 
   let (process, action_digest) = create_process(&store_setup).await;
   store_setup
@@ -249,9 +260,10 @@ async fn cache_read_skipped_on_action_cache_errors() {
 #[tokio::test]
 async fn cache_read_skipped_on_missing_digest() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Fetch);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Fetch).await;
 
   // Claim that the process has a non-empty and not-persisted stdout digest.
   let (process, action_digest) = create_process(&store_setup).await;
@@ -294,9 +306,10 @@ async fn cache_read_eager_fetch() {
     cache_content_behavior: CacheContentBehavior,
     workunit: &mut RunningWorkunit,
   ) -> (i32, usize) {
-    let store_setup = StoreSetup::new();
+    let store_setup = StoreSetup::new().await;
     let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
-    let cache_runner = create_cached_runner(local_runner, &store_setup, cache_content_behavior);
+    let cache_runner =
+      create_cached_runner(local_runner, &store_setup, cache_content_behavior).await;
 
     let (process, action_digest) = create_process(&store_setup).await;
     store_setup.cas.action_cache.insert(
@@ -344,10 +357,11 @@ async fn cache_read_speculation() {
       StubCAS::builder()
         .ac_read_delay(Duration::from_millis(remote_delay_ms))
         .build(),
-    );
+    )
+    .await;
     let (local_runner, local_runner_call_counter) = create_local_runner(1, local_delay_ms);
     let cache_runner =
-      create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+      create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
 
     let (process, action_digest) = create_process(&store_setup).await;
     let process = process.cache_scope(cache_scope);
@@ -481,9 +495,10 @@ async fn cache_read_speculation() {
 #[tokio::test]
 async fn cache_write_success() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
   let (process, action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -515,9 +530,10 @@ async fn cache_write_success() {
 #[tokio::test]
 async fn cache_write_not_for_failures() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new().await;
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
   let (process, _action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -543,9 +559,11 @@ async fn cache_write_does_not_block() {
     StubCAS::builder()
       .ac_write_delay(Duration::from_millis(100))
       .build(),
-  );
+  )
+  .await;
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let cache_runner = create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer);
+  let cache_runner =
+    create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Defer).await;
   let (process, action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
@@ -731,23 +749,29 @@ async fn make_action_result_basic() {
 
   let mock_command_runner = Arc::new(MockCommandRunner);
   let cas = StubCAS::builder().build();
-  let runner = crate::remote_cache::CommandRunner::new(
-    mock_command_runner.clone(),
-    None,
-    None,
-    executor.clone(),
-    store.clone(),
-    &cas.address(),
-    None,
-    BTreeMap::default(),
-    true,
-    true,
-    RemoteCacheWarningsBehavior::FirstOnly,
-    CacheContentBehavior::Defer,
-    256,
-    CACHE_READ_TIMEOUT,
-    None,
+  let runner = crate::remote_cache::CommandRunner::from_provider_options(
+    RemoteCacheRunnerOptions {
+      inner: mock_command_runner.clone(),
+      instance_name: None,
+      process_cache_namespace: None,
+      executor: executor.clone(),
+      store: store.clone(),
+      cache_read: true,
+      cache_write: true,
+      warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
+      cache_content_behavior: CacheContentBehavior::Defer,
+      append_only_caches_base_path: None,
+    },
+    RemoteCacheProviderOptions {
+      instance_name: None,
+      action_cache_address: cas.address(),
+      root_ca_certs: None,
+      headers: BTreeMap::default(),
+      concurrency_limit: 256,
+      rpc_timeout: CACHE_READ_TIMEOUT,
+    },
   )
+  .await
   .expect("caching command runner");
 
   let command = remexec::Command {

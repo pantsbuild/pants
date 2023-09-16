@@ -39,7 +39,7 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
-use rule_graph::{self, DependencyKey, RuleGraph};
+use rule_graph::{self, DependencyKey, RuleGraph, RuleId};
 use task_executor::Executor;
 use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
@@ -701,22 +701,25 @@ fn scheduler_create(
   let core = py_executor
     .0
     .enter(|| {
-      Core::new(
-        py_executor.0.clone(),
-        tasks,
-        types,
-        intrinsics,
-        build_root,
-        ignore_patterns,
-        use_gitignore,
-        watch_filesystem,
-        local_execution_root_dir,
-        named_caches_dir,
-        ca_certs_path,
-        local_store_options.0.clone(),
-        remoting_options.0.clone(),
-        exec_strategy_opts.0.clone(),
-      )
+      py_executor.0.block_on(async {
+        Core::new(
+          py_executor.0.clone(),
+          tasks,
+          types,
+          intrinsics,
+          build_root,
+          ignore_patterns,
+          use_gitignore,
+          watch_filesystem,
+          local_execution_root_dir,
+          named_caches_dir,
+          ca_certs_path,
+          local_store_options.0.clone(),
+          remoting_options.0.clone(),
+          exec_strategy_opts.0.clone(),
+        )
+        .await
+      })
     })
     .map_err(PyValueError::new_err)?;
   Ok(PyScheduler(Scheduler::new(core)))
@@ -1011,6 +1014,7 @@ fn session_run_interactive_process(
       &Arc::new(std::sync::atomic::AtomicBool::new(true)),
       core.intrinsics.run(
         &Intrinsic {
+          id: RuleId::new("interactive_process"),
           product: core.types.interactive_process_result,
           inputs: vec![
             DependencyKey::new(core.types.interactive_process),

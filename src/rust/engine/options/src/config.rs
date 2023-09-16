@@ -69,8 +69,8 @@ impl Config {
     files
       .iter()
       .map(Config::parse)
-      .fold(Ok(Config::default()), |acc, parse_result| {
-        acc.and_then(|config| parse_result.map(|parsed| config.merge(parsed)))
+      .try_fold(Config::default(), |config, parse_result| {
+        parse_result.map(|parsed| config.merge(parsed))
       })
   }
 

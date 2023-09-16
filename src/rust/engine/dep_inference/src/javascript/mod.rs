@@ -9,12 +9,14 @@ use tree_sitter::{Node, Parser};
 use protos::gen::pants::cache::JavascriptInferenceMetadata;
 
 use crate::javascript::import_pattern::imports_from_patterns;
-use crate::util::normalize_path;
+use crate::javascript::util::normalize_path;
 
 mod import_pattern;
+mod util;
 
 include!(concat!(env!("OUT_DIR"), "/javascript/constants.rs"));
 include!(concat!(env!("OUT_DIR"), "/javascript/visitor.rs"));
+include!(concat!(env!("OUT_DIR"), "/javascript_impl_hash.rs"));
 
 #[derive(Serialize, Deserialize)]
 pub struct ParsedJavascriptDependencies {
@@ -150,7 +152,7 @@ impl Visitor for ImportCollector<'_> {
   fn visit_expression_statement(&mut self, node: Node) -> ChildBehavior {
     if node.children(&mut node.walk()).any(|child| {
       let id = child.kind_id();
-      id == KindID::CALL_EXPRESSION || id == KindID::AWAIT_EXPRESSION
+      KindID::CALL_EXPRESSION.contains(&id) || id == KindID::AWAIT_EXPRESSION
     }) {
       return self.propagate_pragma(node);
     }

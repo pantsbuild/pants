@@ -159,7 +159,7 @@ impl Drop for RunningOperation {
 
 impl CommandRunner {
   /// Construct a new CommandRunner
-  pub fn new(
+  pub async fn new(
     execution_address: &str,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
@@ -181,15 +181,14 @@ impl CommandRunner {
       None
     };
 
-    let mut execution_headers = headers;
-    let execution_endpoint = grpc_util::create_endpoint(
+    let execution_endpoint = grpc_util::create_channel(
       execution_address,
       tls_client_config.as_ref().filter(|_| execution_use_tls),
-      &mut execution_headers,
-    )?;
-    let execution_http_headers = headers_to_http_header_map(&execution_headers)?;
+    )
+    .await?;
+    let execution_http_headers = headers_to_http_header_map(&headers)?;
     let execution_channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
+      execution_endpoint,
       execution_concurrency_limit,
       execution_http_headers,
       None,
@@ -1066,7 +1065,7 @@ pub(crate) fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Reque
   let md = request.metadata_mut();
   md.insert_bin(
     "google.devtools.remoteexecution.v1test.requestmetadata-bin",
-    BinaryMetadataValue::try_from_bytes(&reapi_request_metadata.to_bytes()).unwrap(),
+    BinaryMetadataValue::try_from(reapi_request_metadata.to_bytes()).unwrap(),
   );
 
   request

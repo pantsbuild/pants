@@ -70,7 +70,8 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                 namespace=f"uat-{env('NS_SUFFIX')}",
                 skip_crds=True,
                 no_hooks=True,
-                dependencies=["//src/chart", "//src/docker/myimage"],
+                chart="//src/chart",
+                dependencies=["//src/docker/myimage"],
                 sources=["common.yaml", "*.yaml", "*-override.yaml", "subdir/*.yaml", "subdir/*-override.yaml", "subdir/last.yaml"],
                 values={
                     "key": "foo",
@@ -172,7 +173,7 @@ def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunne
               helm_deployment(
                 name="bar",
                 namespace="uat",
-                dependencies=["//src/chart"],
+                chart="//src/chart",
                 sources=["*.yaml", "subdir/*.yml"]
               )
               """
@@ -214,7 +215,7 @@ def test_can_deploy_3rd_party_chart(rule_runner: RuleRunner) -> None:
                 """\
               helm_deployment(
                 name="deploy_3rd_party",
-                dependencies=["//3rdparty/helm:prometheus-stack"],
+                chart="//3rdparty/helm:prometheus-stack",
               )
               """
             ),

@@ -22,7 +22,7 @@ from pants.engine.internals.mapper import (
     DuplicateNameError,
     SpecsFilter,
 )
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, _unrecognized_symbol_func
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, _UnrecognizedSymbol
 from pants.engine.internals.target_adaptor import TargetAdaptor as _TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
 from pants.engine.unions import UnionMembership
@@ -95,7 +95,7 @@ def test_address_map_unrecognized_symbol() -> None:
     address_map = parse_address_map(build_file, ignore_unrecognized_symbols=True)
     assert {
         "one": TargetAdaptor(type_alias="thing", name="one"),
-        "bad": TargetAdaptor(type_alias="thing", name="bad", age=_unrecognized_symbol_func),
+        "bad": TargetAdaptor(type_alias="thing", name="bad", age=_UnrecognizedSymbol("fake")),
         "two": TargetAdaptor(type_alias="thing", name="two"),
         "three": TargetAdaptor(
             type_alias="thing",

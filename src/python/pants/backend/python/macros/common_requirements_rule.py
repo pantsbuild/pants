@@ -15,7 +15,6 @@ from pants.backend.python.macros.common_fields import (
     ModuleMappingField,
     TypeStubsModuleMappingField,
 )
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
@@ -39,6 +38,7 @@ from pants.engine.target import (
     SingleSourceField,
 )
 from pants.engine.unions import UnionMembership
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)

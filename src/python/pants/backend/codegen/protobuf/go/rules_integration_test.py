@@ -294,7 +294,7 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: TestProtoGen" in result.stdout
+    assert b"PASS: TestProtoGen" in result.stdout_bytes
 
 
 @requires_go

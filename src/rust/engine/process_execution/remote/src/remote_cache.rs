@@ -27,6 +27,8 @@ use process_execution::{
 use process_execution::{make_execute_request, EntireExecuteRequest};
 
 mod reapi;
+#[cfg(test)]
+mod reapi_tests;
 
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
@@ -39,7 +41,7 @@ pub enum RemoteCacheWarningsBehavior {
 /// This `ActionCacheProvider` trait captures the operations required to be able to cache command
 /// executions remotely.
 #[async_trait]
-trait ActionCacheProvider: Sync + Send + 'static {
+pub trait ActionCacheProvider: Sync + Send + 'static {
   async fn update_action_result(
     &self,
     action_digest: Digest,
@@ -51,6 +53,29 @@ trait ActionCacheProvider: Sync + Send + 'static {
     action_digest: Digest,
     context: &Context,
   ) -> Result<Option<ActionResult>, String>;
+}
+
+#[derive(Clone)]
+pub struct RemoteCacheProviderOptions {
+  pub instance_name: Option<String>,
+  pub action_cache_address: String,
+  pub root_ca_certs: Option<Vec<u8>>,
+  pub headers: BTreeMap<String, String>,
+  pub concurrency_limit: usize,
+  pub rpc_timeout: Duration,
+}
+
+pub struct RemoteCacheRunnerOptions {
+  pub inner: Arc<dyn process_execution::CommandRunner>,
+  pub instance_name: Option<String>,
+  pub process_cache_namespace: Option<String>,
+  pub executor: task_executor::Executor,
+  pub store: Store,
+  pub cache_read: bool,
+  pub cache_write: bool,
+  pub warnings_behavior: RemoteCacheWarningsBehavior,
+  pub cache_content_behavior: CacheContentBehavior,
+  pub append_only_caches_base_path: Option<String>,
 }
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
@@ -80,32 +105,21 @@ pub struct CommandRunner {
 
 impl CommandRunner {
   pub fn new(
-    inner: Arc<dyn process_execution::CommandRunner>,
-    instance_name: Option<String>,
-    process_cache_namespace: Option<String>,
-    executor: task_executor::Executor,
-    store: Store,
-    action_cache_address: &str,
-    root_ca_certs: Option<Vec<u8>>,
-    headers: BTreeMap<String, String>,
-    cache_read: bool,
-    cache_write: bool,
-    warnings_behavior: RemoteCacheWarningsBehavior,
-    cache_content_behavior: CacheContentBehavior,
-    concurrency_limit: usize,
-    rpc_timeout: Duration,
-    append_only_caches_base_path: Option<String>,
-  ) -> Result<Self, String> {
-    let provider = Arc::new(reapi::Provider::new(
-      instance_name.clone(),
-      action_cache_address,
-      root_ca_certs,
-      headers,
-      concurrency_limit,
-      rpc_timeout,
-    )?);
-
-    Ok(CommandRunner {
+    RemoteCacheRunnerOptions {
+      inner,
+      instance_name,
+      process_cache_namespace,
+      executor,
+      store,
+      cache_read,
+      cache_write,
+      warnings_behavior,
+      cache_content_behavior,
+      append_only_caches_base_path,
+    }: RemoteCacheRunnerOptions,
+    provider: Arc<dyn ActionCacheProvider + 'static>,
+  ) -> Self {
+    CommandRunner {
       inner,
       instance_name,
       process_cache_namespace,
@@ -119,7 +133,16 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
-    })
+    }
+  }
+
+  pub async fn from_provider_options(
+    runner_options: RemoteCacheRunnerOptions,
+    provider_options: RemoteCacheProviderOptions,
+  ) -> Result<Self, String> {
+    let provider = Arc::new(reapi::Provider::new(provider_options).await?);
+
+    Ok(Self::new(runner_options, provider))
   }
 
   /// Create a REAPI `Tree` protobuf for an output directory by traversing down from a Pants
@@ -567,7 +590,9 @@ async fn check_action_cache(
       let response = provider
         .get_action_result(action_digest, context)
         .and_then(|action_result| async move {
-          let Some(action_result) = action_result else { return Ok(None) };
+          let Some(action_result) = action_result else {
+            return Ok(None);
+          };
 
           let response = populate_fallible_execution_result(
             store.clone(),

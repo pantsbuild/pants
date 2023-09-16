@@ -9,7 +9,6 @@ from pants.backend.python.goals.pytest_runner import (
     _count_pytest_tests,
     validate_pytest_cov_included,
 )
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
@@ -25,6 +24,7 @@ from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
+from pants.util.pip_requirement import PipRequirement
 
 EXAMPLE_TEST1 = b"""
 def test_foo():

@@ -160,7 +160,7 @@ impl Scheduler {
         items.extend(t.params.keys().map(|k| k.to_value()));
         items.push(v.clone().try_into().unwrap());
       }
-      let mut entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
+      let entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
       entry.0 += 1;
       entry.1 += {
         std::mem::size_of_val(k)

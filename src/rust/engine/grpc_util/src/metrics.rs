@@ -72,7 +72,7 @@ pub struct NetworkMetricsFuture<F> {
 
 impl<F, B, E> Future for NetworkMetricsFuture<F>
 where
-  F: Future<Output = Result<Response<B>, E>>,
+  F: Future<Output = Result<Response<B>, E>> + Send + 'static,
 {
   type Output = Result<Response<B>, E>;
 
@@ -94,7 +94,12 @@ where
 
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for NetworkMetrics<S>
 where
-  S: Service<Request<ReqBody>, Response = Response<ResBody>>,
+  S: Service<Request<ReqBody>, Response = Response<ResBody>> + Send + 'static,
+  ReqBody: Send + 'static,
+  ResBody: Send + 'static,
+  S::Response: Send + 'static,
+  S::Error: Send + 'static,
+  S::Future: Send + 'static,
 {
   type Response = S::Response;
   type Error = S::Error;

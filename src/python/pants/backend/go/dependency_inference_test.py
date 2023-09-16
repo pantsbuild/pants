@@ -120,11 +120,11 @@ def test_multiple_go_mod_support(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: TestFoo" in result.stdout
+    assert b"PASS: TestFoo" in result.stdout_bytes
 
     tgt = rule_runner.get_target(Address("bar"))
     result = rule_runner.request(
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: TestBar" in result.stdout
+    assert b"PASS: TestBar" in result.stdout_bytes

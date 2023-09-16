@@ -1,6 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -36,6 +37,7 @@ pub struct ImmutableInputs(Arc<Inner>);
 
 impl ImmutableInputs {
   pub fn new(store: Store, base: &Path) -> Result<Self, String> {
+    create_dir_all(base).map_err(|e| format!("Failed to create base for immutable inputs: {e}"))?;
     let workdir = tempfile::Builder::new()
       .prefix("immutable_inputs")
       .tempdir_in(base)

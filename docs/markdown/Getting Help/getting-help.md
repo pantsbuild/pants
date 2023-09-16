@@ -7,20 +7,21 @@ createdAt: "2020-03-23T21:37:03.235Z"
 ---
 The [Pants community](doc:the-pants-community) is friendly, welcoming, and passionate about improving the craft of software engineering. If you need help with anything Pants-related, you've come to the right place.  We'd love to hear from you!
 
+Slack
+-----
+
+The best place to become acquainted with Pants community members, exchange informal chat and ask quick questions is at the project's Slack. You can join using [this link](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link).
+
+We encourage you to introduce yourself in the `#welcome` channel!
+
+The primary public channels of community chat also have a [searchable public archive](https://chat.pantsbuild.org/). No login is required.
+
 Discussions
 ----
 
-The best place to ask technical questions or hold design discussions is via the project's [GitHub Discussions](https://github.com/pantsbuild/pants). While questions, feedback, and design discussions are equally welcome on Slack, *we encourage you to choose Discussions whenever it's likely other users would benefit from persistent access to the conversation*. GitHub Discussions is indexed by search engines, and its content is retained long-term, so this is opportunity to help your fellow Pants users by making it easier for folks to discover supplementary technical information beyond the [docs](https://pantsbuild.org/docs).
+The best place to ask deeper technical questions or hold design discussions is via the project's [GitHub Discussions](https://github.com/pantsbuild/pants). While questions, feedback, and design discussions are equally welcome on Slack, *we encourage you to choose Discussions whenever it's likely other users would benefit from persistent access to the conversation*. GitHub Discussions is indexed by search engines, and its content is retained long-term, so this is opportunity to help your fellow Pants users by making it easier for folks to discover supplementary technical information beyond the [docs](https://pantsbuild.org/docs).
 
 We encourage you to introduce yourself in the [`"welcome"`](https://github.com/pantsbuild/pants/discussions/categories/-welcome) category!
-
-
-Community Chat
------
-
-The best place to become acquainted with Pants community members and exchange informal chat is at the project's Slack. You can join using [this link](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link). *We use Slack's basic tier, which expires messages after a couple months, so usage is best suited to the more ephemeral or informal conversations that are unlikely to have long-term archival value.*
-
-We encourage you to introduce yourself in the `#welcome` channel!
 
 
 Blog

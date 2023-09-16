@@ -37,7 +37,7 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::fs::Permissions as FSPermissions;
@@ -64,7 +64,7 @@ use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
-use remexec::{ServerCapabilities, Tree};
+use remexec::Tree;
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 #[cfg(target_os = "macos")]
@@ -84,6 +84,7 @@ mod local;
 pub mod local_tests;
 
 mod remote;
+pub use remote::RemoteOptions;
 #[cfg(test)]
 mod remote_tests;
 
@@ -256,9 +257,12 @@ impl RemoteStore {
     let remote_store = self.store.clone();
     self
       .maybe_download(digest, async move {
-        let store_into_fsdb =
-          f_remote.is_none() && ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
+        let store_into_fsdb = ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
         if store_into_fsdb {
+          assert!(
+            f_remote.is_none(),
+            "Entries to be stored in FSDB should never need validation via f_remote, found {digest:?} of type {entry_type:?} that does"
+          );
           local_store
             .get_file_fsdb()
             .write_using(digest.hash, |file| {
@@ -372,33 +376,12 @@ impl Store {
   /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
   /// attempt to back-fill its local storage from the remote storage.
   ///
-  pub fn into_with_remote(
-    self,
-    cas_address: &str,
-    instance_name: Option<String>,
-    tls_config: grpc_util::tls::Config,
-    headers: BTreeMap<String, String>,
-    chunk_size_bytes: usize,
-    rpc_timeout: Duration,
-    rpc_retries: usize,
-    rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-    batch_api_size_limit: usize,
-  ) -> Result<Store, String> {
+  pub async fn into_with_remote(self, remote_options: RemoteOptions) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
-      remote: Some(RemoteStore::new(remote::ByteStore::new(
-        cas_address,
-        instance_name,
-        tls_config,
-        headers,
-        chunk_size_bytes,
-        rpc_timeout,
-        rpc_retries,
-        rpc_concurrency_limit,
-        capabilities_cell_opt,
-        batch_api_size_limit,
-      )?)),
+      remote: Some(RemoteStore::new(
+        remote::ByteStore::from_options(remote_options).await?,
+      )),
       immutable_inputs_base: self.immutable_inputs_base,
     })
   }
@@ -826,15 +809,16 @@ impl Store {
               remote_store
                 .clone()
                 .maybe_upload(digest, async move {
-                  // TODO(John Sirois): Consider allowing configuration of when to buffer large blobs
-                  // to disk to be independent of the remote store wire chunk size.
-                  if digest.size_bytes > remote_store.store.chunk_size_bytes() {
-                    Self::store_large_blob_remote(local, remote_store.store, entry_type, digest)
-                      .await
-                  } else {
-                    Self::store_small_blob_remote(local, remote_store.store, entry_type, digest)
-                      .await
-                  }
+                  match local.load_from_fs(digest).await? {
+                    Some(path) => {
+                      Self::store_fsdb_blob_remote(remote_store.store, digest, path).await?
+                    }
+                    None => {
+                      Self::store_lmdb_blob_remote(local, remote_store.store, entry_type, digest)
+                        .await?
+                    }
+                  };
+                  Ok(())
                 })
                 .await
             }
@@ -857,7 +841,7 @@ impl Store {
     .boxed()
   }
 
-  async fn store_small_blob_remote(
+  async fn store_lmdb_blob_remote(
     local: local::ByteStore,
     remote: remote::ByteStore,
     entry_type: EntryType,
@@ -865,7 +849,9 @@ impl Store {
   ) -> Result<(), StoreError> {
     // We need to copy the bytes into memory so that they may be used safely in an async
     // future. While this unfortunately increases memory consumption, we prioritize
-    // being able to run `remote.store_bytes()` as async.
+    // being able to run `remote.store_bytes()` as async. In addition, this is only used
+    // for blobs in the LMDB store, most of which are small: large blobs end up in the
+    // FSDB store.
     //
     // See https://github.com/pantsbuild/pants/pull/9793 for an earlier implementation
     // that used `Executor.block_on`, which avoided the clone but was blocking.
@@ -883,31 +869,16 @@ impl Store {
     }
   }
 
-  async fn store_large_blob_remote(
-    local: local::ByteStore,
+  async fn store_fsdb_blob_remote(
     remote: remote::ByteStore,
-    entry_type: EntryType,
     digest: Digest,
+    path: PathBuf,
   ) -> Result<(), StoreError> {
-    remote
-      .store_buffered(digest, |mut buffer| async {
-        let result = local
-          .load_bytes_with(entry_type, digest, move |bytes| {
-            buffer.write_all(bytes).map_err(|e| {
-              format!("Failed to write {entry_type:?} {digest:?} to temporary buffer: {e}")
-            })
-          })
-          .await?;
-        match result {
-          None => Err(StoreError::MissingDigest(
-            format!("Failed to upload {entry_type:?}: Not found in local store",),
-            digest,
-          )),
-          Some(Err(err)) => Err(err.into()),
-          Some(Ok(())) => Ok(()),
-        }
-      })
+    let file = tokio::fs::File::open(&path)
       .await
+      .map_err(|e| format!("failed to read {digest:?} from {path:?}: {e}"))?;
+    remote.store_file(digest, file).await?;
+    Ok(())
   }
 
   ///

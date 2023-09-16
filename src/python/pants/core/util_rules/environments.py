@@ -294,7 +294,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
         """
         Platform properties to set on remote execution requests.
 
-        Format: property=value. Multiple values should be specified as multiple
+        Format: `property=value`. Multiple values should be specified as multiple
         occurrences of this flag.
 
         Pants itself may add additional platform properties.
@@ -313,7 +313,7 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
         Python value `None` to error when remote execution is disabled.
 
         Tip: if you are using a Docker image with your remote execution environment (usually
-        enabled by setting the field {RemoteExtraPlatformPropertiesField.alias}`), then it can be
+        enabled by setting the field `{RemoteExtraPlatformPropertiesField.alias}`), then it can be
         useful to fallback to an equivalent `docker_image` target so that you have a consistent
         execution environment.
         """

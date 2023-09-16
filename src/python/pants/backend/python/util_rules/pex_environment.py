@@ -14,7 +14,6 @@ from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import BinaryPath
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.internals.native_engine import Digest
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
@@ -96,17 +95,14 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
     """The BinaryPath of a Python executable for user code, along with some extras."""
 
     append_only_caches: FrozenDict[str, str] = FrozenDict({})
-    immutable_input_digests: FrozenDict[str, str] = FrozenDict({})
 
     def __init__(
         self,
         path: str,
         fingerprint: str | None = None,
         append_only_caches: Mapping[str, str] = FrozenDict({}),
-        immutable_input_digests: Mapping[str, str] = FrozenDict({}),
     ) -> None:
         object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches))
-        object.__setattr__(self, "immutable_input_digests", FrozenDict(immutable_input_digests))
         super().__init__(path, fingerprint)
         self.__post_init__()
 
@@ -147,8 +143,10 @@ class PexEnvironment:
             _pex_environment=self,
             pex_root=pex_root,
             _working_directory=PurePath(working_directory) if working_directory else None,
-            append_only_caches=FrozenDict({self._PEX_ROOT_DIRNAME: str(pex_root)}),
-            immutable_input_digests=self.bootstrap_python.immutable_input_digests,
+            append_only_caches=FrozenDict(
+                **{self._PEX_ROOT_DIRNAME: str(pex_root)},
+                **self.bootstrap_python.APPEND_ONLY_CACHES,
+            ),
         )
 
     def in_workspace(self) -> CompletePexEnvironment:
@@ -162,8 +160,7 @@ class PexEnvironment:
             _pex_environment=self,
             pex_root=pex_root,
             _working_directory=None,
-            append_only_caches=FrozenDict(),
-            immutable_input_digests=self.bootstrap_python.immutable_input_digests,
+            append_only_caches=self.bootstrap_python.APPEND_ONLY_CACHES,
         )
 
     def venv_site_packages_copies_option(self, use_copies: bool) -> str:
@@ -197,7 +194,6 @@ class CompletePexEnvironment:
     pex_root: PurePath
     _working_directory: PurePath | None
     append_only_caches: FrozenDict[str, str]
-    immutable_input_digests: FrozenDict[str, Digest]
 
     @property
     def interpreter_search_paths(self) -> tuple[str, ...]:

@@ -14,7 +14,7 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.backend.kotlin.compile import kotlinc, kotlinc_plugins
-from pants.backend.kotlin.compile.kotlinc_test import KOTLIN_STDLIB_REQUIREMENTS
+from pants.backend.kotlin.compile.testutil import KOTLIN_STDLIB_REQUIREMENTS
 from pants.backend.kotlin.dependency_inference.rules import rules as kotlin_dep_inf_rules
 from pants.backend.kotlin.subsystems.kotlin import DEFAULT_KOTLIN_VERSION
 from pants.backend.kotlin.target_types import KotlinJunitTestsGeneratorTarget
@@ -34,7 +34,7 @@ from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.test.junit import JunitTestRequest
 from pants.jvm.test.junit import rules as jvm_junit_rules
-from pants.jvm.test.junit_test import run_junit_test
+from pants.jvm.test.testutil import run_junit_test
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -135,9 +135,10 @@ def test_vintage_kotlin_simple_success(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.kt")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test

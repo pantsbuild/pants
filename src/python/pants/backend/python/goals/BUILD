@@ -31,7 +31,7 @@ python_tests(
             "tags": ["platform_specific_behavior"],
             "timeout": 300,
         },
-        "run_pex_binary_integration_test.py": {"timeout": 600},
+        "run_pex_binary_integration_test.py": {"timeout": 660},
         "run_python_source_integration_test.py": {"timeout": 180},
         "package_dists_integration_test.py": {
             "dependencies": ["testprojects/src/python:native_directory"],

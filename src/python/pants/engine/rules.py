@@ -144,7 +144,7 @@ def _ensure_type_annotation(
     return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level"}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "canonical_name_suffix", "desc", "level"}
 # We aren't sure if these'll stick around or be removed at some point, so they are "private"
 # and should only be used in Pants' codebase.
 PRIVATE_RULE_DECORATOR_ARGUMENTS = {
@@ -217,9 +217,18 @@ def rule_decorator(func, **kwargs) -> Callable:
     is_goal_cls = issubclass(return_type, Goal)
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
-    # function that implements it. This is used as the workunit name.
+    # function that implements it, plus an optional suffix. This is used as the workunit name.
+    # The suffix is a convenient way to disambiguate multiple rules registered dynamically from the
+    # same static code (by overriding the inferred param types in the @rule decorator).
+    # TODO: It is not yet clear how dynamically registered rules whose names are generated
+    #  with a suffix will work in practice with the new call-by-name semantics.
+    #  For now the suffix serves to ensure unique names. Whether they are useful is another matter.
+    suffix = kwargs.get("canonical_name_suffix", "")
     effective_name = kwargs.get(
-        "canonical_name", f"{func.__module__}.{func.__qualname__}".replace(".<locals>", "")
+        "canonical_name",
+        f"{func.__module__}.{func.__qualname__}{('_' + suffix) if suffix else ''}".replace(
+            ".<locals>", ""
+        ),
     )
 
     # Set a default description, which is used in the dynamic UI and stacktraces.

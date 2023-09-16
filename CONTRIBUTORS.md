@@ -1,4 +1,4 @@
-Created by running `./pants run build-support/bin/contributors.py`.
+Created as part of the release process.
 
 + A. Alonso Dominguez
 + Aaron Mitchell
@@ -9,6 +9,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Alex Bancroft
 + Alex Schmitt
 + Alexander Johnson
++ Alexander Kuhn-Regnier
 + Alexey Tereshenkov
 + Andreas Stenius
 + Andrew Hamilton
@@ -21,11 +22,13 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Baptiste Gentholz
 + Bardur Arantsson
 + Bastian Wegge
++ Ben Limmer
 + Benjy Weinberger
 + Berkay Öztürk
 + Bill Farner
 + Billy "Hyun Joon" Seol
 + Blaž Šnuderl
++ Bob Gregory
 + Borja Lorente
 + Brandon Milton
 + Brian Larson
@@ -45,6 +48,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Chris Pesto
 + Chris Targett
 + Chris Williams
++ Christoph Proeschel
 + Christopher Livingston
 + Christopher Maier
 + Christopher Neugebauer
@@ -99,6 +103,8 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Gautham Nair
++ Gerald Spencer
 + Gordon Cassie
 + Greg Shuflin
 + Grzegorz Kossakowski
@@ -198,6 +204,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Matt Landis
 + Matt Olsen
 + Matthew Jeffryes
++ Matthias Berndt
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
@@ -238,6 +245,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Raph Estrada
 + Raúl Cuza
 + Rhuan Barreto
 + Rhys Madigan
@@ -277,6 +285,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Tianshuo Deng
 + Tien Nguyen
 + Tim Gates
++ Tim Nielens
 + Tim Treptow
 + Timur Abishev
 + Tina Huang
@@ -293,21 +302,26 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Tushar Singh
 + Ugo Di Girolamo
 + Viktor Kleen
++ Vincent Tavernier
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
 + Win Wang
 + Wolfram Arnold
 + Xaelias
++ Yarden Shoham
 + Yi Cheng
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ azban
 + bianca rosa
 + billybecker
 + eugene yokota
++ gyudoza
 + hephex
 + philipp-sontag-by
++ sww
 + twunderlich-grapl
 + wimax-grapl
 + Ólafur Páll Geirsson

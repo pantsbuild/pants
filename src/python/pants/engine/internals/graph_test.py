@@ -9,7 +9,7 @@ import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type, cast
+from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 
@@ -40,6 +40,7 @@ from pants.engine.target import (
     CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
+    DepsTraversalBehavior,
     ExplicitlyProvidedDependencies,
     Field,
     FieldDefaultFactoryRequest,
@@ -55,7 +56,6 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     OverridesField,
-    SecondaryOwnerMixin,
     ShouldTraverseDepsPredicate,
     SingleSourceField,
     SourcesPaths,
@@ -70,7 +70,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -420,8 +419,12 @@ def test_transitive_targets_with_should_traverse_deps_predicate(
     assert direct_deps == Targets([d1, d2, d3, d4])
 
     class SkipDepsTagOrTraverse(ShouldTraverseDepsPredicate):
-        def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
-            return "skip_deps" not in (target[Tags].value or [])
+        def __call__(
+            self, target: Target, field: Dependencies | SpecialCasedDependencies
+        ) -> DepsTraversalBehavior:
+            if "skip_deps" in (target[Tags].value or []):
+                return DepsTraversalBehavior.EXCLUDE
+            return DepsTraversalBehavior.INCLUDE
 
     predicate = SkipDepsTagOrTraverse()
     # Assert the class is frozen even though it was not decorated with @dataclass(frozen=True)
@@ -783,20 +786,6 @@ def test_invalid_target(transitive_targets_rule_runner: RuleRunner) -> None:
         get_target("t1")
 
 
-class MockSecondaryOwnerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
-    alias = "secondary_owner_field"
-    required = True
-
-    @property
-    def filespec(self) -> Filespec:
-        return {"includes": [os.path.join(self.address.spec_path, cast(str, self.value))]}
-
-
-class MockSecondaryOwnerTarget(Target):
-    alias = "secondary_owner"
-    core_fields = (MockSecondaryOwnerField,)
-
-
 @pytest.fixture
 def owners_rule_runner() -> RuleRunner:
     return RuleRunner(
@@ -807,7 +796,6 @@ def owners_rule_runner() -> RuleRunner:
             MockTarget,
             MockTargetGenerator,
             MockGeneratedTarget,
-            MockSecondaryOwnerTarget,
         ],
         # NB: The `graph` module masks the environment is most/all positions. We disable the
         # inherent environment so that the positions which do require the environment are
@@ -848,7 +836,6 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
                 """\
                 target(name='not-generator', sources=['*.txt'])
                 generator(name='generator', sources=['*.txt'])
-                secondary_owner(name='secondary', secondary_owner_field='deleted.txt')
                 """
             ),
         }
@@ -859,7 +846,6 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
         expected={
             Address("demo", target_name="generator"),
             Address("demo", target_name="not-generator"),
-            Address("demo", target_name="secondary"),
         },
     )
 
@@ -882,7 +868,6 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
             Address("demo", target_name="generator", relative_file_path="f.txt"),
             Address("demo", target_name="generator"),
             Address("demo", target_name="not-generator"),
-            Address("demo", target_name="secondary"),
         },
     )
 
@@ -898,7 +883,6 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
                 target(name='not-generator-f2', sources=['f2.txt'])
                 generator(name='generator-all', sources=['*.txt'])
                 generator(name='generator-f2', sources=['f2.txt'])
-                secondary_owner(name='secondary', secondary_owner_field='f1.txt')
                 """
             ),
         }
@@ -909,7 +893,6 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
         expected={
             Address("demo", target_name="generator-all", relative_file_path="f1.txt"),
             Address("demo", target_name="not-generator-all"),
-            Address("demo", target_name="secondary"),
         },
     )
     assert_owners(
@@ -936,7 +919,6 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
                 target(name='f2_first', sources=['f2.txt'])
                 target(name='f2_second', sources=['f2.txt'])
                 generator(name='generated', sources=['*.txt'])
-                secondary_owner(name='secondary', secondary_owner_field='f1.txt')
                 """
             ),
         }
@@ -955,7 +937,6 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             Address("demo", target_name="f1"),
             Address("demo", target_name="f2_first"),
             Address("demo", target_name="f2_second"),
-            Address("demo", target_name="secondary"),
             Address("demo", target_name="generated", relative_file_path="f1.txt"),
             Address("demo", target_name="generated", relative_file_path="f2.txt"),
         },

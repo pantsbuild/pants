@@ -17,7 +17,6 @@ from pants.backend.python.goals.coverage_py import (
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems import pytest
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
@@ -86,6 +85,7 @@ from pants.option.global_options import GlobalOptions
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger()

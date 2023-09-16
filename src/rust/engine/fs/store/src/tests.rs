@@ -17,12 +17,15 @@ use fs::{
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
-use mock::StubCAS;
+use mock::{RequestType, StubCAS};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
+use crate::local::ByteStore;
 use crate::{
-  EntryType, FileContent, Snapshot, Store, StoreError, StoreFileByDigest, UploadSummary, MEGABYTES,
+  EntryType, FileContent, RemoteOptions, Snapshot, Store, StoreError, StoreFileByDigest,
+  UploadSummary, MEGABYTES,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -68,6 +71,21 @@ pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, Sto
     .await
 }
 
+pub async fn mk_tempfile(contents: Option<&[u8]>) -> tokio::fs::File {
+  let file = tokio::task::spawn_blocking(tempfile::tempfile)
+    .await
+    .unwrap()
+    .unwrap();
+  let mut file = tokio::fs::File::from_std(file);
+
+  if let Some(contents) = contents {
+    file.write_all(contents).await.unwrap();
+    file.rewind().await.unwrap();
+  }
+
+  file
+}
+
 ///
 /// Create a StubCas with a file and a directory inside.
 ///
@@ -92,24 +110,36 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
   Store::local_only(task_executor::Executor::new(), dir).expect("Error creating local store")
 }
 
+fn remote_options(
+  cas_address: String,
+  instance_name: Option<String>,
+  headers: BTreeMap<String, String>,
+) -> RemoteOptions {
+  RemoteOptions {
+    cas_address,
+    instance_name,
+    tls_config: tls::Config::default(),
+    headers,
+    chunk_size_bytes: 10 * MEGABYTES,
+    rpc_timeout: Duration::from_secs(1),
+    rpc_retries: 1,
+    rpc_concurrency_limit: 256,
+    capabilities_cell_opt: None,
+    batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
+  }
+}
 ///
 /// Create a new store with a remote CAS.
 ///
-fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
+async fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
   Store::local_only(task_executor::Executor::new(), dir)
     .unwrap()
-    .into_with_remote(
-      cas_address,
+    .into_with_remote(remote_options(
+      cas_address.to_owned(),
       None,
-      tls::Config::default(),
       BTreeMap::new(),
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    ))
+    .await
     .unwrap()
 }
 
@@ -131,10 +161,14 @@ async fn load_file_prefers_local() {
 
   let cas = new_cas(1024);
   assert_eq!(
-    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
+    load_file_bytes(
+      &new_store(dir.path(), &cas.address()).await,
+      testdata.digest()
+    )
+    .await,
     Ok(testdata.bytes())
   );
-  assert_eq!(0, cas.read_request_count());
+  assert_eq!(0, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -156,12 +190,13 @@ async fn load_directory_prefers_local() {
   let cas = new_cas(1024);
   assert_eq!(
     new_store(dir.path(), &cas.address())
+      .await
       .load_directory(testdir.digest(),)
       .await
       .unwrap(),
     testdir.directory()
   );
-  assert_eq!(0, cas.read_request_count());
+  assert_eq!(0, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -172,11 +207,15 @@ async fn load_file_falls_back_and_backfills() {
 
   let cas = new_cas(1024);
   assert_eq!(
-    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
+    load_file_bytes(
+      &new_store(dir.path(), &cas.address()).await,
+      testdata.digest()
+    )
+    .await,
     Ok(testdata.bytes()),
     "Read from CAS"
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert_eq!(
     crate::local_tests::load_file_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -202,12 +241,15 @@ async fn load_file_falls_back_and_backfills_for_huge_file() {
     .build();
 
   assert_eq!(
-    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest())
-      .await
-      .unwrap(),
+    load_file_bytes(
+      &new_store(dir.path(), &cas.address()).await,
+      testdata.digest()
+    )
+    .await
+    .unwrap(),
     testdata.bytes()
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert!(
     crate::local_tests::load_file_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -220,7 +262,7 @@ async fn load_file_falls_back_and_backfills_for_huge_file() {
 }
 
 #[tokio::test]
-async fn load_directory_falls_back_and_backfills() {
+async fn load_directory_small_falls_back_and_backfills() {
   let dir = TempDir::new().unwrap();
 
   let cas = new_cas(1024);
@@ -229,12 +271,51 @@ async fn load_directory_falls_back_and_backfills() {
 
   assert_eq!(
     new_store(dir.path(), &cas.address())
+      .await
       .load_directory(testdir.digest(),)
       .await
       .unwrap(),
     testdir.directory()
   );
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
+  assert_eq!(
+    crate::local_tests::load_directory_proto_bytes(
+      &crate::local_tests::new_store(dir.path()),
+      testdir.digest(),
+    )
+    .await,
+    Ok(Some(testdir.bytes()))
+  );
+}
+
+#[tokio::test]
+async fn load_directory_huge_falls_back_and_backfills() {
+  let dir = TempDir::new().unwrap();
+
+  let testdir = TestDirectory::many_files();
+  let digest = testdir.digest();
+  // this test is ensuring that "huge" directories don't fall into the FSDB code paths, so let's
+  // ensure we're actually testing that, by validating that a _file_ of this size would use FSDB
+  assert!(ByteStore::should_use_fsdb(
+    EntryType::File,
+    digest.size_bytes
+  ));
+
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder()
+    .directory(&testdir)
+    .file(&TestData::empty())
+    .build();
+
+  assert_eq!(
+    new_store(dir.path(), &cas.address())
+      .await
+      .load_directory(digest)
+      .await
+      .unwrap(),
+    testdir.directory()
+  );
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
   assert_eq!(
     crate::local_tests::load_directory_proto_bytes(
       &crate::local_tests::new_store(dir.path()),
@@ -267,6 +348,7 @@ async fn load_recursive_directory() {
     .build();
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_downloaded(
       HashSet::new(),
       HashSet::from([recursive_testdir_digest.clone()]),
@@ -304,12 +386,12 @@ async fn load_file_missing_is_none() {
 
   let cas = new_empty_cas();
   let result = load_file_bytes(
-    &new_store(dir.path(), &cas.address()),
+    &new_store(dir.path(), &cas.address()).await,
     TestData::roland().digest(),
   )
   .await;
   assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -318,10 +400,11 @@ async fn load_directory_missing_errors() {
 
   let cas = new_empty_cas();
   let result = new_store(dir.path(), &cas.address())
+    .await
     .load_directory(TestDirectory::containing_roland().digest())
     .await;
   assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
-  assert_eq!(1, cas.read_request_count());
+  assert_eq!(1, cas.request_count(RequestType::BSRead));
 }
 
 #[tokio::test]
@@ -331,15 +414,15 @@ async fn load_file_remote_error_is_error() {
   let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::cas_always_errors();
   let error = load_file_bytes(
-    &new_store(dir.path(), &cas.address()),
+    &new_store(dir.path(), &cas.address()).await,
     TestData::roland().digest(),
   )
   .await
   .expect_err("Want error");
   assert!(
-    cas.read_request_count() > 0,
+    cas.request_count(RequestType::BSRead) > 0,
     "Want read_request_count > 0 but got {}",
-    cas.read_request_count()
+    cas.request_count(RequestType::BSRead)
   );
   assert!(
     error
@@ -356,13 +439,14 @@ async fn load_directory_remote_error_is_error() {
   let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::cas_always_errors();
   let error = new_store(dir.path(), &cas.address())
+    .await
     .load_directory(TestData::roland().digest())
     .await
     .expect_err("Want error");
   assert!(
-    cas.read_request_count() > 0,
+    cas.request_count(RequestType::BSRead) > 0,
     "Want read_request_count > 0 but got {}",
-    cas.read_request_count()
+    cas.request_count(RequestType::BSRead)
   );
   assert!(
     error
@@ -426,6 +510,7 @@ async fn malformed_remote_directory_is_error() {
 
   let cas = new_cas(1024);
   new_store(dir.path(), &cas.address())
+    .await
     .load_directory(testdata.digest())
     .await
     .expect_err("Want error");
@@ -464,6 +549,7 @@ async fn non_canonical_remote_directory_is_error() {
     )
     .build();
   new_store(dir.path(), &cas.address())
+    .await
     .load_directory(directory_digest)
     .await
     .expect_err("Want error");
@@ -491,9 +577,12 @@ async fn wrong_remote_file_bytes_is_error() {
       TestDirectory::containing_roland().bytes(),
     )
     .build();
-  load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest())
-    .await
-    .expect_err("Want error");
+  load_file_bytes(
+    &new_store(dir.path(), &cas.address()).await,
+    testdata.digest(),
+  )
+  .await
+  .expect_err("Want error");
 
   assert_eq!(
     crate::local_tests::load_file_bytes(
@@ -518,9 +607,12 @@ async fn wrong_remote_directory_bytes_is_error() {
       TestDirectory::containing_roland().bytes(),
     )
     .build();
-  load_file_bytes(&new_store(dir.path(), &cas.address()), testdir.digest())
-    .await
-    .expect_err("Want error");
+  load_file_bytes(
+    &new_store(dir.path(), &cas.address()).await,
+    testdir.digest(),
+  )
+  .await
+  .expect_err("Want error");
 
   assert_eq!(
     crate::local_tests::load_file_bytes(
@@ -656,6 +748,7 @@ async fn uploads_files() {
   assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect("Error uploading file");
@@ -687,6 +780,7 @@ async fn uploads_directories_recursively() {
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect("Error uploading directory");
@@ -719,6 +813,7 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
     .expect("Error storing file locally");
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect("Error uploading file");
@@ -731,6 +826,7 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect("Error uploading directory");
@@ -765,6 +861,7 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
     .expect("Error storing file locally");
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![roland.digest()])
     .await
     .expect("Error uploading big file");
@@ -778,6 +875,7 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdir.digest(), catnip.digest()])
     .await
     .expect("Error uploading directory");
@@ -804,6 +902,7 @@ async fn does_not_reupload_big_file_already_in_cas() {
     .expect("Error storing file locally");
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![extra_big_file_digest()])
     .await
     .expect("Error uploading directory");
@@ -815,6 +914,7 @@ async fn does_not_reupload_big_file_already_in_cas() {
   );
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![extra_big_file_digest()])
     .await
     .expect("Error uploading directory");
@@ -836,6 +936,7 @@ async fn upload_missing_files() {
   assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
   let error = new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect_err("Want error");
@@ -859,6 +960,7 @@ async fn upload_succeeds_for_digests_which_only_exist_remotely() {
 
   // The data does not exist locally, but already exists remotely: succeed.
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .unwrap();
@@ -880,6 +982,7 @@ async fn upload_missing_file_in_directory() {
   assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
   let error = new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect_err("Want error");
@@ -906,6 +1009,7 @@ async fn uploading_digest_with_wrong_size_is_error() {
   let wrong_digest = Digest::new(testdata.fingerprint(), testdata.len() + 1);
 
   new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![wrong_digest])
     .await
     .expect_err("Expect error uploading file");
@@ -939,18 +1043,12 @@ async fn instance_name_upload() {
 
   let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
+    .into_with_remote(remote_options(
+      cas.address(),
       Some("dark-tower".to_owned()),
-      tls::Config::default(),
       BTreeMap::new(),
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    ))
+    .await
     .unwrap();
 
   store_with_remote
@@ -970,18 +1068,12 @@ async fn instance_name_download() {
 
   let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
+    .into_with_remote(remote_options(
+      cas.address(),
       Some("dark-tower".to_owned()),
-      tls::Config::default(),
       BTreeMap::new(),
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    ))
+    .await
     .unwrap();
 
   assert_eq!(
@@ -1021,18 +1113,8 @@ async fn auth_upload() {
   headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
   let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      headers,
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options(cas.address(), None, headers))
+    .await
     .unwrap();
 
   store_with_remote
@@ -1054,18 +1136,8 @@ async fn auth_download() {
   headers.insert("authorization".to_owned(), "Bearer Armory.Key".to_owned());
   let store_with_remote = Store::local_only(task_executor::Executor::new(), dir.path())
     .unwrap()
-    .into_with_remote(
-      &cas.address(),
-      None,
-      tls::Config::default(),
-      headers,
-      10 * MEGABYTES,
-      Duration::from_secs(1),
-      1,
-      256,
-      None,
-      STORE_BATCH_API_SIZE_LIMIT,
-    )
+    .into_with_remote(remote_options(cas.address(), None, headers))
+    .await
     .unwrap();
 
   assert_eq!(
@@ -1501,6 +1573,7 @@ async fn returns_upload_summary_on_empty_cas() {
     .await
     .expect("Error storing file locally");
   let mut summary = new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect("Error uploading file");
@@ -1551,6 +1624,7 @@ async fn summary_does_not_count_things_in_cas() {
 
   // Store testroland first, which should return a summary of one file
   let mut data_summary = new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testroland.digest()])
     .await
     .expect("Error uploading file");
@@ -1571,6 +1645,7 @@ async fn summary_does_not_count_things_in_cas() {
   // It should see the digest of testroland already in cas,
   // and not report it in uploads.
   let mut dir_summary = new_store(dir.path(), &cas.address())
+    .await
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect("Error uploading directory");
@@ -1624,7 +1699,7 @@ async fn explicitly_overwrites_already_existing_file() {
     .directory(&contents_dir)
     .file(&cas_file)
     .build();
-  let store = new_store(tempfile::tempdir().unwrap(), &cas.address());
+  let store = new_store(tempfile::tempdir().unwrap(), &cas.address()).await;
 
   store
     .materialize_directory(

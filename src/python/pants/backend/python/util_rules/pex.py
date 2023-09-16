@@ -1030,6 +1030,7 @@ async def create_venv_pex(
         additional_args=pex_request.additional_args
         + (
             "--venv",
+            "prepend",
             "--seed",
             "verbose",
             pex_environment.venv_site_packages_copies_option(
@@ -1160,7 +1161,6 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
             **complete_pex_env.append_only_caches,
             **append_only_caches,
         },
-        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,
@@ -1254,7 +1254,6 @@ async def setup_venv_pex_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=append_only_caches,
-        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,

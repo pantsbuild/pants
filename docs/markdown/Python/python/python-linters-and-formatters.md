@@ -24,18 +24,19 @@ Activating linters and formatters
 
 Linter/formatter support is implemented in separate [backends](doc:enabling-backends) so that they are easy to opt in to individually:
 
-| Backend                                            | Tool                                                                                                                       |
-| :------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
-| `pants.backend.python.lint.bandit`                 | [Bandit](https://bandit.readthedocs.io/en/latest/): security linter                                                        |
-| `pants.backend.python.lint.black`                  | [Black](https://black.readthedocs.io/en/stable/): code formatter                                                           |
-| `pants.backend.python.lint.docformatter`           | [Docformatter](https://pypi.org/project/docformatter/): docstring formatter                                                |
-| `pants.backend.python.lint.flake8`                 | [Flake8](https://flake8.pycqa.org/en/latest/): style and bug linter                                                        |
-| `pants.backend.python.lint.isort`                  | [isort](https://readthedocs.org/projects/isort/): import statement formatter                                               |
-| `pants.backend.python.lint.pydocstyle`             | [Pydocstyle](https://pypi.org/project/pydocstyle/): docstring linter                                                       |
-| `pants.backend.python.lint.pylint`                 | [Pylint](https://pylint.pycqa.org/): style and bug linter                                                                  |
-| `pants.backend.python.lint.yapf`                   | [Yapf](https://github.com/google/yapf): code formatter                                                                     |
-| `pants.backend.experimental.python.lint.autoflake` | [Autoflake](https://github.com/myint/autoflake): remove unused imports                                                     |
-| `pants.backend.experimental.python.lint.pyupgrade` | [Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings` |
+| Backend                                       | Tool                                                                                                                       |
+|:----------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------|
+| `pants.backend.python.lint.bandit`            | [Bandit](https://bandit.readthedocs.io/en/latest/): security linter                                                        |
+| `pants.backend.python.lint.black`             | [Black](https://black.readthedocs.io/en/stable/): code formatter                                                           |
+| `pants.backend.python.lint.docformatter`      | [Docformatter](https://pypi.org/project/docformatter/): docstring formatter                                                |
+| `pants.backend.python.lint.flake8`            | [Flake8](https://flake8.pycqa.org/en/latest/): style and bug linter                                                        |
+| `pants.backend.python.lint.isort`             | [isort](https://readthedocs.org/projects/isort/): import statement formatter                                               |
+| `pants.backend.python.lint.pydocstyle`        | [Pydocstyle](https://pypi.org/project/pydocstyle/): docstring linter                                                       |
+| `pants.backend.python.lint.pylint`            | [Pylint](https://pylint.pycqa.org/): style and bug linter                                                                  |
+| `pants.backend.python.lint.yapf`              | [Yapf](https://github.com/google/yapf): code formatter                                                                     |
+| `pants.backend.python.lint.autoflake`         | [Autoflake](https://github.com/myint/autoflake): remove unused imports                                                     |
+| `pants.backend.python.lint.pyupgrade`         | [Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings` |
+| `pants.backend.experimental.python.lint.ruff` | [Ruff](https://beta.ruff.rs/docs/): an extremely fast Python linter, written in Rust.                                      |
 
 To enable, add the appropriate backends in `pants.toml`:
 
@@ -266,12 +267,6 @@ You must tell Pyupgrade which version of Python to target, like this:
 [pyupgrade]
 args = ["--py36-plus"]
 ```
-
-### Autoflake and Pyupgrade are experimental
-
-These tools are marked experimental because we are debating adding a new goal called `fix` and running them with `fix` rather than `fmt`. The tools are safe to use, other than possibly changing how you invoke them in the future.
-
-We invite you to [weigh in with what you think](https://github.com/pantsbuild/pants/issues/13504)!
 
 ### isort: possible issues with its import classifier algorithm
 

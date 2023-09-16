@@ -16,10 +16,12 @@ from unittest.mock import Mock
 import pytest
 
 from pants.backend.python import target_types_rules
+from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
+    PexBinary,
     PexLayout,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -70,6 +72,7 @@ from pants.util.strutil import softwrap
 def rule_runner() -> PythonRuleRunner:
     return PythonRuleRunner(
         rules=[
+            *package_pex_binary.rules(),
             *pex_test_utils.rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
@@ -80,6 +83,7 @@ def rule_runner() -> PythonRuleRunner:
             *setuptools.rules(),
         ],
         target_types=[
+            PexBinary,
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             PythonSourceTarget,
@@ -757,6 +761,52 @@ def test_exclude_sources(include_sources: bool, rule_runner: PythonRuleRunner) -
     pex_request = rule_runner.request(PexRequest, [request])
     snapshot = rule_runner.request(Snapshot, [pex_request.sources])
     assert len(snapshot.files) == (1 if include_sources else 0)
+
+
+def test_include_sources_without_transitive_package_sources(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/app/BUILD": dedent(
+                """
+                python_sources(
+                    name="app",
+                    sources=["app.py"],
+                    dependencies=["//src/dep:pkg"],
+                )
+                """
+            ),
+            "src/app/app.py": "",
+            "src/dep/BUILD": dedent(
+                # This test requires a package that has a standard dependencies field.
+                # 'pex_binary' has a dependencies field; 'archive' does not.
+                """
+                pex_binary(name="pkg", dependencies=[":dep"])
+                python_sources(name="dep", sources=["dep.py"])
+                """
+            ),
+            "src/dep/dep.py": "",
+        }
+    )
+
+    rule_runner.set_options(
+        [
+            "--backend-packages=pants.backend.python",
+            "--python-repos-indexes=[]",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    request = PexFromTargetsRequest(
+        [Address("src/app", target_name="app")],
+        output_filename="demo.pex",
+        internal_only=True,
+        include_source_files=True,
+    )
+    pex_request = rule_runner.request(PexRequest, [request])
+    snapshot = rule_runner.request(Snapshot, [pex_request.sources])
+
+    # the packaged transitive dep is excluded
+    assert snapshot.files == ("app/app.py",)
 
 
 @pytest.mark.parametrize("enable_resolves", [False, True])

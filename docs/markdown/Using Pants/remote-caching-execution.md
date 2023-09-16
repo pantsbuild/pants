@@ -52,8 +52,7 @@ As a more lightweight solution - for caching only - Pants can use a server provi
 
 Bazel Remote Cache supports local disk, S3, GCS, and Azure Blob storage options - needing only a single lightweight Docker container.
 
-There are a few [other](https://github.com/bazelbuild/remote-apis) systems and services in this space, but
-they have not, to our knowledge, been tested with Pants.  Let us know if you have any experience with them!
+There are a few [other](https://github.com/bazelbuild/remote-apis) systems and services in this space, but they have not, to our knowledge, been tested with Pants.  Let us know if you have any experience with them!
 
 Resources
 =========

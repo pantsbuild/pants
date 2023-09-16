@@ -111,13 +111,13 @@ Is the missing import from first-party code? Common issues:
  Common issues with both first and third-party imports:
 
 - Ambiguity. >1 target exposes the same module/package.
-  - If it's a third-party dependency, you should likely use multiple "resolves" (lockfiles). Each resolve should have no more than one of the same requirement.  See [Python](doc:python-third-party-resolves#multiple-lockfiles) and [JVM](doc:jvm-overview).
+  - If it's a third-party dependency, you should likely use multiple "resolves" (lockfiles). Each resolve should have no more than one of the same requirement.  See [Python](doc:python-lockfiles#multiple-lockfiles) and [JVM](doc:jvm-overview).
   - If it's a first-party dependency, you may have unintentionally created multiple targets owning the same file. Run `pants list path/to/file.ext` to see all owners. This often happens from overlapping `sources` fields. If this was intentional, follow the instructions in the ambiguity warning to disambiguate via the `dependencies` field.
 - Some target types like `resources` and `files` often need to be explicitly added to the `dependencies` field and cannot be inferred (yet).
 - Multiple resolves (Python and JVM).
   - A target can only depend on targets that share the same "resolve" (lockfile).
   - Pants will warn when it detects that the import exists in another resolve. This usually implies you should either change the current target's `resolve` field, or use the `parametrize()` mechanism so that the code works with multiple resolves.
-  - See [Python](doc:python-third-party-resolves#multiple-lockfiles) and [JVM](doc:jvm-overview).
+  - See [Python](doc:python-lockfiles#multiple-lockfiles) and [JVM](doc:jvm-overview).
 
 When debugging dependency inference, it can help to explicitly add the problematic dependency to the `dependencies` field to see if it gets the code running. If so, you can then try to figure out why dependency inference is not working.
 

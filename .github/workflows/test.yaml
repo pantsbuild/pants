@@ -27,11 +27,16 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -112,11 +117,16 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -209,11 +219,16 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -312,20 +327,25 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-Linux-ARM64
+        name: logs-wheels-and-pex-Linux-ARM64
         path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_linux_x86_64:
@@ -363,23 +383,29 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
         go-version: 1.19.5
-    - env: {}
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-Linux-x86_64
+        name: logs-wheels-and-pex-Linux-x86_64
         path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
@@ -400,11 +426,16 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -417,6 +448,11 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -424,17 +460,17 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch x86_64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-macOS10-15-x86_64
+        name: logs-wheels-and-pex-macOS10-15-x86_64
         path: .pants.d/*.log
     timeout-minutes: 90
   build_wheels_macos11_arm64:
@@ -455,11 +491,16 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.70.0-*
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -472,6 +513,11 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -479,17 +525,17 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: './pants run src/python/pants_release/release.py -- build-local-pex
-
-        ./pants run src/python/pants_release/release.py -- build-wheels
-
-        '
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch arm64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: logs-wheels-macOS11-ARM64
+        name: logs-wheels-and-pex-macOS11-ARM64
         path: .pants.d/*.log
     timeout-minutes: 90
   check_labels:
@@ -676,7 +722,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -688,7 +734,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_0:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 0/10
     needs:
@@ -766,7 +813,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -778,7 +825,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_1:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 1/10
     needs:
@@ -856,7 +904,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -868,7 +916,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_2:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 2/10
     needs:
@@ -946,7 +995,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -958,7 +1007,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_3:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 3/10
     needs:
@@ -1036,7 +1086,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1048,7 +1098,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_4:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 4/10
     needs:
@@ -1126,7 +1177,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1138,7 +1189,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_5:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 5/10
     needs:
@@ -1216,7 +1268,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1228,7 +1280,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_6:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 6/10
     needs:
@@ -1306,7 +1359,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1318,7 +1371,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_7:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 7/10
     needs:
@@ -1396,7 +1450,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1408,7 +1462,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_8:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 8/10
     needs:
@@ -1486,7 +1541,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1498,7 +1553,8 @@ jobs:
         path: .pants.d/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_9:
-    env: {}
+    env:
+      PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 9/10
     needs:
@@ -1576,7 +1632,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true
@@ -1634,7 +1690,7 @@ jobs:
 
         echo "Uploading test reports to ${S3_DST}"
 
-        ./src/python/pants_release/copy_to_s3.py                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
+        ./pants run ./src/python/pants_release/copy_to_s3.py                   --                   --src-prefix=dist/test/reports                   --dst-prefix=${S3_DST}                   --path=""
 
         '
     - continue-on-error: true

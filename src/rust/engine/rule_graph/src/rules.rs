@@ -23,10 +23,35 @@ pub trait TypeId:
     I: Iterator<Item = Self>;
 }
 
+// Identifies a specific Rule when called by name.
+// TODO: Turn into a generic type param? For now this is just a newtype, for clarity.
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
+pub struct RuleId(String);
+
+impl RuleId {
+  pub fn new(id: &str) -> Self {
+    Self(id.into())
+  }
+
+  pub fn from_string(s: String) -> Self {
+    Self(s)
+  }
+}
+
+impl Display for RuleId {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.0)
+  }
+}
+
 // NB: Most of our expected usecases for multiple-provided-parameters involve two parameters, hence
 // the SmallVec sizing here. See also `Self::provides`.
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
 pub struct DependencyKey<T: TypeId> {
+  // The id of the rule represented by this DependencyKey, if provided at the callsite
+  // (e.g., via call-by-name semantics).
+  pub rule_id: Option<RuleId>,
+
   pub product: T,
   // The param types which are introduced into scope at the callsite ("provided").
   pub provided_params: SmallVec<[T; 2]>,
@@ -41,6 +66,16 @@ pub struct DependencyKey<T: TypeId> {
 impl<T: TypeId> DependencyKey<T> {
   pub fn new(product: T) -> Self {
     DependencyKey {
+      rule_id: None,
+      product,
+      provided_params: SmallVec::default(),
+      in_scope_params: None,
+    }
+  }
+
+  pub fn for_known_rule(rule_id: RuleId, product: T) -> Self {
+    DependencyKey {
+      rule_id: Some(rule_id),
       product,
       provided_params: SmallVec::default(),
       in_scope_params: None,
@@ -121,7 +156,13 @@ impl<T: TypeId> DependencyKey<T> {
 
 impl<T: TypeId> Display for DependencyKey<T> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    if self.provided_params.is_empty() {
+    if let Some(rule_id) = &self.rule_id {
+      write!(
+        f,
+        "{}({:?}, ...) -> {}",
+        rule_id, self.provided_params, self.product
+      )
+    } else if self.provided_params.is_empty() {
       write!(f, "{}", self.product)
     } else {
       write!(f, "Get({}, {:?})", self.product, self.provided_params)
@@ -166,6 +207,11 @@ pub trait Rule:
   Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + Send + Sync + 'static
 {
   type TypeId: TypeId;
+
+  ///
+  /// Returns the id of this Rule.
+  ///
+  fn id(&self) -> &RuleId;
 
   ///
   /// Returns the product (output) type for this Rule.

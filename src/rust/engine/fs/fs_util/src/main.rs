@@ -48,7 +48,8 @@ use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use store::{
-  Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams, UploadSummary,
+  RemoteOptions, Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams,
+  UploadSummary,
 };
 use workunit_store::WorkunitStore;
 
@@ -342,7 +343,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       .map_err(|e| format!("Failed to open/create store for directory {store_dir:?}: {e}"))?;
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
-        let chunk_size = top_match
+        let chunk_size_bytes = top_match
           .value_of_t::<usize>("chunk-bytes")
           .expect("Bad chunk-bytes flag");
 
@@ -411,31 +412,33 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         }
 
         (
-          local_only.into_with_remote(
-            cas_address,
-            top_match
-              .value_of("remote-instance-name")
-              .map(str::to_owned),
-            tls_config,
-            headers,
-            chunk_size,
-            // This deadline is really only in place because otherwise DNS failures
-            // leave this hanging forever.
-            //
-            // Make fs_util have a very long deadline (because it's not configurable,
-            // like it is inside pants).
-            Duration::from_secs(30 * 60),
-            top_match
-              .value_of_t::<usize>("rpc-attempts")
-              .expect("Bad rpc-attempts flag"),
-            top_match
-              .value_of_t::<usize>("rpc-concurrency-limit")
-              .expect("Bad rpc-concurrency-limit flag"),
-            None,
-            top_match
-              .value_of_t::<usize>("batch-api-size-limit")
-              .expect("Bad batch-api-size-limit flag"),
-          ),
+          local_only
+            .into_with_remote(RemoteOptions {
+              cas_address: cas_address.to_owned(),
+              instance_name: top_match
+                .value_of("remote-instance-name")
+                .map(str::to_owned),
+              tls_config,
+              headers,
+              chunk_size_bytes,
+              // This deadline is really only in place because otherwise DNS failures
+              // leave this hanging forever.
+              //
+              // Make fs_util have a very long deadline (because it's not configurable,
+              // like it is inside pants).
+              rpc_timeout: Duration::from_secs(30 * 60),
+              rpc_retries: top_match
+                .value_of_t::<usize>("rpc-attempts")
+                .expect("Bad rpc-attempts flag"),
+              rpc_concurrency_limit: top_match
+                .value_of_t::<usize>("rpc-concurrency-limit")
+                .expect("Bad rpc-concurrency-limit flag"),
+              capabilities_cell_opt: None,
+              batch_api_size_limit: top_match
+                .value_of_t::<usize>("batch-api-size-limit")
+                .expect("Bad batch-api-size-limit flag"),
+            })
+            .await,
           true,
         )
       }

@@ -9,10 +9,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
 from urllib.parse import urlparse
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
-from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
+from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     InvalidPythonLockfileReason,
@@ -38,6 +37,8 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.pip_requirement import PipRequirement
+from pants.util.requirements import parse_requirements_file
 from pants.util.strutil import comma_separated_list, pluralize, softwrap
 
 if TYPE_CHECKING:

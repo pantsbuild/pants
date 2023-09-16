@@ -99,9 +99,9 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
     pass_target = rule_runner.get_target(Address("", target_name="pass"))
     pass_result = run_test(pass_target)
     assert pass_result.exit_code == 0
-    assert pass_result.stdout == "contains 'message'\n"
+    assert pass_result.stdout_bytes == b"contains 'message'\n"
 
     fail_target = rule_runner.get_target(Address("", target_name="fail"))
     fail_result = run_test(fail_target)
     assert fail_result.exit_code == 1
-    assert fail_result.stdout == "does not contain 'xyzzy'\n"
+    assert fail_result.stdout_bytes == b"does not contain 'xyzzy'\n"

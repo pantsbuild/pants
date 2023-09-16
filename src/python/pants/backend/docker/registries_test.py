@@ -5,6 +5,7 @@ import pytest
 
 from pants.backend.docker.registries import (
     DockerRegistries,
+    DockerRegistryAddressCollisionError,
     DockerRegistryOptions,
     DockerRegistryOptionsNotFoundError,
 )
@@ -96,3 +97,15 @@ def test_repository() -> None:
     )
     (reg1,) = registries.get("@reg1")
     assert reg1.repository == "{name}/foo"
+
+
+def test_registries_must_be_unique() -> None:
+    with pytest.raises(DockerRegistryAddressCollisionError) as e:
+        DockerRegistries.from_dict(
+            {
+                "reg1": {"address": "mydomain:port"},
+                "reg2": {"address": "mydomain:port"},
+            }
+        )
+
+    assert e.match("Duplicated docker registry address for aliases: reg1, reg2.")

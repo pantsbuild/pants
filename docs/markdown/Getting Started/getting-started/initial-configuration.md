@@ -47,7 +47,7 @@ Most Pants functionality is provided via pluggable [_backends_](doc:enabling-bac
 [GLOBAL]
 ...
 backend_packages = [
-  "pants.backend.go",
+  "pants.backend.experimental.go",
   "pants.backend.python",
   "pants.backend.python.lint.black",
 ]
@@ -99,7 +99,7 @@ To ignore false positives, set `[tailor].ignore_paths` and `[tailor].ignore_addi
 
 > 📘 Run `pants tailor --check ::` in CI
 > 
-> We recommend running `pants tailor --check ::` in your [continuous integration](doc:doc:using-pants-in-ci) so that you don't forget to add any targets and BUILD files (which might mean that tests aren't run or code isn't validated).
+> We recommend running `pants tailor --check ::` in your [continuous integration](doc:using-pants-in-ci) so that you don't forget to add any targets and BUILD files (which might mean that tests aren't run or code isn't validated).
 > 
 > ```
 > ❯ pants tailor --check ::

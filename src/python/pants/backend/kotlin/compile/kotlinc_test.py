@@ -13,6 +13,7 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
 from pants.backend.kotlin.compile import kotlinc_plugins
 from pants.backend.kotlin.compile.kotlinc import CompileKotlinSourceRequest
 from pants.backend.kotlin.compile.kotlinc import rules as kotlinc_rules
+from pants.backend.kotlin.compile.testutil import _KOTLIN_VERSION, KOTLIN_STDLIB_REQUIREMENTS
 from pants.backend.kotlin.dependency_inference.rules import rules as kotlin_dep_inf_rules
 from pants.backend.kotlin.goals.check import KotlincCheckRequest
 from pants.backend.kotlin.goals.check import rules as kotlin_check_rules
@@ -67,14 +68,6 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
-
-
-_KOTLIN_VERSION = "1.6.20"
-KOTLIN_STDLIB_REQUIREMENTS = [
-    f"org.jetbrains.kotlin:kotlin-stdlib:{_KOTLIN_VERSION}",
-    f"org.jetbrains.kotlin:kotlin-reflect:{_KOTLIN_VERSION}",
-    f"org.jetbrains.kotlin:kotlin-script-runtime:{_KOTLIN_VERSION}",
-]
 
 
 @pytest.fixture

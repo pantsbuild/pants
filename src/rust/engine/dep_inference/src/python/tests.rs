@@ -195,6 +195,48 @@ fn pragma_ignore() {
         *  # pants: no-infer-dep",
     &[],
   );
+  // Imports nested within other constructs
+  assert_imports(
+    r"
+    if x:
+        import a  # pants: no-infer-dep
+    ",
+    &[],
+  );
+  assert_imports(
+    r"
+    if x:
+        import a  # pants: no-infer-dep
+        import b
+    ",
+    &["b"],
+  );
+  assert_imports(
+    r"
+    class X: def method(): if True: while True: class Y: def f(): import a  # pants: no-infer-dep
+    ",
+    &[],
+  );
+  assert_imports(
+    r"
+    if x:
+        import \
+            a  # pants: no-infer-dep
+    ",
+    &[],
+  );
+
+  // https://github.com/pantsbuild/pants/issues/19751
+  assert_imports(
+    r"
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from a import ClassA  # pants: no-infer-dep
+
+    print('Hello, world!')",
+    &["typing.TYPE_CHECKING"],
+  );
 }
 
 #[test]
@@ -248,24 +290,30 @@ fn assert_imports_strong_weak(code: &str, strong: &[&str], weak: &[&str]) {
   collector.collect();
   let (actual_weak, actual_strong): (Vec<_>, Vec<_>) =
     collector.import_map.iter().partition(|(_, v)| v.1);
+  let expected_weak = HashSet::from_iter(weak.iter().map(|s| s.to_string()));
+  let found_weak = actual_weak
+    .iter()
+    .map(|(k, _)| k.to_string())
+    .collect::<HashSet<_>>();
   assert_eq!(
-    HashSet::from_iter(weak.iter().map(|s| s.to_string())),
-    actual_weak
-      .iter()
-      .map(|(k, _)| k.to_string())
-      .collect::<HashSet<_>>()
+    expected_weak, found_weak,
+    "weak imports did not match, expected={:?} found={:?}",
+    expected_weak, found_weak
   );
+  let expected_strong = HashSet::from_iter(strong.iter().map(|s| s.to_string()));
+  let found_strong = actual_strong
+    .iter()
+    .map(|(k, _)| k.to_string())
+    .collect::<HashSet<_>>();
   assert_eq!(
-    HashSet::from_iter(strong.iter().map(|s| s.to_string())),
-    actual_strong
-      .iter()
-      .map(|(k, _)| k.to_string())
-      .collect::<HashSet<_>>()
+    expected_strong, found_strong,
+    "strong imports did not match, expected={:?} found={:?}",
+    expected_strong, found_strong
   );
 }
 
 #[test]
-fn weak_imports() {
+fn tryexcept_weak_imports() {
   assert_imports_strong_weak(
     r"
     try: import strong
@@ -407,6 +455,201 @@ fn weak_imports() {
     &["one.two.three"],
     &[],
   );
+  // Ensure we preserve the stack of weakens with try-except
+  assert_imports_strong_weak(
+    r"
+    try:
+        with suppress(ImportError):
+            import weak0
+        import weak1
+    except ImportError:
+        with suppress(ImportError):
+            import weak2
+        import strong0
+    import strong1
+    ",
+    &["strong0", "strong1"],
+    &["weak0", "weak1", "weak2"],
+  );
+}
+#[test]
+fn tryexcept_weak_imports_dunder() {
+  assert_imports_strong_weak(
+    r"
+    __import__('strong')
+    try:
+      __import__('weak')
+    except ImportError:
+      pass
+    ",
+    &["strong"],
+    &["weak"],
+  )
+}
+
+#[test]
+fn contextlib_suppress_weak_imports() {
+  // standard contextlib.suppress
+  assert_imports_strong_weak(
+    r"
+    with contextlib.suppress(ImportError):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
+  // ensure we reset the weakened status
+  assert_imports_strong_weak(
+    r"
+    with contextlib.suppress(ImportError):
+        import weak0
+
+    import strong0
+    ",
+    &["strong0"],
+    &["weak0"],
+  );
+  // Allow other error types to be suppressed
+  assert_imports_strong_weak(
+    r"
+    with suppress(NameError, ImportError):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
+  // We should respect the intention of any function that is obviously suppressing ImportErrors
+  assert_imports_strong_weak(
+    r"
+    with suppress(ImportError):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
+  // We should not weaken because of other suppressions
+  assert_imports_strong_weak(
+    r"
+    with contextlib.suppress(NameError):
+        import strong0
+      ",
+    &["strong0"],
+    &[],
+  );
+  // Ensure we preserve the stack of weakens
+  assert_imports_strong_weak(
+    r"
+    with suppress(ImportError):
+        import weak0
+        with suppress(ImportError):
+            import weak1
+        import weak2
+    ",
+    &[],
+    &["weak0", "weak1", "weak2"],
+  );
+  // Ensure we preserve the stack of weakens with try-except
+  assert_imports_strong_weak(
+    r"
+    with suppress(ImportError):
+        try:
+            import weak0
+        except ImportError:
+            import weak1
+        import weak2
+    ",
+    &[],
+    &["weak0", "weak1", "weak2"],
+  );
+  // Ensure we aren't affected by weirdness in tree-sitter
+  // where in the viewer the second import wasn't assigned the correct parent
+  assert_imports_strong_weak(
+    r"
+    with suppress(ImportError):
+        import weak0
+        import weak1
+    ",
+    &[],
+    &["weak0", "weak1"],
+  );
+  // Ensure that we still traverse withitems
+  let withitems_open = r"
+    with (
+        open('/dev/null') as f0,
+        open('data/subdir1/a.json') as f1,
+    ):
+        pass
+    ";
+  assert_imports_strong_weak(withitems_open, &[], &[]);
+  assert_strings(withitems_open, &["/dev/null", "data/subdir1/a.json"]);
+  // Ensure suppress bound to variable
+  assert_imports_strong_weak(
+    r"
+    with suppress(ImportError) as e:
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
+  // Ensure multiple items in `with`
+  assert_imports_strong_weak(
+    r"
+    with open('file') as f, suppress(ImportError):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
+  // Ensure multiple with_items
+  assert_imports_strong_weak(
+    r"
+    with suppress(ImportError), open('file'):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+    // &["weak0"],
+  );
+  // Ensure multiple with_items in parens (with trailing comma)
+  assert_imports_strong_weak(
+    r"
+    with (suppress(ImportError), open('file'),):
+        import weak0
+    ",
+    &[],
+    &["weak0"],
+  );
+  // pathological: suppress without a child
+  assert_imports_strong_weak(
+    r"
+    with suppress():
+        import strong0
+    ",
+    &["strong0"],
+    &[],
+  );
+  // pathological: nothing in `with` clause
+  assert_imports_strong_weak(
+    r"
+    with:
+      import strong0
+    ",
+    &["strong0"],
+    &[],
+  );
+}
+
+#[test]
+fn contextlib_suppress_weak_imports_dunder() {
+  assert_imports_strong_weak(
+    r"
+    __import__('strong')
+    with contextlib.suppress(ImportError):
+      __import__('weak')
+    ",
+    &["strong"],
+    &["weak"],
+  )
 }
 
 fn assert_strings(code: &str, strings: &[&str]) {

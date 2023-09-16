@@ -16,7 +16,7 @@ on:
 jobs:
   prerequisites:
     name: Gather Prerequisites
-    if: (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'needs-cherrypick') ) || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'needs-cherrypick') )
     runs-on: ubuntu-latest
     outputs:
       pr_num: ${{ steps.get-prereqs.outputs.pr_num }}
@@ -61,6 +61,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
       - name: Prepare cherry-pick branch
         if: ${{ !env.ACT }}
         run: |

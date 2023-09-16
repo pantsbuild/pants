@@ -523,15 +523,6 @@ class ExecutionOptions:
         bootstrap_options: OptionValueContainer,
         dynamic_remote_options: DynamicRemoteOptions,
     ) -> ExecutionOptions:
-        remote_cache_rpc_timeout_millis = resolve_conflicting_options(
-            old_option="remote_cache_read_timeout_millis",
-            new_option="remote_cache_rpc_timeout_millis",
-            old_scope="",
-            new_scope="",
-            old_container=bootstrap_options,
-            new_container=bootstrap_options,
-        )
-
         return cls(
             # Remote execution strategy.
             remote_execution=dynamic_remote_options.execution,
@@ -562,7 +553,7 @@ class ExecutionOptions:
             # Remote cache setup.
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             remote_cache_rpc_concurrency=dynamic_remote_options.cache_rpc_concurrency,
-            remote_cache_rpc_timeout_millis=remote_cache_rpc_timeout_millis,
+            remote_cache_rpc_timeout_millis=bootstrap_options.remote_cache_rpc_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
             remote_execution_headers=dynamic_remote_options.execution_headers,
@@ -903,7 +894,7 @@ class BootstrapOptions:
     )
     pants_ignore = StrListOption(
         advanced=True,
-        default=[".*/", _default_rel_distdir, "__pycache__"],
+        default=[".*/", _default_rel_distdir, "__pycache__", "!.semgrep/"],
         help=softwrap(
             """
             Paths to ignore for all filesystem operations performed by pants
@@ -961,9 +952,10 @@ class BootstrapOptions:
         default=False,
         help=softwrap(
             """
-            Enable concurrent runs of Pants. Without this enabled, Pants will
+            Enable concurrent runs of Pants. With this enabled, Pants will
             start up all concurrent invocations (e.g. in other terminals) without pantsd.
-            Enabling this option requires parallel Pants invocations to block on the first.
+            As a result, enabling this option will increase the per-run startup cost, but
+            will not block subsequent invocations.
             """
         ),
     )
@@ -1449,13 +1441,6 @@ class BootstrapOptions:
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_bytes,
         help="Size in bytes of chunks transferred to/from the remote file store.",
     )
-    remote_store_chunk_upload_timeout_seconds = IntOption(
-        advanced=True,
-        default=60,
-        removal_version="2.19.0.dev0",
-        removal_hint="Unused: use the `remote_store_rpc_timeout_millis` option instead.",
-        help="Timeout (in seconds) for uploads of individual chunks to the remote file store.",
-    )
     remote_store_rpc_retries = IntOption(
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_retries,
@@ -1492,13 +1477,6 @@ class BootstrapOptions:
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote cache service.",
-    )
-    remote_cache_read_timeout_millis = IntOption(
-        advanced=True,
-        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_timeout_millis,
-        removal_version="2.19.0.dev0",
-        removal_hint="Use the `remote_cache_rpc_timeout_millis` option instead.",
-        help="Timeout value for remote cache lookups in milliseconds.",
     )
     remote_cache_rpc_timeout_millis = IntOption(
         advanced=True,
@@ -1740,7 +1718,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
             Platform properties to set on remote execution requests.
 
-            Format: property=value. Multiple values should be specified as multiple
+            Format: `property=value`. Multiple values should be specified as multiple
             occurrences of this flag.
 
             Pants itself may add additional platform properties.

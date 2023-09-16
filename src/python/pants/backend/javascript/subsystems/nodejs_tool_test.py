@@ -85,7 +85,10 @@ def test_resolve_dictates_version(
         }
     )
     rule_runner.set_options(
-        ["--cowsay-install-from-resolve=", f"--nodejs-package-manager={package_manager}"],
+        [
+            "--cowsay-install-from-resolve=nodejs-default",
+            f"--nodejs-package-manager={package_manager}",
+        ],
         env_inherit={"PATH"},
     )
     tool = rule_runner.request(CowsayTool, [])

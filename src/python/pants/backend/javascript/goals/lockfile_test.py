@@ -20,7 +20,7 @@ from pants.backend.javascript.package_json import (
     PackageJsonForGlobs,
     PackageJsonTarget,
 )
-from pants.backend.javascript.resolve import UserChosenNodeJSResolveAliases
+from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfileResult,
     KnownUserResolveNames,

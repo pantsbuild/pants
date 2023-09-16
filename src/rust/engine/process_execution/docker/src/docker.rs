@@ -203,7 +203,7 @@ async fn credentials_for_image(
   //
   // https://github.com/distribution/distribution/blob/e5d5810851d1f17a5070e9b6f940d8af98ea3c29/reference/reference.go#L4-L26
   let Some((server, _)) = image.split_once('/') else {
-    return Ok(None)
+    return Ok(None);
   };
   let server = server.to_owned();
 
@@ -211,8 +211,11 @@ async fn credentials_for_image(
     .spawn_blocking(
       move || {
         // Resolve the server as a DNS name to confirm that it is actually a registry.
-        let Ok(_) = (server.as_ref(), 80).to_socket_addrs().or_else(|_| server.to_socket_addrs()) else {
-          return Ok(None)
+        let Ok(_) = (server.as_ref(), 80)
+          .to_socket_addrs()
+          .or_else(|_| server.to_socket_addrs())
+        else {
+          return Ok(None);
         };
 
         // TODO: https://github.com/keirlawson/docker_credential/issues/7 means that this will only
@@ -404,8 +407,10 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
         let (container_id, named_caches) = {
           let ProcessExecutionStrategy::Docker(image) = &req.execution_environment.strategy else {
             return Err(ProcessError::Unclassified(
-                "The Docker execution strategy was not set on the Process, but \
-                 the Docker CommandRunner was used.".to_owned()))
+              "The Docker execution strategy was not set on the Process, but \
+                 the Docker CommandRunner was used."
+                .to_owned(),
+            ));
           };
 
           self

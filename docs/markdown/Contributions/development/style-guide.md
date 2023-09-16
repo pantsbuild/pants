@@ -325,7 +325,7 @@ Prefer fixing the underlying API if easy to do, but otherwise, prefer using `cas
 from typing import cast
 
 # Good
-x = cast(str, untyped_method()
+x = cast(str, untyped_method())
 
 # Discouraged
 x: str = untyped_method()

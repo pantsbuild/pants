@@ -6,4 +6,4 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-peg = "0.8"
+peg = { workspace = true }

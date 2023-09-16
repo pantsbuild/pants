@@ -192,21 +192,23 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.kotlin",
         "pants.backend.experimental.kotlin.lint.ktlint",
         "pants.backend.experimental.openapi",
+        "pants.backend.experimental.openapi.lint.openapi_format",
         "pants.backend.experimental.openapi.lint.spectral",
         "pants.backend.experimental.python",
         "pants.backend.experimental.python.framework.stevedore",
         "pants.backend.experimental.python.lint.add_trailing_comma",
-        "pants.backend.experimental.python.lint.autoflake",
-        "pants.backend.experimental.python.lint.pyupgrade",
+        "pants.backend.experimental.python.lint.ruff",
         "pants.backend.experimental.python.packaging.pyoxidizer",
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
         "pants.backend.experimental.terraform",
+        "pants.backend.experimental.tools.semgrep",
         "pants.backend.experimental.tools.workunit_logger",
         "pants.backend.experimental.tools.yamllint",
         "pants.backend.google_cloud_function.python",
         "pants.backend.plugin_development",
         "pants.backend.python",
+        "pants.backend.python.lint.autoflake",
         "pants.backend.python.lint.bandit",
         "pants.backend.python.lint.black",
         "pants.backend.python.lint.docformatter",
@@ -214,9 +216,11 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.isort",
         "pants.backend.python.lint.pydocstyle",
         "pants.backend.python.lint.pylint",
+        "pants.backend.python.lint.pyupgrade",
         "pants.backend.python.lint.yapf",
         "pants.backend.python.mixed_interpreter_constraints",
         "pants.backend.python.typecheck.mypy",
+        "pants.backend.python.typecheck.pytype",
         "pants.backend.shell",
         "pants.backend.shell.lint.shellcheck",
         "pants.backend.shell.lint.shfmt",
@@ -316,6 +320,59 @@ class ReferenceGenerator:
         url_safe_scope = scope.replace(".", "-")
         return f"reference-{url_safe_scope}" if sync else f"{url_safe_scope}.md"
 
+    @staticmethod
+    def _generate_toml_snippet(option_data, scope) -> str:
+        """Generate TOML snippet for a single option."""
+
+        # Generate a toml block for the option to help users fill out their `pants.toml`.  For
+        # scalars and arrays, we put them inline directly in the scope, while for maps we put
+        # them in a nested table. Since the metadata doesn't contain type info, we'll need to
+        # parse command line args a bit.
+
+        if not option_data.get("config_key", None):
+            # This option is not configurable.
+            return ""
+
+        toml_lines = []
+        example_cli = option_data["display_args"][0]
+        config_key = option_data["config_key"]
+
+        if "[no-]" in example_cli:
+            val = "<bool>"
+        else:
+            _, val = example_cli.split("=", 1)
+
+        is_map = val.startswith('"{') and val.endswith('}"')
+        is_array = val.startswith('"[') and val.endswith(']"')
+        if is_map:
+            toml_lines.append(f"[{scope}.{config_key}]")
+            val = val[2:-2]  # strip the quotes and brackets
+
+            pairs = val.split(", ")
+            for pair in pairs:
+                if ":" in pair:
+                    k, v = pair.split(": ", 1)
+                    if k.startswith('"') or k.startswith("'"):
+                        k = k[1:-1]
+
+                    toml_lines.append(f"{k} = {v}")
+                else:
+                    # generally just the trailing ...
+                    toml_lines.append(pair)
+
+        elif is_array:
+            toml_lines.append(f"[{scope}]")
+            toml_lines.append(f"{config_key} = [")
+            val = val[2:-2]
+            for item in val.split(", "):
+                toml_lines.append(f"    {item},")
+            toml_lines.append("]")
+        else:
+            toml_lines.append(f"[{scope}]")
+            toml_lines.append(f"{config_key} = {val}")
+
+        return "\n".join(toml_lines)
+
     @classmethod
     def process_options_input(cls, help_info: dict[str, Any], *, sync: bool) -> dict:
         scope_to_help_info = help_info["scope_to_help_info"]
@@ -338,7 +395,7 @@ class ReferenceGenerator:
 
         # Process the option data.
 
-        def munge_option(option_data):
+        def munge_option(option_data, scope):
             # Munge the default so we can display it nicely when it's multiline, while
             # still displaying it inline if it's not.
             default_help_repr = option_data.get("default_help_repr")
@@ -365,13 +422,15 @@ class ReferenceGenerator:
             else:
                 option_data["marked_up_default"] = f"<code>{escaped_default_str}</code>"
 
-        for shi in scope_to_help_info.values():
+            option_data["toml"] = cls._generate_toml_snippet(option_data, scope)
+
+        for scope, shi in scope_to_help_info.items():
             for opt in shi["basic"]:
-                munge_option(opt)
+                munge_option(opt, scope)
             for opt in shi["advanced"]:
-                munge_option(opt)
+                munge_option(opt, scope)
             for opt in shi["deprecated"]:
-                munge_option(opt)
+                munge_option(opt, scope)
 
         return help_info
 

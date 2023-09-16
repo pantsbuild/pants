@@ -93,7 +93,7 @@ async def _patch_config_file(
     requirements_venv_pex). If there is no config file, create a dummy pyrightconfig.json with the
     `venv` key populated.
 
-    The incoming venv directory works alongside the `--venv-path` CLI argument.
+    The incoming venv directory works alongside the `--venvpath` CLI argument.
 
     Additionally, add source roots to the `extraPaths` key in the config file.
     """
@@ -217,7 +217,7 @@ async def pyright_typecheck_partition(
         NodeJSToolRequest,
         pyright.request(
             args=(
-                f"--venv-path={complete_pex_env.pex_root}",  # Used with `venv` in config
+                f"--venvpath={complete_pex_env.pex_root}",  # Used with `venv` in config
                 *pyright.args,  # User-added arguments
                 *(os.path.join("{chroot}", file) for file in root_sources.snapshot.files),
             ),
