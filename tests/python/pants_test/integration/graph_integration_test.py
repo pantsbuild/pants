@@ -74,8 +74,7 @@ def setup_sources_targets() -> Iterator[None]:
         yield
 
 
-@unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
-@pytest.mark.no_error_if_skipped
+# See https://github.com/pantsbuild/pants/issues/8520 for past flakiness of this test.
 def test_missing_sources_warnings():
     target_to_unmatched_globs = {
         "missing-globs": ["*.a"],
@@ -106,8 +105,7 @@ def test_missing_sources_warnings():
                 )
 
 
-@unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
-@pytest.mark.no_error_if_skipped
+# See https://github.com/pantsbuild/pants/issues/8520 for past flakiness of this test.
 def test_existing_sources():
     target_full = f"{_SOURCES_TARGET_BASE}:text"
     pants_run = run_pants(
@@ -118,8 +116,7 @@ def test_existing_sources():
     assert "[WARN] Unmatched glob" not in pants_run.stderr
 
 
-@unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6787")
-@pytest.mark.no_error_if_skipped
+# See https://github.com/pantsbuild/pants/issues/6787 for past flakiness of this test.
 def test_error_message():
     with setup_sources_targets():
         for target in _ERR_TARGETS:
