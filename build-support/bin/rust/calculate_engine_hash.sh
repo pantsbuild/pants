@@ -5,8 +5,6 @@
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
-echo
-
 # Exposes:
 # + fingerprint_data: Fingerprints the data on stdin.
 # shellcheck source=build-support/common.sh
