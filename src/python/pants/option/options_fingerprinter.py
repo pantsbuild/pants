@@ -1,25 +1,36 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import hashlib
+import json
 import os
 from collections import defaultdict
+from enum import Enum
 from hashlib import sha1
 
 from pants.base.build_environment import get_buildroot
-from pants.base.hash_utils import CoercingEncoder, json_hash
 from pants.option.custom_types import UnsetBool, dict_with_files_option, dir_option, file_option
 from pants.util.strutil import softwrap
 
 
-class CoercingOptionEncoder(CoercingEncoder):
+class OptionEncoder(json.JSONEncoder):
     def default(self, o):
         if o is UnsetBool:
             return "_UNSET_BOOL_ENCODING"
+        if isinstance(o, Enum):
+            return o.value
+        if isinstance(o, dict):
+            # Sort by key to ensure that we don't invalidate if the insertion order changes.
+            return {k: self.default(v) for k, v in sorted(o.items())}
         return super().default(o)
 
 
 def stable_option_fingerprint(obj):
-    return json_hash(obj, encoder=CoercingOptionEncoder)
+    json_str = json.dumps(
+        obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=OptionEncoder
+    )
+    digest = hashlib.sha1()
+    digest.update(json_str.encode("utf8"))
+    return digest.hexdigest()
 
 
 class OptionsFingerprinter:
@@ -140,7 +151,8 @@ class OptionsFingerprinter:
     def _fingerprint_primitives(self, val):
         return stable_option_fingerprint(val)
 
-    def _fingerprint_dict_with_files(self, option_val):
+    @staticmethod
+    def _fingerprint_dict_with_files(option_val):
         """Returns a fingerprint of the given dictionary containing file paths.
 
         Any value which is a file path which exists on disk will be fingerprinted by that file's
