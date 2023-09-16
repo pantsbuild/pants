@@ -87,7 +87,7 @@ async def download_python_binary(
         Process(
             argv=[tar_binary.path, "-xvf", filename],
             input_digest=python_archive,
-            env={"PATH": os.pathsep.join(system_binaries.system_binary_paths)},
+            env={"PATH": os.pathsep.join(system_binaries.EnvironmentAware.system_binary_paths)},
             description="Extract Pants' execution Python",
             level=LogLevel.DEBUG,
             output_directories=("python",),
@@ -114,7 +114,7 @@ async def download_python_binary(
             level=LogLevel.DEBUG,
             input_digest=download_result.output_digest,
             description="Install Python for Pants usage",
-            env={"PATH": os.pathsep.join(system_binaries.system_binary_paths)},
+            env={"PATH": os.pathsep.join(system_binaries.EnvironmentAware.system_binary_paths)},
             append_only_caches=PythonBuildStandaloneBinary.APPEND_ONLY_CACHES,
             # Don't cache, we want this to always be run so that we can assume for the rest of the
             # session the named_cache destination for this Python is valid, as the Python ecosystem
