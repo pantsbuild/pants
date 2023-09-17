@@ -6,6 +6,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 import unittest
 import unittest.mock
 from contextlib import contextmanager
@@ -16,6 +17,7 @@ import psutil
 import pytest
 
 from pants.pantsd.process_manager import ProcessManager
+from pants.testutil.mock_time import MockTime
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdtemp
 
@@ -29,15 +31,17 @@ def fake_process(**kwargs):
     return proc
 
 
-# For history of this test's flakiness: https://github.com/pantsbuild/pants/issues/6836
-def test_deadline_until(caplog):
+def test_deadline_until(monkeypatch, caplog):
+    mock_time = MockTime()
+    monkeypatch.setattr(time, "time", mock_time.time)
+    monkeypatch.setattr(time, "sleep", mock_time.sleep)
     pm = ProcessManager("_test_", metadata_base_dir=safe_mkdtemp())
     with pytest.raises(ProcessManager.Timeout):
         with caplog.at_level(logging.INFO):
             pm._deadline_until(
                 lambda: False, "the impossible", "completed? how?", timeout=0.5, info_interval=0.1
             )
-    assert 4 <= len(caplog.records) <= 6, f"Expected between 4 and 6 infos, got: {caplog.records}"
+    assert len(caplog.records) == 4, f"Expected 4 infos, got: {caplog.records}"
 
 
 # TODO: Convert the rest of these tests to pytest-style test_* functions.
