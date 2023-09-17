@@ -653,8 +653,10 @@ async def find_mkdir(system_binaries: SystemBinariesSubsystem.EnvironmentAware) 
 
 
 @rule(desc="Finding the `mktempt` binary", level=LogLevel.DEBUG)
-async def find_mktemp() -> MktempBinary:
-    request = BinaryPathRequest(binary_name="mktemp", search_path=SEARCH_PATHS)
+async def find_mktemp(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> MktempBinary:
+    request = BinaryPathRequest(
+        binary_name="mktemp", search_path=system_binaries.system_binary_paths
+    )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create temporary files/directories")
     return MktempBinary(first_path.path, first_path.fingerprint)
@@ -687,8 +689,8 @@ async def find_mv(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> 
 
 
 @rule(desc="Finding the `ln` binary", level=LogLevel.DEBUG)
-async def find_ln() -> LnBinary:
-    request = BinaryPathRequest(binary_name="ln", search_path=SEARCH_PATHS)
+async def find_ln(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> LnBinary:
+    request = BinaryPathRequest(binary_name="ln", search_path=system_binaries.system_binary_paths)
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="link files")
     return LnBinary(first_path.path, first_path.fingerprint)

@@ -133,7 +133,9 @@ async def create_system_binary_run_request(
     assert field_set.name.value is not None
     extra_search_paths = field_set.extra_search_paths.value or ()
 
-    search_paths = SearchPath((*extra_search_paths, *system_binaries.system_binary_paths))
+    search_paths = SearchPath(
+        (*extra_search_paths, *system_binaries.EnvironmentAware.system_binary_paths)
+    )
 
     path = await _find_binary(
         field_set.address,
