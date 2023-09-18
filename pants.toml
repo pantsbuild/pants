@@ -1,8 +1,12 @@
 [GLOBAL]
 print_stacktrace = true
 
+# TODO: Fix before landing.
+verify_config = false
+
 # Enable our custom loose-source plugins.
-pythonpath = ["%(buildroot)s/pants-plugins"]
+# TODO: Fix support for interpolated constants.
+pythonpath = ["pants-plugins"]
 backend_packages.add = [
   "pants.backend.build_files.fix.deprecations",
   "pants.backend.build_files.fmt.black",

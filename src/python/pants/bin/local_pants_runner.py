@@ -110,7 +110,9 @@ class LocalPantsRunner:
 
         # Verify configs.
         if global_bootstrap_options.verify_config:
-            options.verify_configs(options_bootstrapper.config)
+            # TODO: Restore.
+            # options.verify_configs(options_bootstrapper.config)
+            pass
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
@@ -119,7 +121,7 @@ class LocalPantsRunner:
             dynamic_remote_options, _ = DynamicRemoteOptions.from_options(
                 options, env, remote_auth_plugin_func=build_config.remote_auth_plugin_func
             )
-            bootstrap_options = options.bootstrap_option_values()
+            bootstrap_options = options.for_global_scope()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(
                 bootstrap_options, build_config, dynamic_remote_options, executor

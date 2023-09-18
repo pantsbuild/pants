@@ -101,7 +101,7 @@ fn test_float() {
   assert!(env.get_float(&option_id!("dne")).unwrap().is_none());
 
   assert_eq!(
-    "Problem parsing PANTS_BAD value swallow as a float value: invalid float literal".to_owned(),
+    "Problem parsing PANTS_BAD value 'swallow' as a float value: invalid float literal".to_owned(),
     env.get_float(&option_id!("pants", "bad")).unwrap_err()
   );
 }

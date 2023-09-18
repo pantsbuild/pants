@@ -53,7 +53,7 @@ enum PythonLogLevel {
 }
 
 async fn execute(start: SystemTime) -> Result<i32, String> {
-  let options_parser = OptionParser::new()?;
+  let options_parser = OptionParser::from_globals()?;
 
   let use_pantsd = options_parser.parse_bool(&option_id!("pantsd"), true)?;
   if !use_pantsd.value {

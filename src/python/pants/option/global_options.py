@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Callable, Type, TypeVar, cast
+from typing import Any, Callable, Type, TypeVar, cast, Optional
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -323,7 +323,7 @@ class DynamicRemoteOptions:
         prior_result: AuthPluginResult | None = None,
         remote_auth_plugin_func: Callable | None = None,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        bootstrap_options = full_options.bootstrap_option_values()
+        bootstrap_options = full_options.for_global_scope()
         assert bootstrap_options is not None
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)

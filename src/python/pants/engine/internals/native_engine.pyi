@@ -527,6 +527,38 @@ class PantsdClientException(Exception):
     pass
 
 # ------------------------------------------------------------------------------
+# Options
+# ------------------------------------------------------------------------------
+
+class PyOptionId:
+    def __init__(
+        self, *components: str, scope: str | None = None, switch: str | None = None
+    ) -> None: ...
+
+class PyOptionParser:
+    def __init__(self, env: dict[str, str], args: Sequence[str], configs: Sequence[str]) -> None: ...
+    def parse_bool(self, option_id: PyOptionId, default: bool) -> tuple[bool, str]: ...
+    def parse_int(self, option_id: PyOptionId, default: int) -> tuple[int, str]: ...
+    def parse_int_optional(
+        self, option_id: PyOptionId, default: int | None
+    ) -> tuple[int | None, str]: ...
+    def parse_float(self, option_id: PyOptionId, default: float) -> tuple[float, str]: ...
+    def parse_float_optional(
+        self, option_id: PyOptionId, default: float | None
+    ) -> tuple[float | None, str]: ...
+    def parse_from_string(
+        self, option_id: PyOptionId, default: Any, parser: Callable[[str], Any]
+    ) -> tuple[Any, str]: ...
+    def parse_from_string_list(
+        self, option_id: PyOptionId, default: list[Any], member_parser: Callable[[str], Any]
+    ) -> tuple[list[Any], str]: ...
+    def parse_from_string_dict(
+        self, option_id: PyOptionId, default: dict[str, Any],
+        member_parser: Callable[[Any], Any],
+        literal_parser: Callable[[str], dict[str, Any]],
+    ) -> tuple[dict[str, Any], str]: ...
+
+# ------------------------------------------------------------------------------
 # Testutil
 # ------------------------------------------------------------------------------
 
