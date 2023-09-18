@@ -18,7 +18,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import BoolOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
@@ -55,6 +55,11 @@ class ReplSubsystem(GoalSubsystem):
     shell = StrOption(
         default=None,
         help="Override the automatically-detected REPL program for the target(s) specified.",
+    )
+    args = ArgsListOption(
+        example="-i helloworld/main.py",
+        tool_name="the repl program",
+        passthrough=True,
     )
     restartable = BoolOption(
         default=False,
@@ -130,7 +135,7 @@ async def run_repl(
     result = await Effect(
         InteractiveProcessResult,
         InteractiveProcess(
-            argv=request.args,
+            argv=(*request.args, *repl_subsystem.args),
             env=env,
             input_digest=request.digest,
             run_in_workspace=request.run_in_workspace,

@@ -7,19 +7,17 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.engine.rules import collect_rules
-from pants.option.option_types import BoolOption, ArgsListOption
+from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
 
 
 class IPython(PythonToolBase):
     options_scope = "ipython"
-    name = "IPython"
     help = "The IPython enhanced REPL (https://ipython.org/)."
 
     default_main = ConsoleScript("ipython")
     default_requirements = ["ipython>=7.34,<9"]
 
-    args = ArgsListOption(example="-i helloworld/main.py", passthrough=True)
     default_lockfile_resource = ("pants.backend.python.subsystems", "ipython.lock")
 
     ignore_cwd = BoolOption(
