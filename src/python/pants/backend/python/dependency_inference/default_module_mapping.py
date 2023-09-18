@@ -10,17 +10,20 @@ from typing import Dict, Iterable, Match
 
 
 def all_hyphen_to_dot(m: Match[str]) -> str:
+    """
+    Convert all hyphens to dots e.g. azure-foo-bar -> azure.foo.bar.
+    """
     return m.string.replace("-", ".")
 
 
 def first_group_hyphen_to_underscore(m: Match[str]) -> str:
+    """
+    Convert the first group(regex match group) of hyphens to underscores e.g. django-admin-cursor-paginator -> admin_cursor_paginator
+    Only returns the first group and must contain at least one group.
+    """
     if m.re.groups == 0 or not m.groups():
         raise ValueError(f"expected at least one group in the pattern{m.re.pattern} but got none.")
     return str(m.groups()[0]).replace("-", "_")
-
-
-def first_group_hyphen_to_dot_second_hyphen_to_underscore(m: Match[str]) -> str:
-    return two_groups_hyphens_two_replacements_with_suffix(m, second_group_replacement="_")
 
 
 def two_groups_hyphens_two_replacements_with_suffix(
@@ -29,8 +32,10 @@ def two_groups_hyphens_two_replacements_with_suffix(
     second_group_replacement: str = "",
     custom_suffix: str = "",
 ) -> str:
-    """take two groups, the first will have '-' replaced with '.', the second will have '-' replaced
-    with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)"""
+    """
+    take two groups, the first will have '-' replaced with '.', the second will have '-' replaced with ''
+    e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
+    """
     if m.re.groups < 2 or not m.groups():
         raise ValueError(f"expected at least two groups in the pattern{m.re.pattern}.")
     prefix = m.string[m.start(1) : m.end(1)].replace("-", first_group_replacement)
@@ -39,32 +44,25 @@ def two_groups_hyphens_two_replacements_with_suffix(
 
 
 """
-A mapping of Patterns and their replacements. will be used with `sub` e.g.
-```python
-pattern="^google-cloud-(.*)"
-replacement="google.cloud.\\g<1>" # just one '\' for realbies
+A mapping of Patterns and their replacements. will be used with `re.sub`.
+The match is either a string or a function`(str) -> str`; that takes a re.Match and returns
+the replacement. see re.sub for more information
 
 then if an import in the python code is google.cloud.foo, then the package of
 google-cloud-foo will be used.
-
-The match is either a string or a function that takes a re.Match and returns
-the replacement. see re.sub for more information
-```
 """
 DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, Iterable] = {
-    re.compile(r"""^(google-cloud-)([^.]+)"""): [
-        two_groups_hyphens_two_replacements_with_suffix,
-        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix="_v1"),
-        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix="_v2"),
-        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix="_v3"),
-    ],
     re.compile(r"""^azure-.+"""): [all_hyphen_to_dot],
     re.compile(r"""^django-((.+(-.+)?))"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^(opentelemetry-instrumentation-)([^.]+)"""): [
-        first_group_hyphen_to_dot_second_hyphen_to_underscore,
+    re.compile(r"""^(google-cloud-)([^.]+)"""): [
+        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix=custom_suffix)
+        for custom_suffix in ("", "_v1", "_v2", "_v3")
     ],
-    re.compile(r"""^(oslo-.*)"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^python-(.*)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(opentelemetry-instrumentation-)([^.]+)"""): [
+        partial(two_groups_hyphens_two_replacements_with_suffix, second_group_replacement="_"),
+    ],
+    re.compile(r"""^(oslo-.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^python-(.+)"""): [first_group_hyphen_to_underscore],
 }
 
 DEFAULT_MODULE_MAPPING = {

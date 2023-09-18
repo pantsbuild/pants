@@ -326,6 +326,7 @@ def generate_mappings_from_pattern(proj_name: str, fallback: str) -> Iterable[st
                 match_pattern.sub(replace_pattern, proj_name)
                 for replace_pattern in replace_patterns
             ]
+            break  # stop after the first match
     return pattern_values + [fallback]
 
 

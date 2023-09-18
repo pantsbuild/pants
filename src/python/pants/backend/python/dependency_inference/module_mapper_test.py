@@ -905,7 +905,7 @@ def test_issue_15111(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_generate_mappings_from_pattern_matches(rule_runner: RuleRunner) -> None:
+def test_generate_mappings_from_pattern_matches() -> None:
     assert generate_mappings_from_pattern("google-cloud-hardyhar", "bar") == [
         "google.cloud.hardyhar",
         "google.cloud.hardyhar_v1",
@@ -934,7 +934,7 @@ def test_generate_mappings_from_pattern_matches(rule_runner: RuleRunner) -> None
     assert generate_mappings_from_pattern("oslo-service", "bar") == ["oslo_service", "bar"]
 
 
-def test_generate_mappings_from_pattern_no_match(rule_runner: RuleRunner) -> None:
+def test_generate_mappings_from_pattern_no_match() -> None:
     assert generate_mappings_from_pattern("pyopenssl", "bar") == ["bar"]
     assert generate_mappings_from_pattern("", "bar") == ["bar"]
 
@@ -944,7 +944,3 @@ def test_number_of_capture_groups_for_functions() -> None:
         re.sub("foo", first_group_hyphen_to_underscore, "foo")
     with pytest.raises(ValueError):
         re.sub("foo", two_groups_hyphens_two_replacements_with_suffix, "foo")
-
-
-def test_group_using_verbose_backslash_g_format() -> None:
-    pass
