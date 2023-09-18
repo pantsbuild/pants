@@ -29,7 +29,7 @@ shell_command(
         "3rdparty/tools/python3:python3",
     ],
     extra_env_vars=["CHROOT={chroot}"],
-    tools=["bash", "cc", "ld", "as", "ar", "cargo", "python3.9"],
+    tools=["bash", "cc", "ld", "as", "ar", "cargo"],
     output_files=[
         f"target/debug/libengine.so",
         f"target/debug/libengine.dylib",
