@@ -180,6 +180,59 @@ very-secret-value
 > 
 > See the example for the [`secrets`](doc:reference-docker_image#codesecretscode) field.
 
+### External cache storage backends
+
+BuildKit supports exporting build cache to an external location, making it possible to import in future builds. Cache backends can be configured using the [`cache_to`](doc:reference-docker_image#codecache_tocode) and [`cache_from`](doc:reference-docker_image#codecache_fromcode) fields.
+
+Enable BuildKit if necessary (it is the default in later versions of Docker):
+
+```
+❯ export DOCKER_BUILDKIT=1
+```
+
+Create a builder using a [build driver](https://docs.docker.com/build/drivers/) that is compatible with the cache backend:
+
+```
+❯ docker buildx create --name container --driver=docker-container container
+```
+
+Use the builder:
+
+```
+❯ export BUILDX_BUILDER=container
+```
+
+Optionally, validate a build with the Docker CLI directly:
+
+```
+❯ docker build -t pants-cache-test:latest \
+  --cache-to type=local,dest=/tmp/docker/pants-test-cache \
+  --cache-from type=local,src=/tmp/docker/pants-test-cache .
+```
+
+Configure Pants:
+
+```toml pants.toml
+[docker]
+env_vars = [
+  "DOCKER_BUILDKIT",
+  "BUILDX_BUILDER"
+]
+```
+```python example/BUILD
+docker_image(
+    name="with-local-cache-backend",
+    cache_to={
+        "type": "local",
+        "dest": "/tmp/docker-cache/pants-example"
+    },
+    cache_from={
+        "type": "local",
+        "src": "/tmp/docker-cache/pants-example"
+    }
+)
+```
+
 ### Build Docker image example
 
 This example copies both a `file` and `pex_binary`. The file is specified as an explicit dependency in the `BUILD` file, whereas the `pex_binary` dependency is inferred from the path in the `Dockerfile`.
