@@ -11,18 +11,11 @@ path = "src/main.rs"
 
 [dependencies]
 env_logger = "0.10.0"
-futures = "0.3"
-libc = "0.2"
 log = "0.4"
 nailgun = { path = "../nailgun" }
 nix = "0.25"
 options = { path = "../options" }
-sha2 = "0.10"
+pantsd = { path = "../pantsd" }
 strum = "0.24"
 strum_macros = "0.24"
-sysinfo = "0.20.0"
 tokio = { version = "1.28", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
-uname = "0.1"
-
-[dev-dependencies]
-tempfile = "3.5.0"

@@ -10,7 +10,7 @@ use crate::parse::parse_string_list;
 use crate::ListEdit;
 use std::collections::HashMap;
 
-pub(crate) struct Args {
+pub struct Args {
   pub(crate) args: Vec<String>,
 }
 
@@ -21,10 +21,12 @@ enum Negate {
 }
 
 impl Args {
-  pub(crate) fn argv() -> Args {
-    Args {
-      args: env::args().collect::<Vec<_>>(),
-    }
+  pub fn new(args: Vec<String>) -> Self {
+    Self { args }
+  }
+
+  pub fn argv() -> Self {
+    Self::new(env::args().collect::<Vec<_>>())
   }
 
   fn arg_name(id: &OptionId, negate: Negate) -> String {

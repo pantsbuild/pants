@@ -7,22 +7,7 @@ use std::time::SystemTime;
 use log::debug;
 
 use nailgun::NailgunClientError;
-
-pub struct ConnectionSettings {
-  pub port: u16,
-  pub timeout_limit: f64,
-  pub dynamic_ui: bool,
-}
-
-impl ConnectionSettings {
-  pub fn new(port: u16) -> ConnectionSettings {
-    ConnectionSettings {
-      port,
-      timeout_limit: 60.0,
-      dynamic_ui: true,
-    }
-  }
-}
+use pantsd::ConnectionSettings;
 
 pub async fn execute_command(
   start: SystemTime,

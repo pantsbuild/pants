@@ -31,7 +31,6 @@ from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.util.contextutil import argv_as, hermetic_environment_as
 from pants.util.dirutil import safe_open
-from pants.util.strutil import ensure_text
 from pants.version import VERSION
 
 _SHUTDOWN_TIMEOUT_SECS = 3
@@ -169,7 +168,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             setattr(sys, attr, os.fdopen(fileno, mode=("w" if writable else "r")))
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[assignment,misc]
 
-    def _initialize_metadata(self) -> None:
+    def _initialize_metadata(self, options_fingerprint: str) -> None:
         """Writes out our pid and other metadata.
 
         Order matters a bit here, because technically all that is necessary to connect is the port,
@@ -180,7 +179,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         # Write the pidfile. The SchedulerService will monitor it after a grace period.
         self.write_pid()
         self.write_process_name()
-        self.write_fingerprint(ensure_text(self.options_fingerprint))
+        self.write_fingerprint(options_fingerprint)
         self._logger.info(f"pantsd {VERSION} running with PID: {self.pid}")
         self.write_socket(self._server.port())
 
@@ -189,6 +188,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         os.environ.pop("PYTHONPATH")
 
         global_bootstrap_options = self._bootstrap_options.for_global_scope()
+        options_fingerprint = self.options_fingerprint
         # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
         set_process_title(f"pantsd [{self._build_root}]")
 
@@ -204,7 +204,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             )
             native_engine.maybe_set_panic_handler()
 
-            self._initialize_metadata()
+            self._initialize_metadata(options_fingerprint)
 
             # Check periodically whether the core is valid, and exit if it is not.
             while self._core.is_valid():

@@ -61,6 +61,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
   externs::process::register(m)?;
+  externs::pantsd::register(py, m)?;
   externs::scheduler::register(m)?;
   externs::testutil::register(m)?;
   externs::workunits::register(m)?;
