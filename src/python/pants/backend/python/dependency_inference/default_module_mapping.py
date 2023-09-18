@@ -10,17 +10,14 @@ from typing import Dict, Iterable, Match
 
 
 def all_hyphen_to_dot(m: Match[str]) -> str:
-    """
-    Convert all hyphens to dots e.g. azure-foo-bar -> azure.foo.bar.
-    """
+    """Convert all hyphens to dots e.g. azure-foo-bar -> azure.foo.bar."""
     return m.string.replace("-", ".")
 
 
 def first_group_hyphen_to_underscore(m: Match[str]) -> str:
-    """
-    Convert the first group(regex match group) of hyphens to underscores e.g. django-admin-cursor-paginator -> admin_cursor_paginator
-    Only returns the first group and must contain at least one group.
-    """
+    """Convert the first group(regex match group) of hyphens to underscores e.g. django-admin-
+    cursor-paginator -> admin_cursor_paginator Only returns the first group and must contain at
+    least one group."""
     if m.re.groups == 0 or not m.groups():
         raise ValueError(f"expected at least one group in the pattern{m.re.pattern} but got none.")
     return str(m.groups()[0]).replace("-", "_")
@@ -32,10 +29,8 @@ def two_groups_hyphens_two_replacements_with_suffix(
     second_group_replacement: str = "",
     custom_suffix: str = "",
 ) -> str:
-    """
-    take two groups, the first will have '-' replaced with '.', the second will have '-' replaced with ''
-    e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
-    """
+    """take two groups, the first will have '-' replaced with '.', the second will have '-' replaced
+    with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)"""
     if m.re.groups < 2 or not m.groups():
         raise ValueError(f"expected at least two groups in the pattern{m.re.pattern}.")
     prefix = m.string[m.start(1) : m.end(1)].replace("-", first_group_replacement)
