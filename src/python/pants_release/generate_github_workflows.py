@@ -264,7 +264,7 @@ def global_env() -> Env:
 
 
 def rust_channel() -> str:
-    with open("rust-toolchain") as fp:
+    with open("src/rust/engine/rust-toolchain") as fp:
         rust_toolchain = toml.load(fp)
     return cast(str, rust_toolchain["toolchain"]["channel"])
 
@@ -446,7 +446,7 @@ class Helper:
                 "uses": "actions/cache@v3",
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-{hash_files('rust-toolchain')}-v2",
+                    "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/engine/rust-toolchain')}-v2",
                 },
             },
             {
