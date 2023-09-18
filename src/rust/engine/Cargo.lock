@@ -552,19 +552,14 @@ name = "client"
 version = "0.0.1"
 dependencies = [
  "env_logger",
- "futures",
- "libc",
  "log",
  "nailgun",
  "nix",
  "options",
- "sha2",
+ "pantsd",
  "strum",
  "strum_macros",
- "sysinfo",
- "tempfile",
  "tokio",
- "uname",
 ]
 
 [[package]]
@@ -1002,6 +997,8 @@ dependencies = [
  "mock",
  "nailgun",
  "num_enum",
+ "options",
+ "pantsd",
  "parking_lot 0.12.1",
  "pe_nailgun",
  "petgraph",
@@ -2278,6 +2275,20 @@ checksum = "eebde548fbbf1ea81a99b128872779c437752fb99f217c45245e1a61dcd9edcd"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "pantsd"
+version = "0.0.1"
+dependencies = [
+ "hex",
+ "libc",
+ "log",
+ "options",
+ "sha2",
+ "sysinfo",
+ "tempfile",
+ "uname",
 ]
 
 [[package]]
