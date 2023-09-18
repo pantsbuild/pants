@@ -40,6 +40,7 @@ Available stable backends
 | `pants.backend.python.lint.docformatter`             | Enables Docformatter, the Python docstring autoformatter: <https://github.com/myint/docformatter>. | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.python.lint.flake8`                   | Enables Flake8, the Python linter: <https://flake8.pycqa.org/en/latest/>.                          | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.python.lint.isort`                    | Enables isort, the Python import autoformatter: <https://timothycrosley.github.io/isort/>.         | [Linters and formatters](doc:python-linters-and-formatters)       |
+| `pants.backend.python.lint.pydocstyle`               | Enables pydocstyle, a Python docstring convention checker: <https://www.pydocstyle.org/>           | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.python.lint.pylint`                   | Enables Pylint, the Python linter: <https://www.pylint.org>                                        | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.python.lint.pyupgrade`                | Enables Pyupgrade, which upgrades to new Python syntax: <https://pypi.org/project/pyupgrade/>      | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.python.lint.yapf`                     | Enables Yapf, the Python formatter: <https://pypi.org/project/yapf/>                               | [Linters and formatters](doc:python-linters-and-formatters)       |
@@ -47,6 +48,9 @@ Available stable backends
 | `pants.backend.shell`                                | Core Shell support, including shUnit2 test runner.                                                 | [Shell overview](doc:shell)                                       |
 | `pants.backend.shell.lint.shfmt`                     | Enables shfmt, a Shell autoformatter: <https://github.com/mvdan/sh>.                               | [Shell overview](doc:shell)                                       |
 | `pants.backend.shell.lint.shellcheck`                | Enables Shellcheck, a Shell linter: <https://www.shellcheck.net/>.                                 | [Shell overview](doc:shell)                                       |
+| `pants.backend.tools.preamble`                       | Enables "preamble", a Pants fixer for copyright headers and shebang lines                          | [`preamble`](doc:reference-preamble)                              |
+| `pants.backend.tools.taplo`                          | Enables Taplo, a TOML autoformatter: <https://taplo.tamasfe.dev>                                   |                                                                   |
+| `pants.backend.url_handlers.s3`                      | Enables accessing s3 via credentials in `file(source=http_source(...))`                            |                                                              |
 
 Available experimental backends
 -------------------------------
