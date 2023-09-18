@@ -2258,6 +2258,7 @@ dependencies = [
 name = "pantsd"
 version = "0.0.1"
 dependencies = [
+ "hex",
  "libc",
  "log",
  "options",

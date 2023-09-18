@@ -6,6 +6,7 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+hex = { workspace = true }
 libc = { workspace = true }
 log = { workspace = true }
 options = { path = "../options" }

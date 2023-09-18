@@ -29,8 +29,8 @@ pub mod pantsd_testing;
 #[cfg(test)]
 mod pantsd_tests;
 
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::{fmt, fs};
 
 use libc::pid_t;
 use log::debug;
@@ -55,14 +55,6 @@ impl ConnectionSettings {
   }
 }
 
-fn to_hex(bytes: &[u8]) -> String {
-  let mut hex = String::with_capacity(bytes.len());
-  for byte in bytes {
-    fmt::Write::write_fmt(&mut hex, format_args!("{byte:02x}")).unwrap();
-  }
-  hex
-}
-
 pub(crate) struct Metadata {
   metadata_dir: PathBuf,
 }
@@ -79,7 +71,7 @@ impl Metadata {
       .finalize();
 
     const HOST_FINGERPRINT_LENGTH: usize = 6;
-    let hex_digest = to_hex(&host_hash[..HOST_FINGERPRINT_LENGTH]);
+    let hex_digest = hex::encode(&host_hash[..HOST_FINGERPRINT_LENGTH]);
 
     let metadata_dir = directory.as_ref().join(hex_digest).join("pantsd");
     if metadata_dir.is_dir() {
@@ -336,7 +328,7 @@ pub fn fingerprint_compute(
     }
   }
   let hash = hasher.finalize();
-  Ok(to_hex(&hash))
+  Ok(hex::encode(hash))
 }
 
 /// The options which are fingerprinted to decide when to restart `pantsd`.
