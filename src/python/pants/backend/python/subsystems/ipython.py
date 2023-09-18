@@ -13,6 +13,7 @@ from pants.util.strutil import softwrap
 
 class IPython(PythonToolBase):
     options_scope = "ipython"
+    name = "IPython"
     help = "The IPython enhanced REPL (https://ipython.org/)."
 
     default_main = ConsoleScript("ipython")
