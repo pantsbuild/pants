@@ -83,7 +83,7 @@ async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProv
     )?))
   } else {
     Err(format!(
-      "Cannot initialise remote byte store provider with address {address}",
+      "Cannot initialise remote byte store provider with address {address}, as the scheme is not supported",
     ))
   }
 }

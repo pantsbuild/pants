@@ -107,7 +107,7 @@ async fn choose_provider(
     )?))
   } else {
     Err(format!(
-      "Cannot initialise remote action cache provider with address {address}",
+      "Cannot initialise remote action cache provider with address {address}, as the scheme is not supported",
     ))
   }
 }
