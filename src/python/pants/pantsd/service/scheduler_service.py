@@ -7,7 +7,7 @@ from typing import Optional, Tuple, cast
 
 import psutil
 
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs, Snapshot, SnapshotDiff
 from pants.engine.internals.scheduler import ExecutionTimeoutError
 from pants.init.engine_initializer import GraphScheduler
 from pants.pantsd.service.pants_service import PantsService
@@ -100,16 +100,9 @@ class SchedulerService(PantsService):
         if snapshot is None or snapshot.digest == invalidation_snapshot.digest:
             return
 
-        before = set(invalidation_snapshot.files + invalidation_snapshot.dirs)
-        after = set(snapshot.files + snapshot.dirs)
-        added = after - before
-        removed = before - after
-        if added or removed:
-            description = f"+{added or '{}'}, -{removed or '{}'}"
-        else:
-            description = f"content changed ({snapshot.digest} fs {invalidation_snapshot.digest})"
+        snapshot_diff = SnapshotDiff.from_snapshots(invalidation_snapshot, snapshot)
         self._logger.critical(
-            f"saw filesystem changes covered by invalidation globs: {description}. terminating the daemon."
+            f"saw filesystem changes covered by invalidation globs: {snapshot_diff}. terminating the daemon."
         )
         self.terminate()
 
