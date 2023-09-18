@@ -19,6 +19,8 @@ backend_packages = [
 Available stable backends
 -------------------------
 
+This list is also available via `pants backends --help`, which includes any additional plugins in your repository that aren't built-in to Pants itself.
+
 | Backend                                              | What it does                                                                                       | Docs                                                              |
 |:-----------------------------------------------------|:---------------------------------------------------------------------------------------------------|:------------------------------------------------------------------|
 | `pants.backend.build_files.fmt.black`                | Enables autoformatting `BUILD` files using `black`.                                                |                                                                   |
@@ -56,6 +58,8 @@ Available experimental backends
 -------------------------------
 
 Pants supports numerous extra backends that aren't as stable as the backends above, due to less extensive documentation, testing and sometimes missing features that inhibit usability. If any of these backends are relevant to you, please try them, [ask any questions](doc:getting-help) you have, and [contribute improvements](doc:contributor-overview)!
+
+This list is also available via `pants backends --help-advanced`, which includes any additional plugins in your repository that aren't built-in to Pants itself.
 
 | Backend                                                            | What it does                                                                                               | Docs                                                        |
 |:-------------------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------|:------------------------------------------------------------|
