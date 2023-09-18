@@ -82,6 +82,12 @@ Out[1]: 84
 
 `pants repl ::` will load all your code.
 
+To pass arguments to the repl program, use `--` at the end of the command, like this:
+```text Shell
+$ pants repl -- -i helloworld/main.py
+```
+
+
 > 📘 Tip: how to exit the REPL
 > 
 > Either type `exit()` and hit enter, or press `ctrl+d`.
