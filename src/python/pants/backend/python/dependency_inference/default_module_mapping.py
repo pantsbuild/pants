@@ -6,7 +6,7 @@
 
 import re
 from functools import partial
-from typing import Dict, Iterable, Match
+from typing import Dict, Iterable, Match, Tuple
 
 
 def all_hyphen_to_dot(m: Match[str]) -> str:
@@ -60,7 +60,7 @@ DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, Iterable] = {
     re.compile(r"""^python-(.+)"""): [first_group_hyphen_to_underscore],
 }
 
-DEFAULT_MODULE_MAPPING = {
+DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "absl-py": ("absl",),
     "acryl-datahub": ("datahub",),
     "ansicolors": ("colors",),

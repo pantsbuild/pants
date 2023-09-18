@@ -606,6 +606,8 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             }
         )
     )
+    print(result)
+    print(expected)
     assert result == expected
 
 
@@ -906,37 +908,32 @@ def test_issue_15111(rule_runner: RuleRunner) -> None:
 
 
 def test_generate_mappings_from_pattern_matches() -> None:
-    assert generate_mappings_from_pattern("google-cloud-hardyhar", "bar") == [
+    assert generate_mappings_from_pattern("google-cloud-hardyhar") == [
         "google.cloud.hardyhar",
         "google.cloud.hardyhar_v1",
         "google.cloud.hardyhar_v2",
         "google.cloud.hardyhar_v3",
-        "bar",
     ]
-    assert generate_mappings_from_pattern("python-jose", "bar") == ["jose", "bar"]
-    assert generate_mappings_from_pattern("opentelemetry-instrumentation-tornado", "bar") == [
+    assert generate_mappings_from_pattern("python-jose") == ["jose"]
+    assert generate_mappings_from_pattern("opentelemetry-instrumentation-tornado") == [
         "opentelemetry.instrumentation.tornado",
-        "bar",
     ]
-    assert generate_mappings_from_pattern("azure-mgmt-consumption", "bar") == [
+    assert generate_mappings_from_pattern("azure-mgmt-consumption") == [
         "azure.mgmt.consumption",
-        "bar",
     ]
-    assert generate_mappings_from_pattern("azure-keyvault", "bar") == ["azure.keyvault", "bar"]
-    assert generate_mappings_from_pattern("django-admin-cursor-paginator", "bar") == [
+    assert generate_mappings_from_pattern("azure-keyvault") == ["azure.keyvault"]
+    assert generate_mappings_from_pattern("django-admin-cursor-paginator") == [
         "admin_cursor_paginator",
-        "bar",
     ]
-    assert generate_mappings_from_pattern("django-dotenv", "bar") == [
+    assert generate_mappings_from_pattern("django-dotenv") == [
         "dotenv",
-        "bar",
     ]
-    assert generate_mappings_from_pattern("oslo-service", "bar") == ["oslo_service", "bar"]
+    assert generate_mappings_from_pattern("oslo-service") == ["oslo_service"]
 
 
 def test_generate_mappings_from_pattern_no_match() -> None:
-    assert generate_mappings_from_pattern("pyopenssl", "bar") == ["bar"]
-    assert generate_mappings_from_pattern("", "bar") == ["bar"]
+    assert generate_mappings_from_pattern("pyopenssl") == []
+    assert generate_mappings_from_pattern("") == []
 
 
 def test_number_of_capture_groups_for_functions() -> None:

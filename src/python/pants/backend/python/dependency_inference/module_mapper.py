@@ -312,10 +312,10 @@ class ThirdPartyPythonModuleMapping:
 
 
 @functools.cache
-def generate_mappings_from_pattern(proj_name: str, fallback: str) -> Iterable[str]:
-    """Generate a list of possible module mappings from a project name using a regex pattern.
+def generate_mappings_from_pattern(proj_name: str) -> Iterable[str]:
+    """Generate an iterable of possible module mappings from a project name using a regex pattern.
 
-    e.g. google-cloud-foo -> [google.cloud.foo, google.cloud.foo_v1, google.cloud.foo_v1beta1]
+    e.g. google-cloud-foo -> [google.cloud.foo, google.cloud.foo_v1, google.cloud.foo_v2]
     Should eliminate the need to "manually" add a mapping for every service
     proj_name: The project name to generate mappings for e.g google-cloud-datastream
     """
@@ -327,7 +327,20 @@ def generate_mappings_from_pattern(proj_name: str, fallback: str) -> Iterable[st
                 for replace_pattern in replace_patterns
             ]
             break  # stop after the first match in the rare chance that there are multiple matches
-    return pattern_values + [fallback]
+    return pattern_values
+
+
+@functools.cache
+def generate_mappings(proj_name: str, fallback_value: str) -> Iterable[str]:
+    """Will try the default mapping first and if no mapping is found, try the pattern match.
+
+    Always append the fallback value.
+    """
+    mappings = list(
+        DEFAULT_MODULE_MAPPING.get(proj_name, generate_mappings_from_pattern(proj_name))
+    )
+    mappings.append(fallback_value)
+    return mappings
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
@@ -383,12 +396,7 @@ async def map_third_party_modules_to_addresses(
                     )
                 add_modules(stub_modules, type_stub=True)
             else:
-                add_modules(
-                    DEFAULT_MODULE_MAPPING.get(
-                        proj_name,
-                        generate_mappings_from_pattern(proj_name, fallback_value),
-                    )
-                )
+                add_modules(generate_mappings(proj_name, fallback_value))
 
     return ThirdPartyPythonModuleMapping(
         FrozenDict(
