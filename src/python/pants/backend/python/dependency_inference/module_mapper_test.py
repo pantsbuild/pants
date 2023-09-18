@@ -907,33 +907,46 @@ def test_issue_15111(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_generate_mappings_from_pattern_matches() -> None:
-    assert generate_mappings_from_pattern("google-cloud-hardyhar") == [
-        "google.cloud.hardyhar",
-        "google.cloud.hardyhar_v1",
-        "google.cloud.hardyhar_v2",
-        "google.cloud.hardyhar_v3",
-    ]
-    assert generate_mappings_from_pattern("python-jose") == ["jose"]
-    assert generate_mappings_from_pattern("opentelemetry-instrumentation-tornado") == [
-        "opentelemetry.instrumentation.tornado",
-    ]
-    assert generate_mappings_from_pattern("azure-mgmt-consumption") == [
-        "azure.mgmt.consumption",
-    ]
-    assert generate_mappings_from_pattern("azure-keyvault") == ["azure.keyvault"]
-    assert generate_mappings_from_pattern("django-admin-cursor-paginator") == [
-        "admin_cursor_paginator",
-    ]
-    assert generate_mappings_from_pattern("django-dotenv") == [
-        "dotenv",
-    ]
-    assert generate_mappings_from_pattern("oslo-service") == ["oslo_service"]
-
-
-def test_generate_mappings_from_pattern_no_match() -> None:
-    assert generate_mappings_from_pattern("pyopenssl") == []
-    assert generate_mappings_from_pattern("") == []
+@pytest.mark.parametrize(
+    ("proj_name", "expected_modules"),
+    [
+        (
+            "google-cloud-hardyhar",
+            [
+                "google.cloud.hardyhar",
+                "google.cloud.hardyhar_v1",
+                "google.cloud.hardyhar_v2",
+                "google.cloud.hardyhar_v3",
+            ],
+        ),
+        (
+            "python-jose",
+            ["jose"],
+        ),
+        ("opentelemetry-instrumentation-tornado", ["opentelemetry.instrumentation.tornado"]),
+        ("azure-mgmt-consumption", ["azure.mgmt.consumption"]),
+        ("azure-keyvault", ["azure.keyvault"]),
+        (
+            "django-admin-cursor-paginator",
+            [
+                "admin_cursor_paginator",
+            ],
+        ),
+        (
+            "django-dotenv",
+            [
+                "dotenv",
+            ],
+        ),
+        ("oslo-service", ["oslo_service"]),
+        ("pyopenssl", []),
+        ("", []),
+    ],
+)
+def test_generate_mappings_from_pattern_matches_para(
+    proj_name: str, expected_modules: list[str]
+) -> None:
+    assert generate_mappings_from_pattern(proj_name) == expected_modules
 
 
 def test_number_of_capture_groups_for_functions() -> None:
