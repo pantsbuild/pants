@@ -37,7 +37,7 @@ function calculate_current_hash() {
       git ls-files --cached --others --exclude-standard \
         "${NATIVE_ROOT}" \
         "${REPO_ROOT}/build-support/bin/rust" |
-        grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" -e "src/rust/engine/cargo_build_shim\.sh$" |
+        grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" |
         git hash-object --stdin-paths
     ) | fingerprint_data
   )
