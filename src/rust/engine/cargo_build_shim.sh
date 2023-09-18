@@ -6,7 +6,7 @@
 # from the rule's env and the `extra_env_vars`.
 
 PYTHON_PATH="${CHROOT}/3rdparty/tools/python3/python/bin"
-PROTOC_PATH=${CHROOT}/3rdparty/tools/protoc/protoc/bin
+PROTOC_PATH="${CHROOT}/3rdparty/tools/protoc/protoc/bin"
 export PATH="$PATH:$PYTHON_PATH:$PROTOC_PATH"
 
 RELTYPE_FLAG=""
