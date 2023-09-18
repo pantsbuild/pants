@@ -23,10 +23,11 @@ shell_command(
     execution_dependencies=[
         ":rust_sources",
         "./cargo_build_shim.sh:shell",
+        "3rdparty/tools/protoc:protoc",
         "3rdparty/tools/python3:python3",
     ],
     extra_env_vars=["CHROOT={chroot}", "MODE"],
-    tools=["bash", "cc", "ld", "as", "ar", "cargo", "protoc", "python3.9"],
+    tools=["bash", "cc", "ld", "as", "ar", "cargo", "python3.9"],
     output_files=[
         f"target/debug/libengine.so",
         f"target/debug/libengine.dylib",
