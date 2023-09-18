@@ -1,10 +1,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import errno
 import logging
 import os
 import subprocess
 import sys
+import time
 import unittest
 import unittest.mock
 from contextlib import contextmanager
@@ -15,6 +17,7 @@ import psutil
 import pytest
 
 from pants.pantsd.process_manager import ProcessManager
+from pants.testutil.mock_time import MockTime
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdtemp
 
@@ -28,13 +31,26 @@ def fake_process(**kwargs):
     return proc
 
 
+def test_deadline_until(monkeypatch, caplog):
+    mock_time = MockTime()
+    monkeypatch.setattr(time, "time", mock_time.time)
+    monkeypatch.setattr(time, "sleep", mock_time.sleep)
+    pm = ProcessManager("_test_", metadata_base_dir=safe_mkdtemp())
+    with pytest.raises(ProcessManager.Timeout):
+        with caplog.at_level(logging.INFO):
+            pm._deadline_until(
+                lambda: False, "the impossible", "completed? how?", timeout=0.5, info_interval=0.1
+            )
+    assert len(caplog.records) == 4, f"Expected 4 infos, got: {caplog.records}"
+
+
+# TODO: Convert the rest of these tests to pytest-style test_* functions.
 class TestProcessManager(unittest.TestCase):
     NAME = "_test_"
     TEST_KEY = "TEST"
     TEST_VALUE = "300"
     TEST_VALUE_INT = 300
     BUILDROOT = "/mock_buildroot/"
-    SUBPROCESS_DIR = safe_mkdtemp()
 
     def setUp(self):
         super().setUp()
@@ -62,19 +78,6 @@ class TestProcessManager(unittest.TestCase):
             self.assertEqual(
                 self.pmm.read_metadata_by_name(self.TEST_KEY, int), self.TEST_VALUE_INT
             )
-
-    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6836")
-    @pytest.mark.no_error_if_skipped
-    def test_deadline_until(self):
-        with self.assertRaises(ProcessManager.Timeout):
-            with self.captured_logging(logging.INFO) as captured:
-                self.pmm._deadline_until(
-                    lambda: False, "the impossible", timeout=0.5, info_interval=0.1
-                )
-        self.assertTrue(
-            4 <= len(captured.infos()) <= 6,
-            f"Expected between 4 and 6 infos, got: {captured.infos()}",
-        )
 
     def test_wait_for_file(self):
         with temporary_dir() as td:

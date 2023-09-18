@@ -206,7 +206,7 @@ bytes = "1.2"
 chrono = "0.4.22"
 clap = "3"
 colored = "2.0.0"
-console = "0.15.7"
+console = "0.15.2"
 criterion = "0.4"
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
