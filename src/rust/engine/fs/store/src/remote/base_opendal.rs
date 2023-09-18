@@ -211,6 +211,12 @@ impl ByteStoreProvider for Provider {
   ) -> Result<HashSet<Digest>, String> {
     // NB. this is doing individual requests and thus may be expensive
     let existences = future::try_join_all(digests.map(|digest| async move {
+      // some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
+      // store it, but can still magic it up when loading, i.e. it is never missing
+      if digest == EMPTY_DIGEST {
+        return Ok(None);
+      }
+
       let path = self.path(digest.hash);
       match self.operator.is_exist(&path).await {
         Ok(true) => Ok(None),

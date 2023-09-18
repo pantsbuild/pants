@@ -281,3 +281,16 @@ async fn list_missing_digests_some_missing() {
     Ok(digest_set)
   )
 }
+
+#[tokio::test]
+async fn list_missing_digests_empty_never_missing() {
+  let testdata = TestData::empty();
+  let provider = new_provider();
+
+  assert_eq!(
+    provider
+      .list_missing_digests(&mut vec![testdata.digest()].into_iter())
+      .await,
+    Ok(HashSet::new())
+  )
+}
