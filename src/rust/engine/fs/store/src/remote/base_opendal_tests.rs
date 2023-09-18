@@ -87,7 +87,7 @@ async fn load_missing() {
 
 #[tokio::test]
 async fn load_empty() {
-  // the empty file can be loaded even when it's not "physically" in the remote provider
+  // The empty file can be loaded even when it's not "physically" in the remote provider.
   let testdata = TestData::empty();
   let provider = new_provider();
 
@@ -188,7 +188,7 @@ async fn store_bytes_empty() {
     .await
     .unwrap();
 
-  // we don't actually store an empty file
+  // We don't actually store an empty file.
   assert!(!provider
     .operator
     .is_exist(&test_path(&testdata))
@@ -216,8 +216,8 @@ async fn store_file_multiple_chunks() {
   let provider = new_provider();
 
   let all_the_henries = big_file_bytes();
-  // our current chunk size is the tokio::io::copy default (8KiB at
-  // the time of writing)
+  // Our current chunk size is the tokio::io::copy default (8KiB at
+  // the time of writing).
   assert!(all_the_henries.len() > 8 * 1024);
   let fingerprint = big_file_fingerprint();
   let digest = Digest::new(fingerprint, all_the_henries.len());
@@ -242,7 +242,7 @@ async fn store_file_empty_file() {
     .await
     .unwrap();
 
-  // we don't actually store an empty file
+  // We don't actually store an empty file.
   assert!(!provider
     .operator
     .is_exist(&test_path(&testdata))

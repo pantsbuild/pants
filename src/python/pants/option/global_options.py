@@ -126,7 +126,7 @@ class _RemoteAddressScheme:
         )
 
         if matching_scheme is None:
-            # Got an address that doesn't seem to have a scheme we understand
+            # This an address that doesn't seem to have a scheme we understand.
             supported_schemes = ", ".join(
                 f"`{rendered}`" for scheme in schemes for rendered in scheme.rendered_schemes()
             )
@@ -144,8 +144,8 @@ class _RemoteAddressScheme:
         scheme_str, scheme = matching_scheme
 
         if scheme.experimental and not addr_is_experimental:
-            # Got a URL like `some-scheme://` for a scheme that IS experimental. Tell the user they
-            # need to specify it as `experimental:some-scheme://`.
+            # This is a URL like `some-scheme://` for a scheme that IS experimental, so let's tell
+            # the user they need to specify it as `experimental:some-scheme://`.
             raise OptionsError(
                 softwrap(
                     f"""
@@ -160,7 +160,7 @@ class _RemoteAddressScheme:
             )
 
         if not scheme.experimental and addr_is_experimental:
-            # Got a URL like `experimental:some-scheme://...` for a scheme that's NOT experimental,
+            # This is a URL like `experimental:some-scheme://...` for a scheme that's NOT experimental,
             # so let's tell the user to fix it up as `some-scheme://...`. It's low importance (we
             # can unambigiously tell what they mean), so a warning is fine.
             logger.warning(
@@ -219,7 +219,7 @@ class _RemoteAddressScheme:
                 if not requires_execution or (requires_execution and scheme.supports_execution)
             ]
             if requires_execution:
-                # if this is the help for remote execution, still include the schemes that don't
+                # If this is the help for remote execution, still include the schemes that don't
                 # support it, but mark them as such.
                 supported_schemes.append(
                     (

@@ -47,7 +47,7 @@ impl Provider {
         // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
         TimeoutLayer::new()
           .with_timeout(options.rpc_timeout)
-          // TimeoutLayer requires specifying a non-zero minimum transfer speed too
+          // TimeoutLayer requires specifying a non-zero minimum transfer speed too.
           .with_speed(1),
       )
       // TODO: RetryLayer doesn't seem to retry stores, but we should
@@ -72,7 +72,7 @@ impl Provider {
   }
 
   fn path(&self, fingerprint: Fingerprint) -> String {
-    // include the two bytes as parent directories to make listings less wide
+    // We include the first two bytes as parent directories to make listings less wide.
     format!(
       "{}/{:02x}/{:02x}/{}",
       self.base_path, fingerprint.0[0], fingerprint.0[1], fingerprint
@@ -85,10 +85,10 @@ impl Provider {
     destination: &mut dyn LoadDestination,
     mode: LoadMode,
   ) -> Result<bool, String> {
-    // some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we just magic
-    // it up here, and ignore it when storing
+    // Some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we just magic
+    // it up here, and ignore it when storing.
     if digest == EMPTY_DIGEST {
-      // destination starts off empty, so is already in the right state
+      // `destination` starts off empty, so is already in the right state.
       return Ok(true);
     }
 
@@ -150,8 +150,8 @@ impl Provider {
 #[async_trait]
 impl ByteStoreProvider for Provider {
   async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String> {
-    // some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
-    // store it here, and magic it up when loading
+    // Some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
+    // store it here, and magic it up when loading.
     if digest == EMPTY_DIGEST {
       return Ok(());
     }
@@ -166,8 +166,8 @@ impl ByteStoreProvider for Provider {
   }
 
   async fn store_file(&self, digest: Digest, mut file: File) -> Result<(), String> {
-    // some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
-    // store it here, and magic it up when loading
+    // Some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
+    // store it here, and magic it up when loading.
     if digest == EMPTY_DIGEST {
       return Ok(());
     }
@@ -209,10 +209,10 @@ impl ByteStoreProvider for Provider {
     &self,
     digests: &mut (dyn Iterator<Item = Digest> + Send),
   ) -> Result<HashSet<Digest>, String> {
-    // NB. this is doing individual requests and thus may be expensive
+    // NB. this is doing individual requests and thus may be expensive.
     let existences = future::try_join_all(digests.map(|digest| async move {
-      // some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
-      // store it, but can still magic it up when loading, i.e. it is never missing
+      // Some providers (e.g. GitHub Actions Cache) don't like storing an empty file, so we don't
+      // store it, but can still magic it up when loading, i.e. it is never missing.
       if digest == EMPTY_DIGEST {
         return Ok(None);
       }

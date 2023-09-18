@@ -20,8 +20,8 @@ use crate::MEGABYTES;
 
 #[tokio::test]
 async fn smoke_test_from_options_reapi_provider() {
-  // run through the various methods using the 'real' REAPI provider (talking to a stubbed CAS), as
-  // a double-check that the test provider is plausible and test provider selection works
+  // This runs through the various methods using the 'real' REAPI provider (talking to a stubbed
+  // CAS), as a double-check that the test provider is plausible and test provider selection works.
   let roland = TestData::roland();
   let empty = TestData::empty();
 
@@ -45,7 +45,7 @@ async fn smoke_test_from_options_reapi_provider() {
   let mut missing_set = HashSet::new();
   missing_set.insert(empty.digest());
 
-  // only roland is in the CAS:
+  // Only roland is in the CAS:
   assert_eq!(
     store.load_bytes(roland.digest()).await,
     Ok(Some(roland.bytes()))
@@ -58,7 +58,7 @@ async fn smoke_test_from_options_reapi_provider() {
     Ok(missing_set)
   );
 
-  // insert empty:
+  // Insert empty:
   assert_eq!(store.store_bytes(empty.bytes()).await, Ok(()));
   assert_eq!(
     store.load_bytes(empty.digest()).await,
@@ -68,8 +68,8 @@ async fn smoke_test_from_options_reapi_provider() {
 
 #[tokio::test]
 async fn smoke_test_from_options_file_provider() {
-  // run through the various methods using the file:// provider, as a double-check that the test
-  // provider is plausible and test provider selection works
+  // This runs through the various methods using the file:// provider, as a double-check that the
+  // test provider is plausible and test provider selection works.
   let roland = TestData::roland();
   let catnip = TestData::catnip();
 
@@ -94,13 +94,13 @@ async fn smoke_test_from_options_file_provider() {
   let mut missing_set = HashSet::new();
   missing_set.insert(catnip.digest());
 
-  // insert roland
+  // Insert roland:
   assert_eq!(store.store_bytes(roland.bytes()).await, Ok(()));
   assert_eq!(
     store.load_bytes(roland.digest()).await,
     Ok(Some(roland.bytes()))
   );
-  // only roland is stored:
+  // Only roland is stored:
   assert_eq!(store.load_bytes(catnip.digest()).await, Ok(None));
   assert_eq!(
     store
@@ -109,7 +109,7 @@ async fn smoke_test_from_options_file_provider() {
     Ok(missing_set)
   );
 
-  // insert catnip:
+  // Insert catnip:
   assert_eq!(store.store_bytes(catnip.bytes()).await, Ok(()));
   assert_eq!(
     store.load_bytes(catnip.digest()).await,
