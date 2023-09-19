@@ -45,6 +45,7 @@ members = [
   "logging",
   "nailgun",
   "options",
+  "pantsd",
   "process_execution",
   "process_execution/docker",
   "process_execution/pe_nailgun",
@@ -89,6 +90,7 @@ default-members = [
   "logging",
   "nailgun",
   "options",
+  "pantsd",
   "process_execution",
   "process_execution/docker",
   "process_execution/pe_nailgun",
@@ -151,6 +153,8 @@ log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
 num_enum = "0.5"
+options = { path = "options" }
+pantsd = { path = "pantsd" }
 parking_lot = "0.12"
 petgraph = "0.6"
 process_execution = { path = "process_execution" }

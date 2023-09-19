@@ -10,15 +10,17 @@ use crate::parse::{parse_bool, parse_string_list};
 use crate::ListEdit;
 
 #[derive(Debug)]
-pub(crate) struct Env {
+pub struct Env {
   pub(crate) env: HashMap<String, String>,
 }
 
 impl Env {
-  pub(crate) fn capture() -> Env {
-    Env {
-      env: env::vars().collect::<HashMap<_, _>>(),
-    }
+  pub fn new(env: HashMap<String, String>) -> Self {
+    Self { env }
+  }
+
+  pub fn capture() -> Self {
+    Self::new(env::vars().collect::<HashMap<_, _>>())
   }
 
   fn env_var_names(id: &OptionId) -> Vec<String> {

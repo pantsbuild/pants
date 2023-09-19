@@ -1,0 +1,16 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "pantsd"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+hex = "0.4.3"
+libc = "0.2"
+log = "0.4"
+options = { path = "../options" }
+sha2 = "0.10"
+sysinfo = "0.20.0"
+tempfile = "3.5.0"
+uname = "0.1"

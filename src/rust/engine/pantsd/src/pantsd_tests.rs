@@ -3,7 +3,6 @@
 
 use std::net::TcpStream;
 
-use crate::pantsd;
 use crate::pantsd_testing::launch_pantsd;
 
 fn assert_connect(port: u16) {
@@ -18,17 +17,17 @@ fn assert_connect(port: u16) {
 
 #[test]
 fn test_address_integration() {
-  let (_, pants_subprocessdir) = launch_pantsd();
+  let (_, _, pants_subprocessdir) = launch_pantsd();
 
-  let pantsd_metadata = pantsd::Metadata::mount(&pants_subprocessdir).unwrap();
+  let pantsd_metadata = crate::Metadata::mount(&pants_subprocessdir).unwrap();
   let port = pantsd_metadata.port().unwrap();
   assert_connect(port);
 }
 
 #[test]
-fn test_probe() {
-  let (build_root, pants_subprocessdir) = launch_pantsd();
+fn test_find_pantsd() {
+  let (build_root, options_parser, _tmpdir) = launch_pantsd();
 
-  let port = pantsd::probe(&build_root, pants_subprocessdir.path()).unwrap();
-  assert_connect(port);
+  let connection_settings = crate::find_pantsd(&build_root, &options_parser).unwrap();
+  assert_connect(connection_settings.port);
 }

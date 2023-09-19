@@ -733,7 +733,9 @@ class BootstrapOptions:
         ),
     )
     log_levels_by_target = DictOption[str](
-        daemon=True,
+        # TODO: While we would like this option to be fingerprinted for the daemon, the Rust side
+        # option parser does not support dict options. See #19832.
+        # daemon=True,
         advanced=True,
         help=softwrap(
             """
