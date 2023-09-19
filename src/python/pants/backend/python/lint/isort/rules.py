@@ -31,7 +31,6 @@ from pants.engine.target import (
     Targets,
 )
 from pants.option.global_options import KeepSandboxes
-from pants.source.source_root import AllSourceRoots
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -54,6 +53,7 @@ class IsortRequest(FmtTargetsRequest):
     tool_subsystem = Isort
     partitioner_type = PartitionerType.CUSTOM
 
+
 @dataclass(frozen=True)
 class IsortPartitionMetadata:
     path_to_firstparty_modules: FrozenDict[str, tuple[str, ...]]
@@ -65,56 +65,53 @@ class IsortPartitionMetadata:
 
 @rule(desc="Partition isort", level=LogLevel.DEBUG)
 async def isort_partition(
-    request: IsortRequest.PartitionRequest,
-    isort: Isort
+    request: IsortRequest.PartitionRequest, isort: Isort
 ) -> Partitions[str, IsortPartitionMetadata]:
     if isort.skip:
         return Partitions()
 
     all_sources_paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(field_set.source))
-        for field_set in request.field_sets
+        Get(SourcesPaths, SourcesPathsRequest(field_set.source)) for field_set in request.field_sets
     )
-    direct_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies))
-        for field_set in request.field_sets
-    )
-    all_direct_targets = {
-        *itertools.chain.from_iterable(direct_dependencies)
-    }
-    stripped_files = await MultiGet(
-        Get(StrippedFileName, StrippedFileNameRequest(target.get(PythonSourceField, default_raw_value="").file_path))
-        for target in all_direct_targets
-    )
-    stripped_file_paths = (PurePath(stripped_file.value) for stripped_file in stripped_files)
-    target_to_stripped_file = {
-        target: module_from_stripped_path(stripped_path)
-        for target, stripped_path in zip(all_direct_targets, stripped_file_paths)
-        if stripped_path and stripped_path.name not in ("__init__.py", "__init__.pyi")
-    }
 
     metadata = defaultdict(set)
-    for source_paths, direct_deps in zip(all_sources_paths, direct_dependencies):
-        for path in source_paths.files:
-            metadata[path].update(
-                target_to_stripped_file[target]
-                for target in direct_deps
-                if target in target_to_stripped_file
-            )
-
-    return (
-        Partitions.single_partition(
-            itertools.chain.from_iterable(
-                sources_paths.files for sources_paths in all_sources_paths
-            ),
-            metadata=IsortPartitionMetadata(
-                FrozenDict(
-                    (path, tuple(mods))
-                    for path, mods in metadata.items()
-                )
-            )
+    if isort.firstparty_discovery:
+        direct_dependencies = await MultiGet(
+            Get(Targets, DependenciesRequest(field_set.dependencies))
+            for field_set in request.field_sets
         )
+        all_direct_targets = {*itertools.chain.from_iterable(direct_dependencies)}
+        stripped_files = await MultiGet(
+            Get(
+                StrippedFileName,
+                StrippedFileNameRequest(
+                    target.get(PythonSourceField, default_raw_value="").file_path
+                ),
+            )
+            for target in all_direct_targets
+        )
+        stripped_file_paths = (PurePath(stripped_file.value) for stripped_file in stripped_files)
+        target_to_stripped_file = {
+            target: module_from_stripped_path(stripped_path)
+            for target, stripped_path in zip(all_direct_targets, stripped_file_paths)
+            if stripped_path and stripped_path.name
+        }
+
+        for source_paths, direct_deps in zip(all_sources_paths, direct_dependencies):
+            for path in source_paths.files:
+                metadata[path].update(
+                    target_to_stripped_file[target]
+                    for target in direct_deps
+                    if target in target_to_stripped_file
+                )
+
+    return Partitions.single_partition(
+        itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths),
+        metadata=IsortPartitionMetadata(
+            FrozenDict((path, tuple(mods)) for path, mods in metadata.items())
+        ),
     )
+
 
 def generate_argv(
     source_files: tuple[str, ...],
@@ -139,17 +136,22 @@ def generate_argv(
         #  `[isort].config` to be a string rather than list[str] option.
         if not explicitly_configured_config_args:
             args.append(f"--settings={isort.config[0]}")
-    args.extend(f"-p={mod}" for mod in direct_dep_modules)
+    args.extend(f"-p={mod}" for mod in sorted(direct_dep_modules))
     args.extend(source_files)
     return tuple(args)
 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(
-    request: IsortRequest.Batch[str, IsortPartitionMetadata], isort: Isort, keep_sandboxes: KeepSandboxes, all_source_roots: AllSourceRoots
+    request: IsortRequest.Batch[str, IsortPartitionMetadata],
+    isort: Isort,
+    keep_sandboxes: KeepSandboxes,
 ) -> FmtResult:
     direct_dep_modules = {
-        *itertools.chain.from_iterable(request.partition_metadata.path_to_firstparty_modules[filepath] for filepath in request.elements)
+        *itertools.chain.from_iterable(
+            request.partition_metadata.path_to_firstparty_modules.get(filepath, ())
+            for filepath in request.elements
+        )
     }
 
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
@@ -174,7 +176,9 @@ async def isort_fmt(
         ProcessResult,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(request.files, isort, is_isort5=is_isort5, direct_dep_modules=direct_dep_modules),
+            argv=generate_argv(
+                request.files, isort, is_isort5=is_isort5, direct_dep_modules=direct_dep_modules
+            ),
             input_digest=input_digest,
             output_files=request.files,
             description=description,

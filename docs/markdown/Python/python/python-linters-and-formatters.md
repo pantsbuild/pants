@@ -277,6 +277,7 @@ They report that this config works for them:
 ```toml
 # pyproject.toml
 [tool.isort]
+known_first_party = ["my_org"]
 default_section = "THIRDPARTY"
 ```
 

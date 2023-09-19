@@ -65,6 +65,29 @@ class Isort(PythonToolBase):
             """
         ),
     )
+    firstparty_discovery = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            """
+            If enabled, Pants will tell `isort` explicitly which imported modules are firstparty (as
+            decided by if Pants is aware of the module via `python_` targets).
+
+            Enabling this option works around a common "gotcha" of isort runs in Pants, where isort's
+            default heuristic of "its firstparty if the file exists locally" can lead to surprising
+            behavior in Pants where the sandbox for the run is only populated with a subset of the
+            files in repo, leading to isort marking firstparty modules as thirdparty.
+
+            The downside to enabling this option is that before isort can run, Pants will be forced
+            to find the direct dependencies of every file being formatted, which can be expensive
+            in some repos (very large repos, or repos with expensive dependency-providing plugins).
+
+            To emulate this behavior without enabling it, you can try setting isort's
+            "known first party" to the modules at the top of your source roots, or try setting isort's
+            "Src Paths" option to your source roots.
+            """
+        ),
+    )
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # Refer to https://pycqa.github.io/isort/docs/configuration/config_files/.
