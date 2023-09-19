@@ -377,8 +377,8 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.71.1-*
 
           ~/.rustup/update-hashes
 
