@@ -15,19 +15,21 @@ files(
     ],
 )
 
-shell_sources(name="shell")
+_RELTYPE_FLAG = "" if env("MODE") == "debug" else "--release"
 
 shell_command(
     name="engine-and-client",
-    command=f"./cargo_build_shim.sh --features=extension-module -p engine -p client",
+    command=(
+        'PATH="${PATH}:${CHROOT}/3rdparty/tools/python3/python/bin:${CHROOT}/3rdparty/tools/protoc/protoc/bin"'
+        + f" cargo build {_RELTYPE_FLAG} --features=extension-module -p engine -p client"
+    ),
     execution_dependencies=[
         ":rust_sources",
-        "./cargo_build_shim.sh:shell",
         "3rdparty/tools/protoc:protoc",
         "3rdparty/tools/python3:python3",
     ],
-    extra_env_vars=["CHROOT={chroot}", "MODE"],
-    tools=["bash", "cc", "ld", "as", "ar", "cargo", "python3.9"],
+    extra_env_vars=["CHROOT={chroot}"],
+    tools=["bash", "cc", "ld", "as", "ar", "cargo"],
     output_files=[
         f"target/debug/libengine.so",
         f"target/debug/libengine.dylib",

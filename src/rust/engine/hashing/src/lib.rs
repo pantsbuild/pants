@@ -85,6 +85,7 @@ impl Fingerprint {
 
   #[allow(clippy::wrong_self_convention)]
   pub fn to_hex(&self) -> String {
+    // TODO: Switch to `hex::encode` from the `hex` crate.
     let mut s = String::new();
     for &byte in &self.0 {
       fmt::Write::write_fmt(&mut s, format_args!("{byte:02x}")).unwrap();
