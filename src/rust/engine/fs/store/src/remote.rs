@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
-use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -14,33 +13,36 @@ use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ServerCapabilities;
+use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWrite};
 use workunit_store::{in_workunit, ObservationMetric};
-
-use crate::StoreError;
 
 mod reapi;
 #[cfg(test)]
 mod reapi_tests;
 
-pub type ByteSource = Arc<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
-
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
-  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String>;
+  /// Store the bytes readable from `file` into the remote store
+  async fn store_file(&self, digest: Digest, file: File) -> Result<(), String>;
 
+  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store_file` when the
+  /// bytes are already in memory
+  async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String>;
+
+  /// Load the data stored (if any) in the remote store for `digest` into `destination`. Returns
+  /// true when found, false when not.
   async fn load(
     &self,
     digest: Digest,
     destination: &mut dyn LoadDestination,
   ) -> Result<bool, String>;
 
+  /// Return any digests from `digests` that are not (currently) available in the remote store.
   async fn list_missing_digests(
     &self,
     digests: &mut (dyn Iterator<Item = Digest> + Send),
   ) -> Result<HashSet<Digest>, String>;
-
-  fn chunk_size_bytes(&self) -> usize;
 }
 
 // TODO: Consider providing `impl Default`, similar to `super::LocalOptions`.
@@ -110,74 +112,40 @@ impl ByteStore {
     Ok(ByteStore::new(instance_name, provider))
   }
 
-  pub(crate) fn chunk_size_bytes(&self) -> usize {
-    self.provider.chunk_size_bytes()
-  }
-
-  pub async fn store_buffered<WriteToBuffer, WriteResult>(
-    &self,
-    digest: Digest,
-    write_to_buffer: WriteToBuffer,
-  ) -> Result<(), StoreError>
-  where
-    WriteToBuffer: FnOnce(std::fs::File) -> WriteResult,
-    WriteResult: Future<Output = Result<(), StoreError>>,
-  {
-    let write_buffer = tempfile::tempfile().map_err(|e| {
-      format!("Failed to create a temporary blob upload buffer for {digest:?}: {e}")
-    })?;
-    let read_buffer = write_buffer.try_clone().map_err(|e| {
-      format!("Failed to create a read handle for the temporary upload buffer for {digest:?}: {e}")
-    })?;
-    write_to_buffer(write_buffer).await?;
-
-    // Unsafety: Mmap presents an immutable slice of bytes, but the underlying file that is mapped
-    // could be mutated by another process. We guard against this by creating an anonymous
-    // temporary file and ensuring it is written to and closed via the only other handle to it in
-    // the code just above.
-    let mmap = Arc::new(unsafe {
-      let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
-        format!("Failed to memory map the temporary file buffer for {digest:?}: {e}")
-      })?;
-      if let Err(err) = madvise::madvise(
-        mapping.as_ptr(),
-        mapping.len(),
-        madvise::AccessPattern::Sequential,
-      ) {
-        log::warn!(
-          "Failed to madvise(MADV_SEQUENTIAL) for the memory map of the temporary file buffer for \
-          {digest:?}. Continuing with possible reduced performance: {err}",
-          digest = digest,
-          err = err
-        )
-      }
-      Ok(mapping) as Result<memmap::Mmap, String>
-    }?);
-
+  /// Store the bytes readable from `file` into the remote store
+  pub async fn store_file(&self, digest: Digest, file: File) -> Result<(), String> {
     self
-      .store_bytes_source(
-        digest,
-        Arc::new(move |range| Bytes::copy_from_slice(&mmap[range])),
-      )
-      .await?;
-
-    Ok(())
-  }
-
-  pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
-    let digest = Digest::of_bytes(&bytes);
-    self
-      .store_bytes_source(digest, Arc::new(move |range| bytes.slice(range)))
+      .store_tracking("store", digest, || self.provider.store_file(digest, file))
       .await
   }
 
-  async fn store_bytes_source(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
+  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store_file` when the
+  /// bytes are already in memory
+  pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
+    let digest = Digest::of_bytes(&bytes);
+    self
+      .store_tracking("store_bytes", digest, || {
+        self.provider.store_bytes(digest, bytes)
+      })
+      .await
+  }
+
+  async fn store_tracking<DoStore, Fut>(
+    &self,
+    workunit: &'static str,
+    digest: Digest,
+    do_store: DoStore,
+  ) -> Result<(), String>
+  where
+    DoStore: FnOnce() -> Fut + Send,
+    Fut: Future<Output = Result<(), String>> + Send,
+  {
     in_workunit!(
-      "store_bytes",
+      workunit,
       Level::Trace,
       desc = Some(format!("Storing {digest:?}")),
       |workunit| async move {
-        let result = self.provider.store_bytes(digest, bytes).await;
+        let result = do_store().await;
 
         if result.is_ok() {
           workunit.record_observation(

@@ -131,9 +131,10 @@ def test_vintage_simple_success(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test
@@ -176,16 +177,17 @@ def test_vintage_simple_failure(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 
     assert test_result.exit_code == 1
+    stdout_text = test_result.stdout_bytes.decode()
     assert (
         re.search(
             r"Finished:.*?helloTest.*?Exception: java.lang.AssertionError",
-            test_result.stdout,
+            stdout_text,
             re.DOTALL,
         )
         is not None
     )
-    assert re.search(r"1 tests failed", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    assert re.search(r"1 tests failed", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test
@@ -243,9 +245,10 @@ def test_vintage_success_with_dep(
     test_result = run_junit_test(rule_runner, "example-test", "ExampleTest.java")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test
@@ -286,9 +289,10 @@ def test_vintage_scala_simple_success(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.scala")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @pytest.fixture
@@ -347,9 +351,10 @@ def test_jupiter_simple_success(
 
     assert test_result.exit_code == 0
     assert test_result.xml_results and test_result.xml_results.files
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test
@@ -393,16 +398,17 @@ def test_jupiter_simple_failure(
 
     assert test_result.exit_code == 1
     assert test_result.xml_results and test_result.xml_results.files
+    stdout_text = test_result.stdout_bytes.decode()
     assert (
         re.search(
             r"Finished:.*?testHello.*?Exception: org.opentest4j.AssertionFailedError: expected: <Goodbye!> but was: <Hello!>",
-            test_result.stdout,
+            stdout_text,
             re.DOTALL,
         )
         is not None
     )
-    assert re.search(r"1 tests failed", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    assert re.search(r"1 tests failed", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test
@@ -463,9 +469,10 @@ def test_jupiter_success_with_dep(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 def _write_file_dependencies(
@@ -533,9 +540,10 @@ def test_vintage_file_dependency(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test
@@ -547,9 +555,10 @@ def test_vintage_files_dependencies(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @pytest.mark.skip  # TODO(14537) `relocated_files` doesn't presently work, un-skip when fixing that.
@@ -563,9 +572,10 @@ def test_vintage_relocated_files_dependency(
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 
     assert test_result.exit_code == 0
-    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
-    assert re.search(r"1 tests successful", test_result.stdout) is not None
-    assert re.search(r"1 tests found", test_result.stdout) is not None
+    stdout_text = test_result.stdout_bytes.decode()
+    assert re.search(r"Finished:\s+testHello", stdout_text) is not None
+    assert re.search(r"1 tests successful", stdout_text) is not None
+    assert re.search(r"1 tests found", stdout_text) is not None
 
 
 @maybe_skip_jdk_test

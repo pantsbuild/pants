@@ -71,7 +71,7 @@ _known_packages = [
 # Disable the explorer backend, as that is packaged into a dedicated Python distribution and thus
 # not included in the pex either.
 DISABLED_BACKENDS_CONFIG = {
-    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants.explorer.server"]',
+    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants_explorer.server"]',
 }
 
 

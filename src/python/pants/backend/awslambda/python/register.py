@@ -9,11 +9,10 @@ See https://www.pantsbuild.org/docs/awslambda-python.
 from pants.backend.awslambda.python import rules as python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonAWSLambdaLayer
 from pants.backend.awslambda.python.target_types import rules as target_types_rules
-from pants.backend.python.subsystems import lambdex
 
 
 def rules():
-    return (*python_rules.rules(), *target_types_rules(), *lambdex.rules())
+    return (*python_rules.rules(), *target_types_rules())
 
 
 def target_types():

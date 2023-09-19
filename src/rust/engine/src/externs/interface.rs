@@ -39,7 +39,7 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
-use rule_graph::{self, DependencyKey, RuleGraph};
+use rule_graph::{self, DependencyKey, RuleGraph, RuleId};
 use task_executor::Executor;
 use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
@@ -61,6 +61,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
   externs::process::register(m)?;
+  externs::pantsd::register(py, m)?;
   externs::scheduler::register(m)?;
   externs::target::register(m)?;
   externs::testutil::register(m)?;
@@ -1014,6 +1015,7 @@ fn session_run_interactive_process(
       &Arc::new(std::sync::atomic::AtomicBool::new(true)),
       core.intrinsics.run(
         &Intrinsic {
+          id: RuleId::new("interactive_process"),
           product: core.types.interactive_process_result,
           inputs: vec![
             DependencyKey::new(core.types.interactive_process),

@@ -5,7 +5,7 @@ excerpt: "Creating Python binaries through PyOxidizer."
 hidden: false
 createdAt: "2022-02-04T18:41:48.950Z"
 ---
-PyOxidizer allows you to distribute your code as a single binary file, similar to [Pex files](doc:pex-files). Unlike Pex, these binaries include a Python interpreter, often greatly simplifying distribution. 
+PyOxidizer allows you to distribute your code as a single binary file, similar to [Pex files](doc:pex). Unlike Pex, these binaries include a Python interpreter, often greatly simplifying distribution. 
 
 See our blog post on [Packaging Python with the Pants PyOxidizer Plugin](https://blog.pantsbuild.org/packaging-python-with-the-pyoxidizer-pants-plugin/) for more discussion of the benefits of PyOxidizer.
 

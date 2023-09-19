@@ -256,7 +256,10 @@ impl AddressInput {
   fn file_to_address(&self) -> PyResult<Address> {
     let Some(target_component) = self.target_component.as_ref() else {
       // Use the default target in the same directory as the file.
-      match (self.path_component.parent(), self.path_component.file_name()) {
+      match (
+        self.path_component.parent(),
+        self.path_component.file_name(),
+      ) {
         (Some(spec_path), Some(relative_file_path)) if !spec_path.as_os_str().is_empty() => {
           return Address::__new__(
             spec_path.to_owned(),

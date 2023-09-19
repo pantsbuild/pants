@@ -744,6 +744,50 @@ def test_infer_python_strict_multiple_resolves(imports_rule_runner: PythonRuleRu
         )
 
 
+def test_infer_python_identical_files_with_relative_imports_should_be_treated_differently(
+    imports_rule_runner: PythonRuleRunner,
+) -> None:
+    # dependency inference shouldn't cache _just_ based on file contents, because this can break
+    # relative imports. When b reused a's results, b/__init__.py was incorrectly depending on
+    # a/file.py (https://github.com/pantsbuild/pants/issues/19618).
+    contents = "from . import file"
+    imports_rule_runner.write_files(
+        {
+            "a/BUILD": "python_sources()",
+            "a/__init__.py": contents,
+            "a/file.py": "",
+            "b/BUILD": "python_sources()",
+            "b/__init__.py": contents,
+            "b/file.py": "",
+        }
+    )
+
+    def get_deps(directory: str) -> InferredDependencies:
+        tgt = imports_rule_runner.get_target(
+            Address(directory, target_name=directory, relative_file_path="__init__.py")
+        )
+
+        return imports_rule_runner.request(
+            InferredDependencies,
+            [InferPythonImportDependencies(PythonImportDependenciesInferenceFieldSet.create(tgt))],
+        )
+
+    # first, seed the cache with the deps for "a"
+    assert get_deps("a") == InferredDependencies(
+        [
+            Address("a", target_name="a", relative_file_path="file.py"),
+        ]
+    )
+
+    # then, run with "b", which _shouldn't_ reuse the cache from the previous run to give
+    # "a/file.py:a" (as it did previously, see #19618), and should instead give "b/file.py:b"
+    assert get_deps("b") == InferredDependencies(
+        [
+            Address("b", target_name="b", relative_file_path="file.py"),
+        ]
+    )
+
+
 class TestCategoriseImportsInfo:
     address = Address("sample/path")
     import_cases = {

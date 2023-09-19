@@ -54,7 +54,6 @@ from pants.engine.target import (
     OptionalSingleSourceField,
     OverridesField,
     ScalarField,
-    SecondaryOwnerMixin,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -70,7 +69,6 @@ from pants.engine.target import (
 )
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
-from pants.source.filespec import Filespec
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.pip_requirement import PipRequirement
@@ -298,7 +296,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
+class EntryPointField(AsyncFieldMixin, Field):
     alias = "entry_point"
     default = None
     help = help_text(
@@ -310,8 +308,6 @@ class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
 
           1) `'app.py'`, Pants will convert into the module `path.to.app`;
           2) `'app.py:func'`, Pants will convert into `path.to.app:func`.
-
-        You must use the file name shorthand for file arguments to work with this target.
 
         You may either set this field or the `script` field, but not both. Leave off both fields
         to have no entry point.
@@ -330,13 +326,6 @@ class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
             return EntryPoint.parse(value, provenance=f"for {address}")
         except ValueError as e:
             raise InvalidFieldException(str(e))
-
-    @property
-    def filespec(self) -> Filespec:
-        if self.value is None or not self.value.module.endswith(".py"):
-            return {"includes": []}
-        full_glob = os.path.join(self.address.spec_path, self.value.module)
-        return {"includes": [full_glob]}
 
 
 class PexEntryPointField(EntryPointField):
@@ -710,7 +699,7 @@ class PexBinary(Target):
         A Python target that can be converted into an executable PEX file.
 
         PEX files are self-contained executable files that contain a complete Python environment
-        capable of running the target. For more information, see {doc_url('pex-files')}.
+        capable of running the target. For more information, see {doc_url('pex')}.
         """
     )
 

@@ -136,7 +136,10 @@ def wrap_source_rule_and_target(
         )
 
     # need to use `_param_type_overrides` to stop `@rule` from inspecting the function's source
-    @rule(_param_type_overrides={"request": GenerateWrapSourceSourcesRequest})
+    @rule(
+        canonical_name_suffix=source_field_type.__name__,
+        _param_type_overrides={"request": GenerateWrapSourceSourcesRequest},
+    )
     async def wrap_source(request: GenerateSourcesRequest) -> GeneratedSources:
         return await _wrap_source(request)
 

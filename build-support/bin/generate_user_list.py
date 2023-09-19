@@ -135,11 +135,6 @@ _orgs = (
         "https://www.tessian.com",
         "https://files.readme.io/6ef9d57-tessian-small.png",
     ),
-    Org(
-        "Toolchain",
-        "https://www.toolchain.com/",
-        "https://files.readme.io/43d674d-toolchain_logo_small.png",
-    ),
     Org("Unit", "https://unit.co", "https://files.readme.io/eda8106-unit.png"),
     Org("Valon", "https://valon.com/", "https://files.readme.io/df5216a-valon-small.png"),
     Org(

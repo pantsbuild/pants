@@ -152,7 +152,7 @@ impl Visitor for ImportCollector<'_> {
   fn visit_expression_statement(&mut self, node: Node) -> ChildBehavior {
     if node.children(&mut node.walk()).any(|child| {
       let id = child.kind_id();
-      id == KindID::CALL_EXPRESSION || id == KindID::AWAIT_EXPRESSION
+      KindID::CALL_EXPRESSION.contains(&id) || id == KindID::AWAIT_EXPRESSION
     }) {
       return self.propagate_pragma(node);
     }

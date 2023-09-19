@@ -63,7 +63,7 @@ The process may fail in one of two ways:
 Step 1: Create the release commit
 ---------------------------------
 
-The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. For `rc` and stable releases, this happens in the relevant stable branch (while the release notes are still updated on `main`).
+The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. For `rc` and stable releases, this happens in the relevant stable branch.
 
 ### `dev0` - set up the new release series
 
@@ -71,32 +71,19 @@ If this is the first dev release in a new series:
 
 1. Create a new file in ` src/python/pants/notes`, e.g. create  `src/python/pants/notes/2.9.x.md`.
    1. Copy the title and template over from the prior release, e.g. `2.8.x.md`.
-2. Add the new file to `pants.toml` in the `release_notes` section.
 
-### Generate the release notes
+### Bump the VERSION
+
 From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
 
 This will create a pull request that:
 
-1. updates release notes (remember to check over the changes and follow the instructions in the PR to make any updates)
-2. updates `CONTRIBUTORS.md`
-3. bumps the `VERSION` on `main`, if appropriate
-
-> 🚧 Reminder: always do this against the `main` branch
->
-> Even if you are preparing notes for a release candidate, always prepare the notes in a branch based on `main` and, later, target your PR to merge with `main`.
+1. updates `CONTRIBUTORS.md`
+2. bumps the `VERSION` on the branch
 
 ### Merge the pull request
 
 Post the PR to the `#development` channel in Slack. Merge once approved and green.
-
-> 🚧 Watch out for any recently landed PRs
->
-> From the time you put up your release prep until you hit "merge", be careful that no one merges any commits into main.
->
-> If they do—and you're doing a `dev` or `a0` release—you should merge `main` into your PR and update the changelog with their changes. It's okay if the changes were internal only, but any public changes must be added to the changelog.
->
-> Once you click "merge", it is safe for people to merge changes again.
 
 ### `a0` - create a new Git branch
 
@@ -108,14 +95,6 @@ For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running
 $ git checkout -b 2.9.x
 $ git push upstream 2.9.x
 ```
-
-### Release candidates - cherry-pick and bump the VERSION
-
-If you're releasing a release candidate, your release notes PR above did not bump the VERSION on main. You must bump it in the release branch.
-
-1. Checkout from `main` into the release branch, e.g. `2.9.x`.
-2. Cherry-pick the release notes prep into the release branch using `git cherry-pick <sha>`.
-3. Bump the `VERSION` in `src/python/pants/VERSION`, e.g. to `2.9.0rc1`. Push this as a new commit directly to the release branch - you do not need to open a pull request.
 
 Step 2: Update this docs site
 -----------------------------
@@ -132,7 +111,7 @@ See the `docs/NOTES.md` for instructions setting up the necessary Node tooling y
 You'll need to 1st login as outlined there via some variant of `npx rdme login --2fa --project pants ...`.
 On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>`; e.g: `npx rdme docs docs/markdown --version v2.8`.
 
-### Regenerate the references
+### Regenerate the reference docs
 
 Still on the relevant release branch, run `./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 
@@ -140,10 +119,8 @@ Still on the relevant release branch, run `./pants run build-support/bin/generat
 
 The first stable release of a branch should update the "default" version of the docsite. For example: when releasing the stable `2.9.0`, the docsite would be changed to pointing from `v2.8` to pointing to `v2.9` by default.
 
-Also, update the [Changelog](doc:changelog)'s "highlights" column with a link to the blog summarizing the release. See the section "Announce the release" below for more info on the blog.
-
 > 🚧 Don't have edit access?
-> 
+>
 > Ping someone in the `#maintainers-confidential` channel in Slack to be added. Alternatively, you can "Suggest edits" in the top right corner.
 
 Step 3: Tag the release to trigger publishing
@@ -154,7 +131,7 @@ Once you have merged the `VERSION` bump — which will be on `main` for `dev` an
 First, ensure that you are on your release branch at your version bump commit.
 
 > 📘 Tip: if new commits have landed after your release commit
-> 
+>
 > You can reset to your release commit by running `git reset --hard <sha>`.
 
 Then, run:
@@ -174,7 +151,7 @@ Run this script as a basic smoke test:
 ./pants run src/python/pants_release/release.py -- test-release
 ```
 
-You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm the changelog is correct on the "Project description" page and that the `macOS` and `manylinux` wheels show up in the "Download files" page. 
+You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm that the `macOS` and `manylinux` wheels show up in the "Download files" page.
 
 Step 5: Run release testing on public repositories
 --------------------------------------------------

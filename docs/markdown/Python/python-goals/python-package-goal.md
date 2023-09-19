@@ -30,7 +30,7 @@ You can run `pants package ::` to build all artifacts in your project. Pants wil
 Creating a PEX file from a `pex_binary` target
 ----------------------------------------------
 
-Running `package` on a `pex_binary` target will create an executable [PEX file](doc:pex-files).
+Running `package` on a `pex_binary` target will create an executable [PEX file](doc:pex).
 
 The PEX file will contain all the code needed to run the binary, namely:
 

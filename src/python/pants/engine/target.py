@@ -2433,44 +2433,6 @@ class SourcesPathsRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
-class SecondaryOwnerMixin(ABC):
-    """Add to a Field for the target to work with file arguments and `--changed-since`, without it
-    needing a `SourcesField`.
-
-    Why use this? In a dependency inference world, multiple targets including the same file in the
-    `sources` field causes issues due to ambiguity over which target to use. So, only one target
-    should have "primary ownership" of the file. However, you may still want other targets to be
-    used when that file is included in file arguments. For example, a `python_source` target
-    being the primary owner of the `.py` file, but a `pex_binary` still working with file
-    arguments for that file. Secondary ownership means that the target won't be used for things like
-    dependency inference and hydrating sources, but file arguments will still work.
-
-    There should be a primary owner of the file(s), e.g. the `python_source` in the above example.
-    Typically, you will want to add a dependency inference rule to infer a dep on that primary
-    owner.
-
-    All associated files must live in the BUILD target's directory or a subdirectory to work
-    properly, like the `sources` field.
-    """
-
-    @property
-    @abstractmethod
-    def filespec(self) -> Filespec:
-        """A dictionary in the form {'globs': ['full/path/to/f.ext']} representing the field's
-        associated files.
-
-        Typically, users should use a file name/glob relative to the BUILD file, like the `sources`
-        field. Then, you can use `os.path.join(self.address.spec_path, self.value)` to relative to
-        the build root.
-        """
-
-    @memoized_property
-    def filespec_matcher(self) -> FilespecMatcher:
-        # Note: memoized because parsing the globs is expensive:
-        # https://github.com/pantsbuild/pants/issues/16122
-        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
-
-
 def targets_with_sources_types(
     sources_types: Iterable[type[SourcesField]],
     targets: Iterable[Target],

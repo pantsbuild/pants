@@ -14,7 +14,6 @@ from itertools import chain
 from typing import Any, Iterable
 
 from pants.backend.helm.subsystems import post_renderer
-from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
@@ -24,11 +23,9 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.backend.helm.value_interpolation import HelmEnvironmentInterpolationValue
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -47,7 +44,6 @@ from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope,
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
-from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 logger = logging.getLogger(__name__)
 
@@ -197,15 +193,6 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return not self.post_processed
 
 
-async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> InterpolationContext:
-    interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
-
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(helm_subsystem.extra_env_vars))
-    interpolation_context["env"] = HelmEnvironmentInterpolationValue(env)
-
-    return InterpolationContext.from_dict(interpolation_context)
-
-
 async def _sort_value_file_names_for_evaluation(
     address: Address,
     *,
@@ -266,7 +253,7 @@ async def _sort_value_file_names_for_evaluation(
 
 @rule(desc="Prepare Helm deployment renderer")
 async def setup_render_helm_deployment_process(
-    request: HelmDeploymentRequest, helm_subsystem: HelmSubsystem
+    request: HelmDeploymentRequest,
 ) -> _HelmDeploymentProcessWrapper:
     value_files_prefix = "__values"
     chart, value_files = await MultiGet(
@@ -318,16 +305,10 @@ async def setup_render_helm_deployment_process(
 
     merged_digests = await Get(Digest, MergeDigests(input_digests))
 
-    # Calculate values that may depend on the interpolation context
-    interpolation_context = await _build_interpolation_context(helm_subsystem)
-    is_render_cmd = request.cmd == HelmDeploymentCmd.RENDER
-
+    inline_values = request.field_set.values.value
     release_name = (
         request.field_set.release_name.value
         or request.field_set.address.target_name.replace("_", "-")
-    )
-    inline_values = request.field_set.values.format_with(
-        interpolation_context, ignore_missing=is_render_cmd
     )
 
     def maybe_escape_string_value(value: str) -> str:
@@ -343,10 +324,6 @@ async def setup_render_helm_deployment_process(
         if request.post_renderer
         else ProcessCacheScope.SUCCESSFUL
     )
-
-    extra_args = list(request.extra_argv)
-    if "--create-namespace" not in extra_args and request.field_set.create_namespace.value:
-        extra_args.append("--create-namespace")
 
     process = HelmProcess(
         argv=[
@@ -381,7 +358,7 @@ async def setup_render_helm_deployment_process(
                 if inline_values
                 else ()
             ),
-            *extra_args,
+            *request.extra_argv,
         ],
         extra_env=env,
         extra_immutable_input_digests=immutable_input_digests,

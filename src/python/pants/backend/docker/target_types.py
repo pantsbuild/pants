@@ -297,6 +297,76 @@ class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStri
                 yield f"{label}:{value_formatter(value)}"
 
 
+class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
+    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2`
+    to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}=" + ",".join(
+                f"{key}={value_formatter(value)}" for key, value in self.value.items()
+            )
+
+
+class DockerImageBuildImageCacheToField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField
+):
+    alias = "cache_to"
+    help = help_text(
+        f"""
+        Export image build cache to an external cache destination.
+
+        Example:
+
+            docker_image(
+                name="example-local-cache-backend",
+                cache_to={{
+                    "type": "local",
+                    "dest": "/tmp/docker-cache/example"
+                }},
+                cache_from={{
+                    "type": "local",
+                    "src": "/tmp/docker-cache/example"
+                }}
+            )
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--cache-to"
+
+
+class DockerImageBuildImageCacheFromField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField
+):
+    alias = "cache_from"
+    help = help_text(
+        f"""
+        Use an external cache source when building the image.
+
+        Example:
+
+            docker_image(
+                name="example-local-cache-backend",
+                cache_to={{
+                    "type": "local",
+                    "dest": "/tmp/docker-cache/example"
+                }},
+                cache_from={{
+                    "type": "local",
+                    "src": "/tmp/docker-cache/example"
+                }}
+            )
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--cache-from"
+
+
 class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
@@ -475,6 +545,8 @@ class DockerImageTarget(Target):
         DockerImageBuildSquashOptionField,
         DockerImageBuildNetworkOptionField,
         DockerImageBuildPlatformOptionField,
+        DockerImageBuildImageCacheToField,
+        DockerImageBuildImageCacheFromField,
         OutputPathField,
         RestartableField,
     )

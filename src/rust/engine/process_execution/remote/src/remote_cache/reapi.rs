@@ -68,7 +68,7 @@ impl ActionCacheProvider for Provider {
     let client = self.action_cache_client.as_ref().clone();
     retry_call(
       client,
-      move |mut client| {
+      move |mut client, _| {
         let update_action_cache_request = remexec::UpdateActionResultRequest {
           instance_name: self.instance_name.clone().unwrap_or_else(|| "".to_owned()),
           action_digest: Some(action_digest.into()),
@@ -98,7 +98,7 @@ impl ActionCacheProvider for Provider {
     let client = self.action_cache_client.as_ref().clone();
     let response = retry_call(
       client,
-      move |mut client| {
+      move |mut client, _| {
         let request = remexec::GetActionResultRequest {
           action_digest: Some(action_digest.into()),
           instance_name: self.instance_name.clone().unwrap_or_default(),

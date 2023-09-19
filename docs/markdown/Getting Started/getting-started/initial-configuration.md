@@ -47,7 +47,7 @@ Most Pants functionality is provided via pluggable [_backends_](doc:enabling-bac
 [GLOBAL]
 ...
 backend_packages = [
-  "pants.backend.go",
+  "pants.backend.experimental.go",
   "pants.backend.python",
   "pants.backend.python.lint.black",
 ]

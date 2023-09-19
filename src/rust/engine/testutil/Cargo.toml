@@ -13,3 +13,4 @@ grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
 prost = { workspace = true }
 protos = { path = "../protos" }
+tokio = { workspace = true }

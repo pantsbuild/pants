@@ -190,10 +190,11 @@ def _single_partition_field_set_rules(cls) -> Iterable:
     one partition."""
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -213,10 +214,11 @@ def _single_partition_file_rules(cls) -> Iterable:
     sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -246,10 +248,11 @@ def _partition_per_input_field_set_rules(cls) -> Iterable:
     a single-element partition per input."""
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -275,10 +278,11 @@ def _partition_per_input_file_rules(cls) -> Iterable:
     sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem

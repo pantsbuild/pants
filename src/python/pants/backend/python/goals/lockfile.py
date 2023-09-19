@@ -119,7 +119,7 @@ async def generate_lockfile(
                 # want to let users change this, as `style=strict` is safer.
                 "--style=universal",
                 "--pip-version",
-                python_setup.pip_version.value,
+                python_setup.pip_version,
                 "--resolver-version",
                 "pip-2020-resolver",
                 # PEX files currently only run on Linux and Mac machines; so we hard code this

@@ -1,7 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -10,11 +9,12 @@ use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use testutil::data::TestData;
+use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
-use crate::remote::{ByteSource, ByteStore, ByteStoreProvider, LoadDestination, RemoteOptions};
-use crate::tests::new_cas;
+use crate::remote::{ByteStore, ByteStoreProvider, LoadDestination, RemoteOptions};
+use crate::tests::{mk_tempfile, new_cas};
 use crate::MEGABYTES;
 
 #[tokio::test]
@@ -105,7 +105,7 @@ async fn load_file_existing() {
   let _ = WorkunitStore::setup_for_tests();
   let store = new_byte_store(&testdata);
 
-  let file = mk_tempfile().await;
+  let file = mk_tempfile(None).await;
 
   let file = store
     .load_file(testdata.digest(), file)
@@ -121,7 +121,7 @@ async fn load_file_missing() {
   let _ = WorkunitStore::setup_for_tests();
   let (store, _) = empty_byte_store();
 
-  let file = mk_tempfile().await;
+  let file = mk_tempfile(None).await;
 
   let result = store.load_file(TestData::roland().digest(), file).await;
   assert!(result.unwrap().is_none());
@@ -132,7 +132,7 @@ async fn load_file_provider_error() {
   let _ = WorkunitStore::setup_for_tests();
   let store = byte_store_always_error_provider();
 
-  let file = mk_tempfile().await;
+  let file = mk_tempfile(None).await;
 
   assert_error(store.load_file(TestData::roland().digest(), file).await);
 }
@@ -157,19 +157,17 @@ async fn store_bytes_provider_error() {
 }
 
 #[tokio::test]
-async fn store_buffered() {
+async fn store_file() {
   let _ = WorkunitStore::setup_for_tests();
-
   let testdata = TestData::roland();
-  let bytes = testdata.bytes();
 
   let (store, provider) = empty_byte_store();
   assert_eq!(
     store
-      .store_buffered(testdata.digest(), move |mut file| async move {
-        file.write_all(&bytes).unwrap();
-        Ok(())
-      })
+      .store_file(
+        testdata.digest(),
+        mk_tempfile(Some(&testdata.bytes())).await
+      )
       .await,
     Ok(())
   );
@@ -179,21 +177,17 @@ async fn store_buffered() {
 }
 
 #[tokio::test]
-async fn store_buffered_provider_error() {
+async fn store_file_provider_error() {
   let _ = WorkunitStore::setup_for_tests();
-
   let testdata = TestData::roland();
-  let bytes = testdata.bytes();
-
   let store = byte_store_always_error_provider();
   assert_error(
     store
-      .store_buffered(testdata.digest(), move |mut file| async move {
-        file.write_all(&bytes).unwrap();
-        Ok(())
-      })
-      .await
-      .map_err(|e| e.to_string()),
+      .store_file(
+        testdata.digest(),
+        mk_tempfile(Some(&testdata.bytes())).await,
+      )
+      .await,
   );
 }
 
@@ -239,8 +233,7 @@ async fn list_missing_digests_provider_error() {
 
 #[tokio::test]
 async fn file_as_load_destination_reset() {
-  let mut file = mk_tempfile().await;
-  file.write_all(b"initial").await.unwrap();
+  let mut file = mk_tempfile(Some(b"initial")).await;
 
   file.reset().await.unwrap();
   assert_file_contents(file, "").await;
@@ -266,14 +259,6 @@ fn empty_byte_store() -> (ByteStore, Arc<TestProvider>) {
 }
 fn byte_store_always_error_provider() -> ByteStore {
   ByteStore::new(None, AlwaysErrorProvider::new())
-}
-
-async fn mk_tempfile() -> tokio::fs::File {
-  let file = tokio::task::spawn_blocking(tempfile::tempfile)
-    .await
-    .unwrap()
-    .unwrap();
-  tokio::fs::File::from_std(file)
 }
 
 async fn assert_file_contents(mut file: tokio::fs::File, expected: &str) {
@@ -317,11 +302,16 @@ impl TestProvider {
 
 #[async_trait::async_trait]
 impl ByteStoreProvider for TestProvider {
-  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
-    self
-      .blobs
-      .lock()
-      .insert(digest.hash, bytes(0..digest.size_bytes));
+  async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String> {
+    self.blobs.lock().insert(digest.hash, bytes);
+    Ok(())
+  }
+
+  async fn store_file(&self, digest: Digest, mut file: File) -> Result<(), String> {
+    // just pull it all into memory
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).await.unwrap();
+    self.blobs.lock().insert(digest.hash, Bytes::from(bytes));
     Ok(())
   }
 
@@ -347,10 +337,6 @@ impl ByteStoreProvider for TestProvider {
     let blobs = self.blobs.lock();
     Ok(digests.filter(|d| !blobs.contains_key(&d.hash)).collect())
   }
-
-  fn chunk_size_bytes(&self) -> usize {
-    1234
-  }
 }
 
 struct AlwaysErrorProvider;
@@ -361,7 +347,11 @@ impl AlwaysErrorProvider {
 }
 #[async_trait::async_trait]
 impl ByteStoreProvider for AlwaysErrorProvider {
-  async fn store_bytes(&self, _: Digest, _: ByteSource) -> Result<(), String> {
+  async fn store_bytes(&self, _: Digest, _: Bytes) -> Result<(), String> {
+    Err("AlwaysErrorProvider always fails".to_owned())
+  }
+
+  async fn store_file(&self, _: Digest, _: File) -> Result<(), String> {
     Err("AlwaysErrorProvider always fails".to_owned())
   }
 
@@ -374,9 +364,5 @@ impl ByteStoreProvider for AlwaysErrorProvider {
     _: &mut (dyn Iterator<Item = Digest> + Send),
   ) -> Result<HashSet<Digest>, String> {
     Err("AlwaysErrorProvider always fails".to_owned())
-  }
-
-  fn chunk_size_bytes(&self) -> usize {
-    unreachable!("shouldn't call this")
   }
 }

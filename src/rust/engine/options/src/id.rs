@@ -121,4 +121,8 @@ impl OptionId {
       .collect::<Vec<_>>()
       .join(sep)
   }
+
+  pub fn name_underscored(&self) -> String {
+    self.name("_", NameTransform::None)
+  }
 }

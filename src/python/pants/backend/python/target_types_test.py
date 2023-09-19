@@ -66,20 +66,6 @@ def test_pex_binary_validation() -> None:
     assert create_tgt(entry_point="foo")[PexEntryPointField].value == EntryPoint("foo")
 
 
-@pytest.mark.parametrize(
-    ["entry_point", "expected"],
-    (
-        ("path.to.module", []),
-        ("path.to.module:func", []),
-        ("lambda.py", ["project/dir/lambda.py"]),
-        ("lambda.py:func", ["project/dir/lambda.py"]),
-    ),
-)
-def test_entry_point_filespec(entry_point: str | None, expected: list[str]) -> None:
-    field = PexEntryPointField(entry_point, Address("project/dir"))
-    assert field.filespec == {"includes": expected}
-
-
 def test_entry_point_validation(caplog) -> None:
     addr = Address("src/python/project")
 

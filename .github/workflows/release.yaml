@@ -63,12 +63,16 @@ jobs:
         path: .pants.d/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
-      run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
-        import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
-        )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
-        \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
         \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
         )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
@@ -136,12 +140,16 @@ jobs:
         path: .pants.d/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
-      run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
-        import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
-        )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
-        \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
         \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
         )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
@@ -180,8 +188,9 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.71.1-*
+        key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
+          }}-v2
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -220,12 +229,16 @@ jobs:
         path: .pants.d/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
-      run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
-        import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
-        )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
-        \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
         \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
         )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
@@ -257,8 +270,9 @@ jobs:
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
-        key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.71.1-*
+        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
+          }}-v2
+        path: '~/.rustup/toolchains/1.72.0-*
 
           ~/.rustup/update-hashes
 
@@ -297,12 +311,16 @@ jobs:
         path: .pants.d/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
-      run: "LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
-        import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')\"\
-        )\nmv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex\n\
-        \ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
-        \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
-        \ }}?name=pants.$LOCAL_TAG.pex \\\n    --data-binary \"@dist/src.python.pants/pants.$LOCAL_TAG.pex\"\
+      run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
+        import pants.version;print(pants.version.VERSION)\")\nPY_VER=$(PEX_INTERPRETER=1\
+        \ dist/src.python.pants/pants-pex.pex -c \"import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')\"\
+        )\nPLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"import\
+        \ os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')\"\
+        )\nPEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex\n\nmv dist/src.python.pants/pants-pex.pex\
+        \ dist/src.python.pants/$PEX_FILENAME\n\ncurl -L --fail \\\n    -X POST \\\
+        \n    -H \"Authorization: Bearer ${{ github.token }}\" \\\n    -H \"Content-Type:\
+        \ application/octet-stream\" \\\n    ${{ needs.release_info.outputs.release-asset-upload-url\
+        \ }}?name=$PEX_FILENAME \\\n    --data-binary \"@dist/src.python.pants/$PEX_FILENAME\"\
         \n\nWHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name \"pantsbuild.pants-*.whl\"\
         )\ncurl -L --fail \\\n    -X POST \\\n    -H \"Authorization: Bearer ${{ github.token\
         \ }}\" \\\n    -H \"Content-Type: application/octet-stream\" \\\n    \"${{\
@@ -333,15 +351,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download wheels
-      run: gh release download ${{ needs.release_info.outputs.build-ref }} -p '*.whl'
-        --dir dest/pypi_release
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        packages-dir: dest/pypi_release
-        password: ${{ secrets.PANTSBUILD_PYPI_API_TOKEN }}
-        skip-existing: true
     - name: Generate announcement
       run: './pants run src/python/pants_release/generate_release_announcement.py                         --
         --output-dir=${{ runner.temp }}
@@ -365,10 +374,8 @@ jobs:
         subject: file://${{ runner.temp }}/email_announcement_subject.txt
         to: pants-devel@googlegroups.com
     - name: Get release notes
-      run: 'REF="${{ needs.release_info.outputs.build-ref }}"
-
-        ./pants run src/python/pants_release/get_release_notes.py -- ${REF#"release_"}
-        > notes.txt
+      run: './pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref
+        }}" > notes.txt
 
         '
     - env:

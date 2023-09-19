@@ -1,14 +1,15 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::cmp::min;
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fmt;
+use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Instant;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::{FutureExt, StreamExt};
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{
@@ -22,14 +23,15 @@ use remexec::{
   content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
   ServerCapabilities,
 };
-use tokio::io::AsyncWriteExt;
+use tokio::fs::File;
+use tokio::io::{AsyncRead, AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
 
 use crate::RemoteOptions;
 
-use super::{ByteSource, ByteStoreProvider, LoadDestination};
+use super::{ByteStoreProvider, LoadDestination};
 
 pub struct Provider {
   instance_name: Option<String>,
@@ -50,6 +52,15 @@ enum ByteStoreError {
 
   /// Other errors
   Other(String),
+}
+
+impl ByteStoreError {
+  fn is_retryable(&self) -> bool {
+    match self {
+      ByteStoreError::Grpc(status) => status_is_retryable(status),
+      ByteStoreError::Other(_) => false,
+    }
+  }
 }
 
 impl fmt::Display for ByteStoreError {
@@ -103,16 +114,12 @@ impl Provider {
     })
   }
 
-  async fn store_bytes_source_batch(
-    &self,
-    digest: Digest,
-    bytes: ByteSource,
-  ) -> Result<(), ByteStoreError> {
+  async fn store_bytes_batch(&self, digest: Digest, bytes: Bytes) -> Result<(), ByteStoreError> {
     let request = BatchUpdateBlobsRequest {
       instance_name: self.instance_name.clone().unwrap_or_default(),
       requests: vec![remexec::batch_update_blobs_request::Request {
         digest: Some(digest.into()),
-        data: bytes(0..digest.size_bytes),
+        data: bytes,
         compressor: remexec::compressor::Value::Identity as i32,
       }],
     };
@@ -125,10 +132,10 @@ impl Provider {
     Ok(())
   }
 
-  async fn store_bytes_source_stream(
+  async fn store_source_stream(
     &self,
     digest: Digest,
-    bytes: ByteSource,
+    source: Arc<Mutex<dyn AsyncRead + Send + Sync + Unpin + 'static>>,
   ) -> Result<(), ByteStoreError> {
     let len = digest.size_bytes;
     let instance_name = self.instance_name.clone().unwrap_or_default();
@@ -143,40 +150,80 @@ impl Provider {
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
-    let chunk_size_bytes = self.chunk_size_bytes;
+    // we have to communicate the (first) error reading the underlying reader out of band
+    let error_occurred = Arc::new(parking_lot::Mutex::new(None));
+    let error_occurred_stream = error_occurred.clone();
 
-    let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
-      if offset >= len && has_sent_any {
-        futures::future::ready(None)
-      } else {
-        let next_offset = min(offset + chunk_size_bytes, len);
-        let req = protos::gen::google::bytestream::WriteRequest {
+    let chunk_size_bytes = self.chunk_size_bytes;
+    let stream = async_stream::stream! {
+      if len == 0 {
+        // if the reader is empty, the ReaderStream gives no elements, but we have to write at least
+        // one.
+        yield protos::gen::google::bytestream::WriteRequest {
           resource_name: resource_name.clone(),
-          write_offset: offset as i64,
-          finish_write: next_offset == len,
-          // TODO(tonic): Explore using the unreleased `Bytes` support in Prost from:
-          // https://github.com/danburkert/prost/pull/341
-          data: bytes(offset..next_offset),
+          write_offset: 0,
+          finish_write: true,
+          data: Bytes::new(),
         };
-        futures::future::ready(Some((req, (next_offset, true))))
+        return;
       }
-    });
+
+      // Read the source in appropriately sized chunks.
+      // NB. it is possible that this doesn't fill each chunk fully (i.e. may not send
+      // `chunk_size_bytes` in each request). For the usual sources, this should be unlikely.
+      let mut source = source.lock().await;
+      let reader_stream = tokio_util::io::ReaderStream::with_capacity(&mut *source, chunk_size_bytes);
+      let mut num_seen_bytes = 0;
+
+      for await read_result in reader_stream {
+        match read_result {
+          Ok(data) => {
+            let write_offset = num_seen_bytes as i64;
+            num_seen_bytes += data.len();
+            yield protos::gen::google::bytestream::WriteRequest {
+              resource_name: resource_name.clone(),
+              write_offset,
+              finish_write: num_seen_bytes == len,
+              data,
+            }
+          },
+          Err(err) => {
+            // reading locally hit an error, so store it for re-processing below
+            *error_occurred_stream.lock() = Some(err);
+            // cut off here, no point continuing
+            break;
+          }
+        }
+      }
+    };
 
     // NB: We must box the future to avoid a stack overflow.
     // Explicit type annotation is a workaround for https://github.com/rust-lang/rust/issues/64552
     let future: std::pin::Pin<
       Box<dyn futures::Future<Output = Result<(), ByteStoreError>> + Send>,
-    > = Box::pin(client.write(Request::new(stream)).map(|r| match r {
-      Err(err) => Err(ByteStoreError::Grpc(err)),
-      Ok(response) => {
-        let response = response.into_inner();
-        if response.committed_size == len as i64 {
-          Ok(())
-        } else {
-          Err(ByteStoreError::Other(format!(
-            "Uploading file with digest {:?}: want committed size {} but got {}",
-            digest, len, response.committed_size
-          )))
+    > = Box::pin(client.write(Request::new(stream)).map(move |r| {
+      if let Some(ref read_err) = *error_occurred.lock() {
+        // check if reading `source` locally hit an error: if so, propagate that error (there will
+        // likely be a remote error too, because our write will be too short, but the local error is
+        // the interesting root cause)
+        return Err(ByteStoreError::Other(format!(
+          "Uploading file with digest {:?}: failed to read local source: {}",
+          digest, read_err
+        )));
+      }
+
+      match r {
+        Err(err) => Err(ByteStoreError::Grpc(err)),
+        Ok(response) => {
+          let response = response.into_inner();
+          if response.committed_size == len as i64 {
+            Ok(())
+          } else {
+            Err(ByteStoreError::Other(format!(
+              "Uploading file with digest {:?}: want committed size {} but got {}",
+              digest, len, response.committed_size
+            )))
+          }
         }
       }
     }));
@@ -207,7 +254,7 @@ impl Provider {
 
 #[async_trait]
 impl ByteStoreProvider for Provider {
-  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
+  async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String> {
     let len = digest.size_bytes;
 
     let max_batch_total_size_bytes = {
@@ -224,12 +271,46 @@ impl ByteStoreProvider for Provider {
     let batch_api_allowed_by_server_config =
       max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
 
-    let result = if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
-      self.store_bytes_source_batch(digest, bytes).await
-    } else {
-      self.store_bytes_source_stream(digest, bytes).await
-    };
-    result.map_err(|e| e.to_string())
+    retry_call(
+      bytes,
+      move |bytes, _| async move {
+        if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+          self.store_bytes_batch(digest, bytes).await
+        } else {
+          self
+            .store_source_stream(digest, Arc::new(Mutex::new(Cursor::new(bytes))))
+            .await
+        }
+      },
+      ByteStoreError::is_retryable,
+    )
+    .await
+    .map_err(|e| e.to_string())
+  }
+
+  async fn store_file(&self, digest: Digest, file: File) -> Result<(), String> {
+    let source = Arc::new(Mutex::new(file));
+    retry_call(
+      source,
+      move |source, retry_attempt| async move {
+        if retry_attempt > 0 {
+          // if we're retrying, we need to go back to the start of the source to start the whole
+          // read fresh
+          source.lock().await.rewind().await.map_err(|err| {
+            ByteStoreError::Other(format!(
+              "Uploading file with digest {digest:?}: failed to rewind before retry {retry_attempt}: {err}"
+            ))
+          })?;
+        }
+
+        // A file might be small enough to write via the batch API, but we ignore that possibility
+        // for now, because these are expected to stored in the FSDB, and thus large
+        self.store_source_stream(digest, source).await
+      },
+      ByteStoreError::is_retryable,
+    )
+    .await
+    .map_err(|e| e.to_string())
   }
 
   async fn load(
@@ -258,7 +339,7 @@ impl ByteStoreProvider for Provider {
 
     retry_call(
       (client, request, destination),
-      move |(mut client, request, destination)| {
+      move |(mut client, request, destination), retry_attempt| {
         async move {
           let mut start_opt = Some(Instant::now());
           let response = client.read(request).await?;
@@ -280,7 +361,11 @@ impl ByteStoreProvider for Provider {
 
           let mut writer = destination.lock().await;
           let mut hasher = Hasher::new();
-          writer.reset().await?;
+          if retry_attempt > 0 {
+            // if we're retrying, we need to clear out the destination to start the whole write
+            // fresh
+            writer.reset().await?;
+          }
           while let Some(response) = stream.next().await {
             let response = response?;
             writer.write_all(&response.data).await?;
@@ -322,7 +407,7 @@ impl ByteStoreProvider for Provider {
     let client = self.cas_client.as_ref().clone();
     let response = retry_call(
       client,
-      move |mut client| {
+      move |mut client, _| {
         let request = request.clone();
         async move { client.find_missing_blobs(request).await }
       },
@@ -337,9 +422,5 @@ impl ByteStoreProvider for Provider {
       .iter()
       .map(|digest| digest.try_into())
       .collect::<Result<HashSet<_>, _>>()
-  }
-
-  fn chunk_size_bytes(&self) -> usize {
-    self.chunk_size_bytes
   }
 }

@@ -10,7 +10,7 @@ use deepsize::DeepSizeOf;
 use indexmap::IndexSet;
 use internment::Intern;
 use log::Level;
-use rule_graph::{DependencyKey, DisplayForGraph, DisplayForGraphArgs, Query};
+use rule_graph::{DependencyKey, DisplayForGraph, DisplayForGraphArgs, Query, RuleId};
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
@@ -68,6 +68,13 @@ impl DisplayForGraph for Rule {
 
 impl rule_graph::Rule for Rule {
   type TypeId = TypeId;
+
+  fn id(&self) -> &RuleId {
+    match self {
+      Rule::Task(task) => &task.id,
+      Rule::Intrinsic(intrinsic) => &intrinsic.id,
+    }
+  }
 
   fn product(&self) -> TypeId {
     match self {
@@ -140,6 +147,7 @@ impl fmt::Display for Rule {
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Task {
+  pub id: RuleId,
   pub product: TypeId,
   pub side_effecting: bool,
   pub engine_aware_return_type: bool,
@@ -160,13 +168,18 @@ pub struct DisplayInfo {
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Intrinsic {
+  pub id: RuleId,
   pub product: TypeId,
   pub inputs: Vec<DependencyKey<TypeId>>,
 }
 
 impl Intrinsic {
-  pub fn new(product: TypeId, input: TypeId) -> Self {
+  pub fn new(name: &str, product: TypeId, input: TypeId) -> Self {
+    // TODO: Python rule code that calls an intrinsic by name will need to be
+    //  able to import that name, so we'll need to create stubs representing the
+    //  intrinsics, in pants.engine.intrinsics.py.
     Self {
+      id: RuleId::from_string(format!("pants.engine.intrinsics:{}", name)),
       product,
       inputs: vec![DependencyKey::new(input)],
     }
@@ -192,7 +205,7 @@ pub struct Tasks {
 ///   2. add_*() - zero or more times per task to add input clauses
 ///   3. task_end() - once per task
 ///
-/// (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
+/// (This protocol was originally defined in a Builder, but that complicated the C lifecycle.)
 ///
 impl Tasks {
   pub fn new() -> Tasks {
@@ -242,6 +255,7 @@ impl Tasks {
     let args = arg_types.into_iter().map(DependencyKey::new).collect();
 
     self.preparing = Some(Task {
+      id: RuleId::new(&name),
       cacheable,
       product: return_type,
       side_effecting,

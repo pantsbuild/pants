@@ -313,6 +313,23 @@ def get_branch_value_from_config(fc: FileContent) -> bool:
     return cp.getboolean(run_section, "branch", fallback=False)
 
 
+def get_namespace_value_from_config(fc: FileContent) -> bool:
+    if PurePath(fc.path).suffix == ".toml":
+        all_config = _parse_toml_config(fc)
+        return bool(
+            all_config.get("tool", {})
+            .get("coverage", {})
+            .get("report", {})
+            .get("include_namespace_packages", False)
+        )
+
+    cp = _parse_ini_config(fc)
+    report_section = "coverage:report" if fc.path in ("tox.ini", "setup.cfg") else "report"
+    if not cp.has_section(report_section):
+        return False
+    return cp.getboolean(report_section, "include_namespace_packages", fallback=False)
+
+
 @rule
 async def create_or_update_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
     config_files = await Get(ConfigFiles, ConfigFilesRequest, coverage.config_request)
@@ -381,6 +398,9 @@ async def merge_coverage_data(
         # See https://github.com/pantsbuild/pants/issues/14542 .
         config_contents = await Get(DigestContents, Digest, coverage_config.digest)
         branch = get_branch_value_from_config(config_contents[0]) if config_contents else False
+        namespace_packages = (
+            get_namespace_value_from_config(config_contents[0]) if config_contents else False
+        )
         global_coverage_base_dir = PurePath("__global_coverage__")
         global_coverage_config_path = global_coverage_base_dir / "pyproject.toml"
         global_coverage_config_content = toml.dumps(
@@ -391,7 +411,10 @@ async def merge_coverage_data(
                             "relative_files": True,
                             "source": [source_root.path for source_root in source_roots],
                             "branch": branch,
-                        }
+                        },
+                        "report": {
+                            "include_namespace_packages": namespace_packages,
+                        },
                     }
                 }
             }

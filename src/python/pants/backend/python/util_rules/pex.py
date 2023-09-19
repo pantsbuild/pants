@@ -1030,6 +1030,7 @@ async def create_venv_pex(
         additional_args=pex_request.additional_args
         + (
             "--venv",
+            "prepend",
             "--seed",
             "verbose",
             pex_environment.venv_site_packages_copies_option(
