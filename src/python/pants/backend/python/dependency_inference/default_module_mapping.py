@@ -10,14 +10,21 @@ from typing import Dict, Iterable, Match, Tuple
 
 
 def all_hyphen_to_dot(m: Match[str]) -> str:
-    """Convert all hyphens to dots e.g. azure-foo-bar -> azure.foo.bar."""
+    """Convert all hyphens to dots e.g. azure-foo-bar -> azure.foo.bar.
+
+    >>> all_hyphen_to_dot(re.match(r"^azure-.+", "azure-foo-bar"))
+    'azure.foo.bar'
+    """
     return m.string.replace("-", ".")
 
 
 def first_group_hyphen_to_underscore(m: Match[str]) -> str:
-    """Convert the first group(regex match group) of hyphens to underscores e.g. django-admin-
-    cursor-paginator -> admin_cursor_paginator Only returns the first group and must contain at
-    least one group."""
+    """Convert the first group(regex match group) of hyphens to underscores. Only returns the first group and must contain at
+    least one group.
+
+    >>> first_group_hyphen_to_underscore(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"))
+    'admin_cursor_paginator'
+    """
     if m.re.groups == 0 or not m.groups():
         raise ValueError(f"expected at least one group in the pattern{m.re.pattern} but got none.")
     return str(m.groups()[0]).replace("-", "_")
@@ -29,8 +36,12 @@ def two_groups_hyphens_two_replacements_with_suffix(
     second_group_replacement: str = "",
     custom_suffix: str = "",
 ) -> str:
-    """take two groups, the first will have '-' replaced with '.', the second will have '-' replaced
-    with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)"""
+    """take two groups, and by default, the first will have '-' replaced with '.', the second will have '-' replaced
+    with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
+
+    >>> two_groups_hyphens_two_replacements_with_suffix(re.match(r"^(google-cloud-)([^.]+)", "google-cloud-foo-bar"))
+    'google.cloud.foobar'
+    """
     if m.re.groups < 2 or not m.groups():
         raise ValueError(f"expected at least two groups in the pattern{m.re.pattern}.")
     prefix = m.string[m.start(1) : m.end(1)].replace("-", first_group_replacement)
@@ -49,6 +60,8 @@ google-cloud-foo will be used.
 DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, Iterable] = {
     re.compile(r"""^azure-.+"""): [all_hyphen_to_dot],
     re.compile(r"""^django-((.+(-.+)?))"""): [first_group_hyphen_to_underscore],
+    # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
+    # libraries. We only add libraries in GA, not beta.
     re.compile(r"""^(google-cloud-)([^.]+)"""): [
         partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix=custom_suffix)
         for custom_suffix in ("", "_v1", "_v2", "_v3")
@@ -70,7 +83,6 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "beautifulsoup4": ("bs4",),
     "bitvector": ("BitVector",),
     "cattrs": ("cattr",),
-    # explicit for django, as these don't follow the patterns
     "django-filter": ("django_filters",),
     "django-postgres-extra": ("psqlextra",),
     "django-cors-headers": ("corsheaders",),
@@ -82,8 +94,6 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "factory-boy": ("factory",),
     "fluent-logger": ("fluent",),
     "gitpython": ("git",),
-    # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
-    # libraries. We only add libraries in GA, not beta.
     "graphql-core": ("graphql",),
     "grpcio": ("grpc",),
     "ipython": ("IPython",),
@@ -97,9 +107,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "opensearch-py": ("opensearchpy",),
     # opentelemetry
     "opentelemetry-api": ("opentelemetry",),
-    # exception: kafka-python -> kafka instead of kafka_python
     "opentelemetry-instrumentation-kafka-python": ("opentelemetry.instrumentation.kafka",),
-    # exporters
     "opentelemetry-exporter-otlp": ("opentelemetry.exporter",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
     "opentelemetry-exporter-otlp-proto-http": ("opentelemetry.exporter.otlp.proto.http",),
@@ -159,3 +167,8 @@ DEFAULT_TYPE_STUB_MODULE_MAPPING = {
     "types-python-dateutil": ("dateutil",),
     "types-setuptools": ("easy_install", "pkg_resources", "setuptools"),
 }
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
