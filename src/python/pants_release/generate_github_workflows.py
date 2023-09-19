@@ -1186,6 +1186,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
+                *helper.bootstrap_caches(),
                 {
                     "name": "Generate announcement",
                     "run": dedent(
