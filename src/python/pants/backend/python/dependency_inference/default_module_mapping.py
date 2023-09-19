@@ -19,8 +19,8 @@ def all_hyphen_to_dot(m: Match[str]) -> str:
 
 
 def first_group_hyphen_to_underscore(m: Match[str]) -> str:
-    """Convert the first group(regex match group) of hyphens to underscores. Only returns the first group and must contain at
-    least one group.
+    """Convert the first group(regex match group) of hyphens to underscores. Only returns the first
+    group and must contain at least one group.
 
     >>> first_group_hyphen_to_underscore(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"))
     'admin_cursor_paginator'
@@ -36,8 +36,8 @@ def two_groups_hyphens_two_replacements_with_suffix(
     second_group_replacement: str = "",
     custom_suffix: str = "",
 ) -> str:
-    """take two groups, and by default, the first will have '-' replaced with '.', the second will have '-' replaced
-    with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
+    """take two groups, and by default, the first will have '-' replaced with '.', the second will
+    have '-' replaced with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
 
     >>> two_groups_hyphens_two_replacements_with_suffix(re.match(r"^(google-cloud-)([^.]+)", "google-cloud-foo-bar"))
     'google.cloud.foobar'
