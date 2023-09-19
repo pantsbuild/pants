@@ -17,8 +17,8 @@ import psutil
 
 from pants.base.build_environment import get_buildroot
 from pants.bin.pants_env_vars import DAEMON_ENTRYPOINT
+from pants.engine.internals.native_engine import pantsd_fingerprint_compute
 from pants.option.options import Options
-from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
 from pants.pantsd.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
@@ -513,7 +513,7 @@ class PantsDaemonProcessManager(ProcessManager, metaclass=ABCMeta):
         self._daemon_entrypoint = daemon_entrypoint
 
     @property
-    def options_fingerprint(self):
+    def options_fingerprint(self) -> str:
         """Returns the options fingerprint for the pantsd process.
 
         This should cover all options consumed by the pantsd process itself in order to start: also
@@ -524,9 +524,11 @@ class PantsDaemonProcessManager(ProcessManager, metaclass=ABCMeta):
         PantsDaemonCore fingerprints the entire set of bootstrap options to identify when the
         Scheduler needs need to be re-initialized.
         """
-        return OptionsFingerprinter.combined_options_fingerprint_for_scope(
-            GLOBAL_SCOPE, self._bootstrap_options, daemon_only=True
+        fingerprintable_options = self._bootstrap_options.get_fingerprintable_for_scope(
+            GLOBAL_SCOPE, daemon_only=True
         )
+        fingerprintable_option_names = {name for name, _, _ in fingerprintable_options}
+        return pantsd_fingerprint_compute(fingerprintable_option_names)
 
     def needs_restart(self, option_fingerprint):
         """Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
