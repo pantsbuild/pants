@@ -51,8 +51,8 @@ class OptionsFingerprinter:
         """
         fingerprinter = cls()
         hasher = sha1()
-        pairs = options.get_fingerprintable_for_scope(scope, daemon_only)
-        for option_type, option_value in pairs:
+        option_items = options.get_fingerprintable_for_scope(scope, daemon_only)
+        for _, option_type, option_value in option_items:
             fingerprint = fingerprinter.fingerprint(option_type, option_value)
             if fingerprint is None:
                 # This isn't necessarily a good value to be using here, but it preserves behavior from

@@ -23,6 +23,8 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
+    DockerImageBuildImageCacheFromField,
+    DockerImageBuildImageCacheToField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -334,6 +336,18 @@ def get_build_options(
             yield from target[field_type].options()
         elif issubclass(field_type, DockerBuildOptionFlagFieldMixin):
             yield from target[field_type].options()
+        elif issubclass(field_type, DockerImageBuildImageCacheToField) or issubclass(
+            field_type, DockerImageBuildImageCacheFromField
+        ):
+            source = InterpolationContext.TextSource(
+                address=target.address, target_alias=target.alias, field_alias=field_type.alias
+            )
+            format = partial(
+                context.interpolation_context.format,
+                source=source,
+                error_cls=DockerImageOptionValueError,
+            )
+            yield from target[field_type].options(format)
 
     # Target stage
     target_stage = None
