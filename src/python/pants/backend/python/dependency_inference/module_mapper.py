@@ -336,11 +336,11 @@ def generate_mappings(proj_name: str, fallback_value: str) -> Iterable[str]:
 
     Always append the fallback value.
     """
-    mappings = list(
-        DEFAULT_MODULE_MAPPING.get(proj_name, generate_mappings_from_pattern(proj_name))
-    )
-    mappings.append(fallback_value)
-    return mappings
+    if mappings := DEFAULT_MODULE_MAPPING.get(proj_name):
+        return mappings
+    if pattern_mappings := generate_mappings_from_pattern(proj_name):
+        return pattern_mappings
+    return (fallback_value,)
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)

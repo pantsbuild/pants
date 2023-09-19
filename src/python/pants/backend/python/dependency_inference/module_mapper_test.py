@@ -449,12 +449,6 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                                 ModuleProviderType.IMPL,
                             ),
                         ),
-                        "azure_keyvault_secrets": (
-                            ModuleProvider(
-                                Address("", target_name="azure-keyvault-secrets"),
-                                ModuleProviderType.IMPL,
-                            ),
-                        ),
                         "file_dist": (
                             ModuleProvider(
                                 Address("", target_name="file_dist"), ModuleProviderType.IMPL
@@ -508,20 +502,6 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                                 ModuleProviderType.IMPL,
                             ),
                         ),
-                        # this is the fallback
-                        "google_cloud_hardyhar": (
-                            ModuleProvider(
-                                Address("", target_name="google-cloud-hardyhar"),
-                                ModuleProviderType.IMPL,
-                            ),
-                        ),
-                        # this is the fallback
-                        "google_cloud_secret_manager": (
-                            ModuleProvider(
-                                Address("", target_name="google-cloud-secret-manager"),
-                                ModuleProviderType.IMPL,
-                            ),
-                        ),
                         "looks_like_stubs": (
                             ModuleProvider(
                                 Address("", target_name="looks_like_stubs"), ModuleProviderType.IMPL
@@ -544,12 +524,6 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                             ),
                         ),
                         "opentelemetry.instrumentation.botocore": (
-                            ModuleProvider(
-                                Address("", target_name="opentelemetry-instrumentation-botocore"),
-                                ModuleProviderType.IMPL,
-                            ),
-                        ),
-                        "opentelemetry_instrumentation_botocore": (
                             ModuleProvider(
                                 Address("", target_name="opentelemetry-instrumentation-botocore"),
                                 ModuleProviderType.IMPL,
