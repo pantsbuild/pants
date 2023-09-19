@@ -313,12 +313,23 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
     assert "0 errors" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
-    # On the second run, it should fail because the venv cannot be found in the cache directory.
-    with temporary_dir() as named_caches:
-        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={named_caches}"])
+    original_cache_dir = (
+        rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
+    )
+
+    # Should now fail with a different cache directory, since there is no venv
+    with temporary_dir() as cache_dir:
+        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert 'Import "more_itertools" could not be resolved' in result[0].stdout
+
+    # Should work once we go back to the original
+    result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={original_cache_dir}"])
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert "0 errors" in result[0].stdout
+    assert result[0].report == EMPTY_DIGEST
 
 
 @pytest.mark.parametrize(
