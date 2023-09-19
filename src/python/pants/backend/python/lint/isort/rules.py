@@ -108,7 +108,7 @@ async def isort_partition(
     return Partitions.single_partition(
         itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths),
         metadata=IsortPartitionMetadata(
-            FrozenDict((path, tuple(mods)) for path, mods in metadata.items())
+            FrozenDict((path, tuple(sorted(mods))) for path, mods in metadata.items())
         ),
     )
 
