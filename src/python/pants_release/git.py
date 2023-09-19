@@ -7,7 +7,7 @@ import shlex
 import subprocess
 
 import github
-from pants_release.common import die, green
+from pants_release.common import die
 
 from pants.util.strutil import softwrap
 
@@ -73,11 +73,8 @@ def github_repo() -> github.Repository.Repository:
 
     try:
         gh = github.Github(auth=github.Auth.Token(token))
-        user = gh.get_user()
         repo = gh.get_repo(MAIN_REPO_SLUG)
     except Exception as e:
         die(f"Failed to get Github info; is your token valid? {e}")
-    else:
-        green(f"Operating on Github as: @{user.login}")
 
     return repo
