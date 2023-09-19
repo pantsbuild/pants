@@ -59,7 +59,7 @@ Available experimental backends
 
 Pants offers [additional backends as previews](https://blog.pantsbuild.org/quick-feedback-on-new-features-via-experimental-backends/) that are still in development. These backends may still undergo major changes to improve the interface or fix bugs, with fewer (or no) deprecation warnings. If any of these backends are relevant to you, please try them, [ask any questions](doc:getting-help) you have, and [contribute improvements](doc:contributor-overview)! Volunteers like you jumping in to help is how these backends are promoted from preview to fully stable.
 
-This list is also available via `pants backends --help-advanced`, which includes any additional plugins in your repository that aren't built-in to Pants itself.
+The list of all backends (both stable and experimental) is also available via `pants backends --help-advanced`, which includes any additional plugins in your repository that aren't built-in to Pants itself.
 
 | Backend                                                            | What it does                                                                                               | Docs                                                        |
 |:-------------------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------|:------------------------------------------------------------|
