@@ -334,13 +334,13 @@ def generate_mappings_from_pattern(proj_name: str) -> Iterable[str]:
 def generate_mappings(proj_name: str, fallback_value: str) -> Iterable[str]:
     """Will try the default mapping first and if no mapping is found, try the pattern match.
 
-    Always append the fallback value.
+    If those fail, use the fallback_value
     """
-    if mappings := DEFAULT_MODULE_MAPPING.get(proj_name):
-        return mappings
-    if pattern_mappings := generate_mappings_from_pattern(proj_name):
-        return pattern_mappings
-    return (fallback_value,)
+    return (
+        DEFAULT_MODULE_MAPPING.get(proj_name)
+        or generate_mappings_from_pattern(proj_name)
+        or (fallback_value,)
+    )
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
