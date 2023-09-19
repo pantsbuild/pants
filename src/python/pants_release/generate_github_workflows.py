@@ -1232,6 +1232,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
                         """
                     ),
+                    "env": {
+                        "GH_TOKEN": "${{ github.token }}",
+                        "GH_REPO": "${{ github.repository }}",
+                    },
                 },
                 {
                     "name": "Publish GitHub Release",
