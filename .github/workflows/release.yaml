@@ -351,6 +351,41 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Install Protoc
+      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.72.0-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - id: get-engine-hash
+      name: Get native engine hash
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Cache native engine
+      uses: actions/cache@v3
+      with:
+        key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        path: 'src/python/pants/bin/native_client
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Generate announcement
       run: './pants run src/python/pants_release/generate_release_announcement.py                         --
         --output-dir=${{ runner.temp }}
