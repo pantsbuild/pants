@@ -57,7 +57,7 @@ function _run_bootstrapped_pants_command() {
 }
 
 function _calculate_current_hash() {
-  _run_bootstrapped_pants_command peek src/rust/engine:engine-and-client | jq -r .[0].sources_fingerprint
+  _run_bootstrapped_pants_command peek src/rust/engine:engine-and-client | grep -o '"sources_fingerprint": "[^"]*' | cut -d'"' -f4
 }
 
 function _build_native_code() {
