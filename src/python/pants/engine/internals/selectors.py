@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Coroutine,
     Generator,
     Generic,
@@ -24,6 +25,7 @@ from typing import (
 from pants.base.exceptions import NativeEngineFailure
 from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
+    PyGeneratorResponseCall,
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
 )
@@ -61,6 +63,8 @@ class GetParseError(ValueError):
 
 @dataclass(frozen=True)
 class AwaitableConstraints:
+    # If this is a call-by-name, then we will already know the callable `@rule` that will be used.
+    callee: Callable | None
     output_type: type
     input_types: tuple[type, ...]
     is_effect: bool
@@ -78,6 +82,14 @@ class AwaitableConstraints:
 
     def __str__(self) -> str:
         return repr(self)
+
+
+class Call(PyGeneratorResponseCall):
+    def __await__(
+        self,
+    ) -> Generator[Any, None, Any]:
+        result = yield self
+        return result
 
 
 # TODO: Conditional needed until Python 3.8 allows the subscripted type to be used directly.
@@ -637,7 +649,7 @@ def native_engine_generator_send(
     else:
         # It isn't necessary to differentiate between `Get` and `Effect` here, as the static
         # analysis of `@rule`s has already validated usage.
-        if isinstance(res, (Get, Effect)):
+        if isinstance(res, (Call, Get, Effect)):
             return res
         elif type(res) in (tuple, list):
             return PyGeneratorResponseGetMulti(res)

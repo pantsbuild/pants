@@ -84,10 +84,6 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_class::<PyThreadLocals>()?;
   m.add_class::<PyTypes>()?;
 
-  m.add_class::<externs::PyGeneratorResponseBreak>()?;
-  m.add_class::<externs::PyGeneratorResponseGet>()?;
-  m.add_class::<externs::PyGeneratorResponseGetMulti>()?;
-
   m.add_function(wrap_pyfunction!(stdio_initialize, m)?)?;
   m.add_function(wrap_pyfunction!(stdio_thread_console_set, m)?)?;
   m.add_function(wrap_pyfunction!(stdio_thread_console_color_mode_set, m)?)?;
