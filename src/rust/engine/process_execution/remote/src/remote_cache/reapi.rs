@@ -29,13 +29,25 @@ impl Provider {
       instance_name,
       action_cache_address,
       root_ca_certs,
+      mtls_certs,
+      mtls_key,
       headers,
       concurrency_limit,
       rpc_timeout,
     }: RemoteCacheProviderOptions,
   ) -> Result<Self, String> {
-    let tls_client_config = if action_cache_address.starts_with("https://") {
-      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
+    let needs_tls =
+      action_cache_address.starts_with("https://") || action_cache_address.starts_with("grpcs://");
+
+    let tls_client_config = if needs_tls {
+      let tls_config = if let Some((cert_chain, key)) = mtls_certs.zip(mtls_key) {
+        let mtls_config = grpc_util::tls::MtlsConfig::from_pem_buffers(&cert_chain, &key)?;
+        grpc_util::tls::Config::new(root_ca_certs.as_deref(), mtls_config)?
+      } else {
+        grpc_util::tls::Config::new_without_mtls(root_ca_certs.as_deref())?
+      };
+
+      Some(tls_config.try_into()?)
     } else {
       None
     };

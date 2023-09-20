@@ -5,7 +5,7 @@ hidden: false
 createdAt: "2020-11-13T23:44:25.806Z"
 ---
 > 🚧 Remote execution support is still experimental
-> 
+>
 > Remote execution support in Pants comes with several limitations. For example, Pants requires that the server's operating system match the client's operating system. In practice, this means that Pants must be running on Linux because all three major server projects generally only operate on Linux.
 
 What is remote execution?
@@ -91,6 +91,9 @@ remote_execution_address = "grpcs://build.example.com:443"
 remote_instance_name = "main"
 # This is optional, Pants will auto-discover certificates otherwise.
 remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
+# this allows you to setup mTLS with a client certificate and key.
+remote_mtls_certs_path = "/etc/ssl/certs/client-cert.pem"
+remote_mtls_key_path = "/etc/ssl/certs/client-key.pem"
 ```
 
 Reference

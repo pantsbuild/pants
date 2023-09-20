@@ -69,6 +69,8 @@ pub struct RemoteCacheProviderOptions {
   pub instance_name: Option<String>,
   pub action_cache_address: String,
   pub root_ca_certs: Option<Vec<u8>>,
+  pub mtls_certs: Option<Vec<u8>>,
+  pub mtls_key: Option<Vec<u8>>,
   pub headers: BTreeMap<String, String>,
   pub concurrency_limit: usize,
   pub rpc_timeout: Duration,
