@@ -41,11 +41,6 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
@@ -114,11 +109,6 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -180,36 +170,6 @@ jobs:
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v3
-      with:
-        key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
-          }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
-
-          ~/.rustup/update-hashes
-
-          ~/.rustup/settings.toml
-
-          '
-    - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust/engine
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -264,36 +224,6 @@ jobs:
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
-    - name: Set rustup profile
-      run: rustup set profile default
-    - name: Cache Rust toolchain
-      uses: actions/cache@v3
-      with:
-        key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain')
-          }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
-
-          ~/.rustup/update-hashes
-
-          ~/.rustup/settings.toml
-
-          '
-    - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust/engine
-    - name: Install Protoc
-      uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        version: 23.x
     - name: Install Go
       uses: actions/setup-go@v3
       with:

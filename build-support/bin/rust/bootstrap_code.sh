@@ -8,14 +8,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
 
-# Defines:
-# + NATIVE_ROOT: The Rust code directory, ie: src/rust/engine.
-# + MODE: Whether to run in debug or release mode.
-# + MODE_FLAG: The string to pass to Cargo to determine if we're in debug or release mode.
-# Exposes:
-# + calculate_current_hash: Generate a stable hash to determine if we need to rebuild the engine.
-# shellcheck source=build-support/bin/rust/calculate_engine_hash.sh
-source "${REPO_ROOT}/build-support/bin/rust/calculate_engine_hash.sh"
+readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
+
+# N.B. Set $MODE to "debug" for faster builds.
+readonly MODE="${MODE:-release}"
+
+
 
 KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
@@ -31,25 +29,46 @@ case "${KERNEL}" in
 esac
 
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
-export NATIVE_CLIENT_BINARY="${REPO_ROOT}/src/python/pants/bin/native_client"
+readonly NATIVE_ENGINE_TARGET="dist/codegen/src/rust/engine/target/${MODE}/libengine.${LIB_EXTENSION}"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
-readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
+export NATIVE_CLIENT_BINARY="${REPO_ROOT}/src/python/pants/bin/native_client"
+readonly NATIVE_CLIENT_TARGET="dist/codegen/src/rust/engine/target/${MODE}/pants"
+
+function _run_bootstrapped_pants_command() {
+  PANTS_VERSION=2.18.0rc0 pants \
+    --no-pantsd \
+    --no-verify-config \
+    --backend-packages='["pants.backend.shell"]' \
+    --pants-ignore='[ \
+          "/BUILD", \
+          "/3rdparty/jvm", \
+          "/3rdparty/python", \
+          "/testprojects", \
+          "/build-support", \
+          "/tests", \
+          "/pants-plugins", \
+          "/pants-plugins", \
+          "/.github", \
+      ]' \
+    --pythonpath="[]" \
+    --environments-preview-names="{}" \
+    "$@"
+}
+
+function _calculate_current_hash() {
+  _run_bootstrapped_pants_command peek src/rust/engine:engine-and-client | jq -r .[0].sources_fingerprint
+}
 
 function _build_native_code() {
   banner "Building native code..."
-  # NB: See Cargo.toml with regard to the `extension-module` features.
-  "${REPO_ROOT}/cargo" build \
-    --features=extension-module \
-    ${MODE_FLAG} \
-    -p engine \
-    -p client || die
+  _run_bootstrapped_pants_command export-codegen src/rust/engine:engine-and-client
 }
 
 function bootstrap_native_code() {
   # Bootstraps the native code only if needed.
   local engine_version_calculated
-  engine_version_calculated="$(calculate_current_hash)"
+  engine_version_calculated="$(_calculate_current_hash)"
   local engine_version_in_metadata
   if [[ -f "${NATIVE_ENGINE_RESOURCE_METADATA}" ]]; then
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
@@ -63,9 +82,8 @@ function bootstrap_native_code() {
   _build_native_code || die
 
   # If bootstrapping the native engine fails, don't attempt to run Pants afterwards.
-  local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
-  if [[ ! -f "${native_binary}" ]]; then
-    die "Failed to build native engine, file missing at ${native_binary}."
+  if [[ ! -f "${NATIVE_ENGINE_TARGET}" ]]; then
+    die "Failed to build native engine, file missing at ${NATIVE_ENGINE_TARGET}."
   fi
 
   # If bootstrapping the native client fails, don't attempt to run Pants afterwards.
@@ -73,14 +91,11 @@ function bootstrap_native_code() {
     die "Failed to build native client."
   fi
 
-  # Pick up Cargo.lock changes if any caused by the `cargo build`.
-  engine_version_calculated="$(calculate_current_hash)"
-
   # Create the native engine resource.
   # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
   #  process from being killed when recompiling.
   rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}"
-  cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
+  cp "${NATIVE_ENGINE_TARGET}" "${NATIVE_ENGINE_RESOURCE}"
   cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_BINARY}"
 
   # Create the accompanying metadata file.

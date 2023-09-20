@@ -317,20 +317,6 @@ def install_go() -> Step:
     }
 
 
-# NOTE: Any updates to the version of arduino/setup-protoc will require an audit of the updated  source code to verify
-# nothing "bad" has been added to the action. (We pass the user's GitHub secret to the action in order to avoid the
-# default GitHub rate limits when downloading protoc._
-def install_protoc() -> Step:
-    return {
-        "name": "Install Protoc",
-        "uses": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
-        "with": {
-            "version": "23.x",
-            "repo-token": "${{ secrets.GITHUB_TOKEN }}",
-        },
-    }
-
-
 def download_apache_thrift() -> Step:
     return {
         "name": "Download Apache `thrift` binary (Linux)",
@@ -413,87 +399,6 @@ class Helper:
             return f"arch -arm64 {cmd}"
         return cmd
 
-    def native_binaries_upload(self) -> Step:
-        return {
-            "name": "Upload native binaries",
-            "uses": "actions/upload-artifact@v3",
-            "with": {
-                "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
-                "path": "\n".join(NATIVE_FILES),
-            },
-        }
-
-    def native_binaries_download(self) -> Sequence[Step]:
-        return [
-            {
-                "name": "Download native binaries",
-                "uses": "actions/download-artifact@v3",
-                "with": {
-                    "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
-                    "path": NATIVE_FILES_COMMON_PREFIX,
-                },
-            },
-            {
-                "name": "Make native-client runnable",
-                "run": f"chmod +x {NATIVE_FILES[0]}",
-            },
-        ]
-
-    def rust_caches(self) -> Sequence[Step]:
-        return [
-            install_protoc(),  # for `prost` crate
-            {
-                "name": "Set rustup profile",
-                "run": "rustup set profile default",
-            },
-            {
-                "name": "Cache Rust toolchain",
-                "uses": "actions/cache@v3",
-                "with": {
-                    "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/engine/rust-toolchain')}-v2",
-                },
-            },
-            {
-                "name": "Cache Cargo",
-                "uses": "benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1",
-                "with": {
-                    # If set, replaces the job id in the cache key, so that the cache is stable across jobs.
-                    # If we don't set this, each job may restore from a previous job's cache entry (via a
-                    # restore key) but will write its own entry, even if there were no rust changes.
-                    # This will cause us to hit the 10GB limit much sooner, and also spend time uploading
-                    # identical cache entries unnecessarily.
-                    "shared-key": "engine",
-                    "workspaces": "src/rust/engine",
-                    # A custom option from our fork of the action.
-                    "cache-bin": "false",
-                },
-            },
-        ]
-
-    def bootstrap_caches(self) -> Sequence[Step]:
-        return [
-            *self.rust_caches(),
-            # NB: This caching is only intended for the bootstrap jobs to avoid them needing to
-            # re-compile when possible. Compare to the upload-artifact and download-artifact actions,
-            # which are how the bootstrap jobs share the compiled binaries with the other jobs like
-            # `lint` and `test`.
-            {
-                "name": "Get native engine hash",
-                "id": "get-engine-hash",
-                "run": 'echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT',
-                "shell": "bash",
-            },
-            {
-                "name": "Cache native engine",
-                "uses": "actions/cache@v3",
-                "with": {
-                    "path": "\n".join(NATIVE_FILES),
-                    "key": f"{self.platform_name()}-engine-{gha_expr('steps.get-engine-hash.outputs.hash')}-v1",
-                },
-            },
-        ]
-
     def setup_primary_python(self) -> Sequence[Step]:
         ret = []
         # We pre-install Python on our self-hosted platforms.
@@ -519,7 +424,6 @@ class Helper:
         return [
             *checkout(),
             *self.setup_primary_python(),
-            *self.bootstrap_caches(),
             {
                 "name": "Bootstrap Pants",
                 # Check for a regression of https://github.com/pantsbuild/pants/issues/17470.
@@ -541,7 +445,6 @@ class Helper:
                 ),
             },
             self.upload_log_artifacts(name="bootstrap"),
-            self.native_binaries_upload(),
         ]
 
     def upload_log_artifacts(self, name: str) -> Step:
@@ -718,7 +621,6 @@ def test_jobs(
             ),
             *helper.setup_primary_python(),
             *helper.expose_all_pythons(),
-            *helper.native_binaries_download(),
             {
                 "name": human_readable_step_name,
                 "run": pants_args_str,
@@ -832,7 +734,6 @@ def build_wheels_job(
             # virtualenv. This is because we must build both these things with
             # multiple Python versions, whereas that caching assumes only one primary
             # Python version (marked via matrix.strategy).
-            *helper.rust_caches(),
         ]
 
     if_condition = (
@@ -856,7 +757,6 @@ def build_wheels_job(
             },
             "steps": [
                 *initial_steps,
-                install_protoc(),  # for prost crate
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 {
                     "name": "Build wheels",
@@ -972,7 +872,6 @@ def test_workflow_jobs() -> Jobs:
                     *checkout(),
                     *launch_bazel_remote(),
                     *linux_x86_64_helper.setup_primary_python(),
-                    *linux_x86_64_helper.native_binaries_download(),
                     {
                         "name": "Lint",
                         "run": "./pants lint check ::\n",
