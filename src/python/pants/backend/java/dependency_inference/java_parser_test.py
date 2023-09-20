@@ -86,22 +86,13 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
                     }
                 }
 
-                sealed interface SimpleInterface permits SimpleImplementation1 {
-                
-                }
+                sealed interface SimpleInterface permits SimpleImplementation1 {}
 
-                final class SimpleImplementation1 implements SimpleInterface {
-                
-                }
+                final class SimpleImplementation1 implements SimpleInterface {}
 
-                sealed class SimpleClass permits SimpleImplementation2 {
-                
-                }
+                sealed class SimpleClass permits SimpleImplementation2 {}
 
-                final class SimpleImplementation2 implements SimpleClass {
-                
-                }
-                
+                final class SimpleImplementation2 implements SimpleClass {}
 
                 class Foo {}
                 """
