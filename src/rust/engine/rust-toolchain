@@ -1,9 +1,7 @@
-[toolchain]
-channel = "1.72.0"
-components = [
-  "cargo",
-  "clippy",
-  "rust-std",
-  "rustc",
-  "rustfmt",
-]
+[toolchain];
+channel = "1.72.0";
+// NB: We don't list the components (namely `clippy` and `rustfmt`) and instead rely on either the
+//  the profile being "default" (by-and-large the default profile) or the nice error message from
+//  `cargo fmt` and `cargo clippy` if the required component isn't installed
+//  This is so the Pants-compiled engine (which uses the "minimal" profile) doesn't download/install
+//  these as they are unnecessary.

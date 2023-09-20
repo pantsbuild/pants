@@ -31,18 +31,19 @@ shell_command(
     name="cargo-shim",
     command="""
         chmod +x rustup-init
-        ./rustup-init --no-modify-path --no-update-default-toolchain --default-toolchain none -y
+        ./rustup-init --no-modify-path --no-update-default-toolchain --profile minimal --default-toolchain none -y
     """,
     extra_env_vars=["RUSTUP_HOME=dummy", "CARGO_HOME=shims"],
     tools=["chmod"],
     execution_dependencies=[":rustup-init"],
-    output_files=["shims/bin/cargo"],
+    output_directories=["shims/bin"],
 )
 
 shell_command(
     name="cargo",
     command="""
         mv ../../../src/rust/engine/rust-toolchain rust-toolchain
+        ./shims/bin/rustup set profile minimal
         ./shims/bin/cargo version
         mv toolchains/* cargo
     """,
@@ -53,4 +54,5 @@ shell_command(
         "src/rust/engine:rust-toolchain",
     ],
     output_directories=["cargo"],
+    timeout = 600,
 )
