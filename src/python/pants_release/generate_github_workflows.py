@@ -1173,6 +1173,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         # clone the repo, we're not so big as to need to optimize this.
                         "fetch-depth": "0",
                         "ref": f"{gha_expr('needs.release_info.outputs.build-ref')}",
+                        "fetch-tags": True,
                     },
                 },
                 *helper.setup_primary_python(),
@@ -1223,6 +1224,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
                         """
                     ),
+                    "env": {
+                        "GH_TOKEN": "${{ github.token }}",
+                        "GH_REPO": "${{ github.repository }}",
+                    },
                 },
                 {
                     "name": "Publish GitHub Release",
