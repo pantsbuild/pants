@@ -170,6 +170,16 @@ struct Opt {
   #[structopt(long)]
   cas_root_ca_cert_file: Option<PathBuf>,
 
+  /// Path to file containing client certificates for the CAS server.
+  /// If not set, TLS will not be used when connecting to the CAS server.
+  #[structopt(long)]
+  cas_mtls_certs_file: Option<PathBuf>,
+
+  /// Path to file containing client key for the CAS server.
+  /// If not set, TLS will not be used when connecting to the CAS server.
+  #[structopt(long)]
+  cas_mtls_key_file: Option<PathBuf>,
+
   /// Path to file containing oauth bearer token for communication with the CAS server.
   /// If not set, no authorization will be provided to remote servers.
   #[structopt(long)]
@@ -242,6 +252,16 @@ async fn main() {
         .as_ref()
         .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
+      let mtls_certs = args
+        .cas_mtls_certs_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading root mtls certs file"));
+
+      let mtls_key = args
+        .cas_mtls_key_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading root mtls key file"));
+
       let mut headers = BTreeMap::new();
       if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
         let token =
@@ -252,11 +272,20 @@ async fn main() {
         );
       }
 
+      let tls_config = if let Some((cert_chain, key)) = mtls_certs.zip(mtls_key) {
+        let mtls_config = grpc_util::tls::MtlsConfig::from_pem_buffers(&cert_chain, &key)
+          .expect("failed parsing PEM buffers for mtls config");
+        grpc_util::tls::Config::new(root_ca_certs.as_deref(), mtls_config)
+      } else {
+        grpc_util::tls::Config::new_without_mtls(root_ca_certs.as_deref())
+      }
+      .expect("failed parsing root CA certs");
+
       local_only_store
         .into_with_remote(RemoteOptions {
           cas_address: cas_server.to_owned(),
           instance_name: args.remote_instance_name.clone(),
-          tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs),
+          tls_config,
           headers,
           chunk_size_bytes: args.upload_chunk_bytes,
           rpc_timeout: Duration::from_secs(30),
@@ -292,6 +321,16 @@ async fn main() {
         .execution_root_ca_cert_file
         .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
+      let mtls_certs = args
+        .cas_mtls_certs_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading root mtls certs file"));
+
+      let mtls_key = args
+        .cas_mtls_key_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading root mtls key file"));
+
       if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
         let token =
           std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
@@ -307,6 +346,8 @@ async fn main() {
         process_metadata.cache_key_gen_version.clone(),
         None,
         root_ca_certs.clone(),
+        mtls_certs.clone(),
+        mtls_key.clone(),
         headers.clone(),
         store.clone(),
         executor.clone(),
@@ -339,6 +380,8 @@ async fn main() {
               instance_name: process_metadata.instance_name.clone(),
               action_cache_address: address,
               root_ca_certs,
+              mtls_certs,
+              mtls_key,
               headers,
               concurrency_limit: args.cache_rpc_concurrency,
               rpc_timeout: Duration::from_secs(2),

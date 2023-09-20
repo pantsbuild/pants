@@ -369,7 +369,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                 "Failed to read mtls-client-certificate-chain-path from {cert_chain_path:?}: {err:?}"
               )
             })?;
-            Some(MtlsConfig { key, cert_chain })
+            Some(MtlsConfig::from_pem_buffers(&cert_chain, &key)?)
           }
           (None, None) => None,
           _ => {
@@ -383,11 +383,13 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           CertificateCheck::Enabled
         };
 
-        let tls_config = grpc_util::tls::Config {
-          root_ca_certs,
-          mtls,
-          certificate_check,
-        };
+        let mut tls_config = if let Some(mtls) = mtls {
+          grpc_util::tls::Config::new(root_ca_certs.as_deref(), mtls)
+        } else {
+          grpc_util::tls::Config::new_without_mtls(root_ca_certs.as_deref())
+        }?;
+
+        tls_config.certificate_check = certificate_check;
 
         let mut headers = BTreeMap::new();
 

@@ -1318,6 +1318,8 @@ async fn sends_headers() {
     None,
     None,
     None,
+    None,
+    None,
     btreemap! {
       String::from("cat") => String::from("roland"),
       String::from("authorization") => String::from("Bearer catnip-will-get-you-anywhere"),
@@ -1471,6 +1473,8 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
+    None,
+    None,
     None,
     None,
     None,
@@ -1846,6 +1850,8 @@ async fn execute_missing_file_uploads_if_known() {
     None,
     None,
     None,
+    None,
+    None,
     BTreeMap::new(),
     store.clone(),
     task_executor::Executor::new(),
@@ -1894,6 +1900,8 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
+    None,
+    None,
     None,
     None,
     None,
@@ -2601,6 +2609,8 @@ async fn create_command_runner(
   let store = make_store(store_dir.path(), cas, runtime).await;
   let command_runner = CommandRunner::new(
     &execution_address,
+    None,
+    None,
     None,
     None,
     None,
