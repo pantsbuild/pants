@@ -442,8 +442,8 @@ class Helper:
         return [
             install_protoc(),  # for `prost` crate
             {
-                "name": "Ensure default rustup profile",
-                "run": "rustup set profile default",
+                "name": "joshs",
+                "run": "cat  ~/.rustup/settings.toml && rustup set profile default && cat  ~/.rustup/settings.toml"
             },
             {
                 "name": "Cache Rust toolchain",
