@@ -23,6 +23,14 @@ jobs:
     - Linux
     - ARM64
     steps:
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
     - name: Check out code
       uses: actions/checkout@v3
       with:
@@ -48,15 +56,6 @@ jobs:
       with:
         name: logs-bootstrap-Linux-ARM64
         path: .pants.d/*.log
-    - name: Upload native binaries
-      uses: actions/upload-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
-        path: 'src/python/pants/bin/native_client
-
-          src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
     - env:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
@@ -74,6 +73,14 @@ jobs:
     runs-on:
     - ubuntu-20.04
     steps:
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
     - name: Check out code
       uses: actions/checkout@v3
       with:
@@ -103,15 +110,6 @@ jobs:
       with:
         name: logs-bootstrap-Linux-x86_64
         path: .pants.d/*.log
-    - name: Upload native binaries
-      uses: actions/upload-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: 'src/python/pants/bin/native_client
-
-          src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
     - name: Validate CI config
       run: './pants run src/python/pants_release/generate_github_workflows.py -- --check
 
@@ -141,6 +139,14 @@ jobs:
     runs-on:
     - macos-11
     steps:
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
     - name: Check out code
       uses: actions/checkout@v3
       with:
@@ -170,15 +176,6 @@ jobs:
       with:
         name: logs-bootstrap-macOS11-x86_64
         path: .pants.d/*.log
-    - name: Upload native binaries
-      uses: actions/upload-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
-        path: 'src/python/pants/bin/native_client
-
-          src/python/pants/engine/internals/native_engine.so
-
-          src/python/pants/engine/internals/native_engine.so.metadata'
     - env:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
@@ -446,13 +443,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Lint
       run: './pants lint check ::
 
@@ -532,13 +522,6 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
@@ -623,13 +606,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 0/10
       run: './pants test --shard=0/10 ::
 
@@ -714,13 +690,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 1/10
       run: './pants test --shard=1/10 ::
 
@@ -805,13 +774,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 2/10
       run: './pants test --shard=2/10 ::
 
@@ -896,13 +858,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 3/10
       run: './pants test --shard=3/10 ::
 
@@ -987,13 +942,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 4/10
       run: './pants test --shard=4/10 ::
 
@@ -1078,13 +1026,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 5/10
       run: './pants test --shard=5/10 ::
 
@@ -1169,13 +1110,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 6/10
       run: './pants test --shard=6/10 ::
 
@@ -1260,13 +1194,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 7/10
       run: './pants test --shard=7/10 ::
 
@@ -1351,13 +1278,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 8/10
       run: './pants test --shard=8/10 ::
 
@@ -1442,13 +1362,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python test shard 9/10
       run: './pants test --shard=9/10 ::
 
@@ -1500,13 +1413,6 @@ jobs:
         python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
-        path: src/python/pants
-    - name: Make native-client runnable
-      run: chmod +x src/python/pants/bin/native_client
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
