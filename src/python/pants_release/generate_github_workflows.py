@@ -443,7 +443,7 @@ class Helper:
             install_protoc(),  # for `prost` crate
             {
                 "name": "Ensure default rustup profile",
-                "run": f"rustup set profile default",
+                "run": "rustup set profile default",
             },
             {
                 "name": "Cache Rust toolchain",

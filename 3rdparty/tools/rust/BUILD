@@ -54,5 +54,5 @@ shell_command(
         "src/rust/engine:rust-toolchain",
     ],
     output_directories=["cargo"],
-    timeout = 600,
+    timeout=600,
 )
