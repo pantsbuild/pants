@@ -4,7 +4,6 @@ use super::{EntryType, ShrinkBehavior};
 
 use core::future::Future;
 use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -21,6 +20,7 @@ use sharded_lmdb::ShardedLmdb;
 use std::os::unix::fs::PermissionsExt;
 use task_executor::Executor;
 use tempfile::Builder;
+use tokio::fs::hard_link;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use workunit_store::ObservationMetric;
 
@@ -144,12 +144,16 @@ impl UnderlyingByteStore for ShardedLmdb {
 }
 
 // We shard so there isn't a plethora of entries in one single dir.
+//
+// TODO: Add Arc'd inner struct to reduce clone costs.
 #[derive(Debug, Clone)]
 pub(crate) struct ShardedFSDB {
   root: PathBuf,
   executor: Executor,
   lease_time: Duration,
   dest_initializer: Arc<Mutex<HashMap<Fingerprint, Arc<OnceCell<()>>>>>,
+  // A cache of whether destination root directories are hardlinkable from the fsdb.
+  hardlinkable_destinations: Arc<Mutex<HashMap<PathBuf, Arc<OnceCell<bool>>>>>,
 }
 
 enum VerifiedCopyError {
@@ -167,6 +171,57 @@ impl ShardedFSDB {
   pub(crate) fn get_path(&self, fingerprint: Fingerprint) -> PathBuf {
     let hex = fingerprint.to_hex();
     self.root.join(hex.get(0..2).unwrap()).join(hex)
+  }
+
+  async fn is_hardlinkable_destination(&self, destination: &Path) -> Result<bool, String> {
+    let cell = {
+      let mut cells = self.hardlinkable_destinations.lock();
+      if let Some(cell) = cells.get(destination) {
+        cell.clone()
+      } else {
+        let cell = Arc::new(OnceCell::new());
+        cells.insert(destination.to_owned(), cell.clone());
+        cell
+      }
+    };
+
+    if let Some(res) = cell.get() {
+      return Ok(*res);
+    }
+
+    let fsdb = self.clone();
+    let dst_parent_dir = destination.to_owned();
+    cell
+      .get_or_try_init(async move {
+        let src_display = fsdb.root.display().to_string();
+        let dst_display = dst_parent_dir.display().to_string();
+        tokio::fs::create_dir_all(&dst_parent_dir)
+          .await
+          .map_err(|e| format!("Failed to create directory: {e}"))?;
+        let (src_file, dst_dir) = fsdb
+          .executor
+          .spawn_blocking(
+            move || {
+              let src_file = Builder::new()
+                .suffix(".hardlink_canary")
+                .tempfile_in(&fsdb.root)
+                .map_err(|e| format!("Failed to create hardlink canary file: {e}"))?;
+              let dst_dir = Builder::new()
+                .suffix(".hardlink_canary")
+                .tempdir_in(dst_parent_dir)
+                .map_err(|e| format!("Failed to create hardlink canary dir: {e}"))?;
+              Ok((src_file, dst_dir))
+            },
+            |e| Err(format!("hardlink canary temp files task failed: {e}")),
+          )
+          .await?;
+        let dst_file = dst_dir.path().join("hard_link");
+        let is_hardlinkable = hard_link(src_file, dst_file).await.is_ok();
+        log::debug!("{src_display} -> {dst_display} hardlinkable: {is_hardlinkable}");
+        Ok(is_hardlinkable)
+      })
+      .await
+      .copied()
   }
 
   async fn bytes_writer(
@@ -478,7 +533,6 @@ struct InnerStore {
   directory_lmdb: Result<Arc<ShardedLmdb>, String>,
   file_fsdb: ShardedFSDB,
   executor: task_executor::Executor,
-  filesystem_device: u64,
 }
 
 impl ByteStore {
@@ -501,16 +555,8 @@ impl ByteStore {
 
     std::fs::create_dir_all(root)
       .map_err(|e| format!("Failed to create {}: {e}", root.display()))?;
-
-    let filesystem_device = root
-      .metadata()
-      .map_err(|e| {
-        format!(
-          "Failed to get metadata for store root {}: {e}",
-          root.display()
-        )
-      })?
-      .dev();
+    std::fs::create_dir_all(&fsdb_files_root)
+      .map_err(|e| format!("Failed to create {}: {e}", fsdb_files_root.display()))?;
 
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
@@ -535,9 +581,9 @@ impl ByteStore {
           root: fsdb_files_root,
           lease_time: options.lease_time,
           dest_initializer: Arc::new(Mutex::default()),
+          hardlinkable_destinations: Arc::new(Mutex::default()),
         },
         executor,
-        filesystem_device,
       }),
     })
   }
@@ -546,8 +592,12 @@ impl ByteStore {
     &self.inner.executor
   }
 
-  pub fn filesystem_device(&self) -> u64 {
-    self.inner.filesystem_device
+  pub async fn is_hardlinkable_destination(&self, destination: &Path) -> Result<bool, String> {
+    self
+      .inner
+      .file_fsdb
+      .is_hardlinkable_destination(destination)
+      .await
   }
 
   pub async fn entry_type(&self, fingerprint: Fingerprint) -> Result<Option<EntryType>, String> {
