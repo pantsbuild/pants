@@ -32,24 +32,22 @@ shell_command(
     command="""
         chmod +x rustup-init
         ./rustup-init --no-modify-path --no-update-default-toolchain --default-toolchain none -y
-        mv shims/bin/cargo cargo
     """,
     extra_env_vars=["RUSTUP_HOME=dummy", "CARGO_HOME=shims"],
-    tools=["chmod", "mv"],
+    tools=["chmod"],
     execution_dependencies=[":rustup-init"],
-    output_files=["cargo"],
+    output_files=["shims/bin/cargo"],
 )
 
 shell_command(
     name="cargo",
     command="""
         mv ../../../src/rust/engine/rust-toolchain rust-toolchain
-        ./cargo version
-        rm cargo
+        ./shims/bin/cargo version
         mv toolchains/* cargo
     """,
     extra_env_vars=["RUSTUP_HOME=."],
-    tools=["mv", "rm"],
+    tools=["mv"],
     execution_dependencies=[
         ":cargo-shim",
         "src/rust/engine:rust-toolchain",
