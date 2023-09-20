@@ -185,8 +185,8 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - name: joshs
-      run: cat  ~/.rustup/settings.toml && rustup set profile default && cat  ~/.rustup/settings.toml
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
@@ -269,8 +269,8 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - name: joshs
-      run: cat  ~/.rustup/settings.toml && rustup set profile default && cat  ~/.rustup/settings.toml
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
