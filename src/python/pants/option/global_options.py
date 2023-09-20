@@ -1613,7 +1613,7 @@ class BootstrapOptions:
         advanced=True,
         help=softwrap(
             """
-            Path to a PEM file containing CA certificates used for verifying secure connections to
+            Path to a PEM file containing client certificates used for verifying secure connections to
             `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address` when using
             `mTLS`.
 
