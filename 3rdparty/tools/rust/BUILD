@@ -5,22 +5,22 @@ file(
     name="rustup-init",
     source=per_platform(
         linux_arm64=http_source(
-            url="https://static.rust-lang.org/rustup/dist/aarch64-unknown-linux-gnu/rustup-init",
+            url="https://static.rust-lang.org/rustup/archive/1.26.0/aarch64-unknown-linux-gnu/rustup-init",
             len=14131368,
             sha256="673e336c81c65e6b16dcdede33f4cc9ed0f08bde1dbe7a935f113605292dc800",
         ),
         linux_x86_64=http_source(
-            url="https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init",
+            url="https://static.rust-lang.org/rustup/archive/1.26.0/x86_64-unknown-linux-gnu/rustup-init",
             len=14293176,
             sha256="0b2f6c8f85a3d02fde2efc0ced4657869d73fccfce59defb4e8d29233116e6db",
         ),
         macos_arm64=http_source(
-            url="https://static.rust-lang.org/rustup/dist/aarch64-apple-darwin/rustup-init",
+            url="https://static.rust-lang.org/rustup/archive/1.26.0/aarch64-apple-darwin/rustup-init",
             len=8000713,
             sha256="ed299a8fe762dc28161a99a03cf62836977524ad557ad70e13882d2f375d3983",
         ),
         macos_x86_64=http_source(
-            url="https://static.rust-lang.org/rustup/dist/x86_64-apple-darwin/rustup-init",
+            url="https://static.rust-lang.org/rustup/archive/1.26.0/x86_64-apple-darwin/rustup-init",
             len=8670640,
             sha256="f6d1a9fac1a0d0802d87c254f02369a79973bc8c55aa0016d34af4fcdbd67822",
         ),
