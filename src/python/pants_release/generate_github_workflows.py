@@ -274,7 +274,7 @@ def install_rustup() -> Step:
         "name": "Install rustup",
         "run": dedent(
             """\
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none --profile default
             echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
             """
         ),

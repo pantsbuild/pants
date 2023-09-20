@@ -28,7 +28,7 @@ jobs:
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
       run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-        -v -y --default-toolchain none
+        -v -y --default-toolchain none --profile default
 
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
@@ -101,7 +101,7 @@ jobs:
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
       run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-        -v -y --default-toolchain none
+        -v -y --default-toolchain none --profile default
 
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
