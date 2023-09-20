@@ -70,7 +70,7 @@ impl TryFrom<Config> for ClientConfig {
             Some(certs) => {
               for cert in &certs {
                 root_cert_store
-                  .add(&cert)
+                  .add(cert)
                   .map_err(|e| format!("failed adding CA cert to store: {e:?}"))?;
               }
             }
