@@ -9,7 +9,7 @@ import logging
 import sys
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Iterator, List, get_type_hints
+from typing import Any, Callable, Iterator, List, Sequence, get_type_hints
 
 import typing_extensions
 
@@ -193,7 +193,30 @@ class _AwaitableCollector(ast.NodeVisitor):
             )
         return resolved
 
-    def _get_awaitable(self, call_node: ast.Call, is_effect: bool) -> AwaitableConstraints:
+    def _get_inputs(self, input_nodes: Sequence[Any]) -> tuple[Sequence[Any], List[Any]]:
+        if not input_nodes:
+            return input_nodes, []
+        if len(input_nodes) != 1:
+            return input_nodes, [self._lookup(input_nodes[0])]
+
+        input_constructor = input_nodes[0]
+        if isinstance(input_constructor, ast.Call):
+            cls_or_func = self._lookup(input_constructor.func)
+            try:
+                type_ = (
+                    _lookup_return_type(cls_or_func, check=True)
+                    if not isinstance(cls_or_func, type)
+                    else cls_or_func
+                )
+            except TypeError as e:
+                raise RuleTypeError(self._missing_type_error(input_constructor, str(e))) from e
+            return [input_constructor.func], [type_]
+        elif isinstance(input_constructor, ast.Dict):
+            return input_constructor.values, [self._lookup(v) for v in input_constructor.values]
+        else:
+            return input_nodes, [self._lookup(n) for n in input_nodes]
+
+    def _get_legacy_awaitable(self, call_node: ast.Call, is_effect: bool) -> AwaitableConstraints:
         get_args = call_node.args
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
 
@@ -209,33 +232,10 @@ class _AwaitableCollector(ast.NodeVisitor):
         output_node = get_args[0]
         output_type = self._lookup(output_node)
 
-        input_nodes = get_args[1:]
-        input_types: List[Any]
-        if not input_nodes:
-            input_types = []
-        elif len(input_nodes) == 1:
-            input_constructor = input_nodes[0]
-            if isinstance(input_constructor, ast.Call):
-                cls_or_func = self._lookup(input_constructor.func)
-                try:
-                    type_ = (
-                        _lookup_return_type(cls_or_func, check=True)
-                        if not isinstance(cls_or_func, type)
-                        else cls_or_func
-                    )
-                except TypeError as e:
-                    raise RuleTypeError(self._missing_type_error(input_constructor, str(e))) from e
-                input_nodes = [input_constructor.func]
-                input_types = [type_]
-            elif isinstance(input_constructor, ast.Dict):
-                input_nodes = input_constructor.values
-                input_types = [self._lookup(v) for v in input_constructor.values]
-            else:
-                input_types = [self._lookup(n) for n in input_nodes]
-        else:
-            input_types = [self._lookup(input_nodes[0])]
+        input_nodes, input_types = self._get_inputs(get_args[1:])
 
         return AwaitableConstraints(
+            None,
             self._check_constraint_arg_type(output_type, output_node),
             tuple(
                 self._check_constraint_arg_type(input_type, input_node)
@@ -244,14 +244,70 @@ class _AwaitableCollector(ast.NodeVisitor):
             is_effect,
         )
 
+    def _get_byname_awaitable(
+        self, rule_func: Callable, call_node: ast.Call
+    ) -> AwaitableConstraints:
+        parse_error = partial(
+            GetParseError, get_args=call_node.args, source_file_name=self.source_file
+        )
+
+        output_type = _lookup_return_type(rule_func, check=True)
+
+        if call_node.args:
+            raise parse_error(
+                self._format(
+                    call_node,
+                    (
+                        f"Expected no positional arguments (got {len(call_node.args)}), and "
+                        "a `**implicitly(..)` application."
+                    ),
+                )
+            )
+
+        input_types: tuple[type, ...]
+        if not call_node.keywords:
+            input_types = ()
+        elif (
+            len(call_node.keywords) == 1
+            and not call_node.keywords[0].arg
+            and isinstance(implicitly_call := call_node.keywords[0].value, ast.Call)
+            and self._lookup(implicitly_call.func).__name__ == "implicitly"
+        ):
+            input_nodes, input_type_nodes = self._get_inputs(implicitly_call.args)
+            input_types = tuple(
+                self._check_constraint_arg_type(input_type, input_node)
+                for input_type, input_node in zip(input_type_nodes, input_nodes)
+            )
+        else:
+            raise parse_error(
+                self._format(
+                    call_node,
+                    "Expected an `**implicitly(..)` application as the only input.",
+                )
+            )
+
+        return AwaitableConstraints(
+            rule_func,
+            output_type,
+            input_types,
+            # TODO: Extract this from the callee? Currently only intrinsics can be Effects, so need
+            # to figure out their new syntax first.
+            is_effect=False,
+        )
+
     def visit_Call(self, call_node: ast.Call) -> None:
         func = self._lookup(call_node.func)
         if func is not None:
             if isinstance(func, type) and issubclass(func, Awaitable):
+                # Is a `Get`/`Effect`.
                 self.awaitables.append(
-                    self._get_awaitable(call_node, is_effect=issubclass(func, Effect))
+                    self._get_legacy_awaitable(call_node, is_effect=issubclass(func, Effect))
                 )
+            elif inspect.isfunction(func) and getattr(func, "rule", None):
+                # Is a direct `@rule` call.
+                self.awaitables.append(self._get_byname_awaitable(func, call_node))
             elif inspect.iscoroutinefunction(func) or _returns_awaitable(func):
+                # Is a call to a "rule helper".
                 self.awaitables.extend(collect_awaitables(func))
 
         self.generic_visit(call_node)

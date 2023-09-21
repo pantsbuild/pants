@@ -1376,7 +1376,10 @@ class OptionsTest(unittest.TestCase):
 
         # NB: Passthrough args end up on our `--modifypassthrough` arg.
         pairs = options.get_fingerprintable_for_scope("compile")
-        assert [(str, "blah blah blah"), (str, ["-d", "-v"])] == pairs
+        assert [
+            ("modifycompile", str, "blah blah blah"),
+            ("modifypassthrough", str, ["-d", "-v"]),
+        ] == pairs
 
     def test_fingerprintable(self) -> None:
         options = self._parse(
@@ -1385,9 +1388,9 @@ class OptionsTest(unittest.TestCase):
             + " --explicitly-not-fingerprinted=shant_be_fingerprinted"
         )
         pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE)
-        assert (str, "shall_be_fingerprinted") in pairs
-        assert (str, "also_shall_be_fingerprinted") in pairs
-        assert (str, "shant_be_fingerprinted") not in pairs
+        assert ("implicitly_fingerprinted", str, "shall_be_fingerprinted") in pairs
+        assert ("explicitly_fingerprinted", str, "also_shall_be_fingerprinted") in pairs
+        assert not any(value == "shant_be_fingerprinted" for _, _, value in pairs)
 
     def test_fingerprintable_daemon_only(self) -> None:
         options = self._parse(
@@ -1396,9 +1399,7 @@ class OptionsTest(unittest.TestCase):
             + " --implicitly-not-daemoned=also_shant_be_fingerprinted"
         )
         pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE, daemon_only=True)
-        assert (str, "shall_be_fingerprinted") in pairs
-        assert (str, "shant_be_fingerprinted") not in pairs
-        assert (str, "also_shant_be_fingerprinted") not in pairs
+        assert [("explicitly_daemoned", str, "shall_be_fingerprinted")] == pairs
 
     def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
         def _do_assert_fromfile(dest, expected, contents, passthru_flags=""):

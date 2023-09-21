@@ -471,6 +471,12 @@ EMPTY_SNAPSHOT: Snapshot
 def default_cache_path() -> str: ...
 
 # ------------------------------------------------------------------------------
+# `pantsd`
+# ------------------------------------------------------------------------------
+
+def pantsd_fingerprint_compute(expected_option_names: set[str]) -> str: ...
+
+# ------------------------------------------------------------------------------
 # Process
 # ------------------------------------------------------------------------------
 
@@ -732,6 +738,30 @@ class PyGeneratorResponseBreak:
 
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
+
+class PyGeneratorResponseCall:
+    @overload
+    def __init__(self) -> None: ...
+    @overload
+    def __init__(
+        self,
+        input_arg0: dict[Any, type],
+    ) -> None: ...
+    @overload
+    def __init__(self, input_arg0: _Input) -> None: ...
+    @overload
+    def __init__(
+        self,
+        input_arg0: type[_Input],
+        input_arg1: _Input,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self,
+        input_arg0: type[_Input] | _Input,
+        input_arg1: _Input | None = None,
+    ) -> None: ...
+    def set_output_type(self, output_type: type) -> None: ...
 
 class PyGeneratorResponseGet(Generic[_Output]):
     output_type: type[_Output]

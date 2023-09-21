@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import os
 import re
 from dataclasses import dataclass, field
@@ -264,7 +265,7 @@ def global_env() -> Env:
 
 
 def rust_channel() -> str:
-    with open("rust-toolchain") as fp:
+    with open("src/rust/engine/rust-toolchain") as fp:
         rust_toolchain = toml.load(fp)
     return cast(str, rust_toolchain["toolchain"]["channel"])
 
@@ -442,11 +443,15 @@ class Helper:
         return [
             install_protoc(),  # for `prost` crate
             {
+                "name": "Set rustup profile",
+                "run": "rustup set profile default",
+            },
+            {
                 "name": "Cache Rust toolchain",
                 "uses": "actions/cache@v3",
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-{hash_files('rust-toolchain')}-v2",
+                    "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/engine/rust-toolchain')}-v2",
                 },
             },
             {
@@ -1173,10 +1178,12 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         # clone the repo, we're not so big as to need to optimize this.
                         "fetch-depth": "0",
                         "ref": f"{gha_expr('needs.release_info.outputs.build-ref')}",
+                        "fetch-tags": True,
                     },
                 },
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
+                *helper.bootstrap_caches(),
                 {
                     "name": "Generate announcement",
                     "run": dedent(
@@ -1222,6 +1229,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
                         """
                     ),
+                    "env": {
+                        "GH_TOKEN": "${{ github.token }}",
+                        "GH_REPO": "${{ github.repository }}",
+                    },
                 },
                 {
                     "name": "Publish GitHub Release",
@@ -1726,14 +1737,24 @@ def main() -> None:
     args = create_parser().parse_args()
     generated_yaml = generate()
     if args.check:
-        for path, content in generated_yaml.items():
-            if path.read_text() != content:
+        for path, expected in generated_yaml.items():
+            actual = path.read_text()
+            if actual != expected:
+                diff = difflib.unified_diff(
+                    actual.splitlines(),
+                    expected.splitlines(),
+                    fromfile="actual",
+                    tofile="expected",
+                    lineterm="",
+                )
                 die(
                     os.linesep.join(
                         (
                             f"Error: Generated path mismatched: {path}",
-                            "To re-generate, run: `./pants run src/python/pants_release/"
-                            "generate_github_workflows.py`",
+                            "To re-generate, run: `./pants run src/python/pants_release/generate_github_workflows.py`",
+                            "Also note that you might need to merge the latest changes to `main` to this branch.",
+                            "Diff:",
+                            *diff,
                         )
                     )
                 )

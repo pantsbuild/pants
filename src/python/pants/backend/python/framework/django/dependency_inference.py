@@ -4,6 +4,7 @@
 import json
 from pathlib import PurePath
 
+from pants.backend.python import dependency_inference
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonAssetPaths,
     ParsedPythonDependencies,
@@ -19,6 +20,7 @@ from pants.backend.python.dependency_inference.rules import (
 from pants.backend.python.framework.django.detect_apps import DjangoApps
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
+from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -118,5 +120,7 @@ async def django_parser_script(
 def rules():
     return [
         *collect_rules(),
+        *pex.rules(),
+        *dependency_inference.rules.rules(),
         UnionRule(InferDependenciesRequest, InferDjangoDependencies),
     ]

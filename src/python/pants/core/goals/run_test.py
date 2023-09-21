@@ -90,7 +90,7 @@ def single_target_run(
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
 
     with mock_console(rule_runner.options_bootstrapper) as (console, _):
-        res = run_rule_with_mocks(
+        return run_rule_with_mocks(
             run,
             rule_args=[
                 create_goal_subsystem(RunSubsystem, args=[], cleanup=True, debug_adapter=False),
@@ -137,7 +137,6 @@ def single_target_run(
                 },
             ),
         )
-        return cast(Run, res)
 
 
 def test_normal_run(rule_runner: RuleRunner) -> None:

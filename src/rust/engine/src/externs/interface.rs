@@ -61,6 +61,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
   externs::process::register(m)?;
+  externs::pantsd::register(py, m)?;
   externs::scheduler::register(m)?;
   externs::target::register(m)?;
   externs::testutil::register(m)?;
@@ -82,10 +83,6 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_class::<PyTasks>()?;
   m.add_class::<PyThreadLocals>()?;
   m.add_class::<PyTypes>()?;
-
-  m.add_class::<externs::PyGeneratorResponseBreak>()?;
-  m.add_class::<externs::PyGeneratorResponseGet>()?;
-  m.add_class::<externs::PyGeneratorResponseGetMulti>()?;
 
   m.add_function(wrap_pyfunction!(stdio_initialize, m)?)?;
   m.add_function(wrap_pyfunction!(stdio_thread_console_set, m)?)?;

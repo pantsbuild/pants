@@ -19,8 +19,6 @@ case "$MODE" in
   *) MODE_FLAG="--release" ;;
 esac
 
-RUST_TOOLCHAIN_CONTENTS="$(cat "${REPO_ROOT}/rust-toolchain")"
-
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
   # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
@@ -33,13 +31,11 @@ function calculate_current_hash() {
     cd "${REPO_ROOT}" || exit 1
     (
       echo "${MODE_FLAG}"
-      echo "${RUST_TOOLCHAIN_CONTENTS}"
       uname -mps
       # the engine only depends on the implementation and major.minor version, not the patch
       "${PY}" -c 'import sys; print(sys.implementation.name, sys.version_info.major, sys.version_info.minor)'
       git ls-files --cached --others --exclude-standard \
         "${NATIVE_ROOT}" \
-        "${REPO_ROOT}/rust-toolchain" \
         "${REPO_ROOT}/build-support/bin/rust" |
         grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" |
         git hash-object --stdin-paths

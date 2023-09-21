@@ -7,7 +7,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Iterable, Mapping, Optional, Tuple, TypeVar, Union
+from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple, TypeVar, Union
 
 from typing_extensions import final
 
@@ -311,7 +311,7 @@ def _run_in_sandbox_behavior_rule(cls: type[RunFieldSet]) -> Iterable:
     async def run_request_not_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
-    default_rules = {
+    default_rules: dict[RunInSandboxBehavior, list[Any]] = {
         RunInSandboxBehavior.NOT_SUPPORTED: [not_supported],
         RunInSandboxBehavior.RUN_REQUEST_HERMETIC: [run_request_hermetic],
         RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC: [run_request_not_hermetic],
