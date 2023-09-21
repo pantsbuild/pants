@@ -171,12 +171,12 @@ struct Opt {
   cas_root_ca_cert_file: Option<PathBuf>,
 
   /// Path to file containing client certificates for the CAS server.
-  /// If not set, TLS will not be used when connecting to the CAS server.
+  /// If not set, mTLS will not be used when connecting to the CAS server.
   #[structopt(long)]
   cas_mtls_certs_file: Option<PathBuf>,
 
   /// Path to file containing client key for the CAS server.
-  /// If not set, TLS will not be used when connecting to the CAS server.
+  /// If not set, mTLS will not be used when connecting to the CAS server.
   #[structopt(long)]
   cas_mtls_key_file: Option<PathBuf>,
 
@@ -255,12 +255,18 @@ async fn main() {
       let mtls_certs = args
         .cas_mtls_certs_file
         .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root mtls certs file"));
+        .map(|path| std::fs::read(path).expect("Error reading root mTLS certs file"));
 
       let mtls_key = args
         .cas_mtls_key_file
         .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root mtls key file"));
+        .map(|path| std::fs::read(path).expect("Error reading root mTLS key file"));
+
+      let mtls_data = match (mtls_certs, mtls_key) {
+        (Some(certs), Some(key)) => Some((certs, key)),
+        (None, None) => None,
+        _ => panic!("Must specify both --cas-mtls-certs-file and --cas-mtls-key-file or neither"),
+      };
 
       let mut headers = BTreeMap::new();
       if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
@@ -272,14 +278,8 @@ async fn main() {
         );
       }
 
-      let tls_config = if let Some((cert_chain, key)) = mtls_certs.zip(mtls_key) {
-        let mtls_config = grpc_util::tls::MtlsConfig::from_pem_buffers(&cert_chain, &key)
-          .expect("failed parsing PEM buffers for mtls config");
-        grpc_util::tls::Config::new(root_ca_certs.as_deref(), mtls_config)
-      } else {
-        grpc_util::tls::Config::new_without_mtls(root_ca_certs.as_deref())
-      }
-      .expect("failed parsing root CA certs");
+      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)
+        .expect("failed parsing root CA certs");
 
       local_only_store
         .into_with_remote(RemoteOptions {
@@ -324,12 +324,18 @@ async fn main() {
       let mtls_certs = args
         .cas_mtls_certs_file
         .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root mtls certs file"));
+        .map(|path| std::fs::read(path).expect("Error reading root mTLS certs file"));
 
       let mtls_key = args
         .cas_mtls_key_file
         .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root mtls key file"));
+        .map(|path| std::fs::read(path).expect("Error reading root mTLS key file"));
+
+      let mtls_data = match (mtls_certs, mtls_key) {
+        (Some(certs), Some(key)) => Some((certs, key)),
+        (None, None) => None,
+        _ => panic!("Must specify both --cas-mtls-certs-file and --cas-mtls-key-file or neither"),
+      };
 
       if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
         let token =
@@ -346,8 +352,7 @@ async fn main() {
         process_metadata.cache_key_gen_version.clone(),
         None,
         root_ca_certs.clone(),
-        mtls_certs.clone(),
-        mtls_key.clone(),
+        mtls_data.clone(),
         headers.clone(),
         store.clone(),
         executor.clone(),
@@ -380,8 +385,7 @@ async fn main() {
               instance_name: process_metadata.instance_name.clone(),
               action_cache_address: address,
               root_ca_certs,
-              mtls_certs,
-              mtls_key,
+              mtls_data,
               headers,
               concurrency_limit: args.cache_rpc_concurrency,
               rpc_timeout: Duration::from_secs(2),

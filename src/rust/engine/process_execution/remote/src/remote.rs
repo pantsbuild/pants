@@ -165,8 +165,7 @@ impl CommandRunner {
     process_cache_namespace: Option<String>,
     append_only_caches_base_path: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
-    mtls_certs: Option<Vec<u8>>,
-    mtls_key: Option<Vec<u8>>,
+    mtls_data: Option<(Vec<u8>, Vec<u8>)>,
     headers: BTreeMap<String, String>,
     store: Store,
     executor: Executor,
@@ -179,13 +178,7 @@ impl CommandRunner {
       execution_address.starts_with("https://") || execution_address.starts_with("grpcs://");
 
     let tls_client_config = if needs_tls {
-      let tls_config = if let Some((cert_chain, key)) = mtls_certs.zip(mtls_key) {
-        let mtls_config = grpc_util::tls::MtlsConfig::from_pem_buffers(&cert_chain, &key)?;
-        grpc_util::tls::Config::new(root_ca_certs.as_deref(), mtls_config)?
-      } else {
-        grpc_util::tls::Config::new_without_mtls(root_ca_certs.as_deref())?
-      };
-
+      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)?;
       Some(tls_config.try_into()?)
     } else {
       None

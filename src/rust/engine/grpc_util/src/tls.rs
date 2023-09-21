@@ -15,27 +15,25 @@ pub struct Config {
 
 impl Config {
   /// Creates a new config with the given root CA certs and mTLS config.
-  pub fn new(root_ca_certs: Option<&[u8]>, mtls: MtlsConfig) -> Result<Self, String> {
-    let mut this = Self::new_without_mtls(root_ca_certs)?;
-
-    this.mtls = Some(mtls);
-
-    Ok(this)
-  }
-
-  /// Creates a new config with the given root CA certs.
-  pub fn new_without_mtls(root_ca_certs: Option<&[u8]>) -> Result<Self, String> {
+  pub fn new<Buf: AsRef<[u8]>>(
+    root_ca_certs: Option<Buf>,
+    mtls: Option<(Buf, Buf)>,
+  ) -> Result<Self, String> {
     let root_ca_certs = root_ca_certs
       .map(|certs| {
-        let raw_certs = rustls_pemfile::certs(&mut std::io::Cursor::new(certs))
+        let raw_certs = rustls_pemfile::certs(&mut std::io::Cursor::new(certs.as_ref()))
           .map_err(|e| format!("Failed to read mTLS certs file: {e:?}"))?;
         Result::<_, String>::Ok(raw_certs.into_iter().map(rustls::Certificate).collect())
       })
       .transpose()?;
 
+    let mtls = mtls
+      .map(|buffers| MtlsConfig::from_pem_buffers(buffers.0.as_ref(), buffers.1.as_ref()))
+      .transpose()?;
+
     Ok(Self {
       root_ca_certs,
-      mtls: None,
+      mtls,
       certificate_check: CertificateCheck::Enabled,
     })
   }
@@ -57,7 +55,7 @@ impl TryFrom<Config> for ClientConfig {
         if let Some(MtlsConfig { cert_chain, key }) = config.mtls {
           tls_config
             .with_client_auth_cert(cert_chain, key)
-            .map_err(|err| format!("Error creating MTLS config: {:?}", err))?
+            .map_err(|err| format!("Error creating mTLS config: {:?}", err))?
         } else {
           tls_config.with_no_client_auth()
         }
@@ -95,25 +93,22 @@ impl TryFrom<Config> for ClientConfig {
         if let Some(MtlsConfig { cert_chain, key }) = config.mtls {
           tls_config
             .with_client_auth_cert(cert_chain, key)
-            .map_err(|err| format!("Error creating MTLS config: {:?}", err))?
+            .map_err(|err| format!("Error creating mTLS config: {:?}", err))?
         } else {
           tls_config.with_no_client_auth()
         }
       }
     };
 
-    // Note[TSolberg]: This causes hyper to explode -- it seems a bit odd to pre-set negotiation,
-    // but this was added for a reason presumably.
-    //tls_config.alpn_protocols = vec![b"h2".to_vec()];
     Ok(tls_config)
   }
 }
 
 #[derive(Clone)]
 pub struct MtlsConfig {
-  /// PEM bytes of the private key used for MTLS.
+  /// DER bytes of the private key used for mTLS.
   pub key: rustls::PrivateKey,
-  /// PEM bytes of the certificate used for MTLS.
+  /// DER bytes of the certificate used for mTLS.
   pub cert_chain: Vec<rustls::Certificate>,
 }
 
