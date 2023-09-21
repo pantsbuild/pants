@@ -48,7 +48,7 @@ The release is automated, outside of these steps:
 3. CONTRIBUTOR.md updates
 4. Version bumping
 
-The first three steps always happen in the `main` branch, whereas the version bump happens in the relevant release branch. 
+These steps always happen in the release branch. 
 
 For `dev` and `a0` releases, the release branch is `main`. For all other release candidates and stable releases, the release branch is that respective version's branch, e.g. `2.8.x` or `2.9.x`.
 
@@ -94,15 +94,11 @@ Update the release page in `src/python/pants/notes` for this release series, e.g
 
 Run `git fetch --all --tags` to be sure you have the latest release tags available locally.
 
-From the `main` branch, run `pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
+From the release branch, run `pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
 
 This will generate the sections to copy into the release notes. Delete any empty sections. Do not paste the `Internal` section into the notes file. Instead, paste into a comment on the prep PR.
 
 You are encouraged to fix typos and tweak change descriptions for clarity to users. Ensure that there is exactly one blank line between descriptions, headers etc.
-
-> 🚧 Reminder: always do this against the `main` branch
-> 
-> Even if you are preparing notes for a release candidate, always prepare the notes in a branch based on `main` and, later, target your PR to merge with `main`.
 
 > 📘 See any weird PR titles?
 > 
@@ -122,23 +118,15 @@ If this is a stable release, then you can use `git diff` to find all new contrib
 git diff release_2.8.0..release_2.9.0 CONTRIBUTORS.md
 ```
 
-### 3. `dev` and `a0` - bump the `VERSION`
+### 3. Bump the `VERSION`
 
 Change `src/python/pants/VERSION` to the new release, e.g. `2.12.0.dev0`. If you encounter an `a0` version on `main`, then the next release will be for a new release series (i.e. you'll bump from `2.12.0a0` to `2.13.0.dev0`).
 
 ### 4. Post the prep to GitHub
 
-Open a pull request on GitHub to merge into `main`. Post the PR to the `#development` in Slack.  
+Open a pull request on GitHub to merge into the release branch. Post the PR to the `#development` in Slack.  
 
 Merge once approved and green.
-
-> 🚧 Watch out for any recently landed PRs
-> 
-> From the time you put up your release prep until you hit "merge", be careful that no one merges any commits into main. 
-> 
-> If they do—and you're doing a `dev` or `a0` release—you should merge `main` into your PR and update the changelog with their changes. It's okay if the changes were internal only, but any public changes must be added to the changelog.
-> 
-> Once you click "merge", it is safe for people to merge changes again.
 
 ### 5a. `a0` - create a new Git branch
 
@@ -148,12 +136,6 @@ For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running
 $ git checkout -b 2.9.x
 $ git push upstream 2.9.x
 ```
-
-### 5b. release candidates - cherry-pick and bump the VERSION
-
-1. Checkout from `main` into the release branch, e.g. `2.9.x`.
-2. Cherry-pick the release prep using `git cherry-pick <sha>`.
-3. Bump the `VERSION` in `src/python/pants/VERSION`, e.g. to `2.9.0rc1`. Push this as a new commit directly to the release branch - you do not need to open a pull request.
 
 Step 2: Update this docs site
 -----------------------------
