@@ -56,7 +56,7 @@ use fs::{
   FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
   EMPTY_DIRECTORY_DIGEST,
 };
-use futures::future::{self, BoxFuture, Either, FutureExt};
+use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use local::ByteStore;
@@ -1182,12 +1182,10 @@ impl Store {
     mutable_paths: &BTreeSet<RelativePath>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
-    if cfg!(debug_assertions) {
-      assert!(
-        destination.starts_with(destination_root),
-        "The destination root must be a parent directory of the destination."
-      )
-    }
+    debug_assert!(
+      destination.starts_with(destination_root),
+      "The destination root must be a parent directory of the destination."
+    );
 
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
     // parent path and its children.
@@ -1209,18 +1207,9 @@ impl Store {
 
     // Create the root, and determine what filesystem it and the store are on.
     let destination_is_hardlinkable = {
-      let directory_creation_fut = self.local.executor().spawn_blocking(
-        {
-          let destination = destination.clone();
-          move || {
-            std::fs::create_dir_all(&destination)
-              .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))
-          }
-        },
-        |e| Err(format!("Directory creation task failed: {e}")),
-      );
       let (_, destination_is_hardlinkable) = tokio::try_join!(
-        directory_creation_fut,
+        tokio::fs::create_dir_all(&destination)
+          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display())),
         self.local.is_hardlinkable_destination(destination_root)
       )?;
       destination_is_hardlinkable

@@ -532,7 +532,6 @@ struct InnerStore {
   file_lmdb: Result<Arc<ShardedLmdb>, String>,
   directory_lmdb: Result<Arc<ShardedLmdb>, String>,
   file_fsdb: ShardedFSDB,
-  executor: task_executor::Executor,
 }
 
 impl ByteStore {
@@ -577,19 +576,14 @@ impl ByteStore {
         )
         .map(Arc::new),
         file_fsdb: ShardedFSDB {
-          executor: executor.clone(),
+          executor: executor,
           root: fsdb_files_root,
           lease_time: options.lease_time,
           dest_initializer: Arc::new(Mutex::default()),
           hardlinkable_destinations: Arc::new(Mutex::default()),
         },
-        executor,
       }),
     })
-  }
-
-  pub fn executor(&self) -> &task_executor::Executor {
-    &self.inner.executor
   }
 
   pub async fn is_hardlinkable_destination(&self, destination: &Path) -> Result<bool, String> {

@@ -372,7 +372,7 @@ async fn main() {
   .expect("Error executing");
 
   if let Some(output) = args.materialize_output_to {
-    // NB: We use `destination` as the root directory, because there is no need to
+    // NB: We use `output` as the root directory, because there is no need to
     // memoize a check for whether some other parent directory is hardlinkable.
     let output_root = output.clone();
     store
