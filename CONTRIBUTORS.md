@@ -196,6 +196,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Matt Landis
 + Matt Olsen
 + Matthew Jeffryes
++ Matthias Berndt
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
