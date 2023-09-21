@@ -353,7 +353,7 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 ),
             ],
         ).val
-        return result  # type: ignore[no-any-return]
+        return result
 
     def create_local_tgt(
         *, compatible_platforms: list[Platform] | None = None, fallback: bool = False

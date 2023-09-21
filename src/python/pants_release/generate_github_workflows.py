@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import os
 import re
 from dataclasses import dataclass, field
@@ -441,6 +442,10 @@ class Helper:
     def rust_caches(self) -> Sequence[Step]:
         return [
             install_protoc(),  # for `prost` crate
+            {
+                "name": "Set rustup profile",
+                "run": "rustup set profile default",
+            },
             {
                 "name": "Cache Rust toolchain",
                 "uses": "actions/cache@v3",
@@ -1732,14 +1737,24 @@ def main() -> None:
     args = create_parser().parse_args()
     generated_yaml = generate()
     if args.check:
-        for path, content in generated_yaml.items():
-            if path.read_text() != content:
+        for path, expected in generated_yaml.items():
+            actual = path.read_text()
+            if actual != expected:
+                diff = difflib.unified_diff(
+                    actual.splitlines(),
+                    expected.splitlines(),
+                    fromfile="actual",
+                    tofile="expected",
+                    lineterm="",
+                )
                 die(
                     os.linesep.join(
                         (
                             f"Error: Generated path mismatched: {path}",
-                            "To re-generate, run: `./pants run src/python/pants_release/"
-                            "generate_github_workflows.py`",
+                            "To re-generate, run: `./pants run src/python/pants_release/generate_github_workflows.py`",
+                            "Also note that you might need to merge the latest changes to `main` to this branch.",
+                            "Diff:",
+                            *diff,
                         )
                     )
                 )
