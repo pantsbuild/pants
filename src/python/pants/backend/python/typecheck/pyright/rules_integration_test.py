@@ -31,6 +31,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.util.dirutil import safe_rmtree
 from pants.util.contextutil import temporary_dir
 
 
@@ -315,7 +316,7 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
         assert result[0].report == EMPTY_DIGEST
 
         # Delete the cache directory
-        shutil.rmtree(cache_dir)
+        safe_rmtree(cache_dir)
 
         # Run again
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
