@@ -31,8 +31,8 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.util.dirutil import safe_rmtree
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_rmtree
 
 
 @pytest.fixture

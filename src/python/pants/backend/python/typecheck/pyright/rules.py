@@ -203,7 +203,7 @@ async def pyright_typecheck_partition(
             requirements_venv_pex,
             description="Force venv to materialize",
             argv=["-c", "''"],
-            cache_scope=ProcessCacheScope.SESSION,
+            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
 
