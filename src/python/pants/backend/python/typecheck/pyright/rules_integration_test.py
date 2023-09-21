@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 from textwrap import dedent
 from typing import Iterable
 
@@ -309,14 +310,17 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
 
     # On the first run, it should work as advertised with no modifications.
     with temporary_dir() as cache_dir:
+        pex_root_dir = os.path.join(os.path.abspath(cache_dir), "pex_root")
+        os.mkdir(pex_root_dir)
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
+
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert "0 errors" in result[0].stdout
         assert result[0].report == EMPTY_DIGEST
 
-        # Delete the cache directory
-        safe_rmtree(cache_dir)
+        # Delete the pex_root cache directory
+        safe_rmtree(pex_root_dir)
 
         # Run again
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
