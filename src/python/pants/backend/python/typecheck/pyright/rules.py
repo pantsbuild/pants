@@ -41,7 +41,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -195,12 +195,15 @@ async def pyright_typecheck_partition(
     )
 
     # Force the requirements venv to materialize always by running a no-op.
+    # This operation must be called with `ProcessCacheScope.SESSION`
+    # as the venv is cached per session.
     await Get(
         ProcessResult,
         VenvPexProcess(
             requirements_venv_pex,
             description="Force venv to materialize",
             argv=["-c", "''"],
+            cache_scope=ProcessCacheScope.SESSION,
         ),
     )
 
