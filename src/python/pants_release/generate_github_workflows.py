@@ -442,6 +442,10 @@ class Helper:
         return [
             install_protoc(),  # for `prost` crate
             {
+                "name": "Set rustup profile",
+                "run": "rustup set profile default",
+            },
+            {
                 "name": "Cache Rust toolchain",
                 "uses": "actions/cache@v3",
                 "with": {
