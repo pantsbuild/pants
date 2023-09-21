@@ -83,7 +83,7 @@ mod local;
 #[cfg(test)]
 pub mod local_tests;
 
-mod remote;
+pub mod remote;
 pub use remote::RemoteOptions;
 #[cfg(test)]
 mod remote_tests;
