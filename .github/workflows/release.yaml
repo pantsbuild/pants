@@ -185,6 +185,8 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
@@ -267,6 +269,8 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
@@ -344,6 +348,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: '0'
+        fetch-tags: true
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
@@ -356,6 +361,8 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
@@ -408,7 +415,10 @@ jobs:
         secure: true
         subject: file://${{ runner.temp }}/email_announcement_subject.txt
         to: pants-devel@googlegroups.com
-    - name: Get release notes
+    - env:
+        GH_REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+      name: Get release notes
       run: './pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref
         }}" > notes.txt
 
