@@ -29,7 +29,19 @@ shell_command(
         PATH="${{PATH}}:{{chroot}}/3rdparty/tools/protoc/protoc/bin";
         PATH="${{PATH}}:{{chroot}}/3rdparty/tools/rust/cargo/bin";
 
-        cargo build {_RELTYPE_FLAG} --features=extension-module -p engine -p client
+        rm -rf target;  # This is created for the `output_files`.
+        ln -s {{chroot}}/.target target;
+        # Use a lock solely because the resulting binaries are materialized in `target/`
+        #   and we don't want a collision.
+        python3 -c 'import fcntl;\
+            fd=open("target/pants-execution.lock", mode="w");\
+            fcntl.lockf(fd, fcntl.LOCK_EX);import subprocess;\
+            subprocess.run(\
+                ["cargo build {_RELTYPE_FLAG} --features=extension-module -p engine -p client"],\
+                shell=True,\
+                check=True\
+            )\
+        '
     """,
     execution_dependencies=[
         ":rust_sources",
@@ -37,7 +49,11 @@ shell_command(
         "3rdparty/tools/python3:python3",
         "3rdparty/tools/rust:cargo",
     ],
-    tools=["bash", "cc", "ld", "as", "ar"],
+    tools=["cc", "ld", "as", "ar", "ln", "rm"],
+    experimental_named_caches={
+        # NB: This named cache should be used SOLELY for this target.
+        "pants_engine_target": ".target"
+    },
     output_files=[
         f"target/debug/libengine.so",
         f"target/debug/libengine.dylib",
