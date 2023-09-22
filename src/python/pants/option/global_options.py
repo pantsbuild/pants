@@ -999,7 +999,7 @@ class BootstrapOptions:
     pants_workdir = StrOption(
         advanced=True,
         metavar="<dir>",
-        default=lambda _: os.path.join(get_buildroot(), ".pants.d"),
+        default=lambda _: os.path.join(get_buildroot(), ".pants.d", "workdir"),
         daemon=True,
         help="Write intermediate logs and output files to this dir.",
     )
@@ -1024,7 +1024,7 @@ class BootstrapOptions:
     )
     pants_subprocessdir = StrOption(
         advanced=True,
-        default=lambda _: os.path.join(get_buildroot(), ".pids"),
+        default=lambda _: os.path.join(get_buildroot(), ".pants.d", "pids"),
         daemon=True,
         help=softwrap(
             """

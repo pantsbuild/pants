@@ -95,8 +95,9 @@ async def handle_bsp_java_options_request(
             target=request.bsp_target_id,
             options=(),
             classpath=(),
+            # TODO: Why is this hardcoded and not under pants_workdir?
             class_directory=build_root.pathlib_path.joinpath(
-                f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"
+                ".pants.d", "bsp", jvm_classes_directory(request.bsp_target_id)
             ).as_uri(),
         )
     )

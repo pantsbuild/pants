@@ -85,7 +85,7 @@ def timings_for_build(
     # Build a PEX for the commit, then ensure that `pantsd` is not running.
     checkout(build_commit)
     run(["package", "src/python/pants/bin:pants"], use_pex=False)
-    shutil.rmtree(".pids")
+    shutil.rmtree(".pants.d/pids")
     # Then collect a runtime for each commit in the range.
     cache_namespace = f"cache-comparison-{build_commit}-{time()}"
     return {

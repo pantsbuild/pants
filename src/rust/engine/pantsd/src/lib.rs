@@ -178,7 +178,10 @@ pub fn find_pantsd(
   options_parser: &OptionParser,
 ) -> Result<ConnectionSettings, String> {
   let pants_subprocessdir = option_id!("pants", "subprocessdir");
-  let option_value = options_parser.parse_string(&pants_subprocessdir, ".pids")?;
+  let option_value = options_parser.parse_string(
+    &pants_subprocessdir,
+    Path::new(".pants.d").join("pids").to_str().unwrap(),
+  )?;
   let metadata_dir = {
     let path = PathBuf::from(&option_value.value);
     if path.is_absolute() {
@@ -342,8 +345,9 @@ pub fn fingerprint_compute(
 /// options (because we have redundancy of options definitions between `global_options.py` and what
 /// the Rust native client uses).
 pub fn fingerprinted_options(build_root: &BuildRoot) -> Result<Vec<FingerprintedOption>, String> {
-  let build_root_subdir = |subdir: &str| -> Result<String, String> {
+  let dot_pants_dot_d_subdir = |subdir: &str| -> Result<String, String> {
     build_root
+      .join(".pants.d")
       .join(subdir)
       .into_os_string()
       .into_string()
@@ -363,14 +367,14 @@ pub fn fingerprinted_options(build_root: &BuildRoot) -> Result<Vec<Fingerprinted
     ),
     FingerprintedOption::new(
       option_id!("pants", "workdir"),
-      build_root_subdir(".pants.d")?,
+      dot_pants_dot_d_subdir("workdir")?,
     ),
     // Optional strings are not currently supported by the Rust options parser, but we're only
     // using these for fingerprinting, and so can use a placeholder default.
     FingerprintedOption::new(option_id!("pants", "physical", "workdir", "base"), "<none>"),
     FingerprintedOption::new(
       option_id!("pants", "subprocessdir"),
-      build_root_subdir(".pids")?,
+      dot_pants_dot_d_subdir("pids")?,
     ),
     FingerprintedOption::new(option_id!("logdir"), "<none>"),
     FingerprintedOption::new(option_id!("pantsd"), true),

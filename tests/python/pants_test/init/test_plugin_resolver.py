@@ -29,10 +29,10 @@ from pants.init.options_initializer import create_bootstrap_scheduler
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.python_interpreter_selection import (
-    PY_36,
-    PY_37,
+    PY_38,
+    PY_39,
     python_interpreter_path,
-    skip_unless_python36_and_python37_present,
+    skip_unless_python38_and_python39_present,
 )
 from pants.testutil.rule_runner import EXECUTOR, QueryRule, RuleRunner
 from pants.util.contextutil import temporary_dir
@@ -290,23 +290,23 @@ def test_range_deps(rule_runner: RuleRunner) -> None:
         assert "2.26.0" == working_set.find(Requirement.parse("requests")).version
 
 
-@skip_unless_python36_and_python37_present
+@skip_unless_python38_and_python39_present
 def test_exact_requirements_interpreter_change_sdist(rule_runner: RuleRunner) -> None:
     _do_test_exact_requirements_interpreter_change(rule_runner, True)
 
 
-@skip_unless_python36_and_python37_present
+@skip_unless_python38_and_python39_present
 def test_exact_requirements_interpreter_change_bdist(rule_runner: RuleRunner) -> None:
     _do_test_exact_requirements_interpreter_change(rule_runner, False)
 
 
 def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: bool) -> None:
-    python36 = PythonInterpreter.from_binary(python_interpreter_path(PY_36))
-    python37 = PythonInterpreter.from_binary(python_interpreter_path(PY_37))
+    python38 = PythonInterpreter.from_binary(python_interpreter_path(PY_38))
+    python39 = PythonInterpreter.from_binary(python_interpreter_path(PY_39))
 
     with plugin_resolution(
         rule_runner,
-        interpreter=python36,
+        interpreter=python38,
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
     ) as results:
@@ -316,7 +316,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
         with pytest.raises(ExecutionError):
             with plugin_resolution(
                 rule_runner,
-                interpreter=python37,
+                interpreter=python39,
                 chroot=chroot,
                 plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
             ):
@@ -333,7 +333,7 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
         # directly from the still in-tact cache.
         with plugin_resolution(
             rule_runner,
-            interpreter=python36,
+            interpreter=python38,
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         ) as results2:

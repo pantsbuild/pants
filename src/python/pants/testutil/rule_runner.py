@@ -377,7 +377,7 @@ class RuleRunner:
 
     @property
     def pants_workdir(self) -> str:
-        return os.path.join(self.build_root, ".pants.d")
+        return os.path.join(self.build_root, ".pants.d", "workdir")
 
     @property
     def target_types(self) -> tuple[type[Target], ...]:

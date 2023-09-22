@@ -117,7 +117,7 @@ To run a binary, use `pants run path/to/main_pkg:` (note the colon). You can pas
 
 ```
 ❯ pants run cmd/deploy: -- --help
-Usage of /Users/pantsbuild/example/.pants.d/tmpzfh33ggu/cmd.deploy/bin:
+Usage of /Users/pantsbuild/example/.pants.d/workdir/tmpzfh33ggu/cmd.deploy/bin:
       --allow-insecure-auth        allow credentials to be passed unencrypted (i.e., no TLS)
   -A, --auth-token-env string      name of environment variable with auth bearer token
 ...
