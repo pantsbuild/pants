@@ -172,7 +172,8 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
 class Simplifier:
     """Helper for options for conditionally simplifying a string."""
 
-    strip_chroot_path: bool = False
+    # it's only rarely useful to show a chroot path to a user, hence they're stripped by default
+    strip_chroot_path: bool = True
     """remove all instances of the chroot tmpdir path"""
     strip_formatting: bool = False
     """remove ANSI formatting commands (colors, bold, etc)"""
