@@ -1647,7 +1647,6 @@ fn write_digest(
   digest: &PyAny,
   path_prefix: String,
   clear_paths: Vec<String>,
-  invalidate: bool,
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
@@ -1683,13 +1682,11 @@ fn write_digest(
         )
         .await?;
 
-      if invalidate {
-        let snapshot = store::Snapshot::from_digest(store, lifted_digest).await?;
-        let files = snapshot.tree.files(SymlinkBehavior::Aware);
-        py_scheduler
-          .0
-          .invalidate_paths(&files.into_iter().collect());
-      }
+      let snapshot = store::Snapshot::from_digest(store, lifted_digest).await?;
+      let files = snapshot.tree.files(SymlinkBehavior::Aware);
+      py_scheduler
+        .0
+        .invalidate_paths(&files.into_iter().collect());
 
       Ok(())
     })

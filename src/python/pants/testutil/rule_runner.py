@@ -595,7 +595,6 @@ class RuleRunner:
         *,
         path_prefix: str | None = None,
         clear_paths: Sequence[str] = (),
-        invalidate: bool = True,
     ) -> None:
         """Write a digest to disk, relative to the test's build root.
 
@@ -607,7 +606,6 @@ class RuleRunner:
             digest,
             path_prefix or "",
             clear_paths,
-            invalidate=invalidate,
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:

@@ -619,7 +619,6 @@ class SchedulerSession:
         *,
         path_prefix: str | None = None,
         clear_paths: Sequence[str] = (),
-        invalidate: bool = True,
     ) -> None:
         """Write a digest to disk, relative to the build root."""
         if path_prefix and PurePath(path_prefix).is_absolute():
@@ -628,7 +627,7 @@ class SchedulerSession:
                 "the digest relative to the build root."
             )
         native_engine.write_digest(
-            self.py_scheduler, self.py_session, digest, path_prefix or "", clear_paths, invalidate
+            self.py_scheduler, self.py_session, digest, path_prefix or "", clear_paths
         )
 
     def lease_files_in_graph(self) -> None:
