@@ -35,6 +35,3 @@ if git diff "${MERGE_BASE}" --name-only | grep src/python/pants_release/generate
   echo "* Checking GitHub workflows generation"
   $_PANTS_PRE_COMMIT_BINARY run src/python/pants_release/generate_github_workflows.py -- --check
 fi
-
-echo "* Checking __init__.py files"
-$_PANTS_PRE_COMMIT_BINARY run build-support/bin/check_inits.py
