@@ -500,12 +500,11 @@ async def generate_coverage_reports(
     )
     sources = await Get(
         PythonSourceFiles,
-        # Coverage sometimes includes non-Python files in its `.coverage` data. We need to
-        # ensure that they're present when generating the report. We include all the files included
-        # by `pytest_runner.py`.
-        PythonSourceFilesRequest(
-            transitive_targets.closure, include_files=True, include_resources=True
-        ),
+        # Coverage sometimes includes non-Python files in its `.coverage` data, so we
+        # include resources here. We don't include files because relocated_files targets
+        # may cause digest merge collisions. So anything you compute coverage over must
+        # be a source file or a resource.
+        PythonSourceFilesRequest(transitive_targets.closure),
     )
     input_digest = await Get(
         Digest,
