@@ -613,6 +613,7 @@ fn interactive_process(
       )?;
       prepare_workdir(
         tempdir.path().to_owned(),
+        &context.core.local_execution_root_dir,
         &process,
         process.input_digests.inputs.clone(),
         &context.core.store(),

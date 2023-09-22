@@ -77,6 +77,10 @@ impl NailgunPool {
     }
   }
 
+  pub fn workdir_base(&self) -> &Path {
+    &self.workdir_base
+  }
+
   ///
   /// Given a name and a `Process` configuration, return a port of a nailgun server running
   /// under that name and configuration.
@@ -367,6 +371,7 @@ impl NailgunProcess {
     // simpler.
     prepare_workdir(
       workdir.path().to_owned(),
+      workdir_base,
       &startup_options,
       startup_options.input_digests.inputs.clone(),
       store,
