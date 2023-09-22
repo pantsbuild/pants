@@ -86,7 +86,7 @@ async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
     result = await Get(
         FallibleProcessResult, _RunRuffRequest(snapshot=request.snapshot, is_fix=True)
     )
-    return await FixResult.create(request, result, strip_chroot_path=True)
+    return await FixResult.create(request, result)
 
 
 @rule(desc="Lint with ruff", level=LogLevel.DEBUG)
@@ -97,7 +97,7 @@ async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintRe
     result = await Get(
         FallibleProcessResult, _RunRuffRequest(snapshot=source_files.snapshot, is_fix=False)
     )
-    return LintResult.create(request, result, strip_chroot_path=True)
+    return LintResult.create(request, result)
 
 
 def rules():
