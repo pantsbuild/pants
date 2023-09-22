@@ -143,7 +143,7 @@ async def _prepare_process_request_from_target(
 
     append_only_caches = {
         **merged_extras.append_only_caches,
-        **shell_command.get(ShellCommandNamedCachesField).value,
+        **(shell_command.get(ShellCommandNamedCachesField).value or {}),
     }
 
     return AdhocProcessRequest(

@@ -219,7 +219,6 @@ class AdhocToolWorkdirField(StringField):
 
 class AdhocToolNamedCachesField(DictStringToStringField):
     alias = "experimental_named_caches"
-    default = {}
     help = help_text(
         """
         Named caches to construct for the execution.

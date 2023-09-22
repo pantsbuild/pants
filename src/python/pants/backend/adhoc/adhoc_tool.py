@@ -152,7 +152,7 @@ async def run_in_sandbox_request(
 
     append_only_caches = {
         **merged_extras.append_only_caches,
-        **target.get(AdhocToolNamedCachesField).value,
+        **(target.get(AdhocToolNamedCachesField).value or {}),
     }
 
     process_request = AdhocProcessRequest(
