@@ -12,7 +12,7 @@ In such cases, users are typically still able to access internal proxies and ser
 Installing Pants
 ----------------
 
-The `pants` launcher from [Installing Pants](doc:installation) uses GitHub Releases to download and install a PEX including Pants and all itsdependencies.
+The `pants` launcher from [Installing Pants](doc:installation) uses GitHub Releases to download and install a PEX including Pants and all its dependencies.
 
 If you cannot access GitHub directly, you will need to follow the instructions for firewalls/restricted internet access for [the launcher itself](https://github.com/pantsbuild/scie-pants).
 
