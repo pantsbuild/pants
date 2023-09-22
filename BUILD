@@ -22,3 +22,20 @@ remote_environment(
     name="buildgrid_remote",
     python_bootstrap_search_path=["<PATH>"],
 )
+
+files(
+    name="all-__init__.py-files",
+    sources=[
+        "**/__init__.py",
+        # These are explicit namespace packages
+        "!src/python/pants/__init__.py",
+        "!src/python/pants/testutil/__init__.py",
+    ]
+)
+
+experimental_test_shell_command(
+    name="Check empty init files",
+    command="test -r $CHROOT/some-data-file.txt",
+    tools=["test"],
+    execution_dependencies=[":all-__init__.py-files"],
+)
