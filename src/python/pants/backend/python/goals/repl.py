@@ -71,6 +71,7 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
 
 class PythonRepl(ReplImplementation):
     name = "python"
+    supports_passthrough_args = False
 
 
 @rule(level=LogLevel.DEBUG)
@@ -124,6 +125,7 @@ async def create_python_repl_request(
 
 class IPythonRepl(ReplImplementation):
     name = "ipython"
+    supports_passthrough_args = True
 
 
 @rule(level=LogLevel.DEBUG)

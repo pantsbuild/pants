@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple, cast, Type
 
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses
@@ -33,6 +33,7 @@ class ReplImplementation(ABC):
     """
 
     name: ClassVar[str]
+    supports_passthrough_args: ClassVar[bool]
 
     targets: Sequence[Target]
 
@@ -60,6 +61,7 @@ class ReplSubsystem(GoalSubsystem):
         example="-i helloworld/main.py",
         tool_name="the repl program",
         passthrough=True,
+        extra_help="Currently supported only for the ipython shell.",
     )
     restartable = BoolOption(
         default=False,
@@ -115,7 +117,7 @@ async def run_repl(
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
     implementations = {impl.name: impl for impl in union_membership[ReplImplementation]}
-    repl_implementation_cls = implementations.get(repl_shell_name)
+    repl_implementation_cls = cast(Optional[Type[ReplImplementation]], implementations.get(repl_shell_name))
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())
         console.print_stderr(
@@ -128,10 +130,21 @@ async def run_repl(
         )
         return Repl(-1)
 
+    if repl_subsystem.args and not repl_implementation_cls.supports_passthrough_args:
+        console.print_stderr(
+            softwrap(
+                f"""
+                REPL goal does not support passing args to a {repr(repl_shell_name)} shell.  
+                """
+            )
+        )
+        return Repl(-1)
+
     repl_impl = repl_implementation_cls(targets=specified_targets)
     request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
     env = {**complete_env, **request.extra_env}
+
     result = await Effect(
         InteractiveProcessResult,
         InteractiveProcess(
