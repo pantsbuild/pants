@@ -35,8 +35,7 @@ impl Provider {
       rpc_timeout,
     }: RemoteCacheProviderOptions,
   ) -> Result<Self, String> {
-    let needs_tls =
-      action_cache_address.starts_with("https://") || action_cache_address.starts_with("grpcs://");
+    let needs_tls = action_cache_address.starts_with("https://");
 
     let tls_client_config = if needs_tls {
       let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)?;

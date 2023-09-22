@@ -174,8 +174,7 @@ impl CommandRunner {
     execution_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
-    let needs_tls =
-      execution_address.starts_with("https://") || execution_address.starts_with("grpcs://");
+    let needs_tls = execution_address.starts_with("https://");
 
     let tls_client_config = if needs_tls {
       let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)?;

@@ -177,3 +177,54 @@ impl ServerCertVerifier for NoVerifier {
     Ok(ServerCertVerified::assertion())
   }
 }
+
+#[cfg(test)]
+mod test {
+  use super::Config;
+  use std::path::PathBuf;
+
+  #[test]
+  fn test_client_auth_cert_resolver_is_unconfigured_no_mtls() {
+    let cert_pem = std::fs::read(
+      PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("test-certs")
+        .join("cert.pem"),
+    )
+    .unwrap();
+
+    let config = Config::new(Some(&cert_pem), None).unwrap();
+
+    assert!(config.root_ca_certs.is_some());
+    assert!(config.mtls.is_none());
+
+    let rustls_config: rustls::ClientConfig = config.try_into().unwrap();
+
+    assert!(!rustls_config.client_auth_cert_resolver.has_certs());
+  }
+
+  #[test]
+  fn test_client_auth_cert_resolver_is_configured() {
+    let cert_pem = std::fs::read(
+      PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("test-certs")
+        .join("cert.pem"),
+    )
+    .unwrap();
+
+    let key_pem = std::fs::read(
+      PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("test-certs")
+        .join("key.pem"),
+    )
+    .unwrap();
+
+    let config = Config::new(Some(&cert_pem), Some((&cert_pem, &key_pem))).unwrap();
+
+    assert!(config.root_ca_certs.is_some());
+    assert!(config.mtls.is_some());
+
+    let rustls_config: rustls::ClientConfig = config.try_into().unwrap();
+
+    assert!(rustls_config.client_auth_cert_resolver.has_certs());
+  }
+}
