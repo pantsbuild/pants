@@ -1656,6 +1656,7 @@ fn write_digest(
     let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
 
     // Python will have already validated that path_prefix is a relative path.
+    let path_prefix = Path::new(&path_prefix);
     let mut destination = PathBuf::new();
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
@@ -1686,7 +1687,7 @@ fn write_digest(
       let paths = snapshot.tree.leaf_paths();
       py_scheduler
         .0
-        .invalidate_paths(&paths.into_iter().collect());
+        .invalidate_paths(&paths.into_iter().map(|p| path_prefix.join(&p)).collect());
 
       Ok(())
     })
