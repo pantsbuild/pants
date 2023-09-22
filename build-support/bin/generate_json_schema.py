@@ -37,9 +37,9 @@ PYTHON_TO_JSON_TYPE_MAPPING = {
 # This list may need to be extended as more options with environment specific default values are added.
 ENV_SPECIFIC_OPTION_DEFAULTS = {
     "pants_config_files": ["<buildroot>/pants.toml"],
-    "pants_subprocessdir": "<buildroot>/.pids",
+    "pants_subprocessdir": "<buildroot>/.pants.d/pids",
     "pants_distdir": "<buildroot>/dist",
-    "pants_workdir": "<buildroot>/.pants.d",
+    "pants_workdir": "<buildroot>/.pants.d/workdir",
     "local_store_dir": "$XDG_CACHE_HOME/lmdb_store",
     "named_caches_dir": "$XDG_CACHE_HOME/named_caches",
 }

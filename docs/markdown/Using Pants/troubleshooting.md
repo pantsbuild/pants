@@ -54,9 +54,9 @@ To start with, first try using `--no-pantsd`. If that doesn't work, you can also
 If `--no-pantsd` worked, you can restart `pantsd`, either by:
 
 - Killing the `pantsd` process associated with your workspace. You can use `ps aux | grep pants` to find the PID, the `kill -9 <pid>`. 
-- Deleting the `<build root>/.pids` directory. 
+- Deleting the `<build root>/.pants.d/pids` directory. 
 
-If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/pantsd/pantsd.log` file.
+If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/workdir/pantsd/pantsd.log` file.
 
 If restarting `pantsd` is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
 
@@ -161,7 +161,7 @@ You may change any of these options in the `[GLOBAL]` section of your `pants.tom
     "1-2": "`~/.cache/pants/named_caches`",
     "2-0": "`pants_workdir`",
     "2-1": "Stores some project-specific logs; used as a temporary directory when running `pants repl` and `pants run`.  \n  \nThis is not used for caching.  \n  \nThis must be relative to the build root.",
-    "2-2": "`<build_root>/.pants.d/`",
+    "2-2": "`<build_root>/.pants.d/workdir`",
     "3-0": "`pants_distdir`",
     "3-1": "Where Pants writes artifacts to, such as the result of `pants package`.  \n  \nThis is not used for caching; you can delete this folder and still leverage the cache from `local_store_dir`.  \n  \nThis must be relative to the build root.",
     "3-2": "`<build_root>/dist/`"
