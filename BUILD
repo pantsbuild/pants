@@ -35,7 +35,15 @@ files(
 
 experimental_test_shell_command(
     name="Check empty init files",
-    command="test -r $CHROOT/some-data-file.txt",
-    tools=["test"],
+    command="""
+        NONEMPTY_INITS=$(find . -maxdepth 1 -type f -name "*.py" -size +0);
+        if [ -n "$NONEMPTY_INITS" ]; then
+            echo "All \\`__init__.py\\` file should be empty, but the following had content:";
+            echo "$NONEMPTY_INITS";
+            exit 1;
+        fi
+        exit 0;
+    """,
+    tools=["echo", "find"],
     execution_dependencies=[":all-__init__.py-files"],
 )
