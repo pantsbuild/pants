@@ -10,6 +10,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
+    DictStringToStringField,
     IntField,
     MultipleSourcesField,
     SpecialCasedDependencies,
@@ -212,6 +213,25 @@ class AdhocToolWorkdirField(StringField):
         * Values beginning with `./` are relative to the location of the `BUILD` file.
         * `/` or the empty string specifies the build root.
         * Values beginning with `/` are also relative to the build root.
+        """
+    )
+
+
+class AdhocToolNamedCachesField(DictStringToStringField):
+    alias = "experimental_named_caches"
+    help = help_text(
+        """
+        Named caches to construct for the execution.
+        See https://www.pantsbuild.org/docs/reference-global#named_caches_dir.
+
+        The keys of the mapping are the directory name to be created in the named caches dir.
+        The values are the name of the symlink (relative to the sandbox root) in the sandbox which
+        points to the subdirectory in the named caches dir
+
+        NOTE: The named caches MUST be handled with great care. Processes accessing the named caches
+        can be run in parallel, and can be cancelled at any point in their execution (and
+        potentially restarted). That means that _every_ operation modifying the contents of the cache
+        MUST be concurrency and cancellation safe.
         """
     )
 
