@@ -608,6 +608,17 @@ impl DigestTrie {
     symlinks
   }
 
+  /// The paths of all "leaf" nodes of the DigestTrie: empty directories, files, or symlinks.
+  pub fn leaf_paths(&self) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    self.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
+      Entry::Directory(d) if d.tree.0.is_empty() => paths.push(path.to_owned()),
+      Entry::Directory(_) => {}
+      Entry::File(_) | Entry::Symlink(_) => paths.push(path.to_owned()),
+    });
+    paths
+  }
+
   /// Visit every node in the tree, calling the given function with the path to the Node, and its
   /// entries.
   /// NOTE: if SymlinkBehavior::Oblivious, `f` will never be called with a `SymlinkEntry`.
