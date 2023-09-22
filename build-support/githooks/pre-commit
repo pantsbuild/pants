@@ -38,6 +38,3 @@ fi
 
 echo "* Checking __init__.py files"
 $_PANTS_PRE_COMMIT_BINARY run build-support/bin/check_inits.py
-
-echo "* Checking for banned imports"
-$_PANTS_PRE_COMMIT_BINARY run build-support/bin/check_banned_imports.py
