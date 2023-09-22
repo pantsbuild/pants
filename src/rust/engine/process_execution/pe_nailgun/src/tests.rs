@@ -11,23 +11,24 @@ use workunit_store::WorkunitStore;
 use crate::NailgunPool;
 use crate::{NamedCaches, Process};
 
-fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs) {
+fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs, TempDir) {
   let _ = WorkunitStore::setup_for_tests();
-  let named_caches_dir = TempDir::new().unwrap();
-  let store_dir = TempDir::new().unwrap();
+  let base_dir = TempDir::new().unwrap();
+  let named_caches_dir = base_dir.path().join("named");
+  let store_dir = base_dir.path().join("store");
   let executor = Executor::new();
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-  let base_dir = std::env::temp_dir();
+  let store = Store::local_only(executor.clone(), &store_dir).unwrap();
 
-  let pool = NailgunPool::new(base_dir.clone(), size, store.clone(), executor);
+  let pool = NailgunPool::new(base_dir.path().to_owned(), size, store.clone(), executor);
   (
     pool,
-    NamedCaches::new_local(named_caches_dir.path().to_owned()),
-    ImmutableInputs::new(store, &base_dir).unwrap(),
+    NamedCaches::new_local(named_caches_dir),
+    ImmutableInputs::new(store, base_dir.path()).unwrap(),
+    base_dir,
   )
 }
 
-async fn run(pool: &(NailgunPool, NamedCaches, ImmutableInputs), port: u16) -> PathBuf {
+async fn run(pool: &(NailgunPool, NamedCaches, ImmutableInputs, TempDir), port: u16) -> PathBuf {
   let mut p = pool
     .0
     .acquire(

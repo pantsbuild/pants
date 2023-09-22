@@ -41,6 +41,10 @@ tower-service = { workspace = true }
 tryfuture = { path = "../../tryfuture" }
 uuid = { workspace = true, features = ["v4"] }
 workunit_store = { path = "../../workunit_store" }
+opendal = { workspace = true, default-features = false, features = [
+  "services-memory",
+  "services-fs",
+] }
 
 [dev-dependencies]
 criterion = { workspace = true }
