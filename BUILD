@@ -27,16 +27,19 @@ files(
     name="all-__init__.py-files",
     sources=[
         "**/__init__.py",
+        "!testprojects/**",
         # These are explicit namespace packages
         "!src/python/pants/__init__.py",
         "!src/python/pants/testutil/__init__.py",
     ]
 )
 
+# NB: This should be in `lint` when we implement `lint` in https://github.com/pantsbuild/pants/issues/17729
 experimental_test_shell_command(
-    name="Check empty init files",
+    name="checks-empty-init-files",
     command="""
-        NONEMPTY_INITS=$(find . -maxdepth 1 -type f -name "*.py" -size +0);
+        NONEMPTY_INITS=$(find . -type f -name "*.py" -size +0);
+
         if [ -n "$NONEMPTY_INITS" ]; then
             echo "All \\`__init__.py\\` file should be empty, but the following had content:";
             echo "$NONEMPTY_INITS";
