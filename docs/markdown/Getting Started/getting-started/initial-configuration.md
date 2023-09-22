@@ -62,9 +62,8 @@ If you use Git, we recommend adding these lines to your top-level `.gitignore` f
 
 ```text .gitignore
 # Pants workspace files
-/.pants.*
+/.pants.d
 /dist/
-/.pids
 ```
 
 > 📘 FYI: Pants will ignore all files in your `.gitignore` by default
