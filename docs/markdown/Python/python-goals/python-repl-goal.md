@@ -84,9 +84,9 @@ Out[1]: 84
 
 To pass arguments to the repl program, use `--` at the end of the command, like this:
 ```text Shell
-$ pants repl -- -i helloworld/main.py
+$ pants repl --shell=ipython -- -i helloworld/main.py
 ```
-
+Check the documentation for the `--repl-args` option in `pants help repl` to see which shells support passing arguments.  
 
 > 📘 Tip: how to exit the REPL
 > 
