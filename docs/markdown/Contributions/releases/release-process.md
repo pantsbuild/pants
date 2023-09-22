@@ -1,7 +1,7 @@
 ---
 title: "Release process"
 slug: "release-process"
-excerpt: "How to release a new version of `pantsbuild.pants` and its plugins."
+excerpt: "How to release a new version of Pants and its plugins."
 hidden: false
 createdAt: "2020-05-16T22:36:48.334Z"
 ---
