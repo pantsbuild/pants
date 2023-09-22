@@ -161,7 +161,6 @@ async def setup_shunit2_for_target(
     shell_setup: ShellSetup.EnvironmentAware,
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
-    global_options: GlobalOptions,
     shunit2: Shunit2,
     platform: Platform,
 ) -> TestSetup:
@@ -216,7 +215,9 @@ async def setup_shunit2_for_target(
 
     env_dict = {
         "PATH": create_path_env_var(shell_setup.executable_search_path),
-        "SHUNIT_COLOR": "always" if global_options.colors else "none",
+        # Always include colors and strip them out for display below (if required), for better cache
+        # hit rates
+        "SHUNIT_COLOR": "always",
         **test_extra_env.env,
     }
     argv = (
@@ -242,7 +243,9 @@ async def setup_shunit2_for_target(
 
 @rule(desc="Run tests with Shunit2", level=LogLevel.DEBUG)
 async def run_tests_with_shunit2(
-    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any], test_subsystem: TestSubsystem
+    batch: Shunit2TestRequest.Batch[Shunit2FieldSet, Any],
+    test_subsystem: TestSubsystem,
+    global_options: GlobalOptions,
 ) -> TestResult:
     field_set = batch.single_element
 
@@ -252,6 +255,7 @@ async def run_tests_with_shunit2(
         result,
         address=field_set.address,
         output_setting=test_subsystem.output,
+        output_simplifier=global_options.output_simplifier(),
     )
 
 
