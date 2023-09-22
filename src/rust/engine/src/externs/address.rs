@@ -77,7 +77,7 @@ lazy_static! {
     [':', '#', '!', '@', '?', '=', ',', ' '].into();
 }
 
-#[pyclass(name = "AddressInput")]
+#[pyclass(name = "AddressInput", weakref)]
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub struct AddressInput {
   original_spec: String,
@@ -406,7 +406,7 @@ fn split_on_longest_dir_prefix<'a, 'b>(
   matched
 }
 
-#[pyclass(name = "Address")]
+#[pyclass(name = "Address", weakref)]
 #[derive(Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Address {
   // NB: Field ordering is deliberate, so that Ord will roughly match `self.spec`.

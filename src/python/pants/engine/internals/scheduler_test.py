@@ -30,6 +30,16 @@ class B:
     pass
 
 
+@dataclass(frozen=True)
+class C:
+    pass
+
+
+@dataclass(frozen=True)
+class D:
+    b: B
+
+
 @rule
 def consumes_a_and_b(a: A, b: B) -> str:
     return str(f"{a} and {b}")
@@ -47,7 +57,7 @@ def test_use_params() -> None:
     assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # And confirm that a superset of Params is also accepted.
-    result_str = rule_runner.request(str, [a, b, b"bytes aren't used by any rules"])
+    result_str = rule_runner.request(str, [a, b, C()])
     assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # But not a subset.
@@ -56,19 +66,9 @@ def test_use_params() -> None:
         rule_runner.request(str, [a])
 
 
-@dataclass(frozen=True)
-class C:
-    pass
-
-
 @rule
 def transitive_b_c(c: C) -> B:
     return B()
-
-
-@dataclass(frozen=True)
-class D:
-    b: B
 
 
 @rule
@@ -114,22 +114,13 @@ def boolean_and_int(i: int, b: bool) -> A:
     return A()
 
 
-def test_strict_equals() -> None:
-    rule_runner = RuleRunner(rules=[boolean_and_int, QueryRule(A, [int, bool])])
-    # With the default implementation of `__eq__` for boolean and int, `1 == True`. But in the
-    # engine, that behavior would be surprising and would cause both of these Params to intern
-    # to the same value, triggering an error. Instead, the engine additionally includes the
-    # type of a value in equality.
-    assert A() == rule_runner.request(A, [1, True])
-
-
 # -----------------------------------------------------------------------------------------------
 # Test direct @rule calls
 # -----------------------------------------------------------------------------------------------
 
 
 @rule
-async def b(i: int) -> B:
+async def b(i: D) -> B:
     return B()
 
 
@@ -140,7 +131,7 @@ def c() -> C:
 
 @rule
 async def a() -> A:
-    _ = await b(**implicitly(int(1)))
+    _ = await b(**implicitly(D(B())))
     _ = await c()
     return A()
 
@@ -218,11 +209,11 @@ def test_union_rules_in_scope_via_query() -> None:
     assert rule_runner.request(int, [WrappedVehicle(Car()), Fuel()]) == 4
     assert rule_runner.request(int, [WrappedVehicle(Motorcycle()), Fuel()]) == 2
 
-    # Fails due to no union relationship between Vehicle -> str.
+    # Fails due to no union relationship between Vehicle -> A.
     with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(int, [WrappedVehicle("not a vehicle"), Fuel()])  # type: ignore[arg-type]
+        rule_runner.request(int, [WrappedVehicle(A()), Fuel()])  # type: ignore[arg-type]
     assert (
-        "Invalid Get. Because an input type for `Get(int, Vehicle, not a vehicle)` was "
+        "Invalid Get. Because an input type for `Get(int, Vehicle, A())` was "
         "annotated with `@union`, the value for that type should be a member of that union. Did you "
         "intend to register a `UnionRule`?"
     ) in str(exc.value.args[0])
@@ -254,7 +245,7 @@ def test_union_rules_in_scope_computed() -> None:
 
 
 def create_outlined_get() -> Get[int]:
-    return Get(int, str, "hello")
+    return Get(int, A())
 
 
 @rule
@@ -272,9 +263,9 @@ def test_outlined_get() -> None:
     # Fails because the creation of the `Get` was out-of-lined into a separate function.
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(int, [])
-    assert (
-        "Get(int, str, hello) was not detected in your @rule body at rule compile time."
-    ) in str(exc.value.args[0])
+    assert ("Get(int, A, A()) was not detected in your @rule body at rule compile time.") in str(
+        exc.value.args[0]
+    )
 
 
 @rule
@@ -283,7 +274,7 @@ async def uses_rule_helper_before_definition() -> int:
 
 
 async def get_after_rule() -> int:
-    return await Get(int, str, "hello")
+    return await Get(int, A())
 
 
 def test_rule_helper_after_rule_definition_fails() -> None:
@@ -296,9 +287,9 @@ def test_rule_helper_after_rule_definition_fails() -> None:
 
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(int, [])
-    assert (
-        "Get(int, str, hello) was not detected in your @rule body at rule compile time."
-    ) in str(exc.value.args[0])
+    assert ("Get(int, A, A()) was not detected in your @rule body at rule compile time.") in str(
+        exc.value.args[0]
+    )
 
 
 @dataclass(frozen=True)

@@ -268,7 +268,7 @@ class Example(Goal):
 
 @goal_rule
 async def a_goal_rule_generator(console: Console) -> Example:
-    a = await Get(A, str("a str!"))
+    a = await Get(A, B())
     console.print_stdout(str(a))
     return Example(exit_code=0)
 
@@ -278,7 +278,7 @@ class TestRule:
         res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
-            mock_gets=[MockGet(output_type=A, input_types=(str,), mock=lambda _: A())],
+            mock_gets=[MockGet(output_type=A, input_types=(B,), mock=lambda _: A())],
         )
         assert res == Example(0)
 

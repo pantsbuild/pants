@@ -23,6 +23,7 @@ use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
 mod address;
+mod collection;
 pub mod dep_inference;
 pub mod engine_aware;
 pub mod fs;

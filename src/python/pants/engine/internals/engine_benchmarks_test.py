@@ -9,15 +9,20 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @dataclass(frozen=True)
+class Input:
+    val: int
+
+
+@dataclass(frozen=True)
 class Deep:
     val: int
 
 
 @rule
-async def deep(n: int) -> Deep:
-    if n < 2:
-        return Deep(n)
-    x, y = tuple(await MultiGet([Get(Deep, int(n - 2)), Get(Deep, int(n - 1))]))
+async def deep(n: Input) -> Deep:
+    if n.val < 2:
+        return Deep(n.val)
+    x, y = tuple(await MultiGet([Get(Deep, Input(n.val - 2)), Get(Deep, Input(n.val - 1))]))
     return Deep(x.val + y.val)
 
 
@@ -27,21 +32,21 @@ class Wide:
 
 
 @rule
-async def wide(index: int) -> Wide:
-    if index > 0:
-        _ = await MultiGet([Get(Wide, int(randrange(index))) for _ in range(100)])
-    return Wide(index)
+async def wide(index: Input) -> Wide:
+    if index.val > 0:
+        _ = await MultiGet([Get(Wide, Input(randrange(index.val))) for _ in range(100)])
+    return Wide(index.val)
 
 
 def test_bench_deep():
-    rule_runner = RuleRunner(rules=[deep, QueryRule(Deep, (int,))])
+    rule_runner = RuleRunner(rules=[deep, QueryRule(Deep, (Input,))])
     for _ in range(0, 10):
         rule_runner.scheduler.scheduler.invalidate_all()
-        _ = rule_runner.request(Deep, [10000])
+        _ = rule_runner.request(Deep, [Input(1000)])
 
 
 def test_bench_wide():
-    rule_runner = RuleRunner(rules=[wide, QueryRule(Wide, (int,))])
+    rule_runner = RuleRunner(rules=[wide, QueryRule(Wide, (Input,))])
     for _ in range(0, 5):
         rule_runner.scheduler.scheduler.invalidate_all()
-        _ = rule_runner.request(Wide, [1000])
+        _ = rule_runner.request(Wide, [Input(1000)])

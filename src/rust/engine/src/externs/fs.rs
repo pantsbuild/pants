@@ -50,7 +50,7 @@ pub fn possible_store_missing_digest(e: store::StoreError) -> PyErr {
   failure.into()
 }
 
-#[pyclass(name = "Digest")]
+#[pyclass(name = "Digest", weakref)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyDigest(pub DirectoryDigest);
 
@@ -107,7 +107,7 @@ impl PyDigest {
   }
 }
 
-#[pyclass(name = "FileDigest")]
+#[pyclass(name = "FileDigest", weakref)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PyFileDigest(pub Digest);
 
@@ -151,7 +151,7 @@ impl PyFileDigest {
   }
 }
 
-#[pyclass(name = "Snapshot")]
+#[pyclass(name = "Snapshot", weakref)]
 pub struct PySnapshot(pub Snapshot);
 
 #[pymethods]
@@ -253,7 +253,7 @@ impl PySnapshot {
   }
 }
 
-#[pyclass(name = "MergeDigests")]
+#[pyclass(name = "MergeDigests", weakref)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
 
@@ -294,7 +294,7 @@ impl PyMergeDigests {
   }
 }
 
-#[pyclass(name = "AddPrefix")]
+#[pyclass(name = "AddPrefix", weakref)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct PyAddPrefix {
   pub digest: DirectoryDigest,
@@ -335,7 +335,7 @@ impl PyAddPrefix {
   }
 }
 
-#[pyclass(name = "RemovePrefix")]
+#[pyclass(name = "RemovePrefix", weakref)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct PyRemovePrefix {
   pub digest: DirectoryDigest,
@@ -416,7 +416,7 @@ impl<'source> FromPyObject<'source> for PyPathGlobs {
 // FilespecMatcher
 // -----------------------------------------------------------------------------
 
-#[pyclass(name = "FilespecMatcher")]
+#[pyclass(name = "FilespecMatcher", weakref)]
 #[derive(Debug)]
 pub struct PyFilespecMatcher(FilespecMatcher);
 

@@ -136,7 +136,7 @@ class MockTarget(Target):
 
 @dataclass(frozen=True)
 class MockCoverageData(CoverageData):
-    addresses: Iterable[Address]
+    addresses: tuple[Address, ...]
 
 
 class MockCoverageDataCollection(CoverageDataCollection):
@@ -177,14 +177,14 @@ class MockTestRequest(TestRequest):
 
     @classmethod
     def test_result(cls, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
-        addresses = [field_set.address for field_set in field_sets]
+        addresses = tuple(field_set.address for field_set in field_sets)
         return TestResult(
             exit_code=cls.exit_code(addresses),
             stdout_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_bytes=b"",
             stderr_digest=EMPTY_FILE_DIGEST,
-            addresses=tuple(addresses),
+            addresses=addresses,
             coverage_data=MockCoverageData(addresses),
             output_setting=ShowOutput.ALL,
             result_metadata=None if cls.skipped(addresses) else make_process_result_metadata("ran"),

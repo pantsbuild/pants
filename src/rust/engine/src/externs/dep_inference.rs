@@ -20,7 +20,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyInferenceMetadata>()
 }
 
-#[pyclass(name = "InferenceMetadata")]
+#[pyclass(name = "InferenceMetadata", weakref)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyInferenceMetadata(pub dependency_inference_request::Metadata);
 
@@ -65,7 +65,7 @@ impl PyInferenceMetadata {
   }
 }
 
-#[pyclass(name = "NativeDependenciesRequest")]
+#[pyclass(name = "NativeDependenciesRequest", weakref)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyNativeDependenciesRequest {
   pub directory_digest: DirectoryDigest,

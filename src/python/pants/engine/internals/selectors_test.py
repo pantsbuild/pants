@@ -11,6 +11,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.unions import union
 
 
+@dataclass(frozen=True)
 class AClass:
     pass
 
@@ -26,22 +27,22 @@ def test_create_get() -> None:
     assert get1.input_types == []
     assert get1.inputs == []
 
-    get2 = Get(AClass, int, 42)
+    get2 = Get(AClass, BClass, BClass())
     assert get2.output_type is AClass
-    assert get2.input_types == [int]
-    assert get2.inputs == [42]
+    assert get2.input_types == [BClass]
+    assert get2.inputs == [BClass()]
 
     # Also test the equivalence of the 1-arg and 2-arg versions.
-    get3 = Get(AClass, int(42))
+    get3 = Get(AClass, BClass())
     assert get2.output_type == get3.output_type
     assert get2.input_types == get3.input_types
     assert get2.inputs == get3.inputs
 
     # And finally the multiple parameter syntax.
-    get4 = Get(AClass, {42: int, "hello": str})
+    get4 = Get(AClass, {AClass(): AClass, BClass(): BClass})
     assert get4.output_type is AClass
-    assert get4.input_types == [int, str]
-    assert get4.inputs == [42, "hello"]
+    assert get4.input_types == [AClass, BClass]
+    assert get4.inputs == [AClass(), BClass()]
 
 
 def assert_invalid_get(create_get: Callable[[], Get], *, expected: str) -> None:
@@ -91,10 +92,10 @@ def test_invalid_get() -> None:
 
 def test_invalid_get_input_does_not_match_type() -> None:
     assert_invalid_get(
-        lambda: Get(AClass, str, 1),
+        lambda: Get(AClass, AClass, 1),
         expected=(
             f"Invalid Get. The third argument `1` must have the exact same type as the "
-            f"second argument, {str}, but had the type {int}."
+            f"second argument, {AClass}, but had the type {int}."
         ),
     )
 
@@ -103,9 +104,9 @@ def test_invalid_get_input_does_not_match_type() -> None:
     class UnionBase:
         pass
 
-    union_get = Get(AClass, UnionBase, 1)
+    union_get = Get(AClass, UnionBase, AClass())
     assert union_get.input_types == [UnionBase]
-    assert union_get.inputs == [1]
+    assert union_get.inputs == [AClass()]
 
 
 def test_multiget_invalid_types() -> None:

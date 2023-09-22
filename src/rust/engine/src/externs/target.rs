@@ -35,7 +35,7 @@ impl NoFieldValue {
   }
 }
 
-#[pyclass(subclass)]
+#[pyclass(subclass, weakref)]
 pub struct Field {
   value: PyObject,
 }

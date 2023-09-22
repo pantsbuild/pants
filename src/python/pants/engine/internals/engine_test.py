@@ -77,17 +77,17 @@ class Fib:
     val: int
 
 
-@rule(desc="Fibonacci", level=LogLevel.INFO)
-async def fib(n: int) -> Fib:
-    if n < 2:
-        return Fib(n)
-    x, y = tuple(await MultiGet([Get(Fib, int(n - 2)), Get(Fib, int(n - 1))]))
-    return Fib(x.val + y.val)
-
-
 @dataclass(frozen=True)
 class MyInt:
     val: int
+
+
+@rule(desc="Fibonacci", level=LogLevel.INFO)
+async def fib(n: MyInt) -> Fib:
+    if n.val < 2:
+        return Fib(n.val)
+    x, y = tuple(await MultiGet([Get(Fib, MyInt(n.val - 2)), Get(Fib, MyInt(n.val - 1))]))
+    return Fib(x.val + y.val)
 
 
 @dataclass(frozen=True)
@@ -187,8 +187,10 @@ class TestEngine(SchedulerTestBase):
 
     def test_recursive_multi_get(self, tmp_path: Path) -> None:
         # Tests that a rule that "uses itself" multiple times per invoke works.
-        rules = [fib, QueryRule(Fib, (int,))]
-        (fib_10,) = self.mk_scheduler(tmp_path, rules=rules).product_request(Fib, subjects=[10])
+        rules = [fib, QueryRule(Fib, (MyInt,))]
+        (fib_10,) = self.mk_scheduler(tmp_path, rules=rules).product_request(
+            Fib, subjects=[MyInt(10)]
+        )
         assert 55 == fib_10.val
 
     def test_no_include_trace_error_raises_boring_error(self, tmp_path: Path) -> None:
@@ -332,19 +334,19 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
     def test_streaming_workunits_reporting(self, tmp_path: Path) -> None:
         scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path / "start", [fib, QueryRule(Fib, (int,))]
+            tmp_path / "start", [fib, QueryRule(Fib, (MyInt,))]
         )
         with handler:
-            scheduler.product_request(Fib, subjects=[0])
+            scheduler.product_request(Fib, subjects=[MyInt(0)])
         flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         # The execution of the single named @rule "fib" should be providing this one workunit.
         assert len(flattened) == 1
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path / "second", [fib, QueryRule(Fib, (int,))]
+            tmp_path / "second", [fib, QueryRule(Fib, (MyInt,))]
         )
         with handler:
-            scheduler.product_request(Fib, subjects=[10])
+            scheduler.product_request(Fib, subjects=[MyInt(10)])
 
         # Requesting a bigger fibonacci number will result in more rule executions and thus
         # more reported workunits. In this case, we expect 11 invocations of the `fib` rule.
@@ -495,16 +497,16 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return self._level
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> ModifiedOutput:
-            return ModifiedOutput(val=n, _level=LogLevel.ERROR)
+        def a_rule(n: MyInt) -> ModifiedOutput:
+            return ModifiedOutput(val=n.val, _level=LogLevel.ERROR)
 
         scheduler, tracker, handler = self._fixture_for_rules(
             tmp_path,
-            [a_rule, QueryRule(ModifiedOutput, (int,))],
+            [a_rule, QueryRule(ModifiedOutput, (MyInt,))],
             max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler:
-            scheduler.product_request(ModifiedOutput, subjects=[0])
+            scheduler.product_request(ModifiedOutput, subjects=[MyInt(0)])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
@@ -554,16 +556,16 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return self._level
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> ModifiedOutput:
-            return ModifiedOutput(val=n, _level=None)
+        def a_rule(n: MyInt) -> ModifiedOutput:
+            return ModifiedOutput(val=n.val, _level=None)
 
         scheduler, tracker, handler = self._fixture_for_rules(
             tmp_path,
-            [a_rule, QueryRule(ModifiedOutput, (int,))],
+            [a_rule, QueryRule(ModifiedOutput, (MyInt,))],
             max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler:
-            scheduler.product_request(ModifiedOutput, subjects=[0])
+            scheduler.product_request(ModifiedOutput, subjects=[MyInt(0)])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
@@ -583,14 +585,14 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return {"some_arbitrary_key": EMPTY_SNAPSHOT}
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> Output:
-            return Output(val=n)
+        def a_rule(n: MyInt) -> Output:
+            return Output(val=n.val)
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path, [a_rule, QueryRule(Output, (MyInt,))], max_workunit_verbosity=LogLevel.TRACE
         )
         with handler:
-            scheduler.product_request(Output, subjects=[0])
+            scheduler.product_request(Output, subjects=[MyInt(0)])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
@@ -611,14 +613,14 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return {"k1": 1, "k2": "a string", "k3": [1, 2, 3]}
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> Output:
-            return Output(val=n)
+        def a_rule(n: MyInt) -> Output:
+            return Output(val=n.val)
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path, [a_rule, QueryRule(Output, (MyInt,))], max_workunit_verbosity=LogLevel.TRACE
         )
         with handler:
-            scheduler.product_request(Output, subjects=[0])
+            scheduler.product_request(Output, subjects=[MyInt(0)])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
@@ -644,14 +646,14 @@ class TestStreamingWorkunit(SchedulerTestBase):
                 return {10: "foo", "other_key": "other value"}
 
         @rule(desc="a_rule")
-        def a_rule(n: int) -> Output:
-            return Output(val=n)
+        def a_rule(n: MyInt) -> Output:
+            return Output(val=n.val)
 
         scheduler, tracker, handler = self._fixture_for_rules(
-            tmp_path, [a_rule, QueryRule(Output, (int,))], max_workunit_verbosity=LogLevel.TRACE
+            tmp_path, [a_rule, QueryRule(Output, (MyInt,))], max_workunit_verbosity=LogLevel.TRACE
         )
         with handler:
-            scheduler.product_request(Output, subjects=[0])
+            scheduler.product_request(Output, subjects=[MyInt(0)])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
