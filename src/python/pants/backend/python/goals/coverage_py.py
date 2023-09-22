@@ -504,7 +504,7 @@ async def generate_coverage_reports(
         # include resources here. We don't include files because relocated_files targets
         # may cause digest merge collisions. So anything you compute coverage over must
         # be a source file or a resource.
-        PythonSourceFilesRequest(transitive_targets.closure),
+        PythonSourceFilesRequest(transitive_targets.closure, include_resources=True),
     )
     input_digest = await Get(
         Digest,
