@@ -22,11 +22,6 @@ See the [getting started](https://www.pantsbuild.org/docs/getting-started) docum
 
 # Credits
 
-We release to [PyPI](https://pypi.org/pypi)
-
-[![version](https://img.shields.io/pypi/v/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
-[![license](https://img.shields.io/pypi/l/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
-
 Linux ARM64 CI resources provided by [Works on ARM](https://www.arm.com/markets/computing-infrastructure/works-on-arm).
 
 macOS CI resources provided by [MacStadium](https://www.macstadium.com/).
