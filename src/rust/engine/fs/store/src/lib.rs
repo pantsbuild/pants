@@ -43,7 +43,7 @@ use std::fs::OpenOptions;
 use std::fs::Permissions as FSPermissions;
 use std::future::Future;
 use std::io::Write;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -56,7 +56,7 @@ use fs::{
   FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
   EMPTY_DIRECTORY_DIGEST,
 };
-use futures::future::{self, BoxFuture, Either, FutureExt};
+use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use local::ByteStore;
@@ -386,11 +386,6 @@ impl Store {
   // This default suffix is also hard-coded into the Python options code in global_options.py
   pub fn default_path() -> PathBuf {
     default_cache_path().join("lmdb_store")
-  }
-
-  /// Return the device ID that the local Store is hosted on.
-  pub fn local_filesystem_device(&self) -> u64 {
-    self.local.filesystem_device()
   }
 
   ///
@@ -1183,14 +1178,24 @@ impl Store {
   /// an existing destination directory, meaning that directory and file creation must be
   /// idempotent.
   ///
+  /// If the destination (more specifically, the given parent directory of the destination, for
+  /// memoization purposes) is hardlinkable from the local store, and `!force_mutable`, hardlinks
+  /// may be used for large files which are not listed in `mutable_paths`.
+  ///
   pub async fn materialize_directory(
     &self,
     destination: PathBuf,
+    destination_root: &Path,
     digest: DirectoryDigest,
     force_mutable: bool,
     mutable_paths: &BTreeSet<RelativePath>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
+    debug_assert!(
+      destination.starts_with(destination_root),
+      "The destination root must be a parent directory of the destination."
+    );
+
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
     // parent path and its children.
     let mut parent_to_child = HashMap::new();
@@ -1210,41 +1215,21 @@ impl Store {
     }
 
     // Create the root, and determine what filesystem it and the store are on.
-    let materializing_to_same_filesystem = {
-      let store_filesystem_device = self.local_filesystem_device();
-      self
-        .local
-        .executor()
-        .spawn_blocking(
-          {
-            let destination = destination.clone();
-            move || {
-              std::fs::create_dir_all(&destination).map_err(|e| {
-                format!("Failed to create directory {}: {e}", destination.display())
-              })?;
-              let dest_device = destination
-                .metadata()
-                .map_err(|e| {
-                  format!(
-                    "Failed to get metadata for destination {}: {e}",
-                    destination.display()
-                  )
-                })?
-                .dev();
-              Ok(dest_device == store_filesystem_device)
-            }
-          },
-          |e| Err(format!("Directory creation task failed: {e}")),
-        )
-        .await?
+    let destination_is_hardlinkable = {
+      let (_, destination_is_hardlinkable) = tokio::try_join!(
+        tokio::fs::create_dir_all(&destination)
+          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display())),
+        self.local.is_hardlinkable_destination(destination_root)
+      )?;
+      destination_is_hardlinkable
     };
 
     self
       .materialize_directory_children(
-        destination.clone(),
+        destination,
         true,
         force_mutable,
-        materializing_to_same_filesystem,
+        destination_is_hardlinkable,
         &parent_to_child,
         &mutable_path_ancestors,
         perms,
