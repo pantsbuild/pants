@@ -54,6 +54,7 @@ files(
     sources=["**/*.rs"],
 )
 
+# NB: This should be in `lint` when we implement `lint` in https://github.com/pantsbuild/pants/issues/17729
 experimental_test_shell_command(
     name="checks-rust-banned-imports",
     command=f"""
