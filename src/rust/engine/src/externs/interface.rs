@@ -1657,7 +1657,7 @@ fn write_digest(
 
     // Python will have already validated that path_prefix is a relative path.
     let mut destination = PathBuf::new();
-    destination.push(core.build_root.clone());
+    destination.push(&core.build_root);
     destination.push(path_prefix);
 
     for subpath in &clear_paths {
@@ -1675,6 +1675,7 @@ fn write_digest(
         .store()
         .materialize_directory(
           destination.clone(),
+          &core.build_root,
           lifted_digest,
           true, // Force everything we write to be mutable
           &BTreeSet::new(),

@@ -467,6 +467,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
         // DOCKER-NOTE: The input root will be bind mounted into the container.
         let exclusive_spawn = prepare_workdir(
           workdir.path().to_owned(),
+          &self.work_dir_base,
           &req,
           req.input_digests.inputs.clone(),
           &self.store,

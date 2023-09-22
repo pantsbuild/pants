@@ -552,7 +552,7 @@ class Helper:
             "continue-on-error": True,
             "with": {
                 "name": f"logs-{name.replace('/', '_')}-{self.platform_name()}",
-                "path": ".pants.d/*.log",
+                "path": ".pants.d/workdir/*.log",
             },
         }
 

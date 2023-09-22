@@ -351,8 +351,8 @@ def test_process_name_setproctitle_integration(tmp_path: Path) -> None:
     buildroot.mkdir()
     manager_name = "Bob"
     process_name = f"{manager_name} [{buildroot}]"
-    metadata_base_dir = tmp_path / ".pids"
-    metadata_base_dir.mkdir()
+    metadata_base_dir = tmp_path / ".pants.d" / "pids"
+    metadata_base_dir.mkdir(parents=True)
 
     subprocess.check_call(
         args=[

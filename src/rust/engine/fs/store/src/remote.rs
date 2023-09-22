@@ -21,6 +21,10 @@ mod reapi;
 #[cfg(test)]
 mod reapi_tests;
 
+pub mod base_opendal;
+#[cfg(test)]
+mod base_opendal_tests;
+
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
   /// Store the bytes readable from `file` into the remote store
@@ -48,6 +52,8 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
 // TODO: Consider providing `impl Default`, similar to `super::LocalOptions`.
 #[derive(Clone)]
 pub struct RemoteOptions {
+  // TODO: this is currently framed for the REAPI provider, with some options used by others, would
+  // be good to generalise
   pub cas_address: String,
   pub instance_name: Option<String>,
   pub headers: BTreeMap<String, String>,
@@ -58,6 +64,28 @@ pub struct RemoteOptions {
   pub rpc_concurrency_limit: usize,
   pub capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   pub batch_api_size_limit: usize,
+}
+
+// TODO: this is probably better positioned somewhere else
+pub const REAPI_ADDRESS_SCHEMAS: [&str; 3] = ["grpc://", "grpcs://", "http://"];
+
+async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProvider>, String> {
+  let address = options.cas_address.clone();
+  if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
+    Ok(Arc::new(reapi::Provider::new(options).await?))
+  } else if let Some(path) = address.strip_prefix("file://") {
+    // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
+    // testing.
+    Ok(Arc::new(base_opendal::Provider::fs(
+      path,
+      "byte-store".to_owned(),
+      options,
+    )?))
+  } else {
+    Err(format!(
+      "Cannot initialise remote byte store provider with address {address}, as the scheme is not supported",
+    ))
+  }
 }
 
 #[derive(Clone)]
@@ -108,7 +136,7 @@ impl ByteStore {
 
   pub async fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
     let instance_name = options.instance_name.clone();
-    let provider = Arc::new(reapi::Provider::new(options).await?);
+    let provider = choose_provider(options).await?;
     Ok(ByteStore::new(instance_name, provider))
   }
 
