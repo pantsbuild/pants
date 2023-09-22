@@ -34,7 +34,7 @@ from pants.core.target_types import (
     ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
-from pants.testutil.python_interpreter_selection import skip_unless_python36_present
+from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
 
@@ -283,21 +283,21 @@ def test_resolve_local_platforms(pex_executable: str, rule_runner: PythonRuleRun
     subprocess.run([executable], check=True)
 
 
-@skip_unless_python36_present
+@skip_unless_python38_present
 def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
-    linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py36.json")
+    linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py38.json")
     assert linux_complete_platform is not None
 
-    mac_complete_platform = pkgutil.get_data(__name__, "platform-mac-py36.json")
+    mac_complete_platform = pkgutil.get_data(__name__, "platform-mac-py38.json")
     assert mac_complete_platform is not None
 
     rule_runner.write_files(
         {
-            "src/py/project/platform-linux-py36.json": linux_complete_platform,
-            "src/py/project/platform-mac-py36.json": mac_complete_platform,
+            "src/py/project/platform-linux-py38.json": linux_complete_platform,
+            "src/py/project/platform-mac-py38.json": mac_complete_platform,
             "src/py/project/BUILD": dedent(
                 """\
-                python_requirement(name="p537", requirements=["p537==1.0.4"])
+                python_requirement(name="p537", requirements=["p537==1.0.6"])
                 files(name="platforms", sources=["platform*.json"])
                 pex_binary(
                     dependencies=[":p537"],
@@ -327,8 +327,8 @@ def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
     )
     assert sorted(
         [
-            "p537-1.0.4-cp36-cp36m-manylinux1_x86_64.whl",
-            "p537-1.0.4-cp36-cp36m-macosx_10_13_x86_64.whl",
+            "p537-1.0.6-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.whl",
+            "p537-1.0.6-cp38-cp38-macosx_10_15_x86_64.whl",
         ]
     ) == sorted(pex_info["distributions"])
 
