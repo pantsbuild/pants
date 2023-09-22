@@ -218,7 +218,7 @@ def generate_java_parser_lockfile_request(
             {
                 "com.fasterxml.jackson.core:jackson-databind:2.12.4",
                 "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.4",
-                "com.github.javaparser:javaparser-symbol-solver-core:3.24.4",
+                "com.github.javaparser:javaparser-symbol-solver-core:3.25.5",
             }
         ),
         artifact_option_name="n/a",
