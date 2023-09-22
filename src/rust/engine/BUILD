@@ -58,7 +58,7 @@ files(
 experimental_test_shell_command(
     name="checks-rust-banned-imports",
     command=f"""
-        BAD_FILES=$(grep -r -l -E "^use std::sync::.*(Mutex|RwLock)" {build_file_dir()})
+        BAD_FILES=$(grep -r -l -E "^use std::sync::.*(Mutex|RwLock)" {build_file_dir()});
         if [ -n "$BAD_FILES" ]; then
             echo "The following files contained banned \\`std::sync\\` imports (\\`Mutex\\` and \\`RWLock\\`).";
             echo "(Hint: Use the \\`parking_lot::\\` equivalent)";
