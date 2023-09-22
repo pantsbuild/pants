@@ -136,7 +136,7 @@ async def run_repl(
         console.print_stderr(
             softwrap(
                 f"""
-                REPL goal does not support passing args to a {repr(repl_shell_name)} shell.  
+                REPL goal does not support passing args to a {repr(repl_shell_name)} shell.
                 """
             )
         )
