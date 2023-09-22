@@ -66,7 +66,7 @@ from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import classproperty
-from pants.util.strutil import help_text, softwrap
+from pants.util.strutil import Simplifier, help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,8 @@ class TestResult(EngineAwareReturnType):
     extra_output: Snapshot | None = None
     # True if the core test rules should log that extra output was written.
     log_extra_output: bool = False
+
+    output_simplifier: Simplifier = Simplifier()
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -141,6 +143,7 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
         log_extra_output: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
@@ -155,6 +158,7 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
             log_extra_output=log_extra_output,
+            output_simplifier=output_simplifier,
         )
 
     @staticmethod
@@ -167,6 +171,7 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
         log_extra_output: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
@@ -181,6 +186,7 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
             log_extra_output=log_extra_output,
+            output_simplifier=output_simplifier,
             partition_description=batch.partition_metadata.description,
         )
 
@@ -224,6 +230,9 @@ class TestResult(EngineAwareReturnType):
             return LogLevel.DEBUG
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
+    def _simplified_output(self, v: bytes) -> str:
+        return self.output_simplifier.simplify(v.decode(errors="replace"))
+
     def message(self) -> str:
         if self.exit_code is None:
             return "no tests found."
@@ -237,9 +246,9 @@ class TestResult(EngineAwareReturnType):
             return message
         output = ""
         if self.stdout_bytes:
-            output += f"\n{self.stdout_bytes.decode(errors='replace')}"
+            output += f"\n{self._simplified_output(self.stdout_bytes)}"
         if self.stderr_bytes:
-            output += f"\n{self.stderr_bytes.decode(errors='replace')}"
+            output += f"\n{self._simplified_output(self.stderr_bytes)}"
         if output:
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
