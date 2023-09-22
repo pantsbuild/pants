@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
-use fs::{DirectoryDigest, SymlinkBehavior};
+use fs::DirectoryDigest;
 use futures::future::{self, FutureExt};
 use futures::Future;
 use hashing::Digest;
@@ -1683,10 +1683,10 @@ fn write_digest(
         .await?;
 
       let snapshot = store::Snapshot::from_digest(store, lifted_digest).await?;
-      let files = snapshot.tree.files(SymlinkBehavior::Aware);
+      let paths = snapshot.tree.leaf_paths();
       py_scheduler
         .0
-        .invalidate_paths(&files.into_iter().collect());
+        .invalidate_paths(&paths.into_iter().collect());
 
       Ok(())
     })
