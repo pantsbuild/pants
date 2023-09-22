@@ -12,13 +12,9 @@ In such cases, users are typically still able to access internal proxies and ser
 Installing Pants
 ----------------
 
-The `pants` script from [Installing Pants](doc:installation) uses PyPI to download and install the wheel `pantsbuild.pants` and all of Pants's dependencies. 
+The `pants` launcher from [Installing Pants](doc:installation) uses GitHub Releases to download and install a PEX including Pants and all itsdependencies.
 
-If you cannot access PyPI directly, you may have an internal mirror or custom Python package repository. If so, you can ensure that `pantsbuild.pants` and all of its dependencies are available in that repository, and modify your `pants` script to bootstrap from it.
-
-Otherwise, you may instead download Pants as a PEX binary from <https://github.com/pantsbuild/pants/releases>. After downloading the PEX artifact, you can rename the file to `pants`, run `chmod +x pants`, then run `pants --version` like you normally would. 
-
-You may want to check the binary into version control so that everyone in your organization can use it. To upgrade to a new Pants release, update the `pants_version` option in `pants.toml` and download the newest release from <https://github.com/pantsbuild/pants/releases>.
+If you cannot access GitHub directly, you will need to follow the instructions for firewalls/restricted internet access for [the launcher itself](https://github.com/pantsbuild/scie-pants).
 
 Setting up a Certificate Authority
 ----------------------------------
