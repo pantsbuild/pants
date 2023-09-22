@@ -12,6 +12,7 @@ import textwrap
 from collections import abc
 from typing import Any, Callable, Iterable, TypeVar
 
+import colors
 from typing_extensions import ParamSpec
 
 from pants.engine.internals.native_engine import Digest
@@ -165,6 +166,29 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     if isinstance(v, bytes):
         v = v.decode()
     return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
+
+
+@dataclasses.dataclass(frozen=True)
+class Simplifier:
+    """Helper for options for conditionally simplifying a string."""
+
+    strip_chroot_path: bool = False
+    """remove all instances of the chroot tmpdir path"""
+    strip_formatting: bool = False
+    """remove ANSI formatting commands (colors, bold, etc)"""
+
+    def simplify(self, v: bytes | str) -> str:
+        chroot = (
+            strip_v2_chroot_path(v)
+            if self.strip_chroot_path
+            else v.decode()
+            if isinstance(v, bytes)
+            else v
+        )
+        formatting = colors.strip_color(chroot) if self.strip_formatting else chroot
+        assert isinstance(formatting, str)
+
+        return formatting
 
 
 def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
