@@ -169,7 +169,7 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
         self, *, log_level: str = "info", extra_config: dict[str, Any] | None = None
     ) -> Iterator[tuple[str, dict[str, Any], PantsDaemonMonitor]]:
         with temporary_dir(root_dir=os.getcwd()) as dot_pants_dot_d:
-            pid_dir = os.path.join(dot_pants_dot_d, ".pants.d", "pids")
+            pid_dir = os.path.join(dot_pants_dot_d, "pids")
             workdir = os.path.join(dot_pants_dot_d, "workdir")
             print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
             pantsd_config = {
