@@ -13,7 +13,7 @@ from pants.testutil.rule_runner import RuleRunner, mock_console
 
 class MockRepl(ReplImplementation):
     name = "mock"
-    supports_passthrough_args = False
+    supports_args = False
 
 
 @rule

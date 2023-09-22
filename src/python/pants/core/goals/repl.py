@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple, cast, Type
+from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple, Type, cast
 
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses
@@ -33,7 +33,7 @@ class ReplImplementation(ABC):
     """
 
     name: ClassVar[str]
-    supports_passthrough_args: ClassVar[bool]
+    supports_args: ClassVar[bool]
 
     targets: Sequence[Target]
 
@@ -117,7 +117,9 @@ async def run_repl(
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
     implementations = {impl.name: impl for impl in union_membership[ReplImplementation]}
-    repl_implementation_cls = cast(Optional[Type[ReplImplementation]], implementations.get(repl_shell_name))
+    repl_implementation_cls = cast(
+        Optional[Type[ReplImplementation]], implementations.get(repl_shell_name)
+    )
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())
         console.print_stderr(
@@ -130,7 +132,7 @@ async def run_repl(
         )
         return Repl(-1)
 
-    if repl_subsystem.args and not repl_implementation_cls.supports_passthrough_args:
+    if repl_subsystem.args and not repl_implementation_cls.supports_args:
         console.print_stderr(
             softwrap(
                 f"""
