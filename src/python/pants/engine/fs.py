@@ -295,11 +295,14 @@ class Workspace(SideEffecting):
         Get(Digest, MergeDigests)` beforehand.
 
         As an advanced usecase, if the digest is known to be written to a temporary or idempotent
-        location, side_effecting=False may be passed to avoid tracking this write as a side effect.
+        location, side_effecting=False may be passed to avoid tracking this write as a side effect
+        and invalidating files.
         """
         if side_effecting:
             self.side_effected()
-        self._scheduler.write_digest(digest, path_prefix=path_prefix, clear_paths=clear_paths)
+        self._scheduler.write_digest(
+            digest, path_prefix=path_prefix, clear_paths=clear_paths, invalidate=side_effecting
+        )
 
 
 @dataclass(frozen=True)
