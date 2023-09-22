@@ -1202,6 +1202,7 @@ async fn materialize_missing_directory() {
   store
     .materialize_directory(
       materialize_dir.path().to_owned(),
+      materialize_dir.path(),
       TestDirectory::recursive().directory_digest(),
       false,
       &BTreeSet::new(),
@@ -1236,6 +1237,7 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
   store
     .materialize_directory(
       materialize_dir.path().to_owned(),
+      materialize_dir.path(),
       recursive_testdir.directory_digest(),
       false,
       &BTreeSet::new(),
@@ -1699,11 +1701,13 @@ async fn explicitly_overwrites_already_existing_file() {
     .directory(&contents_dir)
     .file(&cas_file)
     .build();
-  let store = new_store(tempfile::tempdir().unwrap(), &cas.address()).await;
+  let store_dir = tempfile::tempdir().unwrap();
+  let store = new_store(store_dir.path(), &cas.address()).await;
 
   store
     .materialize_directory(
       dir_to_write_to.path().to_owned(),
+      dir_to_write_to.path(),
       contents_dir.directory_digest(),
       false,
       &BTreeSet::new(),
@@ -1716,7 +1720,6 @@ async fn explicitly_overwrites_already_existing_file() {
   assert_eq!(file_contents, b"abc123".to_vec());
 }
 
-#[ignore] // see #17754
 #[tokio::test]
 async fn big_file_immutable_link() {
   let materialize_dir = TempDir::new().unwrap();
@@ -1779,6 +1782,7 @@ async fn big_file_immutable_link() {
   store
     .materialize_directory(
       materialize_dir.path().to_owned(),
+      materialize_dir.path(),
       directory_digest,
       false,
       &BTreeSet::from([
