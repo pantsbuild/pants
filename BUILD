@@ -31,7 +31,7 @@ files(
         # These are explicit namespace packages
         "!src/python/pants/__init__.py",
         "!src/python/pants/testutil/__init__.py",
-    ]
+    ],
 )
 
 # NB: This should be in `lint` when we implement `lint` in https://github.com/pantsbuild/pants/issues/17729
