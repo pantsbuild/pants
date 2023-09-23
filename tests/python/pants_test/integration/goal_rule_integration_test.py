@@ -31,8 +31,7 @@ def test_unimplemented_goals_error() -> None:
         run_pants(["--backend-packages=['pants.backend.python']", "run", tmpdir]).assert_success()
 
 
-@pytest.mark.skip(reason="Flaky test. https://github.com/pantsbuild/pants/issues/10478")
-@pytest.mark.no_error_if_skipped
+# Historically flaky: https://github.com/pantsbuild/pants/issues/10478
 class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     hermetic = False
 
