@@ -19,8 +19,17 @@ impl Env {
     Self { env }
   }
 
-  pub fn capture() -> Self {
-    Self::new(env::vars().collect::<HashMap<_, _>>())
+  pub fn capture_lossy() -> Self {
+    Self::new(
+      env::vars_os()
+        .map(|(k, v)| {
+          (
+            k.to_string_lossy().to_string(),
+            v.to_string_lossy().to_string(),
+          )
+        })
+        .collect::<HashMap<_, _>>(),
+    )
   }
 
   fn env_var_names(id: &OptionId) -> Vec<String> {
@@ -37,6 +46,16 @@ impl Env {
       names.push(name);
     }
     names
+  }
+}
+
+impl From<&Env> for Vec<(String, String)> {
+  fn from(env: &Env) -> Self {
+    env
+      .env
+      .iter()
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect::<Vec<(_, _)>>()
   }
 }
 

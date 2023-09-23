@@ -132,6 +132,13 @@ class RemotePantsRunner:
     ) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
 
+        # NB: If an OS string is not valid UTF-8, Python encodes the non-decodable bytes
+        #  as lone surrogates (see https://peps.python.org/pep-0383/).
+        #  However when we pass these to Rust, we will fail to decode as strict UTF-8.
+        #  So we perform a lossy re-encoding to prevent this.
+        def strict_utf8(s: str) -> str:
+            return s.encode("utf-8", "replace").decode("utf-8")
+
         try:
             # Merge the nailgun TTY capability environment variables with the passed environment dict.
             ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
@@ -139,7 +146,7 @@ class RemotePantsRunner:
             logger.debug("Failed to execute ttynames_to_env:  %s", e)
             ng_env = {}
         modified_env = {
-            **self._env,
+            **{strict_utf8(k): strict_utf8(v) for k, v in self._env.items()},
             **ng_env,
             "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(start_time),
             "PANTSD_REQUEST_TIMEOUT_LIMIT": str(

@@ -53,7 +53,10 @@ enum PythonLogLevel {
 
 async fn execute(start: SystemTime) -> Result<i32, String> {
   let build_root = BuildRoot::find()?;
-  let options_parser = OptionParser::new(Env::capture(), Args::argv())?;
+  let env = Env::capture_lossy();
+  let env_items = (&env).into();
+  let argv = env::args().collect::<Vec<_>>();
+  let options_parser = OptionParser::new(env, Args::argv())?;
 
   let use_pantsd = options_parser.parse_bool(&option_id!("pantsd"), true)?;
   if !use_pantsd.value {
@@ -83,9 +86,7 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   env_logger::init_from_env(env_logger::Env::new().filter_or("__PANTS_LEVEL__", level.as_ref()));
 
   let pantsd_settings = find_pantsd(&build_root, &options_parser)?;
-  let env = env::vars().collect::<Vec<(_, _)>>();
-  let argv = env::args().collect::<Vec<_>>();
-  client::execute_command(start, pantsd_settings, env, argv).await
+  client::execute_command(start, pantsd_settings, env_items, argv).await
 }
 
 fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> {
