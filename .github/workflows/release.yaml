@@ -60,7 +60,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-Linux-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
@@ -137,7 +137,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
@@ -228,7 +228,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-macOS10-15-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
@@ -312,7 +312,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-macOS11-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
