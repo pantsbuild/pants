@@ -368,7 +368,7 @@ def _target_parametrizations(
 ) -> _TargetParametrization:
     expanded_parametrizations = tuple(Parametrize.expand(address, target_adaptor.kwargs))
     first_address, first_kwargs = expanded_parametrizations[0]
-    if first_address != address:
+    if first_address is not address:
         # The target was parametrized, and so the original Target does not exist.
         generated = FrozenDict(
             (
