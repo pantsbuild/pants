@@ -4,8 +4,6 @@
 import os
 import time
 
-import pytest
-
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_integration_test import ensure_daemon, run_pants, setup_tmpdir
 from pants.util.contextutil import temporary_dir
