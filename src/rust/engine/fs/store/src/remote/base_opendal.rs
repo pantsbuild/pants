@@ -178,12 +178,7 @@ impl ByteStoreProvider for Provider {
 
     let path = self.path(digest.hash);
 
-    let mut writer = match self
-      .operator
-      .writer_with(&path)
-      .content_length(digest.size_bytes as u64)
-      .await
-    {
+    let mut writer = match self.operator.writer(&path).await {
       Ok(writer) => writer,
       // The item already exists, i.e. these bytes have already been stored. For example,
       // concurrent executions that are caching the same bytes. This makes the assumption that
