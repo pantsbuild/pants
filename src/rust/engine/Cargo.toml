@@ -254,7 +254,11 @@ notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bf
 num_cpus = "1"
 num_enum = "0.5"
 once_cell = "1.18"
-opendal = { version = "0.39.0", default-features = false }
+opendal = { version = "0.39.0", default-features = false, features = [
+  "services-memory",
+  "services-fs",
+  "services-ghac",
+] }
 os_pipe = "1.1"
 parking_lot = "0.12"
 peg = "0.8"
