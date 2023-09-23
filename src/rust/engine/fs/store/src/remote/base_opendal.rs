@@ -158,11 +158,15 @@ impl ByteStoreProvider for Provider {
 
     let path = self.path(digest.hash);
 
-    self
-      .operator
-      .write(&path, bytes)
-      .await
-      .map_err(|e| format!("failed to write bytes to {path}: {e}"))
+    match self.operator.write(&path, bytes).await {
+      Ok(()) => Ok(()),
+      // The item already exists, i.e. these bytes have already been stored. For example,
+      // concurrent executions that are caching the same bytes. This makes the assumption that
+      // which ever execution won the race to create the item successfully finishes the write, and
+      // so no wait + retry (or similar) here.
+      Err(e) if e.kind() == opendal::ErrorKind::AlreadyExists => Ok(()),
+      Err(e) => Err(format!("failed to write bytes to {path}: {e}")),
+    }
   }
 
   async fn store_file(&self, digest: Digest, mut file: File) -> Result<(), String> {
@@ -174,12 +178,20 @@ impl ByteStoreProvider for Provider {
 
     let path = self.path(digest.hash);
 
-    let mut writer = self
+    let mut writer = match self
       .operator
       .writer_with(&path)
       .content_length(digest.size_bytes as u64)
       .await
-      .map_err(|e| format!("failed to start write to {path}: {e}"))?;
+    {
+      Ok(writer) => writer,
+      // The item already exists, i.e. these bytes have already been stored. For example,
+      // concurrent executions that are caching the same bytes. This makes the assumption that
+      // which ever execution won the race to create the item successfully finishes the write, and
+      // so no wait + retry (or similar) here.
+      Err(e) if e.kind() == opendal::ErrorKind::AlreadyExists => return Ok(()),
+      Err(e) => return Err(format!("failed to start write to {path}: {e} {}", e.kind())),
+    };
 
     // TODO: it would be good to pass through options.chunk_size_bytes here
     match tokio::io::copy(&mut file, &mut writer).await {
