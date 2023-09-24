@@ -1630,7 +1630,7 @@ class BootstrapOptions:
             """
             Path to a PEM file containing a private key used for verifying secure connections to
             `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address` when using
-            client authentication.
+            client authentication (mTLS).
 
             If unspecified, will use regular TLS. Requires `remote_client_certs_path` to also be
             specified.
