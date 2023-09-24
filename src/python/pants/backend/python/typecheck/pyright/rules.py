@@ -26,7 +26,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.partition import (
     _partition_by_interpreter_constraints_and_resolve,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess, VenvPexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -184,19 +184,23 @@ async def pyright_typecheck_partition(
         config_files_get,
     )
 
+    complete_pex_env = pex_environment.in_workspace()
     requirements_venv_pex = await Get(
         VenvPex,
-        PexRequest(
-            output_filename="requirements_venv.pex",
-            internal_only=True,
-            pex_path=[requirements_pex],
-            interpreter_constraints=partition.interpreter_constraints,
+        VenvPexRequest(
+            PexRequest(
+                output_filename="requirements_venv.pex",
+                internal_only=True,
+                pex_path=[requirements_pex],
+                interpreter_constraints=partition.interpreter_constraints,
+            ),
+            complete_pex_env,
         ),
     )
 
     # Force the requirements venv to materialize always by running a no-op.
     # This operation must be called with `ProcessCacheScope.SESSION`
-    # as the venv is cached per session.
+    # so that it runs every time.
     await Get(
         ProcessResult,
         VenvPexProcess(
@@ -224,7 +228,6 @@ async def pyright_typecheck_partition(
         ),
     )
 
-    complete_pex_env = pex_environment.in_workspace()
     process = await Get(
         Process,
         NodeJSToolRequest,

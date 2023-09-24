@@ -310,23 +310,21 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
 
     # On the first run, it should work as advertised with no modifications.
     with temporary_dir() as cache_dir:
-        pex_root_dir = os.path.join(os.path.abspath(cache_dir), "pex_root")
-        os.mkdir(pex_root_dir)
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
-
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert "0 errors" in result[0].stdout
         assert result[0].report == EMPTY_DIGEST
 
-        # Delete the pex_root cache directory
-        safe_rmtree(pex_root_dir)
+        # Delete the cache directory
+        safe_rmtree(cache_dir)
 
-        # Run again
+        # Run again - should work as the venv will be created again from scratch.
         result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
         assert len(result) == 1
-        assert result[0].exit_code == 1
-        assert 'Import "more_itertools" could not be resolved' in result[0].stdout
+        assert result[0].exit_code == 0
+        assert "0 errors" in result[0].stdout
+        assert result[0].report == EMPTY_DIGEST
 
 
 @pytest.mark.parametrize(
