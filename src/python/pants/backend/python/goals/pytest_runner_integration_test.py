@@ -824,7 +824,7 @@ def test_debug_adaptor_request_argv(rule_runner: PythonRuleRunner) -> None:
         "127.0.0.1:5678",
         "-c",
         unittest.mock.ANY,
-        "--color=no",
+        "--color=yes",
         "tests/python/pants_test/test_foo.py",
     )
 
