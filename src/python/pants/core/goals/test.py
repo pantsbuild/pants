@@ -233,6 +233,14 @@ class TestResult(EngineAwareReturnType):
     def _simplified_output(self, v: bytes) -> str:
         return self.output_simplifier.simplify(v.decode(errors="replace"))
 
+    @property
+    def stdout_simplified_str(self) -> str:
+        return self._simplified_output(self.stdout_bytes)
+
+    @property
+    def stderr_simplified_str(self) -> str:
+        return self._simplified_output(self.stderr_bytes)
+
     def message(self) -> str:
         if self.exit_code is None:
             return "no tests found."
@@ -246,9 +254,9 @@ class TestResult(EngineAwareReturnType):
             return message
         output = ""
         if self.stdout_bytes:
-            output += f"\n{self._simplified_output(self.stdout_bytes)}"
+            output += f"\n{self.stdout_simplified_str}"
         if self.stderr_bytes:
-            output += f"\n{self._simplified_output(self.stderr_bytes)}"
+            output += f"\n{self.stderr_simplified_str}"
         if output:
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
