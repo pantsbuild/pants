@@ -184,6 +184,8 @@ def test_pathglob_parse(base: str, pattern_text: str | tuple[str, str], expected
             (
                 # path, base, expected
                 ("src/foo/bar", "src/qux", "foo/bar"),
+                ("", "snout", ""),
+                ("", "snout/deep", None),
             ),
         ),
     ],
