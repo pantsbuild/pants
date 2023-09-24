@@ -691,8 +691,8 @@ class ExecutionOptions:
 
     remote_instance_name: str | None
     remote_ca_certs_path: str | None
-    remote_mtls_certs_path: str | None
-    remote_mtls_key_path: str | None
+    remote_client_certs_path: str | None
+    remote_client_key_path: str | None
 
     keep_sandboxes: KeepSandboxes
     local_cache: bool
@@ -739,8 +739,8 @@ class ExecutionOptions:
             # General remote setup.
             remote_instance_name=dynamic_remote_options.instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
-            remote_mtls_certs_path=bootstrap_options.remote_mtls_certs_path,
-            remote_mtls_key_path=bootstrap_options.remote_mtls_key_path,
+            remote_client_certs_path=bootstrap_options.remote_client_certs_path,
+            remote_client_key_path=bootstrap_options.remote_client_key_path,
             # Process execution setup.
             keep_sandboxes=GlobalOptions.resolve_keep_sandboxes(bootstrap_options),
             local_cache=bootstrap_options.local_cache,
@@ -825,8 +825,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # General remote setup.
     remote_instance_name=None,
     remote_ca_certs_path=None,
-    remote_mtls_certs_path=None,
-    remote_mtls_key_path=None,
+    remote_client_certs_path=None,
+    remote_client_key_path=None,
     # Process execution setup.
     process_total_child_memory_usage=None,
     process_per_child_memory_usage=memory_size(_PER_CHILD_MEMORY_USAGE),
@@ -1608,31 +1608,31 @@ class BootstrapOptions:
             """
         ),
     )
-    remote_mtls_certs_path = StrOption(
+    remote_client_certs_path = StrOption(
         default=None,
         advanced=True,
         help=softwrap(
             """
             Path to a PEM file containing client certificates used for verifying secure connections to
             `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address` when using
-            `mTLS`.
+            client authentication.
 
-            If unspecified, will use regular TLS. Requires `remote_mtls_key_path` to also be
+            If unspecified, will use regular TLS. Requires `remote_client_key_path` to also be
             specified.
             """
         ),
     )
 
-    remote_mtls_key_path = StrOption(
+    remote_client_key_path = StrOption(
         default=None,
         advanced=True,
         help=softwrap(
             """
             Path to a PEM file containing a private key used for verifying secure connections to
             `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address` when using
-            `mTLS`.
+            client authentication.
 
-            If unspecified, will use regular TLS. Requires `remote_mtls_certs_path` to also be
+            If unspecified, will use regular TLS. Requires `remote_client_certs_path` to also be
             specified.
             """
         ),
@@ -2055,11 +2055,13 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         validate_remote_headers("remote_execution_headers")
         validate_remote_headers("remote_store_headers")
 
-        if opts.remote_mtls_key_path is None != opts.remote_mtls_certs_path is None:
+        is_remote_client_key_set = opts.remote_client_key_path is not None
+        is_remote_client_certs_set = opts.remote_client_certs_path is not None
+        if is_remote_client_key_set != is_remote_client_certs_set:
             raise OptionsError(
                 softwrap(
                     """
-                    `--remote-mtls-key-path` and `--remote-mtls-certs-path` must be specified
+                    `--remote-client-key-path` and `--remote-client-certs-path` must be specified
                     together.
                     """
                 )

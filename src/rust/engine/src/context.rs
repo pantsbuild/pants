@@ -92,8 +92,8 @@ pub struct RemotingOptions {
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
-  pub mtls_certs_path: Option<PathBuf>,
-  pub mtls_key_path: Option<PathBuf>,
+  pub client_certs_path: Option<PathBuf>,
+  pub client_key_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
   pub store_chunk_bytes: usize,
   pub store_rpc_retries: usize,
@@ -529,28 +529,30 @@ impl Core {
       None
     };
 
-    let mtls_certs = remoting_opts
-      .mtls_certs_path
+    let client_certs = remoting_opts
+      .client_certs_path
       .as_ref()
       .map(|path| {
-        std::fs::read(path).map_err(|err| format!("Error reading mTLS certs file {path:?}: {err}"))
+        std::fs::read(path)
+          .map_err(|err| format!("Error reading client authentication certs file {path:?}: {err}"))
       })
       .transpose()?;
 
-    let mtls_key = remoting_opts
-      .mtls_key_path
+    let client_key = remoting_opts
+      .client_key_path
       .as_ref()
       .map(|path| {
-        std::fs::read(path).map_err(|err| format!("Error reading mTLS key file {path:?}: {err}"))
+        std::fs::read(path)
+          .map_err(|err| format!("Error reading client authentication key file {path:?}: {err}"))
       })
       .transpose()?;
 
-    let mtls_data = match (mtls_certs.as_ref(), mtls_key.as_ref()) {
+    let mtls_data = match (client_certs.as_ref(), client_key.as_ref()) {
       (Some(cert), Some(key)) => Some((cert.deref(), key.deref())),
       (None, None) => None,
       _ => {
         return Err(
-			"Both remote_mtls_certs_path and remote_mtls_key_path must be specified to enable mTLS, but only one was provided."
+			"Both remote_client_certs_path and remote_client_key_path must be specified to enable client authentication, but only one was provided."
             .to_owned(),
         )
       }

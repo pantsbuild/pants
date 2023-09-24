@@ -91,9 +91,9 @@ remote_execution_address = "grpcs://build.example.com:443"
 remote_instance_name = "main"
 # This is optional, Pants will auto-discover certificates otherwise.
 remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
-# this allows you to setup mTLS with a client certificate and key.
-remote_mtls_certs_path = "/etc/ssl/certs/client-cert.pem"
-remote_mtls_key_path = "/etc/ssl/certs/client-key.pem"
+# this allows you to setup client authentication with a certificate and key (mTLS).
+remote_client_certs_path = "/etc/ssl/certs/client-cert.pem"
+remote_client_key_path = "/etc/ssl/certs/client-key.pem"
 ```
 
 Reference

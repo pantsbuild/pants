@@ -171,14 +171,14 @@ struct Opt {
   cas_root_ca_cert_file: Option<PathBuf>,
 
   /// Path to file containing client certificates for the CAS server.
-  /// If not set, mTLS will not be used when connecting to the CAS server.
+  /// If not set, client authentication will not be used when connecting to the CAS server.
   #[structopt(long)]
-  cas_mtls_certs_file: Option<PathBuf>,
+  cas_client_certs_file: Option<PathBuf>,
 
   /// Path to file containing client key for the CAS server.
-  /// If not set, mTLS will not be used when connecting to the CAS server.
+  /// If not set, client authentication will not be used when connecting to the CAS server.
   #[structopt(long)]
-  cas_mtls_key_file: Option<PathBuf>,
+  cas_client_key_file: Option<PathBuf>,
 
   /// Path to file containing oauth bearer token for communication with the CAS server.
   /// If not set, no authorization will be provided to remote servers.
@@ -252,20 +252,22 @@ async fn main() {
         .as_ref()
         .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
-      let mtls_certs = args
-        .cas_mtls_certs_file
+      let client_certs = args
+        .cas_client_certs_file
         .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root mTLS certs file"));
+        .map(|path| std::fs::read(path).expect("Error reading client authentication certs file"));
 
-      let mtls_key = args
-        .cas_mtls_key_file
+      let client_key = args
+        .cas_client_key_file
         .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root mTLS key file"));
+        .map(|path| std::fs::read(path).expect("Error reading client authentication key file"));
 
-      let mtls_data = match (mtls_certs, mtls_key) {
+      let mtls_data = match (client_certs, client_key) {
         (Some(certs), Some(key)) => Some((certs, key)),
         (None, None) => None,
-        _ => panic!("Must specify both --cas-mtls-certs-file and --cas-mtls-key-file or neither"),
+        _ => {
+          panic!("Must specify both --cas-client-certs-file and --cas-client-key-file or neither")
+        }
       };
 
       let mut headers = BTreeMap::new();
@@ -321,20 +323,22 @@ async fn main() {
         .execution_root_ca_cert_file
         .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
-      let mtls_certs = args
-        .cas_mtls_certs_file
+      let client_certs = args
+        .cas_client_certs_file
         .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root mTLS certs file"));
+        .map(|path| std::fs::read(path).expect("Error reading root client certs file"));
 
-      let mtls_key = args
-        .cas_mtls_key_file
+      let client_key = args
+        .cas_client_key_file
         .as_ref()
-        .map(|path| std::fs::read(path).expect("Error reading root mTLS key file"));
+        .map(|path| std::fs::read(path).expect("Error reading client authentication key file"));
 
-      let mtls_data = match (mtls_certs, mtls_key) {
+      let mtls_data = match (client_certs, client_key) {
         (Some(certs), Some(key)) => Some((certs, key)),
         (None, None) => None,
-        _ => panic!("Must specify both --cas-mtls-certs-file and --cas-mtls-key-file or neither"),
+        _ => {
+          panic!("Must specify both --cas-client-certs-file and --cas-client-key-file or neither")
+        }
       };
 
       if let Some(oauth_path) = args.execution_oauth_bearer_token_path {

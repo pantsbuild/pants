@@ -316,8 +316,8 @@ impl PyRemotingOptions {
     execution_process_cache_namespace: Option<String>,
     instance_name: Option<String>,
     root_ca_certs_path: Option<PathBuf>,
-    mtls_certs_path: Option<PathBuf>,
-    mtls_key_path: Option<PathBuf>,
+    client_certs_path: Option<PathBuf>,
+    client_key_path: Option<PathBuf>,
     append_only_caches_base_path: Option<String>,
   ) -> Self {
     Self(RemotingOptions {
@@ -327,8 +327,8 @@ impl PyRemotingOptions {
       execution_process_cache_namespace,
       instance_name,
       root_ca_certs_path,
-      mtls_certs_path,
-      mtls_key_path,
+      client_certs_path,
+      client_key_path,
       store_headers,
       store_chunk_bytes,
       store_rpc_retries,
