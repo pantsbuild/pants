@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Mapping
 
 from pants.backend.adhoc.target_types import (
     SystemBinaryExtraSearchPathsField,
@@ -22,11 +22,11 @@ from pants.core.util_rules.adhoc_process_support import (
     ResolveExecutionDependenciesRequest,
 )
 from pants.core.util_rules.system_binaries import (
-    SearchPath,
-    SystemBinariesSubsystem,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
+    SearchPath,
+    SystemBinariesSubsystem,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get, MultiGet

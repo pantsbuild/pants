@@ -15,7 +15,6 @@ from typing import Iterable, Mapping, Sequence
 
 from typing_extensions import Self
 
-from pants.option.subsystem import Subsystem
 from pants.core.subsystems import python_bootstrap
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
@@ -26,12 +25,13 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.option.option_types import StrListOption
+from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
-from pants.option.option_types import StrListOption
-from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
 
