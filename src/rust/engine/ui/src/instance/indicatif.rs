@@ -1,14 +1,22 @@
-use futures::future::BoxFuture;
-use futures::FutureExt;
-use indexmap::IndexSet;
-use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle, WeakProgressBar};
-use parking_lot::Mutex;
+// Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::cmp;
 use std::collections::HashMap;
 use std::future;
 use std::sync::Arc;
-use std::time::Duration;
 use std::time::SystemTime;
+
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use indexmap::IndexSet;
+use indicatif::MultiProgress;
+use indicatif::ProgressBar;
+use indicatif::ProgressDrawTarget;
+use indicatif::ProgressStyle;
+use indicatif::WeakProgressBar;
+use parking_lot::Mutex;
+
 use workunit_store::format_workunit_duration_ms;
 use workunit_store::SpanId;
 
@@ -38,33 +46,8 @@ impl IndicatifInstance {
     // initialization. That way, the exclusive callback can always assume that the destination
     // is initialized (i.e., can `unwrap` it).
     let mut stderr_dest_bar_guard = stderr_dest_bar.lock();
-    let (term_read, _, term_stderr_write) = {
-      let stderr_dest_bar = stderr_dest_bar.clone();
-      stdio::get_destination().exclusive_start(Box::new(move |msg: &str| {
-        // Acquire a handle to the destination bar in the UI. If we fail to upgrade, it's because
-        // the UI has shut down: we fail the callback to have the logging module directly log to
-        // stderr at that point.
-        let dest_bar = {
-          let stderr_dest_bar = stderr_dest_bar.lock();
-          // We can safely unwrap here because the Mutex is held until the bar is initialized.
-          stderr_dest_bar.as_ref().unwrap().upgrade().ok_or(())?
-        };
-        dest_bar.println(msg);
-        Ok(())
-      }))?
-    };
+    let multi_progress = setup_bar_outputs(stderr_dest_bar.clone())?;
 
-    let stderr_use_color = term_stderr_write.use_color;
-    let term = console::Term::read_write_pair_with_style(
-      term_read,
-      term_stderr_write,
-      console::Style::new().force_styling(stderr_use_color),
-    );
-
-    // NB: We render more frequently than we receive new data in order to minimize aliasing where a
-    // render might barely miss a data refresh.
-    let draw_target = ProgressDrawTarget::term(term, ConsoleUI::render_rate_hz() * 2);
-    let multi_progress = MultiProgress::with_draw_target(draw_target);
     let bars = (0..cmp::min(local_parallelism, terminal_height.into()))
       .map(|_n| {
         let style = ProgressStyle::default_bar()
@@ -74,6 +57,7 @@ impl IndicatifInstance {
         multi_progress.add(ProgressBar::new(terminal_width.into()).with_style(style))
       })
       .collect::<Vec<_>>();
+
     *stderr_dest_bar_guard = Some(bars[0].downgrade());
 
     Ok(IndicatifInstance {
@@ -127,4 +111,33 @@ impl IndicatifInstance {
       pbar.tick();
     }
   }
+}
+
+fn setup_bar_outputs(
+  stderr_dest_bar: Arc<Mutex<Option<WeakProgressBar>>>,
+) -> Result<MultiProgress, String> {
+  let (term_read, _, term_stderr_write) = {
+    let stderr_dest_bar = stderr_dest_bar.clone();
+    stdio::get_destination().exclusive_start(Box::new(move |msg: &str| {
+      // Acquire a handle to the destination bar in the UI. If we fail to upgrade, it's because
+      // the UI has shut down: we fail the callback to have the logging module directly log to
+      // stderr at that point.
+      let dest_bar = {
+        let stderr_dest_bar = stderr_dest_bar.lock();
+        // We can safely unwrap here because the Mutex is held until the bar is initialized.
+        stderr_dest_bar.as_ref().unwrap().upgrade().ok_or(())?
+      };
+      dest_bar.println(msg);
+      Ok(())
+    }))?
+  };
+  let stderr_use_color = term_stderr_write.use_color;
+  let term = console::Term::read_write_pair_with_style(
+    term_read,
+    term_stderr_write,
+    console::Style::new().force_styling(stderr_use_color),
+  );
+  let draw_target = ProgressDrawTarget::term(term, ConsoleUI::render_rate_hz() * 2);
+  let multi_progress = MultiProgress::with_draw_target(draw_target);
+  Ok(multi_progress)
 }

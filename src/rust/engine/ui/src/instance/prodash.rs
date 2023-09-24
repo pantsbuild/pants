@@ -1,16 +1,21 @@
-use futures::future::BoxFuture;
-use futures::FutureExt;
-use logging::fatal_log;
-use prodash::progress::Step;
-use prodash::render::line;
-use prodash::Root;
-use prodash::TreeOptions;
+// Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::mpsc;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
+
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use prodash::progress::Step;
+use prodash::render::line;
+use prodash::Root;
+use prodash::TreeOptions;
+
+use logging::fatal_log;
 use task_executor::Executor;
 use workunit_store::format_workunit_duration_ms;
 use workunit_store::SpanId;
