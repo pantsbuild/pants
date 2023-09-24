@@ -191,17 +191,15 @@ async def pyright_typecheck_partition(
     )
 
     complete_pex_env = pex_environment.in_workspace()
+    requirements_pex_request = PexRequest(
+        output_filename="requirements_venv.pex",
+        internal_only=True,
+        pex_path=[requirements_pex],
+        interpreter_constraints=partition.interpreter_constraints,
+    )
     requirements_venv_pex = await Get(
         VenvPex,
-        VenvPexRequest(
-            PexRequest(
-                output_filename="requirements_venv.pex",
-                internal_only=True,
-                pex_path=[requirements_pex],
-                interpreter_constraints=partition.interpreter_constraints,
-            ),
-            complete_pex_env,
-        ),
+        VenvPexRequest(requirements_pex_request, complete_pex_env),
     )
 
     # Force the requirements venv to materialize always by running a no-op.
