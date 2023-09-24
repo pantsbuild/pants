@@ -22,7 +22,7 @@ impl Config {
     let root_ca_certs = root_ca_certs
       .map(|certs| {
         let raw_certs = rustls_pemfile::certs(&mut std::io::Cursor::new(certs.as_ref()))
-          .map_err(|e| format!("Failed to read mTLS certs file: {e:?}"))?;
+          .map_err(|e| format!("Failed to parse TLS certs data: {e:?}"))?;
         Result::<_, String>::Ok(raw_certs.into_iter().map(rustls::Certificate).collect())
       })
       .transpose()?;
@@ -55,7 +55,7 @@ impl TryFrom<Config> for ClientConfig {
         if let Some(MtlsConfig { cert_chain, key }) = config.mtls {
           tls_config
             .with_client_auth_cert(cert_chain, key)
-            .map_err(|err| format!("Error creating mTLS config: {:?}", err))?
+            .map_err(|err| format!("Error setting client authentication configuration: {err:?}"))?
         } else {
           tls_config.with_no_client_auth()
         }
@@ -93,7 +93,7 @@ impl TryFrom<Config> for ClientConfig {
         if let Some(MtlsConfig { cert_chain, key }) = config.mtls {
           tls_config
             .with_client_auth_cert(cert_chain, key)
-            .map_err(|err| format!("Error creating mTLS config: {:?}", err))?
+            .map_err(|err| format!("Error setting client authentication configuration: {err:?}"))?
         } else {
           tls_config.with_no_client_auth()
         }
@@ -106,26 +106,26 @@ impl TryFrom<Config> for ClientConfig {
 
 #[derive(Clone)]
 pub struct MtlsConfig {
-  /// DER bytes of the private key used for mTLS.
-  pub key: rustls::PrivateKey,
   /// DER bytes of the certificate used for mTLS.
   pub cert_chain: Vec<rustls::Certificate>,
+  /// DER bytes of the private key used for mTLS.
+  pub key: rustls::PrivateKey,
 }
 
 impl MtlsConfig {
   pub fn from_pem_buffers(certs: &[u8], key: &[u8]) -> Result<Self, String> {
     let cert_chain = rustls_pemfile::certs(&mut std::io::Cursor::new(certs))
-      .map_err(|e| format!("Failed to read mTLS certs file: {e:?}"))?
+      .map_err(|e| format!("Failed to parse client authentication (mTLS) certs data: {e:?}"))?
       .into_iter()
       .map(rustls::Certificate)
       .collect();
 
     let keys = rustls_pemfile::read_all(&mut std::io::Cursor::new(key))
-      .map_err(|e| format!("Failed to read mTLS key file: {e:?}"))?
+      .map_err(|e| format!("Failed to parse client authentication (mTLS) key data: {e:?}"))?
       .into_iter()
       .filter(|item| match item {
         rustls_pemfile::Item::X509Certificate(_) => {
-          log::warn!("Found x509 certificate in mTLS key file. Ignoring.");
+          log::warn!("Found x509 certificate in client authentication (mTLS) key data. Ignoring.");
           false
         }
         _ => true,
@@ -140,13 +140,14 @@ impl MtlsConfig {
           key = Some(rustls::PrivateKey(buf))
         }
         Item::X509Certificate(_) => unreachable!("filtered above"),
-        _ => todo!("non-exhaustive match"),
+        _ => unreachable!("rustls_pemfile::read_all returned an unexpected item"),
       }
     }
 
-    let key = key.ok_or_else(|| "No private key found in mTLS key file".to_owned())?;
+    let key = key
+      .ok_or_else(|| "No private key found in client authentication (mTLS) key data".to_owned())?;
 
-    Ok(Self { key, cert_chain })
+    Ok(Self { cert_chain, key })
   }
 }
 
