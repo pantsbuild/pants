@@ -151,7 +151,7 @@ Run this script as a basic smoke test:
 ./pants run src/python/pants_release/release.py -- test-release
 ```
 
-You should also [GitHub Releases](https://github.com/pantsbuild/pants/releases) to ensure everything looks good. Find the version you released, then click it and confirm that the "Assets" list includes PEXes for macOS and Linux.
+You should also check [GitHub Releases](https://github.com/pantsbuild/pants/releases) to ensure everything looks good. Find the version you released, then click it and confirm that the "Assets" list includes PEXes for macOS and Linux.
 
 Step 5: Run release testing on public repositories
 --------------------------------------------------
