@@ -308,7 +308,6 @@ Created as part of the release process.
 + Wilhelmina Drengwitz
 + Win Wang
 + Wolfram Arnold
-+ Worker Pants (Pantsbuild GitHub Automation Bot)
 + Xaelias
 + Yarden Shoham
 + Yi Cheng
