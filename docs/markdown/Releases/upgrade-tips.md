@@ -9,7 +9,7 @@ createdAt: "2020-05-16T22:53:24.499Z"
 >
 > Change the `pants_version` option in the `[GLOBAL]` scope in your pants.toml to upgrade.
 >
-> You can see all releases at <https://pypi.org/project/pantsbuild.pants/#history>.
+> You can see all releases at <https://github.com/pantsbuild/pants/releases>.
 
 Upgrade one minor release at a time
 -----------------------------------
