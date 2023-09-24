@@ -83,9 +83,9 @@ impl ConsoleUI {
   /// drives rendering, while this method feeds it new data.
   ///
   pub fn render(&mut self) {
-    let Some(instance) = &mut self.instance  else {
-			return;
-		};
+    let Some(instance) = &mut self.instance else {
+      return;
+    };
 
     let heavy_hitters = self.workunit_store.heavy_hitters(self.local_parallelism);
     instance.render(&heavy_hitters)
