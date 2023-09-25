@@ -129,7 +129,7 @@ class PathGlob:
 
     def _match_path(self, path: str, base: str) -> str | None:
         if self.anchor_mode is PathGlobAnchorMode.INVOKED_PATH:
-            path = os.path.relpath(path, base + "/.." * self.uplvl)
+            path = os.path.relpath(path or ".", base + "/.." * self.uplvl)
             if path.startswith(".."):
                 # The `path` is not in the sub tree of `base`.
                 return None
