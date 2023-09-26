@@ -64,7 +64,7 @@ from pants.option.option_types import BoolOption, EnumOption, IntOption, StrList
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized
+from pants.util.memo import memoized, memoized_property
 from pants.util.meta import classproperty
 from pants.util.strutil import Simplifier, help_text, softwrap
 
@@ -233,11 +233,11 @@ class TestResult(EngineAwareReturnType):
     def _simplified_output(self, v: bytes) -> str:
         return self.output_simplifier.simplify(v.decode(errors="replace"))
 
-    @property
+    @memoized_property
     def stdout_simplified_str(self) -> str:
         return self._simplified_output(self.stdout_bytes)
 
-    @property
+    @memoized_property
     def stderr_simplified_str(self) -> str:
         return self._simplified_output(self.stderr_bytes)
 
