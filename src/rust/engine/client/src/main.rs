@@ -53,7 +53,7 @@ enum PythonLogLevel {
 
 async fn execute(start: SystemTime) -> Result<i32, String> {
   let build_root = BuildRoot::find()?;
-  let env = Env::capture_lossy();
+  let (env, dropped) = Env::capture_lossy();
   let env_items = (&env).into();
   let argv = env::args().collect::<Vec<_>>();
   let options_parser = OptionParser::new(env, Args::argv())?;
@@ -85,6 +85,10 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   })?;
   env_logger::init_from_env(env_logger::Env::new().filter_or("__PANTS_LEVEL__", level.as_ref()));
 
+  // Now that the logger has been set up, we can retroactively log any dropped env vars.
+  for name in dropped {
+    log::warn!("Environment variable with non-UTF-8 name or value ignored: {name}");
+  }
   let pantsd_settings = find_pantsd(&build_root, &options_parser)?;
   client::execute_command(start, pantsd_settings, env_items, argv).await
 }

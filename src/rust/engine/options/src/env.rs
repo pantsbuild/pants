@@ -19,17 +19,31 @@ impl Env {
     Self { env }
   }
 
-  pub fn capture_lossy() -> Self {
-    Self::new(
-      env::vars_os()
-        .map(|(k, v)| {
-          (
-            k.to_string_lossy().to_string(),
-            v.to_string_lossy().to_string(),
-          )
-        })
-        .collect::<HashMap<_, _>>(),
-    )
+  pub fn capture_lossy() -> (Self, Vec<String>) {
+    let env_os = env::vars_os();
+    let mut env: HashMap<String, String> = HashMap::with_capacity(env_os.size_hint().0);
+    let mut dropped: Vec<String> = Vec::new();
+    for (os_key, os_val) in env_os {
+      match os_key.into_string() {
+        Ok(key) => {
+          match os_val.into_string() {
+            Ok(val) => {
+              env.insert(key, val);
+            },
+            Err(_) => {
+              dropped.push(key);
+            }
+          }
+        },
+        Err(os_key) => {
+          // We'll only be able to log the lossy name of any non-UTF-8 keys, but
+          // the user will know which one we mean.
+          dropped.push(os_key.to_string_lossy().to_string());
+        },
+      }
+    }
+    dropped.sort();
+    (Self::new(env), dropped)
   }
 
   fn env_var_names(id: &OptionId) -> Vec<String> {
