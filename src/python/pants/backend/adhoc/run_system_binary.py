@@ -128,13 +128,14 @@ async def _find_binary(
 
 @rule(level=LogLevel.DEBUG)
 async def create_system_binary_run_request(
-    field_set: SystemBinaryFieldSet, system_binaries: SystemBinariesSubsystem
+    field_set: SystemBinaryFieldSet,
+    system_binaries_environment: SystemBinariesSubsystem.EnvironmentAware,
 ) -> RunRequest:
     assert field_set.name.value is not None
     extra_search_paths = field_set.extra_search_paths.value or ()
 
     search_paths = SearchPath(
-        (*extra_search_paths, *system_binaries.EnvironmentAware.system_binary_paths)
+        (*extra_search_paths, *system_binaries_environment.system_binary_paths)
     )
 
     path = await _find_binary(
