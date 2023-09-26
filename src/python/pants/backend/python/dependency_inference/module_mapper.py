@@ -490,7 +490,6 @@ async def map_module_to_address(
                 continue
             providers_with_shortest_relative_path: list[ModuleProvider] = []
             shortest_relative_path_len = 9999
-            print(shortest_relative_path_len, providers)
             for provider in providers:
                 common_ancestor_len = len(
                     os.path.relpath(request.locality, provider.addr.spec_path).split(os.path.sep)
