@@ -612,7 +612,9 @@ def bootstrap_jobs(
         # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
         # pass on GHA MacOS containers.
         step_cmd = helper.wrap_cmd(
-            helper.maybe_append_cargo_test_parallelism("./cargo test --locked --tests -- --nocapture")
+            helper.maybe_append_cargo_test_parallelism(
+                "./cargo test --locked --tests -- --nocapture"
+            )
         )
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
