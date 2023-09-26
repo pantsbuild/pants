@@ -3,7 +3,7 @@
 PANTS_BASE=$(dirname "$0")/../..
 rm -rf "${HOME}/.pex"
 rm -rf "${HOME}/.cache/pants/pants_dev_deps"
-rm -rf "${PANTS_BASE}/.pants.d"
+rm -rf "${PANTS_BASE}/.pants.d/workdir"
 find "${PANTS_BASE}" -name '*.pyc' -print0 | xargs -0 rm -f
 
 # Legacy:

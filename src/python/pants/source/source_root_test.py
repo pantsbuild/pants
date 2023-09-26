@@ -3,7 +3,7 @@
 
 import os
 from pathlib import PurePath
-from typing import Iterable, Optional, cast
+from typing import Iterable, Optional
 
 import pytest
 
@@ -45,20 +45,17 @@ def _find_root(
         return Paths(files=tuple(), dirs=tuple())
 
     def _do_find_root(src_root_req: SourceRootRequest) -> OptionalSourceRoot:
-        return cast(
-            OptionalSourceRoot,
-            run_rule_with_mocks(
-                get_optional_source_root,
-                rule_args=[src_root_req, source_root_config],
-                mock_gets=[
-                    MockGet(
-                        output_type=OptionalSourceRoot,
-                        input_types=(SourceRootRequest,),
-                        mock=_do_find_root,
-                    ),
-                    MockGet(output_type=Paths, input_types=(PathGlobs,), mock=_mock_fs_check),
-                ],
-            ),
+        return run_rule_with_mocks(
+            get_optional_source_root,
+            rule_args=[src_root_req, source_root_config],
+            mock_gets=[
+                MockGet(
+                    output_type=OptionalSourceRoot,
+                    input_types=(SourceRootRequest,),
+                    mock=_do_find_root,
+                ),
+                MockGet(output_type=Paths, input_types=(PathGlobs,), mock=_mock_fs_check),
+            ],
         )
 
     source_root = _do_find_root(SourceRootRequest(PurePath(path))).source_root

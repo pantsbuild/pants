@@ -207,6 +207,7 @@ impl process_execution::CommandRunner for CommandRunner {
         // Prepare the workdir.
         let exclusive_spawn = prepare_workdir(
           nailgun_process.workdir_path().to_owned(),
+          self.nailgun_pool.workdir_base(),
           &client_req,
           client_req.input_digests.inputs.clone(),
           &self.store,

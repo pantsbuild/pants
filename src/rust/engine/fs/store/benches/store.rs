@@ -77,6 +77,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
               let _ = executor
                 .block_on(store.materialize_directory(
                   dest,
+                  parent_dest_path,
                   digest.clone(),
                   false,
                   &BTreeSet::new(),

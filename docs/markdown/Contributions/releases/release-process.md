@@ -1,7 +1,7 @@
 ---
 title: "Release process"
 slug: "release-process"
-excerpt: "How to release a new version of `pantsbuild.pants` and its plugins."
+excerpt: "How to release a new version of Pants and its plugins."
 hidden: false
 createdAt: "2020-05-16T22:36:48.334Z"
 ---
@@ -151,7 +151,7 @@ Run this script as a basic smoke test:
 ./pants run src/python/pants_release/release.py -- test-release
 ```
 
-You should also [check PyPI](https://pypi.org/pypi/pantsbuild.pants) to ensure everything looks good. Click "Release history" to find the version you released, then click it and confirm that the `macOS` and `manylinux` wheels show up in the "Download files" page.
+You should also check [GitHub Releases](https://github.com/pantsbuild/pants/releases) to ensure everything looks good. Find the version you released, then click it and confirm that the "Assets" list includes PEXes for macOS and Linux.
 
 Step 5: Run release testing on public repositories
 --------------------------------------------------

@@ -13,5 +13,3 @@ fi
 
 echo "* Checking formatting of Rust files"
 ./build-support/bin/check_rust_formatting.sh || exit 1
-echo "* Checking Rust target headers"
-./build-support/bin/check_rust_target_headers.sh || exit 1

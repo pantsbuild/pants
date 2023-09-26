@@ -9,12 +9,14 @@ use async_trait::async_trait;
 use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
+use grpc_util::tls;
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::{ActionResult, Command, Tree};
-use store::{Store, StoreError};
+use store::remote::REAPI_ADDRESS_SCHEMAS;
+use store::{RemoteOptions, Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
@@ -26,6 +28,9 @@ use process_execution::{
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
 
+mod base_opendal;
+#[cfg(test)]
+mod base_opendal_tests;
 mod reapi;
 #[cfg(test)]
 mod reapi_tests;
@@ -57,12 +62,54 @@ pub trait ActionCacheProvider: Sync + Send + 'static {
 
 #[derive(Clone)]
 pub struct RemoteCacheProviderOptions {
+  // TODO: this is currently framed for the REAPI provider, with some options used by others, would
+  // be good to generalise
+  // TODO: this is structurally very similar to `RemoteOptions`: maybe they should be the same? (see
+  // comment in `choose_provider` too)
   pub instance_name: Option<String>,
   pub action_cache_address: String,
   pub root_ca_certs: Option<Vec<u8>>,
   pub headers: BTreeMap<String, String>,
   pub concurrency_limit: usize,
   pub rpc_timeout: Duration,
+}
+
+async fn choose_provider(
+  options: RemoteCacheProviderOptions,
+) -> Result<Arc<dyn ActionCacheProvider>, String> {
+  let address = options.action_cache_address.clone();
+
+  // TODO: we shouldn't need to gin up a whole copy of this struct; it'd be better to have the two
+  // set of remoting options managed together.
+  let remote_options = RemoteOptions {
+    cas_address: address.clone(),
+    instance_name: options.instance_name.clone(),
+    headers: options.headers.clone(),
+    tls_config: tls::Config::new_without_mtls(options.root_ca_certs.clone()),
+    rpc_timeout: options.rpc_timeout,
+    rpc_concurrency_limit: options.concurrency_limit,
+    // TODO: these should either be passed through or not synthesized here
+    chunk_size_bytes: 0,
+    rpc_retries: 0,
+    capabilities_cell_opt: None,
+    batch_api_size_limit: 0,
+  };
+
+  if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
+    Ok(Arc::new(reapi::Provider::new(options).await?))
+  } else if let Some(path) = address.strip_prefix("file://") {
+    // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
+    // testing.
+    Ok(Arc::new(base_opendal::Provider::fs(
+      path,
+      "action-cache".to_owned(),
+      remote_options,
+    )?))
+  } else {
+    Err(format!(
+      "Cannot initialise remote action cache provider with address {address}, as the scheme is not supported",
+    ))
+  }
 }
 
 pub struct RemoteCacheRunnerOptions {
@@ -140,8 +187,7 @@ impl CommandRunner {
     runner_options: RemoteCacheRunnerOptions,
     provider_options: RemoteCacheProviderOptions,
   ) -> Result<Self, String> {
-    let provider = Arc::new(reapi::Provider::new(provider_options).await?);
-
+    let provider = choose_provider(provider_options).await?;
     Ok(Self::new(runner_options, provider))
   }
 

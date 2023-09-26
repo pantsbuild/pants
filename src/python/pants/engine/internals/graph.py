@@ -366,8 +366,9 @@ def _target_parametrizations(
     target_type: type[Target],
     union_membership: UnionMembership,
 ) -> _TargetParametrization:
-    first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
-    if rest:
+    expanded_parametrizations = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    first_address, first_kwargs = expanded_parametrizations[0]
+    if first_address is not address:
         # The target was parametrized, and so the original Target does not exist.
         generated = FrozenDict(
             (
@@ -380,7 +381,7 @@ def _target_parametrizations(
                     description_of_origin=target_adaptor.description_of_origin,
                 ),
             )
-            for parameterized_address, parameterized_fields in (first, *rest)
+            for parameterized_address, parameterized_fields in expanded_parametrizations
         )
         return _TargetParametrization(None, generated)
     else:

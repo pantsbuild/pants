@@ -75,8 +75,24 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
                         System.out.println("It's " + date.toString());
                         some.qualified.ref.Foo.bar();
                         some.other.Thing[] things = new some.other.Thing[1];
+
+                        var result = switch("TEST") {
+                            case "TEST" -> {
+                                yield "something";
+                            }
+                            default -> "something else";
+                        };
+                        System.out.println("It's " + result);
                     }
                 }
+
+                sealed interface SimpleInterface permits SimpleImplementation1 {}
+
+                final class SimpleImplementation1 implements SimpleInterface {}
+
+                sealed class SimpleClass permits SimpleImplementation2 {}
+
+                final class SimpleImplementation2 implements SimpleClass {}
 
                 class Foo {}
                 """
@@ -111,10 +127,16 @@ def test_simple_java_parser_analysis(rule_runner: RuleRunner) -> None:
     )
     assert analysis.top_level_types == (
         "org.pantsbuild.example.SimpleSource",
+        "org.pantsbuild.example.SimpleInterface",
+        "org.pantsbuild.example.SimpleImplementation1",
+        "org.pantsbuild.example.SimpleClass",
+        "org.pantsbuild.example.SimpleImplementation2",
         "org.pantsbuild.example.Foo",
     )
     assert sorted(analysis.consumed_types) == [
         "Date",
+        "SimpleClass",
+        "SimpleInterface",
         "System",
         "date",  # note: false positive on a variable identifier
         "some",

@@ -121,6 +121,7 @@ Created as part of the release process.
 + In-Ho Yi
 + Itay Donanhirsh
 + Ity Kaul
++ JC (Jonathan Chen)
 + Jackson Davis
 + Jacob Floyd
 + Jake Donham
@@ -188,11 +189,13 @@ Created as part of the release process.
 + Marc Abramowitz
 + Marcelo Trylesinski
 + Marcin Podolski
++ Marcus Bolmstedt
 + Marcus Lim
 + Marek Żarnowski
 + Marijn Valk
 + Marilyn Cruz
 + Marius Eriksen
++ Marius Räsener
 + Mark Chu-Carroll
 + Mark Davis
 + Mark McBride
@@ -210,12 +213,14 @@ Created as part of the release process.
 + Michael Doherty
 + Michael Glass
 + Michal Bryc
++ Mikael Souza
 + Mike Cripps
 + Mike Geeves
 + Mike Lindsey
 + Mike Solomon
 + Misho Krastev
 + Mohamed Abdi
++ Morten Hauge
 + Moses Nakamura
 + Nadav Samet
 + Nathan Levesque
@@ -225,6 +230,7 @@ Created as part of the release process.
 + Nik Shkrob
 + Nimrod Shlagman
 + Nitay Joffe
++ Nobu
 + Nora Howard
 + Ny Saechao
 + Oliver Gould
@@ -253,6 +259,7 @@ Created as part of the release process.
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Ryan Despain
 + Ryan King
 + Ryan Scott Brown
 + Ryan Williams
@@ -301,11 +308,13 @@ Created as part of the release process.
 + Troy Howard
 + Tushar Singh
 + Ugo Di Girolamo
++ Ulugbek Adilbekov
 + Viktor Kleen
 + Vincent Tavernier
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
++ Willy Lulciuc
 + Win Wang
 + Wolfram Arnold
 + Xaelias
@@ -320,6 +329,7 @@ Created as part of the release process.
 + eugene yokota
 + gyudoza
 + hephex
++ olivercoleman-switchdin
 + philipp-sontag-by
 + sww
 + twunderlich-grapl
