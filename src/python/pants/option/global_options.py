@@ -280,6 +280,21 @@ _REMOTE_ADDRESS_SCHEMES = (
             """
         ),
     ),
+    _RemoteAddressScheme(
+        schemes=("github-actions-cache+http", "github-actions-cache+https"),
+        supports_execution=False,
+        experimental=True,
+        description=softwrap(
+            f"""
+            Use the GitHub Actions Cache for fine-grained caching. This requires extracting
+            `ACTIONS_CACHE_URL` (passing it in `[GLOBAL].remote_store_address`) and
+            `ACTIONS_RUNTIME_TOKEN` (storing it in a file and passing
+            `[GLOBAL].remote_oauth_bearer_token_path` or setting `[GLOBAL].remote_store_headers` to
+            include `authorization: Bearer {{token...}}`). See
+            {doc_url('remote-caching#github-actions-cache')} for more details.
+            """
+        ),
+    ),
 )
 
 
