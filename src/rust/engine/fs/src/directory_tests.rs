@@ -370,3 +370,25 @@ fn walk_too_many_links_subdir() {
     vec!["".to_string(), "a".to_string()],
   );
 }
+
+#[test]
+fn leaf_paths() {
+  let file = PathBuf::from("parent/file.txt");
+  let link = PathBuf::from("parent/link");
+  let empty_dir = PathBuf::from("empty_dir");
+  let tree = make_tree(vec![
+    TypedPath::File {
+      path: &file,
+      is_executable: false,
+    },
+    TypedPath::Link {
+      path: &link,
+      target: Path::new("file.txt"),
+    },
+    TypedPath::Dir(&empty_dir),
+  ]);
+
+  let leaf_paths = tree.leaf_paths();
+
+  assert_eq!(leaf_paths, vec![empty_dir, file, link])
+}
