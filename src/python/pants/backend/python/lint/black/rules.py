@@ -62,7 +62,7 @@ async def _run_black(
             level=LogLevel.DEBUG,
         ),
     )
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+    return await FmtResult.create(request, result)
 
 
 @rule
