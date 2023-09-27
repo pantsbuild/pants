@@ -43,7 +43,7 @@ If the endpoint is using TLS, then the `remote_store_address` option would be sp
 GitHub Actions Cache
 ====================
 
-GitHub Actions provides built-in caching service which Pants supports using for sharing caches across GitHub Actions runs (not with machines outside of GitHub Actions). It is typically used via the `actions/cache` action to cache whole directories and files, but Pants can use the same functionality for fine-grained caching.
+GitHub Actions provides a built-in caching service which Pants supports using for sharing caches across GitHub Actions runs (not with machines outside of GitHub Actions). It is typically used via the `actions/cache` action to cache whole directories and files, but Pants can use the same functionality for fine-grained caching.
 
 > 🚧 GitHub Actions Cache support is still experimental
 >
