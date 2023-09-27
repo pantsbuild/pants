@@ -1684,11 +1684,20 @@ fn write_digest(
         )
         .await?;
 
+      // invalidate all the paths we've changed within `path_prefix`: both the paths we cleared and
+      // the files we've just written to.
       let snapshot = store::Snapshot::from_digest(store, lifted_digest).await?;
-      let paths = snapshot.tree.leaf_paths();
-      py_scheduler
-        .0
-        .invalidate_paths(&paths.into_iter().map(|p| path_prefix.join(&p)).collect());
+      let written_paths = snapshot.tree.leaf_paths();
+      let written_paths = written_paths.iter().map(|p| p as &Path);
+
+      let cleared_paths = clear_paths.iter().map(Path::new);
+
+      let changed_paths = written_paths
+        .chain(cleared_paths)
+        .map(|p| path_prefix.join(p))
+        .collect();
+
+      py_scheduler.0.invalidate_paths(&changed_paths);
 
       Ok(())
     })
