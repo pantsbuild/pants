@@ -98,7 +98,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture --test-threads=8
+      run: ./cargo test --locked --tests -- --nocapture --test-threads=8
     timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
@@ -198,7 +198,7 @@ jobs:
 
         ./build-support/bin/check_rust_pre_commit.sh
 
-        ./cargo test --all --tests -- --nocapture
+        ./cargo test --locked --all --tests -- --nocapture
 
         ./cargo check --benches
 
@@ -294,7 +294,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture
+      run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:

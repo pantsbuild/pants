@@ -47,7 +47,7 @@ async def run_openapi_format(
         ),
     )
 
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+    return await FmtResult.create(request, result)
 
 
 def rules():

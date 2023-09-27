@@ -25,6 +25,7 @@ from pants.util.logging import LogLevel
 
 class ScalaRepl(ReplImplementation):
     name = "scala"
+    supports_args = False
 
 
 @rule(level=LogLevel.DEBUG)

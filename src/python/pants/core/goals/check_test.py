@@ -35,6 +35,7 @@ from pants.testutil.option_util import create_options_bootstrapper, create_subsy
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
+from pants.util.strutil import Simplifier
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -285,42 +286,36 @@ def test_streaming_output_partitions() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("strip_chroot_path", "strip_formatting", "expected"),
-    [
-        (False, False, "\033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m"),
-        (False, True, "/var/pants-sandbox-123/red/path.py bold"),
-        (True, False, "\033[0;31mred/path.py\033[0m \033[1mbold\033[0m"),
-        (True, True, "red/path.py bold"),
-    ],
-)
-def test_from_fallible_process_result_output_prepping(
-    strip_chroot_path: bool, strip_formatting: bool, expected: str
-) -> None:
-    result = CheckResult.from_fallible_process_result(
-        FallibleProcessResult(
-            exit_code=0,
-            stdout=b"stdout \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr=b"stderr \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
-            stderr_digest=EMPTY_FILE_DIGEST,
-            output_digest=EMPTY_DIGEST,
-            metadata=ProcessResultMetadata(
-                0,
-                ProcessExecutionEnvironment(
-                    environment_name=None,
-                    platform=Platform.create_for_localhost().value,
-                    docker_image=None,
-                    remote_execution=False,
-                    remote_execution_extra_platform_properties=[],
-                ),
-                "ran_locally",
-                0,
-            ),
-        ),
-        strip_chroot_path=strip_chroot_path,
-        strip_formatting=strip_formatting,
-    )
+def test_from_fallible_process_result_output_prepping() -> None:
+    # Check that this calls the simplifier.
+    class DistinctiveException(Exception):
+        pass
 
-    assert result.stdout == "stdout " + expected
-    assert result.stderr == "stderr " + expected
+    class SubSimplifier(Simplifier):
+        def simplify(self, v: bytes | str) -> str:
+            raise DistinctiveException()
+
+    with pytest.raises(DistinctiveException):
+        CheckResult.from_fallible_process_result(
+            FallibleProcessResult(
+                exit_code=0,
+                stdout=b"",
+                stdout_digest=EMPTY_FILE_DIGEST,
+                stderr=b"",
+                stderr_digest=EMPTY_FILE_DIGEST,
+                output_digest=EMPTY_DIGEST,
+                metadata=ProcessResultMetadata(
+                    0,
+                    ProcessExecutionEnvironment(
+                        environment_name=None,
+                        platform=Platform.create_for_localhost().value,
+                        docker_image=None,
+                        remote_execution=False,
+                        remote_execution_extra_platform_properties=[],
+                    ),
+                    "ran_locally",
+                    0,
+                ),
+            ),
+            output_simplifier=SubSimplifier(),
+        )

@@ -51,7 +51,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
-from pants.util.strutil import fmt_memory_size, softwrap
+from pants.util.strutil import Simplifier, fmt_memory_size, softwrap
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -277,6 +277,21 @@ _REMOTE_ADDRESS_SCHEMES = (
             Use a local directory as a 'remote' store, for testing, debugging, or potentially an NFS
             mount. Format: `file://$path`. For example: `file:///tmp/remote-cache-example/` will
             store within the `/tmp/remote-cache-example/` directory, creating it if necessary.
+            """
+        ),
+    ),
+    _RemoteAddressScheme(
+        schemes=("github-actions-cache+http", "github-actions-cache+https"),
+        supports_execution=False,
+        experimental=True,
+        description=softwrap(
+            f"""
+            Use the GitHub Actions Cache for fine-grained caching. This requires extracting
+            `ACTIONS_CACHE_URL` (passing it in `[GLOBAL].remote_store_address`) and
+            `ACTIONS_RUNTIME_TOKEN` (storing it in a file and passing
+            `[GLOBAL].remote_oauth_bearer_token_path` or setting `[GLOBAL].remote_store_headers` to
+            include `authorization: Bearer {{token...}}`). See
+            {doc_url('remote-caching#github-actions-cache')} for more details.
             """
         ),
     ),
@@ -2132,6 +2147,15 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     @memoized_property
     def named_caches_dir(self) -> PurePath:
         return Path(self._named_caches_dir).resolve()
+
+    def output_simplifier(self) -> Simplifier:
+        """Create a `Simplifier` instance for use on stdout and stderr that will be shown to a
+        user."""
+        return Simplifier(
+            # it's ~never useful to show the chroot path to a user
+            strip_chroot_path=True,
+            strip_formatting=not self.colors,
+        )
 
 
 @dataclass(frozen=True)

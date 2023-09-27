@@ -81,6 +81,16 @@ async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProv
       "byte-store".to_owned(),
       options,
     )?))
+  } else if let Some(url) = address.strip_prefix("github-actions-cache+") {
+    // This is relying on python validating that it was set as `github-actions-cache+https://...` so
+    // incorrect values could easily slip through here and cause downstream confusion. We're
+    // intending to change the approach (https://github.com/pantsbuild/pants/issues/19902) so this
+    // is tolerable for now.
+    Ok(Arc::new(base_opendal::Provider::github_actions_cache(
+      url,
+      "byte-store".to_owned(),
+      options,
+    )?))
   } else {
     Err(format!(
       "Cannot initialise remote byte store provider with address {address}, as the scheme is not supported",

@@ -8,7 +8,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Iterable, Iterator, Sequence, TypeVar, cast
 
-import colors
 from typing_extensions import Protocol, final
 
 from pants.base.specs import Specs
@@ -43,7 +42,7 @@ from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
-from pants.util.strutil import softwrap, strip_v2_chroot_path
+from pants.util.strutil import Simplifier, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -67,19 +66,13 @@ class LintResult(EngineAwareReturnType):
         request: AbstractLintRequest.Batch,
         process_result: FallibleProcessResult,
         *,
-        strip_chroot_path: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
         report: Digest = EMPTY_DIGEST,
-        strip_formatting: bool = False,
     ) -> LintResult:
-        def prep_output(s: bytes) -> str:
-            chroot = strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-            formatting = cast(str, colors.strip_color(chroot)) if strip_formatting else chroot
-            return formatting
-
         return cls(
             exit_code=process_result.exit_code,
-            stdout=prep_output(process_result.stdout),
-            stderr=prep_output(process_result.stderr),
+            stdout=output_simplifier.simplify(process_result.stdout),
+            stderr=output_simplifier.simplify(process_result.stderr),
             linter_name=request.tool_name,
             partition_description=request.partition_metadata.description,
             report=report,

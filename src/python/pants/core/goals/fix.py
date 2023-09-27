@@ -37,7 +37,7 @@ from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap, strip_v2_chroot_path
+from pants.util.strutil import Simplifier, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -55,16 +55,13 @@ class FixResult(EngineAwareReturnType):
         request: AbstractFixRequest.Batch,
         process_result: ProcessResult | FallibleProcessResult,
         *,
-        strip_chroot_path: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> FixResult:
-        def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-
         return FixResult(
             input=request.snapshot,
             output=await Get(Snapshot, Digest, process_result.output_digest),
-            stdout=prep_output(process_result.stdout),
-            stderr=prep_output(process_result.stderr),
+            stdout=output_simplifier.simplify(process_result.stdout),
+            stderr=output_simplifier.simplify(process_result.stderr),
             tool_name=request.tool_name,
         )
 
