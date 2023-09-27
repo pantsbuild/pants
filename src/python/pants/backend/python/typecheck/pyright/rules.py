@@ -190,6 +190,11 @@ async def pyright_typecheck_partition(
         config_files_get,
     )
 
+    # This is a workaround for https://github.com/pantsbuild/pants/issues/19946.
+    # complete_pex_env needs to be created here so that the test `test_passing_cache_clear`
+    # test can pass using the appropriate caching directory.
+    # See https://github.com/pantsbuild/pants/pull/19430#discussion_r1337851780
+    # for more discussion.
     complete_pex_env = pex_environment.in_workspace()
     requirements_pex_request = PexRequest(
         output_filename="requirements_venv.pex",
