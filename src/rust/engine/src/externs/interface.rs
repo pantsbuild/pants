@@ -1626,69 +1626,17 @@ fn single_file_digests_to_bytes<'py>(
   })
 }
 
-/// Delete `path` and anything under it (if a directory), without following symlinks, returning all
-/// paths removed in `deleted` (even if there was an error part way through)
-fn ensure_path_doesnt_exist(deleted: &mut Vec<PathBuf>, path: PathBuf) -> io::Result<()> {
-  match std::fs::remove_file(&path) {
-    Ok(()) => {
-      deleted.push(path.to_owned());
-      Ok(())
-    }
+fn ensure_path_doesnt_exist(path: &Path) -> io::Result<()> {
+  match std::fs::remove_file(path) {
+    Ok(()) => Ok(()),
     Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
     // Always fall through to remove_dir_all unless the path definitely doesn't exist, because
     // std::io::ErrorKind::IsADirectory is unstable https://github.com/rust-lang/rust/issues/86442
     //
     // NB. we don't need to check this returning NotFound because remove_file will identify that
     // above (except if there's a concurrent removal, which is out of scope)
-    Err(_) => remove_dir_all_recursive(deleted, path),
+    Err(_) => std::fs::remove_dir_all(path),
   }
-}
-
-// This is very similar to std::fs::remove_dir_all's implementation, but we need to extract the
-// paths that were deleted.
-fn remove_dir_all_recursive(deleted: &mut Vec<PathBuf>, path: PathBuf) -> io::Result<()> {
-  fn push_if_success(
-    deleted: &mut Vec<PathBuf>,
-    path: PathBuf,
-    result: io::Result<()>,
-  ) -> io::Result<()> {
-    if let Ok(()) = result {
-      deleted.push(path);
-    }
-    result
-  }
-
-  // TODO: convert this to be async to issue deletes concurrently
-  for child in std::fs::read_dir(&path)? {
-    let child = child?;
-    let path = child.path();
-    if child.file_type()?.is_dir() {
-      remove_dir_all_recursive(deleted, path)?;
-    } else {
-      let result = std::fs::remove_file(&path);
-      push_if_success(deleted, path, result)?;
-    }
-  }
-  let result = std::fs::remove_dir(&path);
-  push_if_success(deleted, path, result)
-}
-
-fn ensure_paths_dont_exist(
-  deleted: &mut Vec<PathBuf>,
-  base: &Path,
-  paths: &[String],
-) -> PyO3Result<()> {
-  for subpath in paths {
-    let resolved = base.join(subpath);
-    ensure_path_doesnt_exist(deleted, resolved.clone()).map_err(|e| {
-      PyIOError::new_err(format!(
-        "Failed to clear {} when writing digest: {e}",
-        resolved.display()
-      ))
-    })?;
-  }
-
-  Ok(())
 }
 
 #[pyfunction]
@@ -1713,29 +1661,14 @@ fn write_digest(
     destination.push(&core.build_root);
     destination.push(path_prefix);
 
-    let mut cleared_paths = Vec::new();
-    let result = ensure_paths_dont_exist(&mut cleared_paths, &destination, &clear_paths);
-
-    let mut paths_to_invalidate = cleared_paths
-      .into_iter()
-      .map(|p| {
-        // the deletes use absolute paths, but invalidation should use build-root relative ones, so
-        // the build-root needs to be removed
-        p.strip_prefix(&core.build_root)
-          .unwrap_or_else(|err| {
-            panic!(
-              "all deleted paths must be within {:?}, found {:?}: {}",
-              core.build_root, p, err
-            )
-          })
-          .to_owned()
-      })
-      .collect();
-
-    if result.is_err() {
-      // we're bailing out, but we should still invalidate what's been changed on disk
-      py_scheduler.0.invalidate_paths(&paths_to_invalidate);
-      return result;
+    for subpath in &clear_paths {
+      let resolved = destination.join(subpath);
+      ensure_path_doesnt_exist(&resolved).map_err(|e| {
+        PyIOError::new_err(format!(
+          "Failed to clear {} when writing digest: {e}",
+          resolved.display()
+        ))
+      })?;
     }
 
     block_in_place_and_wait(py, || async move {
@@ -1752,14 +1685,10 @@ fn write_digest(
         .await?;
 
       let snapshot = store::Snapshot::from_digest(store, lifted_digest).await?;
-      paths_to_invalidate.extend(
-        snapshot
-          .tree
-          .leaf_paths()
-          .into_iter()
-          .map(|p| path_prefix.join(p)),
-      );
-      py_scheduler.0.invalidate_paths(&paths_to_invalidate);
+      let paths = snapshot.tree.leaf_paths();
+      py_scheduler
+        .0
+        .invalidate_paths(&paths.into_iter().map(|p| path_prefix.join(&p)).collect());
 
       Ok(())
     })
