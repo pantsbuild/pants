@@ -505,6 +505,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
     ("tree", sub_match) => match expect_subcommand(sub_match) {
       ("materialize", args) => {
         let destination = PathBuf::from(args.value_of("destination").unwrap());
+        // NB: We use `destination` as the root directory, because there is no need to
+        // memoize a check for whether some other parent directory is hardlinkable.
+        let destination_root = destination.clone();
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
         let size_bytes = args
           .value_of("size_bytes")
@@ -522,6 +525,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           store
             .materialize_directory(
               destination,
+              &destination_root,
               output_digest,
               false,
               &BTreeSet::new(),
@@ -535,6 +539,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
     ("directory", sub_match) => match expect_subcommand(sub_match) {
       ("materialize", args) => {
         let destination = PathBuf::from(args.value_of("destination").unwrap());
+        // NB: We use `destination` as the root directory, because there is no need to
+        // memoize a check for whether some other parent directory is hardlinkable.
+        let destination_root = destination.clone();
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
         let size_bytes = args
           .value_of("size_bytes")
@@ -546,6 +553,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           store
             .materialize_directory(
               destination,
+              &destination_root,
               digest,
               false,
               &BTreeSet::new(),

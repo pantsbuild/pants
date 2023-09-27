@@ -254,9 +254,10 @@ class ProcessManager:
         """An identity-keyed inter-process lock for safeguarding lifecycle and other operations."""
         safe_mkdir(self._metadata_base_dir)
         return OwnerPrintingInterProcessFileLock(
-            # N.B. This lock can't key into the actual named metadata dir (e.g. `.pids/pantsd/lock`
-            # via `ProcessManager._get_metadata_dir_by_name()`) because of a need to purge
-            # the named metadata dir on startup to avoid stale metadata reads.
+            # N.B. This lock can't key into the actual named metadata dir (e.g.
+            # `.pants.d/pids/pantsd/lock` via `ProcessManager._get_metadata_dir_by_name()`)
+            # because of a need to purge the named metadata dir on startup to avoid stale
+            # metadata reads.
             os.path.join(self._metadata_base_dir, f".lock.{self._name}")
         )
 

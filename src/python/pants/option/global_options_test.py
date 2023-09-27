@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from collections import Counter
 from pathlib import Path
 from textwrap import dedent
 
@@ -14,7 +15,13 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import DynamicRemoteOptions, GlobalOptions
+from pants.option.errors import OptionsError
+from pants.option.global_options import (
+    _REMOTE_ADDRESS_SCHEMES,
+    DynamicRemoteOptions,
+    GlobalOptions,
+    _RemoteAddressScheme,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil import rule_runner
 from pants.testutil.option_util import create_options_bootstrapper
@@ -154,3 +161,116 @@ def test_invalidation_globs() -> None:
     )
     for glob in globs:
         assert suffix not in glob
+
+
+def _scheme(
+    schemes: tuple[str, ...] = ("foo",),
+    supports_execution: bool = False,
+    experimental: bool = False,
+) -> _RemoteAddressScheme:
+    return _RemoteAddressScheme(
+        schemes=schemes,
+        supports_execution=supports_execution,
+        experimental=experimental,
+        description="DESCRIPTION",
+    )
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "experimental:foo://",
+        "experimental:foo://host:123",
+        "experimental:foos://path/here",
+        "bar://",
+        "bar://user@host:123/path?query#fragment",
+    ],
+)
+@pytest.mark.parametrize("execution", [False, True])
+def test_remote_schemes_validate_address_should_pass_for_various_good_addresses_without_execution(
+    address: str, execution: bool
+) -> None:
+    _RemoteAddressScheme._validate_address(
+        (
+            _scheme(schemes=("foo", "foos"), experimental=True, supports_execution=execution),
+            # (smoke test require_execution=False supports_execution=True)
+            _scheme(schemes=("bar",), supports_execution=True),
+        ),
+        address,
+        require_execution=execution,
+        context_for_diagnostics="CONTEXT",
+    )
+
+
+@pytest.mark.parametrize(
+    "address",
+    ["", "foo", "foo:", "foo:/", "FOO://", "foo:bar://", "fooextra://", "baz://", "bars://"],
+)
+def test_remote_schemes_validate_address_should_error_when_bad_address(address: str) -> None:
+    with pytest.raises(
+        OptionsError,
+        match=f"(?s)CONTEXT has invalid value `{address}`: it does not have a supported scheme.*start with one of: `foo://`, `foos://`, `bar://`",
+    ):
+        _RemoteAddressScheme._validate_address(
+            (
+                _scheme(schemes=("foo", "foos")),
+                _scheme(schemes=("bar",)),
+            ),
+            address,
+            require_execution=False,
+            context_for_diagnostics="CONTEXT",
+        )
+
+
+def test_remote_schemes_validate_address_should_error_when_missing_experimental() -> None:
+    with pytest.raises(
+        OptionsError,
+        match="(?s)CONTEXT has invalid value `foo://bar`: the scheme `foo` is experimental.*Specify the value as `experimental:foo://bar`",
+    ):
+        _RemoteAddressScheme._validate_address(
+            (_scheme(experimental=True),),
+            "foo://bar",
+            require_execution=False,
+            context_for_diagnostics="CONTEXT",
+        )
+
+
+def test_remote_schemes_validate_address_should_warn_when_unnecessary_experimental(caplog) -> None:
+    with caplog.at_level("WARNING"):
+        _RemoteAddressScheme._validate_address(
+            (_scheme(experimental=False),),
+            "experimental:foo://bar",
+            require_execution=False,
+            context_for_diagnostics="CONTEXT",
+        )
+
+    assert "CONTEXT has value `experimental:foo://bar`" in caplog.text
+    assert "the scheme `foo` is not experimental" in caplog.text
+    assert "Specify the value as `foo://bar`" in caplog.text
+
+
+def test_remote_schemes_validate_address_should_error_when_execution_required_but_not_supported() -> (
+    None
+):
+    with pytest.raises(
+        OptionsError,
+        match="(?s)CONTEXT has invalid value `foo://bar`: the scheme `foo` does not support remote execution.*starting with one of: `bar://`",
+    ):
+        _RemoteAddressScheme._validate_address(
+            (
+                _scheme(supports_execution=False),
+                _scheme(schemes=("bar",), supports_execution=True),
+            ),
+            "foo://bar",
+            require_execution=True,
+            context_for_diagnostics="CONTEXT",
+        )
+
+
+def test_remote_schemes_should_have_unique_schemes():
+    # the raw schemes supported for remoting (not with experimental: prefix, etc.) should be unique,
+    # so there's no accidental ambiguity about, for instance, `http://` configured more than once
+    counts = Counter(
+        scheme_str for scheme in _REMOTE_ADDRESS_SCHEMES for scheme_str in scheme.schemes
+    )
+    assert [scheme for scheme, count in counts.items() if count > 1] == []

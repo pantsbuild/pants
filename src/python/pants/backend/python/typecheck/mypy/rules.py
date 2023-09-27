@@ -368,7 +368,7 @@ async def mypy_typecheck_partition(
         result,
         partition_description=partition.description(),
         report=report,
-        strip_formatting=not global_options.colors,
+        output_simplifier=global_options.output_simplifier(),
     )
 
 

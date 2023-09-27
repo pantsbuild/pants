@@ -225,7 +225,7 @@ async def lint(
         ),
     )
 
-    return LintResult.create(request, result, strip_formatting=not global_options.colors)
+    return LintResult.create(request, result, output_simplifier=global_options.output_simplifier())
 
 
 def rules() -> Iterable[Rule | UnionRule]:

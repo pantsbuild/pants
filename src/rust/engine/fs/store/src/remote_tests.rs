@@ -8,6 +8,7 @@ use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
+use tempfile::TempDir;
 use testutil::data::TestData;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
@@ -19,9 +20,8 @@ use crate::MEGABYTES;
 
 #[tokio::test]
 async fn smoke_test_from_options_reapi_provider() {
-  // run through the various methods using a 'real' provider (REAPI
-  // talking to a stubbed CAS), as a double-check that the test
-  // provider is plausible
+  // This runs through the various methods using the 'real' REAPI provider (talking to a stubbed
+  // CAS), as a double-check that the test provider is plausible and test provider selection works.
   let roland = TestData::roland();
   let empty = TestData::empty();
 
@@ -45,7 +45,7 @@ async fn smoke_test_from_options_reapi_provider() {
   let mut missing_set = HashSet::new();
   missing_set.insert(empty.digest());
 
-  // only roland is in the CAS:
+  // Only roland is in the CAS:
   assert_eq!(
     store.load_bytes(roland.digest()).await,
     Ok(Some(roland.bytes()))
@@ -58,11 +58,62 @@ async fn smoke_test_from_options_reapi_provider() {
     Ok(missing_set)
   );
 
-  // insert empty:
+  // Insert empty:
   assert_eq!(store.store_bytes(empty.bytes()).await, Ok(()));
   assert_eq!(
     store.load_bytes(empty.digest()).await,
     Ok(Some(empty.bytes()))
+  );
+}
+
+#[tokio::test]
+async fn smoke_test_from_options_file_provider() {
+  // This runs through the various methods using the file:// provider, as a double-check that the
+  // test provider is plausible and test provider selection works.
+  let roland = TestData::roland();
+  let catnip = TestData::catnip();
+
+  let _ = WorkunitStore::setup_for_tests();
+  let dir = TempDir::new().unwrap();
+
+  let store = ByteStore::from_options(RemoteOptions {
+    cas_address: format!("file://{}", dir.path().display()),
+    instance_name: None,
+    tls_config: tls::Config::default(),
+    headers: BTreeMap::new(),
+    chunk_size_bytes: 10 * MEGABYTES,
+    rpc_timeout: Duration::from_secs(5),
+    rpc_retries: 1,
+    rpc_concurrency_limit: 256,
+    capabilities_cell_opt: None,
+    batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+  })
+  .await
+  .unwrap();
+
+  let mut missing_set = HashSet::new();
+  missing_set.insert(catnip.digest());
+
+  // Insert roland:
+  assert_eq!(store.store_bytes(roland.bytes()).await, Ok(()));
+  assert_eq!(
+    store.load_bytes(roland.digest()).await,
+    Ok(Some(roland.bytes()))
+  );
+  // Only roland is stored:
+  assert_eq!(store.load_bytes(catnip.digest()).await, Ok(None));
+  assert_eq!(
+    store
+      .list_missing_digests(vec![roland.digest(), catnip.digest()])
+      .await,
+    Ok(missing_set)
+  );
+
+  // Insert catnip:
+  assert_eq!(store.store_bytes(catnip.bytes()).await, Ok(()));
+  assert_eq!(
+    store.load_bytes(catnip.digest()).await,
+    Ok(Some(catnip.bytes()))
   );
 }
 
