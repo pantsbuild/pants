@@ -20,7 +20,7 @@ use crate::session::{ObservedValueResult, Root, Session};
 
 use graph::LastObserved;
 use ui::ConsoleUI;
-use watch::Invalidatable;
+use watch::{Invalidatable, InvalidateCaller};
 
 pub enum ExecutionTermination {
   // Raised as a vanilla keyboard interrupt on the python side.
@@ -99,14 +99,17 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate_paths(&self, paths: &HashSet<PathBuf>) -> usize {
-    self.core.graph.invalidate(paths, "external")
+    self
+      .core
+      .graph
+      .invalidate(paths, InvalidateCaller::External)
   }
 
   ///
   /// Invalidate all filesystem dependencies in the graph.
   ///
   pub fn invalidate_all_paths(&self) -> usize {
-    self.core.graph.invalidate_all("external")
+    self.core.graph.invalidate_all(InvalidateCaller::External)
   }
 
   ///

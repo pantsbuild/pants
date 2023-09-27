@@ -1656,6 +1656,7 @@ fn write_digest(
     let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
 
     // Python will have already validated that path_prefix is a relative path.
+    let path_prefix = Path::new(&path_prefix);
     let mut destination = PathBuf::new();
     destination.push(&core.build_root);
     destination.push(path_prefix);
@@ -1671,17 +1672,34 @@ fn write_digest(
     }
 
     block_in_place_and_wait(py, || async move {
-      core
-        .store()
+      let store = core.store();
+      store
         .materialize_directory(
           destination.clone(),
           &core.build_root,
-          lifted_digest,
+          lifted_digest.clone(),
           true, // Force everything we write to be mutable
           &BTreeSet::new(),
           fs::Permissions::Writable,
         )
-        .await
+        .await?;
+
+      // Invalidate all the paths we've changed within `path_prefix`: both the paths we cleared and
+      // the files we've just written to.
+      let snapshot = store::Snapshot::from_digest(store, lifted_digest).await?;
+      let written_paths = snapshot.tree.leaf_paths();
+      let written_paths = written_paths.iter().map(|p| p as &Path);
+
+      let cleared_paths = clear_paths.iter().map(Path::new);
+
+      let changed_paths = written_paths
+        .chain(cleared_paths)
+        .map(|p| path_prefix.join(p))
+        .collect();
+
+      py_scheduler.0.invalidate_paths(&changed_paths);
+
+      Ok(())
     })
     .map_err(possible_store_missing_digest)
   })
