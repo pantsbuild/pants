@@ -590,11 +590,7 @@ class RuleRunner:
         ).target
 
     def write_digest(
-        self,
-        digest: Digest,
-        *,
-        path_prefix: str | None = None,
-        clear_paths: Sequence[str] = (),
+        self, digest: Digest, *, path_prefix: str | None = None, clear_paths: Sequence[str] = ()
     ) -> None:
         """Write a digest to disk, relative to the test's build root.
 

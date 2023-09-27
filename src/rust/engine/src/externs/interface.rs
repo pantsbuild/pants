@@ -1684,7 +1684,7 @@ fn write_digest(
         )
         .await?;
 
-      // invalidate all the paths we've changed within `path_prefix`: both the paths we cleared and
+      // Invalidate all the paths we've changed within `path_prefix`: both the paths we cleared and
       // the files we've just written to.
       let snapshot = store::Snapshot::from_digest(store, lifted_digest).await?;
       let written_paths = snapshot.tree.leaf_paths();
