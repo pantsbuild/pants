@@ -25,21 +25,19 @@ impl Env {
     let mut dropped: Vec<String> = Vec::new();
     for (os_key, os_val) in env_os {
       match os_key.into_string() {
-        Ok(key) => {
-          match os_val.into_string() {
-            Ok(val) => {
-              env.insert(key, val);
-            },
-            Err(_) => {
-              dropped.push(key);
-            }
+        Ok(key) => match os_val.into_string() {
+          Ok(val) => {
+            env.insert(key, val);
+          }
+          Err(_) => {
+            dropped.push(key);
           }
         },
         Err(os_key) => {
           // We'll only be able to log the lossy name of any non-UTF-8 keys, but
           // the user will know which one we mean.
           dropped.push(os_key.to_string_lossy().to_string());
-        },
+        }
       }
     }
     dropped.sort();
