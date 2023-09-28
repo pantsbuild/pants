@@ -259,10 +259,10 @@ impl InvalidationWatcher {
 
     if flag == Some(Flag::Rescan) {
       debug!("notify queue overflowed: invalidating all paths");
-      invalidatable.invalidate_all("notify");
+      invalidatable.invalidate_all(InvalidateCaller::Notify);
     } else if !paths.is_empty() {
       debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
-      invalidatable.invalidate(&paths, "notify");
+      invalidatable.invalidate(&paths, InvalidateCaller::Notify);
     }
   }
 
@@ -325,9 +325,14 @@ impl InvalidationWatcher {
   }
 }
 
+pub enum InvalidateCaller {
+  External,
+  Notify,
+}
+
 pub trait Invalidatable: Send + Sync + 'static {
-  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize;
-  fn invalidate_all(&self, caller: &str) -> usize;
+  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: InvalidateCaller) -> usize;
+  fn invalidate_all(&self, caller: InvalidateCaller) -> usize;
 }
 
 ///
