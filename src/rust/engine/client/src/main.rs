@@ -86,8 +86,11 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   env_logger::init_from_env(env_logger::Env::new().filter_or("__PANTS_LEVEL__", level.as_ref()));
 
   // Now that the logger has been set up, we can retroactively log any dropped env vars.
-  for name in dropped {
-    log::warn!("Environment variable with non-UTF-8 name or value ignored: {name}");
+  for name in dropped.keys_with_non_utf8_values {
+    log::warn!("Environment variable with non-UTF-8 value ignored: {name}");
+  }
+  for name in dropped.non_utf8_keys {
+    log::warn!("Environment variable with non-UTF-8 name ignored: {name}");
   }
   let pantsd_settings = find_pantsd(&build_root, &options_parser)?;
   client::execute_command(start, pantsd_settings, env_items, argv).await

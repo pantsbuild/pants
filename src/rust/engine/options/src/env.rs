@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::env;
+use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId, Scope};
 use super::OptionsSource;
@@ -14,33 +15,45 @@ pub struct Env {
   pub(crate) env: HashMap<String, String>,
 }
 
+#[derive(Debug)]
+pub struct DroppedEnvVars {
+  pub non_utf8_keys: Vec<String>,
+  pub keys_with_non_utf8_values: Vec<String>,
+}
+
 impl Env {
   pub fn new(env: HashMap<String, String>) -> Self {
     Self { env }
   }
 
-  pub fn capture_lossy() -> (Self, Vec<String>) {
-    let env_os = env::vars_os();
+  pub fn capture_lossy() -> (Self, DroppedEnvVars) {
+    Self::do_capture_lossy(env::vars_os())
+  }
+
+  pub(crate) fn do_capture_lossy<I>(env_os: I) -> (Self, DroppedEnvVars)
+  where
+    I: Iterator<Item = (OsString, OsString)>,
+  {
     let mut env: HashMap<String, String> = HashMap::with_capacity(env_os.size_hint().0);
-    let mut dropped: Vec<String> = Vec::new();
+    let mut dropped = DroppedEnvVars {
+      non_utf8_keys: Vec::new(),
+      keys_with_non_utf8_values: Vec::new(),
+    };
     for (os_key, os_val) in env_os {
-      match os_key.into_string() {
-        Ok(key) => match os_val.into_string() {
-          Ok(val) => {
-            env.insert(key, val);
-          }
-          Err(_) => {
-            dropped.push(key);
-          }
-        },
-        Err(os_key) => {
-          // We'll only be able to log the lossy name of any non-UTF-8 keys, but
-          // the user will know which one we mean.
-          dropped.push(os_key.to_string_lossy().to_string());
+      match (os_key.into_string(), os_val.into_string()) {
+        (Ok(key), Ok(val)) => {
+          env.insert(key, val);
         }
+        (Ok(key), Err(_)) => dropped.keys_with_non_utf8_values.push(key),
+        // We'll only be able to log the lossy name of any non-UTF-8 keys, but
+        // the user will know which one we mean.
+        (Err(os_key), _) => dropped
+          .non_utf8_keys
+          .push(os_key.to_string_lossy().to_string()),
       }
     }
-    dropped.sort();
+    dropped.non_utf8_keys.sort();
+    dropped.keys_with_non_utf8_values.sort();
     (Self::new(env), dropped)
   }
 
