@@ -23,7 +23,7 @@ use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{Graph, InvalidationResult};
 use hashing::Digest;
-use log::info;
+use log::{log, Level};
 use parking_lot::Mutex;
 // use docker::docker::{self, DOCKER, IMAGE_PULL_CACHE};
 use docker::docker;
@@ -38,7 +38,7 @@ use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
 use store::{self, ImmutableInputs, Store};
 use task_executor::Executor;
-use watch::{Invalidatable, InvalidationWatcher};
+use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
@@ -648,8 +648,20 @@ impl Core {
 
 pub struct InvalidatableGraph(Graph<NodeKey>);
 
+fn caller_to_logging_info(caller: InvalidateCaller) -> (Level, &'static str) {
+  match caller {
+    // An external invalidation is driven by some other pants operation, and thus isn't as
+    // interesting, there's likely to be output about that action already, hence this can be logged
+    // quieter.
+    InvalidateCaller::External => (Level::Debug, "external"),
+    // A notify invalidation may have been triggered by a user-driven action that isn't otherwise
+    // visible in logs (e.g. file editing, branch switching), hence log it louder.
+    InvalidateCaller::Notify => (Level::Info, "notify"),
+  }
+}
+
 impl Invalidatable for InvalidatableGraph {
-  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize {
+  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: InvalidateCaller) -> usize {
     let InvalidationResult { cleared, dirtied } = self.invalidate_from_roots(false, move |node| {
       if let Some(fs_subject) = node.fs_subject() {
         paths.contains(fs_subject)
@@ -657,19 +669,28 @@ impl Invalidatable for InvalidatableGraph {
         false
       }
     });
-    info!(
+    let (level, caller) = caller_to_logging_info(caller);
+    log!(
+      level,
       "{} invalidation: cleared {} and dirtied {} nodes for: {:?}",
-      caller, cleared, dirtied, paths
+      caller,
+      cleared,
+      dirtied,
+      paths
     );
     cleared + dirtied
   }
 
-  fn invalidate_all(&self, caller: &str) -> usize {
+  fn invalidate_all(&self, caller: InvalidateCaller) -> usize {
     let InvalidationResult { cleared, dirtied } =
       self.invalidate_from_roots(false, |node| node.fs_subject().is_some());
-    info!(
+    let (level, caller) = caller_to_logging_info(caller);
+    log!(
+      level,
       "{} invalidation: cleared {} and dirtied {} nodes for all paths",
-      caller, cleared, dirtied
+      caller,
+      cleared,
+      dirtied
     );
     cleared + dirtied
   }
