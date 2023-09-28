@@ -82,3 +82,16 @@ def test_recursion_limit() -> None:
     assert "RecursionError" in small_run.stderr
     # Non integer value fails.
     run("this isn't an int").assert_failure()
+
+
+def test_non_utf8_env_vars() -> None:
+    res = run_pants(
+        command=["--version"],
+        extra_env={
+            "FOO": b"B\xa5R",
+            b"F\xa5O": "BAR",
+        },
+        use_pantsd=True,
+    )
+    print(res.stdout)
+    res.assert_success()

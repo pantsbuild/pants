@@ -9,7 +9,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, List, Mapping, Union
+from typing import Iterator, List, Mapping, Union, cast
 
 import pytest
 
@@ -87,7 +87,7 @@ def run_pants_with_workdir_without_waiting(
     hermetic: bool = True,
     use_pantsd: bool = True,
     config: Mapping | None = None,
-    extra_env: Mapping[str, str] | None = None,
+    extra_env: Mapping[str | bytes, str | bytes] | None = None,
     shell: bool = False,
     set_pants_ignore: bool = True,
 ) -> PantsJoinHandle:
@@ -137,6 +137,7 @@ def run_pants_with_workdir_without_waiting(
     # Only allow-listed entries will be included in the environment if hermetic=True. Note that
     # the env will already be fairly hermetic thanks to the v2 engine; this provides an
     # additional layer of hermiticity.
+    env: dict[str | bytes, str | bytes]
     if hermetic:
         # With an empty environment, we would generally get the true underlying system default
         # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we
@@ -157,7 +158,7 @@ def run_pants_with_workdir_without_waiting(
                 if value is not None:
                     env[h] = value
     else:
-        env = os.environ.copy()
+        env = cast(dict[Union[str, bytes], Union[str, bytes]], os.environ.copy())
 
     env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
     if extra_env:
@@ -171,7 +172,10 @@ def run_pants_with_workdir_without_waiting(
         command=pants_command,
         process=subprocess.Popen(
             pants_command,
-            env=env,
+            # The type stub for the env argument is unnecessarily restrictire: it requires
+            # all keys to be str or all to be bytes. But in practice Popen supports a mix,
+            # which is what we pass. So we silence the typechecking error.
+            env=env,  # type: ignore
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -188,7 +192,7 @@ def run_pants_with_workdir(
     hermetic: bool = True,
     use_pantsd: bool = True,
     config: Mapping | None = None,
-    extra_env: Mapping[str, str] | None = None,
+    extra_env: Mapping[str | bytes, str | bytes] | None = None,
     stdin_data: bytes | str | None = None,
     shell: bool = False,
     set_pants_ignore: bool = True,
@@ -212,7 +216,7 @@ def run_pants(
     hermetic: bool = True,
     use_pantsd: bool = False,
     config: Mapping | None = None,
-    extra_env: Mapping[str, str] | None = None,
+    extra_env: Mapping[str | bytes, str | bytes] | None = None,
     stdin_data: bytes | str | None = None,
 ) -> PantsResult:
     """Runs Pants in a subprocess.
