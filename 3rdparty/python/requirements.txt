@@ -17,6 +17,7 @@ psutil==5.9.0
 # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
 # recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
 # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
+pydevd-pycharm==232.9559.58
 #  E.g., as default_version = "pytest>=6.2.4,<8,!=7.1.0,!=7.1.1"
 pytest>=6.2.4,<7.1.0
 python-lsp-jsonrpc==1.0.0
