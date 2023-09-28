@@ -17,7 +17,7 @@ pub struct Env {
 
 #[derive(Debug)]
 pub struct DroppedEnvVars {
-  pub non_utf8_keys: Vec<String>,
+  pub non_utf8_keys: Vec<OsString>,
   pub keys_with_non_utf8_values: Vec<String>,
 }
 
@@ -45,11 +45,7 @@ impl Env {
           env.insert(key, val);
         }
         (Ok(key), Err(_)) => dropped.keys_with_non_utf8_values.push(key),
-        // We'll only be able to log the lossy name of any non-UTF-8 keys, but
-        // the user will know which one we mean.
-        (Err(os_key), _) => dropped
-          .non_utf8_keys
-          .push(os_key.to_string_lossy().to_string()),
+        (Err(os_key), _) => dropped.non_utf8_keys.push(os_key),
       }
     }
     dropped.non_utf8_keys.sort();

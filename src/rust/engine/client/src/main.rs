@@ -90,7 +90,7 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
     log::warn!("Environment variable with non-UTF-8 value ignored: {name}");
   }
   for name in dropped.non_utf8_keys {
-    log::warn!("Environment variable with non-UTF-8 name ignored: {name}");
+    log::warn!("Environment variable with non-UTF-8 name ignored: {}", name.to_string_lossy());
   }
   let pantsd_settings = find_pantsd(&build_root, &options_parser)?;
   client::execute_command(start, pantsd_settings, env_items, argv).await
@@ -103,7 +103,7 @@ fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> 
 
   let mut c_args = vec![c_exe.clone()];
   c_args.extend(
-    std::env::args_os()
+    env::args_os()
       .skip(1)
       .map(|arg| CString::new(arg.into_vec()).expect("Failed to convert argument to a C string.")),
   );
