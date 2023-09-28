@@ -26,6 +26,9 @@ class Shellcheck(TemplatedExternalTool):
         "v0.8.0|linux_x86_64|01d181787ffe63ebb0a2293f63bdc8455c5c30d3a6636320664bfa278424638f|2082242",
     ]
 
+    # We use this third party source since it has pre-compiled binaries for both x86 and aarch.
+    # It is recommended by shellcheck
+    # https://github.com/koalaman/shellcheck/blob/90d3172dfec30a7569f95b32479ae97af73b8b2e/README.md?plain=1#L236-L237
     default_url_template = (
         "https://github.com/vscode-shellcheck/shellcheck-binaries/releases/download/{version}/shellcheck-"
         "{version}.{platform}.tar.gz"
@@ -52,7 +55,7 @@ class Shellcheck(TemplatedExternalTool):
     )
 
     def generate_exe(self, _: Platform) -> str:
-        return f"./shellcheck"
+        return "./shellcheck"
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # Refer to https://www.mankier.com/1/shellcheck#RC_Files for how config files are
