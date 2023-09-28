@@ -1,6 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use crate::{Invalidatable, InvalidationWatcher};
+use crate::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 
 use std::collections::HashSet;
 use std::fs::create_dir;
@@ -154,14 +154,14 @@ impl TestInvalidatable {
 }
 
 impl Invalidatable for TestInvalidatable {
-  fn invalidate(&self, paths: &HashSet<PathBuf>, _caller: &str) -> usize {
+  fn invalidate(&self, paths: &HashSet<PathBuf>, _caller: InvalidateCaller) -> usize {
     let invalidated = paths.len();
     let mut calls = self.calls.lock();
     calls.push(paths.clone());
     invalidated
   }
 
-  fn invalidate_all(&self, _caller: &str) -> usize {
+  fn invalidate_all(&self, _caller: InvalidateCaller) -> usize {
     unimplemented!();
   }
 }
