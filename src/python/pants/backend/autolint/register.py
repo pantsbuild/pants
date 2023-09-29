@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Mapping, Optional
 
 from pants.core.goals.lint import LintTargetsRequest, LintResult
 from pants.core.target_types import FileSourceField
@@ -42,35 +43,62 @@ def target_types():
     return []
 
 
-def build():
-    AutoLintSubsystem = type(Subsystem)('AutoLintSubsystem', (Subsystem,), dict(
-        options_scope="autolint",
+@dataclass
+class AutoLintConf:
+    options_scope: str
+    name: str
+    help: str
+    command: str
+    extra_env: Optional[Mapping[str, str]] = None
+
+
+_shellcheck = AutoLintConf(
+    options_scope='autoshellcheck',
+    name="Shellcheck",
+    help="A shell linter based on your installed shellcheck",
+    command="/opt/homebrew/bin/shellcheck",
+)
+
+
+_markdownlint = AutoLintConf(
+    options_scope='automarkdownlint',
+    name="MarkdownLint",
+    help="A markdown linter based on your installed markdown lint.",
+    command="/opt/homebrew/bin/markdownlint",
+    extra_env={"PATH": "/opt/homebrew/bin/"}
+)
+
+
+def build(conf: AutoLintConf):
+    assert conf.options_scope.isidentifier(), "The options scope must be a valid python identifier"
+    subsystem_cls = type(Subsystem)(f'AutoLint_{conf.options_scope}_Subsystem', (Subsystem,), dict(
+        options_scope=conf.options_scope,
         skip=SkipOption("lint"),
-        name="AutoLint",
-        help="An experimental simplified lint",
+        name=conf.name,
+        help=conf.help,
         _dynamic_subsystem=True,
     ))
 
-    AutoLintSubsystem.__module__ = __name__
+    subsystem_cls.__module__ = __name__
 
-    AutoLintFieldSet = type(FieldSet)('AutoLintFieldSet', (FieldSet,), dict(
+    fieldset_cls = type(FieldSet)(f'AutoLint_{conf.options_scope}_FieldSet', (FieldSet,), dict(
         required_fields=(FileSourceField,),
         __annotations__=dict(source=FileSourceField)
     ))
-    AutoLintFieldSet.__module__ = __name__
-    AutoLintFieldSet = dataclass(frozen=True)(AutoLintFieldSet)
+    fieldset_cls.__module__ = __name__
+    fieldset_cls = dataclass(frozen=True)(fieldset_cls)
 
-    AutoLintRequest = type(LintTargetsRequest)('AutoLintRequest', (LintTargetsRequest,), dict(
-        tool_subsystem=AutoLintSubsystem,
+    lintreq_cls = type(LintTargetsRequest)(f'AutoLint_{conf.options_scope}_Request', (LintTargetsRequest,), dict(
+        tool_subsystem=subsystem_cls,
         partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION,
-        field_set_type=AutoLintFieldSet,
+        field_set_type=fieldset_cls,
     ))
-    AutoLintRequest.__module__ = __name__
+    lintreq_cls.__module__ = __name__
 
 
     @rule
     async def run_autolint(
-            request: AutoLintRequest.Batch,
+            request: lintreq_cls.Batch,
     ) -> LintResult:
 
         sources = await Get(
@@ -84,13 +112,13 @@ def build():
         process_result = await Get(
             FallibleProcessResult,
             Process(
-                # argv=(bash.path, "-c", "/opt/homebrew/bin/shellcheck", "scripts/stuff.sh"),
-                argv=("/opt/homebrew/bin/shellcheck", *sources.files),
+                argv=(conf.command, *sources.files),
                 # argv=("/opt/homebrew/bin/markdownlint", *sources.files),
                 # we can use sources.files to have all the files.
                 input_digest=input_digest,
-                description=f"Run Autolint on {request.partition_metadata.description}",
+                description=f"Run {conf.name}",
                 level=LogLevel.INFO,
+                env=conf.extra_env
                 # env={"PATH": "/opt/homebrew/bin/"}
             ),
         )
@@ -98,11 +126,12 @@ def build():
 
     return [
         *collect_rules(dict(locals())),
-        *AutoLintRequest.rules()
+        *lintreq_cls.rules()
     ]
 
 
-_rules = build()
+# _rules = build(_shellcheck)
+_rules = build(_markdownlint)
 
 
 def rules():
