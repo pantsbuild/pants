@@ -103,8 +103,7 @@ def build(conf: AutoLintConf):
     ))
     lintreq_cls.__module__ = __name__
 
-
-    @rule
+    @rule(canonical_name_suffix=conf.options_scope)
     async def run_autolint(
             request: lintreq_cls.Batch,
     ) -> LintResult:
@@ -121,25 +120,23 @@ def build(conf: AutoLintConf):
             FallibleProcessResult,
             Process(
                 argv=(conf.command, *sources.files),
-                # argv=("/opt/homebrew/bin/markdownlint", *sources.files),
-                # we can use sources.files to have all the files.
                 input_digest=input_digest,
                 description=f"Run {conf.name}",
                 level=LogLevel.INFO,
                 env=conf.extra_env
-                # env={"PATH": "/opt/homebrew/bin/"}
             ),
         )
         return LintResult.create(request, process_result)
 
+    namespace = dict(locals())
+
     return [
-        *collect_rules(dict(locals())),
+        *collect_rules(namespace),
         *lintreq_cls.rules()
     ]
 
 
-_rules = build(_shellcheck)
-# _rules = build(_markdownlint)
+_rules = build(_shellcheck) + build(_markdownlint)
 
 
 def rules():
