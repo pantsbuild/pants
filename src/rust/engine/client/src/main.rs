@@ -86,10 +86,14 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   env_logger::init_from_env(env_logger::Env::new().filter_or("__PANTS_LEVEL__", level.as_ref()));
 
   // Now that the logger has been set up, we can retroactively log any dropped env vars.
-  for name in dropped.keys_with_non_utf8_values {
+  let mut keys_with_non_utf8_values = dropped.keys_with_non_utf8_values;
+  keys_with_non_utf8_values.sort();
+  for name in keys_with_non_utf8_values {
     log::warn!("Environment variable with non-UTF-8 value ignored: {name}");
   }
-  for name in dropped.non_utf8_keys {
+  let mut non_utf8_keys = dropped.non_utf8_keys;
+  non_utf8_keys.sort();
+  for name in non_utf8_keys {
     log::warn!(
       "Environment variable with non-UTF-8 name ignored: {}",
       name.to_string_lossy()

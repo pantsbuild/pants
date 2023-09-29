@@ -48,8 +48,6 @@ impl Env {
         (Err(os_key), _) => dropped.non_utf8_keys.push(os_key),
       }
     }
-    dropped.non_utf8_keys.sort();
-    dropped.keys_with_non_utf8_values.sort();
     (Self::new(env), dropped)
   }
 
