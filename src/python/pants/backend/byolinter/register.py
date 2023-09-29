@@ -1,3 +1,4 @@
+import itertools
 from dataclasses import dataclass
 from typing import Mapping, Optional, List
 
@@ -15,31 +16,6 @@ from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 
-# class AlternativeSubsystem(Subsystem):
-#     options_scope = "alt"
-#     skip = SkipOption("lint")
-#     name = "AutoLint"
-#     help = "An experimental simplified lint"
-
-
-import inspect
-# import pantsdebug; pantsdebug.settrace_5678()
-# src_lines, k = inspect.getsourcelines(AutoLintSubsystem)
-# print(srclines[0], k)
-
-#
-# @dataclass(frozen=True)
-# class AutoLintFieldSet(FieldSet):
-#     required_fields = (FileSourceField,)
-#     source: FileSourceField
-
-# class AutoLintRequest(LintTargetsRequest):
-#     tool_subsystem = AutoLintSubsystem
-#     # partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
-#     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
-#     field_set_type = AutoLintFieldSet
-
-
 def target_types():
     return []
 
@@ -51,24 +27,6 @@ class AutoLintConf:
     help: str
     command: str
     file_extensions: List[str]
-
-
-_shellcheck = AutoLintConf(
-    options_scope='autoshellcheck',
-    name="Shellcheck",
-    help="A shell linter based on your installed shellcheck",
-    command="shellcheck",
-    file_extensions=[".sh"],
-)
-
-
-_markdownlint = AutoLintConf(
-    options_scope='automarkdownlint',
-    name="MarkdownLint",
-    help="A markdown linter based on your installed markdown lint.",
-    command="markdownlint",
-    file_extensions=[".md"],
-)
 
 
 def build(conf: AutoLintConf):
@@ -136,8 +94,21 @@ def build(conf: AutoLintConf):
     ]
 
 
-_rules = build(_shellcheck) + build(_markdownlint)
-
-
 def rules():
-    return _rules
+    confs = [
+        AutoLintConf(
+            options_scope='autoshellcheck',
+            name="Shellcheck",
+            help="A shell linter based on your installed shellcheck",
+            command="shellcheck",
+            file_extensions=[".sh"],
+        ),
+        AutoLintConf(
+            options_scope='automarkdownlint',
+            name="MarkdownLint",
+            help="A markdown linter based on your installed markdown lint.",
+            command="markdownlint",
+            file_extensions=[".md"],
+        )
+    ]
+    return list(itertools.chain.from_iterable(build(conf) for conf in confs))
