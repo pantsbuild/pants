@@ -20,28 +20,11 @@ from pants.util.logging import LogLevel
 #     help = "An experimental simplified lint"
 
 
-AutoLintSubsystem = type(Subsystem)('AutoLintSubsystem', (Subsystem,), dict(
-    options_scope="autolint",
-    skip=SkipOption("lint"),
-    name="AutoLint",
-    help="An experimental simplified lint",
-    _dynamic_subsystem=True,
-))
-
-AutoLintSubsystem.__module__ = __name__
-
 import inspect
 # import pantsdebug; pantsdebug.settrace_5678()
 # src_lines, k = inspect.getsourcelines(AutoLintSubsystem)
 # print(srclines[0], k)
 
-
-AutoLintFieldSet = type(FieldSet)('AutoLintFieldSet', (FieldSet,), dict(
-    required_fields=(FileSourceField,),
-    __annotations__=dict(source=FileSourceField)
-))
-AutoLintFieldSet.__module__ = __name__
-AutoLintFieldSet = dataclass(frozen=True)(AutoLintFieldSet)
 #
 # @dataclass(frozen=True)
 # class AutoLintFieldSet(FieldSet):
@@ -55,48 +38,72 @@ AutoLintFieldSet = dataclass(frozen=True)(AutoLintFieldSet)
 #     field_set_type = AutoLintFieldSet
 
 
-AutoLintRequest = type(LintTargetsRequest)('AutoLintRequest', (LintTargetsRequest,), dict(
-    tool_subsystem=AutoLintSubsystem,
-    partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION,
-    field_set_type=AutoLintFieldSet,
-))
-AutoLintRequest.__module__ = __name__
-
 def target_types():
     return []
 
 
-@rule
-async def run_autolint(
-        request: AutoLintRequest.Batch,
-) -> LintResult:
+def build():
+    AutoLintSubsystem = type(Subsystem)('AutoLintSubsystem', (Subsystem,), dict(
+        options_scope="autolint",
+        skip=SkipOption("lint"),
+        name="AutoLint",
+        help="An experimental simplified lint",
+        _dynamic_subsystem=True,
+    ))
 
-    sources = await Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in request.elements),
-    )
+    AutoLintSubsystem.__module__ = __name__
 
-    input_digest = sources.snapshot.digest
+    AutoLintFieldSet = type(FieldSet)('AutoLintFieldSet', (FieldSet,), dict(
+        required_fields=(FileSourceField,),
+        __annotations__=dict(source=FileSourceField)
+    ))
+    AutoLintFieldSet.__module__ = __name__
+    AutoLintFieldSet = dataclass(frozen=True)(AutoLintFieldSet)
 
-    import pantsdebug; pantsdebug.settrace_5678()
-    process_result = await Get(
-        FallibleProcessResult,
-        Process(
-            # argv=(bash.path, "-c", "/opt/homebrew/bin/shellcheck", "scripts/stuff.sh"),
-            argv=("/opt/homebrew/bin/shellcheck", *sources.files),
-            # argv=("/opt/homebrew/bin/markdownlint", *sources.files),
-            # we can use sources.files to have all the files.
-            input_digest=input_digest,
-            description=f"Run Autolint on {request.partition_metadata.description}",
-            level=LogLevel.INFO,
-            # env={"PATH": "/opt/homebrew/bin/"}
-        ),
-    )
-    return LintResult.create(request, process_result)
+    AutoLintRequest = type(LintTargetsRequest)('AutoLintRequest', (LintTargetsRequest,), dict(
+        tool_subsystem=AutoLintSubsystem,
+        partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION,
+        field_set_type=AutoLintFieldSet,
+    ))
+    AutoLintRequest.__module__ = __name__
+
+
+    @rule
+    async def run_autolint(
+            request: AutoLintRequest.Batch,
+    ) -> LintResult:
+
+        sources = await Get(
+            SourceFiles,
+            SourceFilesRequest(field_set.source for field_set in request.elements),
+        )
+
+        input_digest = sources.snapshot.digest
+
+        import pantsdebug; pantsdebug.settrace_5678()
+        process_result = await Get(
+            FallibleProcessResult,
+            Process(
+                # argv=(bash.path, "-c", "/opt/homebrew/bin/shellcheck", "scripts/stuff.sh"),
+                argv=("/opt/homebrew/bin/shellcheck", *sources.files),
+                # argv=("/opt/homebrew/bin/markdownlint", *sources.files),
+                # we can use sources.files to have all the files.
+                input_digest=input_digest,
+                description=f"Run Autolint on {request.partition_metadata.description}",
+                level=LogLevel.INFO,
+                # env={"PATH": "/opt/homebrew/bin/"}
+            ),
+        )
+        return LintResult.create(request, process_result)
+
+    return [
+        *collect_rules(dict(locals())),
+        *AutoLintRequest.rules()
+    ]
+
+
+_rules = build()
 
 
 def rules():
-    return [
-        *collect_rules(),
-        *AutoLintRequest.rules()
-    ]
+    return _rules
