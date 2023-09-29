@@ -21,7 +21,7 @@ def target_types():
 
 
 @dataclass
-class AutoLintConf:
+class ByoLintConf:
     options_scope: str
     name: str
     help: str
@@ -29,9 +29,9 @@ class AutoLintConf:
     file_extensions: List[str]
 
 
-def build(conf: AutoLintConf):
+def build(conf: ByoLintConf):
     assert conf.options_scope.isidentifier(), "The options scope must be a valid python identifier"
-    subsystem_cls = type(Subsystem)(f'AutoLint_{conf.options_scope}_Subsystem', (Subsystem,), dict(
+    subsystem_cls = type(Subsystem)(f'ByoLint_{conf.options_scope}_Subsystem', (Subsystem,), dict(
         options_scope=conf.options_scope,
         skip=SkipOption("lint"),
         name=conf.name,
@@ -45,7 +45,7 @@ def build(conf: AutoLintConf):
         source = tgt.get(FileSourceField).value
         return not any(source.endswith(ext) for ext in conf.file_extensions)
 
-    fieldset_cls = type(FieldSet)(f'AutoLint_{conf.options_scope}_FieldSet', (FieldSet,), dict(
+    fieldset_cls = type(FieldSet)(f'ByoLint_{conf.options_scope}_FieldSet', (FieldSet,), dict(
         required_fields=(FileSourceField,),
         opt_out=staticmethod(opt_out),
         __annotations__=dict(source=FileSourceField)
@@ -53,7 +53,7 @@ def build(conf: AutoLintConf):
     fieldset_cls.__module__ = __name__
     fieldset_cls = dataclass(frozen=True)(fieldset_cls)
 
-    lintreq_cls = type(LintTargetsRequest)(f'AutoLint_{conf.options_scope}_Request', (LintTargetsRequest,), dict(
+    lintreq_cls = type(LintTargetsRequest)(f'ByoLint_{conf.options_scope}_Request', (LintTargetsRequest,), dict(
         tool_subsystem=subsystem_cls,
         partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION,
         field_set_type=fieldset_cls,
@@ -61,7 +61,7 @@ def build(conf: AutoLintConf):
     lintreq_cls.__module__ = __name__
 
     @rule(canonical_name_suffix=conf.options_scope)
-    async def run_autolint(
+    async def run_ByoLint(
             request: lintreq_cls.Batch,
             complete_env: CompleteEnvironmentVars,
     ) -> LintResult:
@@ -96,15 +96,15 @@ def build(conf: AutoLintConf):
 
 def rules():
     confs = [
-        AutoLintConf(
-            options_scope='autoshellcheck',
+        ByoLintConf(
+            options_scope='byo_shellcheck',
             name="Shellcheck",
             help="A shell linter based on your installed shellcheck",
             command="shellcheck",
             file_extensions=[".sh"],
         ),
-        AutoLintConf(
-            options_scope='automarkdownlint',
+        ByoLintConf(
+            options_scope='byo_markdownlint',
             name="MarkdownLint",
             help="A markdown linter based on your installed markdown lint.",
             command="markdownlint",
