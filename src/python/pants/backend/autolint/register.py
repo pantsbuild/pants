@@ -36,17 +36,31 @@ import inspect
 # print(srclines[0], k)
 
 
-@dataclass(frozen=True)
-class AutoLintFieldSet(FieldSet):
-    required_fields = (FileSourceField,)
-    source: FileSourceField
+AutoLintFieldSet = type(FieldSet)('AutoLintFieldSet', (FieldSet,), dict(
+    required_fields=(FileSourceField,),
+    __annotations__=dict(source=FileSourceField)
+))
+AutoLintFieldSet.__module__ = __name__
+AutoLintFieldSet = dataclass(frozen=True)(AutoLintFieldSet)
+#
+# @dataclass(frozen=True)
+# class AutoLintFieldSet(FieldSet):
+#     required_fields = (FileSourceField,)
+#     source: FileSourceField
 
-class AutoLintRequest(LintTargetsRequest):
-    tool_subsystem = AutoLintSubsystem
-    # partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
-    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
-    field_set_type = AutoLintFieldSet
+# class AutoLintRequest(LintTargetsRequest):
+#     tool_subsystem = AutoLintSubsystem
+#     # partitioner_type = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
+#     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+#     field_set_type = AutoLintFieldSet
 
+
+AutoLintRequest = type(LintTargetsRequest)('AutoLintRequest', (LintTargetsRequest,), dict(
+    tool_subsystem=AutoLintSubsystem,
+    partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION,
+    field_set_type=AutoLintFieldSet,
+))
+AutoLintRequest.__module__ = __name__
 
 def target_types():
     return []
