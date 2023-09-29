@@ -725,12 +725,14 @@ impl<N: Node> Entry<N> {
   ///
   /// # Arguments
   ///
-  /// * `graph_still_contains_edges` - If the caller has guaranteed that all edges from this Node
-  ///   have been removed from the graph, they should pass false here, else true. We may want to
-  ///   remove this parameter, and force this method to remove the edges, but that would require
-  ///   acquiring the graph lock here, which we currently don't do.
+  /// * `action` - If `ClearMemory`, then this actually drops the memory associated with the
+  ///   Node.  If not GC-ing, if the caller has guaranteed that all edges from this Node have been
+  ///   removed from the graph, they should pass `JustReset` here, else true. Otherwise `DirtyPrevious`
+  ///   will dirty the nodes connected to the previous value at this Node.  We may want to force this
+  ///   method to remove the edges, but that would requireacquiring the graph lock here, which we
+  ///   currently don't do.
   ///
-  pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
+  pub(crate) fn clear(&mut self, action: ResetStateAction) {
     let mut state = self.state.lock();
 
     let (run_token, generation, mut previous_result) =
@@ -761,10 +763,17 @@ impl<N: Node> Entry<N> {
 
     test_trace_log!("Clearing node {:?}", self.node);
 
-    if graph_still_contains_edges {
-      if let Some(previous_result) = previous_result.as_mut() {
-        previous_result.dirty();
+    match action {
+      ResetStateAction::ClearMemory => {
+        // Don't swap the previous result back in, freeing its memory
+        return;
       }
+      ResetStateAction::DirtyPrevious => {
+        if let Some(previous_result) = previous_result.as_mut() {
+          previous_result.dirty();
+        }
+      }
+      ResetStateAction::JustReset => {}
     }
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
@@ -911,4 +920,10 @@ impl<N: Node> Entry<N> {
     };
     format!("{} == {}", self.node, state)
   }
+}
+
+pub(crate) enum ResetStateAction {
+  JustReset,
+  DirtyPrevious,
+  ClearMemory,
 }
