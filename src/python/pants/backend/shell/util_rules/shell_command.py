@@ -223,6 +223,8 @@ async def _interactive_shell_command(
     shell_command: Target,
     bash: BashBinary,
 ) -> Process:
+    import pantsdebug;
+    pantsdebug.settrace_5678()
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
     working_directory = shell_command[RunShellCommandWorkdirField].value
 
@@ -245,6 +247,8 @@ async def _interactive_shell_command(
             shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
     )
+    import pantsdebug;
+    pantsdebug.settrace_5678()
     dependencies_digest = execution_environment.digest
 
     relpath = parse_relative_directory(working_directory, shell_command.address)
@@ -265,11 +269,14 @@ async def _interactive_shell_command(
 
 @rule
 async def run_shell_command_request(bash: BashBinary, shell_command: RunShellCommand) -> RunRequest:
+    import pantsdebug; pantsdebug.settrace_5678()
     wrapped_tgt = await Get(
         WrappedTarget,
         WrappedTargetRequest(shell_command.address, description_of_origin="<infallible>"),
     )
     process = await _interactive_shell_command(wrapped_tgt.target, bash)
+    import pantsdebug;
+    pantsdebug.settrace_5678()
     return RunRequest(
         digest=process.input_digest,
         args=process.argv,
