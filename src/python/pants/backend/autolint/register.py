@@ -43,7 +43,6 @@ def target_types():
 @rule
 async def run_autolint(
         request: AutoLintRequest.Batch,
-        bash: BashBinary,
 ) -> LintResult:
 
     sources = await Get(
@@ -58,12 +57,13 @@ async def run_autolint(
         FallibleProcessResult,
         Process(
             # argv=(bash.path, "-c", "/opt/homebrew/bin/shellcheck", "scripts/stuff.sh"),
-            argv=("/opt/homebrew/bin/shellcheck", *sources.files),
+            # argv=("/opt/homebrew/bin/shellcheck", *sources.files),
+            argv=("/opt/homebrew/bin/markdownlint", *sources.files),
             # we can use sources.files to have all the files.
             input_digest=input_digest,
             description=f"Run Autolint on {request.partition_metadata.description}",
             level=LogLevel.INFO,
-            # env={"CHROOT": "{chroot}"}
+            env={"PATH": "/opt/homebrew/bin/"}
         ),
     )
     return LintResult.create(request, process_result)
