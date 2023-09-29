@@ -16,20 +16,19 @@ from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 
-def target_types():
-    return []
-
-
 @dataclass
-class ByoLintConf:
+class ByoLinter:
     options_scope: str
     name: str
     help: str
     command: str
     file_extensions: List[str]
 
+    def rules(self):
+        return build(self)
 
-def build(conf: ByoLintConf):
+
+def build(conf: ByoLinter):
     assert conf.options_scope.isidentifier(), "The options scope must be a valid python identifier"
     subsystem_cls = type(Subsystem)(f'ByoLint_{conf.options_scope}_Subsystem', (Subsystem,), dict(
         options_scope=conf.options_scope,
@@ -94,21 +93,21 @@ def build(conf: ByoLintConf):
     ]
 
 
-def rules():
-    confs = [
-        ByoLintConf(
-            options_scope='byo_shellcheck',
-            name="Shellcheck",
-            help="A shell linter based on your installed shellcheck",
-            command="shellcheck",
-            file_extensions=[".sh"],
-        ),
-        ByoLintConf(
-            options_scope='byo_markdownlint',
-            name="MarkdownLint",
-            help="A markdown linter based on your installed markdown lint.",
-            command="markdownlint",
-            file_extensions=[".md"],
-        )
-    ]
-    return list(itertools.chain.from_iterable(build(conf) for conf in confs))
+# def rules():
+#     confs = [
+#         ByoLintConf(
+#             options_scope='byo_shellcheck',
+#             name="Shellcheck",
+#             help="A shell linter based on your installed shellcheck",
+#             command="shellcheck",
+#             file_extensions=[".sh"],
+#         ),
+#         ByoLintConf(
+#             options_scope='byo_linters',
+#             name="MarkdownLint",
+#             help="A markdown linter based on your installed markdown lint.",
+#             command="markdownlint",
+#             file_extensions=[".md"],
+#         )
+#     ]
+#     return list(itertools.chain.from_iterable(conf.rules() for conf in confs))
