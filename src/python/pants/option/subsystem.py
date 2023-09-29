@@ -194,7 +194,10 @@ class Subsystem(metaclass=_SubsystemMeta):
         partial_construct_subsystem.__module__ = cls.__module__
         partial_construct_subsystem.__doc__ = cls.help
 
-        _, class_definition_lineno = inspect.getsourcelines(cls)
+        if getattr(cls, '_dynamic_subsystem', False):
+            class_definition_lineno = 1
+        else:
+            _, class_definition_lineno = inspect.getsourcelines(cls)
         partial_construct_subsystem.__line_number__ = class_definition_lineno
 
         return TaskRule(
