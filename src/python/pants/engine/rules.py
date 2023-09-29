@@ -48,7 +48,7 @@ def implicitly(*args) -> dict[str, Any]:
     # NB: This function does not have a `TypedDict` return type, because the `@rule` decorator
     # cannot adjust the type of the `@rule` function to include a keyword argument (keyword
     # arguments are not supported by PEP-612).
-    return {"__implicitly": Call(*args)}
+    return {"__implicitly": args}
 
 
 class RuleType(Enum):
@@ -64,11 +64,10 @@ AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
 RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
 
 
-def _rule_call_trampoline(output_type: type, func: Callable[P, R]) -> Callable[P, R]:
+def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(func)  # type: ignore
-    async def wrapper(*args, __implicitly: Call | None = None, **kwargs):
-        call = __implicitly or Call()
-        call.set_output_type(output_type)
+    async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
+        call = Call(rule_id, output_type, *__implicitly)
         return await call
 
     return cast(Callable[P, R], wrapper)
@@ -115,7 +114,7 @@ def _make_rule(
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         original_func.__line_number__ = original_func.__code__.co_firstlineno
 
-        func = _rule_call_trampoline(return_type, original_func)
+        func = _rule_call_trampoline(canonical_name, return_type, original_func)
 
         # NB: The named definition of the rule ends up wrapped in a trampoline to handle memoization
         # and implicit arguments for direct by-name calls. But the `TaskRule` takes a reference to

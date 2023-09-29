@@ -245,7 +245,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         )
 
     def _get_byname_awaitable(
-        self, rule_func: Callable, call_node: ast.Call
+        self, rule_id: str, rule_func: Callable, call_node: ast.Call
     ) -> AwaitableConstraints:
         parse_error = partial(
             GetParseError, get_args=call_node.args, source_file_name=self.source_file
@@ -287,7 +287,7 @@ class _AwaitableCollector(ast.NodeVisitor):
             )
 
         return AwaitableConstraints(
-            rule_func,
+            rule_id,
             output_type,
             input_types,
             # TODO: Extract this from the callee? Currently only intrinsics can be Effects, so need
@@ -303,9 +303,10 @@ class _AwaitableCollector(ast.NodeVisitor):
                 self.awaitables.append(
                     self._get_legacy_awaitable(call_node, is_effect=issubclass(func, Effect))
                 )
-            elif inspect.isfunction(func) and getattr(func, "rule", None):
+            elif inspect.isfunction(func) and (rule := getattr(func, "rule", None)) is not None:
                 # Is a direct `@rule` call.
-                self.awaitables.append(self._get_byname_awaitable(func, call_node))
+                rule_id = rule.canonical_name
+                self.awaitables.append(self._get_byname_awaitable(rule_id, func, call_node))
             elif inspect.iscoroutinefunction(func) or _returns_awaitable(func):
                 # Is a call to a "rule helper".
                 self.awaitables.extend(collect_awaitables(func))

@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Coroutine,
     Generator,
     Generic,
@@ -64,7 +63,7 @@ class GetParseError(ValueError):
 @dataclass(frozen=True)
 class AwaitableConstraints:
     # If this is a call-by-name, then we will already know the callable `@rule` that will be used.
-    callee: Callable | None
+    rule_id: str | None
     output_type: type
     input_types: tuple[type, ...]
     is_effect: bool
