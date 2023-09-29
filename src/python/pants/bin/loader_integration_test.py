@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import Union
 
 from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
@@ -85,13 +86,15 @@ def test_recursion_limit() -> None:
 
 
 def test_non_utf8_env_vars() -> None:
+    env: dict[Union[str, bytes], Union[str, bytes]] = {
+        "FOO": b"B\xa5R",
+        b"F\xa5O": "BAR",
+    }
     res = run_pants(
         command=["--version"],
-        extra_env={
-            "FOO": b"B\xa5R",
-            b"F\xa5O": "BAR",
-        },
+        extra_env=env,
         use_pantsd=True,
     )
-    print(res.stdout)
     res.assert_success()
+    assert "Environment variable with non-UTF-8 value ignored: FOO" in res.stderr
+    assert "Environment variable with non-UTF-8 name ignored: F?O\n" in res.stderr
