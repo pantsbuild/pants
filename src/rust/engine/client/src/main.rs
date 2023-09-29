@@ -90,7 +90,10 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
     log::warn!("Environment variable with non-UTF-8 value ignored: {name}");
   }
   for name in dropped.non_utf8_keys {
-    log::warn!("Environment variable with non-UTF-8 name ignored: {}", name.to_string_lossy());
+    log::warn!(
+      "Environment variable with non-UTF-8 name ignored: {}",
+      name.to_string_lossy()
+    );
   }
   let pantsd_settings = find_pantsd(&build_root, &options_parser)?;
   client::execute_command(start, pantsd_settings, env_items, argv).await

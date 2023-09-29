@@ -41,7 +41,7 @@ fn test_capture_lossy() {
   );
   assert_eq!(
     dropped.non_utf8_keys,
-    vec![format!("BAD_{}KEY", char::REPLACEMENT_CHARACTER)]
+    vec![OsString::from_vec(b"BAD_\xa5KEY".to_vec())]
   );
   assert_eq!(
     dropped.keys_with_non_utf8_values,
