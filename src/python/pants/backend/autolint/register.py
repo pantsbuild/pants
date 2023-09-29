@@ -5,6 +5,7 @@ from pants.core.goals.lint import LintTargetsRequest, LintResult
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
@@ -50,14 +51,13 @@ class AutoLintConf:
     help: str
     command: str
     file_extensions: List[str]
-    extra_env: Optional[Mapping[str, str]] = None
 
 
 _shellcheck = AutoLintConf(
     options_scope='autoshellcheck',
     name="Shellcheck",
     help="A shell linter based on your installed shellcheck",
-    command="/opt/homebrew/bin/shellcheck",
+    command="shellcheck",
     file_extensions=[".sh"],
 )
 
@@ -66,9 +66,8 @@ _markdownlint = AutoLintConf(
     options_scope='automarkdownlint',
     name="MarkdownLint",
     help="A markdown linter based on your installed markdown lint.",
-    command="/opt/homebrew/bin/markdownlint",
+    command="markdownlint",
     file_extensions=[".md"],
-    extra_env={"PATH": "/opt/homebrew/bin/"},
 )
 
 
@@ -106,6 +105,7 @@ def build(conf: AutoLintConf):
     @rule(canonical_name_suffix=conf.options_scope)
     async def run_autolint(
             request: lintreq_cls.Batch,
+            complete_env: CompleteEnvironmentVars,
     ) -> LintResult:
 
         sources = await Get(
@@ -123,7 +123,7 @@ def build(conf: AutoLintConf):
                 input_digest=input_digest,
                 description=f"Run {conf.name}",
                 level=LogLevel.INFO,
-                env=conf.extra_env
+                env={**complete_env}
             ),
         )
         return LintResult.create(request, process_result)
