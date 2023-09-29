@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Mapping, Optional
+from typing import Mapping, Optional, List
 
 from pants.core.goals.lint import LintTargetsRequest, LintResult
 from pants.core.target_types import FileSourceField
@@ -8,7 +8,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import FieldSet, Target
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -49,6 +49,7 @@ class AutoLintConf:
     name: str
     help: str
     command: str
+    file_extensions: List[str]
     extra_env: Optional[Mapping[str, str]] = None
 
 
@@ -57,6 +58,7 @@ _shellcheck = AutoLintConf(
     name="Shellcheck",
     help="A shell linter based on your installed shellcheck",
     command="/opt/homebrew/bin/shellcheck",
+    file_extensions=[".sh"],
 )
 
 
@@ -65,7 +67,8 @@ _markdownlint = AutoLintConf(
     name="MarkdownLint",
     help="A markdown linter based on your installed markdown lint.",
     command="/opt/homebrew/bin/markdownlint",
-    extra_env={"PATH": "/opt/homebrew/bin/"}
+    file_extensions=[".md"],
+    extra_env={"PATH": "/opt/homebrew/bin/"},
 )
 
 
@@ -81,8 +84,13 @@ def build(conf: AutoLintConf):
 
     subsystem_cls.__module__ = __name__
 
+    def opt_out(tgt: Target) -> bool:
+        source = tgt.get(FileSourceField).value
+        return not any(source.endswith(ext) for ext in conf.file_extensions)
+
     fieldset_cls = type(FieldSet)(f'AutoLint_{conf.options_scope}_FieldSet', (FieldSet,), dict(
         required_fields=(FileSourceField,),
+        opt_out=staticmethod(opt_out),
         __annotations__=dict(source=FileSourceField)
     ))
     fieldset_cls.__module__ = __name__
@@ -130,8 +138,8 @@ def build(conf: AutoLintConf):
     ]
 
 
-# _rules = build(_shellcheck)
-_rules = build(_markdownlint)
+_rules = build(_shellcheck)
+# _rules = build(_markdownlint)
 
 
 def rules():
