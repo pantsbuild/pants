@@ -43,10 +43,7 @@ class FrozenDict(Mapping[K, V]):
         self._data = dict(item[0]) if item else dict()
         self._data.update(**kwargs)
 
-        # NB: We eagerly compute the hash to validate that the values are hashable and to avoid
-        # performing the calculation multiple times. This can be revisited if it's found to be a
-        # performance bottleneck.
-        self._hash = self._calculate_hash()
+        self._hash: int | None = None
 
     @classmethod
     def deep_freeze(cls, data: Mapping[K, V]) -> FrozenDict[K, V]:
@@ -115,6 +112,8 @@ class FrozenDict(Mapping[K, V]):
             )
 
     def __hash__(self) -> int:
+        if self._hash is None:
+            self._hash = self._calculate_hash()
         return self._hash
 
     def __repr__(self) -> str:

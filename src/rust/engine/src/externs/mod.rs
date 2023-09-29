@@ -30,14 +30,14 @@ pub mod fs;
 mod interface;
 #[cfg(test)]
 mod interface_tests;
-pub mod nailgun;
+mod nailgun;
 mod pantsd;
 pub mod process;
-pub mod scheduler;
+mod scheduler;
 mod stdio;
 mod target;
-pub mod testutil;
-pub mod workunits;
+mod testutil;
+mod workunits;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add_class::<PyFailure>()?;

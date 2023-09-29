@@ -11,6 +11,7 @@ from typing import (
     FrozenSet,
     Generic,
     Iterable,
+    Iterator,
     Mapping,
     Sequence,
     TextIO,
@@ -548,6 +549,36 @@ class PyStubCAS:
     def address(self) -> str: ...
     def remove(self, digest: FileDigest | Digest) -> bool: ...
     def action_cache_len(self) -> int: ...
+
+# ------------------------------------------------------------------------------
+# Collections
+# ------------------------------------------------------------------------------
+
+T = TypeVar("T")
+
+class Collection(Sequence[T]):
+    """A light newtype around immutable sequences for use with the V2 engine.
+
+    This should be subclassed when you want to create a distinct collection type, such as:
+
+        @dataclass(frozen=True)
+        class Example:
+            val1: str
+
+        class Examples(Collection[Example]):
+            pass
+
+    N.B: Collection instances are only considered equal if both their types and contents are equal.
+    """
+
+    def __init__(self, input: Iterable[T] | None = None) -> None: ...
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[T]: ...
+    @overload
+    def __getitem__(self, index: int) -> T: ...
+    @overload
+    def __getitem__(self, index: slice) -> Self: ...
+    def __add__(self, other: Self) -> Self: ...
 
 # ------------------------------------------------------------------------------
 # Dependency inference

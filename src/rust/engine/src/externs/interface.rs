@@ -58,6 +58,7 @@ use crate::{
 fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::register(py, m)?;
   externs::address::register(py, m)?;
+  externs::collection::register(py, m)?;
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
   externs::process::register(m)?;

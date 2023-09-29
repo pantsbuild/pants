@@ -39,6 +39,7 @@ def test_collection_index() -> None:
     assert c1[:] == c1
     assert c1[1:] == Collection([1, 2])
     assert c1[:1] == Collection([0])
+    assert c1[:-1] == Collection([0, 1])
 
 
 def test_collection_reversed() -> None:
@@ -46,8 +47,8 @@ def test_collection_reversed() -> None:
 
 
 def test_collection_equality() -> None:
-    assert () != Collection()
-    assert Collection() != ()
+    assert () != Collection()  # type: ignore[comparison-overlap]
+    assert Collection() != ()  # type: ignore[comparison-overlap]
 
     assert Collection([]) == Collection([])
     c1 = Collection([1, 2, 3])
@@ -59,7 +60,7 @@ def test_collection_equality() -> None:
 
     e1 = Examples([1, 2, 3])
     assert e1 == Examples([1, 2, 3])
-    assert e1 != Examples2([1, 2, 3])
+    assert e1 != Examples2([1, 2, 3])  # type: ignore[comparison-overlap]
 
 
 def test_collection_hash() -> None:
@@ -76,10 +77,10 @@ def test_collection_bool() -> None:
 
 
 def test_collection_repr() -> None:
-    assert repr(Collection([])) == "Collection([])"
-    assert repr(Examples([])) == "Examples([])"
-    assert repr(Collection([1, 2, 3])) == "Collection([1, 2, 3])"
-    assert repr(Examples([1, 2, 3])) == "Examples([1, 2, 3])"
+    assert repr(Collection([])) == "Collection(())"
+    assert repr(Examples([])) == "Examples(())"
+    assert repr(Collection([1, 2, 3])) == "Collection((1, 2, 3))"
+    assert repr(Examples([1, 2, 3])) == "Examples((1, 2, 3))"
 
 
 def test_deduplicated_collection() -> None:

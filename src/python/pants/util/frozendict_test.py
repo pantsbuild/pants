@@ -30,9 +30,9 @@ def test_invalid_arguments() -> None:
 
 def test_unhashable_items_rejected() -> None:
     with pytest.raises(TypeError):
-        FrozenDict({[]: 0})
+        hash(FrozenDict({[]: 0}))
     with pytest.raises(TypeError):
-        FrozenDict({0: []})
+        hash(FrozenDict({0: []}))
 
 
 def test_original_data_gets_copied() -> None:
@@ -138,9 +138,9 @@ def test_works_with_dataclasses() -> None:
     assert hash(fd1) != hash(fd2)
 
     with pytest.raises(TypeError):
-        FrozenDict({Mutable(0): "a"})
+        hash(FrozenDict({Mutable(0): "a"}))
     with pytest.raises(TypeError):
-        FrozenDict({"a": Mutable(0)})
+        hash(FrozenDict({"a": Mutable(0)}))
 
 
 def test_lazy_frozen_dict() -> None:
