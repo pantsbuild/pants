@@ -22,7 +22,7 @@ pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
 fn pantsd_fingerprint_compute(expected_option_names: HashSet<String>) -> PyResult<String> {
   let build_root = BuildRoot::find().map_err(PyException::new_err)?;
   let options_parser =
-    OptionParser::new(Env::capture(), Args::argv()).map_err(PyException::new_err)?;
+    OptionParser::new(Env::capture_lossy().0, Args::argv()).map_err(PyException::new_err)?;
 
   let options = pantsd::fingerprinted_options(&build_root).map_err(PyException::new_err)?;
   let actual_option_names = options
