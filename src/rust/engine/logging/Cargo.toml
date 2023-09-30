@@ -15,7 +15,7 @@ num_enum = { workspace = true }
 parking_lot = { workspace = true }
 regex = { workspace = true }
 stdio = { path = "../stdio" }
-tokio = { version = "1.28" }
+tokio = { version = "1.32" }
 uuid = { workspace = true, features = ["v4"] }
 
 [build-dependencies]
