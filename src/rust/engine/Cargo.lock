@@ -2993,6 +2993,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "remote_provider"
+version = "0.0.1"
+
+[[package]]
+name = "remote_provider_opendal"
+version = "0.0.1"
+
+[[package]]
+name = "remote_provider_reapi"
+version = "0.0.1"
+
+[[package]]
+name = "remote_provider_traits"
+version = "0.0.1"
+
+[[package]]
 name = "reqwest"
 version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
