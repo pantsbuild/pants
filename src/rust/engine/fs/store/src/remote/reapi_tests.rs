@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
-use hashing::Fingerprint;
 use mock::{RequestType, StubCAS};
 use tempfile::TempDir;
 use testutil::data::TestData;
@@ -146,15 +145,9 @@ async fn load_existing_wrong_digest_error() {
   )
 }
 
-fn assert_cas_store(
-  cas: &StubCAS,
-  fingerprint: Fingerprint,
-  bytes: Bytes,
-  chunks: usize,
-  chunk_size: usize,
-) {
+fn assert_cas_store(cas: &StubCAS, testdata: &TestData, chunks: usize, chunk_size: usize) {
   let blobs = cas.blobs.lock();
-  assert_eq!(blobs.get(&fingerprint), Some(&bytes));
+  assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
 
   let write_message_sizes = cas.write_message_sizes.lock();
   assert_eq!(write_message_sizes.len(), chunks);
@@ -182,7 +175,7 @@ async fn store_file_one_chunk() {
     .await
     .unwrap();
 
-  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+  assert_cas_store(&cas, &testdata, 1, 1024)
 }
 #[tokio::test]
 async fn store_file_multiple_chunks() {
@@ -206,13 +199,7 @@ async fn store_file_multiple_chunks() {
     .await
     .unwrap();
 
-  assert_cas_store(
-    &cas,
-    testdata.fingerprint(),
-    testdata.bytes(),
-    98,
-    chunk_size,
-  )
+  assert_cas_store(&cas, &testdata, 98, chunk_size)
 }
 
 #[tokio::test]
@@ -229,7 +216,7 @@ async fn store_file_empty_file() {
     .await
     .unwrap();
 
-  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+  assert_cas_store(&cas, &testdata, 1, 1024)
 }
 
 #[tokio::test]
@@ -314,7 +301,7 @@ async fn store_bytes_one_chunk() {
     .await
     .unwrap();
 
-  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+  assert_cas_store(&cas, &testdata, 1, 1024)
 }
 #[tokio::test]
 async fn store_bytes_multiple_chunks() {
@@ -335,13 +322,7 @@ async fn store_bytes_multiple_chunks() {
     .await
     .unwrap();
 
-  assert_cas_store(
-    &cas,
-    testdata.fingerprint(),
-    testdata.bytes(),
-    98,
-    chunk_size,
-  )
+  assert_cas_store(&cas, &testdata, 98, chunk_size)
 }
 
 #[tokio::test]
@@ -355,7 +336,7 @@ async fn store_bytes_empty_file() {
     .await
     .unwrap();
 
-  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+  assert_cas_store(&cas, &testdata, 1, 1024)
 }
 
 #[tokio::test]
