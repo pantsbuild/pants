@@ -3004,6 +3004,26 @@ version = "0.0.1"
 [[package]]
 name = "remote_provider_reapi"
 version = "0.0.1"
+dependencies = [
+ "async-oncecell",
+ "async-stream",
+ "async-trait",
+ "bytes",
+ "futures",
+ "grpc_util",
+ "hashing",
+ "mock",
+ "parking_lot 0.12.1",
+ "protos",
+ "remote_provider_traits",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "tokio-util 0.7.8",
+ "tonic",
+ "uuid",
+ "workunit_store",
+]
 
 [[package]]
 name = "remote_provider_traits"
@@ -3483,6 +3503,7 @@ dependencies = [
  "prost",
  "prost-types",
  "protos",
+ "remote_provider_reapi",
  "remote_provider_traits",
  "serde",
  "serde_derive",

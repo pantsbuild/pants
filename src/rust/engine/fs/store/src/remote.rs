@@ -13,10 +13,6 @@ use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
 use tokio::fs::File;
 use workunit_store::{in_workunit, ObservationMetric};
 
-mod reapi;
-#[cfg(test)]
-mod reapi_tests;
-
 pub mod base_opendal;
 #[cfg(test)]
 mod base_opendal_tests;
@@ -27,7 +23,9 @@ pub const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", 
 async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProvider>, String> {
   let address = options.cas_address.clone();
   if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
-    Ok(Arc::new(reapi::Provider::new(options).await?))
+    Ok(Arc::new(
+      remote_provider_reapi::byte_store::Provider::new(options).await?,
+    ))
   } else if let Some(path) = address.strip_prefix("file://") {
     // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
     // testing.

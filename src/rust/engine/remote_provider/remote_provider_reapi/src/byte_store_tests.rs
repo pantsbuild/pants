@@ -14,9 +14,10 @@ use workunit_store::WorkunitStore;
 
 use remote_provider_traits::{ByteStoreProvider, RemoteOptions};
 
-use crate::MEGABYTES;
+use crate::byte_store::Provider;
 
-use super::reapi::Provider;
+const MEGABYTES: usize = 1024 * 1024;
+const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * MEGABYTES;
 
 fn remote_options(
   cas_address: String,
@@ -41,7 +42,7 @@ async fn new_provider(cas: &StubCAS) -> Provider {
   Provider::new(remote_options(
     cas.address(),
     10 * MEGABYTES,
-    crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    STORE_BATCH_API_SIZE_LIMIT,
   ))
   .await
   .unwrap()
@@ -256,7 +257,7 @@ async fn store_file_connection_error() {
   let provider = Provider::new(remote_options(
     "http://doesnotexist.example".to_owned(),
     10 * MEGABYTES,
-    crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    STORE_BATCH_API_SIZE_LIMIT,
   ))
   .await
   .unwrap();
@@ -405,7 +406,7 @@ async fn store_bytes_connection_error() {
   let provider = Provider::new(remote_options(
     "http://doesnotexist.example".to_owned(),
     10 * MEGABYTES,
-    crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    STORE_BATCH_API_SIZE_LIMIT,
   ))
   .await
   .unwrap();

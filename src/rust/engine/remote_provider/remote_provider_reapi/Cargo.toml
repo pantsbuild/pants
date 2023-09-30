@@ -6,3 +6,23 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+async-oncecell = { workspace = true }
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+grpc_util = { path = "../../grpc_util" }
+hashing = { path = "../../hashing" }
+parking_lot = { workspace = true }
+protos = { path = "../../protos" }
+remote_provider_traits = { path = "../remote_provider_traits" }
+tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["io"] }
+tonic = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+workunit_store = { path = "../../workunit_store" }
+
+[dev-dependencies]
+mock = { path = "../../testutil/mock" }
+tempfile = { workspace = true }
+testutil = { path = "../../testutil" }
