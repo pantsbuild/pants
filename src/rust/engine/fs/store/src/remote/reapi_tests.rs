@@ -10,9 +10,9 @@ use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
 use tokio::fs::File;
+use workunit_store::WorkunitStore;
 
 use crate::remote::{ByteStoreProvider, RemoteOptions};
-use crate::tests::new_cas;
 use crate::MEGABYTES;
 
 use super::reapi::Provider;
@@ -47,8 +47,12 @@ async fn new_provider(cas: &StubCAS) -> Provider {
 }
 
 async fn load_test(chunk_size: usize) {
+  let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
-  let cas = new_cas(chunk_size);
+  let cas = StubCAS::builder()
+    .chunk_size_bytes(chunk_size)
+    .file(&testdata)
+    .build();
 
   let provider = new_provider(&cas).await;
   let mut destination = Vec::new();
@@ -417,13 +421,15 @@ async fn store_bytes_connection_error() {
 
 #[tokio::test]
 async fn list_missing_digests_none_missing() {
-  let cas = new_cas(1024);
+  let testdata = TestData::roland();
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder().file(&testdata).build();
 
   let provider = new_provider(&cas).await;
 
   assert_eq!(
     provider
-      .list_missing_digests(&mut vec![TestData::roland().digest()].into_iter())
+      .list_missing_digests(&mut vec![testdata.digest()].into_iter())
       .await,
     Ok(HashSet::new())
   )
