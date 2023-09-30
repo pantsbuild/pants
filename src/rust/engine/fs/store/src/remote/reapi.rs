@@ -31,7 +31,7 @@ use workunit_store::{Metric, ObservationMetric};
 
 use crate::RemoteOptions;
 
-use super::{ByteStoreProvider, LoadDestination};
+use remote_provider_traits::{ByteStoreProvider, LoadDestination};
 
 pub struct Provider {
   instance_name: Option<String>,

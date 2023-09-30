@@ -37,6 +37,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 parking_lot = { workspace = true }
 opendal = { workspace = true }
+remote_provider_traits = { path = "../../remote_provider/remote_provider_traits" }
 
 [dev-dependencies]
 env_logger = { workspace = true }

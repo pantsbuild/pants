@@ -2978,6 +2978,7 @@ dependencies = [
  "prost-types",
  "protos",
  "rand",
+ "remote_provider_traits",
  "sharded_lmdb",
  "store",
  "strum",
@@ -3007,6 +3008,12 @@ version = "0.0.1"
 [[package]]
 name = "remote_provider_traits"
 version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "hashing",
+ "tokio",
+]
 
 [[package]]
 name = "reqwest"
@@ -3473,6 +3480,7 @@ dependencies = [
  "prost",
  "prost-types",
  "protos",
+ "remote_provider_traits",
  "serde",
  "serde_derive",
  "sharded_lmdb",

@@ -12,8 +12,9 @@ use remexec::ActionResult;
 
 use super::ActionCacheProvider;
 use process_execution::Context;
+use remote_provider_traits::ByteStoreProvider;
 
-pub use store::remote::{base_opendal::Provider, ByteStoreProvider};
+pub use store::remote::base_opendal::Provider;
 
 #[async_trait]
 impl ActionCacheProvider for Provider {

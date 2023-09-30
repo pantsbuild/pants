@@ -12,7 +12,9 @@ use testutil::file::mk_tempfile;
 use tokio::fs::File;
 use workunit_store::WorkunitStore;
 
-use crate::remote::{ByteStoreProvider, RemoteOptions};
+use remote_provider_traits::ByteStoreProvider;
+
+use crate::remote::RemoteOptions;
 use crate::MEGABYTES;
 
 use super::reapi::Provider;
