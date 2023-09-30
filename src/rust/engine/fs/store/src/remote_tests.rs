@@ -8,7 +8,7 @@ use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use remote_provider_traits::{ByteStoreProvider, LoadDestination};
+use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
@@ -16,7 +16,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
-use crate::remote::{ByteStore, RemoteOptions};
+use crate::remote::ByteStore;
 use crate::tests::new_cas;
 use crate::MEGABYTES;
 

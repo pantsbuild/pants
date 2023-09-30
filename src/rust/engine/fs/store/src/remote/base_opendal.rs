@@ -15,9 +15,7 @@ use opendal::{Builder, Operator};
 use tokio::fs::File;
 use workunit_store::ObservationMetric;
 
-use remote_provider_traits::{ByteStoreProvider, LoadDestination};
-
-use super::RemoteOptions;
+use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
 
 const GITHUB_ACTIONS_CACHE_VERSION: &str = "pants-1";
 

@@ -6,12 +6,11 @@ use std::time::Duration;
 use bytes::Bytes;
 use grpc_util::tls;
 use opendal::services::Memory;
-use remote_provider_traits::ByteStoreProvider;
+use remote_provider_traits::{ByteStoreProvider, RemoteOptions};
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
 
 use super::base_opendal::Provider;
-use super::RemoteOptions;
 
 const BASE: &str = "opendal-testing-base";
 

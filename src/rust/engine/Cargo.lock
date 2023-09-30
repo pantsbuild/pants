@@ -3009,9 +3009,12 @@ version = "0.0.1"
 name = "remote_provider_traits"
 version = "0.0.1"
 dependencies = [
+ "async-oncecell",
  "async-trait",
  "bytes",
+ "grpc_util",
  "hashing",
+ "protos",
  "tokio",
 ]
 

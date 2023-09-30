@@ -1,18 +1,15 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use async_oncecell::OnceCell;
 use bytes::Bytes;
 use futures::Future;
 use hashing::Digest;
 use log::Level;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remexec::ServerCapabilities;
-use remote_provider_traits::{ByteStoreProvider, LoadDestination};
+use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
 use tokio::fs::File;
 use workunit_store::{in_workunit, ObservationMetric};
 
@@ -23,23 +20,6 @@ mod reapi_tests;
 pub mod base_opendal;
 #[cfg(test)]
 mod base_opendal_tests;
-
-// TODO: Consider providing `impl Default`, similar to `super::LocalOptions`.
-#[derive(Clone)]
-pub struct RemoteOptions {
-  // TODO: this is currently framed for the REAPI provider, with some options used by others, would
-  // be good to generalise
-  pub cas_address: String,
-  pub instance_name: Option<String>,
-  pub headers: BTreeMap<String, String>,
-  pub tls_config: grpc_util::tls::Config,
-  pub chunk_size_bytes: usize,
-  pub rpc_timeout: Duration,
-  pub rpc_retries: usize,
-  pub rpc_concurrency_limit: usize,
-  pub capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-  pub batch_api_size_limit: usize,
-}
 
 // TODO: this is probably better positioned somewhere else
 pub const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", "https://"];

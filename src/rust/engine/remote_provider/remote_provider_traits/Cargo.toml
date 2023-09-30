@@ -6,7 +6,10 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+async-oncecell = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
+grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
+protos = { path = "../../protos" }
 tokio = { workspace = true, features = ["fs"] }

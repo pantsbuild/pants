@@ -25,13 +25,35 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
+use std::time::Duration;
 
+use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use hashing::Digest;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use remexec::ServerCapabilities;
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWrite};
+
+// TODO: Consider providing `impl Default`, similar to `remote::LocalOptions`.
+#[derive(Clone)]
+pub struct RemoteOptions {
+  // TODO: this is currently framed for the REAPI provider, with some options used by others, would
+  // be good to generalise
+  pub cas_address: String,
+  pub instance_name: Option<String>,
+  pub headers: BTreeMap<String, String>,
+  pub tls_config: grpc_util::tls::Config,
+  pub chunk_size_bytes: usize,
+  pub rpc_timeout: Duration,
+  pub rpc_retries: usize,
+  pub rpc_concurrency_limit: usize,
+  pub capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
+  pub batch_api_size_limit: usize,
+}
 
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
