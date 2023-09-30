@@ -3628,6 +3628,7 @@ dependencies = [
  "hashing",
  "prost",
  "protos",
+ "tempfile",
  "tokio",
 ]
 

@@ -10,12 +10,13 @@ use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use tempfile::TempDir;
 use testutil::data::TestData;
+use testutil::file::mk_tempfile;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
 use crate::remote::{ByteStore, ByteStoreProvider, LoadDestination, RemoteOptions};
-use crate::tests::{mk_tempfile, new_cas};
+use crate::tests::new_cas;
 use crate::MEGABYTES;
 
 #[tokio::test]

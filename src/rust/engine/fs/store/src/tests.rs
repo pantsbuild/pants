@@ -18,7 +18,6 @@ use grpc_util::tls;
 use hashing::Digest;
 use mock::{RequestType, StubCAS};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;
@@ -33,21 +32,6 @@ pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, Sto
   store
     .load_file_bytes_with(digest, Bytes::copy_from_slice)
     .await
-}
-
-pub async fn mk_tempfile(contents: Option<&[u8]>) -> tokio::fs::File {
-  let file = tokio::task::spawn_blocking(tempfile::tempfile)
-    .await
-    .unwrap()
-    .unwrap();
-  let mut file = tokio::fs::File::from_std(file);
-
-  if let Some(contents) = contents {
-    file.write_all(contents).await.unwrap();
-    file.rewind().await.unwrap();
-  }
-
-  file
 }
 
 ///

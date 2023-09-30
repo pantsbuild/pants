@@ -8,10 +8,11 @@ use grpc_util::tls;
 use mock::{RequestType, StubCAS};
 use tempfile::TempDir;
 use testutil::data::TestData;
+use testutil::file::mk_tempfile;
 use tokio::fs::File;
 
 use crate::remote::{ByteStoreProvider, RemoteOptions};
-use crate::tests::{mk_tempfile, new_cas};
+use crate::tests::new_cas;
 use crate::MEGABYTES;
 
 use super::reapi::Provider;

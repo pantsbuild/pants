@@ -7,8 +7,7 @@ use bytes::Bytes;
 use grpc_util::tls;
 use opendal::services::Memory;
 use testutil::data::TestData;
-
-use crate::tests::mk_tempfile;
+use testutil::file::mk_tempfile;
 
 use super::base_opendal::Provider;
 use super::{ByteStoreProvider, RemoteOptions};
