@@ -5,11 +5,11 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint};
+use hashing::Fingerprint;
 use opendal::services::Memory;
 use testutil::data::TestData;
 
-use crate::tests::{big_file_bytes, big_file_fingerprint, mk_tempfile};
+use crate::tests::mk_tempfile;
 
 use super::base_opendal::Provider;
 use super::{ByteStoreProvider, RemoteOptions};
@@ -213,20 +213,21 @@ async fn store_file_one_chunk() {
 
 #[tokio::test]
 async fn store_file_multiple_chunks() {
+  let testdata = TestData::all_the_henries();
   let provider = new_provider();
 
-  let all_the_henries = big_file_bytes();
   // Our current chunk size is the tokio::io::copy default (8KiB at
   // the time of writing).
-  assert!(all_the_henries.len() > 8 * 1024);
-  let fingerprint = big_file_fingerprint();
-  let digest = Digest::new(fingerprint, all_the_henries.len());
+  assert!(testdata.len() > 8 * 1024);
 
   provider
-    .store_file(digest, mk_tempfile(Some(&all_the_henries)).await)
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .unwrap();
-  assert_store(&provider, fingerprint, all_the_henries).await;
+  assert_store(&provider, testdata.fingerprint(), testdata.bytes()).await;
 }
 
 #[tokio::test]

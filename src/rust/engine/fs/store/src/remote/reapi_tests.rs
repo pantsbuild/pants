@@ -5,14 +5,14 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint};
+use hashing::Fingerprint;
 use mock::{RequestType, StubCAS};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use tokio::fs::File;
 
 use crate::remote::{ByteStoreProvider, RemoteOptions};
-use crate::tests::{big_file_bytes, big_file_fingerprint, mk_tempfile, new_cas};
+use crate::tests::{mk_tempfile, new_cas};
 use crate::MEGABYTES;
 
 use super::reapi::Provider;
@@ -186,6 +186,8 @@ async fn store_file_one_chunk() {
 }
 #[tokio::test]
 async fn store_file_multiple_chunks() {
+  let testdata = TestData::all_the_henries();
+
   let cas = StubCAS::empty();
   let chunk_size = 10 * 1024;
   let provider = Provider::new(remote_options(
@@ -196,16 +198,21 @@ async fn store_file_multiple_chunks() {
   .await
   .unwrap();
 
-  let all_the_henries = big_file_bytes();
-  let fingerprint = big_file_fingerprint();
-  let digest = Digest::new(fingerprint, all_the_henries.len());
-
   provider
-    .store_file(digest, mk_tempfile(Some(&all_the_henries)).await)
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .unwrap();
 
-  assert_cas_store(&cas, fingerprint, all_the_henries, 98, chunk_size)
+  assert_cas_store(
+    &cas,
+    testdata.fingerprint(),
+    testdata.bytes(),
+    98,
+    chunk_size,
+  )
 }
 
 #[tokio::test]
@@ -311,6 +318,8 @@ async fn store_bytes_one_chunk() {
 }
 #[tokio::test]
 async fn store_bytes_multiple_chunks() {
+  let testdata = TestData::all_the_henries();
+
   let cas = StubCAS::empty();
   let chunk_size = 10 * 1024;
   let provider = Provider::new(remote_options(
@@ -321,16 +330,18 @@ async fn store_bytes_multiple_chunks() {
   .await
   .unwrap();
 
-  let all_the_henries = big_file_bytes();
-  let fingerprint = big_file_fingerprint();
-  let digest = Digest::new(fingerprint, all_the_henries.len());
-
   provider
-    .store_bytes(digest, all_the_henries.clone())
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .unwrap();
 
-  assert_cas_store(&cas, fingerprint, all_the_henries, 98, chunk_size)
+  assert_cas_store(
+    &cas,
+    testdata.fingerprint(),
+    testdata.bytes(),
+    98,
+    chunk_size,
+  )
 }
 
 #[tokio::test]
@@ -374,6 +385,7 @@ async fn store_bytes_batch_grpc_error() {
 
 #[tokio::test]
 async fn store_bytes_write_stream_grpc_error() {
+  let testdata = TestData::all_the_henries();
   let cas = StubCAS::cas_always_errors();
   let chunk_size = 10 * 1024;
   let provider = Provider::new(remote_options(
@@ -384,12 +396,8 @@ async fn store_bytes_write_stream_grpc_error() {
   .await
   .unwrap();
 
-  let all_the_henries = big_file_bytes();
-  let fingerprint = big_file_fingerprint();
-  let digest = Digest::new(fingerprint, all_the_henries.len());
-
   let error = provider
-    .store_bytes(digest, all_the_henries)
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .expect_err("Want err");
   assert!(

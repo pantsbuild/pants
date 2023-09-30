@@ -1,7 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fs::File;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -9,14 +8,14 @@ use std::time::Duration;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use fs::{
   DigestEntry, DirectoryDigest, FileEntry, Link, PathStat, Permissions, RelativePath,
   EMPTY_DIRECTORY_DIGEST,
 };
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint};
+use hashing::Digest;
 use mock::{RequestType, StubCAS};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
@@ -29,41 +28,6 @@ use crate::{
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
-
-pub fn big_file_fingerprint() -> Fingerprint {
-  Fingerprint::from_hex_string("8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f")
-    .unwrap()
-}
-
-pub fn big_file_bytes() -> Bytes {
-  let mut f = File::open(
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-      .join("testdata")
-      .join("all_the_henries"),
-  )
-  .expect("Error opening all_the_henries");
-  let mut bytes = Vec::new();
-  f.read_to_end(&mut bytes)
-    .expect("Error reading all_the_henries");
-  Bytes::from(bytes)
-}
-
-pub fn extra_big_file_fingerprint() -> Fingerprint {
-  Fingerprint::from_hex_string("8ae6924fa104396614b99ce1f6aa3b4d85273ef158191b3784c6dbbdb47055cd")
-    .unwrap()
-}
-
-pub fn extra_big_file_digest() -> Digest {
-  Digest::new(extra_big_file_fingerprint(), extra_big_file_bytes().len())
-}
-
-pub fn extra_big_file_bytes() -> Bytes {
-  let bfb = big_file_bytes();
-  let mut bytes = BytesMut::with_capacity(2 * bfb.len());
-  bytes.extend_from_slice(&bfb);
-  bytes.extend_from_slice(&bfb);
-  bytes.freeze()
-}
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, StoreError> {
   store
@@ -896,33 +860,35 @@ async fn does_not_reupload_big_file_already_in_cas() {
   let dir = TempDir::new().unwrap();
   let cas = new_empty_cas();
 
+  let testdata = TestData::double_all_the_henries();
+
   new_local_store(dir.path())
-    .store_file_bytes(extra_big_file_bytes(), false)
+    .store_file_bytes(testdata.bytes(), false)
     .await
     .expect("Error storing file locally");
 
   new_store(dir.path(), &cas.address())
     .await
-    .ensure_remote_has_recursive(vec![extra_big_file_digest()])
+    .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect("Error uploading directory");
 
   assert_eq!(cas.write_message_sizes.lock().len(), 1);
   assert_eq!(
-    cas.blobs.lock().get(&extra_big_file_fingerprint()),
-    Some(&extra_big_file_bytes())
+    cas.blobs.lock().get(&testdata.fingerprint()),
+    Some(&testdata.bytes())
   );
 
   new_store(dir.path(), &cas.address())
     .await
-    .ensure_remote_has_recursive(vec![extra_big_file_digest()])
+    .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect("Error uploading directory");
 
   assert_eq!(cas.write_message_sizes.lock().len(), 1);
   assert_eq!(
-    cas.blobs.lock().get(&extra_big_file_fingerprint()),
-    Some(&extra_big_file_bytes())
+    cas.blobs.lock().get(&testdata.fingerprint()),
+    Some(&testdata.bytes())
   );
 }
 
@@ -1728,8 +1694,9 @@ async fn big_file_immutable_link() {
   let output_dir = materialize_dir.path().join("output_dir");
   let nested_output_file = output_dir.join("file");
 
-  let file_bytes = extra_big_file_bytes();
-  let file_digest = extra_big_file_digest();
+  let testdata = TestData::double_all_the_henries();
+  let file_bytes = testdata.bytes();
+  let file_digest = testdata.digest();
 
   let nested_directory = remexec::Directory {
     files: vec![remexec::FileNode {
