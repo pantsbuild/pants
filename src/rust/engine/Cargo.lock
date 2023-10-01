@@ -3018,6 +3018,8 @@ dependencies = [
  "mock",
  "opendal",
  "parking_lot 0.12.1",
+ "prost",
+ "protos",
  "remote_provider_traits",
  "tempfile",
  "testutil",

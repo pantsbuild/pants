@@ -11,11 +11,12 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::ActionResult;
 use remote_provider_reapi::apply_headers;
+use remote_provider_traits::ActionCacheProvider;
 use workunit_store::Metric;
 
 use tonic::{Code, Request};
 
-use super::{ActionCacheProvider, RemoteCacheProviderOptions};
+use super::RemoteCacheProviderOptions;
 
 pub struct Provider {
   instance_name: Option<String>,

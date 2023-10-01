@@ -31,15 +31,23 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
+use grpc_util::prost::MessageExt;
 use hashing::{async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
 use http::header::AUTHORIZATION;
 use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
 use opendal::{Builder, Operator};
+use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use remexec::ActionResult;
 use tokio::fs::File;
 use workunit_store::ObservationMetric;
 
-use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
+use remote_provider_traits::{
+  ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteOptions,
+};
 
+#[cfg(test)]
+mod action_cache_tests;
 #[cfg(test)]
 mod byte_store_tests;
 
@@ -301,5 +309,37 @@ impl ByteStoreProvider for Provider {
     .await?;
 
     Ok(existences.into_iter().flatten().collect())
+  }
+}
+
+#[async_trait]
+impl ActionCacheProvider for Provider {
+  async fn update_action_result(
+    &self,
+    action_digest: Digest,
+    action_result: ActionResult,
+  ) -> Result<(), String> {
+    let bytes = action_result.to_bytes();
+    self.store_bytes(action_digest, bytes).await
+  }
+  async fn get_action_result(
+    &self,
+    action_digest: Digest,
+    _build_id: &str,
+  ) -> Result<Option<ActionResult>, String> {
+    let mut destination = Vec::new();
+
+    match self
+      .load_without_validation(action_digest, &mut destination)
+      .await?
+    {
+      false => Ok(None),
+      true => {
+        let bytes = Bytes::from(destination);
+        Ok(Some(ActionResult::decode(bytes).map_err(|e| {
+          format!("failed to decode action result for digest {action_digest:?}: {e}")
+        })?))
+      }
+    }
   }
 }

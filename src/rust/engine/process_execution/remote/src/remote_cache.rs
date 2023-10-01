@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::{ActionResult, Command, Tree};
-use remote_provider::REAPI_ADDRESS_SCHEMAS;
+use remote_provider::{ActionCacheProvider, REAPI_ADDRESS_SCHEMAS};
 use store::{RemoteOptions, Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
@@ -28,9 +28,6 @@ use process_execution::{
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
 
-mod base_opendal;
-#[cfg(test)]
-mod base_opendal_tests;
 mod reapi;
 #[cfg(test)]
 mod reapi_tests;
@@ -41,23 +38,6 @@ pub enum RemoteCacheWarningsBehavior {
   Ignore,
   FirstOnly,
   Backoff,
-}
-
-/// This `ActionCacheProvider` trait captures the operations required to be able to cache command
-/// executions remotely.
-#[async_trait]
-pub trait ActionCacheProvider: Sync + Send + 'static {
-  async fn update_action_result(
-    &self,
-    action_digest: Digest,
-    action_result: ActionResult,
-  ) -> Result<(), String>;
-
-  async fn get_action_result(
-    &self,
-    action_digest: Digest,
-    build_id: &str,
-  ) -> Result<Option<ActionResult>, String>;
 }
 
 #[derive(Clone)]
@@ -101,7 +81,7 @@ async fn choose_provider(
   } else if let Some(path) = address.strip_prefix("file://") {
     // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
     // testing.
-    Ok(Arc::new(base_opendal::Provider::fs(
+    Ok(Arc::new(remote_provider_opendal::Provider::fs(
       path,
       "action-cache".to_owned(),
       remote_options,
@@ -111,11 +91,13 @@ async fn choose_provider(
     // incorrect values could easily slip through here and cause downstream confusion. We're
     // intending to change the approach (https://github.com/pantsbuild/pants/issues/19902) so this
     // is tolerable for now.
-    Ok(Arc::new(base_opendal::Provider::github_actions_cache(
-      url,
-      "action-cache".to_owned(),
-      remote_options,
-    )?))
+    Ok(Arc::new(
+      remote_provider_opendal::Provider::github_actions_cache(
+        url,
+        "action-cache".to_owned(),
+        remote_options,
+      )?,
+    ))
   } else {
     Err(format!(
       "Cannot initialise remote action cache provider with address {address}, as the scheme is not supported",

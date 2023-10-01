@@ -34,7 +34,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use hashing::Digest;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remexec::ServerCapabilities;
+use remexec::{ActionResult, ServerCapabilities};
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWrite};
 
@@ -100,4 +100,21 @@ impl LoadDestination for Vec<u8> {
     self.clear();
     Ok(())
   }
+}
+
+/// This `ActionCacheProvider` trait captures the operations required to be able to cache command
+/// executions remotely.
+#[async_trait]
+pub trait ActionCacheProvider: Sync + Send + 'static {
+  async fn update_action_result(
+    &self,
+    action_digest: Digest,
+    action_result: ActionResult,
+  ) -> Result<(), String>;
+
+  async fn get_action_result(
+    &self,
+    action_digest: Digest,
+    build_id: &str,
+  ) -> Result<Option<ActionResult>, String>;
 }

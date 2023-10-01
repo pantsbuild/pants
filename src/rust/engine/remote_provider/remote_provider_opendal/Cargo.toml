@@ -9,16 +9,18 @@ publish = false
 async-trait = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
+grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
 http = { workspace = true }
 parking_lot = { workspace = true }
+prost = { workspace = true }
+protos = { path = "../../protos" }
 opendal = { workspace = true }
 remote_provider_traits = { path = "../remote_provider_traits" }
 tokio = { workspace = true }
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
-grpc_util = { path = "../../grpc_util" }
 mock = { path = "../../testutil/mock" }
 tempfile = { workspace = true }
 testutil = { path = "../../testutil" }

@@ -11,10 +11,9 @@ use hashing::Digest;
 use opendal::services::Memory;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remote_provider_traits::RemoteOptions;
+use remote_provider_traits::{ActionCacheProvider, RemoteOptions};
 
-use super::base_opendal::Provider;
-use super::ActionCacheProvider;
+use super::Provider;
 
 const BASE: &str = "opendal-testing-base";
 
