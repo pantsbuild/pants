@@ -545,7 +545,7 @@ async def find_binary(
     #
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
     #      can catch bugs in the script itself, given an earlier silent failure.
-    search_path = create_path_env_var(request.search_path)
+    search_path = os.pathsep.join(request.search_path)
     result = await Get(
         ProcessResult,
         Process(
