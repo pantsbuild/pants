@@ -31,7 +31,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var, pluralize, softwrap
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
