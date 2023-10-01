@@ -494,7 +494,6 @@ async def get_bash(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
 async def find_binary(
     request: BinaryPathRequest,
     env_target: EnvironmentTarget,
-    # system_binaries: SystemBinariesSubsystem,
 ) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths

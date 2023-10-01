@@ -59,7 +59,7 @@ class SystemBinaryFieldSet(RunFieldSet):
 async def _find_binary(
     address: Address,
     binary_name: str,
-    search_paths: SearchPath,
+    search_path: SearchPath,
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
@@ -68,7 +68,7 @@ async def _find_binary(
         BinaryPaths,
         BinaryPathRequest(
             binary_name=binary_name,
-            search_path=search_paths,
+            search_path=search_path,
         ),
     )
 
@@ -122,26 +122,24 @@ async def _find_binary(
             if not fingerprint_pattern
             else f" with output matching `{fingerprint_pattern}` when run with arguments `{' '.join(fingerprint_args or ())}`"
         )
-        + f". The following paths were searched: {', '.join(search_paths)}."
+        + f". The following paths were searched: {', '.join(search_path)}."
     )
 
 
 @rule(level=LogLevel.DEBUG)
 async def create_system_binary_run_request(
     field_set: SystemBinaryFieldSet,
-    system_binaries_environment: SystemBinariesSubsystem.EnvironmentAware,
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
 ) -> RunRequest:
     assert field_set.name.value is not None
     extra_search_paths = field_set.extra_search_paths.value or ()
 
-    search_paths = SearchPath(
-        (*extra_search_paths, *system_binaries_environment.system_binary_paths)
-    )
+    search_path = SearchPath((*extra_search_paths, *system_binaries.system_binary_paths))
 
     path = await _find_binary(
         field_set.address,
         field_set.name.value,
-        search_paths,
+        search_path,
         field_set.fingerprint_pattern.value,
         field_set.fingerprint_argv.value,
         field_set.fingerprint_dependencies.value,
