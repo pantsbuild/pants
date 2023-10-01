@@ -2979,9 +2979,7 @@ dependencies = [
  "protos",
  "rand",
  "remote_provider",
- "remote_provider_opendal",
  "remote_provider_reapi",
- "remote_provider_traits",
  "sharded_lmdb",
  "store",
  "strum",
@@ -3000,6 +2998,7 @@ dependencies = [
 name = "remote_provider"
 version = "0.0.1"
 dependencies = [
+ "grpc_util",
  "remote_provider_opendal",
  "remote_provider_reapi",
  "remote_provider_traits",

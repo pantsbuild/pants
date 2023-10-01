@@ -60,7 +60,7 @@ pub struct RemoteCacheProviderOptions {
   // TODO: this is currently framed for the REAPI provider, with some options used by others, would
   // be good to generalise
   // TODO: this is structurally very similar to `RemoteOptions`: maybe they should be the same? (see
-  // comment in `choose_provider` too)
+  // comment in `choose_action_cache_provider` too)
   pub instance_name: Option<String>,
   pub action_cache_address: String,
   pub root_ca_certs: Option<Vec<u8>>,
