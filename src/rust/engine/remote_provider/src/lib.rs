@@ -36,6 +36,7 @@ pub use remote_provider_traits::{
 
 const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", "https://"];
 
+// TODO(#19902): a unified view of choosing a provider would be nice
 pub async fn choose_byte_store_provider(
   options: RemoteOptions,
 ) -> Result<Arc<dyn ByteStoreProvider>, String> {
