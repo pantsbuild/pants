@@ -196,7 +196,7 @@ default-members = [
 # https://doc.rust-lang.org/nightly/cargo/reference/specifying-dependencies.html#\
 #  inheriting-a-dependency-from-a-workspace
 [workspace.dependencies]
-arc-swap = "1.5"
+arc-swap = "1.6"
 async-lock = "2.5"
 async-oncecell = "0.2"
 async-stream = "0.3"
@@ -245,7 +245,7 @@ itertools = "0.10"
 lazy_static = "1"
 libc = "0.2.137"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
-log = "0.4.17"
+log = "0.4.20"
 madvise = "0.1"
 maplit = "1.0.1"
 nails = "0.13"
@@ -254,7 +254,14 @@ notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bf
 num_cpus = "1"
 num_enum = "0.5"
 once_cell = "1.18"
-opendal = { version = "0.39.0", default-features = false }
+# TODO: this is waiting for several changes to be released (likely in 0.41):
+# https://github.com/apache/incubator-opendal/pull/3163
+# https://github.com/apache/incubator-opendal/pull/3177
+opendal = { git = "https://github.com/apache/incubator-opendal", rev = "97bcef60eb0b515bd2442ab5b671080766fa35eb", default-features = false, features = [
+  "services-memory",
+  "services-fs",
+  "services-ghac",
+] }
 os_pipe = "1.1"
 parking_lot = "0.12"
 peg = "0.8"
@@ -290,7 +297,7 @@ sysinfo = "0.20.0"
 tempfile = "3.5.0"
 terminal_size = "0.1.15"
 time = "0.3.20"
-tokio = "1.28"
+tokio = "1.32"
 tokio-retry = "0.3"
 tokio-rustls = "0.24"
 tokio-stream = "0.1"

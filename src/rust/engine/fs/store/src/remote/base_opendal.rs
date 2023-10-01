@@ -9,12 +9,15 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
 use hashing::{async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
+use http::header::AUTHORIZATION;
 use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
 use opendal::{Builder, Operator};
 use tokio::fs::File;
 use workunit_store::ObservationMetric;
 
 use super::{ByteStoreProvider, LoadDestination, RemoteOptions};
+
+const GITHUB_ACTIONS_CACHE_VERSION: &str = "pants-1";
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoadMode {
@@ -68,6 +71,44 @@ impl Provider {
   pub fn fs(path: &str, scope: String, options: RemoteOptions) -> Result<Provider, String> {
     let mut builder = opendal::services::Fs::default();
     builder.root(path).enable_path_check();
+    Provider::new(builder, scope, options)
+  }
+
+  pub fn github_actions_cache(
+    url: &str,
+    scope: String,
+    options: RemoteOptions,
+  ) -> Result<Provider, String> {
+    let mut builder = opendal::services::Ghac::default();
+
+    builder.version(GITHUB_ACTIONS_CACHE_VERSION);
+    builder.endpoint(url);
+
+    // extract the token from the `authorization: Bearer ...` header because OpenDAL's Ghac service
+    // reasons about it separately (although does just stick it in its own `authorization: Bearer
+    // ...` header internally).
+    let header_help_blurb = "Using GitHub Actions Cache remote cache requires a token set in a `authorization: Bearer ...` header, set via [GLOBAL].remote_store_headers or [GLOBAL].remote_oauth_bearer_token_path";
+    let Some(auth_header_value) = options.headers.get(AUTHORIZATION.as_str()) else {
+      let existing_headers = options.headers.keys().collect::<Vec<_>>();
+      return Err(format!(
+        "Expected to find '{}' header, but only found: {:?}. {}",
+        AUTHORIZATION, existing_headers, header_help_blurb,
+      ));
+    };
+
+    let Some(token) = auth_header_value.strip_prefix("Bearer ") else {
+      return Err(format!(
+        "Expected '{}' header to start with `Bearer `, found value starting with {:?}. {}",
+        AUTHORIZATION,
+        // only show the first few characters to not accidentally leak (all of) a secret, but
+        // still give the user something to start debugging
+        &auth_header_value[..4],
+        header_help_blurb,
+      ));
+    };
+
+    builder.runtime_token(token);
+
     Provider::new(builder, scope, options)
   }
 
@@ -158,11 +199,15 @@ impl ByteStoreProvider for Provider {
 
     let path = self.path(digest.hash);
 
-    self
-      .operator
-      .write(&path, bytes)
-      .await
-      .map_err(|e| format!("failed to write bytes to {path}: {e}"))
+    match self.operator.write(&path, bytes).await {
+      Ok(()) => Ok(()),
+      // The item already exists, i.e. these bytes have already been stored. For example,
+      // concurrent executions that are caching the same bytes. This makes the assumption that
+      // which ever execution won the race to create the item successfully finishes the write, and
+      // so no wait + retry (or similar) here.
+      Err(e) if e.kind() == opendal::ErrorKind::AlreadyExists => Ok(()),
+      Err(e) => Err(format!("failed to write bytes to {path}: {e}")),
+    }
   }
 
   async fn store_file(&self, digest: Digest, mut file: File) -> Result<(), String> {
@@ -174,12 +219,15 @@ impl ByteStoreProvider for Provider {
 
     let path = self.path(digest.hash);
 
-    let mut writer = self
-      .operator
-      .writer_with(&path)
-      .content_length(digest.size_bytes as u64)
-      .await
-      .map_err(|e| format!("failed to start write to {path}: {e}"))?;
+    let mut writer = match self.operator.writer(&path).await {
+      Ok(writer) => writer,
+      // The item already exists, i.e. these bytes have already been stored. For example,
+      // concurrent executions that are caching the same bytes. This makes the assumption that
+      // which ever execution won the race to create the item successfully finishes the write, and
+      // so no wait + retry (or similar) here.
+      Err(e) if e.kind() == opendal::ErrorKind::AlreadyExists => return Ok(()),
+      Err(e) => return Err(format!("failed to start write to {path}: {e} {}", e.kind())),
+    };
 
     // TODO: it would be good to pass through options.chunk_size_bytes here
     match tokio::io::copy(&mut file, &mut writer).await {

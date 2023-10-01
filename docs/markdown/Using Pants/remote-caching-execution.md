@@ -13,7 +13,7 @@ By default, Pants executes processes in a local [environment](doc:environments) 
 
 2. "Remote execution" where Pants offloads execution of processes to a remote server (and consumes cached results from that remote server)
 
-Pants does this by using the "Remote Execution API" to converse with the remote cache or remote execution server.
+Pants does this by using the "Remote Execution API" to converse with the remote cache or remote execution server. Pants also [supports some additional providers](doc:remote-caching) other than Remote Execution API that provide only remote caching, without execution.
 
 What is Remote Execution API?
 -----------------------------
