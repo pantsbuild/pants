@@ -10,7 +10,7 @@ use remote_provider_traits::{ByteStoreProvider, RemoteOptions};
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
 
-use super::base_opendal::Provider;
+use crate::Provider;
 
 const BASE: &str = "opendal-testing-base";
 

@@ -2978,6 +2978,7 @@ dependencies = [
  "prost-types",
  "protos",
  "rand",
+ "remote_provider_opendal",
  "remote_provider_traits",
  "sharded_lmdb",
  "store",
@@ -3000,6 +3001,22 @@ version = "0.0.1"
 [[package]]
 name = "remote_provider_opendal"
 version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "grpc_util",
+ "hashing",
+ "http",
+ "mock",
+ "opendal",
+ "parking_lot 0.12.1",
+ "remote_provider_traits",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "workunit_store",
+]
 
 [[package]]
 name = "remote_provider_reapi"
@@ -3503,6 +3520,7 @@ dependencies = [
  "prost",
  "prost-types",
  "protos",
+ "remote_provider_opendal",
  "remote_provider_reapi",
  "remote_provider_traits",
  "serde",

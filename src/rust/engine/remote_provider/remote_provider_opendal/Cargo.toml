@@ -6,3 +6,19 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+async-trait = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+hashing = { path = "../../hashing" }
+http = { workspace = true }
+parking_lot = { workspace = true }
+opendal = { workspace = true }
+remote_provider_traits = { path = "../remote_provider_traits" }
+tokio = { workspace = true }
+workunit_store = { path = "../../workunit_store" }
+
+[dev-dependencies]
+grpc_util = { path = "../../grpc_util" }
+mock = { path = "../../testutil/mock" }
+tempfile = { workspace = true }
+testutil = { path = "../../testutil" }

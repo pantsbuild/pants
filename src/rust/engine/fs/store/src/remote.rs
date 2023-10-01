@@ -13,10 +13,6 @@ use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
 use tokio::fs::File;
 use workunit_store::{in_workunit, ObservationMetric};
 
-pub mod base_opendal;
-#[cfg(test)]
-mod base_opendal_tests;
-
 // TODO: this is probably better positioned somewhere else
 pub const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", "https://"];
 
@@ -29,7 +25,7 @@ async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProv
   } else if let Some(path) = address.strip_prefix("file://") {
     // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
     // testing.
-    Ok(Arc::new(base_opendal::Provider::fs(
+    Ok(Arc::new(remote_provider_opendal::Provider::fs(
       path,
       "byte-store".to_owned(),
       options,
@@ -39,11 +35,13 @@ async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProv
     // incorrect values could easily slip through here and cause downstream confusion. We're
     // intending to change the approach (https://github.com/pantsbuild/pants/issues/19902) so this
     // is tolerable for now.
-    Ok(Arc::new(base_opendal::Provider::github_actions_cache(
-      url,
-      "byte-store".to_owned(),
-      options,
-    )?))
+    Ok(Arc::new(
+      remote_provider_opendal::Provider::github_actions_cache(
+        url,
+        "byte-store".to_owned(),
+        options,
+      )?,
+    ))
   } else {
     Err(format!(
       "Cannot initialise remote byte store provider with address {address}, as the scheme is not supported",

@@ -14,7 +14,7 @@ use super::ActionCacheProvider;
 use process_execution::Context;
 use remote_provider_traits::ByteStoreProvider;
 
-pub use store::remote::base_opendal::Provider;
+pub use remote_provider_opendal::Provider;
 
 #[async_trait]
 impl ActionCacheProvider for Provider {
