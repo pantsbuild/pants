@@ -28,10 +28,6 @@ use process_execution::{
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
 
-mod reapi;
-#[cfg(test)]
-mod reapi_tests;
-
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
 pub enum RemoteCacheWarningsBehavior {
@@ -62,7 +58,7 @@ async fn choose_provider(
   };
 
   if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
-    Ok(Arc::new(reapi::Provider::new(options).await?))
+    Ok(Arc::new(remote_provider_reapi::action_cache::Provider::new(options).await?))
   } else if let Some(path) = address.strip_prefix("file://") {
     // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
     // testing.

@@ -7,7 +7,7 @@ use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remote_provider_traits::{ActionCacheProvider, RemoteCacheProviderOptions};
 
-use super::reapi::Provider;
+use super::action_cache::Provider;
 
 async fn new_provider(cas: &StubCAS) -> Provider {
   Provider::new(RemoteCacheProviderOptions {

@@ -31,6 +31,9 @@ use tonic::Request;
 
 use grpc_util::prost::MessageExt;
 
+pub mod action_cache;
+#[cfg(test)]
+pub mod action_cache_tests;
 pub mod byte_store;
 #[cfg(test)]
 pub mod byte_store_tests;
