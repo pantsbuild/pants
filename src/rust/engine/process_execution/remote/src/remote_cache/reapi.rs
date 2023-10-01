@@ -10,9 +10,9 @@ use hashing::Digest;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::ActionResult;
+use remote_provider_reapi::apply_headers;
 use workunit_store::Metric;
 
-use crate::remote::apply_headers;
 use process_execution::Context;
 use tonic::{Code, Request};
 

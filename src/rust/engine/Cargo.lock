@@ -2980,6 +2980,7 @@ dependencies = [
  "rand",
  "remote_provider",
  "remote_provider_opendal",
+ "remote_provider_reapi",
  "remote_provider_traits",
  "sharded_lmdb",
  "store",
