@@ -11,7 +11,6 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ActionResult;
 
 use super::ActionCacheProvider;
-use process_execution::Context;
 use remote_provider_traits::ByteStoreProvider;
 
 pub use remote_provider_opendal::Provider;
@@ -29,7 +28,7 @@ impl ActionCacheProvider for Provider {
   async fn get_action_result(
     &self,
     action_digest: Digest,
-    _context: &Context,
+    _build_id: &str,
   ) -> Result<Option<ActionResult>, String> {
     let mut destination = Vec::new();
 

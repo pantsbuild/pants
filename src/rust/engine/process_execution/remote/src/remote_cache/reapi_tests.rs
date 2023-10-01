@@ -4,7 +4,6 @@ use std::{collections::BTreeMap, time::Duration};
 
 use hashing::Digest;
 use mock::StubCAS;
-use process_execution::Context;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 use super::{reapi::Provider, ActionCacheProvider, RemoteCacheProviderOptions};
@@ -40,9 +39,7 @@ async fn get_action_result_existing() {
     .insert(action_digest.hash, action_result.clone());
 
   assert_eq!(
-    provider
-      .get_action_result(action_digest, &Context::default())
-      .await,
+    provider.get_action_result(action_digest, "").await,
     Ok(Some(action_result))
   );
 }
@@ -55,9 +52,7 @@ async fn get_action_result_missing() {
   let action_digest = Digest::of_bytes(b"update_action_cache test");
 
   assert_eq!(
-    provider
-      .get_action_result(action_digest, &Context::default())
-      .await,
+    provider.get_action_result(action_digest, "").await,
     Ok(None)
   );
 }
@@ -70,7 +65,7 @@ async fn get_action_result_grpc_error() {
   let action_digest = Digest::of_bytes(b"get_action_result_grpc_error test");
 
   let error = provider
-    .get_action_result(action_digest, &Context::default())
+    .get_action_result(action_digest, "")
     .await
     .expect_err("Want err");
 

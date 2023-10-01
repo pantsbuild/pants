@@ -56,7 +56,7 @@ pub trait ActionCacheProvider: Sync + Send + 'static {
   async fn get_action_result(
     &self,
     action_digest: Digest,
-    context: &Context,
+    build_id: &str,
   ) -> Result<Option<ActionResult>, String>;
 }
 
@@ -645,7 +645,7 @@ async fn check_action_cache(
 
       let start = Instant::now();
       let response = provider
-        .get_action_result(action_digest, context)
+        .get_action_result(action_digest, &context.build_id)
         .and_then(|action_result| async move {
           let Some(action_result) = action_result else {
             return Ok(None);
