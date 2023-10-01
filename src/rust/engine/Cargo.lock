@@ -2978,6 +2978,7 @@ dependencies = [
  "prost-types",
  "protos",
  "rand",
+ "remote_provider",
  "remote_provider_opendal",
  "remote_provider_traits",
  "sharded_lmdb",
@@ -2997,6 +2998,11 @@ dependencies = [
 [[package]]
 name = "remote_provider"
 version = "0.0.1"
+dependencies = [
+ "remote_provider_opendal",
+ "remote_provider_reapi",
+ "remote_provider_traits",
+]
 
 [[package]]
 name = "remote_provider_opendal"
@@ -3520,9 +3526,7 @@ dependencies = [
  "prost",
  "prost-types",
  "protos",
- "remote_provider_opendal",
- "remote_provider_reapi",
- "remote_provider_traits",
+ "remote_provider",
  "serde",
  "serde_derive",
  "sharded_lmdb",

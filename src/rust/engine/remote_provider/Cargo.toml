@@ -6,3 +6,6 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+remote_provider_opendal = { path = "./remote_provider_opendal" }
+remote_provider_reapi = { path = "./remote_provider_reapi" }
+remote_provider_traits = { path = "./remote_provider_traits" }

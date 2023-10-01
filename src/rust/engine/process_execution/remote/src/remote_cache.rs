@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::{ActionResult, Command, Tree};
-use store::remote::REAPI_ADDRESS_SCHEMAS;
+use remote_provider::REAPI_ADDRESS_SCHEMAS;
 use store::{RemoteOptions, Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,

@@ -8,7 +8,7 @@ use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
+use remote_provider::{ByteStoreProvider, LoadDestination, RemoteOptions};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
