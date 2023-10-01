@@ -30,7 +30,8 @@ use std::sync::Arc;
 // Re-export these so that consumers don't have to know about the exact arrangement of underlying
 // crates.
 pub use remote_provider_traits::{
-  ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteOptions,
+  ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteCacheProviderOptions,
+  RemoteOptions,
 };
 
 pub const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", "https://"];

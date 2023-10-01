@@ -5,9 +5,9 @@ use std::{collections::BTreeMap, time::Duration};
 use hashing::Digest;
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remote_provider_traits::ActionCacheProvider;
+use remote_provider_traits::{ActionCacheProvider, RemoteCacheProviderOptions};
 
-use super::{reapi::Provider, RemoteCacheProviderOptions};
+use super::reapi::Provider;
 
 async fn new_provider(cas: &StubCAS) -> Provider {
   Provider::new(RemoteCacheProviderOptions {

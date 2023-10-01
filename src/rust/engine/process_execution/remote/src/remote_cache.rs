@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Debug};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use async_trait::async_trait;
 use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::{ActionResult, Command, Tree};
-use remote_provider::{ActionCacheProvider, REAPI_ADDRESS_SCHEMAS};
+use remote_provider::{ActionCacheProvider, RemoteCacheProviderOptions, REAPI_ADDRESS_SCHEMAS};
 use store::{RemoteOptions, Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
@@ -38,21 +38,6 @@ pub enum RemoteCacheWarningsBehavior {
   Ignore,
   FirstOnly,
   Backoff,
-}
-
-#[derive(Clone)]
-pub struct RemoteCacheProviderOptions {
-  // TODO: this is currently framed for the REAPI provider, with some options used by others, would
-  // be good to generalise
-  // TODO: this is structurally very similar to `RemoteOptions`: maybe they should be the same? (see
-  // comment in `choose_provider` too)
-  pub instance_name: Option<String>,
-  pub action_cache_address: String,
-  pub root_ca_certs: Option<Vec<u8>>,
-  pub mtls_data: Option<(Vec<u8>, Vec<u8>)>,
-  pub headers: BTreeMap<String, String>,
-  pub concurrency_limit: usize,
-  pub rpc_timeout: Duration,
 }
 
 async fn choose_provider(
