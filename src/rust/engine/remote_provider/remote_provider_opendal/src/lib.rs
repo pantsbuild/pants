@@ -60,9 +60,7 @@ pub enum LoadMode {
 }
 
 pub struct Provider {
-  /// This is public for easier testing of the action cache provider
-  // TODO: move all the providers into a single crate so that the pub isn't necessary
-  pub operator: Operator,
+  operator: Operator,
   base_path: String,
 }
 
