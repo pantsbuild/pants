@@ -1410,6 +1410,7 @@ dependencies = [
  "hyper-rustls 0.24.1",
  "itertools",
  "lazy_static",
+ "log",
  "parking_lot 0.12.1",
  "pin-project",
  "pin-project-lite",

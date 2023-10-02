@@ -188,4 +188,125 @@ mod tests {
     let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
     assert_eq!(&body[..], TEST_RESPONSE);
   }
+
+  #[tokio::test]
+  async fn tls_mtls_client_request_test() {
+    pub struct CertVerifierMock {
+      saw_a_cert: std::sync::atomic::AtomicUsize,
+    }
+
+    impl rustls::server::ClientCertVerifier for CertVerifierMock {
+      fn offer_client_auth(&self) -> bool {
+        true
+      }
+
+      fn client_auth_root_subjects(&self) -> &[rustls::DistinguishedName] {
+        &[]
+      }
+
+      fn verify_client_cert(
+        &self,
+        _end_entity: &rustls::Certificate,
+        _intermediates: &[rustls::Certificate],
+        _now: std::time::SystemTime,
+      ) -> Result<rustls::server::ClientCertVerified, rustls::Error> {
+        self
+          .saw_a_cert
+          .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        Ok(rustls::server::ClientCertVerified::assertion())
+      }
+    }
+
+    let cert_pem = std::fs::read(
+      PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("test-certs")
+        .join("cert.pem"),
+    )
+    .unwrap();
+
+    let key_pem = std::fs::read(
+      PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("test-certs")
+        .join("key.pem"),
+    )
+    .unwrap();
+
+    let certificates = rustls_pemfile::certs(&mut std::io::Cursor::new(&cert_pem))
+      .unwrap()
+      .into_iter()
+      .map(rustls::Certificate)
+      .collect::<Vec<_>>();
+
+    let privkey = rustls::PrivateKey(
+      rustls_pemfile::pkcs8_private_keys(&mut std::io::Cursor::new(&key_pem))
+        .unwrap()
+        .remove(0),
+    );
+
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store.add(&certificates[0]).unwrap();
+
+    let verifier = Arc::new(CertVerifierMock {
+      saw_a_cert: std::sync::atomic::AtomicUsize::new(0),
+    });
+    let mut config = rustls::ServerConfig::builder()
+      .with_safe_defaults()
+      .with_client_cert_verifier(verifier.clone())
+      .with_single_cert(certificates.clone(), privkey.clone())
+      .unwrap();
+
+    config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+
+    let config = RustlsConfig::from_config(Arc::new(config));
+
+    let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
+    let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server = axum_server::from_tcp_rustls(listener, config);
+
+    tokio::spawn(async move {
+      server.serve(router().into_make_service()).await.unwrap();
+    });
+
+    let uri = Uri::try_from(format!("https://{}", addr.to_string())).unwrap();
+
+    let mut tls_config =
+      crate::tls::Config::new(Some(&cert_pem), Some((&cert_pem, &key_pem))).unwrap();
+
+    tls_config.certificate_check = crate::tls::CertificateCheck::DangerouslyDisabled;
+
+    let tls_config: rustls::ClientConfig = tls_config.try_into().unwrap();
+
+    let mut channel = Channel::new(Some(&tls_config), uri).await.unwrap();
+
+    match &channel.client {
+      super::Client::Plain(_) => panic!("Expected a TLS client"),
+      super::Client::Tls(_) => {}
+    }
+    assert_eq!(
+      verifier
+        .saw_a_cert
+        .load(std::sync::atomic::Ordering::SeqCst),
+      0
+    );
+    let request = Request::builder()
+      .uri(format!("https://{}", addr))
+      .body(tonic::body::empty_body())
+      .unwrap();
+
+    channel.ready().await.unwrap();
+    let response = channel.call(request).await.unwrap();
+
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    assert_eq!(&body[..], TEST_RESPONSE);
+
+    assert_eq!(
+      verifier
+        .saw_a_cert
+        .load(std::sync::atomic::Ordering::SeqCst),
+      1
+    );
+  }
 }
