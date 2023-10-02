@@ -92,6 +92,8 @@ pub struct RemotingOptions {
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
+  pub client_certs_path: Option<PathBuf>,
+  pub client_key_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
   pub store_chunk_bytes: usize,
   pub store_rpc_retries: usize,
@@ -151,7 +153,8 @@ impl Core {
     enable_remote: bool,
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    root_ca_certs: Option<&[u8]>,
+    mtls_data: Option<(&[u8], &[u8])>,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Store, String> {
     let local_only = Store::local_only_with_options(
@@ -165,11 +168,16 @@ impl Core {
         .as_ref()
         .ok_or("Remote store required, but none configured")?
         .clone();
+
+      // Nb: these two should always be passed together. We assume this validation has already
+      // happened.
+      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)?;
+
       local_only
         .into_with_remote(RemoteOptions {
           cas_address,
           instance_name: remoting_opts.instance_name.clone(),
-          tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
+          tls_config,
           headers: remoting_opts.store_headers.clone(),
           chunk_size_bytes: remoting_opts.store_chunk_bytes,
           rpc_timeout: remoting_opts.store_rpc_timeout,
@@ -197,7 +205,8 @@ impl Core {
     named_caches: &NamedCaches,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    root_ca_certs: Option<&[u8]>,
+    mtls_data: Option<(&[u8], &[u8])>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
@@ -278,7 +287,8 @@ impl Core {
           instance_name,
           process_cache_namespace,
           remoting_opts.append_only_caches_base_path.clone(),
-          root_ca_certs.clone(),
+          root_ca_certs.map(|v| v.to_vec()),
+          mtls_data.map(|(cert, key)| (cert.to_vec(), key.to_vec())),
           remoting_opts.execution_headers.clone(),
           full_store.clone(),
           executor.clone(),
@@ -322,7 +332,8 @@ impl Core {
     local_cache: &PersistentCache,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    root_ca_certs: Option<&[u8]>,
+    mtls_data: Option<(&[u8], &[u8])>,
     remoting_opts: &RemotingOptions,
     remote_cache_read: bool,
     remote_cache_write: bool,
@@ -347,7 +358,8 @@ impl Core {
           RemoteCacheProviderOptions {
             instance_name,
             action_cache_address: remoting_opts.store_address.clone().unwrap(),
-            root_ca_certs: root_ca_certs.clone(),
+            root_ca_certs: root_ca_certs.map(|v| v.to_vec()),
+            mtls_data: mtls_data.map(|(cert, key)| (cert.to_vec(), key.to_vec())),
             headers: remoting_opts.store_headers.clone(),
             concurrency_limit: remoting_opts.cache_rpc_concurrency,
             rpc_timeout: remoting_opts.cache_rpc_timeout,
@@ -384,7 +396,8 @@ impl Core {
     named_caches: &NamedCaches,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    root_ca_certs: Option<&[u8]>,
+    mtls_data: Option<(&[u8], &[u8])>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
@@ -399,6 +412,7 @@ impl Core {
       instance_name.clone(),
       process_cache_namespace.clone(),
       root_ca_certs,
+      mtls_data,
       exec_strategy_opts,
       remoting_opts,
       capabilities_cell_opt,
@@ -419,6 +433,7 @@ impl Core {
         instance_name.clone(),
         process_cache_namespace.clone(),
         root_ca_certs,
+        mtls_data,
         remoting_opts,
         remote_cache_read,
         remote_cache_write,
@@ -440,6 +455,7 @@ impl Core {
         instance_name.clone(),
         process_cache_namespace.clone(),
         root_ca_certs,
+        mtls_data,
         remoting_opts,
         false,
         remote_cache_write,
@@ -513,6 +529,35 @@ impl Core {
       None
     };
 
+    let client_certs = remoting_opts
+      .client_certs_path
+      .as_ref()
+      .map(|path| {
+        std::fs::read(path)
+          .map_err(|err| format!("Error reading client authentication certs file {path:?}: {err}"))
+      })
+      .transpose()?;
+
+    let client_key = remoting_opts
+      .client_key_path
+      .as_ref()
+      .map(|path| {
+        std::fs::read(path)
+          .map_err(|err| format!("Error reading client authentication key file {path:?}: {err}"))
+      })
+      .transpose()?;
+
+    let mtls_data = match (client_certs.as_ref(), client_key.as_ref()) {
+      (Some(cert), Some(key)) => Some((cert.deref(), key.deref())),
+      (None, None) => None,
+      _ => {
+        return Err(
+			"Both remote_client_certs_path and remote_client_key_path must be specified to enable client authentication, but only one was provided."
+            .to_owned(),
+        )
+      }
+    };
+
     let need_remote_store = remoting_opts.execution_enable
       || exec_strategy_opts.remote_cache_read
       || exec_strategy_opts.remote_cache_write;
@@ -534,6 +579,7 @@ impl Core {
         local_store_options.store_dir, e
       )
     })?;
+
     let full_store = Self::make_store(
       &executor,
       &local_store_options,
@@ -541,7 +587,8 @@ impl Core {
       need_remote_store,
       &remoting_opts,
       &remoting_opts.store_address,
-      &root_ca_certs,
+      root_ca_certs.as_deref(),
+      mtls_data,
       capabilities_cell_opt.clone(),
     )
     .await
@@ -584,7 +631,8 @@ impl Core {
       &named_caches,
       remoting_opts.instance_name.clone(),
       remoting_opts.execution_process_cache_namespace.clone(),
-      &root_ca_certs,
+      root_ca_certs.as_deref(),
+      mtls_data,
       &exec_strategy_opts,
       &remoting_opts,
       capabilities_cell_opt,
