@@ -69,6 +69,7 @@ pub struct RemoteCacheProviderOptions {
   pub instance_name: Option<String>,
   pub action_cache_address: String,
   pub root_ca_certs: Option<Vec<u8>>,
+  pub mtls_data: Option<(Vec<u8>, Vec<u8>)>,
   pub headers: BTreeMap<String, String>,
   pub concurrency_limit: usize,
   pub rpc_timeout: Duration,
@@ -85,7 +86,7 @@ async fn choose_provider(
     cas_address: address.clone(),
     instance_name: options.instance_name.clone(),
     headers: options.headers.clone(),
-    tls_config: tls::Config::new_without_mtls(options.root_ca_certs.clone()),
+    tls_config: tls::Config::new(options.root_ca_certs.clone(), options.mtls_data.clone())?,
     rpc_timeout: options.rpc_timeout,
     rpc_concurrency_limit: options.concurrency_limit,
     // TODO: these should either be passed through or not synthesized here

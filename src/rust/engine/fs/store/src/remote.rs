@@ -67,7 +67,7 @@ pub struct RemoteOptions {
 }
 
 // TODO: this is probably better positioned somewhere else
-pub const REAPI_ADDRESS_SCHEMAS: [&str; 3] = ["grpc://", "grpcs://", "http://"];
+pub const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", "https://"];
 
 async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProvider>, String> {
   let address = options.cas_address.clone();

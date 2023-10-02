@@ -165,6 +165,7 @@ impl CommandRunner {
     process_cache_namespace: Option<String>,
     append_only_caches_base_path: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
+    mtls_data: Option<(Vec<u8>, Vec<u8>)>,
     headers: BTreeMap<String, String>,
     store: Store,
     executor: Executor,
@@ -173,19 +174,18 @@ impl CommandRunner {
     execution_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
-    let execution_use_tls = execution_address.starts_with("https://");
+    let needs_tls = execution_address.starts_with("https://");
 
-    let tls_client_config = if execution_use_tls {
-      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
+    let tls_client_config = if needs_tls {
+      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)?;
+      Some(tls_config.try_into()?)
     } else {
       None
     };
 
-    let execution_endpoint = grpc_util::create_channel(
-      execution_address,
-      tls_client_config.as_ref().filter(|_| execution_use_tls),
-    )
-    .await?;
+    let execution_endpoint =
+      grpc_util::create_channel(execution_address, tls_client_config.as_ref()).await?;
+
     let execution_http_headers = headers_to_http_header_map(&headers)?;
     let execution_channel = layered_service(
       execution_endpoint,
