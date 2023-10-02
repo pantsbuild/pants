@@ -11,13 +11,14 @@ confs = [
         command="shellcheck",
         file_extensions=[".sh"],
     ),
-    # ByoLinter(
-    #     options_scope='byo_markdownlint',
-    #     name="MarkdownLint",
-    #     help="A markdown linter based on your installed markdown lint.",
-    #     command="markdownlint",
-    #     file_extensions=[".md"],
-    # )
+    ByoLinter(
+        options_scope='byo_markdownlint',
+        name="MarkdownLint",
+        help="A markdown linter based on your installed markdown lint.",
+        command="markdownlint",
+        tools=["node"],
+        file_extensions=[".md"],
+    )
 ]
 
 
@@ -27,5 +28,5 @@ def target_types():
 
 def rules():
     # return lib.shellcheck_rules()
-    return lib.markdownlint_rules()
-    # return list(itertools.chain.from_iterable(conf.rules() for conf in confs))
+    # return lib.markdownlint_rules()
+    return list(itertools.chain.from_iterable(conf.rules() for conf in confs))
