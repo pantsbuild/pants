@@ -16,6 +16,7 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
