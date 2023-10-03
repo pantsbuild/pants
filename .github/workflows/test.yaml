@@ -1645,3 +1645,8 @@ name: Pull Request CI
   push:
     branches-ignore:
     - dependabot/**
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
