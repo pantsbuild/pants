@@ -78,7 +78,7 @@ def test_init_terraform_without_backends(
     # Not initialising the backend means that ./.terraform/.terraform.tfstate will not be present
     assert not find_file(
         initialised_files, "**/*.tfstate"
-    ), "Terraform state file should not be present if the the request was to not initialise the backend"
+    ), "Terraform state file should not be present if the request was to not initialise the backend"
 
     # The dependencies should still be present
     assert find_file(
