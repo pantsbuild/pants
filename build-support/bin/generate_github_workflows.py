@@ -797,7 +797,10 @@ def build_wheels_job(
     # the code, install rustup and expose Pythons.
     # TODO: Apply rust caching here.
     if platform == Platform.LINUX_X86_64:
-        container = {"image": "quay.io/pypa/manylinux2014_x86_64:latest"}
+        # Use 2023-08-27-bd7ad21, because at some point `urllib3 >= 2` broke, and that version
+        # was used for the last "working" build.
+        # See https://github.com/pantsbuild/pants/actions/runs/6286401038/job/17069772062
+        container = {"image": "quay.io/pypa/manylinux2014_x86_64:2023-08-27-bd7ad21"}
     elif platform == Platform.LINUX_ARM64:
         # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
         # generously given by the Works on ARM program. So we have to build in this image.

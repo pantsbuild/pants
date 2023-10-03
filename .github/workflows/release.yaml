@@ -84,7 +84,7 @@ jobs:
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
-      image: quay.io/pypa/manylinux2014_x86_64:latest
+      image: quay.io/pypa/manylinux2014_x86_64:2023-08-27-bd7ad21
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
