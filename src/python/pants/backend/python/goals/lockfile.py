@@ -9,6 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
 
+import pantsdebug
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
@@ -222,6 +223,7 @@ def determine_python_user_resolves(
 async def setup_user_lockfile_requests(
     requested: RequestedPythonUserResolveNames, all_targets: AllTargets, python_setup: PythonSetup
 ) -> UserGenerateLockfiles:
+    pantsdebug.settrace_5678(True)
     if not (python_setup.enable_resolves and python_setup.resolves_generate_lockfiles):
         return UserGenerateLockfiles()
 

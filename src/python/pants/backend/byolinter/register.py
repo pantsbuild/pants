@@ -1,7 +1,10 @@
 import itertools
+from dataclasses import dataclass
+from typing import List
 
-from . import lib
+from . import lib, v2
 from .lib import ByoLinter
+from ..python.target_types import ConsoleScript
 
 confs = [
     ByoLinter(
@@ -22,6 +25,7 @@ confs = [
 ]
 
 
+
 def target_types():
     return []
 
@@ -29,4 +33,5 @@ def target_types():
 def rules():
     # return lib.shellcheck_rules()
     # return lib.markdownlint_rules()
+    # return v2.rules()
     return list(itertools.chain.from_iterable(conf.rules() for conf in confs))

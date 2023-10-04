@@ -12,6 +12,7 @@ from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tu
 
 from typing_extensions import Protocol
 
+import pantsdebug
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
@@ -513,6 +514,7 @@ async def generate_lockfiles_goal(
     console: Console,
     global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
+    pantsdebug.settrace_5678()
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
         for request in union_membership.get(KnownUserResolveNamesRequest)
@@ -522,6 +524,7 @@ async def generate_lockfiles_goal(
         union_membership.get(GenerateToolLockfileSentinel),
         set(generate_lockfiles_subsystem.resolve),
     )
+    pantsdebug.settrace_5678()
 
     # This is the "planning" phase of lockfile generation. Currently this is all done in the local
     # environment, since there's not currently a clear mechanism to prescribe an environment.
@@ -544,15 +547,18 @@ async def generate_lockfiles_goal(
         resolve_specified=bool(generate_lockfiles_subsystem.resolve),
     )
 
+
     # Execute the actual lockfile generation in each request's environment.
     # Currently, since resolves specify a single filename for output, we pick a resonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
-    all_requests: Iterator[GenerateLockfile] = itertools.chain(
+    all_requests = itertools.chain(
         *all_specified_user_requests, applicable_tool_requests
     )
+    all_requests = list(all_requests)
+    pantsdebug.settrace_5678()
     if generate_lockfiles_subsystem.request_diffs:
-        all_requests = (replace(req, diff=True) for req in all_requests)
+        all_requests = list(replace(req, diff=True) for req in all_requests)
 
     results = await MultiGet(
         Get(
@@ -568,6 +574,9 @@ async def generate_lockfiles_goal(
     # Lockfiles are actually written here. This would be an acceptable place to handle conflict
     # resolution behaviour if we start executing requests in multiple environments.
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
+
+    pantsdebug.settrace_5678()
+
     workspace.write_digest(merged_digest)
 
     diffs: list[LockfileDiff] = []

@@ -84,6 +84,7 @@ async def gather_config_files(
 async def partition_inputs(
     request: YamllintRequest.PartitionRequest, yamllint: Yamllint
 ) -> Partitions[Any, PartitionInfo]:
+    import pantsdebug; pantsdebug.settrace_5678(True)
     if yamllint.skip:
         return Partitions()
 
@@ -94,6 +95,7 @@ async def partition_inputs(
     config_files = await Get(
         YamllintConfigFiles, YamllintConfigFilesRequest(filepaths=tuple(sorted(matching_filepaths)))
     )
+    import pantsdebug; pantsdebug.settrace_5678(True)
 
     default_source_files: set[str] = set()
     source_files_by_config_file: dict[str, set[str]] = defaultdict(set)
@@ -109,6 +111,7 @@ async def partition_inputs(
         Get(Snapshot, DigestSubset(config_files.snapshot.digest, PathGlobs([config_file])))
         for config_file in source_files_by_config_file
     )
+    import pantsdebug; pantsdebug.settrace_5678()
 
     return Partitions(
         (

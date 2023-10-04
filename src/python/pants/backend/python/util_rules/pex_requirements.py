@@ -183,6 +183,7 @@ async def load_lockfile(
     request: LoadedLockfileRequest,
     python_setup: PythonSetup,
 ) -> LoadedLockfile:
+    import pantsdebug; pantsdebug.settrace_5678(True)
     lockfile = request.lockfile
     # TODO: Fold "resource://" URL support into the DownloadFile primitive, instead of
     #  manually handling it here. That would also give us support for https:// URLs for tool

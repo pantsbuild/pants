@@ -2,7 +2,7 @@ import pydevd_pycharm
 import os
 
 
-_should_stop = False
+_should_stop = True
 
 def settrace_5678(stop=None):
     should_stop = stop if stop is not None else _should_stop
