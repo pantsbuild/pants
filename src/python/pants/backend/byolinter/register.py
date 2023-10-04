@@ -13,6 +13,8 @@ confs = [
         help="A shell linter based on your installed shellcheck",
         command="shellcheck",
         file_extensions=[".sh"],
+        file_glob_include=["**/*.sh"],
+        file_glob_exclude=[],
     ),
     ByoLinter(
         options_scope='byo_markdownlint',
@@ -21,6 +23,8 @@ confs = [
         command="markdownlint",
         tools=["node"],
         file_extensions=[".md"],
+        file_glob_include=["**/*.md"],
+        file_glob_exclude=["README.md"],
     )
 ]
 

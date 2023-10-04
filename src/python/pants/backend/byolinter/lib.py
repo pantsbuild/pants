@@ -7,7 +7,8 @@ from pants.core.util_rules.partitions import PartitionerType, Partitions, Partit
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import SEARCH_PATHS, BinaryPathRequest, BinaryPaths, BinaryShimsRequest, \
     BinaryShims
-from pants.engine.internals.native_engine import FilespecMatcher
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.native_engine import FilespecMatcher, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
@@ -24,7 +25,9 @@ class ByoLinter:
     name: str
     help: str
     command: str
-    file_extensions: List[str]
+    file_extensions: List[str]  # deprecate
+    file_glob_include: List[str]
+    file_glob_exclude: List[str]
     tools: List[str] = None
 
     def rules(self):
@@ -55,12 +58,12 @@ def build(conf: ByoLinter):
     fieldset_cls.__module__ = __name__
     fieldset_cls = dataclass(frozen=True)(fieldset_cls)
 
-    lintreq_cls = type(LintTargetsRequest)(f'ByoLint_{conf.options_scope}_Request', (LintTargetsRequest,), dict(
-        tool_subsystem=subsystem_cls,
-        partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION,
-        field_set_type=fieldset_cls,
-    ))
-    lintreq_cls.__module__ = __name__
+    # lintreq_cls = type(LintTargetsRequest)(f'ByoLint_{conf.options_scope}_Request', (LintTargetsRequest,), dict(
+    #     tool_subsystem=subsystem_cls,
+    #     partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION,
+    #     field_set_type=fieldset_cls,
+    # ))
+    # lintreq_cls.__module__ = __name__
 
     lint_files_req_cls = type(LintFilesRequest)(f'ByoLint_{conf.options_scope}_Request', (LintFilesRequest,), dict(
         tool_subsystem=subsystem_cls,
@@ -76,21 +79,21 @@ def build(conf: ByoLinter):
             return Partitions()
 
         matching_filepaths = FilespecMatcher(
-            includes=subsystem.file_glob_include, excludes=subsystem.file_glob_exclude
+            includes=conf.file_glob_include, excludes=conf.file_glob_exclude
         ).matches(request.files)
 
         return Partitions.single_partition(sorted(matching_filepaths))
 
-
     @rule(canonical_name_suffix=conf.options_scope)
     async def run_ByoLint(
-            request: lintreq_cls.Batch,
+            request: lint_files_req_cls.Batch,
     ) -> LintResult:
 
-        sources = await Get(
-            SourceFiles,
-            SourceFilesRequest(field_set.source for field_set in request.elements),
-        )
+        # sources = await Get(
+        #     SourceFiles,
+        #     SourceFilesRequest(field_set.source for field_set in request.elements),
+        # )
+        sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
 
         # Currently the hard-coded one but probably should become the
         # shell search path based one.
@@ -116,13 +119,13 @@ def build(conf: ByoLinter):
             tools_path_env = {'PATH': resolved_tools.path_component}
             tools_input_digests = resolved_tools.immutable_input_digests
 
-        input_digest = sources.snapshot.digest
+        input_digest = sources_snapshot.digest
 
         import pantsdebug; pantsdebug.settrace_5678()
         process_result = await Get(
             FallibleProcessResult,
             Process(
-                argv=(command_path, *sources.files),
+                argv=(command_path, *sources_snapshot.files),
                 input_digest=input_digest,
                 description=f"Run {conf.name}",
                 level=LogLevel.INFO,
@@ -136,7 +139,7 @@ def build(conf: ByoLinter):
 
     return [
         *collect_rules(namespace),
-        *lintreq_cls.rules()
+        *lint_files_req_cls.rules()
     ]
 
 
