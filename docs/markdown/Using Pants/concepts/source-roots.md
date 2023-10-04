@@ -4,7 +4,6 @@ slug: "source-roots"
 excerpt: "Configuring Pants to understand your imports."
 hidden: false
 createdAt: "2020-02-21T17:44:27.655Z"
-updatedAt: "2022-02-08T22:56:49.862Z"
 ---
 > 📘 Go and Shell can skip this page
 > 
@@ -52,10 +51,10 @@ There are two ways to configure source roots:
 - Using patterns
 - Using marker files
 
-You can mix and match between both styles. Run `./pants roots` to see what Pants is using:
+You can mix and match between both styles. Run `pants roots` to see what Pants is using:
 
 ```
-./pants roots
+pants roots
 src/assets
 src/python
 src/rust
@@ -163,10 +162,10 @@ We could use this config:
 marker_filenames = ["setup.py"]
 ```
 
-We can then run `./pants roots` to find these source roots used:
+We can then run `pants roots` to find these source roots used:
 
 ```
-./pants roots
+pants roots
 server
 utils
 ```
@@ -303,7 +302,7 @@ from base.models.user import User
 from base.util.math import add_two
 ```
 
-Note that even though the projects live in different top-level folders, you are still able to import from other projects. If you would like to limit this, you can use `./pants dependents` or `./pants dependencies` in CI to track where imports are being used. See [Project introspection](doc:project-introspection).
+Note that even though the projects live in different top-level folders, you are still able to import from other projects. If you would like to limit this, you can use `pants dependents` or `pants dependencies` in CI to track where imports are being used. See [Project introspection](doc:project-introspection).
 
 ### Config:
 

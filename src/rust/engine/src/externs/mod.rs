@@ -10,7 +10,7 @@ use std::convert::TryInto;
 use std::fmt;
 
 use lazy_static::lazy_static;
-use pyo3::exceptions::{PyException, PyTypeError};
+use pyo3::exceptions::{PyAssertionError, PyException, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
@@ -23,20 +23,28 @@ use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
 
 mod address;
+pub mod dep_inference;
 pub mod engine_aware;
 pub mod fs;
 mod interface;
 #[cfg(test)]
 mod interface_tests;
 pub mod nailgun;
+mod pantsd;
 pub mod process;
 pub mod scheduler;
 mod stdio;
+mod target;
 pub mod testutil;
 pub mod workunits;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add_class::<PyFailure>()?;
+  m.add_class::<PyGeneratorResponseBreak>()?;
+  m.add_class::<PyGeneratorResponseCall>()?;
+  m.add_class::<PyGeneratorResponseGet>()?;
+  m.add_class::<PyGeneratorResponseGetMulti>()?;
+
   m.add("EngineError", py.get_type::<EngineError>())?;
   m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
   m.add(
@@ -61,7 +69,7 @@ impl PyFailure {
     match &self.0 {
       Failure::Throw { val, .. } => val.into_py(py),
       f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
-        EngineError::new_err(format!("{}", f))
+        EngineError::new_err(format!("{f}"))
       }
     }
   }
@@ -159,7 +167,7 @@ where
 {
   value
     .getattr(field)
-    .map_err(|e| format!("Could not get field `{}`: {:?}", field, e))?
+    .map_err(|e| format!("Could not get field `{field}`: {e:?}"))?
     .extract::<T>()
     .map_err(|e| {
       format!(
@@ -211,14 +219,10 @@ pub fn getattr_from_str_frozendict<'p, T: FromPyObject<'p>>(
     .collect()
 }
 
-pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> Option<String> {
-  let v = value.getattr(field).unwrap();
-  if v.is_none() {
-    return None;
-  }
+pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> PyResult<Option<String>> {
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
-  Some(v.extract().unwrap())
+  value.getattr(field)?.extract()
 }
 
 /// Call the equivalent of `str()` on an arbitrary Python object.
@@ -270,10 +274,9 @@ pub fn generator_send(
     (Some(arg), None) => arg.to_object(py),
     (None, Some(err)) => err.into_py(py),
     (None, None) => py.None(),
-    (Some(arg), Some(err)) => panic!(
-      "generator_send got both value and error: arg={:?}, err={:?}",
-      arg, err
-    ),
+    (Some(arg), Some(err)) => {
+      panic!("generator_send got both value and error: arg={arg:?}, err={err:?}")
+    }
   };
   let response = native_engine_generator_send
     .call1((generator.to_object(py), py_arg))
@@ -284,6 +287,10 @@ pub fn generator_send(
       Value::new(b.0.clone_ref(py)),
       TypeId::new(b.0.as_ref(py).get_type()),
     ))
+  } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>() {
+    // TODO: When we begin using https://github.com/pantsbuild/pants/pull/19755, this will likely
+    // use a different syntax.
+    Ok(GeneratorResponse::Get(call.take()?))
   } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
     Ok(GeneratorResponse::Get(get.take()?))
   } else if let Ok(get_multi) = response.extract::<PyRef<PyGeneratorResponseGetMulti>>() {
@@ -301,10 +308,7 @@ pub fn generator_send(
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
   } else {
-    panic!(
-      "native_engine_generator_send returned unrecognized type: {:?}",
-      response
-    );
+    panic!("native_engine_generator_send returned unrecognized type: {response:?}");
   }
 }
 
@@ -338,6 +342,124 @@ impl PyGeneratorResponseBreak {
   }
 }
 
+/// Interprets the `Get` and `implicitly(..)` syntax, which reduces to two optional positional
+/// arguments, and results in input types and inputs.
+#[allow(clippy::type_complexity)]
+fn interpret_get_inputs(
+  py: Python,
+  input_arg0: Option<&PyAny>,
+  input_arg1: Option<&PyAny>,
+) -> PyResult<(SmallVec<[TypeId; 2]>, SmallVec<[Key; 2]>)> {
+  match (input_arg0, input_arg1) {
+    (None, None) => Ok((smallvec![], smallvec![])),
+    (None, Some(_)) => Err(PyAssertionError::new_err(
+      "input_arg1 set, but input_arg0 was None. This should not happen with PyO3.",
+    )),
+    (Some(input_arg0), None) => {
+      if input_arg0.is_instance_of::<PyType>() {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the shorthand form \
+            Get(OutputType, InputType(constructor args)), the second argument should be \
+            a constructor call, rather than a type, but given {input_arg0}."
+        )));
+      }
+      if let Ok(d) = input_arg0.downcast::<PyDict>() {
+        let mut input_types = SmallVec::new();
+        let mut inputs = SmallVec::new();
+        for (value, declared_type) in d.iter() {
+          input_types.push(TypeId::new(declared_type.downcast::<PyType>().map_err(
+            |_| {
+              PyTypeError::new_err(
+                "Invalid Get. Because the second argument was a dict, we expected the keys of the \
+            dict to be the Get inputs, and the values of the dict to be the declared \
+            types of those inputs.",
+              )
+            },
+          )?));
+          inputs.push(INTERNS.key_insert(py, value.into())?);
+        }
+        Ok((input_types, inputs))
+      } else {
+        Ok((
+          smallvec![TypeId::new(input_arg0.get_type())],
+          smallvec![INTERNS.key_insert(py, input_arg0.into())?],
+        ))
+      }
+    }
+    (Some(input_arg0), Some(input_arg1)) => {
+      let declared_type = input_arg0.downcast::<PyType>().map_err(|_| {
+        let input_arg0_type = input_arg0.get_type();
+        PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
+          input), the second argument must be a type, but given `{input_arg0}` of type \
+          {input_arg0_type}."
+        ))
+      })?;
+
+      if input_arg1.is_instance_of::<PyType>() {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the longhand form \
+          Get(OutputType, InputType, input), the third argument should be \
+          an object, rather than a type, but given {input_arg1}."
+        )));
+      }
+
+      let actual_type = input_arg1.get_type();
+      if !declared_type.is(actual_type) && !is_union(py, declared_type)? {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
+          second argument, {declared_type}, but had the type {actual_type}."
+        )));
+      }
+
+      Ok((
+        smallvec![TypeId::new(declared_type)],
+        smallvec![INTERNS.key_insert(py, input_arg1.into())?],
+      ))
+    }
+  }
+}
+
+#[pyclass(subclass)]
+pub struct PyGeneratorResponseCall {
+  output_type: Option<TypeId>,
+  input_types: SmallVec<[TypeId; 2]>,
+  inputs: SmallVec<[Key; 2]>,
+}
+
+#[pymethods]
+impl PyGeneratorResponseCall {
+  #[new]
+  fn __new__(py: Python, input_arg0: Option<&PyAny>, input_arg1: Option<&PyAny>) -> PyResult<Self> {
+    let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
+
+    Ok(Self {
+      output_type: None,
+      input_types,
+      inputs,
+    })
+  }
+
+  fn set_output_type(&mut self, output_type: &PyType) {
+    self.output_type = Some(TypeId::new(output_type))
+  }
+}
+
+impl PyGeneratorResponseCall {
+  fn take(&self) -> Result<Get, String> {
+    if let Some(output_type) = self.output_type {
+      Ok(Get {
+        output: output_type,
+        // TODO: Similar to `PyGeneratorResponseGet::take`, this should avoid these clones.
+        input_types: self.input_types.clone(),
+        inputs: self.inputs.clone(),
+      })
+    } else {
+      Err("Cannot convert a Call into a Get until its output_type has been set.".to_owned())
+    }
+  }
+}
+
 // Contains a `RefCell<Option<Get>>` in order to allow us to `take` the content without cloning.
 #[pyclass(subclass)]
 pub struct PyGeneratorResponseGet(RefCell<Option<Get>>);
@@ -358,10 +480,10 @@ impl PyGeneratorResponseGet {
   fn __new__(
     py: Python,
     product: &PyAny,
-    input_arg0: &PyAny,
+    input_arg0: Option<&PyAny>,
     input_arg1: Option<&PyAny>,
   ) -> PyResult<Self> {
-    let product = product.cast_as::<PyType>().map_err(|_| {
+    let product = product.downcast::<PyType>().map_err(|_| {
       let actual_type = product.get_type();
       PyTypeError::new_err(format!(
         "Invalid Get. The first argument (the output type) must be a type, but given \
@@ -370,64 +492,7 @@ impl PyGeneratorResponseGet {
     })?;
     let output = TypeId::new(product);
 
-    let (input_types, inputs) = if let Some(input_arg1) = input_arg1 {
-      let declared_type = input_arg0.cast_as::<PyType>().map_err(|_| {
-        let input_arg0_type = input_arg0.get_type();
-        PyTypeError::new_err(format!(
-          "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
-          input), the second argument must be a type, but given `{input_arg0}` of type \
-          {input_arg0_type}."
-        ))
-      })?;
-
-      if input_arg1.is_instance_of::<PyType>()? {
-        return Err(PyTypeError::new_err(format!(
-          "Invalid Get. Because you are using the longhand form \
-          Get(OutputType, InputType, input), the third argument should be \
-          an object, rather than a type, but given {input_arg1}."
-        )));
-      }
-
-      let actual_type = input_arg1.get_type();
-      if !declared_type.is(actual_type) && !is_union(py, declared_type)? {
-        return Err(PyTypeError::new_err(format!(
-          "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
-          second argument, {declared_type}, but had the type {actual_type}."
-        )));
-      }
-
-      (
-        smallvec![TypeId::new(declared_type)],
-        smallvec![INTERNS.key_insert(py, input_arg1.into())?],
-      )
-    } else if input_arg0.is_instance_of::<PyType>()? {
-      return Err(PyTypeError::new_err(format!(
-        "Invalid Get. Because you are using the shorthand form \
-          Get(OutputType, InputType(constructor args)), the second argument should be \
-          a constructor call, rather than a type, but given {input_arg0}."
-      )));
-    } else if let Ok(d) = input_arg0.cast_as::<PyDict>() {
-      let mut input_types = SmallVec::new();
-      let mut inputs = SmallVec::new();
-      for (value, declared_type) in d.iter() {
-        input_types.push(TypeId::new(declared_type.cast_as::<PyType>().map_err(
-          |_| {
-            PyTypeError::new_err(
-              "Invalid Get. Because the second argument was a dict, we expected the keys of the \
-            dict to be the Get inputs, and the values of the dict to be the declared \
-            types of those inputs.",
-            )
-          },
-        )?));
-        inputs.push(INTERNS.key_insert(py, value.into())?);
-      }
-      (input_types, inputs)
-    } else {
-      (
-        smallvec![TypeId::new(input_arg0.get_type())],
-        smallvec![INTERNS.key_insert(py, input_arg0.into())?],
-      )
-    };
+    let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
     Ok(Self(RefCell::new(Some(Get {
       output,

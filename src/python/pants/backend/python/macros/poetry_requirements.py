@@ -21,7 +21,6 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.macros.common_requirements_rule import _generate_requirements
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementTarget
 from pants.base.build_root import BuildRoot
@@ -35,6 +34,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -254,7 +254,7 @@ def add_markers(base: str, attributes: PyprojectAttr, fp) -> str:
     if not markers_lookup and not python_lookup:
         return base
 
-    result = f"{base};("
+    result = f"{base} ;("
 
     if markers_lookup:
         result += f"{markers_lookup})"
@@ -328,7 +328,6 @@ def parse_single_dependency(
     attributes: str | Mapping[str, str | Sequence] | Sequence[Mapping[str, str | Sequence]],
     pyproject_toml: PyProjectToml,
 ) -> Iterator[PipRequirement]:
-
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
         yield PipRequirement.parse(
@@ -434,7 +433,7 @@ class PoetryRequirementsSourceField(SingleSourceField):
 
 class PoetryRequirementsTargetGenerator(TargetGenerator):
     alias = "poetry_requirements"
-    help = "Generate a `python_requirement` for each entry in a Poetry pyproject.toml."
+    help = "Generate a `python_requirement` for each entry in a Poetry `pyproject.toml`."
     generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
     core_fields = (

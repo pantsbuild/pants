@@ -4,17 +4,16 @@ slug: "python-third-party-dependencies"
 excerpt: "How to use third-party Python libraries in your project."
 hidden: false
 createdAt: "2020-04-30T20:06:43.633Z"
-updatedAt: "2022-07-25T15:27:26.087Z"
 ---
-Pants handles dependencies with more precision than traditional Python workflows. Traditionally, you have a single heavyweight [virtual environment](https://docs.python.org/3/tutorial/venv.html) that includes a large set of dependencies, whether or not you actually need them for your current task. 
+Pants handles dependencies with more precision than traditional Python workflows. Traditionally, you have a single heavyweight [virtual environment](https://docs.python.org/3/tutorial/venv.html) that includes a large set of dependencies, whether or not you actually need them for your current task.
 
 Instead, Pants understands exactly which dependencies every file in your project needs, and efficiently uses just that subset of dependencies needed for the task.
 
 ```
-❯ ./pants dependencies src/py/util.py
+❯ pants dependencies src/py/util.py
 3rdparty/py#requests
 
-❯ ./pants dependencies --transitive src/py/app.py
+❯ pants dependencies --transitive src/py/app.py
 3rdparty/py#flask
 3rdparty/py#requests
 ```
@@ -24,7 +23,7 @@ Among other benefits, this precise and automatic understanding of your dependenc
 Teaching Pants your "universe"(s) of dependencies
 -------------------------------------------------
 
-For Pants to know which dependencies each file uses, it must first know which specific dependencies are in your "universe", i.e. all the third-party dependencies your project directly uses. 
+For Pants to know which dependencies each file uses, it must first know which specific dependencies are in your "universe", that is, all the third-party dependencies your project directly uses.
 
 By default, Pants uses a single universe for your whole project, but it's possible to set up multiple. See the header "Multiple resolves" in the "Lockfiles" section.
 
@@ -37,16 +36,16 @@ python_requirement(
 )
 ```
 
-You do not need a `python_requirement` target for transitive dependencies, i.e. requirements that you do not directly import.
+You do not need a `python_requirement` target for transitive dependencies, that is, requirements that you do not directly import.
 
 To minimize boilerplate, Pants has target generators to generate `python_requirement` targets for you:
 
-- `python_requirements` for `requirements.txt`.
+- `python_requirements` for `requirements.txt` or [PEP 621](https://peps.python.org/pep-0621/)-compliant `pyproject.toml`.
 - `poetry_requirements` for Poetry projects.
 
 ### `requirements.txt`
 
-The `python_requirements()` target generator parses a [`requirements.txt`-style file](https://pip.pypa.io/en/stable/user_guide/#requirements-files) to produce a `python_requirement` target for each entry. 
+The `python_requirements()` target generator parses a [`requirements.txt`-style file](https://pip.pypa.io/en/stable/user_guide/#requirements-files) to produce a `python_requirement` target for each entry.
 
 For example:
 
@@ -85,12 +84,55 @@ python_requirements(source="reqs.txt")
 ```
 
 > 📘 Where should I put the `requirements.txt`?
-> 
+>
 > You can name the file whatever you want, and put it wherever makes the most sense for your project.
-> 
+>
 > In smaller repositories that only use Python, it's often convenient to put the file at the "build root" (top-level), as used on this page.
-> 
+>
 > For larger repositories or multilingual repositories, it's often useful to have a `3rdparty` or `3rdparty/python` directory. Rather than the target's address being `//:reqs#my_requirement`, its address would be `3rdparty/python:reqs#my_requirement`, for example; or `3rdparty/python#my_requirement` if you leave off the `name` field for `python_requirements`. See [Target Generation](doc:targets#target-generation).
+
+### PEP 621-compliant `pyproject.toml`
+
+The `python_requirements()` target generator also supports parsing dependencies from a [PEP 621](https://peps.python.org/pep-0621/)-compliant `pyproject.toml`. You must manually specify the source file if you want to use a `pyproject.toml` file to generate `python_requirement` targets. For example:
+
+```python
+python_requirements(source="pyproject.toml")
+```
+
+Further information about PEP 621 fields can be found in the PEP documentation. Pants will read dependencies from the `project.dependencies` list, as well as the `project.optional-dependencies` mappings. Pants makes no distinction between `dependencies` and `optional-dependencies`, all dependencies are treated in the same manner as though they were listed in the `dependencies` list. For example:
+
+```toml pyproject.toml
+[project]
+dependencies = [
+    "flask>=1.1.2,<1.3",
+    "requests[security]==2.23.0",
+]
+
+[project.optional-dependencies]
+dataclass = ["dataclasses ; python_version<'3.7'"]
+```
+```python BUILD
+# This will generate three targets:
+#
+#  - //:reqs#flask
+#  - //:reqs#requests
+#  - //:reqs#dataclasses
+python_requirements(source="pyproject.toml")
+
+# The above target generator is spiritually equivalent to this:
+python_requirement(
+    name="flask",
+    requirements=["flask>=1.1.2,<1.3"],
+)
+python_requirement(
+    name="requests",
+    requirements=["requests[security]==2.23.0"],
+)
+python_requirement(
+    name="dataclasses",
+    requirements=["dataclasses ; python_version<'3.7'"],
+)
+```
 
 ### Poetry
 
@@ -128,12 +170,12 @@ python_requirement(
 )
 ```
 
-Note that Pants does not consume your `poetry.lock` file. Instead, see the [section on lockfiles](#lockfiles) below.
+Note that Pants does not consume your `poetry.lock` file. Instead, see the [page on lockfiles](doc:python-lockfiles).
 
 How dependencies are chosen
 ---------------------------
 
-Once Pants knows about your "universe"(s) of dependencies, it determines which subset should be used through [dependency inference](https://blog.pantsbuild.org/dependency-inference/). Pants will read your import statements, like `import django`, and map it back to the relevant `python_requirement` target. Run [`./pants dependencies path/to/file.py`](doc:project-introspection) or `./pants dependencies path/to:target` to confirm this works.
+Once Pants knows about your "universe"(s) of dependencies, it determines which subset should be used through [dependency inference](https://blog.pantsbuild.org/dependency-inference/). Pants will read your import statements, like `import django`, and map it back to the relevant `python_requirement` target. Run [`pants dependencies path/to/file.py`](doc:project-introspection) or `pants dependencies path/to:target` to confirm this works.
 
 If dependency inference does not work—such as because it's a runtime dependency you do not import—you can explicitly add the `python_requirement` target to the `dependencies` field, like this:
 
@@ -143,7 +185,7 @@ python_sources(
     dependencies=[
         # We don't have an import statement for this dep, so inference
         # won't add it automatically. We add it explicitly instead.
-        "3rdparty/python#psyscopg2-binary",
+        "3rdparty/python#psycopg2-binary",
     ],
 )
 ```
@@ -155,7 +197,7 @@ Some dependencies expose a module different than their project name, such as `be
 Pants already defines a [default module mapping](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/python/dependency_inference/default_module_mapping.py) for some common Python requirements, but you may need to augment this by teaching Pants additional mappings:
 
 ```python 3rdparty/python/BUILD
-# `modules` and `module_mapping` is only needed for requirements where 
+# `modules` and `module_mapping` is only needed for requirements where
 # the defaults do not work.
 
 python_requirement(
@@ -181,193 +223,14 @@ If the dependency is a type stub, and the default does not work, set `type_stub_
 
 It's invalid in Python to have conflicting versions of the same requirement, e.g. `Django==2` and `Django==3`. Instead, Pants supports "multiple resolves" (i.e. multiple lockfiles), as explained in the below section on lockfiles.
 
-When you have multiple targets for the same dependency and they belong to the same resolve ("lockfile"), dependency inference will not work due to ambiguity. If you're using lockfiles—which we strongly recommend—the solution is to set the `resolve` field for problematic `python_requirement` targets so that each resolve has only one requirement and there is no ambiguity.  
+When you have multiple targets for the same dependency and they belong to the same [resolve](doc:python-lockfiles), dependency inference will not work due to ambiguity. If you're using lockfiles—which we strongly recommend—the solution is to set the `resolve` field for problematic `python_requirement` targets so that each resolve has only one requirement and there is no ambiguity.
 
 This ambiguity is often a problem when you have 2+ `requirements.txt` or `pyproject.toml` files in your project, such as `project1/requirements.txt` and `project2/requirements.txt` both specifying `django`. You may want to set up each `poetry_requirements`/`python_requirements` target generator to use a distinct resolve so that there is no overlap. Alternatively, if the versions are the same, you may want to consolidate the requirements into a common file.
 
 Lockfiles
 ---------
 
-We strongly recommend using lockfiles because they make your builds [more stable](https://classic.yarnpkg.com/blog/2016/11/24/lockfiles-for-all/) so that new releases of dependencies will not break your project. They also reduce the risk of [supply chain attacks](https://docs.microsoft.com/en-us/windows/security/threat-protection/intelligence/supply-chain-malware).
-
-Pants has two types of lockfiles:
-
-- User lockfiles, for your own code such as packaging binaries and running tests.
-- Tool lockfiles, to install tools that Pants runs like Pytest and Flake8.
-
-With both types of lockfiles, Pants can generate the lockfile for you with the `generate-lockfiles` goal.
-
-### User lockfiles
-
-First, set `[python].enable_resolves` in `pants.toml`:
-
-```toml
-[python]
-enable_resolves = true
-```
-
-By default, Pants will write the lockfile to `3rdparty/python/default.lock`. If you want a different location, change `[python].resolves` like this:
-
-```toml
-[python]
-enable_resolves = true
-
-[python.resolves]
-python-default = "lockfile_path.lock" 
-```
-
-Then, use `./pants generate-lockfiles` to generate the lockfile.
-
-```
-❯ ./pants generate-lockfiles
-19:00:39.26 [INFO] Completed: Generate lockfile for python-default
-19:00:39.29 [INFO] Wrote lockfile for the resolve `python-default` to 3rdparty/python/default.lock
-```
-
-> 📘 FYI: user lockfiles improve performance
-> 
-> As explained at the top of these docs, Pants only uses the subset of the "universe" of your
-> dependencies that is actually needed for a build, such as running tests and packaging a wheel
-> file. This gives fine-grained caching and has other benefits like built packages
-> (e.g. PEX binaries) only including their true dependencies.
-> 
-> Without lockfiles, Pants must "resolve" the unique dependencies for each task, which involves
-> often-slow steps like choosing which versions of transitive dependencies to install.
->
-> Instead, with lockfiles, Pants already did the resolve beforehand, so only installs the specific
-> subset of the lockfile relevant to the task.
-
-#### Multiple lockfiles
-
-While it's often desirable to have a single lockfile for the whole repository for simplicity and consistency, sometimes you may need multiple. This is necessary, for example, when you have conflicting versions of requirements, such as one project using Django 2 and other projects using Django 3.
-
-Start by defining multiple "resolves", which are logical names for lockfile paths. For example:
-
-```toml
-[python]
-enable_resolves = true
-default_resolve = "web-app"
-
-[python.resolves]
-data-science = "3rdparty/python/data_science.lock"
-web-app = "3rdparty/python/web_app.lock"
-```
-
-Then, teach Pants which resolves every `python_requirement` target belongs to through the `resolve` field. It will default to `[python].default_resolve`.
-
-```python BUILD
-python_requirement(
-    name="ansicolors",
-    requirements=["ansicolors==1.18"],
-    resolve="web-app",
-)
-
-# Often, you will want to set `resolve` on the 
-# `poetry_requirements` and `python_requirements`
-# target generators.
-poetry_requirements(
-    name="poetry",
-    resolve="data-science",
-    # You can use `overrides` if you only want to change
-    # some targets.
-    overrides={"requests": {"resolve": "web-app"}},
-)
-```
-
-If you want the same requirement to show up in multiple resolves, use the [`parametrize`](doc:targets) mechanism.
-
-```python BUILD
-# The same requirement in multiple resolves:
-python_requirement(
-    name="ansicolors_web-app",
-    requirements=["ansicolors==1.18"],
-    resolve=parametrize("web-app", "data-science")
-)
-
-# You can parametrize target generators, including 
-# via the `overrides` field:
-poetry_requirements(
-    name="poetry",
-    resolve="data-science",
-    overrides={
-        "requests": {
-            "resolve": parametrize("web-app", "data-science")
-        }
-    },
-)
-```
-
-Then, run `./pants generate-lockfiles` to generate the lockfiles. If the results aren't what you'd expect, adjust the prior step.
-
-Finally, update your first-party targets like `python_source` / `python_sources`, `python_test` / `python_tests`, and `pex_binary` to set their `resolve` field. As before, the `resolve` field defaults to `[python].default_resolve`.
-
-```python project/BUILD
-python_sources(
-    resolve="web-app",
-)
-
-python_tests(
-    name="tests",
-    resolve="web-app",
-    # You can use `overrides` to change certain generated targets
-    overrides={"test_utils.py": {"resolve": "data-science"}},
-)
-
-pex_binary(
-    name="main",
-    entry_point="main.py",
-    resolve="web-app",
-)
-```
-
-If a first-party target is compatible with multiple resolves—such as some utility code—you can either use the [`parametrize` mechanism](doc:targets) with the `resolve` field or create distinct targets for the same entity.
-
-All transitive dependencies of a target must use the same resolve. Pants's dependency inference already handles this for you by only inferring dependencies on targets that share the same resolve. If you incorrectly add a target from a different resolve to the `dependencies` field, Pants will error with a helpful message when building your code with goals like `test`, `package`, and `run`.
-
-### Tool lockfiles
-
-Pants distributes a lockfile with each tool by default. However, if you change the tool's `version` and `extra_requirements`—or you change its interpreter constraints to not be compatible with our default lockfile—you will need to use a custom lockfile. Set the `lockfile` option in `pants.toml` for that tool, and then run `./pants generate-lockfiles`.
-
-```toml
-[flake8]
-version = "flake8==3.8.0"
-lockfile = "3rdparty/flake8_lockfile.txt"  # This can be any path you'd like.
-
-[pytest]
-extra_requirements.add = ["pytest-icdiff"]
-lockfile = "3rdparty/pytest_lockfile.txt"
-```
-
-```
-❯  ./pants generate-lockfiles
-19:00:39.26 [INFO] Completed: Generate lockfile for flake8
-19:00:39.27 [INFO] Completed: Generate lockfile for pytest
-19:00:39.29 [INFO] Wrote lockfile for the resolve `flake8` to 3rdparty/flake8_lockfile.txt
-19:00:39.30 [INFO] Wrote lockfile for the resolve `pytest` to 3rdparty/pytest_lockfile.txt
-```
-
-You can also run `./pants generate-lockfiles --resolve=tool`, e.g. `--resolve=flake8`, to only generate that tool's lockfile rather than generating all lockfiles.
-
-Some tools, such as Flake8 and Bandit, need to run on an interpreter compatible with the code they operate on. In this case the tool may not have its own `interpreter_constraints` option, and its lockfile must be compatible with your code's interpreter constraints.
-
-To disable lockfiles entirely for a tool, set `[tool].lockfile = "<none>"` for that tool. Although we do not recommend this!
-
-### Manually generating lockfiles
-
-Rather than using `generate-lockfiles` to generate PEX-style lockfiles, you can manually generate lockfiles. This can be helpful, for example, when adopting Pants in a repository already using Poetry by running `poetry export --dev`.
-
-Manually generated lockfiles must either use Pex's JSON format or use pip's `requirements.txt`-style format (ideally with `--hash` entries for better supply chain security).
-For example:
-
-```text 3rdparty/user_lock.txt
-freezegun==1.2.0 \
-  --hash=sha256:93e90676da3... \
-  --hash=sha256:e19563d0b05...
-```
-
-For manually-generated user lockfiles, set `[python].resolves` to the path of your lockfile(s). Also set `[python].resolves_generate_lockfiles` to `False` so that Pants does not expect its  metadata header. Warning: it will likely be slower to install manually generated user lockfiles than Pex ones because Pants cannot as efficiently extract the subset of requirements used for a particular task; see the option [`[python].run_against_entire_lockfile`](doc:reference-python). 
-
-For manually-generated tool lockfiles, set `[tool].lockfile` to the path of your lockfile, e.g. `[black].lockfile`. Also set `[python].invalid_lockfile_behavior = "error"` so that Pants does not expect metadata headers. Note that this option will disable the check for all lockfiles, including user lockfiles, which may not be desirable. Feel free to open a [GitHub issue](https://github.com/pantsbuild/pants/issues/new) if you want more precise control.
+We strongly recommend using [lockfiles](doc:python-lockfiles) to ensure secure, repeatable dependency resolution. See [here](doc:python-lockfiles) for details on how to do so.
 
 Advanced usage
 --------------
@@ -384,7 +247,7 @@ ModuleNotFoundError: No module named 'pkg_resources'
 To work around this, you can use the `dependencies` field of `python_requirement`, so that anytime you depend on your requirement, you also bring in the undeclared dependency.
 
 ```python BUILD
-# First, make sure you have a `python_requirement` target for 
+# First, make sure you have a `python_requirement` target for
 # the undeclared dependency.
 python_requirement(
     name="setuptools",
@@ -427,15 +290,15 @@ You can install requirements from version control using two styles:
   - `Django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8`
 
 > 📘 Version control via SSH
-> 
+>
 > When using version controlled direct references hosted on private repositories with SSH access:
-> 
+>
 > ```
 > target@ git+ssh://git@github.com:/myorg/myrepo.git@myhash
 > ```
-> 
+>
 > ...you may see errors like:
-> 
+>
 > ```
 >  Complete output (5 lines):
 >   git@github.com: Permission denied (publickey).
@@ -444,9 +307,9 @@ You can install requirements from version control using two styles:
 >   and the repository exists.
 >   ----------------------------------------
 > ```
-> 
+>
 > To fix this, Pants needs to be configured to pass relevant SSH specific environment variables to processes by adding the following to `pants.toml`:
-> 
+>
 > ```
 > [subprocess-environment]
 > env_vars.add = [
@@ -487,7 +350,7 @@ find_links = [
 
 #### Authenticating to custom repos
 
-To authenticate to custom repos, you may need to provide credentials (such as a username and password) in the URL. 
+To authenticate to custom repos, you may need to provide credentials (such as a username and password) in the URL.
 
 You can use [config file `%(env.ENV_VAR)s` interpolation](doc:options#config-file-interpolation) to load the values via environment variables. This avoids checking in sensitive information to version control.
 
@@ -547,12 +410,12 @@ Both approaches require using absolute paths, and the files must exist on your m
 
 #### Working around absolute paths
 
-If you need to share the lockfile on different machines, and you cannot use the same absolute path, then you can use the option `[python-repos].path_mappings` along with `[python-repos].find_links`. (`path_mappings` is not intended for PEP 440 direct requirements.)
+If you need to share a lockfile on different machines, and you cannot use the same absolute path, then you can use the option `[python-repos].path_mappings` along with `[python-repos].find_links`. (`path_mappings` is not intended for PEP 440 direct requirements.)
 
 The `path_mappings` option allows you to substitute a portion of the absolute path with a logical name, which can be set to a different value than your teammates. For example, the path
 `file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could become `file://${WHEELS_DIR}/django-3.1.1-py3-none-any.whl`, where each Pants user defines what `WHEELS_DIR` should be on their machine.
 
-This feature only works when using Pex lockfiles via `[python].resolves` and for tool lockfiles like Pytest and Black.
+This feature only works when using Pex lockfiles via `[python].resolves`.
 
 `[python-repos].path_mappings` expects values in the form `NAME|PATH`, e.g. `WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels`. Also, still use an absolute path for `[python-repos].find_links`.
 
@@ -574,7 +437,7 @@ find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
 path_mappings = ["WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels"]
 ```
 
-After initially setting up `[python-repos].path_mappings` and `[python-repos].find_links`, run `./pants generate-lockfiles` or `./pants generate-lockfiles --resolve=<resolve-name>`. You should see the `path_mappings` key set in the lockfile's JSON.
+After initially setting up `[python-repos].path_mappings` and `[python-repos].find_links`, run `pants generate-lockfiles` or `pants generate-lockfiles --resolve=<resolve-name>`. You should see the `path_mappings` key set in the lockfile's JSON.
 
 ### Constraints files
 
@@ -609,12 +472,12 @@ data-science = ["numpy"]
 
 [python.resolves_to_no_binary]
 pytest = ["pytest-xdist"]
-mypy_extra_type_stubs = ["django-stubs"]
+mypy = ["django-stubs"]
 ```
 
 You can also set the key `__default__` to apply the same value to every resolve by default.
 
-Tip: use `./pants export` to create a virtual environment for IDEs
+Tip: use `pants export` to create a virtual environment for IDEs
 ------------------------------------------------------------------
 
-See [Setting up an IDE](doc:setting-up-an-ide) for more information on `./pants export`. This will create a virtual environment for your user code for compatibility with the rest of the Python ecosystem, e.g. IDEs like Pycharm.
+See [Setting up an IDE](doc:setting-up-an-ide) for more information on `pants export`. This will create a virtual environment for your user code for compatibility with the rest of the Python ecosystem, e.g. IDEs like Pycharm.

@@ -21,7 +21,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class ThriftDependenciesField(Dependencies):
@@ -67,7 +67,7 @@ class ThriftSourceTarget(Target):
         ThriftDependenciesField,
         ThriftSourceField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A single Thrift file used to generate various languages.
 

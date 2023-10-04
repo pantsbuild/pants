@@ -2,12 +2,11 @@
 title: "Validating dependencies"
 slug: "validating-dependencies"
 excerpt: "Validating your code's dependencies."
-hidden: true
+hidden: false
 createdAt: "2022-12-12T09:10:16.427Z"
-updatedAt: "2022-12-12T03:00:53.427Z"
 ---
 
-Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. Using file globs this may be set from entire directory trees down to single files. Targets may be selected not only by its file path but also by target type and tags.
+Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. With these rules a dependency between two files (or targets) may be set for entire directory trees down to single files. A target may be selected not only by its file path but also by target type, name, and tags.
 
 To jump right in, start with [enabling the backend](doc:validating-dependencies#enable-visibility-backend) and add some rules to your BUILD files.
 
@@ -157,6 +156,37 @@ __dependencies_rules__(
 # Due to the `extend=True` flag, which inherits the parent rules after those just declared.
 ```
 
+> 📘 Any rule globs using the declaration path anchoring mode that is inherited using `extend=True` will be anchored to the path of the current BUILD file, not the original one where the rule was extended from.
+>
+> See [glob syntax](doc:targets#glob-syntax) for details on anchoring modes.
+
+For example:
+```python
+# src/BUILD
+__dependencies_rules__(
+  (files,
+    "/relative/to/BUILD/file/**",
+    "!*",
+  ),
+)
+
+# src/subdir/BUILD
+__dependencies_rules__(
+  (resources,
+    "/relative/to/BUILD/file/**",
+    "!*",
+  ),
+  extend=True,
+)
+```
+
+The above rules when applied to `resources` _as well as_ `files` targets in `src/subdir` will allow dependencies only to other targets in the subtree of `src/subdir/relative/to/BUILD/file/` despite the inherited rule declared in `src/BUILD`. For `files` targets in other directories in the `src/` subtree (e.g. `src/another/dir`) dependencies will be allowed only to other targets in the subtree of `src/relative/to/BUILD/file/`.
+
+Keep in mind that visibility rules only operate on direct dependencies - they do not validate dependencies transitively. This is because it would otherwise make it impossible to use private modules. For instance, imagine you have an application stored in `src.app.main`. It needs to access the public modules in the shared library `src.library`. The methods in the public module `src.library.public` make calls to the private modules in that shared library, which means that `src.library.public` depends on `src.library._private`. So when we declare that `src.app.main` may not depend on `src.library._private`, we only forbid the application accessing the private modules directly, since it still needs to access the functionality they provide transitively (but only via the public interface).
+
+If your codebase has a very complex dependency graph, you may need to make sure a given module never reaches some other modules (transitively). For instance, you may need to declare that modules in component `C1` may depend on any module in component `C2` as long as these modules (in `C2`) do not depend (transitively) on any module in component `C3`. This could be necessary if components are deployed separately, for instance, you may package a deployable artifact with components `C1` (full) and `C2` (partial) and another one with components `C2` (partial) and `C3` (full).
+
+In this scenario, you may need to look into alternative solutions to codify these constraints. For example, to check for violations, you could query the dependencies of component `C1` (transitively) using the `dependencies` goal with the `--transitive` option to confirm none of the modules from component `C3` are listed. If there are some, you may find the `paths` goal helpful as it would show you exactly why a certain module from component `C1` depends on a given module in component `C3` if it is unclear. 
 
 Rule sets
 ---------
@@ -180,17 +210,19 @@ __dependencies_rules__(
 )
 ```
 
-The rules are just string values using a [glob syntax](doc:targets#glob-syntax) for pattern matching and may be grouped together for readability (how rules are grouped does not affect how they are applied). The selector is a dictionary value with properties describing what targets its associated rules apply to and together this pair of selector(s) and rules is called a __rule set__. A rule set may have multiple selectors wrapped in a list/tuple.
+The selector and rule share a common syntax (refered to as a __target rule spec__), that is a dictionary value with properties describing what targets it applies to. Together, this pair of selector(s) and rules is called a __rule set__. A rule set may have multiple selectors wrapped in a list/tuple and the rules may be spread out or grouped in any fashion. Grouping rules like this makes it easier to re-use/insert rules from macros or similar.
 
-The selector has three properties: `type`, `tags` and `path`. From the above example, when determining which rule set to apply for the dependencies of `src/a/main.py` Pants will look for the first selector for `src/a/BUILD` that satisifies the properties `type=python_sources`, `tags=["apps"]` and `path=src/a/main.py`. The selection is based on exclusion so only when there is a property value and it doesn't match the targets property it will move on to the next selector, so the lack of a property will be considered to match anything. Consequently an empty selector matches all targets.
+> 📘 An empty selector (`{}` or `""`) will never match anything and is as such pointless and will result in an error.
+>
+> For every dependency link, only a single set of rules will ever be applied. The first rule set
+> with a matching selector will be the only one used and any remaining rule sets are never
+> consulted.
 
-The values of a selector supports wildcard patterns (or globs) in order to have a single selector match multiple different targets. The `path` property uses the same [glob syntax](doc:targets#glob-syntax) as the rules, while `type` and `tags` use a simpler one described below. When listing multiple values for the `tags` property, the target must have all of them in order to match. Spread the tags over multiple selectors in order to switch from AND to OR as required. The target `type` to match against will be that of the type used in the BUILD file, as the path (and target address) may refer to a generated target it is the target generators type that will be used during the selector matching process.
+The __target rule spec__ has four properties: `type`, `name`, `tags`, and `path`. From the above example, when determining which rule set to apply for the dependencies of `src/a/main.py` Pants will look for the first selector for `src/a/BUILD` that satisifies the properties `type=python_sources`, `tags=["apps"]`, and `path=src/a/main.py`. The selection is based on exclusion so only when there is a property value and it doesn't match the target's property it will move on to the next selector; the lack of a property will be considered to match anything. Consequently an empty target spec would match all targets, but this is disallowed and will raise an error if used because it is conceptually not very clear when reading the rules.
 
-The simpler glob syntax used by the `type` and `tags` selector values supports `*` as a match anything and is otherwise case sensitive. (implementation detail: it relies on the `fnmatch` python library so there is a bit more syntax available, but if you find yourself using more than `*` please let us know in case we switch to something else).
+The values of a __target rule spec__ supports wildcard patterns (or globs) in order to have a single selector match multiple different targets, as described in [glob syntax](doc:targets#glob-syntax). When listing multiple values for the `tags` property, the target must have all of them in order to match. Spread the tags over multiple selectors in order to switch from _AND_ to _OR_ as required. The target `type` to match against will be that of the type used in the BUILD file, as the path (and target address) may refer to a generated target it is the target generators type that will be used during the selector matching process.
 
-### NOTE/TODO: maybe drop the use of `fnmatch` entirely, as supporting just `*` is real easy.
-
-The selectors are matched against the target in the order they are defined in the BUILD file, and the first rule set with a selector that is a match will be selected. The rules from the selected rule set is then matched in order against the path of the **target on the other end** of the dependency link. This is worth reading again; Using the above example again, the rules defined in `src/a/BUILD` will be matched against `src/b/lib.py` while the `path` selector will be matched against `src/a/main.py`.
+The selectors are matched against the target in the order they are defined in the BUILD file, and the first rule set with a selector that is a match will be selected. The rules from the selected rule set is then matched in order against the path of the **target on the other end** of the dependency link. This is worth reading again; Using the above example, the rules defined in `src/a/BUILD` will be matched against `src/b/lib.py` while the `path` selector will be matched against `src/a/main.py`.
 
 Providing some example rule sets for the above example (see [rule actions](doc:targets#rule-actions) on how to mark a rule as "allow" or "deny"):
 
@@ -206,7 +238,7 @@ __dependencies_rules__(
 
   # We need another rule set, in case we have non-python sources in here, to avoid fall-through.
   # Sticking in a generic catch-all allow-all rule.
-  ({}, "*"),
+  ("*", "*"),
 )
 
 
@@ -216,7 +248,9 @@ __dependents_rules__(
     (  # Using multiple selectors
       {"type": "python_*", "tags":["any-python"]},
       {"type": "*", "tags":["libs"]},
-      {"path": "special-cased.py"}
+      {"path": "special-cased.py"},
+      {"name": "my-target-name"},
+      {"path": "//src/**", "name": "named-*"},
     ),
     (  # Grouping rules for readability
       (  # Deny rules
@@ -231,17 +265,22 @@ __dependents_rules__(
 
   # We need another rule set, in case we have non-python sources in here, to avoid fall-through.
   # Sticking in a generic catch-all allow-all rule.
-  ({}, "*"),
+  ("*", "*"),
 )
 ```
 
-There are some syntactic sugar for selectors so they may be declared in a more concise text form rather than as a dictionary (this is also the form on which they are presented in messages from Pants, when possible). The syntax is `<type>(<tags>, ...)[<path>]`. With all parts optional, so `""` is a valid catch-all selector. Providing all the selectors from the previous example code block in string form for reference:
+There is some syntactic sugar for __target rule specs__ so they may be declared in a more concise text form rather than as a dictionary (we have used this text form for the rules already--this is also the form in which they are presented in messages from Pants, when possible). The syntax is `<type>[path:name](tags, ...)`. Empty parts are optional and can be left out, and if only `path` (and/or `name`) is provided the enclosing square brackets are optional. For reference, the string form of the selectors in the previous example code block would look like this:
 
 ```python
-python_sources  # {"type": python_sources}  -- target types works as strings when used bare
-"python_*(any-python)"  # {"type": "python_*", "tags":["any-python"]}
-"*(libs)"  # {"type": "*", "tags":["libs"]}
-"[special-cased.py]"  # {"path": "special-cased.py"}
+python_sources            # {"type": python_sources}  -- target types works as strings when used bare
+"<python_sources>"        # {"type": "python_sources"}
+"<python_*>(any-python)"  # {"type": "python_*", "tags":["any-python"]}
+"<*>(libs)"               # {"type": "*", "tags":["libs"]}
+"[special-cased.py]"      # {"path": "special-cased.py"}
+# May omit square brackets when only providing a path and/or name:
+"special-cased.py"        # {"path": "special-cased.py"}
+":my-target-name"         # {"name": "my-target-name"}
+"//src/**:named-*"        # {"path": "//src/**", "name": "named-*"}
 ```
 
 The previous example, using this alternative syntax for the selectors, would look like:
@@ -249,9 +288,11 @@ The previous example, using this alternative syntax for the selectors, would loo
 ```python
   (
     (  # Using multiple selectors
-      "python_*(any-python)",
-      "*(libs)",
-      "[special-cased.py]",
+      "<python_*>(any-python)",
+      "<*>(libs)",
+      "special-cased.py",
+      ":my-target-name",
+      "//src/**:named-*",
     ),
     ...
   )
@@ -261,7 +302,10 @@ The previous example, using this alternative syntax for the selectors, would loo
 Glob syntax
 -----------
 
-The visibility rules support a basic glob syntax, using `*` as a match anything non-recursively with the `**` variant being for a recursive match anything. All rules are matched until the end of the path it is being applied to, so if there is not trailing wildcard (`*` or `**`) the end of the rule glob will match the end of the path. This allows for matching on file types/names regardless of where in the project tree they are:
+The visibility rules are all about matching globs. There are two wildcards: the `*` matches anything except `/`, and the `**` matches anything including `/`. (For paths that is non-recursive and recursive globbing respectively.)
+
+A glob is matched until the end of the value it is being applied to, so if there is no trailing wildcard (`*` or `**`) on the end of the path glob, it will match to the end of the value. An example where this is useful is for matching on file names regardless of where in the project tree they are:
+
 ```
 .py
 my_source.py
@@ -272,11 +316,7 @@ Any leading wildcards may be used to emphasize this if desired, but will functio
 ```
 *.py
 */my_source.py
-*/my_*.py
-
-**/*.py
-**/*my_source.py
-**/*my_*.py
+**/my_*.py
 ```
 
 When providing a file name, like `my_source.py` it will be assumed that it will be the full name, so `another_my_source.py` will _not_ be considered a match in that case.
@@ -288,7 +328,7 @@ some/directory/*
 
 So far the rule globs have been matched from anywhere in the matched to path up to the end. To ensure the path begins with a certain pattern we'd have to provide full paths in our rules, like `src/python/proj/lib/file.py` if we want to make sure that our `file.py` is from the `src/` tree. To avoid lengthy and rigid rule globs hurting refactorings etc, there's a concept of "anchoring" the rule. That will apply the rule glob from a fixed point in the matched to path, and there are three such points: project root, rule declaration path and rule invocation path. The difference between declaration and invocation is explained below.
 
-#### Anchoring mode
+#### Anchoring mode for path globs
 
 The glob prefix specifies which "anchoring mode" to use, and are:
 
@@ -296,8 +336,10 @@ The glob prefix specifies which "anchoring mode" to use, and are:
   Example: `//src/python/**` will match all files from the `src/python/` tree.
 
 - `/` - Anchor the glob to the declaration path.
-  This is the path of the BUILD file where the rule is declared, using one of the rules keywords (i.e. `__dependencies_rules__` or `__dependents_rules__`)
+  This is the path of the BUILD file where the rule is declared or extended to, using one of the rules keywords (i.e. `__dependencies_rules__` or `__dependents_rules__`)
   Example: in `src/python/BUILD` there is a rule `/proj/**` which will match all files from the `src/python/proj/` tree.
+
+  Note: When a rule is extended (using `extend=True` in a rules keyword), it is treated as declared in that new BUILD with the `extend=True` argument.
 
 - `.` - Anchor the glob to the invocation path.
   This is the file path of the target for which the rule will apply for. Relative paths are supported, so `../../cousin/path` is valid.
@@ -324,10 +366,10 @@ __dependents_rules__(
     (
       # List libraries this rule set applies to,
       # here using various anchor modes and patterns for illustration purposes.
-      "[//example/reqs#click"],
-      "[/reqs#ansicolors]",
-      "[#requests]",
-      "[setuptools]",
+      "//example/reqs#click",
+      "/reqs#ansicolors",
+      "#requests",
+      "setuptools",
       ...
     ),
     "src/cli/**",

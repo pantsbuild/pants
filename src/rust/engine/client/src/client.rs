@@ -7,22 +7,7 @@ use std::time::SystemTime;
 use log::debug;
 
 use nailgun::NailgunClientError;
-
-pub struct ConnectionSettings {
-  pub port: u16,
-  pub timeout_limit: f64,
-  pub dynamic_ui: bool,
-}
-
-impl ConnectionSettings {
-  pub fn new(port: u16) -> ConnectionSettings {
-    ConnectionSettings {
-      port,
-      timeout_limit: 60.0,
-      dynamic_ui: true,
-    }
-  }
-}
+use pantsd::ConnectionSettings;
 
 pub async fn execute_command(
   start: SystemTime,
@@ -34,7 +19,7 @@ pub async fn execute_command(
     "PANTSD_RUNTRACKER_CLIENT_START_TIME".to_owned(),
     start
       .duration_since(SystemTime::UNIX_EPOCH)
-      .map_err(|e| format!("Failed to determine current time: {err}", err = e))?
+      .map_err(|e| format!("Failed to determine current time: {e}"))?
       .as_secs_f64()
       .to_string(),
   ));
@@ -62,7 +47,7 @@ pub async fn execute_command(
     if connection_settings.dynamic_ui {
       if let Ok(path) = nix::unistd::ttyname(*raw_fd) {
         env.push((
-          format!("NAILGUN_TTY_PATH_{fd}", fd = raw_fd),
+          format!("NAILGUN_TTY_PATH_{raw_fd}"),
           path.display().to_string(),
         ));
       }

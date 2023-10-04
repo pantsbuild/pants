@@ -28,13 +28,11 @@ from pants.jvm.shading import jarjar
 from pants.jvm.shading.jarjar import JarJar, JarJarGeneratorLockfileSentinel, MisplacedClassStrategy
 from pants.jvm.target_types import JvmShadingRule, _shading_validate_rules
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
+@dataclass(frozen=True)
 class ShadeJarRequest(EngineAwareParameter):
     path: PurePath
     digest: Digest
@@ -53,12 +51,15 @@ class ShadeJarRequest(EngineAwareParameter):
         skip_manifest: bool | None = None,
         misplaced_class_strategy: MisplacedClassStrategy | None = None,
     ) -> None:
-        self.path = path if isinstance(path, PurePath) else PurePath(path)
-        self.digest = digest
-        self.rules = tuple(rules or ())
-        self.skip_manifest = skip_manifest
-        self.misplaced_class_strategy = misplaced_class_strategy
+        object.__setattr__(self, "path", path if isinstance(path, PurePath) else PurePath(path))
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "rules", tuple(rules or ()))
+        object.__setattr__(self, "skip_manifest", skip_manifest)
+        object.__setattr__(self, "misplaced_class_strategy", misplaced_class_strategy)
 
+        self.__post_init__()
+
+    def __post_init__(self):
         validation_errors = _shading_validate_rules(self.rules)
         if validation_errors:
             raise ValueError("\n".join(["Invalid rules provided:\n", *validation_errors]))

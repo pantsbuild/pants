@@ -15,7 +15,11 @@ if TYPE_CHECKING:
     from pants.engine.internals.native_engine import PyFailure
 
 
-class TargetDefinitionException(Exception):
+class PantsException(Exception):
+    """Base exception type for Pants."""
+
+
+class TargetDefinitionException(PantsException):
     """Indicates an invalid target definition.
 
     :API: public
@@ -29,7 +33,7 @@ class TargetDefinitionException(Exception):
         super().__init__(f"Invalid target {target}: {msg}")
 
 
-class BuildConfigurationError(Exception):
+class BuildConfigurationError(PantsException):
     """Indicates an error in a pants installation's configuration."""
 
 
@@ -37,8 +41,12 @@ class BackendConfigurationError(BuildConfigurationError):
     """Indicates a plugin backend with a missing or malformed register module."""
 
 
-class MappingError(Exception):
+class MappingError(PantsException):
     """Indicates an error mapping addressable objects."""
+
+
+class RuleTypeError(PantsException):
+    """Invalid @rule implementation."""
 
 
 class NativeEngineFailure(Exception):

@@ -8,7 +8,7 @@ import pytest
 from pants.backend.docker.goals import package_image
 from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.target_types import DockerImageDependenciesField, DockerImageTarget
-from pants.backend.docker.util_rules import dockerfile
+from pants.backend.docker.util_rules import docker_build_args, dockerfile
 from pants.backend.docker.util_rules.dependencies import (
     InferDockerDependencies,
     infer_docker_dependencies,
@@ -32,6 +32,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *dockerfile.rules(),
             *dockerfile_parser.rules(),
+            *docker_build_args.rules(),
             package.find_all_packageable_targets,
             *package_image.rules(),
             *package_pex_binary.rules(),
@@ -135,3 +136,40 @@ def test_infer_docker_dependencies(files, rule_runner: RuleRunner) -> None:
             Address("project/hello/main/go", target_name="go_bin"),
         ]
     )
+
+
+def test_does_not_infer_dependency_when_docker_build_arg_overwrites(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/upstream/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image",
+                  repository="upstream/{name}",
+                  image_tags=["1.0"],
+                  instructions=["FROM alpine:3.16.1"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=src/upstream:image
+                FROM $BASE_IMAGE
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/downstream", target_name="image"))
+    rule_runner.set_options(
+        ["--docker-build-args=BASE_IMAGE=alpine:3.17.0"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferDockerDependencies(tgt[DockerImageDependenciesField])],
+    )
+    assert inferred == InferredDependencies([])

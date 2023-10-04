@@ -13,7 +13,7 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.target import Target
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
-    JvmArtifactExcludeDependenciesField,
+    JvmArtifactExclusionsField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
     JvmArtifactJarSourceField,
@@ -161,6 +161,7 @@ class ArtifactRequirement:
                 "`JvmArtifactFieldSet` fields present."
             )
 
+        exclusions = target[JvmArtifactExclusionsField].value or ()
         return ArtifactRequirement(
             coordinate=Coordinate(
                 group=target[JvmArtifactGroupField].value,
@@ -173,7 +174,7 @@ class ArtifactRequirement:
                 if target[JvmArtifactJarSourceField].value
                 else None
             ),
-            excludes=frozenset(target[JvmArtifactExcludeDependenciesField].value or []) or None,
+            excludes=frozenset([*(exclusion.to_coord_str() for exclusion in exclusions)]) or None,
         )
 
     def with_extra_excludes(self, *excludes: str) -> ArtifactRequirement:

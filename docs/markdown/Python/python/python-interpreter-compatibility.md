@@ -4,7 +4,6 @@ slug: "python-interpreter-compatibility"
 excerpt: "How to configure which Python version(s) your project should use."
 hidden: false
 createdAt: "2020-04-30T20:06:44.249Z"
-updatedAt: "2022-04-23T21:58:23.364Z"
 ---
 Setting the default Python version
 ----------------------------------
@@ -13,7 +12,7 @@ Configure your default Python interpreter compatibility constraints in `pants.to
 
 ```toml pants.toml
 [python]
-interpreter_constraints = ["CPython==3.8.*"]
+interpreter_constraints = ["CPython==3.11.*"]
 ```
 
 The value can be any valid Requirement-style strings. You can use multiple strings to OR constraints, and use commas within each string to AND constraints. For example:
@@ -26,6 +25,10 @@ The value can be any valid Requirement-style strings. You can use multiple strin
 | `['CPython==2.7.*', 'CPython>=3.5']` | CPython 2.7 or 3.5+                      |
 
 As a shortcut, you can leave off `CPython` and just put the version specifier. For example, `==3.8` will be expanded automatically to `CPython==3.8`.
+
+> 📘 Using Apple Silicon (M1/M2)?
+>
+> If you use Python code on Apple's M1/M2 hardware you may need to set your interpreter constraints to Python 3.9+, as many tools, such as Black, will not install correctly on earlier Python versions on this platform.
 
 Using multiple Python versions in the same project
 --------------------------------------------------
@@ -52,6 +55,7 @@ python_sources(
         "py2.py": {"interpreter_constraints": ["==2.7.*"]},
         # You can use a tuple for multiple files:
         ("common.py", "f.py"): {"interpreter_constraints": ["==2.7.*"]},
+    }
 )
 ```
 
@@ -93,10 +97,10 @@ backend_packages = [
 ]
 ```
 
-You can run `./pants py-constraints $file/$target` to see what final interpreter constraints will be used, and why. For example:
+You can run `pants py-constraints $file/$target` to see what final interpreter constraints will be used, and why. For example:
 
 ```
-$ ./pants py-constraints helloworld/main.py
+$ pants py-constraints helloworld/main.py
 Final merged constraints: CPython==2.7.*,>=3.5 OR CPython>=3.5
 
 CPython>=3.5
@@ -112,7 +116,7 @@ CPython==2.7.* OR CPython>=3.5
 
 #### `py-constraints --summary`
 
-You can run `./pants py-constraints --summary` for Pants to generate a CSV giving an overview of your project's interpreter constraints:
+You can run `pants py-constraints --summary` for Pants to generate a CSV giving an overview of your project's interpreter constraints:
 
 [block:image]
 {
@@ -122,7 +126,7 @@ You can run `./pants py-constraints --summary` for Pants to generate a CSV givin
         "https://files.readme.io/8ebc968-Screen_Shot_2020-11-12_at_9.19.56_AM.png",
         "Screen Shot 2020-11-12 at 9.19.56 AM.png"
       ],
-      "caption": "Result of `./pants py-constraints --summary`, then importing the CSV into Google Sheets."
+      "caption": "Result of `pants py-constraints --summary`, then importing the CSV into Google Sheets."
     }
   ]
 }
@@ -137,9 +141,9 @@ The `# Dependents` column is useful to see how impactful it is to port a file, a
 > While every project will have different needs and scope, there are a few best practices with Pants that will allow for a more successful migration.
 > 
 > - Start by setting the `interpreter_constraints` option in `[python]` to describe the status of the majority of your targets. If most are only compatible with Python 2, set it to `['==2.7.*']`. If most are compatible with Python 2 _and_ Python 3, set to `['==2.7', '>=3.5']`. If most are only compatible with Python 3, set to `[>=3.5]`. For any targets that don't match these global constraints, override with the `interpreter_constraints` field.
-> - Run `./pants py-constraints --summary` and sort by `# Dependents` from Z to A to find your most-used files. Focus on getting these targets to be compatible with Python 2 and 3. You may want to also sub-sort the CSV by `# Dependencies` to find what is easiest to port.
+> - Run `pants py-constraints --summary` and sort by `# Dependents` from Z to A to find your most-used files. Focus on getting these targets to be compatible with Python 2 and 3. You may want to also sub-sort the CSV by `# Dependencies` to find what is easiest to port.
 > - Once >40% of your targets work with both Python 2 and Python 3, change the `interpreter_constraints` option in `[python]` to specify compatibility with both Python 2.7 and Python 3 so that all new code uses this by default.
-> - For files with no or few dependencies, change them to Python 3-only when possible so that you can start using all the neat new Python 3 features like f-strings! Use the CSV from `./pants py-constraints --summary` to find these. You can also do this if every dependent target works exclusively with Python 3, which you can find by the `Transitive Constraints` column and by running `./pants py-constraints path/to/file.py`.
+> - For files with no or few dependencies, change them to Python 3-only when possible so that you can start using all the neat new Python 3 features like f-strings! Use the CSV from `pants py-constraints --summary` to find these. You can also do this if every dependent target works exclusively with Python 3, which you can find by the `Transitive Constraints` column and by running `pants py-constraints path/to/file.py`.
 > 
 > Check out [this blog post](https://enterprise.foursquare.com/intersections/article/how-our-intern-led-pants-migration-to-python-3/) on Pants' own migration to Python 3 in 2019 for more general tips on Python 3 migrations.
 

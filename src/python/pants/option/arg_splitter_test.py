@@ -126,8 +126,8 @@ def goal_split_test(command_line: str, **expected):
     [
         # Basic arg splitting, various flag combos.
         (
-            "./pants --check-long-flag --gg -ltrace check --cc test --ii "
-            "src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
+            "./pants --check-long-flag --gg -ltrace check --cc test --ii"
+            + " src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
             dict(
                 expected_goals=["check", "test"],
                 expected_scope_to_flags={
@@ -139,9 +139,9 @@ def goal_split_test(command_line: str, **expected):
             ),
         ),
         (
-            "./pants --fff=arg check --gg-gg=arg-arg test --iii "
-            "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -ltrace "
-            "--another-global",
+            "./pants --fff=arg check --gg-gg=arg-arg test --iii"
+            + " --check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -ltrace"
+            + " --another-global",
             dict(
                 expected_goals=["check", "test"],
                 expected_scope_to_flags={
@@ -239,9 +239,9 @@ def test_passthru_args(splitter: ArgSplitter) -> None:
     )
     assert_valid_split(
         splitter,
-        "./pants -lerror --fff=arg check --gg-gg=arg-arg test --iii "
-        "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -- "
-        "passthru1 passthru2 -linfo",
+        "./pants -lerror --fff=arg check --gg-gg=arg-arg test --iii"
+        + " --check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz --"
+        + " passthru1 passthru2 -linfo",
         expected_goals=["check", "test"],
         expected_scope_to_flags={
             "": ["-lerror", "--fff=arg"],

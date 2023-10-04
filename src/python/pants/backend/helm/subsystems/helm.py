@@ -18,11 +18,12 @@ from pants.option.option_types import (
     StrOption,
 )
 from pants.util.memo import memoized_method
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list, help_text, softwrap
 
 _VALID_PASSTHROUGH_FLAGS = [
     "--atomic",
     "--cleanup-on-fail",
+    "--create-namespace",
     "--debug",
     "--dry-run",
     "--force",
@@ -58,7 +59,7 @@ class InvalidHelmPassthroughArgs(Exception):
         )
 
 
-registries_help = softwrap(
+registries_help = help_text(
     f"""
     Configure Helm OCI registries. The schema for a registry entry is as follows:
 
@@ -88,8 +89,28 @@ class HelmSubsystem(TemplatedExternalTool):
     options_scope = "helm"
     help = "The Helm command line (https://helm.sh)"
 
-    default_version = "3.10.0"
+    default_version = "3.12.3"
     default_known_versions = [
+        "3.12.3|linux_arm64|79ef06935fb47e432c0c91bdefd140e5b543ec46376007ca14a52e5ed3023088|14355040",
+        "3.12.3|linux_x86_64|1b2313cd198d45eab00cc37c38f6b1ca0a948ba279c29e322bdf426d406129b5|16028423",
+        "3.12.3|macos_arm64|240b0a7da9cae208000eff3d3fb95e0fa1f4903d95be62c3f276f7630b12dae1|16019570",
+        "3.12.3|macos_x86_64|1bdbbeec5a12dd0c1cd4efd8948a156d33e1e2f51140e2a51e1e5e7b11b81d47|16828211",
+        "3.12.2|linux_arm64|cfafbae85c31afde88c69f0e5053610c8c455826081c1b2d665d9b44c31b3759|14350624",
+        "3.12.2|linux_x86_64|2b6efaa009891d3703869f4be80ab86faa33fa83d9d5ff2f6492a8aebe97b219|16028750",
+        "3.12.2|macos_arm64|b60ee16847e28879ae298a20ba4672fc84f741410f438e645277205824ddbf55|16021202",
+        "3.12.2|macos_x86_64|6e8bfc84a640e0dc47cc49cfc2d0a482f011f4249e2dff2a7e23c7ef2df1b64e|16824814",
+        "3.11.3|linux_arm64|0816db0efd033c78c3cc1c37506967947b01965b9c0739fe13ec2b1eea08f601|14475471",
+        "3.11.3|linux_x86_64|ca2d5d40d4cdfb9a3a6205dd803b5bc8def00bd2f13e5526c127e9b667974a89|15489735",
+        "3.11.3|macos_arm64|267e4d50b68e8854b9cc44517da9ab2f47dec39787fed9f7eba42080d61ac7f8|15451086",
+        "3.11.3|macos_x86_64|9d029df37664b50e427442a600e4e065fa75fd74dac996c831ac68359654b2c4|16275303",
+        "3.11.2|linux_arm64|444b65100e224beee0a3a3a54cb19dad37388fa9217ab2782ba63551c4a2e128|14090242",
+        "3.11.2|linux_x86_64|781d826daec584f9d50a01f0f7dadfd25a3312217a14aa2fbb85107b014ac8ca|15026301",
+        "3.11.2|macos_arm64|f61a3aa55827de2d8c64a2063fd744b618b443ed063871b79f52069e90813151|14932800",
+        "3.11.2|macos_x86_64|404938fd2c6eff9e0dab830b0db943fca9e1572cd3d7ee40904705760faa390f|15759988",
+        "3.11.1|linux_arm64 |919173e8fb7a3b54d76af9feb92e49e86d5a80c5185020bae8c393fa0f0de1e8|13484900",
+        "3.11.1|linux_x86_64|0b1be96b66fab4770526f136f5f1a385a47c41923d33aab0dcb500e0f6c1bf7c|15023104",
+        "3.11.1|macos_arm64 |43d0198a7a2ea2639caafa81bb0596c97bee2d4e40df50b36202343eb4d5c46b|14934852",
+        "3.11.1|macos_x86_64|2548a90e5cc957ccc5016b47060665a9d2cd4d5b4d61dcc32f5de3144d103826|15757902",
         "3.10.0|linux_arm64 |3b72f5f8a60772fb156d0a4ab93272e8da7ef4d18e6421a7020d7c019f521fc1|13055719",
         "3.10.0|linux_x86_64|bf56beb418bb529b5e0d6d43d56654c5a03f89c98400b409d1013a33d9586474|14530566",
         "3.10.0|macos_arm64 |f7f6558ebc8211824032a7fdcf0d55ad064cb33ec1eeec3d18057b9fe2e04dbe|14446277",
@@ -130,9 +151,14 @@ class HelmSubsystem(TemplatedExternalTool):
         ),
         advanced=True,
     )
-    tailor = BoolOption(
+    tailor_charts = BoolOption(
         default=True,
         help="If true, add `helm_chart` targets with the `tailor` goal.",
+        advanced=True,
+    )
+    tailor_unittests = BoolOption(
+        default=True,
+        help="If true, add `helm_unittest_tests` targets with the `tailor` goal.",
         advanced=True,
     )
 
@@ -146,11 +172,11 @@ class HelmSubsystem(TemplatedExternalTool):
             Only a subset of Helm arguments are considered valid as passthrough arguments as most of them
             have equivalents in the form of fields of the different target types.
 
-            The list of valid arguments is as folows:
+            The list of valid arguments is as follows:
 
             {bullet_list([*_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
 
-            Before attempting to use passthrough arguments, check the refence of each of the available target types
+            Before attempting to use passthrough arguments, check the reference of each of the available target types
             to see what fields are accepted in each of them.
             """
         ),

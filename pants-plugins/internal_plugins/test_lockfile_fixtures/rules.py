@@ -19,7 +19,6 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.tailor import group_by_dir
 from pants.core.goals.test import TestExtraEnv
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.collection import DeduplicatedCollection
@@ -34,6 +33,7 @@ from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsReq
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
+from pants.util.dirutil import group_by_dir
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
@@ -58,16 +58,10 @@ class RenderedJVMLockfileFixtures(DeduplicatedCollection[RenderedJVMLockfileFixt
     pass
 
 
-@dataclass(frozen=True)
-class CollectFixtureConfigsRequest:
-    pass
-
-
 # TODO: This rule was mostly copied from the rule `setup_pytest_for_target` in
 # `src/python/pants/backend/python/goals/pytest_runner.py`. Some refactoring should be done.
 @rule
 async def collect_fixture_configs(
-    _request: CollectFixtureConfigsRequest,
     pytest: PyTest,
     python_setup: PythonSetup,
     test_extra_env: TestExtraEnv,
@@ -82,12 +76,8 @@ async def collect_fixture_configs(
     pytest_pex, requirements_pex, prepared_sources, root_sources = await MultiGet(
         Get(
             Pex,
-            PexRequest(
-                output_filename="pytest.pex",
-                requirements=pytest.pex_requirements(),
-                interpreter_constraints=interpreter_constraints,
-                internal_only=True,
-            ),
+            PexRequest,
+            pytest.to_pex_request(interpreter_constraints=interpreter_constraints),
         ),
         Get(Pex, RequirementsPexRequest(addresses)),
         Get(
@@ -181,8 +171,9 @@ async def collect_fixture_configs(
 
 
 @rule
-async def gather_lockfile_fixtures() -> RenderedJVMLockfileFixtures:
-    configs = await Get(CollectedJVMLockfileFixtureConfigs, CollectFixtureConfigsRequest())
+async def gather_lockfile_fixtures(
+    configs: CollectedJVMLockfileFixtureConfigs,
+) -> RenderedJVMLockfileFixtures:
     rendered_fixtures = []
     for config in configs:
         artifact_reqs = ArtifactRequirements(

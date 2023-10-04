@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.util.docutil import git_url
 
 
 class AvroSubsystem(JvmToolBase):
@@ -14,7 +13,3 @@ class AvroSubsystem(JvmToolBase):
         "pants.backend.codegen.avro.java",
         "avro-tools.default.lockfile.txt",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/codegen/avro/java/avro-tools.default.lockfile.txt"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)

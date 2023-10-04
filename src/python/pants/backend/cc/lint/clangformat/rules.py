@@ -39,7 +39,6 @@ class ClangFormatRequest(FmtTargetsRequest):
 
 @rule(level=LogLevel.DEBUG)
 async def clangformat_fmt(request: ClangFormatRequest.Batch, clangformat: ClangFormat) -> FmtResult:
-
     # Look for any/all of the clang-format configuration files (recurse sub-dirs)
     config_files_get = Get(
         ConfigFiles,
@@ -81,7 +80,7 @@ async def clangformat_fmt(request: ClangFormatRequest.Batch, clangformat: ClangF
             level=LogLevel.DEBUG,
         ),
     )
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+    return await FmtResult.create(request, result)
 
 
 def rules() -> Iterable[Rule | UnionRule]:

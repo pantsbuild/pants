@@ -37,12 +37,13 @@ from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Target
-from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule, mock_console
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *shunit2_test_runner.rules(),
             *source_files.rules(),
@@ -77,7 +78,7 @@ GOOD_TEST = dedent(
 
 
 def run_shunit2(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     test_target: Target,
     *,
     extra_args: list[str] | None = None,
@@ -103,15 +104,15 @@ def run_shunit2(
     return test_result
 
 
-def test_passing(rule_runner: RuleRunner) -> None:
+def test_passing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"tests.sh": GOOD_TEST, "BUILD": "shunit2_tests(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "tests.sh": dedent(
@@ -129,10 +130,10 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 1
-    assert "Ran 1 test.\n\nFAILED" in result.stdout
+    assert "Ran 1 test.\n\nFAILED" in result.stdout_simplified_str
 
 
-def test_dependencies(rule_runner: RuleRunner) -> None:
+def test_dependencies(rule_runner: PythonRuleRunner) -> None:
     """Ensure direct and transitive dependencies work."""
     rule_runner.write_files(
         {
@@ -176,17 +177,17 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
-def test_subdirectories(rule_runner: RuleRunner) -> None:
+def test_subdirectories(rule_runner: PythonRuleRunner) -> None:
     # We always download the shunit2 script to the build root - this test is a smoke screen that
     # we properly source the file.
     rule_runner.write_files({"a/b/c/tests.sh": GOOD_TEST, "a/b/c/BUILD": "shunit2_tests()"})
     tgt = rule_runner.get_target(Address("a/b/c", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
 @pytest.mark.skip(
@@ -195,7 +196,7 @@ def test_subdirectories(rule_runner: RuleRunner) -> None:
     "`--force` does not work properly."
 )
 @pytest.mark.no_error_if_skipped
-def test_force(rule_runner: RuleRunner) -> None:
+def test_force(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"tests.sh": GOOD_TEST, "BUILD": "shunit2_tests(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
 
@@ -213,7 +214,7 @@ def test_force(rule_runner: RuleRunner) -> None:
     assert result_one is result_two
 
 
-def test_extra_env_vars(rule_runner: RuleRunner) -> None:
+def test_extra_env_vars(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "tests.sh": dedent(
@@ -237,10 +238,10 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         env={"OTHER_VAR": "other_value"},
     )
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
-def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
+def test_runtime_package_dependency(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/py/main.py": "",
@@ -267,10 +268,10 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
     result = run_shunit2(rule_runner, tgt)
     assert result.exit_code == 0
-    assert "Ran 1 test.\n\nOK" in result.stdout
+    assert "Ran 1 test.\n\nOK" in result.stdout_simplified_str
 
 
-def test_determine_shell_runner(rule_runner: RuleRunner) -> None:
+def test_determine_shell_runner(rule_runner: PythonRuleRunner) -> None:
     addr = Address("", target_name="t")
     fc = FileContent("tests.sh", b"#!/usr/bin/env sh")
     rule_runner.set_options([], env_inherit={"PATH"})

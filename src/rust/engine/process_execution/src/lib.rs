@@ -28,24 +28,38 @@
 extern crate derivative;
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use concrete_time::{Duration, TimeSpan};
 use deepsize::DeepSizeOf;
 use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
+use fs::{File, PathStat};
 use futures::future::try_join_all;
+use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::try_join;
+use futures::FutureExt;
+use grpc_util::prost::MessageExt;
 use hashing::Digest;
 use itertools::Itertools;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 use remexec::ExecutedActionMetadata;
+use remexec::{Action, Command, ExecuteRequest};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::fmt::Write;
+use std::path::Path;
+use store::{Snapshot, StoreFileByDigest};
 use store::{SnapshotOps, Store, StoreError};
 use task_executor::TailTasks;
+use tryfuture::try_future;
+use uuid::Uuid;
 use workunit_store::{in_workunit, Level, RunId, RunningWorkunit, WorkunitStore};
 
 pub mod bounded;
@@ -60,33 +74,36 @@ pub mod switched;
 
 pub mod children;
 
-pub mod docker;
-#[cfg(test)]
-mod docker_tests;
-
 pub mod local;
 #[cfg(test)]
-mod local_tests;
-
-pub mod nailgun;
+pub mod local_tests;
 
 pub mod named_caches;
-
-pub mod remote;
 #[cfg(test)]
-pub mod remote_tests;
-
-pub mod remote_cache;
-#[cfg(test)]
-mod remote_cache_tests;
+pub mod named_caches_tests;
 
 extern crate uname;
 
 pub use crate::children::ManagedChild;
 pub use crate::named_caches::{CacheName, NamedCaches};
-pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
-use crate::remote::EntireExecuteRequest;
+// Environment variable which is exclusively used for cache key invalidation.
+// This may be not specified in an Process, and may be populated only by the
+// CommandRunner.
+pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
+
+// Environment variable which is used to differentiate between running in Docker vs. local vs.
+// remote execution.
+pub const CACHE_KEY_EXECUTION_STRATEGY: &str = "PANTS_CACHE_KEY_EXECUTION_STRATEGY";
+
+// Environment variable which is used to include a unique value for cache busting of processes that
+// have indicated that they should never be cached.
+pub const CACHE_KEY_SALT_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_SALT";
+
+// Environment variable which is exclusively used for cache key invalidation.
+// This may be not specified in an Process, and may be populated only by the
+// CommandRunner.
+pub const CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_TARGET_PLATFORM";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProcessError {
@@ -182,8 +199,7 @@ impl Platform {
         ref machine,
         ..
       } => Err(format!(
-        "Found unknown system/arch name pair {} {}",
-        sysname, machine
+        "Found unknown system/arch name pair {sysname} {machine}"
       )),
     }
   }
@@ -208,10 +224,7 @@ impl TryFrom<String> for Platform {
       "macos_x86_64" => Ok(Platform::Macos_x86_64),
       "linux_x86_64" => Ok(Platform::Linux_x86_64),
       "linux_arm64" => Ok(Platform::Linux_arm64),
-      other => Err(format!(
-        "Unknown platform {:?} encountered in parsing",
-        other
-      )),
+      other => Err(format!("Unknown platform {other:?} encountered in parsing")),
     }
   }
 }
@@ -242,7 +255,7 @@ impl TryFrom<String> for ProcessCacheScope {
       "per_restart_always" => Ok(ProcessCacheScope::PerRestartAlways),
       "per_restart_successful" => Ok(ProcessCacheScope::PerRestartSuccessful),
       "per_session" => Ok(ProcessCacheScope::PerSession),
-      other => Err(format!("Unknown Process cache scope: {:?}", other)),
+      other => Err(format!("Unknown Process cache scope: {other:?}")),
     }
   }
 }
@@ -268,8 +281,7 @@ pub struct InputDigests {
   /// The input files for the process execution, which will be materialized as mutable inputs in a
   /// sandbox for the process.
   ///
-  /// TODO: Rename to `inputs` for symmetry with `immutable_inputs`.
-  pub input_files: DirectoryDigest,
+  pub inputs: DirectoryDigest,
 
   /// Immutable input digests to make available in the input root.
   ///
@@ -295,7 +307,7 @@ pub struct InputDigests {
 impl InputDigests {
   pub async fn new(
     store: &Store,
-    input_files: DirectoryDigest,
+    inputs: DirectoryDigest,
     immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
     use_nailgun: BTreeSet<RelativePath>,
   ) -> Result<Self, StoreError> {
@@ -319,14 +331,14 @@ impl InputDigests {
         }
       })
       .collect::<Vec<_>>();
-    complete_digests.push(input_files.clone());
+    complete_digests.push(inputs.clone());
 
     let (complete, nailgun) =
       try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
     Ok(Self {
-      complete: complete,
-      nailgun: nailgun,
-      input_files,
+      complete,
+      nailgun,
+      inputs,
       immutable_inputs,
       use_nailgun,
     })
@@ -359,17 +371,17 @@ impl InputDigests {
       .collect();
     let input_files_digests = from
       .iter()
-      .map(|input_digests| input_digests.input_files.clone())
+      .map(|input_digests| input_digests.inputs.clone())
       .collect();
-    let (complete, nailgun, input_files) = try_join!(
+    let (complete, nailgun, inputs) = try_join!(
       store.merge(complete_digests),
       store.merge(nailgun_digests),
       store.merge(input_files_digests),
     )?;
     Ok(Self {
-      complete: complete,
-      nailgun: nailgun,
-      input_files: input_files,
+      complete,
+      nailgun,
+      inputs,
       immutable_inputs: merged_immutable_inputs,
       use_nailgun: Itertools::concat(
         from
@@ -381,11 +393,11 @@ impl InputDigests {
     })
   }
 
-  pub fn with_input_files(input_files: DirectoryDigest) -> Self {
+  pub fn with_input_files(inputs: DirectoryDigest) -> Self {
     Self {
-      complete: input_files.clone(),
+      complete: inputs.clone(),
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-      input_files,
+      inputs,
       immutable_inputs: BTreeMap::new(),
       use_nailgun: BTreeSet::new(),
     }
@@ -409,7 +421,7 @@ impl InputDigests {
         // TODO: See method doc.
         complete: EMPTY_DIRECTORY_DIGEST.clone(),
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-        input_files: self.input_files.clone(),
+        inputs: self.inputs.clone(),
         immutable_inputs: client,
         use_nailgun: BTreeSet::new(),
       },
@@ -417,7 +429,7 @@ impl InputDigests {
       InputDigests {
         complete: self.nailgun.clone(),
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-        input_files: EMPTY_DIRECTORY_DIGEST.clone(),
+        inputs: EMPTY_DIRECTORY_DIGEST.clone(),
         immutable_inputs: server,
         use_nailgun: BTreeSet::new(),
       },
@@ -430,7 +442,7 @@ impl Default for InputDigests {
     Self {
       complete: EMPTY_DIRECTORY_DIGEST.clone(),
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-      input_files: EMPTY_DIRECTORY_DIGEST.clone(),
+      inputs: EMPTY_DIRECTORY_DIGEST.clone(),
       immutable_inputs: BTreeMap::new(),
       use_nailgun: BTreeSet::new(),
     }
@@ -458,6 +470,23 @@ impl ProcessExecutionStrategy {
       Self::Docker(image) => format!("docker_execution: {image}"),
     }
   }
+
+  pub fn strategy_type(&self) -> &'static str {
+    match self {
+      Self::Local => "local",
+      Self::RemoteExecution(_) => "remote",
+      Self::Docker(_) => "docker",
+    }
+  }
+}
+
+#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+pub struct ProcessExecutionEnvironment {
+  /// The name of the environment the process is running in, or None if it is running in the
+  /// default (local) environment.
+  pub name: Option<String>,
+  pub platform: Platform,
+  pub strategy: ProcessExecutionStrategy,
 }
 
 ///
@@ -550,11 +579,9 @@ pub struct Process {
   ///
   pub jdk_home: Option<PathBuf>,
 
-  pub platform: Platform,
-
   pub cache_scope: ProcessCacheScope,
 
-  pub execution_strategy: ProcessExecutionStrategy,
+  pub execution_environment: ProcessExecutionEnvironment,
 
   pub remote_cache_speculation_delay: std::time::Duration,
 }
@@ -565,11 +592,12 @@ impl Process {
   /// be used to set values.
   ///
   /// We use the more ergonomic (but possibly slightly slower) "move self for each builder method"
-  /// pattern, so this method is only enabled for test usage: production usage should construct the
+  /// pattern, so this method should only be used in tests: production usage should construct the
   /// Process struct wholesale. We can reconsider this if we end up with more production callsites
   /// that require partial options.
   ///
-  #[cfg(test)]
+  /// NB: Some of the default values used in this constructor only make sense in tests.
+  ///
   pub fn new(argv: Vec<String>) -> Process {
     Process {
       argv,
@@ -583,11 +611,14 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      platform: Platform::current().unwrap(),
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
-      execution_strategy: ProcessExecutionStrategy::Local,
+      execution_environment: ProcessExecutionEnvironment {
+        name: None,
+        platform: Platform::current().unwrap(),
+        strategy: ProcessExecutionStrategy::Local,
+      },
       remote_cache_speculation_delay: std::time::Duration::from_millis(0),
     }
   }
@@ -636,21 +667,26 @@ impl Process {
   }
 
   ///
-  /// Set the execution strategy to Docker, with the specified image.
+  /// Set the execution environment to Docker, with the specified image.
   ///
   pub fn docker(mut self, image: String) -> Process {
-    self.execution_strategy = ProcessExecutionStrategy::Docker(image);
+    self.execution_environment = ProcessExecutionEnvironment {
+      name: None,
+      platform: Platform::current().unwrap(),
+      strategy: ProcessExecutionStrategy::Docker(image),
+    };
     self
   }
 
   ///
-  /// Set the execution strategy to remote execution with the provided platform properties.
+  /// Set the execution environment to remote execution with the specified platform properties.
   ///
-  pub fn remote_execution_platform_properties(
-    mut self,
-    properties: Vec<(String, String)>,
-  ) -> Process {
-    self.execution_strategy = ProcessExecutionStrategy::RemoteExecution(properties);
+  pub fn remote_execution(mut self, properties: Vec<(String, String)>) -> Process {
+    self.execution_environment = ProcessExecutionEnvironment {
+      name: None,
+      platform: Platform::current().unwrap(),
+      strategy: ProcessExecutionStrategy::RemoteExecution(properties),
+    };
     self
   }
 
@@ -668,6 +704,8 @@ impl Process {
 ///
 /// The result of running a process.
 ///
+/// TODO: Rename to `FallibleProcessResult`: see #18450.
+///
 #[derive(DeepSizeOf, Derivative, Clone, Debug, Eq)]
 #[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
@@ -675,23 +713,35 @@ pub struct FallibleProcessResultWithPlatform {
   pub stderr_digest: Digest,
   pub exit_code: i32,
   pub output_directory: DirectoryDigest,
-  pub platform: Platform,
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub metadata: ProcessResultMetadata,
 }
 
-/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
-/// conversion is lossy, but the interesting parts are preserved.
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
-  /// The time from starting to completion, including preparing the chroot and cleanup.
+  /// The execution time of this process when it ran.
+  ///
   /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
   /// `ExecutedActionMetadata`.
   ///
   /// NB: This is optional because the REAPI does not guarantee that it is returned.
   pub total_elapsed: Option<Duration>,
+  /// How much faster a cache hit was than running the process again.
+  ///
+  /// This includes the overhead of setting up and cleaning up the process for execution, and it
+  /// should include all overhead for the cache lookup.
+  ///
+  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
+  /// may still have been faster than rerunning the process a second time, e.g. if speculation
+  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
+  /// second run would have taken, so the best we can do is report 0.
+  ///
+  /// If the original process's execution time was not recorded, this may be None.
+  pub saved_by_cache: Option<Duration>,
   /// The source of the result.
   pub source: ProcessResultSource,
+  /// The environment that the process ran in.
+  pub environment: ProcessExecutionEnvironment,
   /// The RunId of the Session in which the `ProcessResultSource` was accurate. In further runs
   /// within the same process, the source of the process implicitly becomes memoization.
   pub source_run_id: RunId,
@@ -701,11 +751,14 @@ impl ProcessResultMetadata {
   pub fn new(
     total_elapsed: Option<Duration>,
     source: ProcessResultSource,
+    environment: ProcessExecutionEnvironment,
     source_run_id: RunId,
   ) -> Self {
     Self {
       total_elapsed,
+      saved_by_cache: None,
       source,
+      environment,
       source_run_id,
     }
   }
@@ -713,6 +766,7 @@ impl ProcessResultMetadata {
   pub fn new_from_metadata(
     metadata: ExecutedActionMetadata,
     source: ProcessResultSource,
+    environment: ProcessExecutionEnvironment,
     source_run_id: RunId,
   ) -> Self {
     let total_elapsed = match (
@@ -724,35 +778,18 @@ impl ProcessResultMetadata {
         .ok(),
       _ => None,
     };
-    Self {
-      total_elapsed,
-      source,
-      source_run_id,
-    }
+
+    Self::new(total_elapsed, source, environment, source_run_id)
   }
 
-  /// How much faster a cache hit was than running the process again.
-  ///
-  /// This includes the overhead of setting up and cleaning up the process for execution, and it
-  /// should include all overhead for the cache lookup.
-  ///
-  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
-  /// may still have been faster than rerunning the process a second time, e.g. if speculation
-  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
-  /// second run would have taken, so the best we can do is report 0.
-  ///
-  /// If the original process's execution time was not recorded, we return None because we
-  /// cannot make a meaningful comparison.
-  pub fn time_saved_from_cache(
-    &self,
-    cache_lookup: std::time::Duration,
-  ) -> Option<std::time::Duration> {
-    self.total_elapsed.and_then(|original_process| {
-      let original_process: std::time::Duration = original_process.into();
-      original_process
-        .checked_sub(cache_lookup)
-        .or_else(|| Some(std::time::Duration::new(0, 0)))
-    })
+  pub fn update_cache_hit_elapsed(&mut self, cache_hit_elapsed: std::time::Duration) {
+    self.saved_by_cache = self.total_elapsed.map(|total_elapsed| {
+      let total_elapsed: std::time::Duration = total_elapsed.into();
+      total_elapsed
+        .checked_sub(cache_hit_elapsed)
+        .unwrap_or_else(|| std::time::Duration::new(0, 0))
+        .into()
+    });
   }
 }
 
@@ -784,8 +821,7 @@ impl From<ProcessResultMetadata> for ExecutedActionMetadata {
 
 #[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum ProcessResultSource {
-  RanLocally,
-  RanRemotely,
+  Ran,
   HitLocally,
   HitRemotely,
 }
@@ -793,8 +829,7 @@ pub enum ProcessResultSource {
 impl From<ProcessResultSource> for &'static str {
   fn from(prs: ProcessResultSource) -> &'static str {
     match prs {
-      ProcessResultSource::RanLocally => "ran_locally",
-      ProcessResultSource::RanRemotely => "ran_remotely",
+      ProcessResultSource::Ran => "ran",
       ProcessResultSource::HitLocally => "hit_locally",
       ProcessResultSource::HitRemotely => "hit_remotely",
     }
@@ -815,7 +850,7 @@ pub enum CacheContentBehavior {
 /// If content loading is deferred, a Digest which is discovered to be missing later on during
 /// execution will cause backtracking.
 ///
-pub(crate) async fn check_cache_content(
+pub async fn check_cache_content(
   response: &FallibleProcessResultWithPlatform,
   store: &Store,
   cache_content_behavior: CacheContentBehavior,
@@ -855,10 +890,10 @@ pub(crate) async fn check_cache_content(
 
 #[derive(Clone)]
 pub struct Context {
-  workunit_store: WorkunitStore,
-  build_id: String,
-  run_id: RunId,
-  tail_tasks: TailTasks,
+  pub workunit_store: WorkunitStore,
+  pub build_id: String,
+  pub run_id: RunId,
+  pub tail_tasks: TailTasks,
 }
 
 impl Default for Context {
@@ -938,7 +973,7 @@ impl<T: CommandRunner + ?Sized> CommandRunner for Arc<T> {
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub async fn digest(
+pub async fn get_digest(
   process: &Process,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
@@ -947,7 +982,7 @@ pub async fn digest(
 ) -> Digest {
   let EntireExecuteRequest {
     execute_request, ..
-  } = remote::make_execute_request(
+  } = make_execute_request(
     process,
     instance_name,
     process_cache_namespace,
@@ -957,6 +992,528 @@ pub async fn digest(
   .await
   .unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
+}
+
+pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {
+  Ok(Digest::of_bytes(&message.to_bytes()))
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntireExecuteRequest {
+  pub action: Action,
+  pub command: Command,
+  pub execute_request: ExecuteRequest,
+  pub input_root_digest: DirectoryDigest,
+}
+
+fn make_wrapper_for_append_only_caches(
+  caches: &BTreeMap<CacheName, RelativePath>,
+  base_path: &str,
+  working_directory: Option<&str>,
+) -> Result<String, String> {
+  let mut script = String::new();
+  writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+
+  // Setup the append-only caches.
+  for (cache_name, path) in caches {
+    writeln!(
+      &mut script,
+      "/bin/mkdir -p '{}/{}'",
+      base_path,
+      cache_name.name()
+    )
+    .map_err(|err| format!("write! failed: {err:?}"))?;
+    if let Some(parent) = path.parent() {
+      writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
+        .map_err(|err| format!("write! failed: {err}"))?;
+    }
+    writeln!(
+      &mut script,
+      "/bin/ln -s '{}/{}' '{}'",
+      base_path,
+      cache_name.name(),
+      path.as_path().to_string_lossy()
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Change into any working directory.
+  //
+  // Note: When this wrapper script is in effect, Pants will not set the `working_directory`
+  // field on the `ExecuteRequest` so that this wrapper script can operate in the input root
+  // first.
+  if let Some(path) = working_directory {
+    writeln!(
+      &mut script,
+      concat!(
+        "cd '{0}'\n",
+        "if [ \"$?\" != 0 ]; then\n",
+        "  echo \"pants-wrapper: Failed to change working directory to: {0}\" 1>&2\n",
+        "  exit 1\n",
+        "fi\n",
+      ),
+      path
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Finally, execute the process.
+  writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
+  Ok(script)
+}
+
+pub async fn make_execute_request(
+  req: &Process,
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
+  store: &Store,
+  append_only_caches_base_path: Option<&str>,
+) -> Result<EntireExecuteRequest, String> {
+  const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
+
+  // Implement append-only caches by running a wrapper script before the actual program
+  // to be invoked in the remote environment.
+  let wrapper_script_digest_opt = match (append_only_caches_base_path, &req.append_only_caches) {
+    (Some(base_path), caches) if !caches.is_empty() => {
+      let script = make_wrapper_for_append_only_caches(
+        caches,
+        base_path,
+        req.working_directory.as_ref().and_then(|p| p.to_str()),
+      )?;
+      let digest = store
+        .store_file_bytes(Bytes::from(script), false)
+        .await
+        .map_err(|err| format!("Failed to store wrapper script for remote execution: {err}"))?;
+      let path = RelativePath::new(Path::new(WRAPPER_SCRIPT))?;
+      let snapshot = store.snapshot_of_one_file(path, digest, true).await?;
+      let directory_digest = DirectoryDigest::new(snapshot.digest, snapshot.tree);
+      Some(directory_digest)
+    }
+    _ => None,
+  };
+
+  let arguments = match &wrapper_script_digest_opt {
+    Some(_) => {
+      let mut args = Vec::with_capacity(req.argv.len() + 1);
+      args.push(WRAPPER_SCRIPT.to_string());
+      args.extend(req.argv.iter().cloned());
+      args
+    }
+    None => req.argv.clone(),
+  };
+
+  let mut command = remexec::Command {
+    arguments,
+    ..remexec::Command::default()
+  };
+
+  for (name, value) in &req.env {
+    if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
+      || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+      || name == CACHE_KEY_SALT_ENV_VAR_NAME
+    {
+      return Err(format!(
+        "Cannot set env var with name {name} as that is reserved for internal use by pants"
+      ));
+    }
+
+    command
+      .environment_variables
+      .push(remexec::command::EnvironmentVariable {
+        name: name.to_string(),
+        value: value.to_string(),
+      });
+  }
+
+  let mut platform_properties = match &req.execution_environment.strategy {
+    ProcessExecutionStrategy::RemoteExecution(properties) => properties.clone(),
+    _ => vec![],
+  };
+
+  if let Some(cache_key_gen_version) = cache_key_gen_version {
+    command
+      .environment_variables
+      .push(remexec::command::EnvironmentVariable {
+        name: CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string(),
+        value: cache_key_gen_version,
+      });
+  }
+
+  command
+    .environment_variables
+    .push(remexec::command::EnvironmentVariable {
+      name: CACHE_KEY_EXECUTION_STRATEGY.to_string(),
+      value: req.execution_environment.strategy.cache_value(),
+    });
+
+  if matches!(
+    req.cache_scope,
+    ProcessCacheScope::PerSession
+      | ProcessCacheScope::PerRestartAlways
+      | ProcessCacheScope::PerRestartSuccessful
+  ) {
+    command
+      .environment_variables
+      .push(remexec::command::EnvironmentVariable {
+        name: CACHE_KEY_SALT_ENV_VAR_NAME.to_string(),
+        value: Uuid::new_v4().to_string(),
+      });
+  }
+
+  {
+    command
+      .environment_variables
+      .push(remexec::command::EnvironmentVariable {
+        name: CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string(),
+        value: req.execution_environment.platform.into(),
+      });
+  }
+
+  let mut output_files = req
+    .output_files
+    .iter()
+    .map(|p| {
+      p.to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| format!("Non-UTF8 output file path: {p:?}"))
+    })
+    .collect::<Result<Vec<String>, String>>()?;
+  output_files.sort();
+  command.output_files = output_files;
+
+  let mut output_directories = req
+    .output_directories
+    .iter()
+    .map(|p| {
+      p.to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| format!("Non-UTF8 output directory path: {p:?}"))
+    })
+    .collect::<Result<Vec<String>, String>>()?;
+  output_directories.sort();
+  command.output_directories = output_directories;
+
+  if let Some(working_directory) = &req.working_directory {
+    // Do not set `working_directory` if a wrapper script is in use because the wrapper script
+    // will change to the working directory itself.
+    if wrapper_script_digest_opt.is_none() {
+      command.working_directory = working_directory
+        .to_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {working_directory:?}"));
+    }
+  }
+
+  if req.jdk_home.is_some() {
+    // Ideally, the JDK would be brought along as part of the input directory, but we don't
+    // currently have support for that. Scoot supports this property, and will symlink .jdk to a
+    // system-installed JDK https://github.com/twitter/scoot/pull/391 - we should probably come to
+    // some kind of consensus across tools as to how this should work; RBE appears to work by
+    // allowing you to specify a jdk-version platform property, and it will put a JDK at a
+    // well-known path in the docker container you specify in which to run.
+    platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
+  }
+
+  // Extract `Platform` proto from the `Command` to avoid a partial move of `Command`.
+  let mut command_platform = command.platform.take().unwrap_or_default();
+
+  // Add configured platform properties to the `Platform`.
+  for (name, value) in platform_properties {
+    command_platform
+      .properties
+      .push(remexec::platform::Property {
+        name: name.clone(),
+        value: value.clone(),
+      });
+  }
+
+  // Sort the platform properties.
+  //
+  // From the remote execution spec:
+  //   The properties that make up this platform. In order to ensure that
+  //   equivalent `Platform`s always hash to the same value, the properties MUST
+  //   be lexicographically sorted by name, and then by value. Sorting of strings
+  //   is done by code point, equivalently, by the UTF-8 bytes.
+  //
+  // Note: BuildBarn enforces this requirement.
+  command_platform
+    .properties
+    .sort_by(|x, y| match x.name.cmp(&y.name) {
+      Ordering::Equal => x.value.cmp(&y.value),
+      v => v,
+    });
+
+  // Store the separate copy back into the Command proto.
+  command.platform = Some(command_platform);
+
+  // Sort the environment variables. REv2 spec requires sorting by name for same reasons that
+  // platform properties are sorted, i.e. consistent hashing.
+  command
+    .environment_variables
+    .sort_by(|x, y| x.name.cmp(&y.name));
+
+  let input_root_digest: DirectoryDigest = match &wrapper_script_digest_opt {
+    Some(wrapper_digest) => {
+      let digests = vec![
+        req.input_digests.complete.clone(),
+        wrapper_digest.to_owned(),
+      ];
+      store
+        .merge(digests)
+        .await
+        .map_err(|err| format!("store error: {err}"))?
+    }
+    None => req.input_digests.complete.clone(),
+  };
+
+  let mut action = remexec::Action {
+    command_digest: Some((&digest(&command)?).into()),
+    input_root_digest: Some(input_root_digest.as_digest().into()),
+    ..remexec::Action::default()
+  };
+
+  if let Some(timeout) = req.timeout {
+    action.timeout = Some(prost_types::Duration::try_from(timeout).unwrap());
+  }
+
+  let execute_request = remexec::ExecuteRequest {
+    action_digest: Some((&digest(&action)?).into()),
+    instance_name: instance_name.unwrap_or_else(|| "".to_owned()),
+    // We rely on the RemoteCache command runner for caching with remote execution. We always
+    // disable remote servers from doing caching themselves not only to avoid wasted work, but
+    // more importantly because they do not have our same caching semantics, e.g.
+    // `ProcessCacheScope.SUCCESSFUL` vs `ProcessCacheScope.ALWAYS`.
+    skip_cache_lookup: true,
+    ..remexec::ExecuteRequest::default()
+  };
+
+  Ok(EntireExecuteRequest {
+    action,
+    command,
+    execute_request,
+    input_root_digest,
+  })
+}
+
+/// Convert an ActionResult into a FallibleProcessResultWithPlatform.
+///
+/// HACK: The caching CommandRunner stores the digest of the Directory that merges all output
+/// files and output directories in the `tree_digest` field of the `output_directories` field
+/// of the ActionResult/ExecuteResponse stored in the local cache. When
+/// `treat_tree_digest_as_final_directory_hack` is true, then that final merged directory
+/// will be extracted from the tree_digest of the single output directory.
+pub async fn populate_fallible_execution_result(
+  store: Store,
+  run_id: RunId,
+  action_result: &remexec::ActionResult,
+  treat_tree_digest_as_final_directory_hack: bool,
+  source: ProcessResultSource,
+  environment: ProcessExecutionEnvironment,
+) -> Result<FallibleProcessResultWithPlatform, StoreError> {
+  let (stdout_digest, stderr_digest, output_directory) = future::try_join3(
+    extract_stdout(&store, action_result),
+    extract_stderr(&store, action_result),
+    extract_output_files(
+      store,
+      action_result,
+      treat_tree_digest_as_final_directory_hack,
+    ),
+  )
+  .await?;
+
+  let metadata = if let Some(metadata) = action_result.execution_metadata.clone() {
+    ProcessResultMetadata::new_from_metadata(metadata, source, environment, run_id)
+  } else {
+    ProcessResultMetadata::new(None, source, environment, run_id)
+  };
+
+  Ok(FallibleProcessResultWithPlatform {
+    stdout_digest,
+    stderr_digest,
+    exit_code: action_result.exit_code,
+    output_directory,
+    metadata,
+  })
+}
+
+fn extract_stdout<'a>(
+  store: &Store,
+  action_result: &'a remexec::ActionResult,
+) -> BoxFuture<'a, Result<Digest, StoreError>> {
+  let store = store.clone();
+  async move {
+    if let Some(digest_proto) = &action_result.stdout_digest {
+      let stdout_digest_result: Result<Digest, String> = digest_proto.try_into();
+      let stdout_digest =
+        stdout_digest_result.map_err(|err| format!("Error extracting stdout: {err}"))?;
+      Ok(stdout_digest)
+    } else {
+      let stdout_raw = Bytes::copy_from_slice(&action_result.stdout_raw);
+      let digest = store
+        .store_file_bytes(stdout_raw, true)
+        .map_err(move |error| format!("Error storing raw stdout: {error:?}"))
+        .await?;
+      Ok(digest)
+    }
+  }
+  .boxed()
+}
+
+fn extract_stderr<'a>(
+  store: &Store,
+  action_result: &'a remexec::ActionResult,
+) -> BoxFuture<'a, Result<Digest, StoreError>> {
+  let store = store.clone();
+  async move {
+    if let Some(digest_proto) = &action_result.stderr_digest {
+      let stderr_digest_result: Result<Digest, String> = digest_proto.try_into();
+      let stderr_digest =
+        stderr_digest_result.map_err(|err| format!("Error extracting stderr: {err}"))?;
+      Ok(stderr_digest)
+    } else {
+      let stderr_raw = Bytes::copy_from_slice(&action_result.stderr_raw);
+      let digest = store
+        .store_file_bytes(stderr_raw, true)
+        .map_err(move |error| format!("Error storing raw stderr: {error:?}"))
+        .await?;
+      Ok(digest)
+    }
+  }
+  .boxed()
+}
+
+pub fn extract_output_files(
+  store: Store,
+  action_result: &remexec::ActionResult,
+  treat_tree_digest_as_final_directory_hack: bool,
+) -> BoxFuture<'static, Result<DirectoryDigest, StoreError>> {
+  // HACK: The caching CommandRunner stores the digest of the Directory that merges all output
+  // files and output directories in the `tree_digest` field of the `output_directories` field
+  // of the ActionResult/ExecuteResponse stored in the local cache. When
+  // `treat_tree_digest_as_final_directory_hack` is true, then this code will extract that
+  // directory from the tree_digest and skip the merging performed by the remainder of this
+  // method.
+  if treat_tree_digest_as_final_directory_hack {
+    match &action_result.output_directories[..] {
+      [directory] => {
+        match require_digest(directory.tree_digest.as_ref()) {
+          Ok(digest) => {
+            return future::ready::<Result<_, StoreError>>(Ok(
+              DirectoryDigest::from_persisted_digest(digest),
+            ))
+            .boxed()
+          }
+          Err(err) => return futures::future::err(err.into()).boxed(),
+        };
+      }
+      _ => {
+        return futures::future::err(
+          "illegal state: treat_tree_digest_as_final_directory_hack \
+          expected single output directory"
+            .to_owned()
+            .into(),
+        )
+        .boxed();
+      }
+    }
+  }
+
+  // Get Digests of output Directories.
+  // Then we'll make a Directory for the output files, and merge them.
+  let mut directory_digests = Vec::with_capacity(action_result.output_directories.len() + 1);
+  // TODO: Maybe take rather than clone
+  let output_directories = action_result.output_directories.clone();
+  for dir in output_directories {
+    let store = store.clone();
+    directory_digests.push(
+      (async move {
+        // The `OutputDirectory` contains the digest of a `Tree` proto which contains
+        // the `Directory` proto of the root directory of this `OutputDirectory` plus all
+        // of the `Directory` protos for child directories of that root.
+
+        // Retrieve the Tree proto and hash its root `Directory` proto to obtain the digest
+        // of the output directory needed to construct the series of `Directory` protos needed
+        // for the final merge of the output directories.
+        let tree_digest: Digest = require_digest(dir.tree_digest.as_ref())?;
+        let directory_digest = store
+          .load_tree_from_remote(tree_digest)
+          .await?
+          .ok_or_else(|| format!("Tree with digest {tree_digest:?} was not in remote"))?;
+
+        store
+          .add_prefix(directory_digest, &RelativePath::new(dir.path)?)
+          .await
+      })
+      .map_err(|err| format!("Error saving remote output directory to local cache: {err}")),
+    );
+  }
+
+  // Make a directory for the files
+  let mut path_map = HashMap::new();
+  let path_stats_result: Result<Vec<PathStat>, String> = action_result
+    .output_files
+    .iter()
+    .map(|output_file| {
+      let output_file_path_buf = PathBuf::from(output_file.path.clone());
+      let digest: Result<Digest, String> = require_digest(output_file.digest.as_ref());
+      path_map.insert(output_file_path_buf.clone(), digest?);
+      Ok(PathStat::file(
+        output_file_path_buf.clone(),
+        File {
+          path: output_file_path_buf,
+          is_executable: output_file.is_executable,
+        },
+      ))
+    })
+    .collect();
+
+  let path_stats = try_future!(path_stats_result);
+
+  #[derive(Clone)]
+  struct StoreOneOffRemoteDigest {
+    map_of_paths_to_digests: HashMap<PathBuf, Digest>,
+  }
+
+  impl StoreOneOffRemoteDigest {
+    fn new(map: HashMap<PathBuf, Digest>) -> StoreOneOffRemoteDigest {
+      StoreOneOffRemoteDigest {
+        map_of_paths_to_digests: map,
+      }
+    }
+  }
+
+  impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
+    fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
+      match self.map_of_paths_to_digests.get(&file.path) {
+        Some(digest) => future::ok(*digest),
+        None => future::err(format!(
+          "Didn't know digest for path in remote execution response: {:?}",
+          file.path
+        )),
+      }
+      .boxed()
+    }
+  }
+
+  async move {
+    let files_snapshot =
+      Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
+        move |error| {
+          format!("Error when storing the output file directory info in the remote CAS: {error:?}")
+        },
+      );
+
+    let (files_snapshot, mut directory_digests) =
+      future::try_join(files_snapshot, future::try_join_all(directory_digests)).await?;
+
+    directory_digests.push(files_snapshot.into());
+
+    store
+      .merge(directory_digests)
+      .map_err(|err| err.enrich("Error when merging output files and directories"))
+      .await
+  }
+  .boxed()
 }
 
 #[cfg(test)]

@@ -10,6 +10,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.base.specs import DirGlobSpec, DirLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -23,8 +24,9 @@ from pants.core.goals.tailor import (
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
-    group_by_dir,
+    has_source_or_sources_field,
     make_content_str,
+    resolve_specs_with_build,
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
@@ -36,6 +38,7 @@ from pants.source.filespec import FilespecMatcher
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.dirutil import group_by_dir
 from pants.util.strutil import softwrap
 
 
@@ -148,6 +151,12 @@ def test_default_sources_for_target_type() -> None:
     assert default_sources_for_target_type(FortranLibraryTarget) == FortranLibrarySources.default
     assert default_sources_for_target_type(FortranTestsTarget) == FortranTestsSources.default
     assert default_sources_for_target_type(FortranModule) == tuple()
+
+
+def test_has_source_or_sources_field() -> None:
+    assert has_source_or_sources_field(FortranLibraryTarget)
+    assert has_source_or_sources_field(FortranTestsTarget)
+    assert not has_source_or_sources_field(FortranModule)
 
 
 def test_make_content_str() -> None:
@@ -410,26 +419,6 @@ def test_build_file_lacks_leading_whitespace(rule_runner: RuleRunner, header: st
         assert content.lstrip() == content
 
 
-def test_group_by_dir() -> None:
-    paths = {
-        "foo/bar/baz1.ext",
-        "foo/bar/baz1_test.ext",
-        "foo/bar/qux/quux1.ext",
-        "foo/__init__.ext",
-        "foo/bar/__init__.ext",
-        "foo/bar/baz2.ext",
-        "foo/bar1.ext",
-        "foo1.ext",
-        "__init__.ext",
-    }
-    assert {
-        "": {"__init__.ext", "foo1.ext"},
-        "foo": {"__init__.ext", "bar1.ext"},
-        "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
-        "foo/bar/qux": {"quux1.ext"},
-    } == group_by_dir(paths)
-
-
 def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -599,3 +588,44 @@ def test_filter_by_ignores() -> None:
         ),
     )
     assert set(result) == set(valid_ptgts)
+
+
+@pytest.mark.parametrize("build_file_name", ["BUILD", "OTHER_NAME"])
+def test_resolve_specs_targetting_build_files(build_file_name) -> None:
+    specs = Specs(
+        includes=RawSpecs(
+            description_of_origin="CLI arguments",
+            dir_literals=(DirLiteralSpec(f"src/{build_file_name}"), DirLiteralSpec("src/dir")),
+            dir_globs=(DirGlobSpec("src/other/"),),
+            file_literals=(FileLiteralSpec(f"src/exists/{build_file_name}.suffix"),),
+        ),
+        ignores=RawSpecs(
+            description_of_origin="CLI arguments",
+            dir_literals=(DirLiteralSpec(f"bad/{build_file_name}"), DirLiteralSpec("bad/dir")),
+            dir_globs=(DirGlobSpec("bad/other/"),),
+            file_literals=(FileLiteralSpec(f"bad/exists/{build_file_name}.suffix"),),
+        ),
+    )
+    build_file_patterns = (build_file_name, f"{build_file_name}.*")
+    resolved = resolve_specs_with_build(specs, build_file_patterns)
+
+    assert resolved.includes.file_literals == tuple()
+    assert resolved.ignores.file_literals == tuple()
+
+    assert resolved.includes.dir_literals == (
+        DirLiteralSpec("src/exists"),
+        DirLiteralSpec("src"),
+        DirLiteralSpec("src/dir"),
+    )
+    assert resolved.ignores.dir_literals == (
+        DirLiteralSpec("bad/exists"),
+        DirLiteralSpec("bad"),
+        DirLiteralSpec("bad/dir"),
+    )
+
+    assert resolved.includes.dir_globs == (
+        DirGlobSpec("src/other/"),
+    ), "did not passthrough other spec type"
+    assert resolved.ignores.dir_globs == (
+        DirGlobSpec("bad/other/"),
+    ), "did not passthrough other spec type"

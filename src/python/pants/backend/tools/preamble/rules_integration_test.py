@@ -141,6 +141,27 @@ def test_ignores_shebang(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is False
 
 
+def test_preserves_shebang(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo.py": "#!/usr/bin/env python3\n...",
+        }
+    )
+    fmt_result = run_preamble(
+        rule_runner,
+        {
+            "**/*.py": "# Copyright\n",
+        },
+    )
+
+    assert fmt_result.did_change is True
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {
+            "foo.py": "#!/usr/bin/env python3\n# Copyright\n...",
+        }
+    )
+
+
 def test_preamble_includes_shebang(rule_runner: RuleRunner) -> None:
     files_before = {"foo.py": "#!/usr/bin/env python3\n# Copyright"}
 

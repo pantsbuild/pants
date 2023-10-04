@@ -4,7 +4,6 @@ slug: "contributor-overview"
 excerpt: "The flow for making changes to Pants."
 hidden: false
 createdAt: "2020-05-16T22:54:21.867Z"
-updatedAt: "2022-06-04T12:23:09.473Z"
 ---
 We welcome contributions of all types: from fixing typos to bug fixes to new features. For further questions about any of the below, please refer to the [community overview](doc:the-pants-community).
 
@@ -19,9 +18,7 @@ We welcome contributions of all types: from fixing typos to bug fixes to new fea
 Documentation Fixes
 -------------------
 
-Pants uses [readme.com](https://readme.com/) for the documentation at [pantsbuild.org](https://pantsbuild.org). On any of docs pages, click "Suggest Edits" at the top right corner to be dropped into the editor interface. You will be asked to log in or sign up to readme.com, which only asks for your email address and a name.
-
-When ready, click "Submit Suggested Edits" at the top right corner in order to send them to us for review.
+To suggest edits to Pants documentation, fork the [Pants repository](https://github.com/pantsbuild/pants), make changes to files in the `docs/` directory, and submit a PR against the `main` branch. Address feedback from maintainers and, once approved, your changes will be incorporated into the official documentation.
 
 Pants's tech stack
 ------------------
@@ -71,14 +68,14 @@ To begin, [set up Pants on your local machine](doc:contributor-setup).
 To run a test, run:
 
 ```bash
-$ ./pants test src/python/pants/util/frozendict_test.py
+$ pants test src/python/pants/util/frozendict_test.py
 ```
 
 Periodically, you will want to run MyPy and the autoformatters and linters:
 
 ```bash
 # Format un-committed changes
-$ ./pants --changed-since=HEAD fmt
+$ pants --changed-since=HEAD fmt
 
 # Run the pre-commit checks, including `check` and `lint`
 $ build-support/githooks/pre-commit
@@ -90,7 +87,7 @@ See our [Style guide](doc:style-guide) for some Python conventions we follow.
 > 
 > You do not need to fully finish your change before asking for feedback. We'd be eager to help you while iterating.
 > 
-> If doing this, please open your pull request as a "Draft" and prefix your PR title with "WIP". Then, comment on the PR asking for feedback and/or post a link to the PR in [Slack](doc:community).
+> If doing this, please open your pull request as a "Draft" and prefix your PR title with "WIP". Then, comment on the PR asking for feedback and/or post a link to the PR in [Slack](doc:the-pants-community).
 
 Opening a pull request
 ----------------------

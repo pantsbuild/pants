@@ -3,16 +3,13 @@
 
 from __future__ import annotations
 
-from packaging.version import Version
-
-from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
+from pants.backend.python.util_rules.package_dists import SetupKwargs, SetupKwargsRequest
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalTool,
     ExternalToolRequest,
 )
 from pants.engine.console import Console
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.options_parsing import _Options
 from pants.engine.internals.session import SessionValues
@@ -21,47 +18,9 @@ from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.alias import CliAlias
 from pants.option.config import Config
-from pants.option.option_types import DictOption
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.subsystem import Subsystem
-from pants.version import PANTS_SEMVER, VERSION
-
-
-class PantsReleases(Subsystem):
-    options_scope = "pants-releases"
-    help = "Options for Pants's release process."
-
-    _release_notes = DictOption[str](
-        help="A dict from branch name to release notes rst-file location.",
-    )
-
-    @classmethod
-    def _branch_name(cls, version: Version) -> str:
-        """Defines a mapping between versions and branches.
-
-        All releases, including dev releases, map to a particular branch page.
-        """
-        suffix = version.public[len(version.base_version) :]
-        components = version.base_version.split(".") + [suffix]
-        if suffix != "" and not (
-            suffix.startswith("rc")
-            or suffix.startswith("a")
-            or suffix.startswith("b")
-            or suffix.startswith(".dev")
-        ):
-            raise ValueError(f"Unparseable pants version number: {version}")
-        return "{}.{}.x".format(*components[:2])
-
-    def notes_file_for_version(self, version: Version) -> str:
-        """Given the parsed Version of Pants, return its release notes file path."""
-        branch_name = self._branch_name(version)
-        notes_file = self._release_notes.get(branch_name)
-        if notes_file is None:
-            raise ValueError(
-                f"Version {version} lives in branch {branch_name}, which is not configured in "
-                f"{self._release_notes}."
-            )
-        return notes_file
+from pants.util.strutil import softwrap
+from pants.version import VERSION
 
 
 class PantsSetupKwargsRequest(SetupKwargsRequest):
@@ -73,9 +32,7 @@ class PantsSetupKwargsRequest(SetupKwargsRequest):
 
 
 @rule
-async def pants_setup_kwargs(
-    request: PantsSetupKwargsRequest, pants_releases: PantsReleases
-) -> SetupKwargs:
+async def pants_setup_kwargs(request: PantsSetupKwargsRequest) -> SetupKwargs:
     kwargs = request.explicit_kwargs.copy()
 
     if request.target.address.path_safe_spec.startswith("testprojects"):
@@ -103,22 +60,16 @@ async def pants_setup_kwargs(
     ]
     kwargs["classifiers"] = [*standard_classifiers, *kwargs.get("classifiers", [])]
 
-    # Determine the long description by reading from ABOUT.md and the release notes.
-    notes_file = pants_releases.notes_file_for_version(PANTS_SEMVER)
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            ["src/python/pants/ABOUT.md", notes_file],
-            description_of_origin="Pants release files",
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        ),
-    )
-    long_description = "\n".join(file_content.content.decode() for file_content in digest_contents)
-
     # Hardcode certain kwargs and validate that they weren't already set.
     hardcoded_kwargs = dict(
         version=VERSION,
-        long_description=long_description,
+        long_description=softwrap(
+            """
+            Pants is an Apache2 licensed build tool written in Python and Rust.
+
+            The latest documentation can be found at [pantsbuild.org](https://www.pantsbuild.org/).
+            """
+        ),
         long_description_content_type="text/markdown",
         url="https://github.com/pantsbuild/pants",
         project_urls={

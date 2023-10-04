@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Iterable, cast
 
@@ -42,8 +42,9 @@ class DuplicateHelmChartNamesFound(Exception):
 
 class HelmArtifactLocationSpec(ABC):
     @property
+    @abstractmethod
     def spec(self) -> str:
-        pass
+        ...
 
     @property
     def is_url(self) -> bool:

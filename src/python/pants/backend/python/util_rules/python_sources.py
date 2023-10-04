@@ -19,7 +19,6 @@ from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesF
 from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
@@ -53,11 +52,18 @@ class StrippedPythonSourceFiles:
     stripped_source_files: StrippedSourceFiles
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class PythonSourceFilesRequest:
     targets: tuple[Target, ...]
     include_resources: bool
+    # NB: Setting this to True may cause Digest merge collisions, in the presence of
+    #  relocated_files targets that relocate two different files to the same destination.
+    #  Set this to True only if you know this cannot logically happen (e.g., if it did
+    #  happen the underlying user operation would make no sense anyway).
+    #  For example, if the user relocates different config files to the same location
+    #  in different tests, there is no problem as long as we sandbox each test's sources
+    #  separately. The user may hit this issue if they run tests in batches, but in that
+    #  case they couldn't make that work even without Pants.
     include_files: bool
 
     def __init__(
@@ -67,9 +73,9 @@ class PythonSourceFilesRequest:
         include_resources: bool = True,
         include_files: bool = False,
     ) -> None:
-        self.targets = tuple(targets)
-        self.include_resources = include_resources
-        self.include_files = include_files
+        object.__setattr__(self, "targets", tuple(targets))
+        object.__setattr__(self, "include_resources", include_resources)
+        object.__setattr__(self, "include_files", include_files)
 
     @property
     def valid_sources_types(self) -> tuple[type[SourcesField], ...]:

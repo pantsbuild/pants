@@ -28,10 +28,9 @@ from pants.jvm.package import war
 from pants.jvm.package.war import PackageWarFileFieldSet
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.shading.rules import rules as shading_rules
-from pants.jvm.shading.rules_integration_test import _get_jar_contents_snapshot
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import JVM_SHADING_RULE_TYPES, JvmArtifactTarget, JvmWarTarget
-from pants.jvm.testutil import maybe_skip_jdk_test
+from pants.jvm.testutil import _get_jar_contents_snapshot, maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 

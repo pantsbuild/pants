@@ -75,7 +75,61 @@ class ExternalToolVersion:
         return cls(version, platform, sha256, int(filesize))
 
 
-class ExternalTool(Subsystem, metaclass=ABCMeta):
+class ExternalToolOptionsMixin:
+    """Common options for implementing subsystem providing an `ExternalToolRequest`."""
+
+    @classproperty
+    def name(cls):
+        """The name of the tool, for use in user-facing messages.
+
+        Derived from the classname, but subclasses can override, e.g., with a classproperty.
+        """
+        return cls.__name__.lower()
+
+    # The default values for --version and --known-versions, and the supported versions.
+    # Subclasses must set appropriately.
+    default_version: str
+    default_known_versions: list[str]
+    version_constraints: str | None = None
+
+    version = StrOption(
+        default=lambda cls: cls.default_version,
+        advanced=True,
+        help=lambda cls: f"Use this version of {cls.name}."
+        + (
+            f"\n\nSupported {cls.name} versions: {cls.version_constraints}"
+            if cls.version_constraints
+            else ""
+        ),
+    )
+
+    # Note that you can compute the length and sha256 conveniently with:
+    #   `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+    known_versions = StrListOption(
+        default=lambda cls: cls.default_known_versions,
+        advanced=True,
+        help=textwrap.dedent(
+            f"""
+        Known versions to verify downloads against.
+
+        Each element is a pipe-separated string of `version|platform|sha256|length`, where:
+
+          - `version` is the version string
+          - `platform` is one of `[{','.join(Platform.__members__.keys())}]`
+          - `sha256` is the 64-character hex representation of the expected sha256
+            digest of the download file, as emitted by `shasum -a 256`
+          - `length` is the expected length of the download file in bytes, as emitted by
+            `wc -c`
+
+        E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
+
+        Values are space-stripped, so pipes can be indented for readability if necessary.
+        """
+        ),
+    )
+
+
+class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
     """Configuration for an invocable tool that we download from an external source.
 
     Subclass this to configure a specific tool.
@@ -111,59 +165,9 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         ...
     """
 
-    # The default values for --version and --known-versions, and the supported versions.
-    # Subclasses must set appropriately.
-    default_version: str
-    default_known_versions: list[str]
-    version_constraints: str | None = None
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.check_version_constraints()
-
-    @classproperty
-    def name(cls):
-        """The name of the tool, for use in user-facing messages.
-
-        Derived from the classname, but subclasses can override, e.g., with a classproperty.
-        """
-        return cls.__name__.lower()
-
-    version = StrOption(
-        default=lambda cls: cls.default_version,
-        advanced=True,
-        help=lambda cls: f"Use this version of {cls.name}."
-        + (
-            f"\n\nSupported {cls.name} versions: {cls.version_constraints}"
-            if cls.version_constraints
-            else ""
-        ),
-    )
-
-    # Note that you can compute the length and sha256 conveniently with:
-    #   `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
-    known_versions = StrListOption(
-        default=lambda cls: cls.default_known_versions,
-        advanced=True,
-        help=textwrap.dedent(
-            f"""
-        Known versions to verify downloads against.
-
-        Each element is a pipe-separated string of `version|platform|sha256|length`, where:
-
-            - `version` is the version string
-            - `platform` is one of [{','.join(Platform.__members__.keys())}],
-            - `sha256` is the 64-character hex representation of the expected sha256
-            digest of the download file, as emitted by `shasum -a 256`
-            - `length` is the expected length of the download file in bytes, as emitted by
-            `wc -c`
-
-        E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
-
-        Values are space-stripped, so pipes can be indented for readability if necessary.
-        """
-        ),
-    )
 
     use_unsupported_version = EnumOption(
         advanced=True,
@@ -275,20 +279,9 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             raise UnsupportedVersion(" ".join(msg))
 
 
-class TemplatedExternalTool(ExternalTool):
-    """Extends the ExternalTool to allow url templating for custom/self-hosted source.
-
-    In addition to ExternalTool functionalities, it is needed to set, e.g.:
-
-    default_url_template = "https://tool.url/{version}/{platform}-mytool.zip"
-    default_url_platform_mapping = {
-        "macos_x86_64": "osx_intel",
-        "macos_arm64": "osx_arm",
-        "linux_x86_64": "linux",
-    }
-
-    The platform mapping dict is optional.
-    """
+class TemplatedExternalToolOptionsMixin(ExternalToolOptionsMixin):
+    """Common options for implementing a subsystem providing an `ExternalToolRequest` via a URL
+    template."""
 
     default_url_template: str
     default_url_platform_mapping: dict[str, str] | None = None
@@ -304,8 +297,8 @@ class TemplatedExternalTool(ExternalTool):
             `file:/this/is/absolute`, possibly by
             [templating the buildroot in a config file]({doc_url('options#config-file-entries')})).
 
-            Use `{{version}}` to have the value from --version substituted, and `{{platform}}` to
-            have a value from --url-platform-mapping substituted in, depending on the
+            Use `{{version}}` to have the value from `--version` substituted, and `{{platform}}` to
+            have a value from `--url-platform-mapping` substituted in, depending on the
             current platform. For example,
             https://github.com/.../protoc-{{version}}-{{platform}}.zip.
             """
@@ -321,17 +314,33 @@ class TemplatedExternalTool(ExternalTool):
             A dictionary mapping platforms to strings to be used when generating the URL
             to download the tool.
 
-            In --url-template, anytime the `{platform}` string is used, Pants will determine the
+            In `--url-template`, anytime the `{platform}` string is used, Pants will determine the
             current platform, and substitute `{platform}` with the respective value from your dictionary.
 
             For example, if you define `{"macos_x86_64": "apple-darwin", "linux_x86_64": "unknown-linux"}`,
             and run Pants on Linux with an intel architecture, then `{platform}` will be substituted
-            in the --url-template option with unknown-linux.
+            in the `--url-template` option with `unknown-linux`.
             """
         ),
     )
 
-    def generate_url(self, plat: Platform):
+
+class TemplatedExternalTool(ExternalTool, TemplatedExternalToolOptionsMixin):
+    """Extends the ExternalTool to allow url templating for custom/self-hosted source.
+
+    In addition to ExternalTool functionalities, it is needed to set, e.g.:
+
+    default_url_template = "https://tool.url/{version}/{platform}-mytool.zip"
+    default_url_platform_mapping = {
+        "macos_x86_64": "osx_intel",
+        "macos_arm64": "osx_arm",
+        "linux_x86_64": "linux",
+    }
+
+    The platform mapping dict is optional.
+    """
+
+    def generate_url(self, plat: Platform) -> str:
         platform = self.url_platform_mapping.get(plat.value, "")
         return self.url_template.format(version=self.version, platform=platform)
 

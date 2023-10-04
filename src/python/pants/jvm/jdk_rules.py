@@ -30,7 +30,7 @@ from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty, frozen_after_init
+from pants.util.meta import classproperty
 from pants.util.strutil import fmt_memory_size, softwrap
 
 logger = logging.getLogger(__name__)
@@ -312,8 +312,7 @@ async def prepare_jdk_environment(
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class JvmProcess:
     jdk: JdkEnvironment
     argv: tuple[str, ...]
@@ -351,24 +350,29 @@ class JvmProcess:
         use_nailgun: bool = True,
         remote_cache_speculation_delay: int | None = None,
     ):
-        self.jdk = jdk
-        self.argv = tuple(argv)
-        self.classpath_entries = tuple(classpath_entries)
-        self.input_digest = input_digest
-        self.description = description
-        self.level = level
-        self.extra_jvm_options = tuple(extra_jvm_options or ())
-        self.extra_nailgun_keys = tuple(extra_nailgun_keys or ())
-        self.output_files = tuple(output_files or ())
-        self.output_directories = tuple(output_directories or ())
-        self.timeout_seconds = timeout_seconds
-        self.cache_scope = cache_scope
-        self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
-        self.extra_env = FrozenDict(extra_env or {})
-        self.use_nailgun = use_nailgun
-        self.remote_cache_speculation_delay = remote_cache_speculation_delay
+        object.__setattr__(self, "jdk", jdk)
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "classpath_entries", tuple(classpath_entries))
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "extra_jvm_options", tuple(extra_jvm_options or ()))
+        object.__setattr__(self, "extra_nailgun_keys", tuple(extra_nailgun_keys or ()))
+        object.__setattr__(self, "output_files", tuple(output_files or ()))
+        object.__setattr__(self, "output_directories", tuple(output_directories or ()))
+        object.__setattr__(self, "timeout_seconds", timeout_seconds)
+        object.__setattr__(self, "cache_scope", cache_scope)
+        object.__setattr__(
+            self, "extra_immutable_input_digests", FrozenDict(extra_immutable_input_digests or {})
+        )
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(self, "use_nailgun", use_nailgun)
+        object.__setattr__(self, "remote_cache_speculation_delay", remote_cache_speculation_delay)
 
-        if not use_nailgun and extra_nailgun_keys:
+        self.__post_init__()
+
+    def __post_init__(self):
+        if not self.use_nailgun and self.extra_nailgun_keys:
             raise AssertionError(
                 "`JvmProcess` specified nailgun keys, but has `use_nailgun=False`. Either "
                 "specify `extra_nailgun_keys=None` or `use_nailgun=True`."
@@ -382,7 +386,6 @@ _JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
 async def jvm_process(
     bash: BashBinary, request: JvmProcess, jvm: JvmSubsystem, global_options: GlobalOptions
 ) -> Process:
-
     jdk = request.jdk
 
     immutable_input_digests = {

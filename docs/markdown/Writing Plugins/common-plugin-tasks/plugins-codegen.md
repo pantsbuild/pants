@@ -4,11 +4,10 @@ slug: "plugins-codegen"
 excerpt: "How to add a new code generator to Pants."
 hidden: false
 createdAt: "2020-07-01T04:52:54.817Z"
-updatedAt: "2022-05-07T23:43:05.454Z"
 ---
 Pants supports code generators that convert a protocol language like Protobuf into other languages, such as Python or Java. The same protocol source may be used to generate multiple distinct languages.
 
-Pants will not actually write the generated files to disk, except when running `./pants export-codegen`. Instead, any targets that depend on the protocol targets will cause their code to be generated, and those generated files will be copied over into the "chroot" (temporary directory) where Pants executes.
+Pants will not actually write the generated files to disk, except when running `pants export-codegen`. Instead, any targets that depend on the protocol targets will cause their code to be generated, and those generated files will be copied over into the "chroot" (temporary directory) where Pants executes.
 
 > 📘 Example: Protobuf -> Python
 > 
@@ -279,7 +278,7 @@ def rules():
 
 > 📘 Tip: use `export-codegen` to test it works
 > 
-> Run `./pants export-codegen path/to/file.ext` to ensure Pants is correctly generating the file. This will write the generated file(s) under the `dist/` directory, using the same path that will be used during Pants runs.
+> Run `pants export-codegen path/to/file.ext` to ensure Pants is correctly generating the file. This will write the generated file(s) under the `dist/` directory, using the same path that will be used during Pants runs.
 
 5. Audit call sites to ensure they've enabled codegen
 -----------------------------------------------------
@@ -288,7 +287,7 @@ Call sites must opt into using codegen, and they must also specify what types of
 
 For example, if you added a code generator that goes from `ProtobufSourceField -> JavaSourceField`, then Pants's Python backend would not use your new implementation because it ignores `JavaSourceField`.
 
-You should check that everywhere you're expecting is using your new codegen implementation by manually testing it out. Create a new protocol target, add it to the `dependencies` field of a target, and then run goals like `./pants package` and `./pants test` to make sure that the generated file works correctly.
+You should check that everywhere you're expecting is using your new codegen implementation by manually testing it out. Create a new protocol target, add it to the `dependencies` field of a target, and then run goals like `pants package` and `pants test` to make sure that the generated file works correctly.
 
 6. Add tests (optional)
 -----------------------

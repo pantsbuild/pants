@@ -13,7 +13,6 @@ from pants.backend.python.lint.flake8.rules import Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
 from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem_rules
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.lint import LintResult, Partitions
@@ -23,14 +22,16 @@ from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
-    skip_unless_python27_and_python3_present,
+    skip_unless_python37_and_python39_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
+from pants.util.resources import read_sibling_resource
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *flake8_rules(),
             *flake8_subsystem_rules(),
@@ -49,7 +50,7 @@ BAD_FILE = "import typing\n"  # Unused import.
 
 
 def run_flake8(
-    rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python.lint.flake8", *(extra_args or ())],
@@ -70,7 +71,7 @@ def run_flake8(
 
 
 def assert_success(
-    rule_runner: RuleRunner, target: Target, *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, target: Target, *, extra_args: list[str] | None = None
 ) -> None:
     result = run_flake8(rule_runner, [target], extra_args=extra_args)
     assert len(result) == 1
@@ -82,9 +83,9 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
-def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(
@@ -94,7 +95,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(rule_runner, [tgt])
@@ -104,7 +105,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
+def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
@@ -119,60 +120,55 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert "bad.py:1:1: F401" in result[0].stdout
 
 
-@skip_unless_python27_and_python3_present
-def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
+@skip_unless_python37_and_python39_present
+def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
-            "f.py": "version: str = 'Py3 > Py2'\n",
+            "f.py": "y = (x := 5)\n",
             "BUILD": dedent(
                 """\
-                python_sources(name='py2', interpreter_constraints=['==2.7.*'])
-                python_sources(name='py3', interpreter_constraints=['>=3.6'])
+                python_sources(name='py37', interpreter_constraints=['CPython==3.7.*'])
+                python_sources(name='py39', interpreter_constraints=['CPython==3.9.*'])
                 """
             ),
         }
     )
-    extra_args = [
-        "--flake8-lockfile=<none>",
-        "--flake8-version=flake8<4.0,>=3.9.2",
-        # Necessary due to https://github.com/PyCQA/flake8/issues/1701, which the flake8 maintainers
-        # have closed without, as far as I can tell, actually fixing.
-        "--flake8-extra-requirements=importlib-metadata>=1.1.0,<4.3",
-    ]
 
-    py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
-    py2_result = run_flake8(rule_runner, [py2_tgt], extra_args=extra_args)
-    assert len(py2_result) == 1
-    assert py2_result[0].exit_code == 1
-    assert "f.py:1:8: E999 SyntaxError" in py2_result[0].stdout
+    py37_tgt = rule_runner.get_target(Address("", target_name="py37", relative_file_path="f.py"))
+    py37_result = run_flake8(rule_runner, [py37_tgt])
+    assert len(py37_result) == 1
+    assert py37_result[0].exit_code == 1
+    assert "f.py:1:8: E999 SyntaxError" in py37_result[0].stdout
 
-    py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
-    py3_result = run_flake8(rule_runner, [py3_tgt], extra_args=extra_args)
-    assert len(py3_result) == 1
-    assert py3_result[0].exit_code == 0
-    assert py3_result[0].stdout.strip() == ""
+    py39_tgt = rule_runner.get_target(Address("", target_name="py39", relative_file_path="f.py"))
+    py39_result = run_flake8(rule_runner, [py39_tgt])
+    assert len(py39_result) == 1
+    assert py39_result[0].exit_code == 0
+    assert py39_result[0].stdout.strip() == ""
 
-    # Test that we partition incompatible targets when passed in a single batch. We expect Py2
-    # to still fail, but Py3 should pass.
-    combined_result = run_flake8(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
+    # Test that we partition incompatible targets when passed in a single batch. We expect Py37
+    # to still fail, but Py39 should pass.
+    combined_result = run_flake8(rule_runner, [py37_tgt, py39_tgt])
     assert len(combined_result) == 2
-    batched_py3_result, batched_py2_result = sorted(
+    batched_py39_result, batched_py37_result = sorted(
         combined_result, key=lambda result: result.exit_code
     )
-    assert batched_py2_result.exit_code == 1
-    assert batched_py2_result.partition_description == "['CPython==2.7.*']"
-    assert "f.py:1:8: E999 SyntaxError" in batched_py2_result.stdout
+    assert batched_py37_result.exit_code == 1
+    assert batched_py37_result.partition_description == "['CPython==3.7.*']"
+    assert "f.py:1:8: E999 SyntaxError" in batched_py37_result.stdout
 
-    assert batched_py3_result.exit_code == 0
-    assert batched_py3_result.partition_description == "['CPython>=3.6']"
-    assert batched_py3_result.stdout.strip() == ""
+    assert batched_py39_result.exit_code == 0
+    assert batched_py39_result.partition_description == "['CPython==3.9.*']"
+    assert batched_py39_result.stdout.strip() == ""
 
 
 @pytest.mark.parametrize(
     "config_path,extra_args",
     ([".flake8", []], ["custom_config.ini", ["--flake8-config=custom_config.ini"]]),
 )
-def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
+def test_config_file(
+    rule_runner: PythonRuleRunner, config_path: str, extra_args: list[str]
+) -> None:
     rule_runner.write_files(
         {
             "f.py": BAD_FILE,
@@ -184,26 +180,27 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
-def test_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--flake8-args='--ignore=F401'"])
 
 
-def test_skip(rule_runner: RuleRunner) -> None:
+def test_skip(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(rule_runner, [tgt], extra_args=["--flake8-skip"])
     assert not result
 
 
-def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
-    # Test extra_files option
+def test_3rdparty_plugin(rule_runner: PythonRuleRunner) -> None:
+    # Test extra_files option.
     rule_runner.write_files(
         {
             "f.py": "assert 1 == 1\n",
             ".bandit": "[bandit]\nskips: B101\n",
             "BUILD": "python_sources(name='t')",
+            "flake8.lock": read_sibling_resource(__name__, "flake8_plugin_test.lock"),
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
@@ -211,9 +208,8 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
         extra_args=[
-            "--flake8-extra-requirements=flake8-bandit==4.1.1",
-            "--flake8-extra-requirements=setuptools==65.5.0",
-            "--flake8-lockfile=<none>",
+            "--python-resolves={'flake8':'flake8.lock'}",
+            "--flake8-install-from-resolve=flake8",
             "--flake8-extra-files=['.bandit']",
         ],
     )
@@ -221,7 +217,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 0, result[0].stderr
 
 
-def test_report_file(rule_runner: RuleRunner) -> None:
+def test_report_file(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(
@@ -235,7 +231,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert "f.py:1:1: F401" in report_files[0].content.decode()
 
 
-def test_type_stubs(rule_runner: RuleRunner) -> None:
+def test_type_stubs(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {"f.pyi": BAD_FILE, "f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"}
     )

@@ -3,7 +3,6 @@ title: "GitHub Actions macOS ARM64 runners"
 slug: "ci-for-macos-on-arm64"
 hidden: false
 createdAt: "2022-06-05T15:31:27.665Z"
-updatedAt: "2022-06-12T08:38:54.894Z"
 ---
 Apple is phasing out their X86_64 hardware, and all new macOS systems are based on the M1 ARM64 processor. Pants must run on these systems, which means we need an M1 CI machine on which to test and package Pants.
 

@@ -41,7 +41,6 @@ async def map_protobuf_to_python_modules(
     python_setup: PythonSetup,
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets

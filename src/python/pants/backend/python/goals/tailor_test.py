@@ -21,6 +21,7 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
+from pants.core.target_types import ResourceTarget
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -68,6 +69,15 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
             "3rdparty/Pipfile.lock": "{}",
             "3rdparty/pyproject.toml": "[tool.poetry]",
             "3rdparty/requirements-test.txt": "",
+            "pep621/pyproject.toml": textwrap.dedent(
+                """\
+                [project]
+                dependencies = [
+                    "ansicolors>=1.18.0",
+                ]
+            """
+            ),
+            "pep621/requirements.txt": "",  # requirements in same dir as pep621 pyproject.toml causes conflict for name
             "already_owned/requirements.txt": "",
             "already_owned/Pipfile.lock": "",
             "already_owned/pyproject.toml": "[tool.poetry]",
@@ -91,7 +101,14 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets,
         [
             PutativePythonTargetsRequest(
-                ("3rdparty", "already_owned", "no_match", "src/python/foo", "src/python/foo/bar")
+                (
+                    "3rdparty",
+                    "already_owned",
+                    "no_match",
+                    "src/python/foo",
+                    "src/python/foo/bar",
+                    "pep621",
+                )
             ),
             AllOwnedSources(
                 [
@@ -125,6 +142,19 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     name="reqs",
                     triggering_sources=["3rdparty/requirements-test.txt"],
                     kwargs={"source": "requirements-test.txt"},
+                ),
+                PutativeTarget.for_target_type(
+                    PythonRequirementsTargetGenerator,
+                    path="pep621",
+                    name="reqs",
+                    triggering_sources=["pep621/pyproject.toml"],
+                    kwargs={"source": "pyproject.toml"},
+                ),
+                PutativeTarget.for_target_type(
+                    PythonRequirementsTargetGenerator,
+                    path="pep621",
+                    name="reqs",
+                    triggering_sources=["pep621/requirements.txt"],
                 ),
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget, "src/python/foo", None, ["__init__.py"]
@@ -298,6 +328,32 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                     "__main__",
                     [],
                     kwargs={"entry_point": "__main__.py"},
+                ),
+            ]
+        )
+        == pts
+    )
+
+
+def test_find_putative_targets_for_py_typed_marker_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"src/python/foo/py.typed": ""})
+    rule_runner.set_options(["--python-tailor-py-typed-targets"])
+    pts = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativePythonTargetsRequest(("src/python/foo",)),
+            AllOwnedSources([]),
+        ],
+    )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    ResourceTarget,
+                    path="src/python/foo",
+                    name="py_typed",
+                    triggering_sources=("py.typed",),
+                    kwargs={"source": "py.typed"},
                 ),
             ]
         )

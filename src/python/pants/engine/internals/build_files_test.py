@@ -27,7 +27,7 @@ from pants.engine.internals.defaults import ParametrizeDefault
 from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
 from pants.engine.internals.mapper import AddressFamily
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
+from pants.engine.internals.parser import BuildFilePreludeSymbols, BuildFileSymbolInfo, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
@@ -44,6 +44,7 @@ from pants.engine.target import (
     Target,
 )
 from pants.engine.unions import UnionMembership
+from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.testutil.pytest_util import assert_logged
 from pants.testutil.rule_runner import (
     MockGet,
@@ -68,8 +69,9 @@ def test_parse_address_family_empty() -> None:
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
+            BootstrapStatus(in_progress=False),
             BuildFileOptions(("BUILD",)),
-            BuildFilePreludeSymbols(FrozenDict()),
+            BuildFilePreludeSymbols(FrozenDict(), ()),
             AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
             UnionMembership({}),
@@ -133,7 +135,17 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
 
 
 def test_prelude_parsing_good() -> None:
-    result = run_prelude_parsing_rule("def foo(): return 1")
+    prelude_content = dedent(
+        """
+        def bar():
+            __defaults__(all=dict(ok=123))
+            return build_file_dir()
+
+        def foo():
+            return 1
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
     assert result.symbols["foo"]() == 1
 
 
@@ -155,6 +167,45 @@ def test_prelude_parsing_illegal_import() -> None:
     with pytest.raises(
         Exception,
         match="Import used in /dev/null/prelude at line 1\\. Import statements are banned",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_filepath() -> None:
+    prelude_content = dedent(
+        """
+        build_file_dir()
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file symbol `build_file_dir` may only be used in BUILD files\\. If used",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_defaults() -> None:
+    prelude_content = dedent(
+        """
+        __defaults__(all=dict(bad=123))
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file symbol `__defaults__` may only be used in BUILD files\\. If used",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_env() -> None:
+    prelude_content = dedent(
+        """
+        env("nope")
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file symbol `env` may only be used in BUILD files\\. If used",
     ):
         run_prelude_parsing_rule(prelude_content)
 
@@ -186,6 +237,107 @@ def test_prelude_references_builtin_symbols() -> None:
     result.symbols["make_a_target"]()
 
 
+def test_prelude_type_hint_code() -> None:
+    # Issue 18435
+    prelude_content = dedent(
+        """\
+        def ecr_docker_image(
+            *,
+            name: Optional[str] = None,
+            dependencies: Optional[List[str]] = None,
+            image_tags: Optional[List[str]] = None,
+            git_tag_prefix: Optional[str] = None,
+            latest_tag_prefix: Optional[str] = None,
+            buildcache_tag: str = "buildcache",
+            image_labels: Optional[Mapping[str, str]] = None,
+            tags: Optional[List[str]] = None,
+            extra_build_args: Optional[List[str]] = None,
+            source: Optional[str] = None,
+            target_stage: Optional[str] = None,
+            instructions: Optional[List[str]] = None,
+            repository: Optional[str] = None,
+            context_root: Optional[str] = None,
+            push_in_pants_ci: bool = True,
+            push_latest: bool = False,
+        ) -> int:
+            return 42
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    ecr_docker_image = result.info["ecr_docker_image"]
+    assert ecr_docker_image.signature in (
+        (
+            "(*,"
+            " name: Optional[str] = None,"
+            " dependencies: Optional[List[str]] = None,"
+            " image_tags: Optional[List[str]] = None,"
+            " git_tag_prefix: Optional[str] = None,"
+            " latest_tag_prefix: Optional[str] = None,"
+            " buildcache_tag: str = 'buildcache',"
+            " image_labels: Optional[Mapping[str, str]] = None,"
+            " tags: Optional[List[str]] = None,"
+            " extra_build_args: Optional[List[str]] = None,"
+            " source: Optional[str] = None,"
+            " target_stage: Optional[str] = None,"
+            " instructions: Optional[List[str]] = None,"
+            " repository: Optional[str] = None,"
+            " context_root: Optional[str] = None,"
+            " push_in_pants_ci: bool = True,"
+            " push_latest: bool = False"
+            ") -> int"
+        ),
+        (
+            "(*,"
+            " name: Union[str, NoneType] = None,"
+            " dependencies: Union[List[str], NoneType] = None,"
+            " image_tags: Union[List[str], NoneType] = None,"
+            " git_tag_prefix: Union[str, NoneType] = None,"
+            " latest_tag_prefix: Union[str, NoneType] = None,"
+            " buildcache_tag: str = 'buildcache',"
+            " image_labels: Union[Mapping[str, str], NoneType] = None,"
+            " tags: Union[List[str], NoneType] = None,"
+            " extra_build_args: Union[List[str], NoneType] = None,"
+            " source: Union[str, NoneType] = None,"
+            " target_stage: Union[str, NoneType] = None,"
+            " instructions: Union[List[str], NoneType] = None,"
+            " repository: Union[str, NoneType] = None,"
+            " context_root: Union[str, NoneType] = None,"
+            " push_in_pants_ci: bool = True,"
+            " push_latest: bool = False"
+            ") -> int"
+        ),
+    )
+    assert 42 == ecr_docker_image.value()
+
+
+def test_prelude_docstrings() -> None:
+    macro_docstring = "This is the doc-string for `macro_func`."
+    prelude_content = dedent(
+        f"""
+        def macro_func(arg: int) -> str:
+            '''{macro_docstring}'''
+            pass
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    info = result.info["macro_func"]
+    assert BuildFileSymbolInfo("macro_func", result.symbols["macro_func"]) == info
+    assert macro_docstring == info.help
+    assert "(arg: int) -> str" == info.signature
+    assert {"macro_func"} == set(result.info)
+
+
+def test_prelude_reference_env_vars() -> None:
+    prelude_content = dedent(
+        """
+        def macro():
+            env("MY_ENV")
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    assert ("MY_ENV",) == result.referenced_env_vars
+
+
 class ResolveField(StringField):
     alias = "resolve"
 
@@ -213,34 +365,34 @@ def test_resolve_address() -> None:
         assert rule_runner.request(Address, [address_input]) == expected
 
     assert_is_expected(
-        AddressInput("a/b/c.txt", description_of_origin="tests"),
+        AddressInput.parse("a/b/c.txt", description_of_origin="tests"),
         Address("a/b", target_name=None, relative_file_path="c.txt"),
     )
     assert_is_expected(
-        AddressInput("a/b", description_of_origin="tests"),
+        AddressInput.parse("a/b", description_of_origin="tests"),
         Address("a/b", target_name=None, relative_file_path=None),
     )
 
     assert_is_expected(
-        AddressInput("a/b", target_component="c", description_of_origin="tests"),
+        AddressInput.parse("a/b:c", description_of_origin="tests"),
         Address("a/b", target_name="c"),
     )
     assert_is_expected(
-        AddressInput("a/b/c.txt", target_component="c", description_of_origin="tests"),
+        AddressInput.parse("a/b/c.txt:c", description_of_origin="tests"),
         Address("a/b", relative_file_path="c.txt", target_name="c"),
     )
 
     # Top-level addresses will not have a path_component, unless they are a file address.
     assert_is_expected(
-        AddressInput("f.txt", target_component="original", description_of_origin="tests"),
+        AddressInput.parse("f.txt:original", description_of_origin="tests"),
         Address("", relative_file_path="f.txt", target_name="original"),
     )
     assert_is_expected(
-        AddressInput("", target_component="t", description_of_origin="tests"),
+        AddressInput.parse("//:t", description_of_origin="tests"),
         Address("", target_name="t"),
     )
 
-    bad_address_input = AddressInput("a/b/fake", description_of_origin="tests")
+    bad_address_input = AddressInput.parse("a/b/fake", description_of_origin="tests")
     expected_err = "'a/b/fake' does not exist on disk"
     with engine_error(ResolveError, contains=expected_err):
         rule_runner.request(Address, [bad_address_input])
@@ -396,11 +548,10 @@ def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -
         {
             "BUILD": dedent(
                 """
+                __defaults__(all=dict(tags=["default-tag"]))
                 mock_tgt(
-                  sources=(
-                    "*.added",
-                    *mock_tgt.sources.default,
-                  ),
+                  sources=["*.added", *mock_tgt.sources.default],
+                  tags=["custom-tag", *mock_tgt.tags.default],
                 )
                 """
             ),
@@ -410,7 +561,8 @@ def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -
         TargetAdaptor,
         [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
     )
-    assert target_adaptor.kwargs["sources"] == ("*.added", "*.mock")
+    assert target_adaptor.kwargs["sources"] == ["*.added", "*.mock"]
+    assert target_adaptor.kwargs["tags"] == ["custom-tag", "default-tag"]
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -513,6 +665,9 @@ def test_macro_undefined_symbol_bootstrap() -> None:
         rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
         is_bootstrap=True,
     )
+    rule_runner.set_options(
+        args=("--build-file-prelude-globs=prelude.py",),
+    )
     rule_runner.write_files(
         {
             "prelude.py": dedent(
@@ -532,6 +687,28 @@ def test_macro_undefined_symbol_bootstrap() -> None:
     # Parse the root BUILD file.
     address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
     assert not address_family.name_to_target_adaptors
+
+
+def test_default_plugin_field_bootstrap() -> None:
+    # Tests that an unknown field in `__defaults__` is ignored while bootstrapping.
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+        is_bootstrap=True,
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                __defaults__({mock_tgt: dict(presumably_plugin_field="default", tags=["ok"])})
+                """
+            ),
+        }
+    )
+
+    # Parse the root BUILD file.
+    address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
+    assert dict(tags=("ok",)) == dict(address_family.defaults["mock_tgt"])
 
 
 def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -557,6 +734,35 @@ def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
     )
     assert target_adaptor.kwargs["description"] == "from env"
     assert target_adaptor.kwargs["tags"] == ["default", "tag"]
+
+
+def test_prelude_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "prelude.py": dedent(
+                """
+                def macro_val():
+                    return env("MACRO_ENV")
+                """
+            ),
+            "BUILD": dedent(
+                """
+                mock_tgt(
+                  description=macro_val(),
+                )
+                """
+            ),
+        },
+    )
+    target_adaptor_rule_runner.set_options(
+        args=("--build-file-prelude-globs=prelude.py",),
+        env={"MACRO_ENV": "from env"},
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["description"] == "from env"
 
 
 def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRunner) -> None:
@@ -596,3 +802,45 @@ def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRun
             ),
         ],
     )
+
+
+def test_build_file_parse_error(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/bad/BUILD": dedent(
+                """\
+                mock_tgt(
+                  name="foo"
+                  tags=[]
+                )
+                """
+            ),
+        },
+    )
+    with pytest.raises(ExecutionError, match='File "src/bad/BUILD", line 3'):
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [
+                TargetAdaptorRequest(
+                    Address("src/bad", target_name="foo"), description_of_origin="test"
+                )
+            ],
+        )
+
+
+def test_build_file_description_of_origin(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                # Define a target..
+                mock_tgt(name="foo")
+                """
+            ),
+        },
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
+    )
+    assert "src/BUILD:2" == target_adaptor.description_of_origin

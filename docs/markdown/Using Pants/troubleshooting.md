@@ -4,7 +4,6 @@ slug: "troubleshooting"
 excerpt: "Frequently asked questions (FAQs) and known issues you may encounter."
 hidden: false
 createdAt: "2020-04-10T19:42:28.637Z"
-updatedAt: "2022-05-25T14:34:36.454Z"
 ---
 > 👍 We love giving help!
 > 
@@ -20,7 +19,7 @@ Pants defaults to not displaying the full stack trace when it encounters an erro
 When you encounter an exception, it can help to use the global options `--print-stacktrace` and `-ldebug`, like this:
 
 ```bash
-./pants --print-stacktrace -ldebug <rest of your command>
+pants --print-stacktrace -ldebug <rest of your command>
 ```
 
 Setting the option `--pex-verbosity=9` can help debug exceptions that occur when building .pex files.
@@ -35,7 +34,7 @@ Pants runs most processes in a hermetic sandbox (temporary directory), which all
 Use the option `--keep-sandboxes=always` for Pants to log the paths to these sandboxes, and to keep them around after the run. You can then inspect them to check if the files you are expecting are present.
 
 ```bash
-./pants --keep-sandboxes=always lint src/project/app.py
+pants --keep-sandboxes=always lint src/project/app.py
 ...
 21:26:13.55 [INFO] preserving local process execution dir `"/private/var/folders/hm/qjjq4w3n0fsb07kp5bxbn8rw0000gn/T/process-executionQgIOjb"` for "Run isort on 1 file."
 ...
@@ -55,9 +54,9 @@ To start with, first try using `--no-pantsd`. If that doesn't work, you can also
 If `--no-pantsd` worked, you can restart `pantsd`, either by:
 
 - Killing the `pantsd` process associated with your workspace. You can use `ps aux | grep pants` to find the PID, the `kill -9 <pid>`. 
-- Deleting the `<build root>/.pids` directory. 
+- Deleting the `<build root>/.pants.d/pids` directory. 
 
-If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/pantsd/pantsd.log` file.
+If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/workdir/pantsd/pantsd.log` file.
 
 If restarting `pantsd` is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
 
@@ -84,13 +83,13 @@ Because Pants runs processes in hermetic sandboxes (temporary directories), Pant
 
 Usually, you do not need to tell Pants about your dependencies thanks to dependency inference, but sometimes dependency inference is not set up properly or cannot work.
 
-To see what dependencies Pants knows about, run `./pants dependencies path/to/file.ext` and `./pants dependencies --transitive`.
+To see what dependencies Pants knows about, run `pants dependencies path/to/file.ext` and `pants dependencies --transitive`.
 
 Is the missing import from a third-party dependency? Common issues:
 
 - Pants does know about your third-party requirements, e.g. missing `python_requirements` and `go_mod` target generators.
-  - To see all third-party requirement targets Pants knows, run `./pants --filter-target-type=$tgt list ::`, where Python: `python_requirement`, Go: `go_third_party_package`, and JVM: `jvm_artifact`.
-  - Run `./pants tailor ::`, or manually add the relevant targets.
+  - To see all third-party requirement targets Pants knows, run `pants --filter-target-type=$tgt list ::`, where Python: `python_requirement`, Go: `go_third_party_package`, and JVM: `jvm_artifact`.
+  - Run `pants tailor ::`, or manually add the relevant targets.
 - The dependency is missing from your third-party requirements list, e.g. `go.mod` or `requirements.txt`.
 - The dependency exposes a module different than the default Pants uses, e.g. Python's `ansicolors` exposing `colors`.
   - [Python](doc:python-third-party-dependencies): set the `modules` field and `module_mapping` fields.
@@ -102,21 +101,23 @@ Is the missing import from first-party code? Common issues:
 - The file does not exist.
   - Or, it's ignored by Pants. See the above guide "Pants cannot find a file in your project".
 - The file is missing an owning target like `python_sources`, `go_package`, or `resources`.
-  - Run `./pants list path/to/file.ext` to see all owning targets.
-  - Try running `./pants tailor ::`. Warning: some target types like [`resources` and `files`](doc:assets) must be manually added.
+  - Run `pants list path/to/file.ext` to see all owning targets.
+  - Try running `pants tailor ::`. Warning: some target types like [`resources` and `files`](doc:assets) must be manually added.
 - [Source roots](doc:source-roots) are not set up properly (Python and JVM only).
   - This allows converting file paths like `src/py/project/app.py` to the Python module `project.app`.
+- Code generation such as [Protobuf](doc:protobuf-python) is not set up properly (Python and JVM only).
+  - Generate missing targets so that produced modules could be found. If there are any Python files that are known to be created ad hoc only at runtime, you might consider using `.pyi` stub files for the modules to be discovered during dependency inference.
 
  Common issues with both first and third-party imports:
 
 - Ambiguity. >1 target exposes the same module/package.
-  - If it's a third-party dependency, you should likely use multiple "resolves" (lockfiles). Each resolve should have no more than one of the same requirement.  See [Python](doc:python-third-party-resolves#multiple-lockfiles) and [JVM](doc:jvm-overview).
-  - If it's a first-party dependency, you may have unintentionally created multiple targets owning the same file. Run `./pants list path/to/file.ext` to see all owners. This often happens from overlapping `sources` fields. If this was intentional, follow the instructions in the ambiguity warning to disambiguate via the `dependencies` field.
+  - If it's a third-party dependency, you should likely use multiple "resolves" (lockfiles). Each resolve should have no more than one of the same requirement.  See [Python](doc:python-lockfiles#multiple-lockfiles) and [JVM](doc:jvm-overview).
+  - If it's a first-party dependency, you may have unintentionally created multiple targets owning the same file. Run `pants list path/to/file.ext` to see all owners. This often happens from overlapping `sources` fields. If this was intentional, follow the instructions in the ambiguity warning to disambiguate via the `dependencies` field.
 - Some target types like `resources` and `files` often need to be explicitly added to the `dependencies` field and cannot be inferred (yet).
 - Multiple resolves (Python and JVM).
   - A target can only depend on targets that share the same "resolve" (lockfile).
   - Pants will warn when it detects that the import exists in another resolve. This usually implies you should either change the current target's `resolve` field, or use the `parametrize()` mechanism so that the code works with multiple resolves.
-  - See [Python](doc:python-third-party-resolves#multiple-lockfiles) and [JVM](doc:jvm-overview).
+  - See [Python](doc:python-lockfiles#multiple-lockfiles) and [JVM](doc:jvm-overview).
 
 When debugging dependency inference, it can help to explicitly add the problematic dependency to the `dependencies` field to see if it gets the code running. If so, you can then try to figure out why dependency inference is not working.
 
@@ -159,10 +160,10 @@ You may change any of these options in the `[GLOBAL]` section of your `pants.tom
     "1-1": "Stores the caches for certain tools used by Pants, like PEX's cache for resolving Python requirements.",
     "1-2": "`~/.cache/pants/named_caches`",
     "2-0": "`pants_workdir`",
-    "2-1": "Stores some project-specific logs; used as a temporary directory when running `./pants repl` and `./pants run`.  \n  \nThis is not used for caching.  \n  \nThis must be relative to the build root.",
-    "2-2": "`<build_root>/.pants.d/`",
+    "2-1": "Stores some project-specific logs; used as a temporary directory when running `pants repl` and `pants run`.  \n  \nThis is not used for caching.  \n  \nThis must be relative to the build root.",
+    "2-2": "`<build_root>/.pants.d/workdir`",
     "3-0": "`pants_distdir`",
-    "3-1": "Where Pants writes artifacts to, such as the result of `./pants package`.  \n  \nThis is not used for caching; you can delete this folder and still leverage the cache from `local_store_dir`.  \n  \nThis must be relative to the build root.",
+    "3-1": "Where Pants writes artifacts to, such as the result of `pants package`.  \n  \nThis is not used for caching; you can delete this folder and still leverage the cache from `local_store_dir`.  \n  \nThis must be relative to the build root.",
     "3-2": "`<build_root>/dist/`"
   },
   "cols": 3,
@@ -179,7 +180,7 @@ For `local_store_dir` and `named_caches_dir`, you may either specify an absolute
 
 It is safe to delete these folders to free up space.
 
-You can also change the cache used by the `./pants` script described in [Installing Pants](doc:installation), which defaults to `~/.pants/cache/setup`. Either set the environment variable `PANTS_SETUP_CACHE` or change the Bash script directly where it defines `PANTS_SETUP_CACHE`. You may use an absolute path or a path relative to the build root. 
+You can also change the cache used by the `pants` script described in [Installing Pants](doc:installation), which defaults to `~/.pants/cache/setup`. Either set the environment variable `PANTS_SETUP_CACHE` or change the Bash script directly where it defines `PANTS_SETUP_CACHE`. You may use an absolute path or a path relative to the build root. 
 
 BadZipFile error when processing Python wheels
 ----------------------------------------------
@@ -188,16 +189,23 @@ This can happen if your temporary directory (`/tmp/` by default) is not on the s
 
 The solution is to move `~/.cache/pants`, or at least the `named_caches_dir`(see [above](#how-to-change-your-cache-directory)), to the same filesystem as the temporary directory, or vice versa.
 
+Issues packaging AWS CDK into a PEX
+-----------------------------------
+
+If you get errors like `ModuleNotFoundError: No module named 'aws_cdk.asset_awscli_v1`, set `execution_mode="venv"` and `venv_site_packages_copies=True` on your `pex_binary` target.
+
+This ensures that the `aws_cdk` subpackages are properly nested under the parent package, despite those distributions not being configured as [namespace packages](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/).
+
 "Double requirement given" error when resolving Python requirements
 -------------------------------------------------------------------
 
 This is an error from `pip`, and it means that the same 3rd-party Python requirement—with different version constraints—appears in your dependencies.
 
-You can use `./pants peek` to help identify why the same requirement is being used more than once:
+You can use `pants peek` to help identify why the same requirement is being used more than once:
 
 ```shell Shell
 # Check the `requirements` key to see if it has the problematic requirement.
-./pants --filter-target-type=python_requirement peek ::
+pants --filter-target-type=python_requirement peek ::
 ```
 
 macOS users: issues with system Python interpreters
@@ -217,7 +225,7 @@ You can set the option `interpreter_search_paths` in the `[python]` scope to tea
 You may encounter this error when running Pants:
 
 ```
-./pants count-loc helloworld/greet/f.py
+pants count-loc helloworld/greet/f.py
 
 ERROR: Could not initialize store for process cache: "Error making env for store at \"/Users/pantsbuild/.cache/pants/lmdb_store/processes/2\": Too many open files"
 
@@ -232,7 +240,7 @@ This can be fixed by setting `ulimit -n 10000`. (10,000 should work in all cases
 > 
 > We recommend permanently setting this by either:
 > 
-> 1. Adding `ulimit -n 10000` to your `./pants.bootstrap` script.
+> 1. Adding `ulimit -n 10000` to your `pants.bootstrap` script.
 > 2. Adding `ulimit -n 10000` to your global `.bashrc` or equivalent.
 > 
 > The first two approaches have the benefit that they will be checked into version control, so every developer at your organization can use the same setting.
@@ -249,7 +257,7 @@ When adopting Pants for your tests you may find that they have issues with being
 To temporarily run a single test at a time (albeit with reduced performance), you can reduce the parallelism globally:
 
 ```
-./pants --process-execution-local-parallelism=1 test ::
+pants --process-execution-local-parallelism=1 test ::
 ```
 
 A more sustainable solution for shared resources is to use the [`[pytest].execution_slot_var`](doc:reference-pytest#section-execution-slot-var) option, which sets an environment variable which test runs can consume to determine which copy of a resource to consume.
@@ -263,3 +271,14 @@ It works mostly same as a normal installation, but has an important difference: 
 This may cause problems if your code or tests ry to create a container with a bind-mount of a directory or file _under the current working directory_.  Container creation will fail with "invalid mount config for type "bind": bind source path does not exist", because Pants' default `local_execution_root_dir` option is `/tmp`, which the Snap-based Docker service cannot access.
 
 You can work around this issue by explicitly setting `[GLOBAL].local_execution_root_dir` to a directory outside the system `/tmp` directory, such as `"%(buildroot)s/tmp"`.
+
+Using pants on self-hosted GitHub actions runner
+------------------------------------------------
+
+Setting up pants to run with Python executables provided by [setup-python](https://github.com/marketplace/actions/setup-python) will not work on vanilla actions runner setup. This is due to the [known limitation](https://github.com/pantsbuild/pants/issues/16565) of pants which does not allow leaking arbitrary environment variable (in this case `LD_LIBRARY_PATH` for us) when evaluating dependency inference rules. If you fall into this situation, you will face an error complaining about missing shared object files, like this:
+
+```
+/home/ubuntu/.cache/python-tools/Python/3.11.3/x64/bin/python3.11: error while loading shared libraries: libpython3.11.so.1.0: cannot open shared object file: No such file or directory
+```
+
+One of the workaround to fix this issue is setting up python tool cache files at `/opt/hostedtoolcache` directory. This is the default path which `setup-python` action uses to download relevant files on hosted GitHub actions runner. Overriding tool cache download directory can be achieved by following [setup-python documentation](https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#linux).

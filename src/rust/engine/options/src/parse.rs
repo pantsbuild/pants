@@ -107,7 +107,9 @@ peg::parser! {
             }
 
         rule implicit_add() -> Vec<ListEdit<String>>
-            = !(whitespace() / add() / remove() / tuple_start() / list_start()) item:string() {
+            // If the value is not prefixed with any of the syntax that we recognize as indicating
+            // our list edit syntax, then it is implicitly an Add.
+            = !(whitespace() / (action() list_start()) / (action() tuple_start()) / tuple_start() / list_start()) item:string() {
                 vec![ListEdit { action: ListEditAction::Add, items: vec![item.to_owned()] }]
             }
 
@@ -129,9 +131,8 @@ mod err {
         template_ref.contains("{name}"),
         "\
         Expected the template to contain at least one `{{name}}` placeholder, but found none: \
-        {template}.\
-        ",
-        template = template_ref
+        {template_ref}.\
+        "
       );
       ParseError {
         template: template_ref.to_owned(),
@@ -164,7 +165,7 @@ fn format_parse_error(
           "-".repeat(parse_error.location.column - 1)
         )
       } else {
-        format!("{}:{}", line_no, line)
+        format!("{line_no}:{line}")
       }
     })
     .collect::<Vec<_>>()
@@ -199,8 +200,7 @@ pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
     "true" => Ok(true),
     "false" => Ok(false),
     _ => Err(ParseError::new(format!(
-      "Got '{value}' for {{name}}. Expected 'true' or 'false'.",
-      value = value
+      "Got '{value}' for {{name}}. Expected 'true' or 'false'."
     ))),
   }
 }

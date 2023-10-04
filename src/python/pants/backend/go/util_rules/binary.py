@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pants.backend.go.target_types import (
     GoBinaryDependenciesField,
     GoBinaryMainPackageField,
+    GoImportPathField,
     GoPackageSourcesField,
 )
 from pants.base.specs import DirGlobSpec, RawSpecs
@@ -30,6 +31,9 @@ from pants.util.logging import LogLevel
 @dataclass(frozen=True)
 class GoBinaryMainPackage:
     address: Address
+
+    is_third_party: bool
+    import_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,15 +66,25 @@ async def determine_main_pkg_for_go_binary(
             WrappedTarget,
             WrappedTargetRequest(specified_address, description_of_origin=description_of_origin),
         )
-        if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
+        if not wrapped_specified_tgt.target.has_field(
+            GoPackageSourcesField
+        ) and not wrapped_specified_tgt.target.has_field(GoImportPathField):
             raise InvalidFieldException(
                 f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
-                "a `go_package` target, but was the address for a "
+                "a `go_package` or `go_third_party_package` target, but was the address for a "
                 f"`{wrapped_specified_tgt.target.alias}` target.\n\n"
-                "Hint: you should normally not specify this field so that Pants will find the "
-                "`go_package` target for you."
+                "Hint: unless the package is a `go_third_party_package` target, you should normally "
+                "not specify this field for local packages so that Pants will find the `go_package` "
+                "target for you."
             )
-        return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
+
+        if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
+            return GoBinaryMainPackage(
+                wrapped_specified_tgt.target.address,
+                is_third_party=True,
+                import_path=wrapped_specified_tgt.target.get(GoImportPathField).value,
+            )
+        return GoBinaryMainPackage(wrapped_specified_tgt.target.address, is_third_party=False)
 
     candidate_targets = await Get(
         Targets,
@@ -85,7 +99,7 @@ async def determine_main_pkg_for_go_binary(
         if tgt.has_field(GoPackageSourcesField) and tgt.residence_dir == addr.spec_path
     ]
     if len(relevant_pkg_targets) == 1:
-        return GoBinaryMainPackage(relevant_pkg_targets[0].address)
+        return GoBinaryMainPackage(relevant_pkg_targets[0].address, is_third_party=False)
 
     if not relevant_pkg_targets:
         raise ResolveError(

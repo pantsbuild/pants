@@ -31,7 +31,6 @@ from pants.engine.target import (
 )
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -102,8 +101,7 @@ async def isolate_local_dist_wheels(
     return LocalDistWheels(tuple(wheels), wheels_snapshot.digest, frozenset(provided_files))
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class LocalDistsPexRequest:
     """Request to build the local dists from the dependency closure of a set of addresses."""
 
@@ -119,13 +117,13 @@ class LocalDistsPexRequest:
         addresses: Iterable[Address],
         *,
         internal_only: bool,
-        interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
+        interpreter_constraints: InterpreterConstraints,
         sources: PythonSourceFiles = PythonSourceFiles.empty(),
     ) -> None:
-        self.addresses = Addresses(addresses)
-        self.internal_only = internal_only
-        self.interpreter_constraints = interpreter_constraints
-        self.sources = sources
+        object.__setattr__(self, "addresses", Addresses(addresses))
+        object.__setattr__(self, "internal_only", internal_only)
+        object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
+        object.__setattr__(self, "sources", sources)
 
 
 @dataclass(frozen=True)

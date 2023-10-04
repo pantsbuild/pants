@@ -2,12 +2,12 @@
 version = "0.0.1"
 edition = "2021"
 name = "async_latch"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-parking_lot = "0.12"
-tokio = { version = "1.21", features = ["sync"] }
+parking_lot = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
-tokio = { version = "1.21", features = ["rt", "macros", "time"] }
+tokio = { workspace = true, features = ["rt", "macros", "time"] }

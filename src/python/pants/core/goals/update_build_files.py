@@ -19,10 +19,12 @@ from pants.backend.build_files.fix.deprecations import renamed_fields_rules, ren
 from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
 from pants.backend.build_files.fmt.yapf.register import YapfRequest
+from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.rules import _run_yapf
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
 from pants.backend.python.util_rules import pex
 from pants.base.specs import Specs
 from pants.engine.console import Console
@@ -48,7 +50,7 @@ from pants.option.option_types import BoolOption, EnumOption
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +109,7 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
-    help = softwrap(
+    help = help_text(
         f"""
         Format and fix safe deprecations in BUILD files.
 
@@ -237,7 +239,7 @@ async def update_build_files(
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:
-        all_rewritten_files = await MultiGet(
+        all_rewritten_files = await MultiGet(  # noqa: PNT30: this is inherently sequential
             Get(
                 RewrittenBuildFile,
                 RewrittenBuildFileRequest,
@@ -311,7 +313,7 @@ async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
-    yapf_ics = await Yapf._find_python_interpreter_constraints_from_lockfile(yapf)
+    yapf_ics = await get_lockfile_interpreter_constraints(yapf)
     result = await _run_yapf(
         YapfRequest.Batch(
             Yapf.options_scope,
@@ -345,7 +347,7 @@ async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
-    black_ics = await Black._find_python_interpreter_constraints_from_lockfile(black)
+    black_ics = await get_lockfile_interpreter_constraints(black)
     result = await _run_black(
         BlackRequest.Batch(
             Black.options_scope,
@@ -381,7 +383,7 @@ async def maybe_rename_deprecated_targets(
     old_bytes = "\n".join(request.lines).encode("utf-8")
     new_content = await Get(
         FixedBUILDFile,
-        renamed_fields_rules.RenameFieldsInFileRequest(path=request.path, content=old_bytes),
+        renamed_targets_rules.RenameTargetsInFileRequest(path=request.path, content=old_bytes),
     )
 
     return RewrittenBuildFile(
@@ -427,6 +429,7 @@ def rules():
         *collect_rules(renamed_fields_rules),
         *collect_rules(renamed_targets_rules),
         *pex.rules(),
+        *lockfile.rules(),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedFieldsRequest),
         # NB: We want this to come at the end so that running Black or Yapf happens

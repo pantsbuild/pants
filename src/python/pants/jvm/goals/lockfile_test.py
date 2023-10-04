@@ -58,7 +58,11 @@ def test_generate_lockfile(rule_runner: RuleRunner) -> None:
     )
     result = rule_runner.request(
         GenerateLockfileResult,
-        [GenerateJvmLockfile(artifacts=artifacts, resolve_name="test", lockfile_dest="lock.txt")],
+        [
+            GenerateJvmLockfile(
+                artifacts=artifacts, resolve_name="test", lockfile_dest="lock.txt", diff=False
+            )
+        ],
     )
     digest_contents = rule_runner.request(DigestContents, [result.digest])
     assert len(digest_contents) == 1
@@ -99,7 +103,6 @@ def test_artifact_collision(rule_runner: RuleRunner) -> None:
                       artifact='artifact',
                       version='1',
                       jar='jar.jar',
-                      excludes=['ex:clude'],
                   )
 
                 mk('one')
@@ -163,6 +166,7 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
             ),
             resolve_name="a",
             lockfile_dest="a.lock",
+            diff=False,
         ),
         GenerateJvmLockfile(
             artifacts=ArtifactRequirements(
@@ -173,5 +177,6 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
             ),
             resolve_name="b",
             lockfile_dest="b.lock",
+            diff=False,
         ),
     }

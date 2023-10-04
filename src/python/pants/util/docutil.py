@@ -36,4 +36,8 @@ def bin_name() -> str:
     # However, this assumption really breaks down when we go to test pants (or a plugin author goes
     # to test their plugin). Therefore we give a fallback and have integration test(s) to assert
     # we've set this at the right point in time.
-    return os.environ.get("PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN
+    #
+    # Note that __PANTS_BIN_NAME is set in options_bootstrapper.py based on the value of the
+    # pants_bin_name global option, so you cannot naively modify this by setting __PANTS_BIN_NAME
+    # externally. You must set that option value in one of the usual ways.
+    return os.environ.get("__PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN

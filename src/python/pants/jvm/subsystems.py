@@ -5,19 +5,19 @@ from __future__ import annotations
 
 from pants.option.option_types import BoolOption, DictOption, IntOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class JvmSubsystem(Subsystem):
     options_scope = "jvm"
-    help = softwrap(
+    help = help_text(
         """
         Options for general JVM functionality.
 
         JDK strings will be passed directly to Coursier's `--jvm` parameter.
         Run `cs java --available` to see a list of available JVM versions on your platform.
 
-        If the string 'system' is passed, Coursier's `--system-jvm` option will be used
+        If the string `'system'` is passed, Coursier's `--system-jvm` option will be used
         instead, but note that this can lead to inconsistent behavior since the JVM version
         will be whatever happens to be found first on the system's PATH.
         """
@@ -56,7 +56,7 @@ class JvmSubsystem(Subsystem):
             This string will be passed directly to Coursier's `--jvm` parameter.
             Run `cs java --available` to see a list of available JVM versions on your platform.
 
-            If the string 'system' is passed, Coursier's `--system-jvm` option will be used
+            If the string `'system'` is passed, Coursier's `--system-jvm` option will be used
             instead, but note that this can lead to inconsistent behavior since the JVM version
             will be whatever happens to be found first on the system's PATH.
             """
@@ -84,7 +84,7 @@ class JvmSubsystem(Subsystem):
             Extra JVM arguments to use when running tests in debug mode.
 
             For example, if you want to attach a remote debugger, use something like
-            ['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']
+            `['-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005']`.
             """
         ),
     )

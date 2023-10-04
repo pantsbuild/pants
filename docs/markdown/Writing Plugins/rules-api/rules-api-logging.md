@@ -4,9 +4,8 @@ slug: "rules-api-logging"
 excerpt: "How to add logging and influence the dynamic UI."
 hidden: false
 createdAt: "2020-09-12T03:38:10.345Z"
-updatedAt: "2020-09-16T03:17:03.975Z"
 ---
-Even though a [`@goal_rule`](doc:rules-api-goals) is the only type of rule that can print to `stdout` (via the special `Console` type), any rule can log to stderr and change how the rule appears in the dynamic UI.
+Even though a [`@goal_rule`](doc:rules-api-goal-rules) is the only type of rule that can print to `stdout` (via the special `Console` type), any rule can log to stderr and change how the rule appears in the dynamic UI.
 
 Adding logging
 --------------
@@ -24,7 +23,7 @@ def demo(...) -> Foo:
     ...
 ```
 
-You can use `logger.info`, `logger.warning`, `logger.error`, `logger.debug`, and `logger.trace`. You can then change your log level by setting the `-l`/`--level` option, e.g. `./pants -ldebug my-goal`.
+You can use `logger.info`, `logger.warning`, `logger.error`, `logger.debug`, and `logger.trace`. You can then change your log level by setting the `-l`/`--level` option, e.g. `pants -ldebug my-goal`.
 
 Changing the dynamic UI
 -----------------------
@@ -32,6 +31,6 @@ Changing the dynamic UI
 Streaming results (advanced)
 ----------------------------
 
-When you run `./pants fmt`, `./pants lint`, and `./pants test`, you may notice that we "stream" the results. As soon as an individual process finishes, we print the result, rather than waiting for all the processes to finish and dumping at the end.
+When you run `pants fmt`, `pants lint`, and `pants test`, you may notice that we "stream" the results. As soon as an individual process finishes, we print the result, rather than waiting for all the processes to finish and dumping at the end.
 
 We also set the log level dynamically. If something succeeds, we log the result at `INFO`, but if something fails, we use `WARN`.

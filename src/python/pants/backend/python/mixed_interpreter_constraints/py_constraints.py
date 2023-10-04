@@ -10,14 +10,12 @@ from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     RegisteredTargetTypes,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -40,7 +38,7 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
             """
             Output a CSV summary of interpreter constraints for your whole repository. The
             headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`,
-            and `# Dependents` (or `# Dependees`, if summary_use_new_header is False).
+            and `# Dependents`.
 
             This information can be useful when prioritizing a migration from one Python version to
             another (e.g. to Python 3). Use `# Dependencies` and `# Dependents` to help prioritize
@@ -49,24 +47,6 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
 
             Use a tool like Pandas or Excel to process the CSV. Use the option
             `--py-constraints-output-file=summary.csv` to write directly to a file.
-            """
-        ),
-    )
-
-    summary_use_new_header = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            If False, use the legacy, misleading `#Dependees` header name in the summary CSV table.
-            If True, will use the new, more accurate, `# Dependents` name for the same column.
-
-            This is a temporary option to ease migration to the new header name. Set this option to
-            True to start working with the new header.
-
-            This option's default value will change to True in 2.16.x, and it will be deprecated
-            in that version.
-
-            This option, and the ability to use the old name, will be removed entirely in 2.17.x.
             """
         ),
     )
@@ -87,16 +67,7 @@ async def py_constraints(
     union_membership: UnionMembership,
 ) -> PyConstraintsGoal:
     if py_constraints_subsystem.summary:
-        if not py_constraints_subsystem.summary_use_new_header:
-            warn_or_error(
-                "2.17.0.dev0",
-                "the old, misleading, `# Dependees` header",
-                "Set --summary-use-new-header to true to start using the new `# Dependents` header.",
-            )
-
-        dependents_header = (
-            "# Dependents" if py_constraints_subsystem.summary_use_new_header else "# Dependees"
-        )
+        dependents_header = "# Dependents"
         if addresses:
             console.print_stderr(
                 softwrap(
@@ -108,7 +79,7 @@ async def py_constraints(
             )
             return PyConstraintsGoal(exit_code=1)
 
-        all_targets = await Get(AllTargets, AllTargetsRequest())
+        all_targets = await Get(AllTargets)
         all_python_targets = tuple(
             t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )

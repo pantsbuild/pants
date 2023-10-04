@@ -36,6 +36,13 @@ def test_maybe_expand_alias(alias: str, expanded: tuple[str, ...] | None) -> Non
     )
     assert cli_alias.maybe_expand("alias") == expanded
 
+    cli_alias = CliAlias.from_dict(
+        {
+            "--alias": alias,
+        }
+    )
+    assert cli_alias.maybe_expand("--alias") == expanded
+
 
 @pytest.mark.parametrize(
     "args, expanded",
@@ -55,6 +62,29 @@ def test_expand_args(args: tuple[str, ...], expanded: tuple[str, ...]) -> None:
     cli_alias = CliAlias.from_dict(
         {
             "alias": "--flag goal",
+        }
+    )
+    assert cli_alias.expand_args(args) == expanded
+
+
+@pytest.mark.parametrize(
+    "args, expanded",
+    [
+        (
+            ("some", "--alias", "target"),
+            ("some", "--flag", "goal", "target"),
+        ),
+        (
+            # Don't touch pass through args.
+            ("some", "--", "--alias", "target"),
+            ("some", "--", "--alias", "target"),
+        ),
+    ],
+)
+def test_expand_args_flag(args: tuple[str, ...], expanded: tuple[str, ...]) -> None:
+    cli_alias = CliAlias.from_dict(
+        {
+            "--alias": "--flag goal",
         }
     )
     assert cli_alias.expand_args(args) == expanded
@@ -105,8 +135,34 @@ def test_no_expand_when_no_aliases() -> None:
             pytest.raises(
                 CliAliasCycleError,
                 match=(
-                    r"CLI alias cycle detected in `\[cli\]\.alias` option: "
-                    r"other-alias -> cycle -> other-alias"
+                    r"CLI alias cycle detected in `\[cli\]\.alias` option:\n"
+                    + r"other-alias -> cycle -> other-alias"
+                ),
+            ),
+        ),
+        (
+            {
+                "cycle": "--other-alias",
+                "--other-alias": "cycle",
+            },
+            pytest.raises(
+                CliAliasCycleError,
+                match=(
+                    r"CLI alias cycle detected in `\[cli\]\.alias` option:\n"
+                    + r"--other-alias -> cycle -> --other-alias"
+                ),
+            ),
+        ),
+        (
+            {
+                "--cycle": "--other-alias",
+                "--other-alias": "--cycle",
+            },
+            pytest.raises(
+                CliAliasCycleError,
+                match=(
+                    r"CLI alias cycle detected in `\[cli\]\.alias` option:\n"
+                    + r"--other-alias -> --cycle -> --other-alias"
                 ),
             ),
         ),
@@ -128,9 +184,7 @@ def test_nested_alias(alias, definitions: dict | ContextManager) -> None:
         "file.name",
         "target:name",
         "-o",
-        "--o",
         "-option",
-        "--option",
     ],
 )
 def test_invalid_alias_name(alias: str) -> None:
@@ -148,4 +202,35 @@ def test_banned_alias_names() -> None:
             r"Invalid alias in `\[cli\]\.alias` option: 'fmt'\. This is already a registered goal\."
         ),
     ):
-        cli_alias.check_name_conflicts({"fmt": ScopeInfo("fmt", is_goal=True)})
+        cli_alias.check_name_conflicts({"fmt": ScopeInfo("fmt", is_goal=True)}, {})
+
+
+@pytest.mark.parametrize(
+    "alias, info, expected",
+    [
+        (
+            {"--keep-sandboxes": "--foobar"},
+            {"": "--keep-sandboxes"},
+            pytest.raises(
+                CliAliasInvalidError,
+                match=(
+                    r"Invalid flag-like alias in `\[cli\]\.alias` option: '--keep-sandboxes'\. This is already a registered flag in the 'global' scope\."
+                ),
+            ),
+        ),
+        (
+            {"--changed-since": "--foobar"},
+            {"changed": "--changed-since"},
+            pytest.raises(
+                CliAliasInvalidError,
+                match=(
+                    r"Invalid flag-like alias in `\[cli\]\.alias` option: '--changed-since'\. This is already a registered flag in the 'changed' scope\."
+                ),
+            ),
+        ),
+    ],
+)
+def test_banned_alias_flag_names(alias, info, expected) -> None:
+    cli_alias = CliAlias.from_dict(alias)
+    with expected:
+        cli_alias.check_name_conflicts({}, info)

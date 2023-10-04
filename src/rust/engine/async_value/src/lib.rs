@@ -25,9 +25,10 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::pin::pin;
 use std::sync::{Arc, Weak};
 
-use tokio::sync::{oneshot, watch};
+use tokio::sync::{mpsc, watch};
 
 ///
 /// A cancellable value computed by one sender, and broadcast to multiple receivers.
@@ -37,27 +38,32 @@ use tokio::sync::{oneshot, watch};
 ///   2. implicitly if all receivers go away
 ///
 /// NB: This is currently a `tokio::sync::watch` (which supports the second case), plus a
-/// separate cancellation signal via `tokio::sync::oneshot` (to support the first case).
+/// separate channel to support the first case, and to support other types of feedback to the
+/// process producing the value.
 ///
 #[derive(Debug)]
-pub struct AsyncValue<T: Clone + Send + Sync + 'static> {
+pub struct AsyncValue<T: Clone + Send + Sync + 'static, I> {
   item_receiver: Weak<watch::Receiver<Option<T>>>,
-  abort_sender: Option<oneshot::Sender<T>>,
+  interrupt_sender: mpsc::UnboundedSender<I>,
 }
 
-impl<T: Clone + Send + Sync + 'static> AsyncValue<T> {
-  pub fn new() -> (AsyncValue<T>, AsyncValueSender<T>, AsyncValueReceiver<T>) {
-    let (abort_sender, abort_receiver) = oneshot::channel();
+impl<T: Clone + Send + Sync + 'static, I> AsyncValue<T, I> {
+  pub fn new() -> (
+    AsyncValue<T, I>,
+    AsyncValueSender<T, I>,
+    AsyncValueReceiver<T>,
+  ) {
+    let (interrupt_sender, interrupt_receiver) = mpsc::unbounded_channel();
     let (item_sender, item_receiver) = watch::channel(None);
     let item_receiver = Arc::new(item_receiver);
     (
       AsyncValue {
         item_receiver: Arc::downgrade(&item_receiver),
-        abort_sender: Some(abort_sender),
+        interrupt_sender,
       },
       AsyncValueSender {
         item_sender,
-        abort_receiver,
+        interrupt_receiver,
       },
       AsyncValueReceiver { item_receiver },
     )
@@ -74,12 +80,11 @@ impl<T: Clone + Send + Sync + 'static> AsyncValue<T> {
       .map(|item_receiver| AsyncValueReceiver { item_receiver })
   }
 
-  pub fn try_abort(&mut self, t: T) -> Result<(), T> {
-    if let Some(abort_sender) = self.abort_sender.take() {
-      abort_sender.send(t)
-    } else {
-      Ok(())
-    }
+  pub fn try_interrupt(&mut self, i: I) -> Result<(), I> {
+    self
+      .interrupt_sender
+      .send(i)
+      .map_err(|send_error| send_error.0)
   }
 }
 
@@ -109,29 +114,21 @@ impl<T: Clone + Send + Sync + 'static> AsyncValueReceiver<T> {
   }
 }
 
-pub struct AsyncValueSender<T: Clone + Send + Sync + 'static> {
+pub struct AsyncValueSender<T: Clone + Send + Sync + 'static, I> {
   item_sender: watch::Sender<Option<T>>,
-  abort_receiver: oneshot::Receiver<T>,
+  interrupt_receiver: mpsc::UnboundedReceiver<I>,
 }
 
-impl<T: Clone + Send + Sync + 'static> AsyncValueSender<T> {
+impl<T: Clone + Send + Sync + 'static, I> AsyncValueSender<T, I> {
   pub fn send(self, item: T) {
     let _ = self.item_sender.send(Some(item));
   }
 
-  pub async fn aborted(&mut self) -> Option<T> {
+  pub async fn interrupted(&mut self) -> Option<I> {
+    let mut recv = pin!(self.interrupt_receiver.recv());
     tokio::select! {
-      res = &mut self.abort_receiver => {
-        match res {
-          Ok(res) => {
-            // Aborted with a value.
-            Some(res)
-          },
-          Err(_) => {
-            // Was dropped.
-            None
-          },
-        }
+      res = &mut recv => {
+        res
       }
       _ = self.item_sender.closed() => { None }
     }

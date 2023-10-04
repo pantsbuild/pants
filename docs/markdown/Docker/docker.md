@@ -4,7 +4,6 @@ slug: "docker"
 excerpt: "How to build Docker images containing artifacts built by Pants"
 hidden: false
 createdAt: "2021-09-03T15:28:55.877Z"
-updatedAt: "2022-05-13T12:34:06.323Z"
 ---
 Docker images typically bundle build artifacts, such as PEX files, wheels, loose files, and so on, with other runtime requirements, such as a Python interpreter.
 
@@ -33,7 +32,7 @@ Pants uses [`docker_image`](doc:reference-docker_image) [targets](doc:targets) t
 You can generate initial BUILD files for your Docker images, using [tailor](doc:initial-configuration#5-generate-build-files):
 
 ```
-❯ ./pants tailor ::
+❯ pants tailor ::
 Created src/docker/app1/BUILD:
   - Add docker_image target docker
 Created src/docker/app2/BUILD:
@@ -71,13 +70,13 @@ When you run `docker build` directly, the context is usually a directory within 
 
 Pants, however, takes care of assembling the context for you. It does so using the dependencies of the [`docker_image`](doc:reference-docker_image) target, which can include:
 
-- Loose files specified using  [`file` / `files` targets](doc:resources#files).
+- Loose files specified using  [`file` / `files` targets](doc:assets#files).
 - Artifacts packaged from a variety of targets, such as [`pex_binary`](doc:reference-pex_binary) , [`python_distribution`](doc:reference-python_distribution), [`archive`](doc:reference-archive), and any other target that can be built via the [package](doc:reference-package) goal, including other docker images.
 
 The context is assembled as follows:
 
 - The sources of `file` / `files` targets are assembled at their relative path from the repo root.
-- The artifacts of any packaged targets are built, as if by running `./pants package`, and placed in the context using the artifact's `output_path` field.
+- The artifacts of any packaged targets are built, as if by running `pants package`, and placed in the context using the artifact's `output_path` field.
   - The `output_path` defaults to the scheme `path.to.directory/tgt_name.ext`, e.g. `src.python.helloworld/bin.pex`.
 
 ### Dependency inference support
@@ -103,7 +102,7 @@ Building a Docker image
 You build Docker images using the `package` goal:
 
 ```
-❯ ./pants package path/to/Dockerfile
+❯ pants package path/to/Dockerfile
 ```
 
 ### Build arguments
@@ -146,7 +145,7 @@ COPY files /
 ```
 
 ```
-❯ ./pants package --docker-build-target-stage=base Dockerfile
+❯ pants package --docker-build-target-stage=base Dockerfile
 ```
 
 See this [blog post](https://blog.pantsbuild.org/optimizing-python-docker-deploys-using-pants/) for more examples using multi-stage builds.
@@ -181,6 +180,59 @@ very-secret-value
 > 
 > See the example for the [`secrets`](doc:reference-docker_image#codesecretscode) field.
 
+### External cache storage backends
+
+BuildKit supports exporting build cache to an external location, making it possible to import in future builds. Cache backends can be configured using the [`cache_to`](doc:reference-docker_image#codecache_tocode) and [`cache_from`](doc:reference-docker_image#codecache_fromcode) fields.
+
+Enable BuildKit if necessary (it is the default in later versions of Docker):
+
+```
+❯ export DOCKER_BUILDKIT=1
+```
+
+Create a builder using a [build driver](https://docs.docker.com/build/drivers/) that is compatible with the cache backend:
+
+```
+❯ docker buildx create --name container --driver=docker-container container
+```
+
+Use the builder:
+
+```
+❯ export BUILDX_BUILDER=container
+```
+
+Optionally, validate a build with the Docker CLI directly:
+
+```
+❯ docker build -t pants-cache-test:latest \
+  --cache-to type=local,dest=/tmp/docker/pants-test-cache \
+  --cache-from type=local,src=/tmp/docker/pants-test-cache .
+```
+
+Configure Pants:
+
+```toml pants.toml
+[docker]
+env_vars = [
+  "DOCKER_BUILDKIT",
+  "BUILDX_BUILDER"
+]
+```
+```python example/BUILD
+docker_image(
+    name="with-local-cache-backend",
+    cache_to={
+        "type": "local",
+        "dest": "/tmp/docker-cache/pants-example"
+    },
+    cache_from={
+        "type": "local",
+        "src": "/tmp/docker-cache/pants-example"
+    }
+)
+```
+
 ### Build Docker image example
 
 This example copies both a `file` and `pex_binary`. The file is specified as an explicit dependency in the `BUILD` file, whereas the `pex_binary` dependency is inferred from the path in the `Dockerfile`.
@@ -207,7 +259,7 @@ python_sources(name="lib")
 
 pex_binary(name="bin", entry_point="main.py")
 ```
-```python src/py/hw/main.py
+```python src/python/hw/main.py
 import os
 
 msg = "Hello"
@@ -219,7 +271,7 @@ print(msg)
 ```
 
 ```
-❯ ./pants package src/docker/hw/Dockerfile
+❯ pants package src/docker/hw/Dockerfile
 08:09:22.86 [INFO] Completed: Building local_dists.pex
 08:09:23.80 [INFO] Completed: Building src.python.hw/bin.pex
 08:10:42.51 [INFO] Completed: Building docker image helloworld:latest
@@ -233,21 +285,21 @@ Running a Docker image
 You can ask Pants to run a Docker image on your local system with the `run` goal:
 
 ```
-❯ ./pants run src/docker/hw/Dockerfile
+❯ pants run src/docker/hw/Dockerfile
 Hello, Docker!
 ```
 
 Any arguments for the Docker container may be provided as pass through args to the `run` goal, as usual. That is, use either the `--args` option or after all other arguments after a separating double-dash:
 
 ```
-❯ ./pants run src/docker/hw/Dockerfile -- arguments for the container
+❯ pants run src/docker/hw/Dockerfile -- arguments for the container
 Hello, Docker!
 ```
 
 To provide any command line arguments to the `docker run` command, you may use the `--docker-run-args` option:
 
 ```
-❯ ./pants run --docker-run-args="-p 8080 --name demo" src/docker/hw/Dockerfile 
+❯ pants run --docker-run-args="-p 8080 --name demo" src/docker/hw/Dockerfile 
 ```
 
 As with all configuration options, this is not limited to the command line, but may be configured in a Pants rc file (such as `pants.toml`) in the `[docker].run_args` section or as an environment variable, `PANTS_DOCKER_RUN_ARGS` as well.
@@ -255,10 +307,10 @@ As with all configuration options, this is not limited to the command line, but 
 Publishing images
 -----------------
 
-Pants can push your images to registries using `./pants publish`:
+Pants can push your images to registries using `pants publish`:
 
 ```shell
-❯ ./pants publish src/docker/hw:helloworld
+❯ pants publish src/docker/hw:helloworld
 # Will build the image and push it to all registries, with all tags.
 ```
 
@@ -312,7 +364,7 @@ Most authentication mechanisms will also require tools exposed on the `$PATH` to
 [docker]
 env_vars = ["DOCKER_CONFIG=%(homedir)s/.docker"]
 tools = [
-  "docker-credential-gcloud",
+  "docker-credential-gcr", # or docker-credential-gcloud when using artifact registry
   "dirname",
   "readlink",
   "python3",
@@ -332,7 +384,7 @@ You may need to set additional environment variables with `[docker].env_vars`.
 > It can help to simulate a hermetic environment by using `env -i`. With credential helpers, it also helps to directly invoke the helper without Docker and Pants. For example, you can symlink the tools you think you need into a directory like `/some/isolated/directory`, then run the below:
 > 
 > ```
-> ❯ echo europe-north1-docker.pkg.dev | env -i PATH=/some/isolated/directory docker-credential-gcloud get
+> ❯ echo europe-north1-docker.pkg.dev | env -i PATH=/some/isolated/directory docker-credential-gcr get
 > {
 >   "Secret": "ya29.A0ARrdaM-...-ZhScVscwTVtQ",
 >   "Username": "_dcgcloud_token"
@@ -345,7 +397,7 @@ Linting Dockerfiles with Hadolint
 Pants can run [Hadolint](https://github.com/hadolint/hadolint) on your Dockerfiles to check for errors and mistakes:
 
 ```
-❯ ./pants lint src/docker/hw/Dockerfile
+❯ pants lint src/docker/hw/Dockerfile
 ```
 
 This must first be enabled by activating the Hadolint backend:

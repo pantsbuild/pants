@@ -4,28 +4,27 @@ slug: "command-line-help"
 excerpt: "How to dynamically get more information on Pants's internals."
 hidden: false
 createdAt: "2020-02-27T01:32:45.818Z"
-updatedAt: "2021-11-09T20:48:14.737Z"
 ---
-Run `./pants help` to get basic help, including a list of commands you can run to get more specific help:
+Run `pants help` to get basic help, including a list of commands you can run to get more specific help:
 
 ```text Shell
-❯ ./pants help
+❯ pants help
 Pants 2.14.0
 
 Usage:
 
-  ./pants [options] [goals] [inputs]          Attempt the specified goals on the specified inputs.
-  ./pants help                               Display this usage message.
-  ./pants help goals                         List all installed goals.
-  ./pants help targets                       List all installed target types.
-  ./pants help subsystems                    List all configurable subsystems.
-  ./pants help tools                         List all external tools.
-  ./pants help api-types                     List all plugin API types.
-  ./pants help global                        Help for global options.
-  ./pants help-advanced global               Help for global advanced options.
-  ./pants help [name]                        Help for a target type, goal, subsystem, plugin API type or rule.
-  ./pants help-advanced [goal/subsystem]     Help for a goal or subsystem's advanced options.
-  ./pants help-all                           Print a JSON object containing all help info.
+  pants [options] [goals] [inputs]          Attempt the specified goals on the specified inputs.
+  pants help                               Display this usage message.
+  pants help goals                         List all installed goals.
+  pants help targets                       List all installed target types.
+  pants help subsystems                    List all configurable subsystems.
+  pants help tools                         List all external tools.
+  pants help api-types                     List all plugin API types.
+  pants help global                        Help for global options.
+  pants help-advanced global               Help for global advanced options.
+  pants help [name]                        Help for a target type, goal, subsystem, plugin API type or rule.
+  pants help-advanced [goal/subsystem]     Help for a goal or subsystem's advanced options.
+  pants help-all                           Print a JSON object containing all help info.
 
   [inputs] can be:
      A file, e.g. path/to/file.ext
@@ -42,7 +41,7 @@ Download at https://pypi.org/pypi/pantsbuild.pants/2.14.0
 For example, to get help on the `test` goal:
 
 ```text Shell
-$ ./pants help test
+$ pants help test
 
 `test` goal options
 -------------------
@@ -70,14 +69,14 @@ Config section: [test]
 Related subsystems: coverage-py, download-pex-bin, pants-releases, pex, pex-binary-defaults, pytest, python-infer, python-native-code, python-repos, python-setup, setup-py-generation, setuptools, source, subprocess-environment
 ```
 
-Note that when you run `./pants help <goal>`, it outputs all related subsystems, such as `pytest`. You can then run `./pants help pytest` to get more information.
+Note that when you run `pants help <goal>`, it outputs all related subsystems, such as `pytest`. You can then run `pants help pytest` to get more information.
 
-You can also run `./pants help goals` and `./pants help subsystems` to get a list of all activated options scopes.
+You can also run `pants help goals` and `pants help subsystems` to get a list of all activated options scopes.
 
 To get help on the `python_tests` target:
 
 ```text Shell
-❯ ./pants help python_test
+❯ pants help python_test
 
 `python_test` target
 --------------------
@@ -106,4 +105,4 @@ Advanced Help
 
 Many options are classified as _advanced_, meaning they are primarily intended to be used by admins, not by regular users.  
 
-Use `help-advanced`, e.g. `./pants help-advanced global` or `./pants help-advanced pytest`.
+Use `help-advanced`, e.g. `pants help-advanced global` or `pants help-advanced pytest`.

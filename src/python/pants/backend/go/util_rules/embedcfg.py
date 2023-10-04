@@ -8,12 +8,10 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_prefix
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
+@dataclass(frozen=True)
 class EmbedConfig:
     patterns: FrozenDict[str, tuple[str, ...]]
     files: FrozenDict[str, str]
@@ -35,8 +33,8 @@ class EmbedConfig:
         :param files: Maps each virtual, relative file path used as a value in the `patterns`
           dictionary to the actual filesystem path with that file's content.
         """
-        self.patterns = FrozenDict({k: tuple(v) for k, v in patterns.items()})
-        self.files = FrozenDict(files)
+        object.__setattr__(self, "patterns", FrozenDict({k: tuple(v) for k, v in patterns.items()}))
+        object.__setattr__(self, "files", FrozenDict(files))
 
     @classmethod
     def from_json_dict(

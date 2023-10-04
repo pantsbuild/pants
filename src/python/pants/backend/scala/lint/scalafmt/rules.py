@@ -12,7 +12,6 @@ from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -24,6 +23,7 @@ from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
+from pants.util.dirutil import find_nearest_ancestor_file, group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -73,17 +73,7 @@ class PartitionInfo:
         return self.config_snapshot.files[0]
 
 
-def find_nearest_ancestor_file(files: set[str], dir: str, config_file: str) -> str | None:
-    while True:
-        candidate_config_file_path = os.path.join(dir, config_file)
-        if candidate_config_file_path in files:
-            return candidate_config_file_path
-
-        if dir == "":
-            return None
-        dir = os.path.dirname(dir)
-
-
+# @TODO: This logic is very similar, but not identical to the one for yamllint. It should be generalized and shared.
 @rule
 async def gather_scalafmt_config_files(
     request: GatherScalafmtConfigFilesRequest,

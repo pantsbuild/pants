@@ -4,6 +4,10 @@
 from __future__ import annotations
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+)
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses
@@ -14,13 +18,14 @@ from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
 
 
 class ScalaRepl(ReplImplementation):
     name = "scala"
+    supports_args = False
 
 
 @rule(level=LogLevel.DEBUG)
@@ -36,28 +41,15 @@ async def create_scala_repl_request(
     jdk = max(environs, key=lambda j: j.jre_major_version)
 
     scala_version = scala_subsystem.version_for_resolve(user_classpath.resolve.name)
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
     tool_classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(
             prefix="__toolcp",
             artifact_requirements=ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-compiler",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-library",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-reflect",
-                        version=scala_version,
-                    ),
-                ]
+                scala_artifacts.all_coordinates
             ),
         ),
     )
@@ -77,7 +69,7 @@ async def create_scala_repl_request(
         args=[
             *jdk.args(bash, tool_classpath.classpath_entries(), chroot="{chroot}"),
             "-Dscala.usejavacp=true",
-            "scala.tools.nsc.MainGenericRunner",
+            scala_artifacts.repl_main,
             "-classpath",
             ":".join(user_classpath.args(prefix=user_classpath_prefix)),
         ],

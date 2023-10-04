@@ -11,8 +11,6 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoPackageSourcesField,
     GoPackageTarget,
-    GoSdkPackageTarget,
-    GoSdkTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import (
@@ -28,7 +26,9 @@ from pants.backend.go.util_rules import (
     go_bootstrap,
     go_mod,
     goroot,
+    implicit_linker_deps,
     import_analysis,
+    import_config,
     link,
     pkg_analyzer,
     sdk,
@@ -47,8 +47,6 @@ def target_types():
         GoThirdPartyPackageTarget,
         GoBinaryTarget,
         *wrap_golang.target_types,
-        GoSdkTarget,
-        GoSdkPackageTarget,
     ]
 
 
@@ -67,7 +65,9 @@ def rules():
         *generate.rules(),
         *go_bootstrap.rules(),
         *goroot.rules(),
+        *implicit_linker_deps.rules(),
         *import_analysis.rules(),
+        *import_config.rules(),
         *go_mod.rules(),
         *first_party_pkg.rules(),
         *link.rules(),

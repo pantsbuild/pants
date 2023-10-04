@@ -9,7 +9,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.goals import setup_py
+from pants.backend.python.goals import package_dists
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
@@ -70,7 +70,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *package.rules(),
             *publish.rules(),
-            *setup_py.rules(),
+            *package_dists.rules(),
             *python_target_type_rules(),
             mock_publish,
             PythonDistribution.register_plugin_field(MockRepositoriesField),

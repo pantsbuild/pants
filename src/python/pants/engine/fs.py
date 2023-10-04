@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
 # Note: several of these types are re-exported as the public API of `engine/fs.py`.
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
@@ -24,7 +24,6 @@ from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.engine.rules import QueryRule
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
@@ -147,8 +146,7 @@ class GlobExpansionConjunction(Enum):
     all_match = "all_match"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PathGlobs:
     globs: Tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
@@ -178,10 +176,10 @@ class PathGlobs:
 
         # NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method
         # will need to be aware of any changes to this object's definition.
-        self.globs = tuple(sorted(globs))
-        self.glob_match_error_behavior = glob_match_error_behavior
-        self.conjunction = conjunction
-        self.description_of_origin = description_of_origin
+        object.__setattr__(self, "globs", tuple(sorted(globs)))
+        object.__setattr__(self, "glob_match_error_behavior", glob_match_error_behavior)
+        object.__setattr__(self, "conjunction", conjunction)
+        object.__setattr__(self, "description_of_origin", description_of_origin)
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -249,8 +247,7 @@ class DownloadFile:
     expected_digest: FileDigest
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class NativeDownloadFile:
     """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
 
@@ -272,9 +269,9 @@ class NativeDownloadFile:
     def __init__(
         self, url: str, expected_digest: FileDigest, auth_headers: Mapping[str, str] | None = None
     ) -> None:
-        self.url = url
-        self.expected_digest = expected_digest
-        self.auth_headers = FrozenDict(auth_headers or {})
+        object.__setattr__(self, "url", url)
+        object.__setattr__(self, "expected_digest", expected_digest)
+        object.__setattr__(self, "auth_headers", FrozenDict(auth_headers or {}))
 
 
 @dataclass(frozen=True)
@@ -285,7 +282,12 @@ class Workspace(SideEffecting):
     _enforce_effects: bool = True
 
     def write_digest(
-        self, digest: Digest, *, path_prefix: Optional[str] = None, side_effecting: bool = True
+        self,
+        digest: Digest,
+        *,
+        path_prefix: Optional[str] = None,
+        clear_paths: Sequence[str] = (),
+        side_effecting: bool = True,
     ) -> None:
         """Write a digest to disk, relative to the build root.
 
@@ -297,7 +299,7 @@ class Workspace(SideEffecting):
         """
         if side_effecting:
             self.side_effected()
-        self._scheduler.write_digest(digest, path_prefix=path_prefix)
+        self._scheduler.write_digest(digest, path_prefix=path_prefix, clear_paths=clear_paths)
 
 
 @dataclass(frozen=True)
@@ -323,7 +325,6 @@ class SnapshotDiff:
 
 
 def rules():
-    # Keep in sync with `intrinsics.rs`.
     return (
         QueryRule(Digest, (CreateDigest,)),
         QueryRule(Digest, (PathGlobs,)),

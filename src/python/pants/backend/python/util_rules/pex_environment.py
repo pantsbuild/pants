@@ -10,8 +10,9 @@ from typing import Mapping
 
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.core.util_rules import subprocess_environment, system_binaries
+from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
-from pants.core.util_rules.system_binaries import BinaryPath, PythonBinary
+from pants.core.util_rules.system_binaries import BinaryPath
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
@@ -89,47 +90,52 @@ class PexSubsystem(Subsystem):
         return level
 
 
+@dataclass(frozen=True)
 class PythonExecutable(BinaryPath, EngineAwareReturnType):
-    """The BinaryPath of a Python executable."""
+    """The BinaryPath of a Python executable for user code, along with some extras."""
+
+    append_only_caches: FrozenDict[str, str] = FrozenDict({})
+
+    def __init__(
+        self,
+        path: str,
+        fingerprint: str | None = None,
+        append_only_caches: Mapping[str, str] = FrozenDict({}),
+    ) -> None:
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches))
+        super().__init__(path, fingerprint)
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        if not PurePath(self.path).is_absolute():
+            raise ValueError(
+                softwrap(
+                    f"""
+                    PythonExecutable expects the path to be absolute. Tools like Pex internalize the
+                    absolute path to Python (since `sys.executable` is expected to be absolute).
+
+                    In order to ensure the cache key for Python process is "correct" (especially in
+                    remote cache/execution situations) we require the Python path is absolute.
+
+                    Got: {self.path}
+                    """
+                )
+            )
 
     def message(self) -> str:
         return f"Selected {self.path} to run PEXes with."
 
-    @classmethod
-    def from_python_binary(cls, python_binary: PythonBinary) -> PythonExecutable:
-        """Converts from PythonBinary to PythonExecutable.
-
-        The PythonBinary type is a singleton representing the Python that is used for script
-        execution by `@rule`s. On the other hand, there may be multiple PythonExecutables, since
-        they are subject to a user's interpreter constraints.
-        """
-        return cls(path=python_binary.path, fingerprint=python_binary.fingerprint)
-
 
 @dataclass(frozen=True)
-class PexEnvironment(EngineAwareReturnType):
+class PexEnvironment:
     path: tuple[str, ...]
     interpreter_search_paths: tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
     named_caches_dir: PurePath
-    bootstrap_python: PythonExecutable | None = None
+    bootstrap_python: PythonBuildStandaloneBinary
     venv_use_symlinks: bool = False
 
     _PEX_ROOT_DIRNAME = "pex_root"
-
-    def level(self) -> LogLevel:
-        return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
-
-    def message(self) -> str:
-        if not self.bootstrap_python:
-            return softwrap(
-                """
-                No bootstrap Python executable could be found from the option
-                `interpreter_search_paths` in the `[python]` scope. Will attempt to run
-                PEXes directly.
-                """
-            )
-        return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."
 
     def in_sandbox(self, *, working_directory: str | None) -> CompletePexEnvironment:
         pex_root = PurePath(".cache") / self._PEX_ROOT_DIRNAME
@@ -137,7 +143,10 @@ class PexEnvironment(EngineAwareReturnType):
             _pex_environment=self,
             pex_root=pex_root,
             _working_directory=PurePath(working_directory) if working_directory else None,
-            append_only_caches=FrozenDict({self._PEX_ROOT_DIRNAME: str(pex_root)}),
+            append_only_caches=FrozenDict(
+                **{self._PEX_ROOT_DIRNAME: str(pex_root)},
+                **self.bootstrap_python.APPEND_ONLY_CACHES,
+            ),
         )
 
     def in_workspace(self) -> CompletePexEnvironment:
@@ -151,7 +160,7 @@ class PexEnvironment(EngineAwareReturnType):
             _pex_environment=self,
             pex_root=pex_root,
             _working_directory=None,
-            append_only_caches=FrozenDict(),
+            append_only_caches=self.bootstrap_python.APPEND_ONLY_CACHES,
         )
 
     def venv_site_packages_copies_option(self, use_copies: bool) -> str:
@@ -163,7 +172,7 @@ class PexEnvironment(EngineAwareReturnType):
 @rule(desc="Prepare environment for running PEXes", level=LogLevel.DEBUG)
 async def find_pex_python(
     python_bootstrap: PythonBootstrap,
-    python_binary: PythonBinary,
+    python_binary: PythonBuildStandaloneBinary,
     pex_subsystem: PexSubsystem,
     pex_environment_aware: PexSubsystem.EnvironmentAware,
     subprocess_env_vars: SubprocessEnvironmentVars,
@@ -174,7 +183,7 @@ async def find_pex_python(
         interpreter_search_paths=python_bootstrap.interpreter_search_paths,
         subprocess_environment_dict=subprocess_env_vars.vars,
         named_caches_dir=named_caches_dir.val,
-        bootstrap_python=PythonExecutable.from_python_binary(python_binary),
+        bootstrap_python=python_binary,
         venv_use_symlinks=pex_subsystem.venv_use_symlinks,
     )
 
@@ -186,28 +195,21 @@ class CompletePexEnvironment:
     _working_directory: PurePath | None
     append_only_caches: FrozenDict[str, str]
 
-    _PEX_ROOT_DIRNAME = "pex_root"
-
     @property
     def interpreter_search_paths(self) -> tuple[str, ...]:
         return self._pex_environment.interpreter_search_paths
 
-    def create_argv(
-        self, pex_filepath: str, *args: str, python: PythonExecutable | None = None
-    ) -> tuple[str, ...]:
+    def create_argv(self, pex_filepath: str, *args: str) -> tuple[str, ...]:
         pex_relpath = (
             os.path.relpath(pex_filepath, self._working_directory)
             if self._working_directory
             else pex_filepath
         )
-        python = python or self._pex_environment.bootstrap_python
-        if python:
-            return (python.path, pex_relpath, *args)
-        if os.path.basename(pex_relpath) == pex_relpath:
-            return (f"./{pex_relpath}", *args)
-        return (pex_relpath, *args)
+        return (self._pex_environment.bootstrap_python.path, pex_relpath, *args)
 
-    def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
+    def environment_dict(
+        self, *, python: PythonExecutable | PythonBuildStandaloneBinary | None = None
+    ) -> Mapping[str, str]:
         """The environment to use for running anything with PEX.
 
         If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
@@ -223,10 +225,9 @@ class CompletePexEnvironment:
             ),
             **self._pex_environment.subprocess_environment_dict,
         )
-        # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
-        # pre-selected by Pants. Otherwise, Pex would inadvertently try to find another interpreter
-        # when running PEXes. (Creating a PEX will ignore this env var in favor of `--python-path`.)
-        if not python_configured:
+        if python:
+            d["PEX_PYTHON"] = python.path
+        else:
             d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
         return d
 

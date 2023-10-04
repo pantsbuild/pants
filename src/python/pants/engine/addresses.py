@@ -15,7 +15,6 @@ from pants.build_graph.address import (  # noqa: F401: rexport.
 from pants.build_graph.address import MaybeAddress as MaybeAddress  # noqa: F401: rexport.
 from pants.build_graph.address import ResolveError
 from pants.engine.collection import Collection
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list
 
 
@@ -36,8 +35,7 @@ class Addresses(Collection[Address]):
         return self[0]
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class UnparsedAddressInputs:
     """Raw addresses that have not been parsed yet.
 
@@ -73,7 +71,9 @@ class UnparsedAddressInputs:
         description_of_origin: str,
         skip_invalid_addresses: bool = False,
     ) -> None:
-        self.values = tuple(values)
-        self.relative_to = owning_address.spec_path if owning_address else None
-        self.description_of_origin = description_of_origin
-        self.skip_invalid_addresses = skip_invalid_addresses
+        object.__setattr__(self, "values", tuple(values))
+        object.__setattr__(
+            self, "relative_to", owning_address.spec_path if owning_address else None
+        )
+        object.__setattr__(self, "description_of_origin", description_of_origin)
+        object.__setattr__(self, "skip_invalid_addresses", skip_invalid_addresses)

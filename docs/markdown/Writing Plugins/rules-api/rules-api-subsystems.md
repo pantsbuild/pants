@@ -4,7 +4,6 @@ slug: "rules-api-subsystems"
 excerpt: "How to add options to your plugin."
 hidden: false
 createdAt: "2020-07-01T04:55:36.180Z"
-updatedAt: "2022-04-26T22:11:07.667Z"
 ---
 Defining options
 ----------------
@@ -16,13 +15,12 @@ To add new options:
 1. Define a subclass of `Subsystem` from `pants.subsystem.subsystem`.
    1. Set the class property `options_scope` with the name of the subsystem.
       - This value will be prepended to all options in the subsystem, e.g. `--skip` will become `--shellcheck-skip`.
-   2. Set the class property `help`, which is used by `./pants help`.
+   2. Set the class property `help`, which is used by `pants help`.
 2. Add new options through `pants.options.option_types` class attributes.
-3. Register the `Subsystem` with `SubsystemRule` and `register.py`.
-   - You don't need `SubsystemRule` if the `Subsystem` is used in an `@rule` because `collect_rules()` will recognize it. It doesn't hurt to keep this around, though.
+3. Register the `Subsystem` with `Subsystem.rules()` and `register.py`.
+   - You don't need `Subsystem.rules()` if the `Subsystem` is used in an `@rule` because `collect_rules()` will recognize it. It doesn't hurt to keep this around, though.
 
 ```python pants-plugins/example/shellcheck.py
-from pants.engine.rules import SubsystemRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 
@@ -48,7 +46,7 @@ def rules():
     return [*shellcheck.rules()]
 ```
 
-The subsystem should now show up when you run `./pants help shellcheck`.
+The subsystem should now show up when you run `pants help shellcheck`.
 
 > 📘 `GoalSubsystem`
 >
@@ -88,7 +86,7 @@ You can instead pass a string positional argument, e.g. `my_opt = StrOption("--d
     "6-0": "`DictOption`",
     "6-1": "Default is `{}` if `default` is not set.  \n  \nCurrently, Pants does not offer any validation of the dictionary entries, e.g. `dict[str, str]` vs `dict[str, list[str]]`. (Although per TOML specs, the key should always be `str`.) You may want to add eager validation that users are inputting options the correct way.",
     "7-0": "`ArgsListOption`",
-    "7-1": "Adds an `--args` option, e.g. `--isort-args`. This type is extra useful because it uses a special `shell_str` that lets users type the arguments as a single string with spaces, which Pants will _shlex_ for them. That is, `--args='arg1 arg2'` gets converted to `['arg1', 'arg2']`.  \n  \nYou must set the keyword argument `example`, e.g. `'--arg1 arg2'`. You must also set `tool_name: str`, e.g. `'Black'`.  \n  \nYou can optionally set `passthrough=True` if the user should be able to use the style `./pants my-goal :: -- --arg1`, i.e. arguments after `--`."
+    "7-1": "Adds an `--args` option, e.g. `--isort-args`. This type is extra useful because it uses a special `shell_str` that lets users type the arguments as a single string with spaces, which Pants will _shlex_ for them. That is, `--args='arg1 arg2'` gets converted to `['arg1', 'arg2']`.  \n  \nYou must set the keyword argument `example`, e.g. `'--arg1 arg2'`. You must also set `tool_name: str`, e.g. `'Black'`.  \n  \nYou can optionally set `passthrough=True` if the user should be able to use the style `pants my-goal :: -- --arg1`, i.e. arguments after `--`."
   },
   "cols": 2,
   "rows": 8,

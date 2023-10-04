@@ -50,6 +50,7 @@ pub enum Metric {
   RemoteExecutionSuccess,
   RemoteExecutionTimeouts,
   RemoteStoreMissingDigest,
+  RemoteStoreRequestTimeouts,
   /// Number of times that we backtracked due to missing digests.
   BacktrackAttempts,
   DockerExecutionRequests,

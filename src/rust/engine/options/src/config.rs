@@ -10,6 +10,7 @@ use toml::value::Table;
 use toml::Value;
 
 use super::id::{NameTransform, OptionId};
+use super::parse::parse_string_list;
 use super::{ListEdit, ListEditAction, OptionsSource};
 
 #[derive(Clone)]
@@ -69,8 +70,8 @@ impl Config {
     files
       .iter()
       .map(Config::parse)
-      .fold(Ok(Config::default()), |acc, parse_result| {
-        acc.and_then(|config| parse_result.map(|parsed| config.merge(parsed)))
+      .try_fold(Config::default(), |config, parse_result| {
+        parse_result.map(|parsed| config.merge(parsed))
       })
   }
 
@@ -86,16 +87,14 @@ impl Config {
           items.push(value.to_owned())
         } else {
           return Err(format!(
-            "Expected {} to be an array of strings but given {} containing non string item {}",
-            option_name, value, item
+            "Expected {option_name} to be an array of strings but given {value} containing non string item {item}"
           ));
         }
       }
       Ok(items)
     } else {
       Err(format!(
-        "Expected {} to be an array but given {}.",
-        option_name, value
+        "Expected {option_name} to be a toml array or Python sequence, but given {value}."
       ))
     }
   }
@@ -129,7 +128,7 @@ impl Config {
 
 impl OptionsSource for Config {
   fn display(&self, id: &OptionId) -> String {
-    format!("{}", id)
+    format!("{id}")
   }
 
   fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
@@ -137,10 +136,7 @@ impl OptionsSource for Config {
       if let Some(string) = value.as_str() {
         Ok(Some(string.to_owned()))
       } else {
-        Err(format!(
-          "Expected {} to be a string but given {}.",
-          id, value
-        ))
+        Err(format!("Expected {id} to be a string but given {value}."))
       }
     } else {
       Ok(None)
@@ -152,7 +148,19 @@ impl OptionsSource for Config {
       if let Some(bool) = value.as_bool() {
         Ok(Some(bool))
       } else {
-        Err(format!("Expected {} to be a bool but given {}.", id, value))
+        Err(format!("Expected {id} to be a bool but given {value}."))
+      }
+    } else {
+      Ok(None)
+    }
+  }
+
+  fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
+    if let Some(value) = self.get_value(id) {
+      if let Some(int) = value.as_integer() {
+        Ok(Some(int))
+      } else {
+        Err(format!("Expected {id} to be an int but given {value}."))
       }
     } else {
       Ok(None)
@@ -164,10 +172,7 @@ impl OptionsSource for Config {
       if let Some(float) = value.as_float() {
         Ok(Some(float))
       } else {
-        Err(format!(
-          "Expected {} to be a float but given {}.",
-          id, value
-        ))
+        Err(format!("Expected {id} to be a float but given {value}."))
       }
     } else {
       Ok(None)
@@ -179,36 +184,39 @@ impl OptionsSource for Config {
       let option_name = Self::option_name(id);
       let mut list_edits = vec![];
       if let Some(value) = table.get(&option_name) {
-        if let Some(sub_table) = value.as_table() {
-          if sub_table.is_empty()
-            || !sub_table.keys().collect::<HashSet<_>>().is_subset(
-              &["add".to_owned(), "remove".to_owned()]
-                .iter()
-                .collect::<HashSet<_>>(),
-            )
-          {
-            return Err(format!(
-              "Expected {} to contain an 'add' element, a 'remove' element or both but found: {:?}",
-              option_name, sub_table
-            ));
+        match value {
+          Value::Table(sub_table) => {
+            if sub_table.is_empty()
+              || !sub_table.keys().collect::<HashSet<_>>().is_subset(
+                &["add".to_owned(), "remove".to_owned()]
+                  .iter()
+                  .collect::<HashSet<_>>(),
+              )
+            {
+              return Err(format!(
+                "Expected {option_name} to contain an 'add' element, a 'remove' element or both but found: {sub_table:?}"
+              ));
+            }
+            if let Some(add) = sub_table.get("add") {
+              list_edits.push(ListEdit {
+                action: ListEditAction::Add,
+                items: Self::extract_string_list(&format!("{option_name}.add"), add)?,
+              })
+            }
+            if let Some(remove) = sub_table.get("remove") {
+              list_edits.push(ListEdit {
+                action: ListEditAction::Remove,
+                items: Self::extract_string_list(&format!("{option_name}.remove"), remove)?,
+              })
+            }
           }
-          if let Some(add) = sub_table.get("add") {
-            list_edits.push(ListEdit {
-              action: ListEditAction::Add,
-              items: Self::extract_string_list(&format!("{}.add", option_name), add)?,
-            })
+          Value::String(v) => {
+            list_edits.extend(parse_string_list(v).map_err(|e| e.render(option_name))?);
           }
-          if let Some(remove) = sub_table.get("remove") {
-            list_edits.push(ListEdit {
-              action: ListEditAction::Remove,
-              items: Self::extract_string_list(&format!("{}.remove", option_name), remove)?,
-            })
-          }
-        } else {
-          list_edits.push(ListEdit {
+          value => list_edits.push(ListEdit {
             action: ListEditAction::Replace,
             items: Self::extract_string_list(&option_name, value)?,
-          });
+          }),
         }
       }
       if !list_edits.is_empty() {

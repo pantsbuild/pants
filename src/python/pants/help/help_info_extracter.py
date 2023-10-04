@@ -22,6 +22,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
     cast,
     get_type_hints,
@@ -34,6 +35,7 @@ from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.environments import option_field_name_for
 from pants.engine.goal import GoalSubsystem
+from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo, Registrar
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, is_union
@@ -42,7 +44,9 @@ from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.scope import ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
-from pants.util.strutil import first_paragraph
+from pants.util.strutil import first_paragraph, strval
+
+T = TypeVar("T")
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -222,7 +226,7 @@ class TargetFieldHelpInfo:
         return cls(
             alias=field.alias,
             provider=provider,
-            description=field.help,
+            description=strval(field.help),
             type_hint=type_hint,
             required=field.required,
             default=(
@@ -256,11 +260,12 @@ class TargetTypeHelpInfo:
             # TargetGenerator, they are legal arguments... and that is what most help consumers
             # are interested in.
             fields.extend(target_type.moved_fields)
+        helpstr = strval(target_type.help)
         return cls(
             alias=target_type.alias,
             provider=provider,
-            summary=first_paragraph(target_type.help),
-            description=target_type.help,
+            summary=first_paragraph(helpstr),
+            description=helpstr,
             fields=tuple(
                 TargetFieldHelpInfo.create(
                     field,
@@ -398,6 +403,14 @@ class BackendHelpInfo:
 
 
 @dataclass(frozen=True)
+class BuildFileSymbolHelpInfo:
+    name: str
+    is_target: bool
+    signature: str | None
+    documentation: str | None
+
+
+@dataclass(frozen=True)
 class AllHelpInfo:
     """All available help info."""
 
@@ -407,6 +420,8 @@ class AllHelpInfo:
     name_to_rule_info: LazyFrozenDict[str, RuleInfo]
     name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
     name_to_backend_help_info: LazyFrozenDict[str, BackendHelpInfo]
+    name_to_build_file_info: LazyFrozenDict[str, BuildFileSymbolHelpInfo]
+    env_var_to_help_info: LazyFrozenDict[str, OptionHelpInfo]
 
     def non_deprecated_option_scope_help_infos(self):
         for oshi in self.scope_to_help_info.values():
@@ -433,6 +448,7 @@ class HelpInfoExtracter:
         union_membership: UnionMembership,
         consumed_scopes_mapper: ConsumedScopesMapper,
         registered_target_types: RegisteredTargetTypes,
+        build_symbols: BuildFileSymbolsInfo,
         build_configuration: BuildConfiguration | None = None,
     ) -> AllHelpInfo:
         def option_scope_help_info_loader_for(
@@ -508,12 +524,23 @@ class HelpInfoExtracter:
 
             return load
 
+        def lazily(value: T) -> Callable[[], T]:
+            return lambda: value
+
         known_scope_infos = sorted(options.known_scope_to_info.values(), key=lambda x: x.scope)
         scope_to_help_info = LazyFrozenDict(
             {
                 scope_info.scope: option_scope_help_info_loader_for(scope_info)
                 for scope_info in known_scope_infos
                 if not scope_info.scope.startswith("_")
+            }
+        )
+
+        env_var_to_help_info = LazyFrozenDict(
+            {
+                ohi.env_var: lazily(ohi)
+                for oshi in scope_to_help_info.values()
+                for ohi in chain(oshi.basic, oshi.advanced, oshi.deprecated)
             }
         )
 
@@ -546,6 +573,8 @@ class HelpInfoExtracter:
             name_to_rule_info=cls.get_rule_infos(build_configuration),
             name_to_api_type_info=cls.get_api_type_infos(build_configuration, union_membership),
             name_to_backend_help_info=cls.get_backend_help_info(options),
+            name_to_build_file_info=cls.get_build_file_info(build_symbols),
+            env_var_to_help_info=env_var_to_help_info,
         )
 
     @staticmethod
@@ -580,7 +609,7 @@ class HelpInfoExtracter:
     def compute_metavar(kwargs):
         """Compute the metavar to display in help for an option registered with these kwargs."""
 
-        stringify = lambda t: HelpInfoExtracter.stringify_type(t)
+        stringify = HelpInfoExtracter.stringify_type
 
         metavar = kwargs.get("metavar")
         if not metavar:
@@ -875,6 +904,30 @@ class HelpInfoExtracter:
                 for discovered_backend in sorted(
                     chain(builtin_backends, inrepo_backends, plugin_backends)
                 )
+            }
+        )
+
+    @staticmethod
+    def get_build_file_info(
+        build_symbols: BuildFileSymbolsInfo,
+    ) -> LazyFrozenDict[str, BuildFileSymbolHelpInfo]:
+        def get_build_file_symbol_help_info_loader(
+            symbol: BuildFileSymbolInfo,
+        ) -> Callable[[], BuildFileSymbolHelpInfo]:
+            def load() -> BuildFileSymbolHelpInfo:
+                return BuildFileSymbolHelpInfo(
+                    name=symbol.name,
+                    is_target=isinstance(symbol.value, Registrar),
+                    signature=symbol.signature,
+                    documentation=symbol.help,
+                )
+
+            return load
+
+        return LazyFrozenDict(
+            {
+                symbol.name: get_build_file_symbol_help_info_loader(symbol)
+                for symbol in build_symbols.info.values()
             }
         )
 

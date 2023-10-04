@@ -127,7 +127,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                 MockGet(
                     output_type=EnvironmentTarget,
                     input_types=(EnvironmentNameRequest,),
-                    mock=lambda req: EnvironmentTarget(None),
+                    mock=lambda req: EnvironmentTarget(req.raw_value, None),
                 ),
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
@@ -166,7 +166,8 @@ def test_run_export_rule() -> None:
             assert fp.read() == b"BAR"
 
 
-_e = lambda path, env: make_target(path, path, env)
+def _e(path, env):
+    return make_target(path, path, env)
 
 
 @pytest.mark.parametrize(
@@ -209,7 +210,6 @@ _e = lambda path, env: make_target(path, path, env)
 def test_warnings_for_non_local_target_environments(
     targets: Iterable[Target], err_present: Iterable[str], err_absent: Iterable[str]
 ) -> None:
-
     rule_runner = RuleRunner(
         rules=[
             UnionRule(ExportRequest, MockExportRequest),
@@ -278,10 +278,12 @@ def test_warnings_for_non_local_target_environments(
 
 def _give_an_environment(enr: EnvironmentNameRequest) -> EnvironmentTarget:
     if enr.raw_value.startswith("l"):
-        return EnvironmentTarget(LocalEnvironmentTarget({}, Address("local", target_name="local")))
+        return EnvironmentTarget(
+            enr.raw_value, LocalEnvironmentTarget({}, Address("local", target_name="local"))
+        )
     elif enr.raw_value.startswith("r"):
         return EnvironmentTarget(
-            RemoteEnvironmentTarget({}, Address("remote", target_name="remote"))
+            enr.raw_value, RemoteEnvironmentTarget({}, Address("remote", target_name="remote"))
         )
     else:
         raise Exception()

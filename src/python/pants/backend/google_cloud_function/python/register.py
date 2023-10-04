@@ -9,11 +9,10 @@ See https://www.pantsbuild.org/docs/google-cloud-function-python.
 from pants.backend.google_cloud_function.python import rules as python_rules
 from pants.backend.google_cloud_function.python.target_types import PythonGoogleCloudFunction
 from pants.backend.google_cloud_function.python.target_types import rules as target_types_rules
-from pants.backend.python.subsystems import lambdex
 
 
 def rules():
-    return (*python_rules.rules(), *target_types_rules(), *lambdex.rules())
+    return (*python_rules.rules(), *target_types_rules())
 
 
 def target_types():

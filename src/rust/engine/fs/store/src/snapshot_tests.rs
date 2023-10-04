@@ -5,8 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
-use task_executor;
-use tempfile;
+
 use testutil::data::TestDirectory;
 use testutil::make_file;
 
@@ -73,7 +72,7 @@ async fn snapshot_recursive_directories() {
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
-  std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
+  std::fs::create_dir_all(dir.path().join(cats)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
@@ -100,7 +99,7 @@ async fn snapshot_from_digest() {
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
-  std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
+  std::fs::create_dir_all(dir.path().join(cats)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
@@ -143,9 +142,9 @@ async fn snapshot_recursive_directories_including_empty() {
   let roland = cats.join("roland");
   let dogs = PathBuf::from("dogs");
   let llamas = PathBuf::from("llamas");
-  std::fs::create_dir_all(&dir.path().join(&cats)).unwrap();
-  std::fs::create_dir_all(&dir.path().join(&dogs)).unwrap();
-  std::fs::create_dir_all(&dir.path().join(&llamas)).unwrap();
+  std::fs::create_dir_all(dir.path().join(&cats)).unwrap();
+  std::fs::create_dir_all(dir.path().join(&dogs)).unwrap();
+  std::fs::create_dir_all(dir.path().join(&llamas)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let sorted_path_stats = expand_all_sorted(posix_fs).await;
@@ -229,9 +228,8 @@ async fn merge_directories_clashing_files() {
     .expect_err("Want error merging");
 
   assert!(
-    format!("{:?}", err).contains("roland"),
-    "Want error message to contain roland but was: {:?}",
-    err
+    format!("{err:?}").contains("roland"),
+    "Want error message to contain roland but was: {err:?}"
   );
 }
 
@@ -375,15 +373,9 @@ async fn snapshot_merge_colliding() {
 
   match merged_res {
     Err(ref msg)
-      if format!("{:?}", msg).contains("found 2 duplicate entries")
-        && format!("{:?}", msg).contains("roland") =>
-    {
-      ()
-    }
-    x => panic!(
-      "Snapshot::merge should have failed with a useful message; got: {:?}",
-      x
-    ),
+      if format!("{msg:?}").contains("found 2 duplicate entries")
+        && format!("{msg:?}").contains("roland") => {}
+    x => panic!("Snapshot::merge should have failed with a useful message; got: {x:?}"),
   }
 }
 
@@ -562,7 +554,7 @@ pub async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
   .parse()
   .unwrap();
   let mut v = posix_fs
-    .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
+    .expand_globs(path_globs, SymlinkBehavior::Aware, None)
     .await
     .unwrap();
   v.sort_by(|a, b| a.path().cmp(b.path()));

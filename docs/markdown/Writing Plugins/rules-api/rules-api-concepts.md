@@ -4,7 +4,6 @@ slug: "rules-api-concepts"
 excerpt: "The core concepts of the Rules API."
 hidden: false
 createdAt: "2020-05-07T22:38:44.027Z"
-updatedAt: "2022-07-25T20:57:40.743Z"
 ---
 Rules
 -----
@@ -56,7 +55,7 @@ async def list_targets(
 
 ![](https://files.readme.io/7d5163f-Rule_graph_example-2.png)
 
-At the top of the graph will always be the goals that Pants runs, such as `list` and `test`. These goals are the entry-point into the graph. When a user runs `./pants list`, the engine looks for a special type of rule, called a `@goal_rule`, that implements the respective goal. From there, the `@goal_rule` might request certain types like `Console` and `Addresses`, which will cause other helper `@rule`s to be used. To view the graph for a goal, see: [Visualize the rule graph](doc:rules-api-tips#debugging-visualize-the-rule-graph).
+At the top of the graph will always be the goals that Pants runs, such as `list` and `test`. These goals are the entry-point into the graph. When a user runs `pants list`, the engine looks for a special type of rule, called a `@goal_rule`, that implements the respective goal. From there, the `@goal_rule` might request certain types like `Console` and `Addresses`, which will cause other helper `@rule`s to be used. To view the graph for a goal, see: [Visualize the rule graph](doc:rules-api-tips#debugging-visualize-the-rule-graph).
 
 The graph also has several "roots", such as `Console`, `Specs`, and `OptionsBootstrapper` in this example. Those roots are injected into the graph as the initial input, whereas all other types are derived from those roots.
 
@@ -231,9 +230,7 @@ async def demo(name: Name) -> Foo:
 > 
 > Sometimes, you may want to have a custom `__init__()` constructor. For example, you may want your dataclass to store a `tuple[str, ...]`, but for your constructor to take the more flexible `Iterable[str]` which you then convert to an immutable tuple sequence.
 > 
-> Normally, `@dataclass(frozen=True)` will not allow you to have a custom `__init__()`. But, if you do not set `frozen=True`, then your dataclass would be mutable, which is dangerous with the engine.  
-> 
-> Instead, we added a decorator called `@frozen_after_init`, which can be combined with `@dataclass(unsafe_hash=True)`.
+> The Python docs suggest using `object.__setattr__` to set attributes in your `__init__` for frozen dataclasses.
 > 
 > ```python
 > from __future__ import annotations
@@ -241,15 +238,12 @@ async def demo(name: Name) -> Foo:
 > from dataclasses import dataclass
 > from typing import Iterable
 > 
-> from pants.util.meta import frozen_after_init
-> 
-> @frozen_after_init
-> @dataclass(unsafe_hash=True)
+> @dataclass(frozen=True)
 > class Example:
 >     args: tuple[str, ...]
 > 
 >     def __init__(self, args: Iterable[str]) -> None:
->         self.args = tuple(args)
+>         object.__setattr__(self, "args", tuple(args))
 > ```
 
 ### `Collection`: a newtype for `tuple`

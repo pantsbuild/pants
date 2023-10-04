@@ -9,7 +9,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.target_types import GoModTarget, GoPackageTarget, GoSdkTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -55,7 +55,6 @@ def rule_runner() -> RuleRunner:
         target_types=[
             GoModTarget,
             GoPackageTarget,
-            GoSdkTarget,
             ResourcesGeneratorTarget,
         ],
     )

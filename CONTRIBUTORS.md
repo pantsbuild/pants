@@ -1,4 +1,4 @@
-Created by running `./pants run build-support/bin/contributors.py`.
+Created as part of the release process.
 
 + A. Alonso Dominguez
 + Aaron Mitchell
@@ -6,20 +6,29 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Adam Retter
 + Alan Paulin
 + Alan Velasco
++ Alex Bancroft
 + Alex Schmitt
 + Alexander Johnson
++ Alexander Kuhn-Regnier
 + Alexey Tereshenkov
 + Andreas Stenius
 + Andrew Hamilton
++ Andrii Porokhnavets
 + Andy Reitz
++ Anler
 + Antoine Tollenaere
 + Asher Foa
 + Aurelien Didier
++ Baptiste Gentholz
 + Bardur Arantsson
 + Bastian Wegge
++ Ben Limmer
 + Benjy Weinberger
++ Berkay Öztürk
 + Bill Farner
 + Billy "Hyun Joon" Seol
++ Blaž Šnuderl
++ Bob Gregory
 + Borja Lorente
 + Brandon Milton
 + Brian Larson
@@ -39,11 +48,13 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Chris Pesto
 + Chris Targett
 + Chris Williams
++ Christoph Proeschel
 + Christopher Livingston
 + Christopher Maier
 + Christopher Neugebauer
 + Cody Gibb
 + Colin Taylor
++ Constantin Ponfick
 + Craig Schertz
 + Cristian Matache
 + Damon Revoe
@@ -82,6 +93,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Eugene Burmako
 + Evan Jones
 + Evgeny Kravchenko
++ Facetoe
 + Fatin H
 + Fedor Korotkov
 + Fiona Condone
@@ -91,6 +103,8 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Gautham Nair
++ Gerald Spencer
 + Gordon Cassie
 + Greg Shuflin
 + Grzegorz Kossakowski
@@ -101,11 +115,13 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Huon Wilson
 + Hwasung Lee
 + Ian Tabolt
++ Idan Attias
 + Igor Morozov
 + Ikai Lan
 + In-Ho Yi
 + Itay Donanhirsh
 + Ity Kaul
++ JC (Jonathan Chen)
 + Jackson Davis
 + Jacob Floyd
 + Jake Donham
@@ -144,17 +160,22 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Joshua Cannon
 + Joshua Cohen
 + Joshua Humphries
++ Jovial Joe Jayarson
 + Justin Trobec
++ KadenAgrey
 + Karin Lundberg
 + Kaushik Srenevasan
 + Ken Howard
 + Ken Kawamoto
 + Kevin Oliver
 + Kevin Sweeney
++ Koki Nishihara
 + Kris Wilson
 + Kushal Dave
 + Kyle Derr
++ Kyujin Cho
 + Larry Hosken
++ Lasse Alm
 + Lawrence Finn
 + Le Nucksi
 + Lei Wang
@@ -164,12 +185,17 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Luc Cary
 + Luca Clementi
 + Lukasz Jastrzebski
++ Mahesh Vashishtha
 + Marc Abramowitz
 + Marcelo Trylesinski
 + Marcin Podolski
++ Marcus Bolmstedt
++ Marcus Lim
 + Marek Żarnowski
++ Marijn Valk
 + Marilyn Cruz
 + Marius Eriksen
++ Marius Räsener
 + Mark Chu-Carroll
 + Mark Davis
 + Mark McBride
@@ -181,16 +207,20 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Matt Landis
 + Matt Olsen
 + Matthew Jeffryes
++ Matthias Berndt
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
 + Michael Glass
 + Michal Bryc
++ Mikael Souza
 + Mike Cripps
++ Mike Geeves
 + Mike Lindsey
 + Mike Solomon
 + Misho Krastev
 + Mohamed Abdi
++ Morten Hauge
 + Moses Nakamura
 + Nadav Samet
 + Nathan Levesque
@@ -200,6 +230,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Nik Shkrob
 + Nimrod Shlagman
 + Nitay Joffe
++ Nobu
 + Nora Howard
 + Ny Saechao
 + Oliver Gould
@@ -220,12 +251,15 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Pierre Chevalier
 + Pierre DAL-PRA
 + Qicheng Ma
++ Raph Estrada
 + Raúl Cuza
++ Rhuan Barreto
 + Rhys Madigan
 + Robert Stapenhurst
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Ryan Despain
 + Ryan King
 + Ryan Scott Brown
 + Ryan Williams
@@ -233,29 +267,36 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Sameer Brenn
 + Sara Solano
 + Scott Lessans
++ Scott Searcy
 + Senthil Kumaran
 + SergeKireev
 + Sergey Serebryakov
++ Seve Martinez
 + Shane Delmore
 + Shantanu Kumar
 + Shuo Li
 + Simeon Franklin
++ Simon Biggs
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
 + Stu Hood
++ Subin Kim
 + Suresh Joshi
 + Tal Amuyal
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
 + Thales Menato
++ Theo Ribeiro
 + Tianshuo Deng
 + Tien Nguyen
 + Tim Gates
++ Tim Nielens
 + Tim Treptow
 + Timur Abishev
 + Tina Huang
++ Tobias Nilsson
 + Todd Stumpf
 + Tom Dimiduk
 + Tom Dyas
@@ -267,19 +308,30 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Troy Howard
 + Tushar Singh
 + Ugo Di Girolamo
++ Ulugbek Adilbekov
++ Viktor Kleen
++ Vincent Tavernier
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
++ Willy Lulciuc
 + Win Wang
 + Wolfram Arnold
 + Xaelias
++ Yarden Shoham
 + Yi Cheng
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ azban
++ bianca rosa
 + billybecker
 + eugene yokota
++ gyudoza
 + hephex
++ olivercoleman-switchdin
++ philipp-sontag-by
++ sww
 + twunderlich-grapl
 + wimax-grapl
 + Ólafur Páll Geirsson

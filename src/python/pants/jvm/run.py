@@ -13,7 +13,7 @@ from pants.core.util_rules.system_binaries import rules as system_binaries_rules
 from pants.engine.addresses import Addresses
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.jvm.classpath import Classpath
 from pants.jvm.classpath import rules as classpath_rules
@@ -25,7 +25,6 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-@rule_helper
 async def _find_main(
     unzip: UnzipBinary, jdk: JdkEnvironment, input_digest: Digest, jarfile: str
 ) -> str:
@@ -49,7 +48,6 @@ async def _find_main(
     return mains_from_javap[0]
 
 
-@rule_helper
 async def _find_main_by_manifest(
     unzip: UnzipBinary, input_digest: Digest, jarfile: str
 ) -> Optional[str]:
@@ -84,7 +82,6 @@ async def _find_main_by_manifest(
     return main_class_lines[0]
 
 
-@rule_helper
 async def _find_main_by_javap(
     unzip: UnzipBinary, jdk: JdkEnvironment, input_digest: Digest, jarfile: str
 ) -> Tuple[str, ...]:
@@ -136,7 +133,6 @@ async def create_run_request(
     request: GenericJvmRunRequest,
     unzip: UnzipBinary,
 ) -> RunRequest:
-
     field_set = request.field_set
 
     jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version))

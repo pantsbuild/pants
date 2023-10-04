@@ -90,9 +90,8 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
           if content_length > MAX_LENGTH && !log_enabled!(log::Level::Debug) {
             bytes.extend_from_slice(
               format!(
-                "\n... TRUNCATED contents from {}B to {}B \
-                  (Pass -ldebug to see full contents).",
-                content_length, MAX_LENGTH
+                "\n... TRUNCATED contents from {content_length}B to {MAX_LENGTH}B \
+                  (Pass -ldebug to see full contents)."
               )
               .as_bytes(),
             );
@@ -101,7 +100,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
         })
         .await
         .unwrap_or_else(|_| "<could not load contents>".to_string());
-      let detail = format!("{}{}", header, contents);
+      let detail = format!("{header}{contents}");
       let res: Result<_, String> = Ok((file.name().to_owned(), detail));
       res
     })
@@ -155,7 +154,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
     res
   }
   .await
-  .unwrap_or_else(|err| vec![format!("Failed to load contents for comparison: {}", err)]);
+  .unwrap_or_else(|err| vec![format!("Failed to load contents for comparison: {err}")]);
 
   Ok(format!(
     "Can only merge Directories with no duplicates, but found {} duplicate entries in {}:\
@@ -229,9 +228,9 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
   ) -> Result<DirectoryDigest, Self::Error> {
     let input_tree = self.load_digest_trie(directory_digest.clone()).await?;
     let path_stats = input_tree
-      .expand_globs(params.globs, SymlinkBehavior::Oblivious, None)
+      .expand_globs(params.globs, SymlinkBehavior::Aware, None)
       .await
-      .map_err(|err| format!("Error matching globs against {directory_digest:?}: {}", err))?;
+      .map_err(|err| format!("Error matching globs against {directory_digest:?}: {err}"))?;
 
     let mut files = HashMap::new();
     input_tree.walk(SymlinkBehavior::Oblivious, &mut |path, entry| match entry {

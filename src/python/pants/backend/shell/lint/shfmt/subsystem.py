@@ -8,7 +8,6 @@ from typing import Iterable
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
-from pants.engine.platform import Platform
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
 from pants.util.strutil import softwrap
 
@@ -52,10 +51,6 @@ class Shfmt(TemplatedExternalTool):
             """
         ),
     )
-
-    def generate_exe(self, plat: Platform) -> str:
-        plat_str = self.default_url_platform_mapping[plat.value]
-        return f"./shfmt_{self.version}_{plat_str}"
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # Refer to https://editorconfig.org/#file-location for how config files are discovered.

@@ -3,11 +3,10 @@ title: "Tips and debugging"
 slug: "rules-api-tips"
 hidden: false
 createdAt: "2020-05-08T04:15:06.256Z"
-updatedAt: "2022-02-10T19:52:27.560Z"
 ---
 > 📘 Reminder: ask for help
 > 
-> We would love to help you with your plugin. Please reach out through [Slack](doc:community).
+> We would love to help you with your plugin. Please reach out through [Slack](doc:the-pants-community).
 > 
 > We also appreciate any feedback on the Rules API. If you find certain things confusing or are looking for additional mechanisms, please let us know.
 
@@ -66,7 +65,7 @@ When Pants runs most processes, it runs in a `chroot` (temporary directory). Usu
 Pants will log the path to the chroot, e.g.:
 
 ```
-▶ ./pants --keep-sandboxes=always test src/python/pants/util/strutil_test.py
+▶ pants --keep-sandboxes=always test src/python/pants/util/strutil_test.py
 ...
 12:29:45.08 [INFO] preserving local process execution dir `"/private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/process-executionN9Kdk0"` for "Test binary /Users/pantsbuild/.pyenv/shims/python3."
 ...
@@ -88,7 +87,7 @@ Rule graph issues can be particularly hard to figure out - the error messages ar
 
 We encourage you to reach out in #plugins on [Slack](doc:getting-help) for help.
 
-Often the best way to debug a rule graph issue is to isolate where the problem comes from by commenting out code until the graph compiles. The rule graph is formed solely by looking at the types in the signature of your `@rule` and in any `Get` statements - none of the rest of your rules matter. To check if the rule graph can be built, simply run `./pants --version`.
+Often the best way to debug a rule graph issue is to isolate where the problem comes from by commenting out code until the graph compiles. The rule graph is formed solely by looking at the types in the signature of your `@rule` and in any `Get` statements - none of the rest of your rules matter. To check if the rule graph can be built, simply run `pants --version`.
 
 We recommend starting by determining which backend—or combination of backends—is causing issues. You can run the below script to find this. Once you find the smallest offending combination, focus on fixing that first by removing all irrelevant backends from `backend_packages` in `pants.toml`—this reduces the surface area of where issues can come from. (You may need to use the option `--no-verify-config` so that Pants doesn't complain about unrecognized options.)
 
@@ -113,7 +112,7 @@ BACKENDS = {
 def backends_load(backends) -> bool:
     logging.info(f"Testing {backends}")
     result = subprocess.run(
-        ["./pants", f"--backend-packages={repr(list(backends))}", "--version"],
+        ["pants", f"--backend-packages={repr(list(backends))}", "--version"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )

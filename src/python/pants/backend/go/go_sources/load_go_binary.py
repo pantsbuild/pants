@@ -10,15 +10,10 @@ from typing import Iterable
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.import_analysis import (
-    GoStdLibPackages,
-    GoStdLibPackagesRequest,
-    ImportConfig,
-    ImportConfigRequest,
-)
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.resources import read_resource
@@ -142,23 +137,15 @@ async def setup_go_binary(request: LoadedGoBinaryRequest, goroot: GoRoot) -> Loa
         ),
     )
 
-    import_config = await Get(
-        ImportConfig,
-        ImportConfigRequest(
-            built_pkg.import_paths_to_pkg_a_files, build_opts=build_opts, include_stdlib=False
-        ),
-    )
-
     main_pkg_a_file_path = built_pkg.import_paths_to_pkg_a_files["main"]
-    input_digest = await Get(Digest, MergeDigests([built_pkg.digest, import_config.digest]))
 
     binary = await Get(
         LinkedGoBinary,
         LinkGoBinaryRequest(
-            input_digest=input_digest,
+            input_digest=built_pkg.digest,
             archives=(main_pkg_a_file_path,),
             build_opts=build_opts,
-            import_config_path=import_config.CONFIG_PATH,
+            import_paths_to_pkg_a_files=built_pkg.import_paths_to_pkg_a_files,
             output_filename=request.output_name,
             description=f"Link internal Go binary `{request.output_name}`",
         ),

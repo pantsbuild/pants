@@ -31,7 +31,6 @@ from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption
 from pants.util.dirutil import safe_rmtree
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 
 
 class ExportError(Exception):
@@ -49,8 +48,7 @@ class ExportRequest:
     targets: Sequence[Target]
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PostProcessingCommand:
     """A command to run as a local process after an exported digest is materialized."""
 
@@ -67,12 +65,11 @@ class PostProcessingCommand:
         argv: Iterable[str],
         extra_env: Mapping[str, str] = FrozenDict(),
     ):
-        self.argv = tuple(argv)
-        self.extra_env = FrozenDict(extra_env)
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env))
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class ExportResult:
     description: str
     # Materialize digests under this reldir.
@@ -94,11 +91,11 @@ class ExportResult:
         post_processing_cmds: Iterable[PostProcessingCommand] = tuple(),
         resolve: str | None = None,
     ):
-        self.description = description
-        self.reldir = reldir
-        self.digest = digest
-        self.post_processing_cmds = tuple(post_processing_cmds)
-        self.resolve = resolve
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "reldir", reldir)
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "post_processing_cmds", tuple(post_processing_cmds))
+        object.__setattr__(self, "resolve", resolve)
 
 
 class ExportResults(Collection[ExportResult]):
@@ -180,13 +177,13 @@ async def export(
             for request in union_membership.get(KnownUserResolveNamesRequest)
         )
         all_valid_resolve_names = sorted(
-            [
+            {
                 *itertools.chain.from_iterable(kurn.names for kurn in all_known_user_resolve_names),
                 *(
                     sentinel.resolve_name
                     for sentinel in union_membership.get(GenerateToolLockfileSentinel)
                 ),
-            ]
+            }
         )
         raise UnrecognizedResolveNamesError(
             unexported_resolves,

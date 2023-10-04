@@ -11,12 +11,12 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -39,9 +39,8 @@ class YapfRequest(FmtTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-@rule_helper
 async def _run_yapf(
-    request: FmtRequest.Batch,
+    request: AbstractFmtRequest.Batch,
     yapf: Yapf,
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> FmtResult:

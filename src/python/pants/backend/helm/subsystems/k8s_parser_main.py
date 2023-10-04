@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sys
 
-from hikaru import load_full_yaml
+from hikaru import load_full_yaml  # pants: no-infer-dep
 
 
 def main(args: list[str]):

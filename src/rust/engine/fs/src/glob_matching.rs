@@ -127,7 +127,7 @@ impl PathGlob {
     for component in Path::new(pattern).components() {
       let part = match component {
         Component::Prefix(..) | Component::RootDir => {
-          return Err(format!("Absolute paths not supported: {:?}", pattern));
+          return Err(format!("Absolute paths not supported: {pattern:?}"));
         }
         Component::CurDir => continue,
         c => c.as_os_str(),
@@ -160,7 +160,7 @@ impl PathGlob {
       .into_iter()
       .map(|part| {
         Pattern::new(&part.to_string_lossy())
-          .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))
+          .map_err(|e| format!("Could not parse {filespec:?} as a glob: {e:?}"))
       })
       .collect::<Result<Vec<_>, _>>()?;
 
@@ -233,8 +233,7 @@ impl PathGlob {
         let mut symbolic_path = symbolic_path_parent;
         symbolic_path.extend(parts.iter().map(Pattern::as_str));
         return Err(format!(
-          "Globs may not traverse outside of the buildroot: {:?}",
-          symbolic_path,
+          "Globs may not traverse outside of the buildroot: {symbolic_path:?}",
         ));
       }
       symbolic_path_parent.push(Path::new(&Component::ParentDir));
@@ -334,7 +333,7 @@ impl FilespecMatcher {
         PathGlob::normalize_pattern(glob).and_then(|components| {
           let normalized_pattern: PathBuf = components.into_iter().collect();
           Pattern::new(normalized_pattern.to_str().unwrap())
-            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", glob, e))
+            .map_err(|e| format!("Could not parse {glob:?} as a glob: {e:?}"))
         })
       })
       .collect::<Result<Vec<_>, String>>()?;
@@ -364,7 +363,7 @@ impl FilespecMatcher {
   }
 
   pub fn exclude_globs(&self) -> &[String] {
-    self.excludes.patterns.as_slice()
+    self.excludes.exclude_patterns()
   }
 }
 
@@ -420,8 +419,8 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     symlink_behavior: SymlinkBehavior,
     link_depth: LinkDepth,
   ) -> Result<Vec<(PathStat, LinkDepth)>, E> {
-    // List the directory.
-    let dir_listing = self.scandir(canonical_dir).await?;
+    // List the directory to create relative Stats.
+    let dir_listing = self.scandir(canonical_dir.clone()).await?;
 
     // Match any relevant Stats, and join them into PathStats.
     let path_stats = future::try_join_all(
@@ -447,10 +446,11 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
         .map(|(stat_symbolic_path, stat)| {
           let context = self.clone();
           let exclude = exclude.clone();
+          let stat = stat.within(&canonical_dir.0);
           async move {
             // Canonicalize matched PathStats, and filter paths that are ignored by local excludes.
             // Context ("global") ignore patterns are applied during `scandir`.
-            if exclude.is_ignored(stat) {
+            if exclude.is_ignored(&stat) {
               Ok(None)
             } else {
               match stat {
@@ -464,25 +464,17 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
 
                   if let SymlinkBehavior::Aware = symlink_behavior {
                     return Ok(Some((
-                      PathStat::link(stat_symbolic_path, l.clone()),
+                      PathStat::link(stat_symbolic_path, l),
                       link_depth + 1,
                     )));
                   }
 
-                  let dest = context
-                    .canonicalize_link(stat_symbolic_path, l.clone())
-                    .await?;
+                  let dest = context.canonicalize_link(stat_symbolic_path, l).await?;
 
                   Ok(dest.map(|ps| (ps, link_depth + 1)))
                 }
-                Stat::Dir(d) => Ok(Some((
-                  PathStat::dir(stat_symbolic_path, d.clone()),
-                  link_depth,
-                ))),
-                Stat::File(f) => Ok(Some((
-                  PathStat::file(stat_symbolic_path, f.clone()),
-                  link_depth,
-                ))),
+                Stat::Dir(d) => Ok(Some((PathStat::dir(stat_symbolic_path, d), link_depth))),
+                Stat::File(f) => Ok(Some((PathStat::file(stat_symbolic_path, f), link_depth))),
               }
             }
           }
@@ -535,7 +527,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
       // Get all the inputs which didn't transitively expand to any files.
       let matching_inputs = sources
         .iter()
-        .zip(matched.into_iter())
+        .zip(matched)
         .filter_map(
           |(source, matched)| {
             if matched {
@@ -569,14 +561,14 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
         let prefix = format!("Unmatched glob{}", if single_glob { "" } else { "s" });
         let origin = match &strict_match_behavior {
           StrictGlobMatching::Warn(description) | StrictGlobMatching::Error(description) => {
-            format!(" from {}: ", description)
+            format!(" from {description}: ")
           }
           _ => ": ".to_string(),
         };
         let unmatched_globs = if single_glob {
           format!("{:?}", non_matching_inputs[0])
         } else {
-          format!("{:?}", non_matching_inputs)
+          format!("{non_matching_inputs:?}")
         };
         let exclude_patterns = exclude.exclude_patterns();
         let excludes_portion = if exclude_patterns.is_empty() {
@@ -586,7 +578,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
           if single_exclude {
             format!(", exclude: {:?}", exclude_patterns[0])
           } else {
-            format!(", excludes: {:?}", exclude_patterns)
+            format!(", excludes: {exclude_patterns:?}")
           }
         };
         let msg = format!(

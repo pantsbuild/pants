@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use maplit::hashset;
 use shell_quote::bash;
-use spectral::{assert_that, string::StrAssertions};
 use tempfile::TempDir;
 
 use fs::EMPTY_DIRECTORY_DIGEST;
@@ -19,7 +18,7 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process, ProcessError,
+  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
   RelativePath,
 };
 
@@ -76,7 +75,6 @@ async fn capture_exit_code_signal() {
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, -15);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -93,9 +91,9 @@ async fn env() {
 
   let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let got_env: BTreeMap<String, String> = stdout
-    .split("\n")
+    .split('\n')
     .filter(|line| !line.is_empty())
-    .map(|line| line.splitn(2, "="))
+    .map(|line| line.splitn(2, '='))
     .map(|mut parts| {
       (
         parts.next().unwrap().to_string(),
@@ -169,7 +167,6 @@ async fn output_files_one() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -197,7 +194,6 @@ async fn output_dirs() {
     result.original.output_directory,
     TestDirectory::recursive().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -224,7 +220,6 @@ async fn output_files_many() {
     result.original.output_directory,
     TestDirectory::recursive().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -250,7 +245,6 @@ async fn output_files_execution_failure() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -277,7 +271,6 @@ async fn output_files_partial_output() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -301,7 +294,6 @@ async fn output_overlapping_file_and_dir() {
     result.original.output_directory,
     TestDirectory::nested().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -309,7 +301,7 @@ async fn append_only_cache_created() {
   let name = "geo";
   let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
-  let cache_dest = RelativePath::new(format!("{}/{}", dest_base, name)).unwrap();
+  let cache_dest = RelativePath::new(format!("{dest_base}/{name}")).unwrap();
   let result = run_command_locally(
     Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
@@ -317,11 +309,10 @@ async fn append_only_cache_created() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
+  assert_eq!(result.stdout_bytes, format!("{name}\n").as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -345,7 +336,6 @@ async fn jdk_symlink() {
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -385,9 +375,9 @@ async fn test_chroot_placeholder() {
 
   let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let got_env: BTreeMap<String, String> = stdout
-    .split("\n")
+    .split('\n')
     .filter(|line| !line.is_empty())
-    .map(|line| line.splitn(2, "="))
+    .map(|line| line.splitn(2, '='))
     .map(|mut parts| {
       (
         parts.next().unwrap().to_string(),
@@ -536,7 +526,6 @@ async fn all_containing_directories_for_outputs_are_created() {
     result.original.output_directory,
     TestDirectory::nested_dir_and_file().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -559,7 +548,6 @@ async fn output_empty_dir() {
     result.original.output_directory,
     TestDirectory::containing_falcons_dir().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -579,9 +567,9 @@ async fn timeout() {
   assert_eq!(result.original.exit_code, -15);
   let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
-  assert_that(&stdout).contains("Calculating...");
-  assert_that(&stderr).contains("Exceeded timeout");
-  assert_that(&stderr).contains("sleepy-cat");
+  assert!(&stdout.contains("Calculating..."));
+  assert!(&stderr.contains("Exceeded timeout"));
+  assert!(&stderr.contains("sleepy-cat"));
 }
 
 #[tokio::test]
@@ -635,7 +623,6 @@ async fn working_directory() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -745,10 +732,10 @@ async fn prepare_workdir_exclusive_relative() {
 
   let exclusive_spawn = local::prepare_workdir(
     work_dir.path().to_owned(),
+    work_dir.path(),
     &process,
     TestDirectory::recursive().directory_digest(),
-    store,
-    executor,
+    &store,
     &named_caches,
     &immutable_inputs,
     None,
@@ -757,7 +744,7 @@ async fn prepare_workdir_exclusive_relative() {
   .await
   .unwrap();
 
-  assert_eq!(exclusive_spawn, true);
+  assert!(exclusive_spawn);
 }
 
 pub(crate) fn named_caches_and_immutable_inputs(
@@ -769,7 +756,7 @@ pub(crate) fn named_caches_and_immutable_inputs(
 
   (
     root,
-    NamedCaches::new(named_cache_dir),
+    NamedCaches::new_local(named_cache_dir),
     ImmutableInputs::new(store, &root_path).unwrap(),
   )
 }
@@ -798,7 +785,7 @@ async fn run_command_locally_in_dir(
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, ProcessError> {
   let store_dir = TempDir::new().unwrap();
-  let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
+  let executor = executor.unwrap_or_else(task_executor::Executor::new);
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let (_caches_dir, named_caches, immutable_inputs) =
@@ -811,7 +798,7 @@ async fn run_command_locally_in_dir(
     immutable_inputs,
     cleanup,
   );
-  let original = runner.run(Context::default(), workunit, req.into()).await?;
+  let original = runner.run(Context::default(), workunit, req).await?;
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await?;

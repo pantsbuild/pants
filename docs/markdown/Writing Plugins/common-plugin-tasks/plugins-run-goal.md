@@ -4,7 +4,6 @@ slug: "plugins-run-goal"
 excerpt: "How to add a new implementation to the `run` goal."
 hidden: true
 createdAt: "2020-07-01T04:55:11.390Z"
-updatedAt: "2021-07-20T16:18:29.478Z"
 ---
 The `run` goal runs a single interactive process in the foreground, such as running a script or a program.
 
@@ -85,7 +84,7 @@ The `RunRequest` will get converted into an `InteractiveProcess` that will run i
 
 The process will run in a temporary directory in the build root, which means that the script/program can access files that would normally need to be declared by adding a `files` or `resources` target to the `dependencies` field.
 
-The process will not be hermetic, meaning that it will inherit the environment variables used by the `./pants` process. Any values you set in `extra_env` will add or update the specified environment variables.
+The process will not be hermetic, meaning that it will inherit the environment variables used by the `pants` process. Any values you set in `extra_env` will add or update the specified environment variables.
 
 ```python
 from dataclasses import dataclass
@@ -154,12 +153,12 @@ def rules():
     return [*run_binary.rules()]
 ```
 
-Now, when you run `./pants run path/to/binary.sh`, Pants should run the program.
+Now, when you run `pants run path/to/binary.sh`, Pants should run the program.
 
 4. Define `@rule`s for debugging
 ------------------------------------
 
-`./pants run` exposes `--debug-adapter` options for debugging code. To hook into this behavior, opt-in in your `RunRequest` subclass and define an additional rule:
+`pants run` exposes `--debug-adapter` options for debugging code. To hook into this behavior, opt-in in your `RunRequest` subclass and define an additional rule:
 
 ```python
 from pants.core.goals.run import RunDebugAdapterRequest

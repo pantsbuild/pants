@@ -64,7 +64,7 @@ impl PantsLogger {
       .iter()
       .map(|(k, v)| {
         let python_level: PythonLogLevel = (*v).try_into().unwrap_or_else(|e| {
-          panic!("Unrecognized log level from python: {}: {}", v, e);
+          panic!("Unrecognized log level from python: {v}: {e}");
         });
         let level: log::LevelFilter = python_level.into();
         (k.clone(), level)
@@ -73,14 +73,14 @@ impl PantsLogger {
 
     let max_python_level: PythonLogLevel = max_level
       .try_into()
-      .map_err(|e| format!("Unrecognised log level from Python: {}: {}", max_level, e))?;
+      .map_err(|e| format!("Unrecognised log level from Python: {max_level}: {e}"))?;
     let global_level: LevelFilter = max_python_level.into();
 
     let log_file = OpenOptions::new()
       .create(true)
       .append(true)
       .open(log_file_path)
-      .map_err(|err| format!("Error opening pantsd logfile: {}", err))?;
+      .map_err(|err| format!("Error opening pantsd logfile: {err}"))?;
 
     PANTS_LOGGER.0.store(Arc::new(Inner {
       per_run_logs: Mutex::default(),
@@ -115,7 +115,7 @@ impl PantsLogger {
           .create(true)
           .append(true)
           .open(path)
-          .map_err(|err| format!("Error opening per-run logfile: {}", err))
+          .map_err(|err| format!("Error opening per-run logfile: {err}"))
           .unwrap();
         *self.0.load().per_run_logs.lock() = Some(file);
       }
@@ -127,7 +127,7 @@ impl PantsLogger {
   /// function, which translates the log message into the Rust log paradigm provided by
   /// the `log` crate.
   pub fn log_from_python(message: &str, python_level: u64, target: &str) -> Result<(), String> {
-    let level: PythonLogLevel = python_level.try_into().map_err(|err| format!("{}", err))?;
+    let level: PythonLogLevel = python_level.try_into().map_err(|err| format!("{err}"))?;
     log!(target: target, level.into(), "{}", message);
     Ok(())
   }
@@ -199,19 +199,19 @@ impl Log for PantsLogger {
 
       let level = record.level();
       let level_marker = match level {
-        _ if !use_color => format!("[{}]", level).normal().clear(),
-        Level::Info => format!("[{}]", level).normal(),
-        Level::Error => format!("[{}]", level).red(),
-        Level::Warn => format!("[{}]", level).yellow(),
-        Level::Debug => format!("[{}]", level).green(),
-        Level::Trace => format!("[{}]", level).magenta(),
+        _ if !use_color => format!("[{level}]").normal().clear(),
+        Level::Info => format!("[{level}]").normal(),
+        Level::Error => format!("[{level}]").red(),
+        Level::Warn => format!("[{level}]").yellow(),
+        Level::Debug => format!("[{level}]").green(),
+        Level::Trace => format!("[{level}]").magenta(),
       };
-      write!(log_string, " {}", level_marker).unwrap();
+      write!(log_string, " {level_marker}").unwrap();
 
       if inner.show_target {
         write!(log_string, " ({})", record.target()).unwrap();
       };
-      writeln!(log_string, " {}", log_msg).unwrap();
+      writeln!(log_string, " {log_msg}").unwrap();
       log_string
     };
     let log_bytes = log_string.as_bytes();

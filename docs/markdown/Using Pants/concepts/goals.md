@@ -4,14 +4,13 @@ slug: "goals"
 excerpt: "The commands Pants runs."
 hidden: false
 createdAt: "2020-02-21T17:44:52.605Z"
-updatedAt: "2022-04-11T21:31:11.557Z"
 ---
 Pants commands are known as _goals_, such as `test` and `lint`.
 
 To see the current list of goals, run:
 
 ```bash
-❯ ./pants help goals
+❯ pants help goals
 ```
 
 You'll see more goals activated as you activate more [backends](doc:enabling-backends).
@@ -22,7 +21,7 @@ Running goals
 For example:
 
 ```
-❯ ./pants count-loc project/app_test.py
+❯ pants count-loc project/app_test.py
 ───────────────────────────────────────────────────────────────────────────────
 Language                 Files     Lines   Blanks  Comments     Code Complexity
 ───────────────────────────────────────────────────────────────────────────────
@@ -36,15 +35,14 @@ You can also run multiple goals in a single run of Pants, in which case they wil
 
 ```bash
 # Format all code, and then test it:
-❯ ./pants fmt test ::
+❯ pants fmt test ::
 ```
 
-Finally, Pants supports running goals in a `--loop`. In this mode, all goals specified will run  
-sequentially, and then Pants will wait until a relevant file has changed to try running them again.
+Finally, Pants supports running goals in a `--loop`. In this mode, all goals specified will run sequentially, and then Pants will wait until a relevant file has changed to try running them again.
 
 ```bash
 # Re-run linters and testing continuously as files or their dependencies change:
-❯ ./pants --loop lint test project/app_test.py
+❯ pants --loop lint test project/app_test.py
 ```
 
 Use `Ctrl+C` to exit the `--loop`.
@@ -58,16 +56,16 @@ You can use several argument types:
 
 | Argument type                   | Semantics                                   | Example                         |
 | ------------------------------- | ------------------------------------------- | ------------------------------- |
-| File path                       | Match the file                              | `./pants test project/tests.py` |
-| Directory path                  | Match everything in the directory           | `./pants test project/utils`    |
-| `::` globs                      | Match everything in the directory and below | `./pants test project::`        |
-| [Target addresses](doc:targets) | Match the target                            | `./pants package project:tests` |
+| File path                       | Match the file                              | `pants test project/tests.py` |
+| Directory path                  | Match everything in the directory           | `pants test project/utils`    |
+| `::` globs                      | Match everything in the directory and below | `pants test project::`        |
+| [Target addresses](doc:targets) | Match the target                            | `pants package project:tests` |
 
-You can combine argument types, e.g. `./pants fmt src/go:: src/py/app.py`.
+You can combine argument types, e.g. `pants fmt src/go:: src/py/app.py`.
 
-To ignore something, prefix the argument with `-`. For example,  
-`./pants test :: -project/integration_tests` will run all your tests except for those in the  
-directory `project/integration_tests`.
+You can address targets from the root of the repository by using plain `::` and `:`. For example, `pants package ::` would produce artifacts for all packages declared in the whole repository and `pants package :` would produce artifacts only for those packages that are declared in the root directory of the repository. 
+
+To ignore something, prefix the argument with `-`. For example, `pants test :: -project/integration_tests` will run all your tests except for those in the directory `project/integration_tests` and `pants package project:: -project:` will package all targets in the subdirectories of the `project` directory, recursively, except for those declared directly under the `project` directory.  
 
 > 🚧 Set `[GLOBAL].use_deprecated_directory_cli_args_semantics = false` in `pants.toml`
 > 
@@ -82,12 +80,12 @@ Goal options
 
 Many goals also have [options](doc:options) to change how they behave. Every option in Pants can be set via an environment variable, config file, and the command line.
 
-To see if a goal has any options, run `./pants help $goal` or `./pants help-advanced $goal`. See [Command Line Help](doc:getting-help) for more information.
+To see if a goal has any options, run `pants help $goal` or `pants help-advanced $goal`. See [Command Line Help](doc:getting-help) for more information.
 
 For example:
 
 ```
-❯ ./pants help test
+❯ pants help test
 17:20:14.24 [INFO] Remote cache/execution options updated: reinitializing scheduler...
 17:20:15.36 [INFO] Scheduler initialized.
 
@@ -112,17 +110,17 @@ Config section: [test]
 You can then use the option by prefixing it with the goal name:
 
 ```bash
-./pants --test-debug test project/app_test.py
+pants --test-debug test project/app_test.py
 ```
 
 You can also put the option after the file/target arguments:
 
 ```bash
-./pants test project/app_test.py --test-debug
+pants test project/app_test.py --test-debug
 ```
 
 As a shorthand, if you put the option after the goal and before the file/target arguments, you can leave off the goal name in the flag:
 
 ```bash
-./pants test --debug project/app_test.py
+pants test --debug project/app_test.py
 ```

@@ -43,10 +43,10 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use store::{ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
+use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
 fn executor() -> Executor {
-  Executor::global(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
+  Executor::new_owned(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
 }
 
 pub fn criterion_benchmark_materialize(c: &mut Criterion) {
@@ -62,9 +62,6 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
       let (store, _tempdir, digest) = snapshot(&executor, count, size);
       let parent_dest = TempDir::new().unwrap();
       let parent_dest_path = parent_dest.path();
-      let immutable_inputs_dest = TempDir::new().unwrap();
-      let immutable_inputs_path = immutable_inputs_dest.path();
-      let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_path).unwrap();
 
       cgroup
         .sample_size(10)
@@ -80,9 +77,10 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
               let _ = executor
                 .block_on(store.materialize_directory(
                   dest,
+                  parent_dest_path,
                   digest.clone(),
+                  false,
                   &BTreeSet::new(),
-                  Some(&immutable_inputs),
                   perms,
                 ))
                 .unwrap();
@@ -324,7 +322,7 @@ fn tempdir_containing(max_files: usize, file_target_size: usize) -> (TempDir, Ve
     // We use the (repeated) path as the content as well.
     let abs_path = tempdir.path().join(path.path());
     if let Some(parent) = abs_path.parent() {
-      fs::safe_create_dir_all(parent).unwrap();
+      std::fs::create_dir_all(parent).unwrap();
     }
     let mut f = BufWriter::new(std::fs::File::create(abs_path).unwrap());
     let bytes = path.path().as_os_str().as_bytes();

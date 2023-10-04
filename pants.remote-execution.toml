@@ -17,4 +17,4 @@ remote_execution_address = "grpc://127.0.0.1:50051"
 remote_instance_name = ""
 
 # TODO: See https://gitlab.com/BuildGrid/buildgrid/-/blob/master/buildgrid/server/server.py#L212-222
-process_execution_remote_parallelism = 8
+process_execution_remote_parallelism = 4

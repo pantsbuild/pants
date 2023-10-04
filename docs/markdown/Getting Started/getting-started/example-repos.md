@@ -4,7 +4,6 @@ slug: "example-repos"
 excerpt: "Example projects to help set up your own repository."
 hidden: false
 createdAt: "2020-03-12T20:25:05.256Z"
-updatedAt: "2022-05-02T15:04:27.740Z"
 ---
 A [Python repository](https://github.com/pantsbuild/example-python), demonstrating features such as:
 

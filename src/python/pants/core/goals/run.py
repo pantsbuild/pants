@@ -3,23 +3,11 @@
 
 from __future__ import annotations
 
-import dataclasses
 import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from enum import Enum
-from itertools import filterfalse, tee
-from typing import (
-    Callable,
-    ClassVar,
-    Iterable,
-    Mapping,
-    NamedTuple,
-    Optional,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple, TypeVar, Union
 
 from typing_extensions import final
 
@@ -34,21 +22,11 @@ from pants.engine.internals.specs_rules import (
     TooManyTargetsException,
 )
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import (
-    Effect,
-    Get,
-    Rule,
-    _uncacheable_rule,
-    collect_rules,
-    goal_rule,
-    rule,
-    rule_helper,
-)
+from pants.engine.rules import Effect, Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
     NoApplicableTargetsBehavior,
-    SecondaryOwnerMixin,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -58,8 +36,7 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +89,7 @@ class RunFieldSet(FieldSet, metaclass=ABCMeta):
 class RestartableField(BoolField):
     alias = "restartable"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If true, runs of this target with the `run` goal may be interrupted and
         restarted when its input files change.
@@ -120,8 +97,7 @@ class RestartableField(BoolField):
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class RunRequest:
     digest: Digest
     # Values in args and in env can contain the format specifier "{chroot}", which will
@@ -140,11 +116,13 @@ class RunRequest:
         immutable_input_digests: Mapping[str, Digest] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
-        self.digest = digest
-        self.args = tuple(args)
-        self.extra_env = FrozenDict(extra_env or {})
-        self.immutable_input_digests = immutable_input_digests
-        self.append_only_caches = append_only_caches
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
 
     def to_run_in_sandbox_request(self) -> RunInSandboxRequest:
         return RunInSandboxRequest(
@@ -179,7 +157,7 @@ class RunInSandboxRequest(RunRequest):
 
 class RunSubsystem(GoalSubsystem):
     name = "run"
-    help = softwrap(
+    help = help_text(
         """
         Runs a binary target.
 
@@ -221,19 +199,6 @@ class Run(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
-class RankedFieldSets(NamedTuple):
-    primary: tuple[RunFieldSet, ...]
-    secondary: tuple[RunFieldSet, ...]
-
-
-def _partition(
-    iterable: Iterable[_T], pred: Callable[[_T], bool]
-) -> tuple[tuple[_T, ...], tuple[_T, ...]]:
-    t1, t2 = tee(iterable)
-    return tuple(filter(pred, t2)), tuple(filterfalse(pred, t1))
-
-
-@rule_helper
 async def _find_what_to_run(
     goal_description: str,
 ) -> tuple[RunFieldSet, Target]:
@@ -245,46 +210,20 @@ async def _find_what_to_run(
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
         ),
     )
+    mapping = targets_to_valid_field_sets.mapping
 
-    primary_target: Target | None = None
-    primary_target_rfs: RankedFieldSets | None = None
+    if len(mapping) > 1:
+        raise TooManyTargetsException(mapping, goal_description=goal_description)
 
-    for target, field_sets in targets_to_valid_field_sets.mapping.items():
-        rfs = RankedFieldSets(
-            *_partition(
-                field_sets,
-                lambda field_set: not any(
-                    isinstance(field, SecondaryOwnerMixin)
-                    for field in dataclasses.astuple(field_set)
-                ),
-            )
-        )
-        # In the case of multiple Targets/FieldSets, prefer the "primary" ones to the "secondary" ones.
-        if (
-            primary_target is None
-            or primary_target_rfs is None  # impossible, but satisfies mypy
-            or (rfs.primary and not primary_target_rfs.primary)
-        ):
-            primary_target = target
-            primary_target_rfs = rfs
-        elif (rfs.primary and primary_target_rfs.primary) or (
-            rfs.secondary and primary_target_rfs.secondary
-        ):
-            raise TooManyTargetsException(
-                targets_to_valid_field_sets.mapping, goal_description=goal_description
-            )
-
-    assert primary_target is not None
-    assert primary_target_rfs is not None
-    field_sets = primary_target_rfs.primary or primary_target_rfs.secondary
+    target, field_sets = next(iter(mapping.items()))
     if len(field_sets) > 1:
         raise AmbiguousImplementationsException(
-            primary_target,
-            primary_target_rfs.primary + primary_target_rfs.secondary,
+            target,
+            field_sets,
             goal_description=goal_description,
         )
 
-    return field_sets[0], primary_target
+    return field_sets[0], target
 
 
 @goal_rule
@@ -336,7 +275,7 @@ async def run(
 def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
     """Returns a rule that implements DebugAdapterRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def get_run_debug_adapter_request(request: RunFieldSet) -> RunDebugAdapterRequest:
         raise NotImplementedError(
             "Running this target type with a debug adapter is not yet supported."
@@ -345,7 +284,6 @@ def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
     return collect_rules(locals())
 
 
-@rule_helper
 async def _run_request(request: RunFieldSet) -> RunInSandboxRequest:
     run_request = await Get(RunRequest, RunFieldSet, request)
     return run_request.to_run_in_sandbox_request()
@@ -359,21 +297,21 @@ def _run_in_sandbox_behavior_rule(cls: type[RunFieldSet]) -> Iterable:
     a `RunInSandboxRequest`.
     """
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def not_supported(request: RunFieldSet) -> RunInSandboxRequest:
         raise NotImplementedError(
             "Running this target type within the sandbox is not yet supported."
         )
 
-    @rule(_param_type_overrides={"request": cls})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def run_request_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
-    @_uncacheable_rule(_param_type_overrides={"request": cls})
+    @_uncacheable_rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls})
     async def run_request_not_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
-    default_rules = {
+    default_rules: dict[RunInSandboxBehavior, list[Any]] = {
         RunInSandboxBehavior.NOT_SUPPORTED: [not_supported],
         RunInSandboxBehavior.RUN_REQUEST_HERMETIC: [run_request_hermetic],
         RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC: [run_request_not_hermetic],

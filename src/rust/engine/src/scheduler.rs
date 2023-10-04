@@ -20,7 +20,7 @@ use crate::session::{ObservedValueResult, Root, Session};
 
 use graph::LastObserved;
 use ui::ConsoleUI;
-use watch::Invalidatable;
+use watch::{Invalidatable, InvalidateCaller};
 
 pub enum ExecutionTermination {
   // Raised as a vanilla keyboard interrupt on the python side.
@@ -70,7 +70,7 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = session.graph_context();
     self
       .core
       .graph
@@ -99,14 +99,17 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate_paths(&self, paths: &HashSet<PathBuf>) -> usize {
-    self.core.graph.invalidate(paths, "external")
+    self
+      .core
+      .graph
+      .invalidate(paths, InvalidateCaller::External)
   }
 
   ///
   /// Invalidate all filesystem dependencies in the graph.
   ///
   pub fn invalidate_all_paths(&self) -> usize {
-    self.core.graph.invalidate_all("external")
+    self.core.graph.invalidate_all(InvalidateCaller::External)
   }
 
   ///
@@ -120,7 +123,7 @@ impl Scheduler {
   /// Return Scheduler and per-Session metrics.
   ///
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = session.graph_context();
     let mut m = HashMap::new();
     m.insert("affected_file_count", {
       let mut count = 0;
@@ -150,7 +153,7 @@ impl Scheduler {
     &self,
     session: &Session,
   ) -> (Vec<Value>, HashMap<&'static str, (usize, usize)>) {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = session.graph_context();
     let mut items = vec![];
     let mut sizes: HashMap<&'static str, (usize, usize)> = HashMap::new();
     // TODO: Creation of a Context is exposed in https://github.com/Aeledfyr/deepsize/pull/31.
@@ -160,10 +163,10 @@ impl Scheduler {
         items.extend(t.params.keys().map(|k| k.to_value()));
         items.push(v.clone().try_into().unwrap());
       }
-      let mut entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
+      let entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
       entry.0 += 1;
       entry.1 += {
-        std::mem::size_of_val(&k)
+        std::mem::size_of_val(k)
           + k.deep_size_of_children(&mut deep_context)
           + std::mem::size_of_val(&v)
           + v.deep_size_of_children(&mut deep_context)
@@ -192,7 +195,7 @@ impl Scheduler {
   /// Return all Digests currently in memory in this Scheduler.
   ///
   pub fn all_digests(&self, session: &Session) -> HashSet<hashing::Digest> {
-    let context = Context::new(self.core.clone(), session.clone());
+    let context = session.graph_context();
     let mut digests = HashSet::new();
     self
       .core
@@ -213,19 +216,20 @@ impl Scheduler {
         .core
         .graph
         .poll(root.into(), last_observed, poll_delay, context)
-        .await?;
+        .await;
       (result, Some(last_observed))
     } else {
-      let result = context.core.graph.create(root.into(), context).await?;
+      let result = context.core.graph.create(root.into(), context).await;
       (result, None)
     };
 
-    Ok((
-      result
-        .try_into()
-        .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e)),
+    (
+      result.map(|v| {
+        v.try_into()
+          .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {e:?}"))
+      }),
       last_observed,
-    ))
+    )
   }
 
   ///
@@ -235,7 +239,7 @@ impl Scheduler {
     request: &ExecutionRequest,
     session: &Session,
   ) -> Vec<ObservedValueResult> {
-    let context = Context::new(session.core().clone(), session.clone());
+    let context = session.graph_context();
     let roots = session.roots_zip_last_observed(&request.roots);
     let poll = request.poll;
     let poll_delay = request.poll_delay;
@@ -260,19 +264,13 @@ impl Scheduler {
       results
         .iter()
         .zip(roots.iter())
-        .map(|(result, root)| {
-          let last_observed = result
-            .as_ref()
-            .ok()
-            .and_then(|(_value, last_observed)| *last_observed);
-          (root.clone(), last_observed)
-        })
-        .collect::<Vec<_>>(),
+        .map(|(result, root)| (root.clone(), result.1))
+        .collect(),
     );
 
     results
       .into_iter()
-      .map(|res| res.map(|(value, _last_observed)| value))
+      .map(|(res, _last_observed)| res)
       .collect()
   }
 

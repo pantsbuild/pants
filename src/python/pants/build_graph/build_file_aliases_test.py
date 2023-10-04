@@ -30,8 +30,11 @@ class TestBuildFileAliasesTest:
             BuildFileAliases(context_aware_object_factories={"george": 1})
 
     def test_merge(self):
-        e_factory = lambda ctx: "e"
-        f_factory = lambda ctx: "f"
+        def e_factory(ctx):
+            return "e"
+
+        def f_factory(ctx):
+            return "f"
 
         first = BuildFileAliases(objects={"d": 2}, context_aware_object_factories={"e": e_factory})
 

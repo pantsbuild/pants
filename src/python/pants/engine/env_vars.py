@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Sequence
 
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 name_value_re = re.compile(r"([A-Za-z_]\w*)=(.*)")
@@ -64,8 +63,7 @@ class CompleteEnvironmentVars(FrozenDict):
         return FrozenDict(env_var_subset)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class EnvironmentVarsRequest:
     """Requests a subset of the variables set in the environment.
 
@@ -77,8 +75,8 @@ class EnvironmentVarsRequest:
     allowed: Optional[FrozenOrderedSet[str]]
 
     def __init__(self, requested: Sequence[str], allowed: Optional[Sequence[str]] = None):
-        self.requested = FrozenOrderedSet(requested)
-        self.allowed = None if allowed is None else FrozenOrderedSet(allowed)
+        object.__setattr__(self, "requested", FrozenOrderedSet(requested))
+        object.__setattr__(self, "allowed", None if allowed is None else FrozenOrderedSet(allowed))
 
 
 class EnvironmentVars(FrozenDict[str, str]):
@@ -91,3 +89,7 @@ class EnvironmentVars(FrozenDict[str, str]):
     `CompleteEnvironmentVars`, as it represents a filtered/relevant subset of the environment, rather
     than the entire unfiltered environment.
     """
+
+
+class PathEnvironmentVariable(FrozenOrderedSet):
+    """The PATH environment variable entries, split on `os.pathsep`."""

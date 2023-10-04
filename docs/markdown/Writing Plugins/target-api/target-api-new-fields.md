@@ -4,7 +4,6 @@ slug: "target-api-new-fields"
 excerpt: "How to create a Field, including the available templates."
 hidden: false
 createdAt: "2020-05-07T22:38:40.352Z"
-updatedAt: "2021-11-16T03:05:31.721Z"
 ---
 Before creating a new target type, the first step is to create all of the target type's fields.
 
@@ -15,7 +14,7 @@ To define a new field:
 
 1. Subclass one of the below field templates, like `IntField` or `BoolField`; or, subclass an existing field, like `SingleSourceField`. 
 2. Set the class property `alias`. This is the symbol that people use in BUILD files.
-3. Set the class property `help`. This is used by `./pants help`.
+3. Set the class property `help`. This is used by `pants help`.
 
 For example:
 
@@ -87,11 +86,11 @@ class UploadTimeout(IntField):
       return value_or_default
 ```
 
-Be careful to use the same type hint for the parameter `raw_value` as used in the template. This is used to generate the documentation in `./pants help my_target`.
+Be careful to use the same type hint for the parameter `raw_value` as used in the template. This is used to generate the documentation in `pants help my_target`.
 
 > 🚧 Cannot use new type hint syntax with `compute_value()` and `default`
 > 
-> You cannot use the [new type hint syntax](https://mypy-lang.blogspot.com/2021/01/) with the Target API, i.e. `list[str] | None` instead of `Optional[List[str]]`. The new syntax breaks `./pants help`.
+> You cannot use the [new type hint syntax](https://mypy-lang.blogspot.com/2021/01/) with the Target API, i.e. `list[str] | None` instead of `Optional[List[str]]`. The new syntax breaks `pants help`.
 > 
 > Otherwise, it's safe to use the new syntax when writing plugins.
 
@@ -157,7 +156,7 @@ Use this when you expect a homogenous sequence of values other than strings, suc
 
 The user may use a tuple, set, or list in their BUILD file; Pants will convert the value to an immutable tuple.
 
-You must set the class properties `expected_element_type` and `expected_type_description`.  You should also change the type signature of the classmethod `compute_value` so that Pants can show the correct types when running `./pants help $target_type`.
+You must set the class properties `expected_element_type` and `expected_type_description`.  You should also change the type signature of the classmethod `compute_value` so that Pants can show the correct types when running `pants help $target_type`.
 
 ```python
 class ExampleIntSequence(SequenceField):
@@ -221,7 +220,7 @@ class VersionField(Field):
 
 > 👍 Asking for help
 > 
-> Have a tricky field you're trying to write? We would love to help! See [Getting Help](doc:community).
+> Have a tricky field you're trying to write? We would love to help! See [Getting Help](doc:the-pants-community).
 
 Examples
 --------

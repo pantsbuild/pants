@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import json
+import os
+import zipfile
 from textwrap import dedent
 from typing import Any, ContextManager
 
@@ -30,7 +33,7 @@ from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolatio
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.target_types import PexBinary
+from pants.backend.python.target_types import PexBinary, PythonRequirementTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.shell.target_types import ShellSourcesGeneratorTarget, ShellSourceTarget
 from pants.backend.shell.target_types import rules as shell_target_types_rules
@@ -38,6 +41,7 @@ from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
+from pants.core.util_rules.environments import DockerEnvironmentTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -62,11 +66,14 @@ def create_rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *shell_target_types_rules(),
             *target_types_rules.rules(),
+            package.environment_aware_package,
             package.find_all_packageable_targets,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
         target_types=[
+            PythonRequirementTarget,
+            DockerEnvironmentTarget,
             DockerImageTarget,
             FilesGeneratorTarget,
             PexBinary,
@@ -148,7 +155,7 @@ def test_pants_hash(rule_runner: RuleRunner) -> None:
                 "stage0": "latest",
             },
             "build_args": {},
-            "pants": {"hash": "fd19488a9b08a0184432762cab85f1370904d09bafd9df1a2f8a94614b2b7eb6"},
+            "pants": {"hash": "87e90685c07ac302bbff8f9d846b4015621255f741008485fd3ce72253ce54f4"},
         },
     )
 
@@ -256,6 +263,48 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_from_image_build_arg_dependency_overwritten(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/upstream/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image",
+                  repository="upstream/{name}",
+                  image_tags=["1.0"],
+                  instructions=["FROM alpine:3.16.1"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=src/upstream:image
+                FROM $BASE_IMAGE
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/downstream", target_name="image"),
+        expected_files=["src/downstream/Dockerfile"],
+        build_upstream_images=True,
+        expected_interpolation_context={
+            "tags": {
+                "baseimage": "3.10-slim",
+                "stage0": "3.10-slim",
+            },
+            "build_args": {
+                "BASE_IMAGE": "python:3.10-slim",
+            },
+        },
+        expected_num_upstream_images=0,
+        pants_args=["--docker-build-args=BASE_IMAGE=python:3.10-slim"],
+    )
+
+
 def test_from_image_build_arg_not_in_repo_issue_15585(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -335,6 +384,54 @@ def test_packaged_pex_path(rule_runner: RuleRunner) -> None:
         Address("src/docker", target_name="docker"),
         expected_files=["src/docker/Dockerfile", "src.python.proj.cli/bin.pex"],
     )
+
+
+def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+              docker_environment(
+                name="python_38",
+                image="python:3.8-buster@sha256:bc4b9fb034a871b285bea5418cedfcaa9d2ab5590fb5fb6f0c42aaebb2e2c911",
+                platform="linux_x86_64",
+                python_bootstrap_search_path=["<PATH>"],
+              )
+
+              python_requirement(name="psutil", requirements=["psutil==5.9.2"])
+              """
+            ),
+            "src/docker/BUILD": """docker_image(dependencies=["src/python/proj/cli:bin"])""",
+            "src/docker/Dockerfile": """FROM python:3.8""",
+            "src/python/proj/cli/BUILD": dedent(
+                """
+              pex_binary(
+                name="bin",
+                entry_point="main.py",
+                environment="python_38",
+                dependencies=["//:psutil"],
+              )
+              """
+            ),
+            "src/python/proj/cli/main.py": """import psutil; assert psutil.Process.is_running()""",
+        }
+    )
+
+    pex_file = "src.python.proj.cli/bin.pex"
+    context = assert_build_context(
+        rule_runner,
+        Address("src/docker", target_name="docker"),
+        pants_args=["--environments-preview-names={'python_38': '//:python_38'}"],
+        expected_files=["src/docker/Dockerfile", pex_file],
+    )
+
+    # Confirm that the context contains a PEX for the appropriate platform.
+    rule_runner.write_digest(context.digest, path_prefix="contents")
+    with zipfile.ZipFile(os.path.join(rule_runner.build_root, "contents", pex_file), "r") as zf:
+        assert json.loads(zf.read("PEX-INFO"))["distributions"].keys() == {
+            "psutil-5.9.2-cp37-cp37m-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "psutil-5.9.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+        }
 
 
 def test_interpolation_context_from_dockerfile(rule_runner: RuleRunner) -> None:

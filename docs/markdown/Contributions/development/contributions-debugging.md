@@ -4,7 +4,6 @@ slug: "contributions-debugging"
 excerpt: "Some techniques to figure out why Pants is behaving the way it is."
 hidden: false
 createdAt: "2020-09-04T23:43:34.260Z"
-updatedAt: "2022-03-09T16:40:50.789Z"
 ---
 Benchmarking with `hyperfine`
 -----------------------------
@@ -16,8 +15,8 @@ When benchmarking, you must decide if you care about cold cache performance vs. 
 For example:
 
 ```
-❯ hyperfine --warmup=1 --runs=5 './pants list ::`
-❯ hyperfine --runs=5 './pants --no-pantsd --no-local-cache lint ::'
+❯ hyperfine --warmup=1 --runs=5 'pants list ::`
+❯ hyperfine --runs=5 'pants --no-pantsd --no-local-cache lint ::'
 ```
 
 Profiling with py-spy
@@ -38,8 +37,8 @@ The default output is a flamegraph. `py-spy` can also output speedscope (<https:
 
 Additionally, to profile the Rust code the `--native` flag can be passed to `py-spy` as well. The resulting output will contain frames from Pants Rust code.
 
-Debugging `rule` code with a debugger
--------------------------------------
+Debugging `rule` code with a debugger in VSCode
+-----------------------------------------------
 
 Running pants with the `PANTS_DEBUG` environment variable set will use `debugpy` (<https://github.com/microsoft/debugpy>)
 to start a Debug-Adapter server (<https://microsoft.github.io/debug-adapter-protocol/>) which will
@@ -49,6 +48,24 @@ You can connect any Debug-Adapter-compliant editor (Such as VSCode) as a client,
 inspect variables, run code in a REPL, and break-on-exceptions in your `rule` code.
 
 NOTE: `PANTS_DEBUG` doesn't work with the pants daemon, so `--no-pantsd` must be specified.
+
+Debugging `rule` code with a debugger in PyCharm
+------------------------------------------------
+
+You'll have to follow a different procedure until PyCharm adds Debug-Adapter support:
+
+1. Add a requirement on `pydevd-pycharm` in your local clone of the pants source in [3rdparty/python/requirements.txt](https://github.com/pantsbuild/pants/blob/main/3rdparty/python/requirements.txt)
+2. Add this snippet where you want to break:
+```python
+import pydevd_pycharm
+pydevd_pycharm.settrace('localhost', port=5000, stdoutToServer=True, stderrToServer=True)
+```
+3. Start a remote debugging session
+4. Run pants from your clone. The build will automatically install the new requirement. For example:
+```
+example-python$ PANTS_SOURCE=<path_to_your_pants_clone> pants --no-pantsd test ::
+```
+
 
 Identifying the impact of Python's GIL (on macOS)
 -------------------------------------------------

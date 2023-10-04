@@ -296,15 +296,11 @@ def test_group_field_sets_by_constraints() -> None:
         MockFieldSet.create_for_test(Address("", target_name="py3"), "==3.6.*"),
         MockFieldSet.create_for_test(Address("", target_name="py3_second"), "==3.6.*"),
     ]
-    no_constraints_fs = MockFieldSet.create_for_test(
-        Address("", target_name="no_constraints"), None
-    )
     assert InterpreterConstraints.group_field_sets_by_constraints(
-        [py2_fs, *py3_fs, no_constraints_fs],
+        [py2_fs, *py3_fs],
         python_setup=create_subsystem(PythonSetup, interpreter_constraints=[]),
     ) == FrozenDict(
         {
-            InterpreterConstraints(): (no_constraints_fs,),
             InterpreterConstraints(["CPython>=2.7,<3"]): (py2_fs,),
             InterpreterConstraints(["CPython==3.6.*"]): tuple(py3_fs),
         }
@@ -477,3 +473,61 @@ def test_partition_into_major_minor_versions(constraints: list[str], expected: l
     assert InterpreterConstraints(constraints).partition_into_major_minor_versions(
         ["2.7", "3.6", "3.7", "3.8", "3.9", "3.10"]
     ) == tuple(expected)
+
+
+@pytest.mark.parametrize(
+    ("constraints", "expected"),
+    [
+        # Valid
+        (["==2.7.*"], (2, 7)),
+        (["CPython==2.7.*"], (2, 7)),
+        (["==3.0.*"], (3, 0)),
+        (["==3.45.*"], (3, 45)),
+        ([">=3.45,<3.46"], (3, 45)),
+        ([">=3.45.*,<3.46.*"], (3, 45)),
+        (["CPython>=3.45,<3.46"], (3, 45)),
+        (["<3.46,>=3.45"], (3, 45)),
+        # Invalid/too hard
+        # equality, but with patch versions involved
+        (["==3.45"], None),
+        (["==3.45.6"], None),
+        (["==3.45,!=3.45.6"], None),
+        (["==3.45,!=3.67"], None),
+        (["==3.45.*,!=3.45.6"], None),
+        # comparisons, with patch versions
+        ([">=3.45,<3.45.10"], None),
+        ([">=3.45.67,<3.46"], None),
+        # comparisons, with too-wide constraints
+        ([">=2.7,<3.8"], None),
+        ([">=3.45,<3.47"], None),
+        ([">=3,<4"], None),
+        # (even excluding the extra version isn't enough)
+        ([">=3.45,<3.47,!=3.46"], None),
+        # other operators
+        (["~=3.45"], None),
+        ([">3.45,<=3.46"], None),
+        ([">3.45,<3.47"], None),
+        (["===3.45"], None),
+        ([">=3.45,<=3.45.*"], None),
+        # wrong number of elements
+        ([], None),
+        (["==3.45.*", "==3.46.*"], None),
+        (["==3.45.*", ">=3.45,<3.46"], None),
+    ],
+    ids=str,
+)
+def test_major_minor_version_when_single_and_entire(
+    constraints: list[str], expected: None | tuple[int, int]
+) -> None:
+    ics = InterpreterConstraints(constraints)
+    computed = ics.major_minor_version_when_single_and_entire()
+    assert computed == expected
+
+    if expected is not None:
+        # if we infer a specific version, let's confirm the full enumeration includes exactly all
+        # the patch versions of that major/minor
+        universe = ["2.7", *(f"3.{minor}" for minor in range(100))]
+        all_versions = ics.enumerate_python_versions(universe)
+        assert set(all_versions) == {
+            (*expected, patch) for patch in range(_PATCH_VERSION_UPPER_BOUND + 1)
+        }

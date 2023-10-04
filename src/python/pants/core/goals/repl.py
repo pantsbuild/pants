@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple, Type, cast
 
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.addresses import Addresses
@@ -18,10 +18,9 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import BoolOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 
@@ -34,6 +33,7 @@ class ReplImplementation(ABC):
     """
 
     name: ClassVar[str]
+    supports_args: ClassVar[bool]
 
     targets: Sequence[Target]
 
@@ -57,6 +57,12 @@ class ReplSubsystem(GoalSubsystem):
         default=None,
         help="Override the automatically-detected REPL program for the target(s) specified.",
     )
+    args = ArgsListOption(
+        example="-i helloworld/main.py",
+        tool_name="the repl program",
+        passthrough=True,
+        extra_help="Currently supported only for the ipython shell.",
+    )
     restartable = BoolOption(
         default=False,
         help="True if the REPL should be restarted if its inputs have changed.",
@@ -68,8 +74,7 @@ class Repl(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class ReplRequest:
     digest: Digest
     args: Tuple[str, ...]
@@ -88,12 +93,14 @@ class ReplRequest:
         append_only_caches: Mapping[str, str] | None = None,
         run_in_workspace: bool = True,
     ) -> None:
-        self.digest = digest
-        self.args = tuple(args)
-        self.extra_env = FrozenDict(extra_env or {})
-        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
-        self.append_only_caches = FrozenDict(append_only_caches or {})
-        self.run_in_workspace = run_in_workspace
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
+        object.__setattr__(self, "run_in_workspace", run_in_workspace)
 
 
 @goal_rule
@@ -104,14 +111,15 @@ async def run_repl(
     union_membership: UnionMembership,
     complete_env: CompleteEnvironmentVars,
 ) -> Repl:
-
     await _warn_on_non_local_environments(specified_targets, "the `repl` goal")
 
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
     implementations = {impl.name: impl for impl in union_membership[ReplImplementation]}
-    repl_implementation_cls = implementations.get(repl_shell_name)
+    repl_implementation_cls = cast(
+        Optional[Type[ReplImplementation]], implementations.get(repl_shell_name)
+    )
     if repl_implementation_cls is None:
         available = sorted(implementations.keys())
         console.print_stderr(
@@ -124,14 +132,25 @@ async def run_repl(
         )
         return Repl(-1)
 
+    if repl_subsystem.args and not repl_implementation_cls.supports_args:
+        console.print_stderr(
+            softwrap(
+                f"""
+                REPL goal does not support passing args to a {repr(repl_shell_name)} shell.
+                """
+            )
+        )
+        return Repl(-1)
+
     repl_impl = repl_implementation_cls(targets=specified_targets)
     request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
     env = {**complete_env, **request.extra_env}
+
     result = await Effect(
         InteractiveProcessResult,
         InteractiveProcess(
-            argv=request.args,
+            argv=(*request.args, *repl_subsystem.args),
             env=env,
             input_digest=request.digest,
             run_in_workspace=request.run_in_workspace,

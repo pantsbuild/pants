@@ -11,9 +11,9 @@ pub fn verify_directory_canonical(
   directory: &remote_execution::Directory,
 ) -> Result<(), String> {
   verify_nodes(&directory.files, |n| &n.name, |n| n.digest.as_ref())
-    .map_err(|e| format!("Invalid file in {:?}: {}", digest, e))?;
+    .map_err(|e| format!("Invalid file in {digest:?}: {e}"))?;
   verify_nodes(&directory.directories, |n| &n.name, |n| n.digest.as_ref())
-    .map_err(|e| format!("Invalid directory in {:?}: {}", digest, e))?;
+    .map_err(|e| format!("Invalid directory in {digest:?}: {e}"))?;
   let child_names: HashSet<&str> = directory
     .files
     .iter()
@@ -27,8 +27,7 @@ pub fn verify_directory_canonical(
     .collect();
   if child_names.len() != directory.files.len() + directory.directories.len() {
     return Err(format!(
-      "Child paths must be unique, but a child path of {:?} was both a file and a directory: {:?}",
-      digest, directory
+      "Child paths must be unique, but a child path of {digest:?} was both a file and a directory: {directory:?}"
     ));
   }
   Ok(())
@@ -54,8 +53,7 @@ where
       ));
     } else if name.contains('/') {
       return Err(format!(
-        "All children must have one path segment, but found {}",
-        name
+        "All children must have one path segment, but found {name}"
       ));
     }
     if let Some(p) = prev {

@@ -41,14 +41,15 @@ use fs::{
 use futures::future::{self, BoxFuture};
 use futures::FutureExt;
 use grpc_util::prost::MessageExt;
-use grpc_util::tls::{CertificateCheck, MtlsConfig};
+use grpc_util::tls::CertificateCheck;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use store::{
-  Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams, UploadSummary,
+  RemoteOptions, Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams,
+  UploadSummary,
 };
 use workunit_store::WorkunitStore;
 
@@ -266,14 +267,14 @@ Destination must not exist before this command is run.",
         )
         .arg(
           Arg::new("mtls-client-certificate-chain-path")
-              .help("Path to certificate chain to use when using MTLS.")
+              .help("Path to certificate chain to use when using mTLS.")
               .takes_value(true)
               .long("mtls-client-certificate-chain-path")
               .required(false)
         )
         .arg(
           Arg::new("mtls-client-key-path")
-              .help("Path to private key to use when using MTLS.")
+              .help("Path to private key to use when using mTLS.")
               .takes_value(true)
               .long("mtls-client-key-path")
               .required(false)
@@ -338,22 +339,18 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
     .unwrap_or_else(Store::default_path);
   let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
-    let local_only = Store::local_only(runtime.clone(), &store_dir).map_err(|e| {
-      format!(
-        "Failed to open/create store for directory {:?}: {}",
-        store_dir, e
-      )
-    })?;
+    let local_only = Store::local_only(runtime.clone(), &store_dir)
+      .map_err(|e| format!("Failed to open/create store for directory {store_dir:?}: {e}"))?;
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
-        let chunk_size = top_match
+        let chunk_size_bytes = top_match
           .value_of_t::<usize>("chunk-bytes")
           .expect("Bad chunk-bytes flag");
 
         let root_ca_certs = if let Some(path) = top_match.value_of("root-ca-cert-file") {
           Some(
             std::fs::read(path)
-              .map_err(|err| format!("Error reading root CA certs file {}: {}", path, err))?,
+              .map_err(|err| format!("Error reading root CA certs file {path}: {err}"))?,
           )
         } else {
           None
@@ -365,18 +362,14 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         ) {
           (Some(cert_chain_path), Some(key_path)) => {
             let key = std::fs::read(key_path).map_err(|err| {
-              format!(
-                "Failed to read mtls-client-key-path from {:?}: {:?}",
-                key_path, err
-              )
+              format!("Failed to read mtls-client-key-path from {key_path:?}: {err:?}")
             })?;
             let cert_chain = std::fs::read(cert_chain_path).map_err(|err| {
               format!(
-                "Failed to read mtls-client-certificate-chain-path from {:?}: {:?}",
-                cert_chain_path, err
+                "Failed to read mtls-client-certificate-chain-path from {cert_chain_path:?}: {err:?}"
               )
             })?;
-            Some(MtlsConfig { key, cert_chain })
+            Some((cert_chain, key))
           }
           (None, None) => None,
           _ => {
@@ -390,11 +383,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           CertificateCheck::Enabled
         };
 
-        let tls_config = grpc_util::tls::Config {
-          root_ca_certs,
-          mtls,
-          certificate_check,
-        };
+        let mut tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls)?;
+
+        tls_config.certificate_check = certificate_check;
 
         let mut headers = BTreeMap::new();
 
@@ -403,17 +394,14 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             if let Some((key, value)) = h.split_once('=') {
               headers.insert(key.to_owned(), value.to_owned());
             } else {
-              panic!("Expected --header flag to contain = but was {}", h);
+              panic!("Expected --header flag to contain = but was {h}");
             }
           }
         }
 
         if let Some(oauth_path) = top_match.value_of("oauth-bearer-token-file") {
           let token = std::fs::read_to_string(oauth_path).map_err(|err| {
-            format!(
-              "Error reading oauth bearer token from {:?}: {}",
-              oauth_path, err
-            )
+            format!("Error reading oauth bearer token from {oauth_path:?}: {err}")
           })?;
           headers.insert(
             "authorization".to_owned(),
@@ -422,34 +410,33 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         }
 
         (
-          local_only.into_with_remote(
-            cas_address,
-            top_match
-              .value_of("remote-instance-name")
-              .map(str::to_owned),
-            tls_config,
-            headers,
-            chunk_size,
-            // This deadline is really only in place because otherwise DNS failures
-            // leave this hanging forever.
-            //
-            // Make fs_util have a very long deadline (because it's not configurable,
-            // like it is inside pants) until we switch to Tower (where we can more
-            // carefully control specific components of timeouts).
-            //
-            // See https://github.com/pantsbuild/pants/pull/6433 for more context.
-            Duration::from_secs(30 * 60),
-            top_match
-              .value_of_t::<usize>("rpc-attempts")
-              .expect("Bad rpc-attempts flag"),
-            top_match
-              .value_of_t::<usize>("rpc-concurrency-limit")
-              .expect("Bad rpc-concurrency-limit flag"),
-            None,
-            top_match
-              .value_of_t::<usize>("batch-api-size-limit")
-              .expect("Bad batch-api-size-limit flag"),
-          ),
+          local_only
+            .into_with_remote(RemoteOptions {
+              cas_address: cas_address.to_owned(),
+              instance_name: top_match
+                .value_of("remote-instance-name")
+                .map(str::to_owned),
+              tls_config,
+              headers,
+              chunk_size_bytes,
+              // This deadline is really only in place because otherwise DNS failures
+              // leave this hanging forever.
+              //
+              // Make fs_util have a very long deadline (because it's not configurable,
+              // like it is inside pants).
+              rpc_timeout: Duration::from_secs(30 * 60),
+              rpc_retries: top_match
+                .value_of_t::<usize>("rpc-attempts")
+                .expect("Bad rpc-attempts flag"),
+              rpc_concurrency_limit: top_match
+                .value_of_t::<usize>("rpc-concurrency-limit")
+                .expect("Bad rpc-concurrency-limit flag"),
+              capabilities_cell_opt: None,
+              batch_api_size_limit: top_match
+                .value_of_t::<usize>("batch-api-size-limit")
+                .expect("Bad batch-api-size-limit flag"),
+            })
+            .await,
           true,
         )
       }
@@ -482,14 +469,14 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             runtime.clone(),
             path
               .canonicalize()
-              .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
+              .map_err(|e| format!("Error canonicalizing path {path:?}: {e:?}"))?
               .parent()
-              .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
+              .ok_or_else(|| format!("File being saved must have parent but {path:?} did not"))?,
           );
           let file = posix_fs
-            .stat_sync(PathBuf::from(path.file_name().unwrap()))
+            .stat_sync(Path::new(path.file_name().unwrap()))
             .unwrap()
-            .ok_or_else(|| format!("Tried to save file {:?} but it did not exist", path))?;
+            .ok_or_else(|| format!("Tried to save file {path:?} but it did not exist"))?;
           match file {
             fs::Stat::File(f) => {
               let digest =
@@ -505,13 +492,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
 
               Ok(())
             }
-            o => Err(
-              format!(
-                "Tried to save file {:?} but it was not a file, was a {:?}",
-                path, o
-              )
-              .into(),
-            ),
+            o => {
+              Err(format!("Tried to save file {path:?} but it was not a file, was a {o:?}").into())
+            }
           }
         }
         (_, _) => unimplemented!(),
@@ -520,6 +503,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
     ("tree", sub_match) => match expect_subcommand(sub_match) {
       ("materialize", args) => {
         let destination = PathBuf::from(args.value_of("destination").unwrap());
+        // NB: We use `destination` as the root directory, because there is no need to
+        // memoize a check for whether some other parent directory is hardlinkable.
+        let destination_root = destination.clone();
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
         let size_bytes = args
           .value_of("size_bytes")
@@ -537,9 +523,10 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           store
             .materialize_directory(
               destination,
+              &destination_root,
               output_digest,
+              false,
               &BTreeSet::new(),
-              None,
               Permissions::Writable,
             )
             .await?,
@@ -550,6 +537,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
     ("directory", sub_match) => match expect_subcommand(sub_match) {
       ("materialize", args) => {
         let destination = PathBuf::from(args.value_of("destination").unwrap());
+        // NB: We use `destination` as the root directory, because there is no need to
+        // memoize a check for whether some other parent directory is hardlinkable.
+        let destination_root = destination.clone();
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
         let size_bytes = args
           .value_of("size_bytes")
@@ -561,9 +551,10 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           store
             .materialize_directory(
               destination,
+              &destination_root,
               digest,
+              false,
               &BTreeSet::new(),
-              None,
               Permissions::Writable,
             )
             .await?,
@@ -590,7 +581,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         let paths = posix_fs
           .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
           .await
-          .map_err(|e| format!("Error expanding globs: {:?}", e))?;
+          .map_err(|e| format!("Error expanding globs: {e:?}"))?;
 
         let snapshot = Snapshot::from_path_stats(
           store::OneOffStoreFileByDigest::new(store_copy, posix_fs, false),
@@ -622,7 +613,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               digest,
               SubsetParams {
                 globs: PreparedPathGlobs::create(
-                  vec![format!("{}/**", prefix_to_strip)],
+                  vec![format!("{prefix_to_strip}/**")],
                   StrictGlobMatching::Ignore,
                   GlobExpansionConjunction::AnyMatch,
                 )?,
@@ -656,7 +647,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           "recursive-file-list" => expand_files(store, digest.as_digest())
             .await?
             .into_iter()
-            .map(|(name, _digest)| format!("{}\n", name))
+            .map(|(name, _digest)| format!("{name}\n"))
             .collect::<Vec<String>>()
             .join("")
             .into_bytes(),
@@ -668,7 +659,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .join("")
             .into_bytes(),
           format => {
-            return Err(format!("Unexpected value of --output-format arg: {}", format).into())
+            return Err(format!("Unexpected value of --output-format arg: {format}").into())
           }
         };
 
@@ -701,6 +692,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       ("list", _) => {
         for digest in store
           .all_local_digests(::store::EntryType::Directory)
+          .await
           .expect("Error opening store")
         {
           println!("{} {}", digest.hash, digest.size_bytes);
@@ -713,7 +705,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       let target_size_bytes = args
         .value_of_t::<usize>("target-size-bytes")
         .expect("--target-size-bytes must be passed as a non-negative integer");
-      store.garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)?;
+      store
+        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)
+        .await?;
       Ok(())
     }
 

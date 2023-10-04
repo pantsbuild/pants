@@ -18,6 +18,7 @@ Active Maintainers
 * Patrick Lawson
 * Stu Hood
 * Suresh Joshi (SJ)
+* Tobias Nilsson
 * Tom Dyas
 * Yi Cheng
 

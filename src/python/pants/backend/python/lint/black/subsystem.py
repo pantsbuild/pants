@@ -7,30 +7,17 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.lint.black.skip_field import SkipBlackField
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
     PythonSourceField,
 )
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
-from pants.util.docutil import git_url
-from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
@@ -51,21 +38,18 @@ class Black(PythonToolBase):
     name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==22.6.0"
     default_main = ConsoleScript("black")
+    default_requirements = [
+        "black>=22.6.0,<24",
+        'typing-extensions>=3.10.0.0; python_version < "3.10"',
+    ]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/black/black.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--target-version=py37 --quiet")
-    export = ExportToolOption()
     config = FileOption(
         default=None,
         advanced=True,
@@ -104,61 +88,5 @@ class Black(PythonToolBase):
         )
 
 
-@rule_helper
-async def _black_interpreter_constraints(
-    black: Black, python_setup: PythonSetup
-) -> InterpreterConstraints:
-    constraints = black.interpreter_constraints
-    if black.options.is_default("interpreter_constraints"):
-        code_constraints = await _find_all_unique_interpreter_constraints(
-            python_setup, BlackFieldSet
-        )
-        if code_constraints is not None and code_constraints.requires_python38_or_newer(
-            python_setup.interpreter_versions_universe
-        ):
-            constraints = code_constraints
-    return constraints
-
-
-class BlackLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = Black.options_scope
-
-
-@rule(
-    desc="Determine Black interpreter constraints (for lockfile generation)",
-    level=LogLevel.DEBUG,
-)
-async def setup_black_lockfile(
-    _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    if not black.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(black)
-
-    constraints = await _black_interpreter_constraints(black, python_setup)
-    return GeneratePythonLockfile.from_tool(black, constraints)
-
-
-class BlackExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule(desc="Determine Black interpreter constraints (for `export` goal)", level=LogLevel.DEBUG)
-async def black_export(
-    _: BlackExportSentinel, black: Black, python_setup: PythonSetup
-) -> ExportPythonTool:
-    if not black.export:
-        return ExportPythonTool(resolve_name=black.options_scope, pex_request=None)
-    constraints = await _black_interpreter_constraints(black, python_setup)
-    return ExportPythonTool(
-        resolve_name=black.options_scope,
-        pex_request=black.to_pex_request(interpreter_constraints=constraints),
-    )
-
-
 def rules():
-    return (
-        *collect_rules(),
-        *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, BlackLockfileSentinel),
-        UnionRule(ExportPythonToolSentinel, BlackExportSentinel),
-    )
+    return collect_rules()

@@ -4,9 +4,8 @@ slug: "pyoxidizer"
 excerpt: "Creating Python binaries through PyOxidizer."
 hidden: false
 createdAt: "2022-02-04T18:41:48.950Z"
-updatedAt: "2022-02-28T23:26:51.526Z"
 ---
-PyOxidizer allows you to distribute your code as a single binary file, similar to [Pex files](doc:pex-files). Unlike Pex, these binaries include a Python interpreter, often greatly simplifying distribution. 
+PyOxidizer allows you to distribute your code as a single binary file, similar to [Pex files](doc:pex). Unlike Pex, these binaries include a Python interpreter, often greatly simplifying distribution. 
 
 See our blog post on [Packaging Python with the Pants PyOxidizer Plugin](https://blog.pantsbuild.org/packaging-python-with-the-pyoxidizer-pants-plugin/) for more discussion of the benefits of PyOxidizer.
 
@@ -23,7 +22,7 @@ backend_packages.add = [
 ]
 ```
 
-This adds the new `pyoxidizer_binary` target, which you can confirm by running `./pants help pyoxidizer_binary`.
+This adds the new `pyoxidizer_binary` target, which you can confirm by running `pants help pyoxidizer_binary`.
 
 > 🚧 This backend is experimental
 > 
@@ -96,18 +95,18 @@ Hello, world!
 Step 4: Run `package` or `run` goals
 ------------------------------------
 
-Finally, run `./pants package $address` on your `pyoxidizer_binary` target to create a directory
-including your binary, or `./pants run $address` to launch the binary.
+Finally, run `pants package $address` on your `pyoxidizer_binary` target to create a directory
+including your binary, or `pants run $address` to launch the binary.
 
 For example:
 
 ```
-❯ ./pants package src/py/project:bin
+❯ pants package src/py/project:bin
 14:15:31.18 [INFO] Completed: Building src.py.project:bin with PyOxidizer
 14:15:31.23 [INFO] Wrote dist/src.py.project/bin/aarch64-apple-darwin/debug/install/bin
 ```
 ```
-❯ ./pants run src/py/project:bin
+❯ pants run src/py/project:bin
 14:15:31.18 [INFO] Completed: Building src.py.project:bin with PyOxidizer
 Hello, world!
 ```
@@ -123,7 +122,7 @@ By default, with the `package` goal, Pants will write the package using this sch
 > args = ["--release"]
 > ```
 > 
-> Or by using the command line flag `./pants --pyoxidizer-args='--release' package path/to:tgt`.
+> Or by using the command line flag `pants --pyoxidizer-args='--release' package path/to:tgt`.
 
 Advanced use cases
 ------------------

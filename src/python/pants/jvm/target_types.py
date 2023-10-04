@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Optional, Tuple, Type, Union
+from typing import Callable, ClassVar, Iterable, Optional, Tuple, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
@@ -37,7 +37,7 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Generic resolve support fields
@@ -51,7 +51,7 @@ class JvmDependenciesField(Dependencies):
 class JvmResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         The resolve from `[jvm].resolves` to use when compiling this target.
 
@@ -75,7 +75,7 @@ class JvmResolveField(StringField, AsyncFieldMixin):
 class JvmJdkField(StringField):
     alias = "jdk"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         The major version of the JDK that this target should be built with. If not defined,
         will default to `[jvm].default_source_jdk`.
@@ -101,7 +101,7 @@ class JvmMainClassNameField(StringField):
     alias = "main"
     required = False
     default = None
-    help = softwrap(
+    help = help_text(
         """
         `.`-separated name of the JVM class containing the `main()` method to be called when
         executing this target. If not supplied, this will be calculated automatically, either by
@@ -144,7 +144,7 @@ class JvmArtifactGroupField(StringField):
     alias = "group"
     required = True
     value: str
-    help = softwrap(
+    help = help_text(
         """
         The 'group' part of a Maven-compatible coordinate to a third-party JAR artifact.
 
@@ -157,7 +157,7 @@ class JvmArtifactArtifactField(StringField):
     alias = "artifact"
     required = True
     value: str
-    help = softwrap(
+    help = help_text(
         """
         The 'artifact' part of a Maven-compatible coordinate to a third-party JAR artifact.
 
@@ -170,7 +170,7 @@ class JvmArtifactVersionField(StringField):
     alias = "version"
     required = True
     value: str
-    help = softwrap(
+    help = help_text(
         """
         The 'version' part of a Maven-compatible coordinate to a third-party JAR artifact.
 
@@ -182,7 +182,7 @@ class JvmArtifactVersionField(StringField):
 class JvmArtifactUrlField(StringField):
     alias = "url"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         A URL that points to the location of this artifact.
 
@@ -199,7 +199,7 @@ class JvmArtifactUrlField(StringField):
 class JvmArtifactJarSourceField(OptionalSingleSourceField):
     alias = "jar"
     expected_file_extensions = (".jar",)
-    help = softwrap(
+    help = help_text(
         """
         A local JAR file that provides this artifact to the lockfile resolver, instead of a
         Maven repository.
@@ -229,7 +229,7 @@ class JvmArtifactJarSourceField(OptionalSingleSourceField):
 
 class JvmArtifactPackagesField(StringSequenceField):
     alias = "packages"
-    help = softwrap(
+    help = help_text(
         f"""
         The JVM packages this artifact provides for the purposes of dependency inference.
 
@@ -252,7 +252,7 @@ class JvmArtifactPackagesField(StringSequenceField):
 
 class JvmProvidesTypesField(StringSequenceField):
     alias = "experimental_provides_types"
-    help = softwrap(
+    help = help_text(
         """
         Signals that the specified types should be fulfilled by these source files during
         dependency inference.
@@ -267,25 +267,85 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
-class JvmArtifactExcludeDependenciesField(StringSequenceField):
-    alias = "excludes"
-    help = softwrap(
+@dataclass(frozen=True)
+class JvmArtifactExclusion:
+    alias: ClassVar[str] = "jvm_exclude"
+    help: ClassVar[str | Callable[[], str]] = help_text(
         """
-        A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded
+        Exclude the given `artifact` and `group`, or all artifacts from the given `group`.
+        """
+    )
+
+    group: str
+    artifact: str | None = None
+
+    def validate(self) -> set[str]:
+        return set()
+
+    def to_coord_str(self) -> str:
+        result = self.group
+        if self.artifact:
+            result += f":{self.artifact}"
+        return result
+
+
+def _jvm_artifact_exclusions_field_help(
+    supported_exclusions: Callable[[], Iterable[type[JvmArtifactExclusion]]]
+) -> str | Callable[[], str]:
+    return help_text(
+        lambda: f"""
+        A list of exclusions for unversioned coordinates that should be excluded
         as dependencies when this artifact is resolved.
 
         This does not prevent this artifact from being included in the resolve as a dependency
         of other artifacts that depend on it, and is currently intended as a way to resolve
         version conflicts in complex resolves.
 
-        These values are passed directly to Coursier, and if specified incorrectly will show a
-        parse error from Coursier.
+        Supported exclusions are:
+        {bullet_list(f'`{exclusion.alias}`: {exclusion.help}' for exclusion in supported_exclusions())}
         """
     )
 
 
+class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
+    alias = "exclusions"
+    help = _jvm_artifact_exclusions_field_help(
+        lambda: JvmArtifactExclusionsField.supported_rule_types
+    )
+
+    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (JvmArtifactExclusion,)
+    expected_element_type = JvmArtifactExclusion
+    expected_type_description = "an iterable of JvmArtifactExclusionRule"
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[JvmArtifactExclusion]], address: Address
+    ) -> Optional[Tuple[JvmArtifactExclusion, ...]]:
+        computed_value = super().compute_value(raw_value, address)
+
+        if computed_value:
+            errors: list[str] = []
+            for exclusion_rule in computed_value:
+                err = exclusion_rule.validate()
+                if err:
+                    errors.extend(err)
+
+            if errors:
+                raise InvalidFieldException(
+                    softwrap(
+                        f"""
+                        Invalid value for `{JvmArtifactExclusionsField.alias}` field.
+                        Found following errors:
+
+                        {bullet_list(errors)}
+                        """
+                    )
+                )
+        return computed_value
+
+
 class JvmArtifactResolveField(JvmResolveField):
-    help = softwrap(
+    help = help_text(
         """
         The resolve from `[jvm].resolves` that this artifact should be included in.
 
@@ -303,7 +363,6 @@ class JvmArtifactResolveField(JvmResolveField):
 
 @dataclass(frozen=True)
 class JvmArtifactFieldSet(JvmRunnableSourceFieldSet):
-
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
@@ -326,11 +385,11 @@ class JvmArtifactTarget(Target):
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
-        JvmArtifactExcludeDependenciesField,
+        JvmArtifactExclusionsField,
         JvmJdkField,
         JvmMainClassNameField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A third-party JVM artifact, as identified by its Maven-compatible coordinate.
 
@@ -375,7 +434,7 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 class JvmRequiredMainClassNameField(JvmMainClassNameField):
     required = True
     default = None
-    help = softwrap(
+    help = help_text(
         """
         `.`-separated name of the JVM class containing the `main()` method to be called when
         executing this JAR.
@@ -395,7 +454,7 @@ class JvmShadingRule(ABC):
     """
 
     alias: ClassVar[str]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     @abstractmethod
     def encode(self) -> str:
@@ -414,7 +473,7 @@ class JvmShadingRule(ABC):
         return set(errors)
 
     def __repr__(self) -> str:
-        fields = [f"{fld.name}={repr(getattr(self, fld.name))}" for fld in dataclasses.fields(self)]
+        fields = [f"{fld.name}={repr(getattr(self, fld.name))}" for fld in dataclasses.fields(self)]  # type: ignore[arg-type]
         return f"{self.alias}({', '.join(fields)})"
 
 
@@ -443,7 +502,7 @@ class JvmShadingRenameRule(JvmShadingRule):
 @dataclass(frozen=True, repr=False)
 class JvmShadingRelocateRule(JvmShadingRule):
     alias = "shading_relocate"
-    help = softwrap(
+    help = help_text(
         """
         Relocates the classes under the given `package` into the new package name.
         The default target package is `__shaded_by_pants__` if none provided in
@@ -490,7 +549,7 @@ class JvmShadingZapRule(JvmShadingRule):
 @dataclass(frozen=True, repr=False)
 class JvmShadingKeepRule(JvmShadingRule):
     alias = "shading_keep"
-    help = softwrap(
+    help = help_text(
         """
         Keeps in the final artifact the occurrences of the `pattern`
         (and removes anything else).
@@ -550,7 +609,7 @@ class JvmShadingRulesField(SequenceField[JvmShadingRule], metaclass=ABCMeta):
     alias = "shading_rules"
     required = False
     expected_element_type = JvmShadingRule
-    expected_type_description = "an iterable of ShadingRule"
+    expected_type_description = "an iterable of JvmShadingRule"
 
     @classmethod
     def compute_value(
@@ -604,7 +663,7 @@ class DeployJarDuplicateRule:
 
 class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
     alias = "duplicate_policy"
-    help = softwrap(
+    help = help_text(
         f"""
         A list of the rules to apply when duplicate file entries are found in the final
         assembled JAR file.
@@ -614,18 +673,16 @@ class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
 
         Example:
 
-        ```
-        duplicate_policy=[
-            duplicate_rule(pattern="^META-INF/services", action="concat_text"),
-            duplicate_rule(pattern="^reference\\.conf", action="concat_text"),
-            duplicate_rule(pattern="^org/apache/commons", action="throw"),
-        ]
-        ```
+            duplicate_policy=[
+                duplicate_rule(pattern="^META-INF/services", action="concat_text"),
+                duplicate_rule(pattern="^reference\\.conf", action="concat_text"),
+                duplicate_rule(pattern="^org/apache/commons", action="throw"),
+            ]
 
         Where:
 
         * The `pattern` field is treated as a regular expression
-        * The `action` field must be one of {list(DeployJarDuplicateRule.valid_actions)}.
+        * The `action` field must be one of `{list(DeployJarDuplicateRule.valid_actions)}`.
 
         Note that the order in which the rules are listed is relevant.
         """
@@ -688,7 +745,7 @@ class DeployJarTarget(Target):
         DeployJarDuplicatePolicyField,
         DeployJarShadingRulesField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A `jar` file with first and third-party code bundled for deploys.
 
@@ -710,12 +767,12 @@ class JvmWarDependenciesField(Dependencies):
 class JvmWarDescriptorAddressField(SingleSourceField):
     alias = "descriptor"
     default = "web.xml"
-    help = "Path to a file containing the descriptor (i.e., web.xml) for this WAR file. Defaults to `web.xml`."
+    help = "Path to a file containing the descriptor (i.e., `web.xml`) for this WAR file. Defaults to `web.xml`."
 
 
 class JvmWarContentField(SpecialCasedDependencies):
     alias = "content"
-    help = softwrap(
+    help = help_text(
         """
         A list of addresses to `resources` and `files` targets with content to place in the
         document root of this WAR file.
@@ -740,7 +797,7 @@ class JvmWarTarget(Target):
         JvmWarShadingRulesField,
         OutputPathField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A JSR 154 "web application archive" (or "war") with first-party and third-party code bundled for
         deploys in Java Servlet containers.
@@ -769,7 +826,11 @@ def jvm_resolve_field_default_factory(
 def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
     from pants.jvm.run import rules as run_rules
 
-    @rule(_param_type_overrides={"request": cls}, level=LogLevel.DEBUG)
+    @rule(
+        canonical_name_suffix=cls.__name__,
+        _param_type_overrides={"request": cls},
+        level=LogLevel.DEBUG,
+    )
     async def jvm_source_run_request(request: JvmRunnableSourceFieldSet) -> RunRequest:
         return await Get(RunRequest, GenericJvmRunRequest(request))
 
@@ -787,6 +848,7 @@ def rules():
 def build_file_aliases():
     return BuildFileAliases(
         objects={
+            JvmArtifactExclusion.alias: JvmArtifactExclusion,
             DeployJarDuplicateRule.alias: DeployJarDuplicateRule,
             **{rule.alias: rule for rule in JVM_SHADING_RULE_TYPES},
         }

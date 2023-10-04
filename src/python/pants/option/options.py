@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
@@ -18,6 +18,7 @@ from pants.option.parser import Parser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +85,12 @@ class Options:
         for si in sorted(scope_infos, key=lambda _si: _si.scope):
             if si.scope in original_scopes:
                 raise cls.DuplicateScopeError(
-                    f"Scope `{si.scope}` claimed by {si}, was also claimed "
-                    f"by {original_scopes[si.scope]}."
+                    softwrap(
+                        f"""
+                        Scope `{si.scope}` claimed by {si}, was also claimed
+                        by {original_scopes[si.scope]}.
+                        """
+                    )
                 )
             original_scopes[si.scope] = si
             ret.add(si)
@@ -122,10 +127,15 @@ class Options:
 
         if split_args.passthru and len(split_args.goals) > 1:
             raise cls.AmbiguousPassthroughError(
-                f"Specifying multiple goals (in this case: {split_args.goals}) "
-                "along with passthrough args (args after `--`) is ambiguous.\n"
-                "Try either specifying only a single goal, or passing the passthrough args "
-                "directly to the relevant consumer via its associated flags."
+                softwrap(
+                    f"""
+                    Specifying multiple goals (in this case: {split_args.goals})
+                    along with passthrough args (args after `--`) is ambiguous.
+
+                    Try either specifying only a single goal, or passing the passthrough args
+                    directly to the relevant consumer via its associated flags.
+                    """
+                )
             )
 
         if bootstrap_option_values:
@@ -215,6 +225,10 @@ class Options:
     @property
     def known_scope_to_info(self) -> dict[str, ScopeInfo]:
         return self._known_scope_to_info
+
+    @property
+    def known_scope_to_scoped_args(self) -> dict[str, frozenset[str]]:
+        return {scope: parser.known_scoped_args for scope, parser in self._parser_by_scope.items()}
 
     @property
     def scope_to_flags(self) -> dict[str, list[str]]:
@@ -351,8 +365,9 @@ class Options:
         self,
         scope: str,
         daemon_only: bool = False,
-    ):
-        """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
+    ) -> list[tuple[str, type, Any]]:
+        """Returns a list of fingerprintable (option name, option type, option value) pairs for the
+        given scope.
 
         Options are fingerprintable by default, but may be registered with "fingerprint=False".
 
@@ -366,18 +381,19 @@ class Options:
         pairs = []
         parser = self.get_parser(scope)
         # Sort the arguments, so that the fingerprint is consistent.
-        for (_, kwargs) in sorted(parser.option_registrations_iter()):
+        for _, kwargs in sorted(parser.option_registrations_iter()):
             if not kwargs.get("fingerprint", True):
                 continue
             if daemon_only and not kwargs.get("daemon", False):
                 continue
-            val = self.for_scope(scope)[kwargs["dest"]]
+            dest = kwargs["dest"]
+            val = self.for_scope(scope)[dest]
             # If we have a list then we delegate to the fingerprinting implementation of the members.
             if is_list_option(kwargs):
                 val_type = kwargs.get("member_type", str)
             else:
                 val_type = kwargs.get("type", str)
-            pairs.append((val_type, val))
+            pairs.append((dest, val_type, val))
         return pairs
 
     def __getitem__(self, scope: str) -> OptionValueContainer:

@@ -3,7 +3,6 @@ title: "Deployments"
 slug: "helm-deployments"
 hidden: false
 createdAt: "2022-07-19T13:16:00.000Z"
-updatedAt: "2022-07-19T13:16:00.000Z"
 ---
 > 🚧 Helm deployment support is in alpha stage
 > 
@@ -18,7 +17,7 @@ Helm's ultimate purpose is to simplify the deployment of Kubernetes resources an
 
 This hinders reproducibility since operators end up having a set of configuration files and additional shell scripts that ensure that the Helm command line usued to deploy a piece of software into a given environment is always the same.
 
-Pants solves this problem by providing with the ability to manage the configuration files and the different parameters of a deployment as single unit such that a simple command line as `./pants experimental-deploy ::` will always have the same effect on each of the deployments previously defined.
+Pants solves this problem by providing with the ability to manage the configuration files and the different parameters of a deployment as single unit such that a simple command line as `pants experimental-deploy ::` will always have the same effect on each of the deployments previously defined.
 
 Defining Helm deployments
 -------------------------
@@ -35,11 +34,23 @@ name: example
 version: 0.1.0
 ```
 ```python src/deployment/BUILD
-helm_deployment(name="dev", sources=["common-values.yaml", "dev-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  sources=["common-values.yaml", "dev-override.yaml"]
+)
 
-helm_deployment(name="stage", sources=["common-values.yaml", "stage-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(
+  name="stage",
+  chart="//src/chart",
+  sources=["common-values.yaml", "stage-override.yaml"]
+)
 
-helm_deployment(name="prod", sources=["common-values.yaml", "prod-override.yaml"], dependencies=["//src/chart"])
+helm_deployment(
+  name="prod",
+  chart="//src/chart",
+  sources=["common-values.yaml", "prod-override.yaml"]
+)
 ```
 ```yaml src/deployment/common-values.yaml
 # Default values common to all deployments
@@ -64,12 +75,12 @@ env:
 
 There are quite a few things to notice in the previous example:
 
-* The `helm_deployment` target requires you to explicitly define as a dependency which chart to use.
-* We have three different deployments that using configuration files with the specified chart.
+* The `helm_deployment` target requires you to explicitly set the `chart` field to specify which chart to use.
+* We have three different deployments using different sets of configuration files with the same chart.
 * One of those value files (`common-values.yaml`) provides with default values that are common to all deployments.
 * Each deployment uses an additional `xxx-override.yaml` file with values that are specific to the given deployment.
 
-The `helm_deployment` target has many additional fields including the target kubernetes namespace, adding inline override values (similar to using helm's `--set` arg) and many others. Please run `./pants help helm_deployment` to see all the posibilities.
+The `helm_deployment` target has many additional fields including the target kubernetes namespace, adding inline override values (similar to using helm's `--set` arg) and many others. Please run `pants help helm_deployment` to see all the posibilities.
 
 Dependencies with `docker_image` targets
 ----------------------------------------
@@ -102,18 +113,18 @@ image: example.com/registry/my-app:latest
 apiVersion: v1
 kind: Pod
 metadata:
-  name: my_pod
+  name: my-pod
   labels:
     chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
 spec:
   containers:
-    - name: my_app
+    - name: my-app
       # Uses the `image` value entry from the deployment inputs
       image: {{ .Values.image }}
 ```
 ```python src/deployment/BUILD
 # Overrides the `image` value for the chart using the target address for the first-party docker image.
-helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
+helm_deployment(chart="src/chart", values={"image": "src/docker:docker"})
 ```
 
 > 📘 Docker image references VS Pants' target addresses
@@ -121,7 +132,7 @@ helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
 > You should use typical Docker registry addresses in your Helm charts. Because Helm charts are distributable artifacts and may be used with tools other than Pants, you should create your charts such that when that chart is being used, all Docker image addresses are valid references to images in accessible Docker registries. As shown in the example, we recommend that you make the image address value configurable, especially for charts that deploy first-party Docker images.
 > Your chart resources can still use off-the-shelf images published with other means, and in those cases you will also be referencing the Docker image address. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
 
-With this setup we should be able to run `./pants dependencies src/deployment` and Pants should give the following output:
+With this setup we should be able to run `pants dependencies src/deployment` and Pants should give the following output:
 
 ```text
 src/chart
@@ -141,7 +152,7 @@ Value files
 It's very common that Helm deployments use a series of files providing with values that customise the given chart. When using deployments that may have more than one YAML file as the source of configuration values, the Helm backend needs to sort the file names in a way that is consistent across different machines, as the order in which those files are passed to the Helm command is relevant. The final order depends on the same order in which those files are specified in the `sources` field of the `helm_deployment` target. For example, given the following `BUILD` file:
 
 ```python src/deployment/BUILD
-helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "second.yaml", "last.yaml"])
+helm_deployment(name="dev", chart="//src/chart", sources=["first.yaml", "second.yaml", "last.yaml"])
 ```
 
 This will result in the Helm command receiving the value files as in that exact order.
@@ -160,7 +171,11 @@ src/deployment/last.yaml
 And also the following `helm_deployment` target definition:
 
 ```python src/deployment/BUILD
-helm_deployment(name="dev", dependencies=["//src/chart"], sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"])
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  sources=["first.yaml", "*.yaml", "dev/*-override.yaml", "dev/*.yaml", "last.yaml"]
+)
 ```
 
 In this case, the final ordering of the files would be as follows:
@@ -186,7 +201,7 @@ Inline values are defined as a key-value dictionary, like in the following examp
 ```python src/deployment/BUILD
 helm_deployment(
   name="dev",
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   values={
     "nameOverride": "my_custom_name",
     "image.pullPolicy": "Always",
@@ -194,34 +209,47 @@ helm_deployment(
 )
 ```
 
-### Using dynamic values
+Using dynamic values
+--------------------
 
-Inline values also support interpolation of environment variables. Since Pants runs all processes in a hermetic sandbox, to be able to use environment variables you must first tell Pants what variables to make available to the Helm process using the `[helm].extra_env_vars` option. Consider the following example:
+Pants has support for value interpolation in your BUILD files and you can make use of it when defining some of the values of your `helm_deployment`. This is not exclusive to the Helm backend but it's illustrated here to showcase how it could be leveraged to inject environment variables into your charts.
+
+Consider the following example:
 
 ```python src/deployment/BUILD
 helm_deployment(
   name="dev",
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   values={
-    "configmap.deployedAt": "{env.DEPLOY_TIME}",
+    "configmap.deployedAt": f"{env('DEPLOY_TIME')}",
   },
 )
 ```
-```toml pants.toml
-[helm]
-extra_env_vars = ["DEPLOY_TIME"]
-```
 
-Now you can launch a deployment using the following command:
+In the previous example, Pants will use the value of the `DEPLOY_TIME` environment variable in your inline values, which will be then forwarded to your chart. Now you can launch a deployment using the following command:
 
 ```
-DEPLOY_TIME=$(date) ./pants experimental-deploy src/deployment:dev
+DEPLOY_TIME=$(date) pants experimental-deploy src/deployment:dev
 ```
+
+This isn't restricted to just the `values` field and it can be used in others like shown in the following example:
+
+```python src/deployment/BUILD
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  release=f"{env('ORGANIZATION_ID')}-dev",
+  namespace=f"product-{env('NAMESPACE_SUFFIX')}"
+)
+```
+
+As shown above, now the `release` and `namespace` fields are calculated at deploy-time by Pants and, as in the previous example, they will be forwarded to the Helm chart accordingly.
+
 
 > 🚧 Ensuring repeatable deployments
 > 
 > You should always favor using static values (or value files) VS dynamic values in your deployments. Using interpolated environment variables in your deployments can render your deployments non-repetable anymore if those values can affect the behaviour of the system deployed, or what gets deployed (i.e. Docker image addresses).
-> Dynamic values are supported to give the option of passing some info or metadata to the software being deployed (i.e. deploy time, commit hash, etc) or some less harmful settings of a deployment (i.e. replica count. etc). Be careful when chossing the values that are going to be calculated dynamically.
+> Be careful when chossing the values that are going to be calculated dynamically.
 
 Third party chart artifacts
 ---------------------------
@@ -241,7 +269,7 @@ helm_artifact(
 ```python src/deploy/BUILD
 helm_deployment(
   name="main",
-  dependencies=["//3rdparty/helm/jetstack:cert-manager"],
+  chart="//3rdparty/helm/jetstack:cert-manager",
   values={
     "installCRDs": "true"
   },
@@ -253,7 +281,7 @@ In this example, the deployment at `src/deploy:main` declares a dependency on a 
 Post-renderers
 --------------
 
-User-defined [Helm post-renderers](https://helm.sh/docs/topics/advanced/#post-rendering) are supported by the Helm backend by means of the `post_renderers` field in the `helm_deployment` target. This field takes addresses to other runnable targets (any target that can be run using `./pants run [address]`) and will build and run those targets as part of `experimental-deploy` goal. The referenced targets can be either shell commands or custom-made in any of the other languages supported by Pants.
+User-defined [Helm post-renderers](https://helm.sh/docs/topics/advanced/#post-rendering) are supported by the Helm backend by means of the `post_renderers` field in the `helm_deployment` target. This field takes addresses to other runnable targets (any target that can be run using `pants run [address]`) and will build and run those targets as part of `experimental-deploy` goal. The referenced targets can be either shell commands or custom-made in any of the other languages supported by Pants.
 
 As an example, let's show how we can use the tool [`vals`](https://github.com/variantdev/vals) as a post-renderer and replace all references to secret values stored in HashiCorp Vault by their actual values. The following example is composed of a Helm chart that creates a secret resource in Kubernetes and a Helm deployment that is configured to use `vals` as a post-renderer:
 
@@ -279,18 +307,18 @@ data:
 type: Opaque
 ```
 ```python src/deploy/BUILD
-experimental_run_shell_command(
+run_shell_command(
   name="vals",
   command="vals eval -f -",
 )
 
 helm_deployment(
-  dependencies=["//src/chart"],
+  chart="//src/chart",
   post_renderers=[":vals"],
 )
 ```
 
-In the previous example we define a `experimental_shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
+In the previous example we define a `run_shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
 
 > 📘 Using multiple post-renderers
 >
@@ -299,7 +327,7 @@ In the previous example we define a `experimental_shell_command` target that wil
 Deploying
 ---------
 
-Continuing with the example in the previous section, we can deploy it into Kubernetes using the command `./pants experimental-deploy src/deployment`. This will trigger the following steps:
+Continuing with the example in the previous section, we can deploy it into Kubernetes using the command `pants experimental-deploy src/deployment`. This will trigger the following steps:
 
 1. Analyse the dependencies of the given deployment.
 2. Build and publish any first-party Docker image and Helm charts that are part of those dependencies.
@@ -313,7 +341,7 @@ Please note that the list of valid pass-through arguments has been limited to th
 For example, to make an atomic deployment into a non-default Kubernetes context you can use a command like the following one:
 
 ```
-./pants experimental-deploy src/deployments:prod -- --kube-context my-custom-kube-context --atomic
+pants experimental-deploy src/deployments:prod -- --kube-context my-custom-kube-context --atomic
 ```
 
 > 📘 How does Pants authenticate with the Kubernetes cluster?

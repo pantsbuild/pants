@@ -3,10 +3,9 @@ title: "Remote execution"
 slug: "remote-execution"
 hidden: false
 createdAt: "2020-11-13T23:44:25.806Z"
-updatedAt: "2021-03-19T21:47:56.096Z"
 ---
 > 🚧 Remote execution support is still experimental
-> 
+>
 > Remote execution support in Pants comes with several limitations. For example, Pants requires that the server's operating system match the client's operating system. In practice, this means that Pants must be running on Linux because all three major server projects generally only operate on Linux.
 
 What is remote execution?
@@ -92,11 +91,14 @@ remote_execution_address = "grpcs://build.example.com:443"
 remote_instance_name = "main"
 # This is optional, Pants will auto-discover certificates otherwise.
 remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
+# this allows you to setup client authentication with a certificate and key (mTLS).
+remote_client_certs_path = "/etc/ssl/certs/client-cert.pem"
+remote_client_key_path = "/etc/ssl/certs/client-key.pem"
 ```
 
 Reference
 =========
 
-For global options, run `./pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
+For global options, run `pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
 
-For environment-specific options, see `./pants help-advanced remote_environment` or the [`remote_environment` target](doc:reference-remote_environment).
+For environment-specific options, see `pants help-advanced remote_environment` or the [`remote_environment` target](doc:reference-remote_environment).

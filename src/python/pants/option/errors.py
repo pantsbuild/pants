@@ -4,6 +4,7 @@
 from typing import Tuple
 
 from pants.option.scope import GLOBAL_SCOPE
+from pants.util.strutil import softwrap
 
 
 class OptionsError(Exception):
@@ -22,8 +23,12 @@ class RegistrationError(OptionsError):
         scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope {scope}"
         if self.__doc__ is None:
             raise ValueError(
-                "Invalid RegistrationError definition. "
-                "Please specify the error message in the docstring."
+                softwrap(
+                    """
+                    Invalid RegistrationError definition.
+                    Please specify the error message in the docstring.
+                    """
+                )
             )
         docstring = self.__doc__.format(**msg_format_args)
         super().__init__(f"{docstring} [option {option} in {scope_str}].")
@@ -136,6 +141,12 @@ class InterpolationMissingOptionError(ConfigError):
     def __init__(self, option, section, rawval, reference):
         super().__init__(
             self,
-            f"Bad value substitution: option {option} in section {section} contains an "
-            f"interpolation key {reference} which is not a valid option name. Raw value: {rawval}",
+            softwrap(
+                f"""
+                Bad value substitution: option {option} in section {section} contains an
+                interpolation key {reference} which is not a valid option name.
+
+                Raw value: {rawval}
+                """
+            ),
         )

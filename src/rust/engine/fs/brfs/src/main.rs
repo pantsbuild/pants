@@ -42,7 +42,7 @@ use log::{debug, error, warn};
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
-use store::{Store, StoreError};
+use store::{RemoteOptions, Store, StoreError};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task;
 use tokio_stream::wrappers::SignalStream;
@@ -82,13 +82,13 @@ pub fn digest_from_filepath(str: &str) -> Result<Digest, String> {
   let mut parts = str.split('-');
   let fingerprint_str = parts
     .next()
-    .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?;
+    .ok_or_else(|| format!("Invalid digest: {str} wasn't of form fingerprint-size"))?;
   let fingerprint = Fingerprint::from_hex_string(fingerprint_str)?;
   let size_bytes = parts
     .next()
-    .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?
+    .ok_or_else(|| format!("Invalid digest: {str} wasn't of form fingerprint-size"))?
     .parse::<usize>()
-    .map_err(|err| format!("Invalid digest; size {} not a number: {}", str, err))?;
+    .map_err(|err| format!("Invalid digest; size {str} not a number: {err}"))?;
   Ok(Digest::new(fingerprint, size_bytes))
 }
 
@@ -763,26 +763,35 @@ async fn main() {
 
   let runtime = task_executor::Executor::new();
 
+  let tls_config = match tls::Config::new(root_ca_certs, None) {
+    Ok(tls_config) => tls_config,
+    Err(err) => {
+      error!("Error when creating TLS configuration: {err:?}");
+      std::process::exit(1);
+    }
+  };
+
   let local_only_store =
     Store::local_only(runtime.clone(), store_path).expect("Error making local store.");
   let store = match args.value_of("server-address") {
     Some(address) => local_only_store
-      .into_with_remote(
-        address,
-        args.value_of("remote-instance-name").map(str::to_owned),
-        tls::Config::new_without_mtls(root_ca_certs),
+      .into_with_remote(RemoteOptions {
+        cas_address: address.to_owned(),
+        instance_name: args.value_of("remote-instance-name").map(str::to_owned),
+        tls_config,
         headers,
-        4 * 1024 * 1024,
-        std::time::Duration::from_secs(5 * 60),
-        1,
-        args
+        chunk_size_bytes: 4 * 1024 * 1024,
+        rpc_timeout: std::time::Duration::from_secs(5 * 60),
+        rpc_retries: 1,
+        rpc_concurrency_limit: args
           .value_of_t::<usize>("rpc-concurrency-limit")
           .expect("Bad rpc-concurrency-limit flag"),
-        None,
-        args
+        capabilities_cell_opt: None,
+        batch_api_size_limit: args
           .value_of_t::<usize>("batch-api-size-limit")
           .expect("Bad batch-api-size-limit flag"),
-      )
+      })
+      .await
       .expect("Error making remote store"),
     None => local_only_store,
   };
@@ -799,7 +808,7 @@ async fn main() {
     F: Fn() -> SignalKind,
   {
     SignalStream::new(
-      signal(install_fn()).unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig)),
+      signal(install_fn()).unwrap_or_else(|_| panic!("Failed to install SIG{sig:?} handler")),
     )
     .map(move |_| Some(sig))
   }

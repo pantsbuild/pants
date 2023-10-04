@@ -16,3 +16,8 @@ RUN curl -LO "https://go.dev/dl/go1.17.1.linux-arm64.tar.gz" && \
     tar -C /usr/local -xzf go1.17.1.linux-arm64.tar.gz
 
 ENV PATH="${PATH}:/usr/local/go/bin"
+
+RUN groupadd -g 1000 gha && \
+    adduser -u 1000 -g 1000 gha
+
+USER gha

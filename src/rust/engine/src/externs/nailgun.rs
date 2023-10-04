@@ -34,16 +34,19 @@ struct PyNailgunClient {
 #[pymethods]
 impl PyNailgunClient {
   #[new]
-  fn __new__(port: u16, py_executor: PyExecutor) -> Self {
+  fn __new__(port: u16, py_executor: &PyExecutor) -> Self {
     Self {
       port,
-      executor: py_executor.0,
+      executor: py_executor.0.clone(),
     }
   }
 
   fn execute(&self, command: String, args: Vec<String>, env: &PyDict, py: Python) -> PyResult<i32> {
     use nailgun::NailgunClientError;
 
+    // NB: We assume that env var names and values are Python strs strictly convertible to UTF-8
+    // (that is, with no lone surrogates representing invalid UTF-8 passed from the OS).
+    // The Python-side caller must ensure this.
     let env_list: Vec<(String, String)> = env
       .items()
       .into_iter()

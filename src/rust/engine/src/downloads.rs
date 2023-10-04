@@ -109,10 +109,7 @@ struct FileDownload {
 impl FileDownload {
   async fn start(path: &str, file_name: String) -> Result<FileDownload, StreamingError> {
     let file = tokio::fs::File::open(path).await.map_err(|e| {
-      let msg = format!(
-        "Error ({}) opening file at {} for download to {}",
-        e, path, file_name
-      );
+      let msg = format!("Error ({e}) opening file at {path} for download to {file_name}");
       // Fail quickly for non-existent files.
       if e.kind() == io::ErrorKind::NotFound {
         StreamingError::Permanent(msg)
@@ -247,8 +244,7 @@ pub async fn download(
 
   if expected_digest != actual_digest {
     return Err(format!(
-      "Wrong digest for downloaded file: want {:?} got {:?}",
-      expected_digest, actual_digest
+      "Wrong digest for downloaded file: want {expected_digest:?} got {actual_digest:?}"
     ));
   }
 

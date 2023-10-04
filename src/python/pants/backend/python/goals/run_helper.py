@@ -14,8 +14,9 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexRequest
-from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -25,15 +26,15 @@ from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.rules import Get, MultiGet, rule_helper
+from pants.engine.rules import Get, MultiGet
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.util.frozendict import FrozenDict
 
 
 def _in_chroot(relpath: str) -> str:
     return os.path.join("{chroot}", relpath)
 
 
-@rule_helper
 async def _create_python_source_run_request(
     address: Address,
     *,
@@ -89,7 +90,10 @@ async def _create_python_source_run_request(
         complete_pex_environment = pex_env.in_sandbox(working_directory=None)
     else:
         complete_pex_environment = pex_env.in_workspace()
-    venv_pex = await Get(VenvPex, VenvPexRequest(pex_request, complete_pex_environment))
+    venv_pex, python = await MultiGet(
+        Get(VenvPex, VenvPexRequest(pex_request, complete_pex_environment)),
+        Get(PythonExecutable, InterpreterConstraints, pex_request.interpreter_constraints),
+    )
     input_digests = [
         venv_pex.digest,
         # Note regarding not-in-sandbox mode: You might think that the sources don't need to be copied
@@ -110,24 +114,30 @@ async def _create_python_source_run_request(
         *chrooted_source_roots,
     ]
     extra_env = {
-        **complete_pex_environment.environment_dict(python_configured=venv_pex.python is not None),
+        **complete_pex_environment.environment_dict(python=python),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
+    append_only_caches = (
+        FrozenDict({}) if venv_pex.append_only_caches is None else venv_pex.append_only_caches
+    )
 
     return RunRequest(
         digest=merged_digest,
         args=[_in_chroot(venv_pex.pex.argv0)],
         extra_env=extra_env,
-        append_only_caches=complete_pex_environment.append_only_caches,
+        append_only_caches={
+            **complete_pex_environment.append_only_caches,
+            **append_only_caches,
+        },
     )
 
 
-@rule_helper
 async def _create_python_source_run_dap_request(
     regular_run_request: RunRequest,
     *,
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
+    run_in_sandbox: bool,
 ) -> RunDebugAdapterRequest:
     launcher_digest = await Get(
         Digest,
@@ -141,14 +151,6 @@ async def _create_python_source_run_dap_request(
                             CHROOT = os.environ["PANTS_CHROOT"]
 
                             del os.environ["PEX_INTERPRETER"]
-
-                            # See https://github.com/pantsbuild/pants/issues/17540
-                            # For `run --debug-adapter`, the client might send a `pathMappings`
-                            # (this is likely as VS Code likes to configure that by default) with
-                            # a `remoteRoot` of ".". For `run`, CWD is set to the build root, so
-                            # breakpoints set in-repo will never be hit. We fix this by monkeypatching
-                            # pydevd (the library powering debugpy) so that a remoteRoot of "."
-                            # means the sandbox root.
 
                             import debugpy._vendored.force_pydevd
                             from _pydevd_bundle.pydevd_process_net_command_json import PyDevJsonCommandProcessor
@@ -181,7 +183,18 @@ async def _create_python_source_run_dap_request(
     )
     extra_env = dict(regular_run_request.extra_env)
     extra_env["PEX_INTERPRETER"] = "1"
-    extra_env["PANTS_CHROOT"] = _in_chroot("").rstrip("/")
+    # See https://github.com/pantsbuild/pants/issues/17540
+    # and https://github.com/pantsbuild/pants/issues/18243
+    # For `run --debug-adapter`, the client might send a `pathMappings`
+    # (this is likely as VS Code likes to configure that by default) with a `remoteRoot` of ".".
+    #
+    # For `run`, CWD is the build root. If `run_in_sandbox` is False, everything is OK.
+    # If `run_in_sandbox` is True, breakpoints won't be hit as CWD != sandbox root.
+    #
+    # We fix this by monkeypatching pydevd (the library powering debugpy) so that a remoteRoot of "."
+    # means the sandbox root.
+    # See https://github.com/fabioz/PyDev.Debugger/pull/243 for a better solution.
+    extra_env["PANTS_CHROOT"] = _in_chroot("").rstrip("/") if run_in_sandbox else "."
     args = [
         *regular_run_request.args,
         _in_chroot("__debugpy_launcher.py"),
@@ -193,4 +206,5 @@ async def _create_python_source_run_dap_request(
         args=args,
         extra_env=extra_env,
         append_only_caches=regular_run_request.append_only_caches,
+        immutable_input_digests=regular_run_request.immutable_input_digests,
     )

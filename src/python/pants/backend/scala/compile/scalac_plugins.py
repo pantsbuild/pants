@@ -14,9 +14,22 @@ from pants.backend.scala.target_types import (
 )
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.parametrize import (
+    _TargetParametrizations,
+    _TargetParametrizationsRequest,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import AllTargets, CoarsenedTargets, Target, Targets
+from pants.engine.target import (
+    AllTargets,
+    CoarsenedTargets,
+    FieldDefaults,
+    Target,
+    Targets,
+    TargetTypesToGenerateTargetsRequests,
+    WrappedTarget,
+)
 from pants.jvm.compile import ClasspathEntry, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
@@ -25,6 +38,7 @@ from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import bullet_list, softwrap
 
 
 @dataclass(frozen=True)
@@ -99,12 +113,68 @@ async def add_resolve_name_to_plugin_request(
     )
 
 
+async def _resolve_scalac_plugin_artifact(
+    field: ScalacPluginArtifactField,
+    consumer_target: Target,
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    local_environment_name: ChosenLocalEnvironmentName,
+    field_defaults: FieldDefaults,
+) -> WrappedTarget:
+    """Helps resolving the actual artifact for a scalac plugin even in the scenario in which the
+    artifact has been declared as a scala_artifact and it has been parametrized (i.e. across
+    multiple resolves for cross building)."""
+
+    environment_name = local_environment_name.val
+
+    address = await Get(Address, AddressInput, field.to_address_input())
+
+    parametrizations = await Get(
+        _TargetParametrizations,
+        {
+            _TargetParametrizationsRequest(
+                address.maybe_convert_to_target_generator(),
+                description_of_origin=(
+                    f"the target generator {address.maybe_convert_to_target_generator()}"
+                ),
+            ): _TargetParametrizationsRequest,
+            environment_name: EnvironmentName,
+        },
+    )
+
+    target = parametrizations.get_subset(
+        address, consumer_target, field_defaults, target_types_to_generate_requests
+    )
+    if (
+        target_types_to_generate_requests.is_generator(target)
+        and not target.address.is_generated_target
+    ):
+        generated_tgts = list(parametrizations.generated_for(target.address).values())
+        if len(generated_tgts) > 1:
+            raise Exception(
+                softwrap(
+                    f"""
+                    Could not resolve scalac plugin artifact {address} from target {field.address}
+                    as it points to a target generator that produced more than one target:
+
+                    {bullet_list([tgt.address.spec for tgt in generated_tgts])}
+                    """
+                )
+            )
+        if len(generated_tgts) == 1:
+            target = generated_tgts[0]
+
+    return WrappedTarget(target)
+
+
 @rule
 async def resolve_scala_plugins_for_target(
     request: ScalaPluginsForTargetRequest,
     all_scala_plugins: AllScalaPluginTargets,
     jvm: JvmSubsystem,
     scalac: Scalac,
+    target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    local_environment_name: ChosenLocalEnvironmentName,
+    field_defaults: FieldDefaults,
 ) -> ScalaPluginTargetsForTarget:
     target = request.target
     resolve = request.resolve_name
@@ -115,23 +185,20 @@ async def resolve_scala_plugins_for_target(
         plugin_names = tuple(plugin_names_by_resolve.get(resolve, ()))
 
     candidate_plugins = []
-    artifact_address_gets = []
+    candidate_artifacts = []
     for plugin in all_scala_plugins:
         if _plugin_name(plugin) not in plugin_names:
             continue
         candidate_plugins.append(plugin)
         artifact_field = plugin[ScalacPluginArtifactField]
-        address_input = AddressInput.parse(
-            artifact_field.value,
-            relative_to=target.address.spec_path,
-            description_of_origin=(
-                f"the `{artifact_field.alias}` field from the target {artifact_field.address}"
-            ),
+        wrapped_target = await _resolve_scalac_plugin_artifact(
+            artifact_field,
+            request.target,
+            target_types_to_generate_requests,
+            local_environment_name,
+            field_defaults,
         )
-        artifact_address_gets.append(Get(Address, AddressInput, address_input))
-
-    artifact_addresses = await MultiGet(artifact_address_gets)
-    candidate_artifacts = await Get(Targets, Addresses(artifact_addresses))
+        candidate_artifacts.append(wrapped_target.target)
 
     plugins: dict[str, tuple[Target, Target]] = {}  # Maps plugin name to relevant JVM artifact
     for plugin, artifact in zip(candidate_plugins, candidate_artifacts):
@@ -144,7 +211,7 @@ async def resolve_scala_plugins_for_target(
         if plugin_name not in plugins:
             raise Exception(
                 f"Could not find Scala plugin `{plugin_name}` in resolve `{resolve}` "
-                f"for target {request.target}"
+                f"for target {request.target.address}."
             )
 
     plugin_targets, artifact_targets = zip(*plugins.values()) if plugins else ((), ())

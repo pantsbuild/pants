@@ -11,10 +11,10 @@ use log::debug;
 pub struct BuildRoot(PathBuf);
 
 impl BuildRoot {
-  const SENTINEL_FILES: &'static [&'static str] = &["pants", "BUILDROOT", "BUILD_ROOT"];
+  const SENTINEL_FILES: &'static [&'static str] = &["pants.toml", "BUILDROOT", "BUILD_ROOT"];
 
   pub fn find() -> Result<BuildRoot, String> {
-    let cwd = env::current_dir().map_err(|e| format!("Failed to determine $CWD: {}", e))?;
+    let cwd = env::current_dir().map_err(|e| format!("Failed to determine $CWD: {e}"))?;
     Self::find_from(&cwd)
   }
 

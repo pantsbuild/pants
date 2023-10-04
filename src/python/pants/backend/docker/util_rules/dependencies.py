@@ -8,10 +8,14 @@ from pathlib import PurePath
 
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageDependenciesField
+from pants.backend.docker.util_rules.docker_build_args import (
+    DockerBuildArgs,
+    DockerBuildArgsRequest,
+)
 from pants.core.goals.package import AllPackageableTargets, OutputPathField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies, Targets
 from pants.engine.unions import UnionRule
 from pants.util.strutil import softwrap
 
@@ -33,12 +37,19 @@ async def infer_docker_dependencies(
 ) -> InferredDependencies:
     """Inspects the Dockerfile for references to known packagable targets."""
     dockerfile_info = await Get(DockerfileInfo, DockerfileInfoRequest(request.field_set.address))
+    targets = await Get(Targets, Addresses([request.field_set.address]))
+    build_args = await Get(DockerBuildArgs, DockerBuildArgsRequest(targets.expect_single()))
+    merged_from_build_args = {
+        k: build_args.to_dict().get(k, v)
+        for k, v in dockerfile_info.from_image_build_args.to_dict().items()
+    }
+    dockerfile_build_args = {k: v for k, v in merged_from_build_args.items() if v}
 
     putative_image_addresses = set(
         await Get(
             Addresses,
             UnparsedAddressInputs(
-                (v for v in dockerfile_info.from_image_build_args.to_dict().values() if v),
+                dockerfile_build_args.values(),
                 owning_address=dockerfile_info.address,
                 description_of_origin=softwrap(
                     f"""

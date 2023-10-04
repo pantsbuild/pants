@@ -4,7 +4,6 @@
 import pytest
 
 from pants.backend.python.subsystems.repos import PythonRepos
-from pants.engine.rules import SubsystemRule
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
@@ -12,7 +11,7 @@ from pants.util.logging import LogLevel
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[SubsystemRule(PythonRepos), QueryRule(ScopedOptions, (Scope,))])
+    return RuleRunner(rules=[*PythonRepos.rules(), QueryRule(ScopedOptions, (Scope,))])
 
 
 def test_options_parse_scoped(rule_runner: RuleRunner) -> None:

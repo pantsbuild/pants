@@ -17,15 +17,9 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    FieldSet,
-    SourcesField,
-    SourcesPaths,
-    SourcesPathsRequest,
-    _get_field_set_fields,
-)
+from pants.engine.target import FieldSet, SourcesField, SourcesPaths, SourcesPathsRequest
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import runtime_ignore_subscripts
 
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
 
@@ -151,9 +145,7 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
         return Partitions([Partition(tuple(elements), metadata or _EmptyMetadata())])
 
 
-# NB: Not frozen so it can be subclassed
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 @runtime_ignore_subscripts
 class _BatchBase(Generic[PartitionElementT, PartitionMetadataT], EngineAwareParameter):
     """Base class for a collection of elements that should all be processed together.
@@ -198,10 +190,11 @@ def _single_partition_field_set_rules(cls) -> Iterable:
     one partition."""
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -221,10 +214,11 @@ def _single_partition_file_rules(cls) -> Iterable:
     sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -254,10 +248,11 @@ def _partition_per_input_field_set_rules(cls) -> Iterable:
     a single-element partition per input."""
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -283,10 +278,11 @@ def _partition_per_input_file_rules(cls) -> Iterable:
     sources_field_name = _get_sources_field_name(cls.field_set_type)
 
     @rule(
+        canonical_name_suffix=cls.__name__,
         _param_type_overrides={
             "request": cls.PartitionRequest,
             "subsystem": cls.tool_subsystem,
-        }
+        },
     )
     async def partitioner(
         request: _PartitionFieldSetsRequestBase, subsystem: SkippableSubsystem
@@ -319,7 +315,7 @@ def _get_sources_field_name(field_set_type: type[FieldSet]) -> str:
     """
 
     sources_field_name = None
-    for fieldname, fieldtype in _get_field_set_fields(field_set_type).items():
+    for fieldname, fieldtype in field_set_type.fields.items():
         if issubclass(fieldtype, SourcesField):
             if sources_field_name is None:
                 sources_field_name = fieldname

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -57,9 +57,16 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.internals.session import RunId
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
+from pants.engine.platform import Platform
+from pants.engine.process import (
+    InteractiveProcess,
+    InteractiveProcessResult,
+    ProcessExecutionEnvironment,
+    ProcessResultMetadata,
+)
 from pants.engine.target import (
     BoolField,
+    Field,
     MultipleSourcesField,
     Target,
     TargetRootsToFieldSets,
@@ -69,15 +76,39 @@ from pants.engine.unions import UnionMembership
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
+from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import (
     MockEffect,
     MockGet,
     QueryRule,
-    RuleRunner,
     mock_console,
     run_rule_with_mocks,
 )
 from pants.util.logging import LogLevel
+
+
+def make_process_result_metadata(
+    source: str,
+    *,
+    environment_name: str | None = None,
+    docker_image: str | None = None,
+    remote_execution: bool = False,
+    total_elapsed_ms: int = 999,
+    source_run_id: int = 0,
+) -> ProcessResultMetadata:
+    return ProcessResultMetadata(
+        total_elapsed_ms,
+        ProcessExecutionEnvironment(
+            environment_name=environment_name,
+            # TODO: None of the following are currently consumed in these tests.
+            platform=Platform.create_for_localhost().value,
+            docker_image=docker_image,
+            remote_execution=remote_execution,
+            remote_execution_extra_platform_properties=[],
+        ),
+        source,
+        source_run_id,
+    )
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -93,9 +124,14 @@ class MockSkipTestsField(BoolField):
     default = False
 
 
+class MockRequiredField(Field):
+    alias = "required"
+    required = True
+
+
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (MockMultipleSourcesField, MockSkipTestsField)
+    core_fields = (MockMultipleSourcesField, MockSkipTestsField, MockRequiredField)
 
 
 @dataclass(frozen=True)
@@ -107,8 +143,11 @@ class MockCoverageDataCollection(CoverageDataCollection):
     element_type = MockCoverageData
 
 
-class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
-    required_fields = (MultipleSourcesField,)
+@dataclass(frozen=True)
+class MockTestFieldSet(TestFieldSet):
+    required_fields = (MultipleSourcesField, MockRequiredField)
+    sources: MultipleSourcesField
+    required: MockRequiredField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -141,16 +180,14 @@ class MockTestRequest(TestRequest):
         addresses = [field_set.address for field_set in field_sets]
         return TestResult(
             exit_code=cls.exit_code(addresses),
-            stdout="",
+            stdout_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
-            stderr="",
+            stderr_bytes=b"",
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=tuple(addresses),
             coverage_data=MockCoverageData(addresses),
             output_setting=ShowOutput.ALL,
-            result_metadata=None
-            if cls.skipped(addresses)
-            else ProcessResultMetadata(999, "ran_locally", 0),
+            result_metadata=None if cls.skipped(addresses) else make_process_result_metadata("ran"),
         )
 
 
@@ -189,18 +226,18 @@ def mock_test_partition(request: MockTestRequest.Batch, _: EnvironmentName) -> T
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner()
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner()
 
 
 def make_target(address: Address | None = None, *, skip: bool = False) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({MockSkipTestsField.alias: skip}, address)
+    return MockTarget({MockSkipTestsField.alias: skip, MockRequiredField.alias: "present"}, address)
 
 
 def run_test_rule(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     *,
     request_type: type[TestRequest],
     targets: list[Target],
@@ -350,7 +387,7 @@ def run_test_rule(
         return result.exit_code, stdio_reader.get_stderr()
 
 
-def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
+def test_invalid_target_noops(rule_runner: PythonRuleRunner) -> None:
     exit_code, stderr = run_test_rule(
         rule_runner,
         request_type=SuccessfulRequest,
@@ -361,7 +398,7 @@ def test_invalid_target_noops(rule_runner: RuleRunner) -> None:
     assert stderr.strip() == ""
 
 
-def test_skipped_target_noops(rule_runner: RuleRunner) -> None:
+def test_skipped_target_noops(rule_runner: PythonRuleRunner) -> None:
     exit_code, stderr = run_test_rule(
         rule_runner,
         request_type=ConditionallySucceedsRequest,
@@ -371,7 +408,7 @@ def test_skipped_target_noops(rule_runner: RuleRunner) -> None:
     assert stderr.strip() == ""
 
 
-def test_summary(rule_runner: RuleRunner) -> None:
+def test_summary(rule_runner: PythonRuleRunner) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
     skipped_address = Address("", target_name="skipped")
@@ -401,8 +438,8 @@ def _assert_test_summary(
     assert expected == _format_test_summary(
         TestResult(
             exit_code=exit_code,
-            stdout="",
-            stderr="",
+            stdout_bytes=b"",
+            stderr_bytes=b"",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
             addresses=(Address(spec_path="", target_name="dummy_address"),),
@@ -414,34 +451,49 @@ def _assert_test_summary(
     )
 
 
-def test_format_summary_remote(rule_runner: RuleRunner) -> None:
+def test_format_summary_remote(rule_runner: PythonRuleRunner) -> None:
     _assert_test_summary(
-        "✓ //:dummy_address succeeded in 0.05s (ran remotely).",
+        "✓ //:dummy_address succeeded in 0.05s (ran in remote environment `ubuntu`).",
         exit_code=0,
         run_id=0,
-        result_metadata=ProcessResultMetadata(50, "ran_remotely", 0),
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
     )
 
 
-def test_format_summary_local(rule_runner: RuleRunner) -> None:
+def test_format_summary_local(rule_runner: PythonRuleRunner) -> None:
     _assert_test_summary(
         "✓ //:dummy_address succeeded in 0.05s.",
         exit_code=0,
         run_id=0,
-        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name=None, total_elapsed_ms=50
+        ),
     )
 
 
-def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
+def test_format_summary_memoized(rule_runner: PythonRuleRunner) -> None:
     _assert_test_summary(
         "✓ //:dummy_address succeeded in 0.05s (memoized).",
         exit_code=0,
         run_id=1234,
-        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+        result_metadata=make_process_result_metadata("ran", total_elapsed_ms=50),
     )
 
 
-def test_debug_target(rule_runner: RuleRunner) -> None:
+def test_format_summary_memoized_remote(rule_runner: PythonRuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized for remote environment `ubuntu`).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
+    )
+
+
+def test_debug_target(rule_runner: PythonRuleRunner) -> None:
     exit_code, _ = run_test_rule(
         rule_runner,
         request_type=SuccessfulRequest,
@@ -451,7 +503,7 @@ def test_debug_target(rule_runner: RuleRunner) -> None:
     assert exit_code == 0
 
 
-def test_report(rule_runner: RuleRunner) -> None:
+def test_report(rule_runner: PythonRuleRunner) -> None:
     addr1 = Address("", target_name="t1")
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
@@ -464,7 +516,7 @@ def test_report(rule_runner: RuleRunner) -> None:
     assert "Wrote test reports to dist/test/reports" in stderr
 
 
-def test_report_dir(rule_runner: RuleRunner) -> None:
+def test_report_dir(rule_runner: PythonRuleRunner) -> None:
     report_dir = "dist/test-results"
     addr1 = Address("", target_name="t1")
     addr2 = Address("", target_name="t2")
@@ -479,7 +531,7 @@ def test_report_dir(rule_runner: RuleRunner) -> None:
     assert f"Wrote test reports to {report_dir}" in stderr
 
 
-def test_coverage(rule_runner: RuleRunner) -> None:
+def test_coverage(rule_runner: PythonRuleRunner) -> None:
     addr1 = Address("", target_name="t1")
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
@@ -543,13 +595,13 @@ def assert_streaming_output(
     output_setting: ShowOutput = ShowOutput.ALL,
     expected_level: LogLevel,
     expected_message: str,
-    result_metadata: ProcessResultMetadata = ProcessResultMetadata(999, "dummy", 0),
+    result_metadata: ProcessResultMetadata = make_process_result_metadata("dummy"),
 ) -> None:
     result = TestResult(
         exit_code=exit_code,
-        stdout=stdout,
+        stdout_bytes=stdout.encode(),
         stdout_digest=EMPTY_FILE_DIGEST,
-        stderr=stderr,
+        stderr_bytes=stderr.encode(),
         stderr_digest=EMPTY_FILE_DIGEST,
         output_setting=output_setting,
         addresses=(Address("demo_test"),),
@@ -607,7 +659,7 @@ def test_streaming_output_failure() -> None:
 
 
 def test_runtime_package_dependencies() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             build_runtime_package_dependencies,
             *pex_from_targets.rules(),
@@ -665,3 +717,17 @@ def test_timeout_calculation() -> None:
     assert_timeout_calculated(field_value=None, expected=None)
     assert_timeout_calculated(field_value=None, global_default=20, global_max=10, expected=10)
     assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
+
+
+def test_non_utf8_output() -> None:
+    test_result = TestResult(
+        exit_code=1,  # "test error" so stdout/stderr are output in message
+        stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stdout_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
+        stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stderr_digest=EMPTY_FILE_DIGEST,  # incorrect but we do not check in this test
+        addresses=(),
+        output_setting=ShowOutput.ALL,
+        result_metadata=None,
+    )
+    assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"

@@ -8,8 +8,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, KeysView, Tuple
 
-from pants.util.meta import frozen_after_init
-
 logger = logging.getLogger(__name__)
 
 
@@ -195,8 +193,7 @@ class _ServiceState:
             return self._state == self._TERMINATING
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PantsServices:
     """A collection of running PantsServices threads."""
 
@@ -205,7 +202,7 @@ class PantsServices:
     _service_threads: Dict[PantsService, threading.Thread]
 
     def __init__(self, services: Tuple[PantsService, ...] = ()) -> None:
-        self._service_threads = self._start(services)
+        object.__setattr__(self, "_service_threads", self._start(services))
 
     @classmethod
     def _make_thread(cls, service):

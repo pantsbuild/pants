@@ -37,13 +37,13 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
-use std::fs::hard_link;
 use std::fs::OpenOptions;
+use std::fs::Permissions as FSPermissions;
 use std::future::Future;
-use std::io::{self, Read, Write};
-use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
+use std::io::Write;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -58,36 +58,33 @@ use fs::{
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
-use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::status_to_str;
-use hashing::Digest;
+use hashing::{Digest, Fingerprint};
+use local::ByteStore;
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
-use remexec::{ServerCapabilities, Tree};
+use remexec::Tree;
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
+#[cfg(target_os = "macos")]
+use tokio::fs::copy;
+#[cfg(not(target_os = "macos"))]
+use tokio::fs::hard_link;
+use tokio::fs::symlink;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
-
-use crate::remote::ByteStoreError;
 
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
 
-/// How big a file must be to become an immutable input symlink.
-// NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
-// writing. They were chosen using a rough equation from the microbenchmarks that are optimized
-// for somewhere between 2 and 3 uses of the corresponding entry to "break even".
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
-
 mod local;
 #[cfg(test)]
 pub mod local_tests;
 
-mod remote;
+pub mod remote;
+pub use remote::RemoteOptions;
 #[cfg(test)]
 mod remote_tests;
 
@@ -144,12 +141,6 @@ impl Display for StoreError {
 impl From<String> for StoreError {
   fn from(err: String) -> Self {
     Self::Unclassified(err)
-  }
-}
-
-impl From<io::Error> for StoreError {
-  fn from(err: io::Error) -> Self {
-    Self::Unclassified(err.to_string())
   }
 }
 
@@ -240,55 +231,59 @@ impl RemoteStore {
       .map(|&()| ())
   }
 
+  async fn remote_writer(
+    remote_store: &remote::ByteStore,
+    digest: Digest,
+    file: tokio::fs::File,
+  ) -> Result<tokio::fs::File, StoreError> {
+    remote_store.load_file(digest, file).await?.ok_or_else(|| {
+      StoreError::MissingDigest(
+        "Was not present in either the local or remote store".to_owned(),
+        digest,
+      )
+    })
+  }
+
   /// Download the digest to the local byte store from this remote store. The function `f_remote`
-  /// can be used to validate the bytes.
-  async fn download_digest_to_local<
-    FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
-  >(
+  /// can be used to validate the bytes (NB. if provided, the whole value will be buffered into
+  /// memory to provide the `Bytes` argument, and thus `f_remote` should only be used for small digests).
+  async fn download_digest_to_local(
     &self,
     local_store: local::ByteStore,
     digest: Digest,
     entry_type: EntryType,
-    f_remote: FRemote,
+    f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<(), StoreError> {
     let remote_store = self.store.clone();
     self
       .maybe_download(digest, async move {
-        // TODO(#17065): Now that we always copy from the remote store to the local store before
-        // executing the caller's logic against the local store,
-        // `remote::ByteStore::load_bytes_with` no longer needs to accept a function.
-        let bytes = retry_call(
-          remote_store,
-          |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
-          |err| match err {
-            ByteStoreError::Grpc(status) => status_is_retryable(status),
-            _ => false,
-          },
-        )
-        .await
-        .map_err(|err| match err {
-          ByteStoreError::Grpc(status) => status_to_str(status),
-          ByteStoreError::Other(msg) => msg,
-        })?
-        .ok_or_else(|| {
-          StoreError::MissingDigest(
-            "Was not present in either the local or remote store".to_owned(),
-            digest,
-          )
-        })?;
-
-        f_remote(bytes.clone())?;
-        let stored_digest = local_store
-          .store_bytes(entry_type, None, bytes, true)
-          .await?;
-        if digest == stored_digest {
-          Ok(())
+        let store_into_fsdb = ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
+        if store_into_fsdb {
+          assert!(
+            f_remote.is_none(),
+            "Entries to be stored in FSDB should never need validation via f_remote, found {digest:?} of type {entry_type:?} that does"
+          );
+          local_store
+            .get_file_fsdb()
+            .write_using(digest.hash, |file| {
+              Self::remote_writer(&remote_store, digest, file)
+            })
+            .await?;
         } else {
-          Err(StoreError::Unclassified(format!(
-            "CAS gave wrong digest: expected {:?}, got {:?}",
-            digest, stored_digest
-          )))
+          let bytes = remote_store.load_bytes(digest).await?.ok_or_else(|| {
+            StoreError::MissingDigest(
+              "Was not present in either the local or remote store".to_owned(),
+              digest,
+            )
+          })?;
+          if let Some(f_remote) = f_remote {
+            f_remote(bytes.clone())?;
+          }
+          local_store
+            .store_bytes(entry_type, digest.hash, bytes, true)
+            .await?;
         }
+        Ok(())
       })
       .await
   }
@@ -381,33 +376,12 @@ impl Store {
   /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
   /// attempt to back-fill its local storage from the remote storage.
   ///
-  pub fn into_with_remote(
-    self,
-    cas_address: &str,
-    instance_name: Option<String>,
-    tls_config: grpc_util::tls::Config,
-    headers: BTreeMap<String, String>,
-    chunk_size_bytes: usize,
-    upload_timeout: Duration,
-    rpc_retries: usize,
-    rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-    batch_api_size_limit: usize,
-  ) -> Result<Store, String> {
+  pub async fn into_with_remote(self, remote_options: RemoteOptions) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
-      remote: Some(RemoteStore::new(remote::ByteStore::new(
-        cas_address,
-        instance_name,
-        tls_config,
-        headers,
-        chunk_size_bytes,
-        upload_timeout,
-        rpc_retries,
-        rpc_concurrency_limit,
-        capabilities_cell_opt,
-        batch_api_size_limit,
-      )?)),
+      remote: Some(RemoteStore::new(
+        remote::ByteStore::from_options(remote_options).await?,
+      )),
       immutable_inputs_base: self.immutable_inputs_base,
     })
   }
@@ -435,10 +409,12 @@ impl Store {
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
+    let digest = Digest::of_bytes(&bytes);
     self
       .local
-      .store_bytes(EntryType::File, None, bytes, initial_lease)
-      .await
+      .store_bytes(EntryType::File, digest.hash, bytes, initial_lease)
+      .await?;
+    Ok(digest)
   }
 
   ///
@@ -449,36 +425,28 @@ impl Store {
   ///
   pub async fn store_file_bytes_batch(
     &self,
-    items: Vec<(Option<Digest>, Bytes)>,
+    items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
-  ) -> Result<Vec<Digest>, String> {
+  ) -> Result<(), String> {
     self
       .local
       .store_bytes_batch(EntryType::File, items, initial_lease)
-      .await
+      .await?;
+    Ok(())
   }
 
   ///
   /// Store a file locally by streaming its contents.
   ///
-  pub async fn store_file<F, R>(
+  pub async fn store_file(
     &self,
     initial_lease: bool,
     data_is_immutable: bool,
-    data_provider: F,
-  ) -> Result<Digest, String>
-  where
-    R: Read + Debug,
-    F: Fn() -> Result<R, io::Error> + Send + 'static,
-  {
+    src: PathBuf,
+  ) -> Result<Digest, String> {
     self
       .local
-      .store(
-        EntryType::File,
-        initial_lease,
-        data_is_immutable,
-        data_provider,
-      )
+      .store(EntryType::File, initial_lease, data_is_immutable, src)
       .await
   }
 
@@ -529,14 +497,10 @@ impl Store {
     digest: Digest,
     f: F,
   ) -> Result<T, StoreError> {
-    // No transformation or verification is needed for files.
+    // No transformation or verification (beyond verifying their digest, which the
+    // `remote::ByteStore` will do) is needed for files.
     self
-      .load_bytes_with(
-        EntryType::File,
-        digest,
-        move |v: &[u8]| Ok(f(v)),
-        |_: Bytes| Ok(()),
-      )
+      .load_bytes_with(EntryType::File, digest, move |v: &[u8]| Ok(f(v)), None)
       .await
   }
 
@@ -556,7 +520,7 @@ impl Store {
         if cfg!(debug_assertions) {
           protos::verify_directory_canonical(d.digest(), &directory).unwrap();
         }
-        directories.push((Some(d.digest()), directory.to_bytes()))
+        directories.push((d.digest().hash, directory.to_bytes()))
       }
       directory::Entry::File(_) => (),
       directory::Entry::Symlink(_) => (),
@@ -564,11 +528,13 @@ impl Store {
 
     // Then store them as a batch.
     let local = self.local.clone();
-    let digests = local
+    let root = &directories[0];
+    let top_digest = Digest::new(root.0, root.1.len());
+    local
       .store_bytes_batch(EntryType::Directory, directories, initial_lease)
       .await?;
 
-    Ok(DirectoryDigest::new(digests[0], tree))
+    Ok(DirectoryDigest::new(top_digest, tree))
   }
 
   ///
@@ -582,10 +548,12 @@ impl Store {
     initial_lease: bool,
   ) -> Result<Digest, String> {
     let local = self.local.clone();
-    let digest = local
+    let bytes = directory.to_bytes();
+    let digest = Digest::of_bytes(&bytes);
+    local
       .store_bytes(
         EntryType::Directory,
-        None,
+        digest.hash,
         directory.to_bytes(),
         initial_lease,
       )
@@ -699,10 +667,7 @@ impl Store {
         // and only verify in debug mode, as it's slightly expensive.
         move |bytes: &[u8]| {
           let directory = remexec::Directory::decode(bytes).map_err(|e| {
-            format!(
-              "LMDB corruption: Directory bytes for {:?} were not valid: {:?}",
-              digest, e
-            )
+            format!("LMDB corruption: Directory bytes for {digest:?} were not valid: {e:?}")
           })?;
           if cfg!(debug_assertions) {
             protos::verify_directory_canonical(digest, &directory)?;
@@ -711,16 +676,13 @@ impl Store {
         },
         // Eagerly verify that CAS-returned Directories are canonical, so that we don't write them
         // into our local store.
-        move |bytes: Bytes| {
+        Some(&move |bytes| {
           let directory = remexec::Directory::decode(bytes).map_err(|e| {
-            format!(
-              "CAS returned Directory proto for {:?} which was not valid: {:?}",
-              digest, e
-            )
+            format!("CAS returned Directory proto for {digest:?} which was not valid: {e:?}")
           })?;
           protos::verify_directory_canonical(digest, &directory)?;
           Ok(())
-        },
+        }),
       )
       .await
   }
@@ -748,13 +710,12 @@ impl Store {
   async fn load_bytes_with<
     T: Send + 'static,
     FLocal: Fn(&[u8]) -> Result<T, String> + Clone + Send + Sync + 'static,
-    FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
   >(
     &self,
     entry_type: EntryType,
     digest: Digest,
     f_local: FLocal,
-    f_remote: FRemote,
+    f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<T, StoreError> {
     if let Some(bytes_res) = self
       .local
@@ -818,9 +779,7 @@ impl Store {
           ingested_digests.keys().cloned().collect()
         } else {
           remote
-            .list_missing_digests(
-              remote.find_missing_blobs_request(ingested_digests.keys().cloned()),
-            )
+            .list_missing_digests(ingested_digests.keys().cloned())
             .await?
         };
 
@@ -845,15 +804,16 @@ impl Store {
               remote_store
                 .clone()
                 .maybe_upload(digest, async move {
-                  // TODO(John Sirois): Consider allowing configuration of when to buffer large blobs
-                  // to disk to be independent of the remote store wire chunk size.
-                  if digest.size_bytes > remote_store.store.chunk_size_bytes() {
-                    Self::store_large_blob_remote(local, remote_store.store, entry_type, digest)
-                      .await
-                  } else {
-                    Self::store_small_blob_remote(local, remote_store.store, entry_type, digest)
-                      .await
-                  }
+                  match local.load_from_fs(digest).await? {
+                    Some(path) => {
+                      Self::store_fsdb_blob_remote(remote_store.store, digest, path).await?
+                    }
+                    None => {
+                      Self::store_lmdb_blob_remote(local, remote_store.store, entry_type, digest)
+                        .await?
+                    }
+                  };
+                  Ok(())
                 })
                 .await
             }
@@ -876,7 +836,7 @@ impl Store {
     .boxed()
   }
 
-  async fn store_small_blob_remote(
+  async fn store_lmdb_blob_remote(
     local: local::ByteStore,
     remote: remote::ByteStore,
     entry_type: EntryType,
@@ -884,7 +844,9 @@ impl Store {
   ) -> Result<(), StoreError> {
     // We need to copy the bytes into memory so that they may be used safely in an async
     // future. While this unfortunately increases memory consumption, we prioritize
-    // being able to run `remote.store_bytes()` as async.
+    // being able to run `remote.store_bytes()` as async. In addition, this is only used
+    // for blobs in the LMDB store, most of which are small: large blobs end up in the
+    // FSDB store.
     //
     // See https://github.com/pantsbuild/pants/pull/9793 for an earlier implementation
     // that used `Executor.block_on`, which avoided the clone but was blocking.
@@ -896,48 +858,22 @@ impl Store {
     match maybe_bytes {
       Some(bytes) => Ok(remote.store_bytes(bytes).await?),
       None => Err(StoreError::MissingDigest(
-        format!(
-          "Failed to upload {entry_type:?}: Not found in local store",
-          entry_type = entry_type,
-        ),
+        format!("Failed to upload {entry_type:?}: Not found in local store",),
         digest,
       )),
     }
   }
 
-  async fn store_large_blob_remote(
-    local: local::ByteStore,
+  async fn store_fsdb_blob_remote(
     remote: remote::ByteStore,
-    entry_type: EntryType,
     digest: Digest,
+    path: PathBuf,
   ) -> Result<(), StoreError> {
-    remote
-      .store_buffered(digest, |mut buffer| async {
-        let result = local
-          .load_bytes_with(entry_type, digest, move |bytes| {
-            buffer.write_all(bytes).map_err(|e| {
-              format!(
-                "Failed to write {entry_type:?} {digest:?} to temporary buffer: {err}",
-                entry_type = entry_type,
-                digest = digest,
-                err = e
-              )
-            })
-          })
-          .await?;
-        match result {
-          None => Err(StoreError::MissingDigest(
-            format!(
-              "Failed to upload {entry_type:?}: Not found in local store",
-              entry_type = entry_type,
-            ),
-            digest,
-          )),
-          Some(Err(err)) => Err(err.into()),
-          Some(Ok(())) => Ok(()),
-        }
-      })
+    let file = tokio::fs::File::open(&path)
       .await
+      .map_err(|e| format!("failed to read {digest:?} from {path:?}: {e}"))?;
+    remote.store_file(digest, file).await?;
+    Ok(())
   }
 
   ///
@@ -986,10 +922,7 @@ impl Store {
     } else {
       return Ok(false);
     };
-    let missing = remote
-      .store
-      .list_missing_digests(remote.store.find_missing_blobs_request(missing_locally))
-      .await?;
+    let missing = remote.store.list_missing_digests(missing_locally).await?;
 
     Ok(missing.is_empty())
   }
@@ -1035,7 +968,7 @@ impl Store {
         .into_iter()
         .map(|file_digest| async move {
           if let Err(e) = remote
-            .download_digest_to_local(self.local.clone(), file_digest, EntryType::File, |_| Ok(()))
+            .download_digest_to_local(self.local.clone(), file_digest, EntryType::File, None)
             .await
           {
             log::debug!("Missing file digest from remote store: {:?}", file_digest);
@@ -1076,35 +1009,14 @@ impl Store {
       return Err("Cannot load Trees from a remote without a remote".to_owned());
     };
 
-    let tree_opt = retry_call(
-      remote,
-      |remote| async move {
-        remote
-          .store
-          .load_bytes_with(tree_digest, |b| {
-            let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
-            Ok(tree)
-          })
-          .await
-      },
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
-    )
-    .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
-    })?;
-
-    let tree = match tree_opt {
-      Some(t) => t,
-      None => return Ok(None),
-    };
-
-    let trie = DigestTrie::try_from(tree)?;
-    Ok(Some(trie.into()))
+    match remote.store.load_bytes(tree_digest).await? {
+      Some(b) => {
+        let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {e:?}"))?;
+        let trie = DigestTrie::try_from(tree)?;
+        Ok(Some(trie.into()))
+      }
+      None => Ok(None),
+    }
   }
 
   pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
@@ -1124,12 +1036,12 @@ impl Store {
     Ok(())
   }
 
-  pub fn garbage_collect(
+  pub async fn garbage_collect(
     &self,
     target_size_bytes: usize,
     shrink_behavior: ShrinkBehavior,
   ) -> Result<(), String> {
-    match self.local.shrink(target_size_bytes, shrink_behavior) {
+    match self.local.shrink(target_size_bytes, shrink_behavior).await {
       Ok(size) => {
         if size > target_size_bytes {
           log::warn!(
@@ -1141,7 +1053,7 @@ impl Store {
         }
         Ok(())
       }
-      Err(err) => Err(format!("Garbage collection failed: {:?}", err)),
+      Err(err) => Err(format!("Garbage collection failed: {err:?}")),
     }
   }
 
@@ -1257,14 +1169,24 @@ impl Store {
   /// an existing destination directory, meaning that directory and file creation must be
   /// idempotent.
   ///
+  /// If the destination (more specifically, the given parent directory of the destination, for
+  /// memoization purposes) is hardlinkable from the local store, and `!force_mutable`, hardlinks
+  /// may be used for large files which are not listed in `mutable_paths`.
+  ///
   pub async fn materialize_directory(
     &self,
     destination: PathBuf,
+    destination_root: &Path,
     digest: DirectoryDigest,
+    force_mutable: bool,
     mutable_paths: &BTreeSet<RelativePath>,
-    immutable_inputs: Option<&ImmutableInputs>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
+    debug_assert!(
+      destination.starts_with(destination_root),
+      "The destination root must be a parent directory of the destination."
+    );
+
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
     // parent path and its children.
     let mut parent_to_child = HashMap::new();
@@ -1283,14 +1205,24 @@ impl Store {
       mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
     }
 
+    // Create the root, and determine what filesystem it and the store are on.
+    let destination_is_hardlinkable = {
+      let (_, destination_is_hardlinkable) = tokio::try_join!(
+        tokio::fs::create_dir_all(&destination)
+          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display())),
+        self.local.is_hardlinkable_destination(destination_root)
+      )?;
+      destination_is_hardlinkable
+    };
+
     self
       .materialize_directory_children(
-        destination.clone(),
+        destination,
         true,
-        false,
+        force_mutable,
+        destination_is_hardlinkable,
         &parent_to_child,
         &mutable_path_ancestors,
-        immutable_inputs,
         perms,
       )
       .await
@@ -1301,35 +1233,21 @@ impl Store {
     destination: PathBuf,
     is_root: bool,
     force_mutable: bool,
+    can_hardlink: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
     mutable_paths: &'a BTreeSet<PathBuf>,
-    immutable_inputs: Option<&'a ImmutableInputs>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
     async move {
-      let destination2 = destination.clone();
-      store
-        .local
-        .executor()
-        .spawn_blocking(
-          move || {
-            if is_root {
-              fs::safe_create_dir_all(&destination2)
-            } else {
-              fs::safe_create_dir(&destination2)
-            }
-          },
-          |e| Err(format!("Directory creation task failed: {e}")),
-        )
-        .map_err(|e| {
-          format!(
-            "Failed to create directory {}: {}",
-            destination.display(),
-            e
-          )
-        })
-        .await?;
+      if !is_root {
+        // NB: Although we know that all parent directories already exist, we use `create_dir_all`
+        // because it succeeds even if _this_ directory already exists (which it might, if we're
+        // materializing atop an existing directory structure).
+        tokio::fs::create_dir_all(&destination)
+          .await
+          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))?;
+      }
 
       if let Some(children) = parent_to_child.get(&destination) {
         let mut child_futures = Vec::new();
@@ -1337,8 +1255,7 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
-            let can_be_immutable =
-              immutable_inputs.is_some() && !mutable_paths.contains(&path) && !force_mutable;
+            let can_be_immutable = !force_mutable && can_hardlink && !mutable_paths.contains(&path);
 
             match child {
               directory::Entry::File(f) => {
@@ -1349,7 +1266,6 @@ impl Store {
                     perms,
                     f.is_executable(),
                     can_be_immutable,
-                    immutable_inputs,
                   )
                   .await
               }
@@ -1363,10 +1279,10 @@ impl Store {
                   .materialize_directory_children(
                     path.clone(),
                     false,
-                    mutable_paths.contains(&path),
+                    mutable_paths.contains(&path) || force_mutable,
+                    can_hardlink,
                     parent_to_child,
                     mutable_paths,
-                    immutable_inputs,
                     perms,
                   )
                   .await
@@ -1400,20 +1316,23 @@ impl Store {
     perms: Permissions,
     is_executable: bool,
     can_be_immutable: bool,
-    immutable_inputs: Option<&ImmutableInputs>,
   ) -> Result<(), StoreError> {
-    if can_be_immutable && digest.size_bytes > IMMUTABLE_FILE_SIZE_LIMIT {
-      let dest_path = immutable_inputs
-        .unwrap()
-        .path_for_file(digest, is_executable)
-        .await?;
-      self
-        .materialize_hardlink(destination, dest_path.to_str().unwrap().to_string())
-        .await
+    let hardlink_tgt = if can_be_immutable {
+      self.local.load_from_fs(digest).await?
     } else {
-      self
-        .materialize_file(destination, digest, perms, is_executable)
-        .await
+      None
+    };
+    match hardlink_tgt {
+      Some(path) => {
+        self
+          .materialize_hardlink(destination, path.to_str().unwrap().to_string())
+          .await
+      }
+      None => {
+        self
+          .materialize_file(destination, digest, perms, is_executable)
+          .await
+      }
     }
   }
 
@@ -1424,31 +1343,49 @@ impl Store {
     perms: Permissions,
     is_executable: bool,
   ) -> Result<(), StoreError> {
-    self
-      .load_file_bytes_with(digest, move |bytes| {
-        let mut f = OpenOptions::new()
-          .create(true)
-          .write(true)
-          .truncate(true)
-          .mode(match perms {
-            Permissions::ReadOnly if is_executable => 0o555,
-            Permissions::ReadOnly => 0o444,
-            Permissions::Writable if is_executable => 0o755,
-            Permissions::Writable => 0o644,
-          })
-          .open(&destination)
-          .map_err(|e| {
-            format!(
-              "Error opening file {} for writing: {:?}",
-              destination.display(),
-              e
-            )
-          })?;
-        f.write_all(bytes)
-          .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+    let mode = match perms {
+      Permissions::ReadOnly if is_executable => 0o555,
+      Permissions::ReadOnly => 0o444,
+      Permissions::Writable if is_executable => 0o755,
+      Permissions::Writable => 0o644,
+    };
+    match self.local.load_from_fs(digest).await? {
+      Some(path) => {
+        tokio::fs::copy(&path, &destination).await.map_err(|e| {
+          format!(
+            "Error copying bytes from {} to {}: {e}",
+            path.display(),
+            destination.display()
+          )
+        })?;
+        tokio::fs::set_permissions(destination, FSPermissions::from_mode(mode))
+          .await
+          .map_err(|e| format!("Error setting permissions on {}: {e}", path.display()))?;
         Ok(())
-      })
-      .await?
+      }
+      None => {
+        self
+          .load_file_bytes_with(digest, move |bytes| {
+            let mut f = OpenOptions::new()
+              .create(true)
+              .write(true)
+              .truncate(true)
+              .mode(mode)
+              .open(&destination)
+              .map_err(|e| {
+                format!(
+                  "Error opening file {} for writing: {:?}",
+                  destination.display(),
+                  e
+                )
+              })?;
+            f.write_all(bytes)
+              .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+            Ok(())
+          })
+          .await?
+      }
+    }
   }
 
   pub async fn materialize_symlink(
@@ -1456,7 +1393,28 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    symlink(target, destination)?;
+    // Overwriting a symlink, even with another symlink, fails if it exists. This can occur when
+    // materializing to a fixed directory like dist/. To avoid pessimising the more common case (no
+    // overwrite, e.g. materializing to a temp dir), only remove after noticing a failure.
+    //
+    // NB. #17758, #18849: this is a work-around for inaccurate management of the contents of dist/.
+    for first in [true, false] {
+      match symlink(&target, &destination).await {
+        Ok(()) => break,
+        Err(e) if first && e.kind() == std::io::ErrorKind::AlreadyExists => {
+          tokio::fs::remove_dir_all(&destination).await.map_err(|e| {
+            format!(
+              "Failed to remove existing item at {} when creating symlink to {target} there: {e}",
+              destination.display()
+            )
+          })?
+        }
+        Err(e) => Err(format!(
+          "Failed to create symlink to {target} at {}: {e}",
+          destination.display()
+        ))?,
+      }
+    }
     Ok(())
   }
 
@@ -1465,7 +1423,26 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    hard_link(target, destination)?;
+    // On macOS, copy uses a copy-on-write syscall (fclonefileat) which creates a disconnected
+    // clone. It is more defensive than a hardlink, but has the same requirement that the source
+    // and destination filesystem are the same.
+    //
+    // It also has the benefit of playing nicely with Docker for macOS file virtualization: see
+    // #18162.
+    #[cfg(target_os = "macos")]
+    copy(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to copy from {target} to {}: {e}",
+        destination.display()
+      )
+    })?;
+    #[cfg(not(target_os = "macos"))]
+    hard_link(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to create hardlink to {target} at {}: {e}",
+        destination.display()
+      )
+    })?;
     Ok(())
   }
 
@@ -1492,7 +1469,7 @@ impl Store {
         let content = store
           .load_file_bytes_with(digest, Bytes::copy_from_slice)
           .await
-          .map_err(|e| e.enrich(&format!("Couldn't find file contents for {:?}", path)))?;
+          .map_err(|e| e.enrich(&format!("Couldn't find file contents for {path:?}")))?;
         Ok(FileContent {
           path,
           content,
@@ -1628,8 +1605,8 @@ impl Store {
     res.boxed()
   }
 
-  pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
-    self.local.all_digests(entry_type)
+  pub async fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+    self.local.all_digests(entry_type).await
   }
 }
 

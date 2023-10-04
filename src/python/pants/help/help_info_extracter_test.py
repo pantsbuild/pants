@@ -7,6 +7,7 @@ from typing import Any, Iterable, List, Optional, Tuple, Union
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
+from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
@@ -20,6 +21,7 @@ from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
+from pants.util.strutil import help_text
 
 
 class LogLevelSimple(Enum):
@@ -229,7 +231,7 @@ def test_grouping():
 def test_get_all_help_info():
     class Global(Subsystem):
         options_scope = GLOBAL_SCOPE
-        help = "Global options."
+        help = help_text("Global options.")
 
         opt1 = IntOption(default=42, help="Option 1")
         # This is special in having a short option `-l`. Make sure it works.
@@ -254,7 +256,7 @@ def test_get_all_help_info():
     class QuxField(StringField):
         alias = "qux"
         default = "blahblah"
-        help = "A qux string."
+        help = lambda: "A qux string."
 
     class QuuxField(IntField):
         alias = "quux"
@@ -279,8 +281,9 @@ def test_get_all_help_info():
     Bar.register_options_on_scope(options, UnionMembership({}))
 
     @rule
-    def rule_info_test(foo: Foo) -> Target:
+    def rule_info_test(foo: Foo) -> Target:  # type: ignore[empty-body]
         """This rule is for testing info extraction only."""
+        ...
 
     def fake_consumed_scopes_mapper(scope: str) -> Tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
@@ -295,6 +298,7 @@ def test_get_all_help_info():
         UnionMembership({}),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
+        BuildFileSymbolsInfo.from_info((BuildFileSymbolInfo("dummy", rule_info_test),)),
         bc_builder.create(),
     )
 
@@ -613,6 +617,153 @@ def test_get_all_help_info():
                 "enabled": True,
                 "name": "plugin.dist",
                 "provider": "dummy-plugin",
+            },
+        },
+        "name_to_build_file_info": {
+            "dummy": {
+                "name": "dummy",
+                "is_target": False,
+                "signature": (
+                    "(foo: pants.help.help_info_extracter_test.test_get_all_help_info.<locals>.Foo)"
+                    " -> pants.engine.target.Target"
+                ),
+                "documentation": "This rule is for testing info extraction only.",
+            },
+        },
+        "env_var_to_help_info": {
+            "PANTS_OPT1": {
+                "display_args": ("--opt1=<int>",),
+                "comma_separated_display_args": "--opt1=<int>",
+                "scoped_cmd_line_args": ("--opt1",),
+                "unscoped_cmd_line_args": ("--opt1",),
+                "config_key": "opt1",
+                "env_var": "PANTS_OPT1",
+                "value_history": {
+                    "ranked_values": (
+                        {"rank": Rank.NONE, "value": None, "details": None},
+                        {"rank": Rank.HARDCODED, "value": 42, "details": None},
+                    ),
+                },
+                "typ": int,
+                "default": 42,
+                "fromfile": False,
+                "help": "Option 1",
+                "deprecation_active": False,
+                "deprecated_message": None,
+                "removal_version": None,
+                "removal_hint": None,
+                "choices": None,
+                "comma_separated_choices": None,
+                "target_field_name": None,
+            },
+            "PANTS_LEVEL": {
+                "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
+                "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                "scoped_cmd_line_args": ("-l", "--level"),
+                "unscoped_cmd_line_args": ("-l", "--level"),
+                "config_key": "level",
+                "env_var": "PANTS_LEVEL",
+                "value_history": {
+                    "ranked_values": (
+                        {"rank": Rank.NONE, "value": None, "details": None},
+                        {"rank": Rank.HARDCODED, "value": LogLevel.INFO, "details": None},
+                    ),
+                },
+                "typ": LogLevel,
+                "default": LogLevel.INFO,
+                "fromfile": False,
+                "help": "Set the logging level.",
+                "deprecation_active": False,
+                "deprecated_message": None,
+                "removal_version": None,
+                "removal_hint": None,
+                "choices": ("trace", "debug", "info", "warn", "error"),
+                "comma_separated_choices": "trace, debug, info, warn, error",
+                "target_field_name": None,
+            },
+            "PANTS_BACKEND_PACKAGES": {
+                "choices": None,
+                "comma_separated_choices": None,
+                "comma_separated_display_args": "--backend-packages=\"['<str>', '<str>', ...]\"",
+                "config_key": "backend_packages",
+                "default": [],
+                "deprecated_message": None,
+                "deprecation_active": False,
+                "display_args": ("--backend-packages=\"['<str>', '<str>', ...]\"",),
+                "env_var": "PANTS_BACKEND_PACKAGES",
+                "fromfile": False,
+                "help": "",
+                "removal_hint": None,
+                "removal_version": None,
+                "scoped_cmd_line_args": ("--backend-packages",),
+                "target_field_name": None,
+                "typ": list,
+                "unscoped_cmd_line_args": ("--backend-packages",),
+                "value_history": {
+                    "ranked_values": (
+                        {"details": "", "rank": Rank.NONE, "value": []},
+                        {"details": "", "rank": Rank.HARDCODED, "value": []},
+                        {
+                            "details": "from command-line flag",
+                            "rank": Rank.FLAG,
+                            "value": ["internal_plugins.releases"],
+                        },
+                    ),
+                },
+            },
+            "PANTS_PYTHONPATH": {
+                "choices": None,
+                "comma_separated_choices": None,
+                "comma_separated_display_args": "--pythonpath=\"['<str>', '<str>', ...]\"",
+                "config_key": "pythonpath",
+                "default": [f"{get_buildroot()}/pants-plugins"],
+                "deprecated_message": None,
+                "deprecation_active": False,
+                "display_args": ("--pythonpath=\"['<str>', '<str>', ...]\"",),
+                "env_var": "PANTS_PYTHONPATH",
+                "fromfile": False,
+                "help": "",
+                "removal_hint": None,
+                "removal_version": None,
+                "scoped_cmd_line_args": ("--pythonpath",),
+                "target_field_name": None,
+                "typ": list,
+                "unscoped_cmd_line_args": ("--pythonpath",),
+                "value_history": {
+                    "ranked_values": (
+                        {"details": "", "rank": Rank.NONE, "value": []},
+                        {
+                            "details": "",
+                            "rank": Rank.HARDCODED,
+                            "value": [f"{get_buildroot()}/pants-plugins"],
+                        },
+                    ),
+                },
+            },
+            "PANTS_FOO_OPT2": {
+                "display_args": ("--[no-]foo-opt2",),
+                "comma_separated_display_args": "--[no-]foo-opt2",
+                "scoped_cmd_line_args": ("--foo-opt2", "--no-foo-opt2"),
+                "unscoped_cmd_line_args": ("--opt2", "--no-opt2"),
+                "config_key": "opt2",
+                "env_var": "PANTS_FOO_OPT2",
+                "value_history": {
+                    "ranked_values": (
+                        {"rank": Rank.NONE, "value": None, "details": None},
+                        {"rank": Rank.HARDCODED, "value": True, "details": None},
+                    ),
+                },
+                "typ": bool,
+                "default": True,
+                "fromfile": False,
+                "help": "Option 2",
+                "deprecation_active": False,
+                "deprecated_message": None,
+                "removal_version": None,
+                "removal_hint": None,
+                "choices": None,
+                "comma_separated_choices": None,
+                "target_field_name": None,
             },
         },
     }

@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
-# To change, edit `build-support/bin/generate_github_workflows.py` and run:
-#   ./pants run build-support/bin/generate_github_workflows.py
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
 
 
 jobs:
@@ -13,12 +13,13 @@ jobs:
       with:
         fetch-depth: 10
     - name: Cargo audit (for security vulnerabilities)
-      run: './cargo install --version 0.16.0 cargo-audit
+      run: './cargo install --version 0.17.5 cargo-audit
 
-        ./cargo audit
+        ./cargo audit --ignore RUSTSEC-2020-0128
 
         '
 name: Cargo Audit
 'on':
   schedule:
   - cron: 11 8 * * *
+  workflow_dispatch: null

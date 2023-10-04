@@ -47,12 +47,10 @@ from pants.backend.go.util_rules.build_pkg_target import (
 )
 from pants.backend.go.util_rules.first_party_pkg import FallibleFirstPartyPkgAnalysis
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
-from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.python.util_rules import pex
 from pants.build_graph.address import Address
-from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -89,6 +87,7 @@ from pants.source.source_root import (
     SourceRootsRequest,
     SourceRootsResult,
 )
+from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -353,26 +352,16 @@ async def setup_full_package_build_request(
         )
     analysis = fallible_analysis.analysis
 
-    stdlib_packages = await Get(
-        GoStdLibPackages,
-        GoStdLibPackagesRequest(with_race_detector=request.build_opts.with_race_detector),
-    )
-
     # Obtain build requests for third-party dependencies.
     # TODO: Consider how to merge this code with existing dependency inference code.
-    dep_build_request_addrs: list[Address] = []
+    dep_build_request_addrs: set[Address] = set()
     for dep_import_path in (*analysis.imports, *analysis.test_imports, *analysis.xtest_imports):
-        # Skip inference for stdlib packages.
-        # TODO: This check is deprecated and will be removed once support for building SDK packages lands.
-        if dep_import_path in stdlib_packages:
-            continue
-
         # Infer dependencies on other Go packages.
         candidate_addresses = package_mapping.mapping.get(dep_import_path)
         if candidate_addresses:
             # TODO: Use explicit dependencies to disambiguate? This should never happen with Go backend though.
             if candidate_addresses.infer_all:
-                dep_build_request_addrs.extend(candidate_addresses.addresses)
+                dep_build_request_addrs.update(candidate_addresses.addresses)
             else:
                 if len(candidate_addresses.addresses) > 1:
                     return FallibleBuildGoPackageRequest(
@@ -387,11 +376,11 @@ async def setup_full_package_build_request(
                             """
                         ).strip(),
                     )
-                dep_build_request_addrs.extend(candidate_addresses.addresses)
+                dep_build_request_addrs.update(candidate_addresses.addresses)
 
     dep_build_requests = await MultiGet(
         Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(addr, build_opts=request.build_opts))
-        for addr in dep_build_request_addrs
+        for addr in sorted(dep_build_request_addrs)
     )
 
     return FallibleBuildGoPackageRequest(

@@ -35,10 +35,10 @@ npm install rdme
 ### Log in.
 
 ```
-npx rdme login --project pants --2fa
+npx rdme login --project pants
 ```
 
-(the `--2fa` flag makes `rdme` prompt for 2fa codes, which is necessary if you have TOTP 2fa set up on your account)
+(`rdme` will prompt for two-factor-authentication codes if necessary)
 
 ## When cutting a new release branch
 

@@ -25,13 +25,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-// make the entry module public for testing purposes. We use it to construct mock
-// graph entries in the notify watch tests.
-pub mod entry;
+mod context;
+mod entry;
 mod node;
 
-pub use crate::entry::{Entry, EntryState};
-use crate::entry::{Generation, NodeResult, RunToken};
+use crate::entry::{Entry, Generation, RunToken};
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -40,7 +38,6 @@ use std::path::Path;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
-use async_value::AsyncValueSender;
 use fixedbitset::FixedBitSet;
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use futures::future;
@@ -52,8 +49,10 @@ use petgraph::visit::{EdgeRef, VisitMap, Visitable};
 use petgraph::Direction;
 use task_executor::Executor;
 use tokio::time::sleep;
+use workunit_store::RunId;
 
-pub use crate::node::{EntryId, Node, NodeContext, NodeError, Stats};
+pub use crate::context::Context;
+pub use crate::node::{CompoundNode, EntryId, Node, NodeError};
 
 type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
@@ -68,6 +67,7 @@ type Nodes<N> = HashMap<N, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
+  run_id_generator: u32,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -301,19 +301,19 @@ impl<N: Node> InnerGraph<N> {
     // Dirty transitive entries, but do not yet clear their output edges. We wait to clear
     // outbound edges until we decide whether we can clean an entry: if we can, all edges are
     // preserved; if we can't, they are cleared in `Graph::clear_deps`.
-    for id in &transitive_ids {
-      if let Some(mut entry) = self.pg.node_weight_mut(*id).cloned() {
+    for id in transitive_ids {
+      if let Some(entry) = self.entry_for_id_mut(id) {
         if log_dirtied {
           log::info!("Dirtying {}", entry.node());
         }
-        entry.dirty(self);
+        entry.dirty();
       }
     }
 
     invalidation_result
   }
 
-  fn visualize(&self, roots: &[N], path: &Path, context: &N::Context) -> io::Result<()> {
+  fn visualize(&self, roots: &[N], path: &Path, context: &Context<N>) -> io::Result<()> {
     let file = File::create(path)?;
     let mut f = BufWriter::new(file);
 
@@ -348,11 +348,11 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn live_reachable<'g>(
-    &'g self,
+  fn live_reachable(
+    &self,
     roots: &[N],
-    context: &N::Context,
-  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+    context: &Context<N>,
+  ) -> impl Iterator<Item = (&N, N::Item)> {
     // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
     // calling `peek` on them.
     let root_ids = roots
@@ -368,14 +368,14 @@ impl<N: Node> InnerGraph<N> {
     )
   }
 
-  fn live<'g>(&'g self, context: &N::Context) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+  fn live(&self, context: &Context<N>) -> impl Iterator<Item = (&N, N::Item)> {
     self.live_internal(self.pg.node_indices().collect(), context.clone())
   }
 
   fn live_internal(
     &self,
     entryids: Vec<EntryId>,
-    context: N::Context,
+    context: Context<N>,
   ) -> impl Iterator<Item = (&N, N::Item)> + '_ {
     entryids
       .into_iter()
@@ -387,9 +387,11 @@ impl<N: Node> InnerGraph<N> {
 ///
 /// A DAG (enforced on mutation) of Entries.
 ///
+#[derive(Clone)]
 pub struct Graph<N: Node> {
   inner: Arc<Mutex<InnerGraph<N>>>,
   invalidation_delay: Duration,
+  executor: Executor,
 }
 
 impl<N: Node> Graph<N> {
@@ -401,13 +403,33 @@ impl<N: Node> Graph<N> {
     let inner = Arc::new(Mutex::new(InnerGraph {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
+      run_id_generator: 0,
     }));
     let _join = executor.native_spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
 
     Graph {
       inner,
       invalidation_delay,
+      executor,
     }
+  }
+
+  /// Create a Context wrapping an opaque Node::Context type, which will use a newly generated RunId.
+  pub fn context(&self, context: N::Context) -> Context<N> {
+    self.context_with_run_id(context, self.generate_run_id())
+  }
+
+  /// Create a Context wrapping an opaque Node::Context type.
+  pub fn context_with_run_id(&self, context: N::Context, run_id: RunId) -> Context<N> {
+    Context::new(self.clone(), context, run_id)
+  }
+
+  /// Generate a unique RunId for this Graph which can be reused in `context_with_run_id`.
+  pub fn generate_run_id(&self) -> RunId {
+    let mut inner = self.inner.lock();
+    let run_id = inner.run_id_generator;
+    inner.run_id_generator += 1;
+    RunId(run_id)
   }
 
   ///
@@ -438,92 +460,69 @@ impl<N: Node> Graph<N> {
   async fn get_inner(
     &self,
     src_id: Option<EntryId>,
-    context: &N::Context,
+    context: &Context<N>,
     dst_node: N,
-  ) -> Result<(N::Item, Generation), N::Error> {
+  ) -> (Result<N::Item, N::Error>, Generation) {
     // Compute information about the dst under the Graph lock, and then release it.
-    let (dst_retry, mut entry, entry_id) = {
+    let (entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
 
       let dst_id = inner.ensure_entry(dst_node);
-      let dst_retry = if let Some(src_id) = src_id {
+      if let Some(src_id) = src_id {
         test_trace_log!(
           "Adding dependency from {:?} to {:?}",
           inner.entry_for_id(src_id).unwrap().node(),
           inner.entry_for_id(dst_id).unwrap().node()
         );
         inner.pg.add_edge(src_id, dst_id, ());
-
-        // We should retry the dst Node if the src Node is not restartable. If the src is not
-        // restartable, it is only allowed to run once, and so Node invalidation does not pass
-        // through it.
-        !inner.entry_for_id(src_id).unwrap().node().restartable()
       } else {
         // Otherwise, this is an external request: always retry.
         test_trace_log!(
           "Requesting node {:?}",
           inner.entry_for_id(dst_id).unwrap().node()
         );
-        true
-      };
+      }
 
       let dst_entry = inner.entry_for_id(dst_id).cloned().unwrap();
-      (dst_retry, dst_entry, dst_id)
+      (dst_entry, dst_id)
     };
 
-    // Return the state of the destination.
-    if dst_retry {
-      // Retry the dst a number of times to handle Node invalidation.
-      let context = context.clone();
-      loop {
-        match entry.get_node_result(&context, entry_id).await {
-          Ok(r) => break Ok(r),
-          Err(err) if err == N::Error::invalidated() => {
-            let node = {
-              let inner = self.inner.lock();
-              inner.unsafe_entry_for_id(entry_id).node().clone()
-            };
-            info!(
-              "Filesystem changed during run: retrying `{}` in {:?}...",
-              node, self.invalidation_delay
-            );
-            sleep(self.invalidation_delay).await;
-            continue;
-          }
-          Err(other_err) => break Err(other_err),
+    // Return the state of the destination, retrying the dst to handle Node invalidation.
+    let context = context.clone();
+    let (result, generation, uncacheable) = loop {
+      match entry.get_node_result(&context, entry_id).await {
+        (Err(err), _, _) if err == N::Error::invalidated() => {
+          let node = {
+            let inner = self.inner.lock();
+            inner.unsafe_entry_for_id(entry_id).node().clone()
+          };
+          info!(
+            "Filesystem changed during run: retrying `{}` in {:?}...",
+            node, self.invalidation_delay
+          );
+          sleep(self.invalidation_delay).await;
+          continue;
         }
+        res => break res,
       }
-    } else {
-      // Not retriable.
-      entry.get_node_result(context, entry_id).await
+    };
+
+    if src_id.is_some() {
+      if let Err(e) = context.dep_record(entry_id, generation, uncacheable) {
+        return (Err(e), generation);
+      }
     }
+
+    (result, generation)
   }
 
   ///
-  /// Request the given dst Node, optionally in the context of the given src Node.
+  /// Return the value of the given Node.
   ///
-  /// If there is no src Node, or the src Node is not restartable, this method will retry for
-  /// invalidation until the Node completes.
-  ///
-  /// Invalidation events in the graph (generally, filesystem changes) will cause restartable
-  /// Nodes to be retried here for up to `invalidation_timeout`.
-  ///
-  pub async fn get(
-    &self,
-    src_id: Option<EntryId>,
-    context: &N::Context,
-    dst_node: N,
-  ) -> Result<N::Item, N::Error> {
-    let (res, _generation) = self.get_inner(src_id, context, dst_node).await?;
-    Ok(res)
-  }
-
-  ///
-  /// Return the value of the given Node. Shorthand for `self.get(None, context, node)`.
-  ///
-  pub async fn create(&self, node: N, context: &N::Context) -> Result<N::Item, N::Error> {
-    self.get(None, context, node).await
+  pub async fn create(&self, node: N, context: &Context<N>) -> Result<N::Item, N::Error> {
+    let (res, _generation) = self.get_inner(None, context, node).await;
+    res
   }
 
   ///
@@ -535,8 +534,8 @@ impl<N: Node> Graph<N> {
     node: N,
     token: Option<LastObserved>,
     delay: Option<Duration>,
-    context: &N::Context,
-  ) -> Result<(N::Item, LastObserved), N::Error> {
+    context: &Context<N>,
+  ) -> (Result<N::Item, N::Error>, LastObserved) {
     // If the node is currently clean at the given token, Entry::poll will delay until it has
     // changed in some way.
     if let Some(LastObserved(generation)) = token {
@@ -552,21 +551,24 @@ impl<N: Node> Graph<N> {
     };
 
     // Re-request the Node.
-    let (res, generation) = self.get_inner(None, context, node).await?;
-    Ok((res, LastObserved(generation)))
+    let (res, generation) = self.get_inner(None, context, node).await;
+    (res, LastObserved(generation))
   }
 
   ///
   /// Compares the generations of the dependencies of the given EntryId to their previous
-  /// generation values (re-computing or cleaning them first if necessary), and returns true if any
-  /// dependency has changed.
+  /// generation values (re-computing or cleaning them first if necessary).
   ///
-  async fn dependencies_changed(
+  /// Returns `Ok(uncacheable_deps)` if the node was successfully cleaned, and clears the node's
+  /// edges if it was not successfully cleaned.
+  ///
+  async fn attempt_cleaning(
     &self,
     entry_id: EntryId,
-    previous_dep_generations: Vec<Generation>,
-    context: &N::Context,
-  ) -> bool {
+    run_token: RunToken,
+    previous_dep_generations: &[(EntryId, Generation)],
+    context: &Context<N>,
+  ) -> Result<bool, ()> {
     let generation_matches = {
       let inner = self.inner.lock();
       let entry = if log::log_enabled!(log::Level::Debug) {
@@ -574,34 +576,21 @@ impl<N: Node> Graph<N> {
       } else {
         None
       };
-      let dependency_ids = inner
-        .pg
-        .neighbors_directed(entry_id, Direction::Outgoing)
-        .collect::<Vec<_>>();
 
-      if dependency_ids.len() != previous_dep_generations.len() {
-        // If we don't have the same number of current dependencies as there were generations
-        // previously, then they cannot match.
-        return true;
-      }
-
-      dependency_ids
-        .into_iter()
-        .zip(previous_dep_generations.into_iter())
-        .map(|(dep_id, previous_dep_generation)| {
+      previous_dep_generations
+        .iter()
+        .map(|&(dep_id, previous_dep_generation)| {
           let entry = entry.clone();
-          let mut dep_entry = inner
+          let dep_entry = inner
             .entry_for_id(dep_id)
             .unwrap_or_else(|| panic!("Dependency not present in Graph."))
             .clone();
+
           async move {
-            let (_, generation) = dep_entry
-              .get_node_result(context, dep_id)
-              .await
-              .map_err(|_| ())?;
+            let (_, generation, uncacheable) = dep_entry.get_node_result(context, dep_id).await;
             if generation == previous_dep_generation {
               // Matched.
-              Ok(())
+              Ok(uncacheable)
             } else {
               // Did not match. We error here to trigger fail-fast in `try_join_all`.
               log::debug!(
@@ -620,110 +609,36 @@ impl<N: Node> Graph<N> {
     // generation mismatches. The first mismatch encountered will cause any extraneous cleaning
     // work to be canceled. See #11290 for more information about the tradeoffs inherent in
     // speculation.
-    future::try_join_all(generation_matches).await.is_err()
-  }
-
-  ///
-  /// Clears the dependency edges of the given EntryId if the RunToken matches.
-  ///
-  fn cleaning_failed(&self, entry_id: EntryId, run_token: RunToken) {
-    let mut inner = self.inner.lock();
-    // If the RunToken mismatches, return.
-    if let Some(entry) = inner.entry_for_id_mut(entry_id) {
-      if entry.run_token() != run_token {
-        return;
+    match future::try_join_all(generation_matches).await {
+      Ok(uncacheable_deps) => {
+        // Cleaning succeeded.
+        //
+        // Return true if any dep was uncacheable.
+        Ok(uncacheable_deps.into_iter().any(|u| u))
       }
-      entry.cleaning_failed()
-    }
-
-    // Otherwise, clear the deps. We remove edges in reverse index order, because `remove_edge` is
-    // implemented in terms of `swap_remove`, and so affects edge ids greater than the removed edge
-    // id. See https://docs.rs/petgraph/0.5.1/petgraph/graph/struct.Graph.html#method.remove_edge
-    let mut edge_ids = inner
-      .pg
-      .edges_directed(entry_id, Direction::Outgoing)
-      .map(|e| e.id())
-      .collect::<Vec<_>>();
-    edge_ids.sort_by_key(|id| std::cmp::Reverse(id.index()));
-    for edge_id in edge_ids {
-      inner.pg.remove_edge(edge_id);
-    }
-  }
-
-  ///
-  /// When a Node is canceled because all receivers go away, the Executor for that Node will call
-  /// back to ensure that it is canceled.
-  ///
-  /// See also: `Self::complete`.
-  ///
-  fn cancel(&self, entry_id: EntryId, run_token: RunToken) {
-    let mut inner = self.inner.lock();
-    if let Some(ref mut entry) = inner.entry_for_id_mut(entry_id) {
-      entry.cancel(run_token);
-    }
-  }
-
-  ///
-  /// When the Executor finishes executing a Node it calls back to store the result value. We use
-  /// the run_token and dirty bits to determine whether the Node changed while we were busy
-  /// executing it, so that we can discard the work.
-  ///
-  /// We use the dirty bit in addition to the RunToken in order to avoid cases where dependencies
-  /// change while we're running. In order for a dependency to "change" it must have been cleared
-  /// or been marked dirty. But if our dependencies have been cleared or marked dirty, then we will
-  /// have been as well. We can thus use the dirty bit as a signal that the generation values of
-  /// our dependencies are still accurate. The dirty bit is safe to rely on as it is only ever
-  /// mutated, and dependencies' dirty bits are only read, under the InnerGraph lock - this is only
-  /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
-  /// great not to violate that in the future.
-  ///
-  /// See also: `Self::cancel`.
-  ///
-  fn complete(
-    &self,
-    context: &N::Context,
-    entry_id: EntryId,
-    run_token: RunToken,
-    sender: AsyncValueSender<NodeResult<N>>,
-    result: Option<Result<N::Item, N::Error>>,
-  ) {
-    let (entry, has_uncacheable_deps, dep_generations) = {
-      let inner = self.inner.lock();
-      let mut has_uncacheable_deps = false;
-      // Get the Generations of all dependencies of the Node. We can trust that these have not changed
-      // since we began executing, as long as we are not currently marked dirty (see the method doc).
-      let dep_generations = inner
-        .pg
-        .neighbors_directed(entry_id, Direction::Outgoing)
-        .filter_map(|dep_id| inner.entry_for_id(dep_id))
-        .map(|entry| {
-          // If a dependency is itself uncacheable or has uncacheable deps, this Node should
-          // also complete as having uncacheable deps, independent of matching Generation values.
-          // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
-          // (marked as UncacheableDependencies) dependents, transitively.
-          if entry.has_uncacheable_deps() {
-            has_uncacheable_deps = true;
+      Err(()) => {
+        // Cleaning failed.
+        //
+        // If the RunToken still matches, clear all edges of the Node before returning.
+        let mut inner = self.inner.lock();
+        if let Some(entry) = inner.entry_for_id_mut(entry_id) {
+          if entry.cleaning_failed(run_token).is_ok() {
+            // Clear the deps. We remove edges in reverse index order, because `remove_edge` is
+            // implemented in terms of `swap_remove`, and so affects edge ids greater than the removed edge
+            // id. See https://docs.rs/petgraph/0.5.1/petgraph/graph/struct.Graph.html#method.remove_edge
+            let mut edge_ids = inner
+              .pg
+              .edges_directed(entry_id, Direction::Outgoing)
+              .map(|e| e.id())
+              .collect::<Vec<_>>();
+            edge_ids.sort_by_key(|id| std::cmp::Reverse(id.index()));
+            for edge_id in edge_ids {
+              inner.pg.remove_edge(edge_id);
+            }
           }
-          entry.generation()
-        })
-        .collect();
-      (
-        inner.entry_for_id(entry_id).cloned(),
-        has_uncacheable_deps,
-        dep_generations,
-      )
-    };
-    if let Some(mut entry) = entry {
-      let mut inner = self.inner.lock();
-      entry.complete(
-        context,
-        run_token,
-        dep_generations,
-        sender,
-        result,
-        has_uncacheable_deps,
-        &mut inner,
-      );
+        }
+        Err(())
+      }
     }
   }
 
@@ -744,7 +659,7 @@ impl<N: Node> Graph<N> {
     inner.invalidate_from_roots(log_dirtied, predicate)
   }
 
-  pub fn visualize(&self, roots: &[N], path: &Path, context: &N::Context) -> io::Result<()> {
+  pub fn visualize(&self, roots: &[N], path: &Path, context: &Context<N>) -> io::Result<()> {
     let inner = self.inner.lock();
     inner.visualize(roots, path, context)
   }
@@ -752,7 +667,7 @@ impl<N: Node> Graph<N> {
   pub fn visit_live_reachable(
     &self,
     roots: &[N],
-    context: &N::Context,
+    context: &Context<N>,
     mut f: impl FnMut(&N, N::Item),
   ) {
     let inner = self.inner.lock();
@@ -761,7 +676,7 @@ impl<N: Node> Graph<N> {
     }
   }
 
-  pub fn visit_live(&self, context: &N::Context, mut f: impl FnMut(&N, N::Item)) {
+  pub fn visit_live(&self, context: &Context<N>, mut f: impl FnMut(&N, N::Item)) {
     let inner = self.inner.lock();
     for (n, v) in inner.live(context) {
       f(n, v);

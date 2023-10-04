@@ -4,7 +4,6 @@ slug: "options"
 excerpt: "A deep dive into how options may be configured."
 hidden: false
 createdAt: "2020-02-21T17:44:27.231Z"
-updatedAt: "2022-03-18T23:55:37.347Z"
 ---
 Option scopes
 =============
@@ -26,7 +25,7 @@ Every option can be set in the following ways, in order of precedence:
 
 If an option isn't set in one of these ways, it will take on a default value.
 
-You can inspect both the current value and the default value by using `./pants help $scope` or `./pants help-advanced $scope`, e.g. `./pants help global`.
+You can inspect both the current value and the default value by using `pants help $scope` or `pants help-advanced $scope`, e.g. `pants help global`.
 
 Command-line flags
 ------------------
@@ -34,13 +33,13 @@ Command-line flags
 Global options are set using an unqualified flag:
 
 ```bash
-./pants --level=debug ...
+pants --level=debug ...
 ```
 
 Subsystem options are set by providing the flag, with the name prefixed with the lower-case scope name and a dash. So for the option `--root-patterns` in the scope `source`:
 
 ```bash
-./pants --source-root-patterns="['^ext']"
+pants --source-root-patterns="['^ext']"
 ```
 
 Environment variables
@@ -49,14 +48,14 @@ Environment variables
 Global options are set using the environment variable `PANTS_{OPTION_NAME}`:
 
 ```bash
-PANTS_LEVEL=debug ./pants ...
+PANTS_LEVEL=debug pants ...
 ```
 
 Subsystem options are set using the environment variable  
 `PANTS_{SCOPE}_{OPTION_NAME}`:
 
 ```bash
-PANTS_SOURCE_ROOT_PATTERNS="['^ext']" ./pants ...
+PANTS_SOURCE_ROOT_PATTERNS="['^ext']" pants ...
 ```
 
 Note that the scope and option name are upper-cased, and any dashes in the option flag name are converted to underscores: `--multiword-name` becomes `MULTIWORD_NAME`.
@@ -122,8 +121,8 @@ Standalone string and integer values are written without quotes. Any quotes will
 ### Command-line flags:
 
 ```bash
-./pants --scope-intopt=42
-./pants --scope-stropt=qux
+pants --scope-intopt=42
+pants --scope-stropt=qux
 ```
 
 ### Environment variables:
@@ -149,9 +148,9 @@ Boolean values can be specified using the special strings `true` and `false`. Wh
 ### Command-line flags:
 
 ```bash
-./pants --scope-boolopt=true
-./pants --scope-boolopt
-./pants --no-scope-boolopt
+pants --scope-boolopt=true
+pants --scope-boolopt
+pants --no-scope-boolopt
 ```
 
 ### Environment variables:
@@ -175,13 +174,13 @@ List values are parsed as Python list literals, so you must quote string values,
 ### Command-line flags:
 
 ```bash
-./pants --scope-listopt="['foo','bar']"
+pants --scope-listopt="['foo','bar']"
 ```
 
 You can also leave off the `[]` to _append_ elements. So we can rewrite the above to:
 
 ```bash
-./pants --scope-listopt=foo --scope-listopt=bar
+pants --scope-listopt=foo --scope-listopt=bar
 ```
 
 Appending will add to any values from lower-precedence sources, such as config files (`pants.toml`) and possibly Pants's `default`. Otherwise, using `[]` will override any lower-precedence sources.
@@ -220,19 +219,19 @@ List values have some extra semantics:
 For example, if the value of `--listopt` in `scope` is set to `[1, 2]` in a config file, then 
 
 ```bash
-./pants --scope-listopt="+[3,4]"
+pants --scope-listopt="+[3,4]"
 ```
 
 will set the value to `[1, 2, 3, 4]`. 
 
 ```bash
-./pants --scope-listopt="-[1],+[3,4]"
+pants --scope-listopt="-[1],+[3,4]"
 ```
 
 will set the value to `[2, 3, 4]`, and 
 
 ```bash
-./pants --scope-listopt="[3,4]"
+pants --scope-listopt="[3,4]"
 ```
 
 will set the value to `[3, 4]`.
@@ -266,7 +265,7 @@ Dict values are parsed as Python dict literals on the command-line and environme
 ### Command-line flags:
 
 ```bash
-./pants --scope-dictopt="{'foo':1,'bar':2}"
+pants --scope-dictopt="{'foo':1,'bar':2}"
 ```
 
 ### Environment variables:
@@ -308,13 +307,13 @@ dictopt = """{
 For example, if the value of `--dictopt` in `scope` is set to `{'foo', 1, 'bar': 2}` in a config file, then 
 
 ```bash
-./pants --scope-dictopt="+{'foo':42,'baz':3}"
+pants --scope-dictopt="+{'foo':42,'baz':3}"
 ```
 
 will set the value to `{'foo': 42, 'bar': 2, 'baz': 3}`, and 
 
 ```bash
-./pants --scope-dictopt="{'foo':42,'baz':3}"
+pants --scope-dictopt="{'foo':42,'baz':3}"
 ```
 
 will set the value to `{'foo': 42, 'baz': 3}`.
@@ -344,7 +343,7 @@ PANTS_SCOPE_OPTION=@path/to/file.json
 ```
 
 ```bash
-./pants --scope-option="@path/to/file.json"
+pants --scope-option="@path/to/file.json"
 ```
 
 > 🚧 Gotcha: If you modify the value file, you must manually restart pantsd

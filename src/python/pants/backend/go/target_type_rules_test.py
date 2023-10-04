@@ -9,16 +9,15 @@ import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import (
-    DEFAULT_GO_SDK_ADDR,
     GoBinaryMainPackageField,
     GoBinaryTarget,
     GoImportPathField,
     GoModTarget,
     GoPackageSourcesField,
     GoPackageTarget,
-    GoSdkTarget,
     GoThirdPartyPackageTarget,
 )
+from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -78,7 +77,6 @@ def rule_runner() -> RuleRunner:
             GoModTarget,
             GoPackageTarget,
             GoBinaryTarget,
-            GoSdkTarget,
             GenericTarget,
         ],
     )
@@ -146,7 +144,9 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
 
     go_mod_file_tgts = {Address("foo", relative_file_path=fp) for fp in ("go.mod", "go.sum")}
 
-    assert get_deps(Address("foo/cmd")) == {Address("foo/pkg")}
+    assert get_deps(Address("foo/cmd")) == {
+        Address("foo/pkg"),
+    }
     assert get_deps(Address("foo/pkg")) == {Address("foo", generated_name="rsc.io/quote")}
     assert get_deps(Address("foo", generated_name="rsc.io/quote")) == {
         Address("foo", generated_name="rsc.io/sampler"),
@@ -167,11 +167,11 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
 
 
 def test_go_package_sources_field_validation() -> None:
-    with pytest.raises(InvalidFieldException):
+    with pytest.raises(InvalidTargetException):
         GoPackageTarget({GoPackageSourcesField.alias: ()}, Address("pkg"))
-    with pytest.raises(InvalidFieldException):
+    with pytest.raises(InvalidTargetException):
         GoPackageTarget({GoPackageSourcesField.alias: ("**.go",)}, Address("pkg"))
-    with pytest.raises(InvalidFieldException):
+    with pytest.raises(InvalidTargetException):
         GoPackageTarget({GoPackageSourcesField.alias: ("subdir/f.go",)}, Address("pkg"))
 
 
@@ -267,12 +267,55 @@ def test_third_party_package_targets_cannot_be_manually_created() -> None:
 
 
 def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
+    import_path = "pantsbuild.org/go-sample-for-test"
+    version = "v0.0.1"
+
+    fake_gomod = gen_module_gomodproxy(
+        version,
+        import_path,
+        (
+            (
+                "pkg/hello/hello.go",
+                dedent(
+                    """\
+        package hello
+        import "fmt"
+
+
+        func Hello() {
+            fmt.Println("Hello world!")
+        }
+        """
+                ),
+            ),
+            (
+                "cmd/hello/main.go",
+                dedent(
+                    f"""\
+        package main
+        import "{import_path}/pkg/hello"
+
+
+        func main() {{
+            hello.Hello()
+        }}
+        """
+                ),
+            ),
+        ),
+    )
+
+    # mypy gets sad if update is reversed or ** is used here
+    fake_gomod.update(
         {
             "go.mod": dedent(
-                """\
+                f"""\
                 module example.com/foo
-                go 1.17
+                go 1.16
+
+                require (
+                \t{import_path} {version}
+                )
                 """
             ),
             "BUILD": "go_mod(name='mod')",
@@ -282,6 +325,7 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
             "inferred/BUILD": "go_binary()\ngo_package(name='pkg')",
             "ambiguous/f.go": "",
             "ambiguous/BUILD": "go_binary()\ngo_package(name='pkg1')\ngo_package(name='pkg2')",
+            "external/BUILD": f"go_binary(main='//:mod#{import_path}/cmd/hello')",
             # Note there are no `.go` files in this dir.
             "missing/BUILD": "go_binary()",
             "explicit_wrong_type/BUILD": dedent(
@@ -291,6 +335,17 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
                 """
             ),
         }
+    )
+
+    rule_runner.write_files(fake_gomod)
+
+    rule_runner.set_options(
+        [
+            "--go-test-args=-v -bench=.",
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
     )
 
     def get_main(addr: Address) -> Address:
@@ -311,22 +366,17 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
 
     assert get_main(Address("explicit")) == Address("explicit", target_name="pkg")
     assert get_main(Address("inferred")) == Address("inferred", target_name="pkg")
+    assert get_main(Address("external")) == Address(
+        "",
+        target_name="mod",
+        generated_name="pantsbuild.org/go-sample-for-test/cmd/hello",
+    )
 
     with engine_error(ResolveError, contains="none were found"):
         get_main(Address("missing"))
     with engine_error(ResolveError, contains="There are multiple `go_package` targets"):
         get_main(Address("ambiguous"))
-    with engine_error(InvalidFieldException, contains="must point to a `go_package` target"):
+    with engine_error(
+        InvalidFieldException, contains="a `go_package` or `go_third_party_package` target"
+    ):
         get_main(Address("explicit_wrong_type"))
-
-
-# -----------------------------------------------------------------------------------------------
-# `_go_sdk` and `_go_sdk_package` target types
-# -----------------------------------------------------------------------------------------------
-
-
-def test_go_sdk_target_exists(rule_runner: RuleRunner) -> None:
-    _ = rule_runner.get_target(DEFAULT_GO_SDK_ADDR)
-    fmt_pkg_tgt = rule_runner.get_target(DEFAULT_GO_SDK_ADDR.create_generated("fmt"))
-    addrs = rule_runner.request(Addresses, [DependenciesRequest(fmt_pkg_tgt[Dependencies])])
-    assert len(addrs) > 0, "no dependencies were inferred for `fmt` _go_sdk_package target type"

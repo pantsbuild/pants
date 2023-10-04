@@ -86,7 +86,7 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
                       image: example.com/containers/busybox:1.28
                 """
             ),
-            "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'])",
+            "src/deployment/BUILD": "helm_deployment(name='foo', chart='//src/mychart')",
         }
     )
 
@@ -112,6 +112,100 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
     assert set(dependencies_report.all_image_refs) == set(expected_container_refs)
 
 
+def test_inject_chart_into_deployment_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/mychart/BUILD": "helm_chart()",
+            "src/mychart/Chart.yaml": HELM_CHART_FILE,
+            "src/mychart/values.yaml": HELM_VALUES_FILE,
+            "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/deployment/BUILD": "helm_deployment(name='foo', chart='//src/mychart')",
+        }
+    )
+
+    source_root_patterns = ("src/*",)
+    rule_runner.set_options(
+        [f"--source-root-patterns={repr(source_root_patterns)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    deployment_addr = Address("src/deployment", target_name="foo")
+    tgt = rule_runner.get_target(deployment_addr)
+    field_set = HelmDeploymentFieldSet.create(tgt)
+
+    inferred_dependencies = rule_runner.request(
+        InferredDependencies,
+        [InferHelmDeploymentDependenciesRequest(field_set)],
+    )
+
+    assert len(inferred_dependencies.include) == 1
+    assert list(inferred_dependencies.include)[0] == Address("src/mychart")
+
+
+def test_resolve_relative_docker_addresses_to_deployment(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/mychart/BUILD": "helm_chart()",
+            "src/mychart/Chart.yaml": HELM_CHART_FILE,
+            "src/mychart/values.yaml": dedent(
+                """\
+                container:
+                  image_ref: docker/image:latest
+                """
+            ),
+            "src/mychart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/mychart/templates/pod.yaml": dedent(
+                """\
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: {{ template "fullname" . }}
+                  labels:
+                    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+                spec:
+                  containers:
+                    - name: myapp-container
+                      image: {{ .Values.container.image_ref }}
+                """
+            ),
+            "src/deployment/BUILD": dedent(
+                """\
+                docker_image(name="myapp")
+
+                helm_deployment(
+                    name="foo",
+                    chart="//src/mychart",
+                    values={
+                        "container.image_ref": ":myapp"
+                    }
+                )
+                """
+            ),
+            "src/deployment/Dockerfile": "FROM busybox:1.28",
+        }
+    )
+
+    source_root_patterns = ("src/*",)
+    rule_runner.set_options(
+        [f"--source-root-patterns={repr(source_root_patterns)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    deployment_addr = Address("src/deployment", target_name="foo")
+    tgt = rule_runner.get_target(deployment_addr)
+    field_set = HelmDeploymentFieldSet.create(tgt)
+
+    expected_image_ref = ":myapp"
+    expected_dependency_addr = Address("src/deployment", target_name="myapp")
+
+    mapping = rule_runner.request(
+        FirstPartyHelmDeploymentMapping, [FirstPartyHelmDeploymentMappingRequest(field_set)]
+    )
+    assert list(mapping.indexed_docker_addresses.values()) == [
+        (expected_image_ref, expected_dependency_addr)
+    ]
+
+
 def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -133,7 +227,7 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
                       image: src/image:myapp
                 """
             ),
-            "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'])",
+            "src/deployment/BUILD": "helm_deployment(name='foo', chart='//src/mychart')",
             "src/image/BUILD": "docker_image(name='myapp')",
             "src/image/Dockerfile": "FROM busybox:1.28",
         }
@@ -164,8 +258,9 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
         [InferHelmDeploymentDependenciesRequest(field_set)],
     )
 
-    assert len(inferred_dependencies.include) == 1
-    assert list(inferred_dependencies.include)[0] == expected_dependency_addr
+    # The Helm chart dependency is part of the inferred dependencies
+    assert len(inferred_dependencies.include) == 2
+    assert expected_dependency_addr in inferred_dependencies.include
 
 
 def test_disambiguate_docker_dependency(rule_runner: RuleRunner) -> None:
@@ -193,8 +288,8 @@ def test_disambiguate_docker_dependency(rule_runner: RuleRunner) -> None:
                 """\
                 helm_deployment(
                     name="foo",
+                    chart="//src/mychart",
                     dependencies=[
-                        "//src/mychart",
                         "!//registry/image:latest",
                     ]
                 )
@@ -219,4 +314,6 @@ def test_disambiguate_docker_dependency(rule_runner: RuleRunner) -> None:
         [InferHelmDeploymentDependenciesRequest(HelmDeploymentFieldSet.create(tgt))],
     )
 
-    assert len(inferred_dependencies.include) == 0
+    # Assert only the Helm chart dependency has been inferred
+    assert len(inferred_dependencies.include) == 1
+    assert set(inferred_dependencies.include) == {Address("src/mychart")}

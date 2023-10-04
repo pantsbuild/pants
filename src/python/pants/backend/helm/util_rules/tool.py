@@ -48,7 +48,6 @@ from pants.engine.unions import UnionMembership, union
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
@@ -285,8 +284,7 @@ async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> H
 # ---------------------------------------------
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class HelmBinary:
     path: str
 
@@ -301,9 +299,9 @@ class HelmBinary:
         local_env: Mapping[str, str],
         immutable_input_digests: Mapping[str, Digest],
     ) -> None:
-        self.path = path
-        self.immutable_input_digests = FrozenDict(immutable_input_digests)
-        self.env = FrozenDict({**helm_env, **local_env})
+        object.__setattr__(self, "path", path)
+        object.__setattr__(self, "immutable_input_digests", FrozenDict(immutable_input_digests))
+        object.__setattr__(self, "env", FrozenDict({**helm_env, **local_env}))
 
     @property
     def config_digest(self) -> Digest:
@@ -318,8 +316,7 @@ class HelmBinary:
         return {_HELM_CACHE_NAME: _HELM_CACHE_DIR}
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class HelmProcess:
     argv: tuple[str, ...]
     input_digest: Digest
@@ -348,17 +345,21 @@ class HelmProcess:
         cache_scope: ProcessCacheScope | None = None,
         timeout_seconds: int | None = None,
     ):
-        self.argv = tuple(argv)
-        self.input_digest = input_digest
-        self.description = description
-        self.level = level
-        self.output_directories = tuple(output_directories or ())
-        self.output_files = tuple(output_files or ())
-        self.extra_env = FrozenDict(extra_env or {})
-        self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
-        self.extra_append_only_caches = FrozenDict(extra_append_only_caches or {})
-        self.cache_scope = cache_scope
-        self.timeout_seconds = timeout_seconds
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "output_directories", tuple(output_directories or ()))
+        object.__setattr__(self, "output_files", tuple(output_files or ()))
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(
+            self, "extra_immutable_input_digests", FrozenDict(extra_immutable_input_digests or {})
+        )
+        object.__setattr__(
+            self, "extra_append_only_caches", FrozenDict(extra_append_only_caches or {})
+        )
+        object.__setattr__(self, "cache_scope", cache_scope)
+        object.__setattr__(self, "timeout_seconds", timeout_seconds)
 
 
 @rule(desc="Download and configure Helm", level=LogLevel.DEBUG)
@@ -439,10 +440,12 @@ async def setup_helm(
 
 @rule
 async def helm_process(
-    request: HelmProcess, helm_binary: HelmBinary, helm_subsytem: HelmSubsystem
+    request: HelmProcess,
+    helm_binary: HelmBinary,
+    helm_subsystem: HelmSubsystem,
 ) -> Process:
     global_extra_env = await Get(
-        EnvironmentVars, EnvironmentVarsRequest(helm_subsytem.extra_env_vars)
+        EnvironmentVars, EnvironmentVarsRequest(helm_subsystem.extra_env_vars)
     )
 
     # Helm binary's setup parameters go last to prevent end users overriding any of its values.
@@ -454,8 +457,21 @@ async def helm_process(
     }
     append_only_caches = {**request.extra_append_only_caches, **helm_binary.append_only_caches}
 
+    argv = [helm_binary.path, *request.argv]
+
+    # A special case for "--debug".
+    # This ensures that it is applied to all operations in the chain,
+    # not just the final one.
+    # For example, we want this applied to the call to `template`, not just the call to `install`
+    # Also, we can be helpful and automatically forward a request to debug Pants to also debug Helm
+    debug_requested = "--debug" in helm_subsystem.valid_args() or (
+        0 < logger.getEffectiveLevel() <= LogLevel.DEBUG.level
+    )
+    if debug_requested and "--debug" not in request.argv:
+        argv.append("--debug")
+
     return Process(
-        [helm_binary.path, *request.argv],
+        argv,
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         env=env,

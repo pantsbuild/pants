@@ -23,6 +23,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.goal.run_tracker import RunTracker
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +115,33 @@ class StreamingWorkunitContext:
 
         targets_dict: dict[str, list[TargetInfo]] = {str(addr): [] for addr in unexpanded_addresses}
         for target in expanded_targets:
-            source = targets_dict.get(str(target.address.spec), None)
+            target_spec = str(target.address.spec)
+            source = targets_dict.get(target_spec)
             if source is None:
-                source = targets_dict[str(target.address.maybe_convert_to_target_generator())]
+                target_gen_spec = str(target.address.maybe_convert_to_target_generator())
+                source = targets_dict.get(target_gen_spec)
+                if source is None:
+                    # This is a thing, that may need investigating to be fully understood.
+                    # merely patches over a crash here. See #18564.
+                    logger.warn(
+                        softwrap(
+                            f"""
+                            Unknown source address for target: {target_spec}
+                            Target address generator: {target_gen_spec}
+
+                            Input params:
+                            {params}
+
+                            Unexpanded addresses:
+                            {unexpanded_addresses}
+
+                            Expanded targets:
+                            {expanded_targets}
+                            """
+                        )
+                    )
+                    targets_dict[target_gen_spec or target_spec] = source = []
+
             source.append(
                 TargetInfo(
                     filename=(

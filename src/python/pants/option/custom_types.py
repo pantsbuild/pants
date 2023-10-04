@@ -13,6 +13,7 @@ from typing import Iterable, Pattern, Sequence
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
 
 class UnsetBool:
@@ -109,8 +110,12 @@ def workspace_path(s: str) -> str:
     """
     if s.startswith("/"):
         raise ParseError(
-            f"Invalid value: `{s}`. Expected a relative path, optionally in the form "
-            "`./relative/path` to make it relative to the BUILD files rather than the build root."
+            softwrap(
+                f"""
+                Invalid value: `{s}`. Expected a relative path, optionally in the form
+                `./relative/path` to make it relative to the BUILD files rather than the build root.
+                """
+            )
         )
     return s
 
@@ -134,8 +139,12 @@ def memory_size(s: str | int | float) -> int:
         pass
 
     invalid = ParseError(
-        f"Invalid value: `{original}`. Expected either a bare number or a number with one of "
-        f"`GiB`, `MiB`, `KiB`, or `B`."
+        softwrap(
+            f"""
+            Invalid value: `{original}`. Expected either a bare number or a number with one of
+            `GiB`, `MiB`, `KiB`, or `B`.
+            """
+        )
     )
 
     def convert_to_bytes(power_of_2) -> int:

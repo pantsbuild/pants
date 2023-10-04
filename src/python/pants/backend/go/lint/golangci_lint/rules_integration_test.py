@@ -13,7 +13,7 @@ from pants.backend.go.lint.golangci_lint import skip_field
 from pants.backend.go.lint.golangci_lint.rules import GolangciLintFieldSet, GolangciLintRequest
 from pants.backend.go.lint.golangci_lint.rules import rules as golangci_lint_rules
 from pants.backend.go.lint.golangci_lint.subsystem import GolangciLint
-from pants.backend.go.target_types import GoModTarget, GoPackageTarget, GoSdkTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -27,7 +27,6 @@ from pants.backend.go.util_rules import (
 from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, external_tool, source_files, system_binaries
 from pants.engine.addresses import Address
-from pants.engine.rules import SubsystemRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -35,7 +34,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoModTarget, GoPackageTarget, GoSdkTarget],
+        target_types=[GoModTarget, GoPackageTarget],
         rules=[
             *assembly.rules(),
             *build_pkg.rules(),
@@ -54,7 +53,7 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             QueryRule(Partitions, [GolangciLintRequest.PartitionRequest]),
             QueryRule(LintResult, [GolangciLintRequest.Batch]),
-            SubsystemRule(GolangciLint),
+            *GolangciLint.rules(),
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})

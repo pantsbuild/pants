@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use futures::FutureExt;
-use grpc_util::hyper::AddrIncomingWithStream;
+use grpc_util::hyper_util::AddrIncomingWithStream;
 use hashing::Fingerprint;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -36,7 +36,7 @@ use crate::cas_service::StubCASResponder;
 pub struct StubCAS {
   // CAS fields.
   // TODO: These are inlined (rather than namespaced) for backwards compatibility.
-  read_request_count: Arc<Mutex<usize>>,
+  pub request_counts: Arc<RequestCounter>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
   pub blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
   // AC fields.
@@ -44,6 +44,26 @@ pub struct StubCAS {
   // Generic server fields.
   local_addr: SocketAddr,
   shutdown_sender: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+pub type RequestCounter = Mutex<HashMap<RequestType, usize>>;
+
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+pub enum RequestType {
+  // ByteStream
+  BSRead,
+  BSWrite,
+  // ContentAddressableStorage
+  CASFindMissingBlobs,
+  CASBatchUpdateBlobs,
+  CASBatchReadBlobs,
+  // add others of interest as required
+}
+
+impl RequestType {
+  pub fn record(self, request_counts: &RequestCounter) {
+    *request_counts.lock().entry(self).or_insert(0) += 1;
+  }
 }
 
 impl Drop for StubCAS {
@@ -158,7 +178,7 @@ impl StubCASBuilder {
   }
 
   pub fn build(self) -> StubCAS {
-    let read_request_count = Arc::new(Mutex::new(0));
+    let request_counts = Arc::new(Mutex::new(HashMap::new()));
     let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
     let blobs = Arc::new(Mutex::new(self.content));
     let cas_responder = StubCASResponder {
@@ -166,9 +186,9 @@ impl StubCASBuilder {
       instance_name: self.instance_name,
       blobs: blobs.clone(),
       always_errors: self.cas_always_errors,
-      read_request_count: read_request_count.clone(),
+      request_counts: request_counts.clone(),
       write_message_sizes: write_message_sizes.clone(),
-      required_auth_header: self.required_auth_token.map(|t| format!("Bearer {}", t)),
+      required_auth_header: self.required_auth_token.map(|t| format!("Bearer {t}")),
     };
 
     let action_map = Arc::new(Mutex::new(HashMap::new()));
@@ -204,7 +224,7 @@ impl StubCASBuilder {
     });
 
     StubCAS {
-      read_request_count,
+      request_counts,
       write_message_sizes,
       blobs,
       action_cache: ActionCacheHandle {
@@ -237,8 +257,8 @@ impl StubCAS {
     format!("http://{}", self.local_addr)
   }
 
-  pub fn read_request_count(&self) -> usize {
-    *self.read_request_count.lock()
+  pub fn request_count(&self, request_type: RequestType) -> usize {
+    *self.request_counts.lock().get(&request_type).unwrap_or(&0)
   }
 
   pub fn remove(&self, fingerprint: Fingerprint) -> bool {

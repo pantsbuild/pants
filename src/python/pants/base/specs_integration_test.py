@@ -146,15 +146,11 @@ def test_descendent_addresses() -> None:
 def test_file_arg() -> None:
     """Semantics: find the 'owning' target, using generated target rather than target generator
     when possible (regardless of project introspection vs. "build" goal).
-
-    Also, check that we support 'secondary ownership', e.g. a `pex_binary` being associated with
-    the the file `app.py` even though it does not have a `sources` field.
     """
     with setup_tmpdir(SOURCES) as tmpdir:
         assert run(
             ["list", f"{tmpdir}/py/app.py", f"{tmpdir}/py/utils/strutil_test.py"]
         ).stdout.splitlines() == [
-            f"{tmpdir}/py:bin",
             f"{tmpdir}/py/app.py:lib",
             f"{tmpdir}/py/utils/strutil_test.py:../tests",
         ]

@@ -72,10 +72,8 @@ def test_main():
 
     # all options should be included
     assert all(
-        [
-            key in collected_properties
-            for key in ["log_show_rust_3rdparty", "ignore_warnings", "level"]
-        ]
+        key in collected_properties
+        for key in ["log_show_rust_3rdparty", "ignore_warnings", "level"]
     )
     # deprecated fields shouldn't be included
     assert "process_cleanup" not in collected_properties

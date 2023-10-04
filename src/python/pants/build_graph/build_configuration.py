@@ -30,7 +30,16 @@ logger = logging.getLogger(__name__)
 
 # No goal or target_type can have a name from this set, so that `./pants help <name>`
 # is unambiguous.
-_RESERVED_NAMES = {"api-types", "backends", "global", "goals", "subsystems", "targets", "tools"}
+_RESERVED_NAMES = {
+    "api-types",
+    "backends",
+    "global",
+    "goals",
+    "subsystems",
+    "symbols",
+    "targets",
+    "tools",
+}
 
 
 # Subsystems used outside of any rule.

@@ -4,7 +4,6 @@ slug: "rules-api-and-target-api"
 excerpt: "How to use the Target API in rules."
 hidden: false
 createdAt: "2020-05-07T22:38:40.217Z"
-updatedAt: "2022-07-25T17:50:52.879Z"
 ---
 Start by reading the [Concepts](doc:target-api-concepts) of the Target API.
 
@@ -66,7 +65,7 @@ False
 True
 ```
 
-This allows you to express specifically which types of `Field`s you need to work. For example, the `./pants filedeps` goal only needs `SourceField`, and works with any subclasses. Meanwhile, Black and isort need `PythonSourceField`, and work with any subclasses. Finally, the Pytest runner needs `PythonTestSourceField` (or any subclass).
+This allows you to express specifically which types of `Field`s you need to work. For example, the `pants filedeps` goal only needs `SourceField`, and works with any subclasses. Meanwhile, Black and isort need `PythonSourceField`, and work with any subclasses. Finally, the Pytest runner needs `PythonTestSourceField` (or any subclass).
 
 ### A Target's `Address`
 
@@ -219,7 +218,7 @@ async def demo(...) -> Foo:
 
 ### Dependencies-like fields
 
-You may want to have a field on your target that's like the normal `dependencies` field, but you do something special with it. For example, Pants's [archive](https://github.com/pantsbuild/pants/blob/969c8dcba6eda0c939918b3bc5157ca45099b4d1/src/python/pants/core/target_types.py#L231-L257) target type has the fields `files` and `packages`, rather than `dependencies`, and it has special logic on those fields like running the equivalent of `./pants package` on the `packages` field.
+You may want to have a field on your target that's like the normal `dependencies` field, but you do something special with it. For example, Pants's [archive](https://github.com/pantsbuild/pants/blob/969c8dcba6eda0c939918b3bc5157ca45099b4d1/src/python/pants/core/target_types.py#L231-L257) target type has the fields `files` and `packages`, rather than `dependencies`, and it has special logic on those fields like running the equivalent of `pants package` on the `packages` field.
 
 Instead of subclassing `Dependencies`, you can subclass `SpecialCasedDependencies` from `pants.engine.target`. You must set the `alias` class property to the field's name.
 
@@ -256,7 +255,7 @@ async def demo(...) -> Foo:
     )
 ```
 
-Pants will include your special-cased dependencies with `./pants dependencies`, `./pants dependents`, and `./pants --changed-since`, but the dependencies will not show up when using `await Get(Addresses, DependenciesRequest)`.
+Pants will include your special-cased dependencies with `pants dependencies`, `pants dependents`, and `pants --changed-since`, but the dependencies will not show up when using `await Get(Addresses, DependenciesRequest)`.
 
 `SourcesField`
 --------------

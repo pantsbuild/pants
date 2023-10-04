@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os.path
 import re
 from pathlib import PurePath
 from textwrap import dedent
@@ -127,7 +128,7 @@ def test_flatten(expected, xs) -> None:
 
 
 @pytest.mark.parametrize(
-    "expected, rule, path, relpath",
+    "expected, spec, path, relpath",
     [
         (True, "src/a", "src/a", ""),
         (True, "?src/a", "src/a", ""),
@@ -153,10 +154,20 @@ def test_flatten(expected, xs) -> None:
         (True, "my_file.ext", "path/my_file.ext", ""),
         (False, "my_file.ext", "not_my_file.ext", ""),
         (True, "*my_file.ext", "path/some_of_my_file.ext", ""),
+        (True, ":tgt-*", "where/ever/it/is.from", "no/matter/how/far"),
+        (True, "<target>", "src/a", ""),
+        (False, "<target>[src/b]", "src/a", ""),
+        (False, "<file>", "src/a", ""),
     ],
 )
-def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> None:
-    assert parse_rule(rule).match(path, relpath) == expected
+def test_visibility_rule(expected: bool, spec: str, path: str, relpath: str) -> None:
+    rule = parse_rule(spec)
+    address = Address(
+        os.path.dirname(path), relative_file_path=os.path.basename(path), target_name="tgt-name"
+    )
+    assert expected == rule.match(
+        address, TargetAdaptor("target", None, __description_of_origin__="BUILD:1"), relpath
+    )
 
 
 @pytest.mark.parametrize(
@@ -165,15 +176,15 @@ def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> 
         (
             VisibilityRuleSet(
                 "test/path/BUILD",
-                (TargetGlob.parse("target", ""),),
+                (TargetGlob.parse("<target>", ""),),
                 (parse_rule("src/*"),),
             ),
-            ("target", "src/*"),
+            ("<target>", "src/*"),
         ),
         (
             VisibilityRuleSet(
                 "test/path/BUILD",
-                (TargetGlob.parse("files", ""), TargetGlob.parse("resources", "")),
+                (TargetGlob.parse("<files>", ""), TargetGlob.parse("<resources>", "")),
                 (
                     parse_rule(
                         "src/*",
@@ -182,7 +193,18 @@ def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> 
                     parse_rule("!*"),
                 ),
             ),
-            (("files", "resources"), "src/*", "res/*", "!*"),
+            (("<files>", "<resources>"), "src/*", "res/*", "!*"),
+        ),
+        (
+            VisibilityRuleSet(
+                build_file="test/path/BUILD",
+                selectors=(TargetGlob.parse("<target>", ""),),
+                rules=(
+                    parse_rule("src/*"),
+                    parse_rule("src/a:lib"),
+                ),
+            ),
+            ("<target>", "src/*", "src/a:lib"),
         ),
     ],
 )
@@ -197,33 +219,39 @@ def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> Non
         (
             True,
             "python_sources",
-            ("python_*", ""),
+            ("<python_*>", "*"),
         ),
         (
             False,
             "shell_sources",
-            ("python_*", ""),
+            ("<python_*>", "*"),
         ),
         (
             True,
             "files",
-            (("files", "resources"), ""),
+            (("<files>", "<resources>"), "*"),
         ),
         (
             True,
             "resources",
-            (("files", "resources"), ""),
+            (("<files>", "<resources>"), "*"),
         ),
         (
             False,
             "resource",
-            (("files", "resources"), ""),
+            (("<files>", "<resources>"), "*"),
+        ),
+        (
+            True,
+            "target",
+            (":tgt-name", "*"),
         ),
     ],
 )
 def test_visibility_rule_set_match(expected: bool, target: str, rule_spec: tuple) -> None:
-    assert expected == parse_ruleset(rule_spec, "").match(
-        Address(""), TargetAdaptor(target, None), ""
+    ruleset = parse_ruleset(rule_spec, "")
+    assert expected == ruleset.match(
+        Address("", target_name="tgt-name"), TargetAdaptor(target, None, "BUILD:1"), ""
     )
 
 
@@ -233,7 +261,7 @@ def dependencies_rules() -> BuildFileVisibilityRules:
         "src/BUILD",
         # Rules for outgoing dependency.
         (
-            parse_ruleset(("requirement", "!//3rdparty/req#restrict*", "//3rdparty/**"), "BUILD"),
+            parse_ruleset(("<requirement>", "!//3rdparty/req#restrict*", "//3rdparty/**"), "BUILD"),
             parse_ruleset(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*")), "src/BUILD"),
         ),
     )
@@ -245,7 +273,7 @@ def dependents_rules() -> BuildFileVisibilityRules:
         "tgt/BUILD",
         # Rules for incoming dependency.
         (
-            parse_ruleset(("requirement", "*"), "BUILD"),
+            parse_ruleset(("<requirement>", "*"), "BUILD"),
             parse_ruleset(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*")), "tgt/BUILD"),
         ),
     )
@@ -347,10 +375,12 @@ def test_check_dependency_rules(
         dependency_type=target_type,
     ) == BuildFileVisibilityRules.check_dependency_rules(
         origin_address=origin_address,
-        origin_adaptor=TargetAdaptor(target_type, "source"),
+        origin_adaptor=TargetAdaptor(target_type, "source", __description_of_origin__="BUILD:1"),
         dependencies_rules=dependencies_rules,
         dependency_address=dependency_address,
-        dependency_adaptor=TargetAdaptor(target_type, "target"),
+        dependency_adaptor=TargetAdaptor(
+            target_type, "target", __description_of_origin__="BUILD:1"
+        ),
         dependents_rules=dependents_rules,
     )
 
@@ -537,7 +567,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
           (resources, ".", "!*"),
 
           # Anyone may depend on `files` targets.
-          ("files", "*"),
+          ("<files>", "*"),
 
           # Allow all by default, with a warning
           ("*", "?*"),
@@ -581,7 +611,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
             "src/b/b2/BUILD": BUILD(
                 dependents=(
                     # Override default, any target in `b` may depend on internal targets
-                    ("resources", "src/b", "src/b/*", "!*"),
+                    ("<resources>", "src/b", "src/b/*", "!*"),
                     # Only `b` may depend on our nested modules.
                     ("*", "src/b/*", "!*"),
                 ),
@@ -687,7 +717,7 @@ def test_missing_rule_error_message(rule_runner: RuleRunner) -> None:
         Consider adding the required catch-all rule at the end of the rules spec. Example adding a
         "deny all" at the end:
 
-          (('resources',), '!nope', '!*')
+          (('<resources>',), '!nope', '!*')
         """
     )
     with engine_error(BuildFileVisibilityRulesError, contains=msg):
@@ -710,7 +740,7 @@ def test_missing_rule_error_message(rule_runner: RuleRunner) -> None:
         Consider adding the required catch-all rule at the end of the rules spec. Example adding a
         "deny all" at the end:
 
-          (('resources',), 'res/*', '!*')
+          (('<resources>',), 'res/*', '!*')
         """
     )
     with engine_error(BuildFileVisibilityRulesError, contains=msg):
@@ -809,7 +839,7 @@ def test_file_specific_rules(rule_runner: RuleRunner) -> None:
                 """
                 __dependents_rules__(
                   # Allow all to depend on files from lib/pub/ except for one file in particular.
-                  ("[/exception.txt]", "//src/lib/**", "!*"),
+                  ("/exception.txt", "//src/lib/**", "!*"),
                   ("*", "*"),
                 )
                 """
@@ -901,3 +931,24 @@ def test_single_rules_declaration_per_build_file(rule_runner: RuleRunner) -> Non
             rule_runner,
             "test",
         )
+
+
+def test_target_type_in_verbose_selector_issue_19390(rule_runner: RuleRunner) -> None:
+    """This test is logically a better fit in `./glob_test.py:test_target_glob_parse_spec` but I
+    want to avoid hard coding any assumptions regarding a target types representation in the BUILD
+    file (the `Registrar` type)."""
+    rule_runner.write_files(
+        {
+            "test/BUILD": dedent(
+                """
+                target(name="test")
+
+                __dependencies_rules__(
+                  ({"type": files}, "*"),
+                )
+                """
+            ),
+        },
+    )
+
+    assert_dependency_rules(rule_runner, "test")

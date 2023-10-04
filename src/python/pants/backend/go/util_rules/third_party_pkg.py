@@ -22,7 +22,6 @@ from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
-from pants.core.goals.tailor import group_by_dir
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -38,7 +37,8 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -285,7 +285,6 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
     return FrozenDict(result)
 
 
-@rule_helper
 async def _check_go_sum_has_not_changed(
     input_digest: Digest,
     output_digest: Digest,

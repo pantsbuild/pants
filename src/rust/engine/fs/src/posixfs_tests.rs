@@ -9,7 +9,7 @@ use testutil::make_file;
 use crate::{
   DigestTrie, Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,
-  TypedPath, Vfs,
+  TypedPath,
 };
 
 #[tokio::test]
@@ -30,10 +30,10 @@ async fn is_executable_true() {
 async fn file_path() {
   let dir = tempfile::TempDir::new().unwrap();
   let path = PathBuf::from("marmosets");
-  let fs = new_posixfs(&dir.path());
+  let fs = new_posixfs(dir.path());
   let expected_path = std::fs::canonicalize(dir.path()).unwrap().join(&path);
   let actual_path = fs.file_path(&File {
-    path: path.clone(),
+    path: path,
     is_executable: false,
   });
   assert_eq!(actual_path, expected_path);
@@ -42,11 +42,11 @@ async fn file_path() {
 #[tokio::test]
 async fn stat_executable_file() {
   let dir = tempfile::TempDir::new().unwrap();
-  let posix_fs = new_posixfs(&dir.path());
+  let posix_fs = new_posixfs(dir.path());
   let path = PathBuf::from("photograph_marmosets");
   make_file(&dir.path().join(&path), &[], 0o700);
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&path).unwrap().unwrap(),
     super::Stat::File(File {
       path: path,
       is_executable: true,
@@ -57,11 +57,11 @@ async fn stat_executable_file() {
 #[tokio::test]
 async fn stat_nonexecutable_file() {
   let dir = tempfile::TempDir::new().unwrap();
-  let posix_fs = new_posixfs(&dir.path());
+  let posix_fs = new_posixfs(dir.path());
   let path = PathBuf::from("marmosets");
   make_file(&dir.path().join(&path), &[], 0o600);
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&path).unwrap().unwrap(),
     super::Stat::File(File {
       path: path,
       is_executable: false,
@@ -72,11 +72,11 @@ async fn stat_nonexecutable_file() {
 #[tokio::test]
 async fn stat_dir() {
   let dir = tempfile::TempDir::new().unwrap();
-  let posix_fs = new_posixfs(&dir.path());
+  let posix_fs = new_posixfs(dir.path());
   let path = PathBuf::from("enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&path).unwrap().unwrap(),
     super::Stat::Dir(Dir(path))
   )
 }
@@ -84,14 +84,14 @@ async fn stat_dir() {
 #[tokio::test]
 async fn stat_symlink() {
   let dir = tempfile::TempDir::new().unwrap();
-  let posix_fs = new_posixfs(&dir.path());
+  let posix_fs = new_posixfs(dir.path());
   let path = PathBuf::from("marmosets");
   make_file(&dir.path().join(&path), &[], 0o600);
 
   let link_path = PathBuf::from("remarkably_similar_marmoset");
-  std::os::unix::fs::symlink(&dir.path().join(path.clone()), dir.path().join(&link_path)).unwrap();
+  std::os::unix::fs::symlink(dir.path().join(path.clone()), dir.path().join(&link_path)).unwrap();
   assert_eq!(
-    posix_fs.stat_sync(link_path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&link_path).unwrap().unwrap(),
     super::Stat::Link(Link {
       path: link_path,
       target: dir.path().join(path)
@@ -102,15 +102,15 @@ async fn stat_symlink() {
 #[tokio::test]
 async fn stat_symlink_oblivious() {
   let dir = tempfile::TempDir::new().unwrap();
-  let posix_fs = new_posixfs_symlink_oblivious(&dir.path());
+  let posix_fs = new_posixfs_symlink_oblivious(dir.path());
   let path = PathBuf::from("marmosets");
   make_file(&dir.path().join(&path), &[], 0o600);
 
   let link_path = PathBuf::from("remarkably_similar_marmoset");
-  std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
+  std::os::unix::fs::symlink(dir.path().join(path), dir.path().join(&link_path)).unwrap();
   // Symlink oblivious stat will give us the destination type.
   assert_eq!(
-    posix_fs.stat_sync(link_path.clone()).unwrap().unwrap(),
+    posix_fs.stat_sync(&link_path).unwrap().unwrap(),
     super::Stat::File(File {
       path: link_path,
       is_executable: false,
@@ -121,9 +121,7 @@ async fn stat_symlink_oblivious() {
 #[tokio::test]
 async fn stat_other() {
   assert_eq!(
-    new_posixfs("/dev")
-      .stat_sync(PathBuf::from("null"))
-      .unwrap(),
+    new_posixfs("/dev").stat_sync(Path::new("null")).unwrap(),
     None,
   );
 }
@@ -131,17 +129,14 @@ async fn stat_other() {
 #[tokio::test]
 async fn stat_missing() {
   let dir = tempfile::TempDir::new().unwrap();
-  let posix_fs = new_posixfs(&dir.path());
-  assert_eq!(
-    posix_fs.stat_sync(PathBuf::from("no_marmosets")).unwrap(),
-    None,
-  );
+  let posix_fs = new_posixfs(dir.path());
+  assert_eq!(posix_fs.stat_sync(Path::new("no_marmosets")).unwrap(), None,);
 }
 
 #[tokio::test]
 async fn scandir_empty() {
   let dir = tempfile::TempDir::new().unwrap();
-  let posix_fs = new_posixfs(&dir.path());
+  let posix_fs = new_posixfs(dir.path());
   let path = PathBuf::from("empty_enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
   assert_eq!(
@@ -156,32 +151,34 @@ async fn scandir() {
   let path = PathBuf::from("enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
 
-  let a_marmoset = path.join("a_marmoset");
-  let feed = path.join("feed");
-  let hammock = path.join("hammock");
-  let remarkably_similar_marmoset = path.join("remarkably_similar_marmoset");
-  let sneaky_marmoset = path.join("sneaky_marmoset");
+  let a_marmoset = PathBuf::from("a_marmoset");
+  let feed = PathBuf::from("feed");
+  let hammock = PathBuf::from("hammock");
+  let remarkably_similar_marmoset = PathBuf::from("remarkably_similar_marmoset");
+  let sneaky_marmoset = PathBuf::from("sneaky_marmoset");
 
-  make_file(&dir.path().join(&feed), &[], 0o700);
-  make_file(&dir.path().join(&a_marmoset), &[], 0o600);
-  make_file(&dir.path().join(&sneaky_marmoset), &[], 0o600);
+  make_file(&dir.path().join(&path).join(&feed), &[], 0o700);
+  make_file(&dir.path().join(&path).join(&a_marmoset), &[], 0o600);
+  make_file(&dir.path().join(&path).join(&sneaky_marmoset), &[], 0o600);
   std::os::unix::fs::symlink(
-    &dir.path().join(&a_marmoset),
-    dir
-      .path()
-      .join(&dir.path().join(&remarkably_similar_marmoset)),
+    dir.path().join(&path).join(&a_marmoset),
+    dir.path().join(&path).join(&remarkably_similar_marmoset),
   )
   .unwrap();
-  std::fs::create_dir(dir.path().join(&hammock)).unwrap();
+  std::fs::create_dir(dir.path().join(&path).join(&hammock)).unwrap();
   make_file(
-    &dir.path().join(&hammock).join("napping_marmoset"),
+    &dir
+      .path()
+      .join(&path)
+      .join(&hammock)
+      .join("napping_marmoset"),
     &[],
     0o600,
   );
 
   // Symlink aware.
   assert_eq!(
-    new_posixfs(&dir.path())
+    new_posixfs(dir.path())
       .scandir(Dir(path.clone()))
       .await
       .unwrap(),
@@ -197,7 +194,7 @@ async fn scandir() {
       Stat::Dir(Dir(hammock.clone())),
       Stat::Link(Link {
         path: remarkably_similar_marmoset.clone(),
-        target: dir.path().join(&a_marmoset)
+        target: dir.path().join(&path).join(&a_marmoset)
       }),
       Stat::File(File {
         path: sneaky_marmoset.clone(),
@@ -208,7 +205,7 @@ async fn scandir() {
 
   // Symlink oblivious.
   assert_eq!(
-    new_posixfs_symlink_oblivious(&dir.path())
+    new_posixfs_symlink_oblivious(dir.path())
       .scandir(Dir(path))
       .await
       .unwrap(),
@@ -237,7 +234,7 @@ async fn scandir() {
 #[tokio::test]
 async fn scandir_missing() {
   let dir = tempfile::TempDir::new().unwrap();
-  let posix_fs = new_posixfs(&dir.path());
+  let posix_fs = new_posixfs(dir.path());
   posix_fs
     .scandir(Dir(PathBuf::from("no_marmosets_here")))
     .await
@@ -260,17 +257,17 @@ async fn stats_for_paths() {
 
   make_file(&root_path.join("executable_file"), &[], 0o700);
   make_file(&root_path.join("regular_file"), &[], 0o600);
-  std::fs::create_dir(&root_path.join("dir")).unwrap();
-  std::os::unix::fs::symlink("executable_file", &root_path.join("symlink")).unwrap();
+  std::fs::create_dir(root_path.join("dir")).unwrap();
+  std::os::unix::fs::symlink("executable_file", root_path.join("symlink")).unwrap();
   std::os::unix::fs::symlink(
     "../symlink",
-    &root_path.join("dir").join("recursive_symlink"),
+    root_path.join("dir").join("recursive_symlink"),
   )
   .unwrap();
-  std::os::unix::fs::symlink("dir", &root_path.join("dir_symlink")).unwrap();
-  std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
+  std::os::unix::fs::symlink("dir", root_path.join("dir_symlink")).unwrap();
+  std::os::unix::fs::symlink("doesnotexist", root_path.join("symlink_to_nothing")).unwrap();
 
-  let posix_fs = Arc::new(new_posixfs(&root_path));
+  let posix_fs = Arc::new(new_posixfs(root_path));
   let path_stats = vec![
     PathBuf::from("executable_file"),
     PathBuf::from("regular_file"),
@@ -282,7 +279,7 @@ async fn stats_for_paths() {
     PathBuf::from("doesnotexist"),
   ]
   .into_iter()
-  .map(|p| posix_fs.stat_sync(p).unwrap())
+  .map(|p| posix_fs.stat_sync(&p).unwrap())
   .collect::<Vec<_>>();
   let v: Vec<Option<Stat>> = vec![
     Some(Stat::File(File {
@@ -299,7 +296,7 @@ async fn stats_for_paths() {
       target: PathBuf::from("executable_file"),
     })),
     Some(Stat::Link(Link {
-      path: PathBuf::from("dir/recursive_symlink"),
+      path: PathBuf::from("recursive_symlink"),
       target: PathBuf::from("../symlink"),
     })),
     Some(Stat::Link(Link {
@@ -371,7 +368,7 @@ async fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
     &super::Stat::File(File {
       is_executable: got, ..
     }) => assert_eq!(want_is_executable, got),
-    other => panic!("Expected file, got {:?}", other),
+    other => panic!("Expected file, got {other:?}"),
   }
 }
 
@@ -392,62 +389,4 @@ fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
     SymlinkBehavior::Oblivious,
   )
   .unwrap()
-}
-
-async fn read_mock_files(input: Vec<PathBuf>, posix_fs: &Arc<PosixFS>) -> Vec<Stat> {
-  input
-    .into_iter()
-    .map(|p| posix_fs.stat_sync(p).unwrap().unwrap())
-    .collect()
-}
-
-#[tokio::test]
-async fn test_basic_gitignore_functionality() {
-  let root = tempfile::TempDir::new().unwrap();
-  let root_path = root.path();
-
-  let bytes = "content".as_bytes();
-  make_file(&root_path.join("non-ignored"), bytes, 0o700);
-  make_file(&root_path.join("ignored-file.tmp"), bytes, 0o700);
-  make_file(&root_path.join("important.x"), bytes, 0o700);
-  make_file(&root_path.join("unimportant.x"), bytes, 0o700);
-
-  let gitignore_content = "*.tmp\n!*.x";
-  let gitignore_path = root_path.join(".gitignore");
-  make_file(&gitignore_path, gitignore_content.as_bytes(), 0o700);
-  let executor = task_executor::Executor::new();
-  let ignorer =
-    GitignoreStyleExcludes::create_with_gitignore_file(vec![], Some(gitignore_path.clone()))
-      .unwrap();
-  let posix_fs = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
-
-  let stats = read_mock_files(
-    vec![
-      PathBuf::from("non-ignored"),
-      PathBuf::from("ignored-file.tmp"),
-      PathBuf::from("important.x"),
-      PathBuf::from("unimportant.x"),
-    ],
-    &posix_fs,
-  )
-  .await;
-
-  assert!(!posix_fs.is_ignored(&stats[0]));
-  assert!(posix_fs.is_ignored(&stats[1]));
-  assert!(!posix_fs.is_ignored(&stats[2]));
-  assert!(!posix_fs.is_ignored(&stats[3]));
-
-  // Test that .gitignore files work in tandem with explicit ignores.
-  let executor = task_executor::Executor::new();
-  let ignorer = GitignoreStyleExcludes::create_with_gitignore_file(
-    vec!["unimportant.x".to_string()],
-    Some(gitignore_path),
-  )
-  .unwrap();
-  let posix_fs_2 = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
-
-  assert!(!posix_fs_2.is_ignored(&stats[0]));
-  assert!(posix_fs_2.is_ignored(&stats[1]));
-  assert!(!posix_fs_2.is_ignored(&stats[2]));
-  assert!(posix_fs_2.is_ignored(&stats[3]));
 }

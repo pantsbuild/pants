@@ -3,13 +3,13 @@
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.option.option_types import ArgsListOption, SkipOption
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class Buildifier(TemplatedExternalTool):
     options_scope = "buildifier"
     name = "Buildifier"
-    help = softwrap(
+    help = help_text(
         """
         Buildifier is a tool for formatting BUILD files with a standard convention.
 

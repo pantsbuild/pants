@@ -314,7 +314,6 @@ async fn dropped_future_is_removed_from_queue() {
         tx_thread2.send(()).unwrap();
         rx_thread2.await.unwrap();
         drop(waiter_future);
-        ()
       }
       future::Either::Right(_) => {
         panic!("The sleep result should always be ready first!");

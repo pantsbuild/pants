@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 
+from pants.core.util_rules.asdf import AsdfPathString
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -23,13 +24,12 @@ class GolangSubsystem(Subsystem):
     help = "Options for Golang support."
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
-
         env_vars_used_by_options = ("PATH",)
 
         _go_search_paths = StrListOption(
             default=["<PATH>"],
             help=softwrap(
-                """
+                f"""
                 A list of paths to search for Go.
 
                 Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`.
@@ -38,9 +38,8 @@ class GolangSubsystem(Subsystem):
                 The following special strings are supported:
 
                 * `<PATH>`, the contents of the PATH environment variable
-                * `<ASDF>`, all Go versions currently configured by ASDF \
-                    `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
-                * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
+                * `{AsdfPathString.STANDARD}`, {AsdfPathString.STANDARD.description("Go")}
+                * `{AsdfPathString.LOCAL}`, {AsdfPathString.LOCAL.description("binary")}
                 """
             ),
         )

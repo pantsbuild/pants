@@ -17,7 +17,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.build_graph.address import Address
 from pants.core.target_types import GenericTarget
-from pants.engine.rules import QueryRule, SubsystemRule, rule
+from pants.engine.rules import QueryRule, rule
 from pants.engine.target import FieldSet, Target
 from pants.testutil.rule_runner import RuleRunner
 
@@ -55,7 +55,7 @@ def test_find_unique_interpreter_constraints() -> None:
         rules=[
             run_rule,
             *target_types_rules.rules(),
-            SubsystemRule(PythonSetup),
+            *PythonSetup.rules(),
             QueryRule(InterpreterConstraints, [UniqueICsRequest]),
         ],
         target_types=[PythonSourcesGeneratorTarget, GenericTarget],

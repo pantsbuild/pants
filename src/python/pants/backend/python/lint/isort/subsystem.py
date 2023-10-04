@@ -6,20 +6,11 @@ from __future__ import annotations
 import os.path
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption, BoolOption, FileListOption, SkipOption
-from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
@@ -28,20 +19,15 @@ class Isort(PythonToolBase):
     name = "isort"
     help = "The Python import sorter tool (https://pycqa.github.io/isort/)."
 
-    default_version = "isort[pyproject,colors]>=5.9.3,<6.0"
     default_main = ConsoleScript("isort")
+    default_requirements = ["isort[pyproject,colors]>=5.9.3,<6.0"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.isort", "isort.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/isort/isort.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--case-sensitive --trailing-comma")
-    export = ExportToolOption()
     config = FileListOption(
         # TODO: Figure out how to deprecate this being a list in favor of a single string.
         #  Thanks to config autodiscovery, this option should only be used because you want
@@ -104,30 +90,5 @@ class Isort(PythonToolBase):
         )
 
 
-class IsortLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = Isort.options_scope
-
-
-@rule
-def setup_isort_lockfile(_: IsortLockfileSentinel, isort: Isort) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(isort)
-
-
-class IsortExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule
-def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
-    if not isort.export:
-        return ExportPythonTool(resolve_name=isort.options_scope, pex_request=None)
-    return ExportPythonTool(resolve_name=isort.options_scope, pex_request=isort.to_pex_request())
-
-
 def rules():
-    return (
-        *collect_rules(),
-        *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, IsortLockfileSentinel),
-        UnionRule(ExportPythonToolSentinel, IsortExportSentinel),
-    )
+    return collect_rules()

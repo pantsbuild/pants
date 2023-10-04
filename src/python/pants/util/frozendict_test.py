@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict
 
@@ -12,7 +12,6 @@ from pants.util.frozendict import FrozenDict, LazyFrozenDict
 
 def test_flexible_constructor() -> None:
     expected = FrozenDict({"a": 0, "b": 1})
-    assert FrozenDict(OrderedDict({"a": 0, "b": 1})) == expected
     assert FrozenDict([("a", 0), ("b", 1)]) == expected
     assert FrozenDict((("a", 0), ("b", 1))) == expected
     assert FrozenDict(a=0, b=1) == expected
@@ -166,3 +165,13 @@ def test_lazy_frozen_dict() -> None:
 
     # Hash value should be stable regardless if we've loaded the values or not.
     assert hash(ld1) == hashvalue
+
+
+def test_frozendict_dot_frozen() -> None:
+    a = {1: 2}
+    b = FrozenDict(a)
+    frozen_a = FrozenDict.frozen(a)
+    frozen_b = FrozenDict.frozen(b)
+
+    assert frozen_a == FrozenDict(a)
+    assert frozen_b is b

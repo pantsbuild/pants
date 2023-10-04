@@ -2,24 +2,24 @@
 version = "0.0.1"
 edition = "2021"
 name = "process_executor"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
 protos = { path = "../protos" }
-clap = "3"
-dirs-next = "2"
-env_logger = "0.9.0"
+clap = { workspace = true, features = ["derive"] }
+dirs-next = { workspace = true }
+env_logger = { workspace = true }
 fs = { path = "../fs" }
-futures = "0.3"
+futures = { workspace = true }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
-log = "0.4"
+log = { workspace = true }
 process_execution = { path = "../process_execution" }
-prost = "0.9"
-shlex = "1.1.0"
+prost = { workspace = true }
+shlex = { workspace = true }
 store = { path = "../fs/store" }
-structopt = "0.3.26"
 task_executor = { path = "../task_executor" }
-tokio = { version = "1.21", features = ["rt-multi-thread", "macros"] }
-workunit_store = { path = "../workunit_store"}
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+workunit_store = { path = "../workunit_store" }
+remote = { path = "../process_execution/remote" }

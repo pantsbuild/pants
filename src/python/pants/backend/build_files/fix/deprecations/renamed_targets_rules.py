@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import tokenize
+from dataclasses import dataclass
 
 from pants.backend.build_files.fix.base import FixBuildFilesRequest
 from pants.backend.build_files.fix.deprecations.base import FixBUILDFileRequest, FixedBUILDFile
@@ -22,38 +23,45 @@ class RenameTargetsInFilesRequest(FixBuildFilesRequest):
     tool_subsystem = BUILDDeprecationsFixer
 
 
-class RenameTargetsInFileRequest(FrozenDict[str, str]):
+class RenameTargetsInFileRequest(FixBUILDFileRequest):
     """Deprecated target type names to new names."""
+
+
+@dataclass(frozen=True)
+class RenamedTargetTypes:
+    """Map deprecated field names to their new name, per target."""
+
+    target_renames: FrozenDict[str, str]
 
 
 @rule
 def determine_renamed_target_types(
     target_types: RegisteredTargetTypes,
-) -> RenameTargetsInFileRequest:
-    return RenameTargetsInFileRequest(
-        {
-            tgt.deprecated_alias: tgt.alias
-            for tgt in target_types.types
-            if tgt.deprecated_alias is not None
-        }
+) -> RenamedTargetTypes:
+    return RenamedTargetTypes(
+        FrozenDict(
+            {
+                tgt.deprecated_alias: tgt.alias
+                for tgt in target_types.types
+                if tgt.deprecated_alias is not None
+            }
+        )
     )
-
-
-class RenameRequest(FixBUILDFileRequest):
-    pass
 
 
 @rule
 def fix_single(
-    request: RenameRequest,
-    renamed_target_types: RenameTargetsInFileRequest,
+    request: RenameTargetsInFileRequest,
+    renamed_target_types: RenamedTargetTypes,
 ) -> FixedBUILDFile:
     tokens = request.tokenize()
 
     def should_be_renamed(token: tokenize.TokenInfo) -> bool:
         no_indentation = token.start[1] == 0
         if not (
-            token.type is tokenize.NAME and token.string in renamed_target_types and no_indentation
+            token.type is tokenize.NAME
+            and token.string in renamed_target_types.target_renames
+            and no_indentation
         ):
             return False
         # Ensure that the next token is `(`
@@ -70,7 +78,7 @@ def fix_single(
         line_index = token.start[0] - 1
         line = updated_text_lines[line_index]
         suffix = line[token.end[1] :]
-        new_symbol = renamed_target_types[token.string]
+        new_symbol = renamed_target_types.target_renames[token.string]
         updated_text_lines[line_index] = f"{new_symbol}{suffix}"
 
     return FixedBUILDFile(request.path, content="".join(updated_text_lines).encode("utf-8"))
@@ -82,7 +90,7 @@ async def fix(
 ) -> FixResult:
     digest_contents = await Get(DigestContents, Digest, request.snapshot.digest)
     fixed_contents = await MultiGet(
-        Get(FixedBUILDFile, RenameRequest(file_content.path, file_content.content))
+        Get(FixedBUILDFile, RenameTargetsInFileRequest(file_content.path, file_content.content))
         for file_content in digest_contents
     )
     snapshot = await Get(

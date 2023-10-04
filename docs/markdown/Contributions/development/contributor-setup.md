@@ -4,7 +4,6 @@ slug: "contributor-setup"
 excerpt: "How to set up Pants for local development."
 hidden: false
 createdAt: "2020-05-16T22:54:22.684Z"
-updatedAt: "2022-04-26T23:55:48.923Z"
 ---
 Step 1: Fork and clone `pantsbuild/pants`
 -----------------------------------------
@@ -24,7 +23,41 @@ We use the popular forking workflow typically used by open source projects. See 
 > 
 > (If you don't have `brew` installed, see <https://brew.sh.>)
 
-Step 2: (Optional) Set up a Git hook
+Step 2: Bootstrap the Rust engine
+---------------------------------
+
+Pants uses Rustup to install Rust. Run the command from <https://rustup.rs> to install Rustup; ensure that `rustup` is on your `$PATH`.
+
+If your system Python is not the version Pants expects (currently Python 3.9), you'll need to provide one.  Python interpreters from Linux or Mac distributions sometimes have quirks that can cause headaches with bootstrapping the dev venv.  Some examples of Pythons that work well with Pants are those provided by:
+- [Fedora](https://packages.fedoraproject.org/pkgs/python3.9/python3.9/)
+- [ASDF](https://github.com/asdf-community/asdf-python)
+- [PyEnv](https://github.com/pyenv/pyenv)
+Providers that sometimes cause issues include:
+- Ubuntu Deadsnakes
+You also need to have the protobuf compiler and LLVM clang installed. On Debian derivatives, these can be installed using `apt install clang protobuf-compiler`.
+
+Then, run `pants` to set up the Python virtual environment and compile the engine.
+
+> 🚧 This will take several minutes
+> 
+> Rust compilation is really slow. Fortunately, this step gets cached, so you will only need to wait the first time.
+
+> 📘 Want a faster compile?
+> 
+> We default to compiling with Rust's `release` mode, instead of its `debug` mode, because this makes Pants substantially faster.  However, this results in the compile taking 5-10x longer.
+> 
+> If you are okay with Pants running much slower when iterating, set the environment variable `MODE=debug` and rerun `pants` to compile in debug mode.
+
+> 🚧 Rust compilation can use lots of storage
+> 
+> Compiling the engine typically results in several gigabytes of storage over time. We have not yet implemented automated garbage collection for building the engine because contributors are the only ones to need to compile Rust, not every-day users.
+> 
+> To free up space, run `rm -rf src/rust/engine/target`.
+> 
+> Warning: this will cause Rust to recompile everything.
+
+
+Step 3: (Optional) Set up a Git hook
 ------------------------------------
 
 We have a [Git hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) that runs some useful checks and lints when you `git commit`.
@@ -52,31 +85,6 @@ $ MODE=debug git commit ...
 > 📘 How to temporarily skip the pre-commit checks
 > 
 > Use `git commit --no-verify` or `git commit -n` to skip the checks.
-
-Step 3: Bootstrap the Rust engine
----------------------------------
-
-Pants uses Rustup to install Rust. Run the command from <https://rustup.rs> to install Rustup; ensure that `rustup` is on your `$PATH`.
-
-Then, run `./pants` to set up the Python virtual environment and compile the engine.
-
-> 🚧 This will take several minutes
-> 
-> Rust compilation is really slow. Fortunately, this step gets cached, so you will only need to wait the first time.
-
-> 📘 Want a faster compile?
-> 
-> We default to compiling with Rust's `release` mode, instead of its `debug` mode, because this makes Pants substantially faster.  However, this results in the compile taking 5-10x longer.
-> 
-> If you are okay with Pants running much slower when iterating, set the environment variable `MODE=debug` and rerun `./pants` to compile in debug mode.
-
-> 🚧 Rust compilation can use lots of storage
-> 
-> Compiling the engine typically results in several gigabytes of storage over time. We have not yet implemented automated garbage collection for building the engine because contributors are the only ones to need to compile Rust, not every-day users.
-> 
-> To free up space, run `rm -rf src/rust/engine/target`.
-> 
-> Warning: this will cause Rust to recompile everything.
 
 Configure your IDE (optional)
 -----------------------------

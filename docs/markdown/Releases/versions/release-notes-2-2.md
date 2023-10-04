@@ -3,7 +3,6 @@ title: "2.2.x"
 slug: "release-notes-2-2"
 hidden: true
 createdAt: "2020-11-25T23:17:27.178Z"
-updatedAt: "2020-12-29T04:27:12.338Z"
 ---
 This release requires having a Python 3.7 or 3.8 interpreter to run Pants. Run `curl -L -o ./pants https://raw.githubusercontent.com/pantsbuild/setup/2f079cbe4fc6a1d9d87decba51f19d7689aee69e/pants` to update your ./pants script to choose the correct interpreter.
 

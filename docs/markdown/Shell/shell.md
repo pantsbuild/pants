@@ -4,7 +4,6 @@ slug: "shell"
 excerpt: "Pants's support for Shellcheck, shfmt, and shUnit2."
 hidden: false
 createdAt: "2021-04-14T04:21:15.028Z"
-updatedAt: "2022-05-03T23:52:45.915Z"
 ---
 Pants integrates with these tools to empower you to follow best practices with your Shell scripts:
 
@@ -12,7 +11,7 @@ Pants integrates with these tools to empower you to follow best practices with y
 - [shfmt](https://github.com/mvdan/sh): autoformat Shell code so that you can instead focus on the logic.
 - [shUnit2](https://github.com/kward/shunit2/): write light-weight unit tests for your Shell code.
 
-Pants installs these tools deterministically and integrates them into the workflows you already use: `./pants fmt`, `./pants lint`, and `./pants test`.
+Pants installs these tools deterministically and integrates them into the workflows you already use: `pants fmt`, `pants lint`, and `pants test`.
 
 Initial setup: add `shell_sources` targets
 ------------------------------------------
@@ -44,10 +43,10 @@ backend_packages = [
 ]
 ```
 
-Then, run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files:
+Then, run [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files:
 
 ```
-$ ./pants tailor ::
+$ pants tailor ::
 Created scripts/BUILD:
   - Add shell_sources target scripts
 Created scripts/subdir/BUILD:
@@ -62,7 +61,7 @@ shell_source(name="script_without_a_extension", source="script_without_an_extens
 
 > 📘 Shell dependency inference
 > 
-> Pants will [infer dependencies](doc:dependencies-and-dependency-inference) by looking for imports like `source script.sh` and `. script.sh`. You can check that the correct dependencies are inferred by running `./pants dependencies path/to/script.sh` and `./pants dependencies --transitive path/to/script.sh`.
+> Pants will infer dependencies by looking for imports like `source script.sh` and `. script.sh`. You can check that the correct dependencies are inferred by running `pants dependencies path/to/script.sh` and `pants dependencies --transitive path/to/script.sh`.
 > 
 > Normally, Pants will not understand dynamic sources, e.g. using variable expansion. However, Pants uses Shellcheck for parsing, so you can use Shellcheck's syntax to give a hint to Pants:
 > 
@@ -95,10 +94,10 @@ backend_packages = [
 
 Make sure that you also have set up `shell_source`/`shell_sources` or `shunit2_test`/`shunit2_tests` targets so that Pants knows to operate on the relevant files.
 
-Now you can run `./pants fmt` and `./pants lint`:
+Now you can run `pants fmt` and `pants lint`:
 
 ```
-$ ./pants lint scripts/my_script.sh
+$ pants lint scripts/my_script.sh
 13:05:56.34 [WARN] Completed: lint - shfmt failed (exit code 1).
 --- scripts/my_script.sh.orig
 +++ scripts/my_script.sh
@@ -113,7 +112,7 @@ $ ./pants lint scripts/my_script.sh
 𐄂 shfmt failed.
 ```
 
-Use `./pants fmt lint dir:` to run on all files in the directory, and `./pants fmt lint dir::` to run on all files in the directory and subdirectories.
+Use `pants fmt lint dir:` to run on all files in the directory, and `pants fmt lint dir::` to run on all files in the directory and subdirectories.
 
 Pants will automatically include any relevant `.editorconfig` files in the run. You can also pass command line arguments with `--shfmt-args='-ci -sr'` or permanently set them in `pants.toml`:
 
@@ -125,13 +124,13 @@ args = ["-i 2", "-ci", "-sr"]
 Temporarily disable shfmt with `--shfmt-skip`:
 
 ```bash
-./pants --shfmt-skip fmt ::
+pants --shfmt-skip fmt ::
 ```
 
 Only run shfmt with `--lint-only` and `--fmt-only`:
 
 ```bash
-./pants fmt --only=shfmt ::
+pants fmt --only=shfmt ::
 ```
 
 > 👍 Benefit of Pants: shfmt runs in parallel with Python, Java, Scala, and Go formatters
@@ -155,10 +154,10 @@ backend_packages = [
 
 Make sure that you also have set up `shell_source` / `shell_sources` or `shunit2_test` / `shunit_tests` targets so that Pants knows to operate on the relevant files.
 
-Now you can run `./pants lint`:
+Now you can run `pants lint`:
 
 ```
-$ ./pants lint scripts/my_script.sh
+$ pants lint scripts/my_script.sh
 13:09:10.49 [WARN] Completed: lint - Shellcheck failed (exit code 1).
 
 In scripts/my_script.sh line 12:
@@ -172,7 +171,7 @@ Did you mean:
 𐄂 Shellcheck failed.
 ```
 
-Use `./pants fmt lint dir:` to run on all files in the directory, and `./pants fmt lint dir::` to run on all files in the directory and subdirectories.
+Use `pants fmt lint dir:` to run on all files in the directory, and `pants fmt lint dir::` to run on all files in the directory and subdirectories.
 
 Pants will automatically include any relevant `.shellcheckrc` and `shellcheckrc` files in the run. You can also pass command line arguments with `--shellcheck-args='-x -W 3'` or permanently set them in `pants.toml`:
 
@@ -184,13 +183,13 @@ args = ["--external-sources", "--wiki-link-count=3"]
 Temporarily disable Shellcheck with `--shellcheck-skip`:
 
 ```bash
-./pants --shellcheck-skip lint ::
+pants --shellcheck-skip lint ::
 ```
 
 Only run Shellcheck with `--lint-only`:
 
 ```bash
-./pants lint --only=shellcheck ::
+pants lint --only=shellcheck ::
 ```
 
 > 👍 Benefit of Pants: Shellcheck runs in parallel with other linters
@@ -207,7 +206,7 @@ To use shunit2 with Pants:
 1. Create a test file like `tests.sh`, `test_foo.sh`, or `foo_test.sh`.
    - Refer to <https://github.com/kward/shunit2/> for how to write shUnit2 tests.
 2. Create a `shunit2_test` or `shunit2_tests` target in the directory's BUILD file.
-   - You can run [`./pants tailor`](doc:initial-configuration#5-generate-build-files) to automate this step.
+   - You can run [`pants tailor`](doc:initial-configuration#5-generate-build-files) to automate this step.
 3. Specify which shell to run your tests with, either by setting a shebang directly in the test file or by setting the field `shell` on the `shunit2_test` / `shunit2_tests` target.
    - See [here](doc:reference-shunit2_tests#codeshellcode) for all supported shells.
 
@@ -226,18 +225,18 @@ You can then run your tests like this:
 
 ```bash
 # Run all tests in the repository.
-./pants test ::
+pants test ::
 
 # Run all the tests in the folder.
-./pants test scripts:
+pants test scripts:
 
 # Run just the tests in this file.
-./pants test scripts/tests.sh
+pants test scripts/tests.sh
 ```
 
 Pants will download the `./shunit2` script and will add `source ./shunit2` with the correct relpath for you.
 
-You can import your production code by using `source`. Make sure the code belongs to a `shell_source` or `shell_sources` target. Pants's [dependency inference](doc:targets) will add the relevant dependencies, which you can confirm by running `./pants dependencies scripts/tests.sh`. You can also manually add to the `dependencies` field of your `shunit2_tests` target.
+You can import your production code by using `source`. Make sure the code belongs to a `shell_source` or `shell_sources` target. Pants's [dependency inference](doc:targets) will add the relevant dependencies, which you can confirm by running `pants dependencies scripts/tests.sh`. You can also manually add to the `dependencies` field of your `shunit2_tests` target.
 
 ```shell scripts/tests.sh
 #!/usr/bin/bash
@@ -271,19 +270,19 @@ shell_tests(name="tests")
 > )
 > ```
 > 
-> Then, use `./pants test`:
+> Then, use `pants test`:
 > 
 > ```bash
 > # Run tests with both shells.
-> ./pants test scripts/tests.sh
+> pants test scripts/tests.sh
 > 
 > # Run tests with only Zsh.
-> ./pants test scripts/tests.sh:tests@shell=zsh
+> pants test scripts/tests.sh:tests@shell=zsh
 > ```
 
 ### Controlling output
 
-By default, Pants only shows output for failed tests. You can change this by setting `--test-output` to one of `all`, `failed`, or `never`, e.g. `./pants test --output=all ::`.
+By default, Pants only shows output for failed tests. You can change this by setting `--test-output` to one of `all`, `failed`, or `never`, e.g. `pants test --output=all ::`.
 
 You can permanently set the output format in your `pants.toml` like this:
 
@@ -294,20 +293,20 @@ output = "all"
 
 ### Force reruns with `--force`
 
-To force your tests to run again, rather than reading from the cache, run `./pants test --force path/to/test.sh`.
+To force your tests to run again, rather than reading from the cache, run `pants test --force path/to/test.sh`.
 
 ### Setting environment variables
 
-Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
+Test runs are _hermetic_, meaning that they are stripped of the parent `pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
 
-To add any arbitrary environment variable back to the process, use the option `extra_env_vars` in the `[test]` options scope. You can hardcode a value for the option, or leave off a value to "allowlist" it and read from the parent `./pants` process's environment.
+To add any arbitrary environment variable back to the process, use the option `extra_env_vars` in the `[test]` options scope. You can hardcode a value for the option, or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
 
 ```toml pants.toml
 [test]
 extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
 ```
 
-Use `[bash-setup].executable_search_paths` to change the `$PATH` env var used during test runs. You can use the special string `"<PATH>"` to read the value from the parent `./pants` process's environment.
+Use `[bash-setup].executable_search_paths` to change the `$PATH` env var used during test runs. You can use the special string `"<PATH>"` to read the value from the parent `pants` process's environment.
 
 ```toml pants.toml
 [bash-setup]
@@ -346,15 +345,15 @@ timeout_maximum = 600
 
 If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
 
-Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
+Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
 ### Testing your packaging pipeline
 
-You can include the result of `./pants package` in your test through the `runtime_package_dependencies field`. Pants will run the equivalent of `./pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.
+You can include the result of `pants package` in your test through the `runtime_package_dependencies field`. Pants will run the equivalent of `pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.
 
-This allows you to test your packaging pipeline by simply running `./pants test ::`, without needing custom integration test scripts.
+This allows you to test your packaging pipeline by simply running `pants test ::`, without needing custom integration test scripts.
 
-To depend on a built package, use the `runtime_package_dependencies` field on the `shunit2_test` / `shunit2_tests` targets, which is a list of addresses to targets that can be built with `./pants package`, such as [`pex_binary`](doc:python-package-goal), [`python_awslambda`](doc:awslambda-python), and [`archive`](doc:resources) targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `./pants package`, except without the `dist/` prefix.
+To depend on a built package, use the `runtime_package_dependencies` field on the `shunit2_test` / `shunit2_tests` targets, which is a list of addresses to targets that can be built with `pants package`, such as [`pex_binary`](doc:python-package-goal), [`python_aws_lambda_function`](doc:awslambda-python), and [`archive`](doc:assets) targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix.
 
 For example:
 

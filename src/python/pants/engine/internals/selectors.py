@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Coroutine,
     Generator,
     Generic,
@@ -24,10 +25,10 @@ from typing import (
 from pants.base.exceptions import NativeEngineFailure
 from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
+    PyGeneratorResponseCall,
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
 )
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 _Output = TypeVar("_Output")
@@ -44,10 +45,10 @@ class GetParseError(ValueError):
             if isinstance(expr, ast.Call):
                 # Check if it's a top-level function call.
                 if hasattr(expr.func, "id"):
-                    return f"{expr.func.id}()"  # type: ignore[attr-defined]
+                    return f"{expr.func.id}()"
                 # Check if it's a method call.
                 if hasattr(expr.func, "attr") and hasattr(expr.func, "value"):
-                    return f"{expr.func.value.id}.{expr.func.attr}()"  # type: ignore[attr-defined]
+                    return f"{expr.func.value.id}.{expr.func.attr}()"
 
             # Fall back to the name of the ast node's class.
             return str(type(expr))
@@ -60,9 +61,10 @@ class GetParseError(ValueError):
         )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class AwaitableConstraints:
+    # If this is a call-by-name, then we will already know the callable `@rule` that will be used.
+    callee: Callable | None
     output_type: type
     input_types: tuple[type, ...]
     is_effect: bool
@@ -80,6 +82,14 @@ class AwaitableConstraints:
 
     def __str__(self) -> str:
         return repr(self)
+
+
+class Call(PyGeneratorResponseCall):
+    def __await__(
+        self,
+    ) -> Generator[Any, None, Any]:
+        result = yield self
+        return result
 
 
 # TODO: Conditional needed until Python 3.8 allows the subscripted type to be used directly.
@@ -134,7 +144,10 @@ class Effect(Generic[_Output], Awaitable[_Output]):
 class Get(Generic[_Output], Awaitable[_Output]):
     """Asynchronous generator API for side-effect-free types.
 
-    A Get can be constructed in 3 ways:
+    A Get can be constructed in 4 ways:
+
+    + No arguments:
+        Get(<OutputType>)
 
     + Long form:
         Get(<OutputType>, <InputType>, input)
@@ -147,8 +160,8 @@ class Get(Generic[_Output], Awaitable[_Output]):
 
     The long form supports providing type information to the rule engine that it could not otherwise
     infer from the input variable [1]. Likewise, the short form must use inline construction of the
-    input in order to convey the input type to the engine. The dict form supports providing zero or
-    more inputs to the engine for the Get request.
+    input in order to convey the input type to the engine. The dict form supports providing >1
+    inputs to the engine for the Get request.
 
     [1] The engine needs to determine all rule and Get input and output types statically before
     executing any rules. Since Gets are declared inside function bodies, the only way to extract this
@@ -579,8 +592,7 @@ async def MultiGet(  # noqa: F811
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Params:
     """A set of values with distinct types.
 
@@ -590,11 +602,11 @@ class Params:
     params: tuple[Any, ...]
 
     def __init__(self, *args: Any) -> None:
-        self.params = tuple(args)
+        object.__setattr__(self, "params", tuple(args))
 
 
 # A specification for how the native engine interacts with @rule coroutines:
-# - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines decorated with `@rule_helper`.
+# - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines.
 # - we will send back a single `Any` or a tuple of `Any` to the coroutine, depending upon the variant of `Get`.
 # - a coroutine will eventually return a single `Any`.
 RuleInput = Union[
@@ -637,7 +649,7 @@ def native_engine_generator_send(
     else:
         # It isn't necessary to differentiate between `Get` and `Effect` here, as the static
         # analysis of `@rule`s has already validated usage.
-        if isinstance(res, (Get, Effect)):
+        if isinstance(res, (Call, Get, Effect)):
             return res
         elif type(res) in (tuple, list):
             return PyGeneratorResponseGetMulti(res)

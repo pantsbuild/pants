@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+import re
 from collections import defaultdict
 from typing import Iterable, Iterator, Sequence, Tuple, TypeVar
 
@@ -148,13 +149,6 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
             formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
             return parse_constraint(f"{expected_interpreter}{formatted_specs}")
-
-        def cmp_constraints(req1: Requirement, req2: Requirement) -> int:
-            if req1.project_name != req2.project_name:
-                return -1 if req1.project_name < req2.project_name else 1
-            if req1.specs == req2.specs:
-                return 0
-            return -1 if req1.specs < req2.specs else 1
 
         ored_constraints = (
             and_constraints(constraints_product)
@@ -427,6 +421,89 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             result.add(f"{major}.{minor}")
         return tuple(result)
 
+    def major_minor_version_when_single_and_entire(self) -> None | tuple[int, int]:
+        """Returns the (major, minor) version that these constraints cover, if they cover all of
+        exactly one major minor version, without rules about patch versions.
+
+        This is a best effort function, e.g. for using during inference that can be overridden.
+
+        Examples:
+
+        All of these return (3, 9): `==3.9.*`, `CPython==3.9.*`, `>=3.9,<3.10`, `<3.10,>=3.9`
+
+        All of these return None:
+
+        - `==3.9.10`: restricted to a single patch version
+        - `==3.9`: restricted to a single patch version (0, implicitly)
+        - `==3.9.*,!=3.9.2`: excludes a patch
+        - `>=3.9,<3.11`: more than one major version
+        - `>=3.9,<3.11,!=3.10`: too complicated to understand it only includes 3.9
+        - more than one requirement in the list: too complicated
+        """
+
+        try:
+            return _major_minor_version_when_single_and_entire(self)
+        except _NonSimpleMajorMinor:
+            return None
+
 
 def _major_minor_to_int(major_minor: str) -> tuple[int, int]:
     return tuple(int(x) for x in major_minor.split(".", maxsplit=1))  # type: ignore[return-value]
+
+
+class _NonSimpleMajorMinor(Exception):
+    pass
+
+
+_ANY_PATCH_VERSION = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)(?P<any_patch>\.\*)?$")
+
+
+def _parse_simple_version(version: str, require_any_patch: bool) -> tuple[int, int]:
+    match = _ANY_PATCH_VERSION.fullmatch(version)
+    if match is None or (require_any_patch and match.group("any_patch") is None):
+        raise _NonSimpleMajorMinor()
+
+    return int(match.group("major")), int(match.group("minor"))
+
+
+def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> tuple[int, int]:
+    if len(ics) != 1:
+        raise _NonSimpleMajorMinor()
+
+    req = next(iter(ics))
+
+    just_cpython = req.project_name == "CPython" and not req.extras and not req.marker
+    if not just_cpython:
+        raise _NonSimpleMajorMinor()
+
+    # ==major.minor or ==major.minor.*
+    if len(req.specs) == 1:
+        operator, version = next(iter(req.specs))
+        if operator != "==":
+            raise _NonSimpleMajorMinor()
+
+        return _parse_simple_version(version, require_any_patch=True)
+
+    # >=major.minor,<major.(minor+1)
+    if len(req.specs) == 2:
+        (operator_lo, version_lo), (operator_hi, version_hi) = iter(req.specs)
+
+        if operator_lo != ">=":
+            # if the lo operator isn't >=, they might be in the wrong order (or, if not, the check
+            # below will catch them)
+            operator_lo, operator_hi = operator_hi, operator_lo
+            version_lo, version_hi = version_hi, version_lo
+
+        if operator_lo != ">=" and operator_hi != "<":
+            raise _NonSimpleMajorMinor()
+
+        major_lo, minor_lo = _parse_simple_version(version_lo, require_any_patch=False)
+        major_hi, minor_hi = _parse_simple_version(version_hi, require_any_patch=False)
+
+        if major_lo == major_hi and minor_lo + 1 == minor_hi:
+            return major_lo, minor_lo
+
+        raise _NonSimpleMajorMinor()
+
+    # anything else we don't understand
+    raise _NonSimpleMajorMinor()

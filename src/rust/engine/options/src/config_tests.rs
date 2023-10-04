@@ -15,7 +15,7 @@ fn config<I: IntoIterator<Item = &'static str>>(file_contents: I) -> Config {
     .into_iter()
     .enumerate()
     .map(|(idx, file_content)| {
-      let path = dir.path().join(format!("{}.toml", idx));
+      let path = dir.path().join(format!("{idx}.toml"));
       File::create(&path)
         .unwrap()
         .write_all(file_content.as_bytes())

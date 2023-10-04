@@ -7,7 +7,7 @@ import logging
 from typing import Iterable
 
 from pants.base.specs import Specs
-from pants.core.goals.fix import FixFilesRequest, FixRequest, FixResult, FixTargetsRequest
+from pants.core.goals.fix import AbstractFixRequest, FixFilesRequest, FixResult, FixTargetsRequest
 from pants.core.goals.fix import Partitions as Partitions  # re-export
 from pants.core.goals.fix import _do_fix
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
@@ -24,25 +24,25 @@ FmtResult = FixResult
 
 
 @union
-class FmtRequest(FixRequest):
+class AbstractFmtRequest(AbstractFixRequest):
     is_formatter = True
     is_fixer = False
 
     @classmethod
     def _get_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_rules()
-        yield UnionRule(FmtRequest, cls)
-        yield UnionRule(FmtRequest.Batch, cls.Batch)
+        yield UnionRule(AbstractFmtRequest, cls)
+        yield UnionRule(AbstractFmtRequest.Batch, cls.Batch)
 
 
-class FmtTargetsRequest(FmtRequest, FixTargetsRequest):
+class FmtTargetsRequest(AbstractFmtRequest, FixTargetsRequest):
     @classmethod
     def _get_rules(cls) -> Iterable:
         yield from super()._get_rules()
         yield UnionRule(FmtTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class FmtFilesRequest(FmtRequest, FixFilesRequest):
+class FmtFilesRequest(AbstractFmtRequest, FixFilesRequest):
     @classmethod
     def _get_rules(cls) -> Iterable:
         yield from super()._get_rules()
@@ -55,7 +55,7 @@ class FmtSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return FmtRequest in union_membership
+        return AbstractFmtRequest in union_membership
 
     only = OnlyOption("formatter", "isort", "shfmt")
     batch_size = BatchSizeOption(uppercase="Formatter", lowercase="formatter")
@@ -75,7 +75,7 @@ async def fmt(
     union_membership: UnionMembership,
 ) -> Fmt:
     return await _do_fix(
-        union_membership.get(FmtRequest),
+        union_membership.get(AbstractFmtRequest),
         union_membership.get(FmtTargetsRequest.PartitionRequest),
         union_membership.get(FmtFilesRequest.PartitionRequest),
         Fmt,

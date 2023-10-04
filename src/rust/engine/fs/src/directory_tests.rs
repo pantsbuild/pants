@@ -13,7 +13,7 @@ fn make_tree(path_stats: Vec<TypedPath>) -> DigestTrie {
   file_digests.extend(
     path_stats
       .iter()
-      .map(|path| (PathBuf::from(path.to_path_buf()), EMPTY_DIGEST)),
+      .map(|path| (path.to_path_buf(), EMPTY_DIGEST)),
   );
 
   DigestTrie::from_unique_paths(path_stats, &file_digests).unwrap()
@@ -278,14 +278,14 @@ fn assert_walk(tree: &DigestTrie, expected_filenames: Vec<String>, expected_dirn
     filenames,
     expected_filenames
       .iter()
-      .map(|s| PathBuf::from(s))
+      .map(PathBuf::from)
       .collect::<Vec<_>>()
   );
   assert_eq!(
     dirnames,
     expected_dirnames
       .iter()
-      .map(|s| PathBuf::from(s))
+      .map(PathBuf::from)
       .collect::<Vec<_>>()
   );
 }
@@ -369,4 +369,26 @@ fn walk_too_many_links_subdir() {
       .collect::<Vec<_>>(),
     vec!["".to_string(), "a".to_string()],
   );
+}
+
+#[test]
+fn leaf_paths() {
+  let file = PathBuf::from("parent/file.txt");
+  let link = PathBuf::from("parent/link");
+  let empty_dir = PathBuf::from("empty_dir");
+  let tree = make_tree(vec![
+    TypedPath::File {
+      path: &file,
+      is_executable: false,
+    },
+    TypedPath::Link {
+      path: &link,
+      target: Path::new("file.txt"),
+    },
+    TypedPath::Dir(&empty_dir),
+  ]);
+
+  let leaf_paths = tree.leaf_paths();
+
+  assert_eq!(leaf_paths, vec![empty_dir, file, link])
 }

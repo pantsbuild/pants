@@ -32,7 +32,7 @@ from pants.backend.helm.subsystems.post_renderer import SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership
 from pants.util.logging import LogLevel
@@ -52,7 +52,6 @@ class HelmDeploymentPostRendererRequest(EngineAwareParameter):
         return {"address": self.field_set.address.spec}
 
 
-@rule_helper
 async def _obtain_custom_image_tags(
     address: Address, union_membership: UnionMembership
 ) -> DockerImageTags:

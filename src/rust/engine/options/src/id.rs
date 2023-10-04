@@ -48,8 +48,7 @@ impl OptionId {
       .collect::<Vec<_>>();
     if name_components.is_empty() {
       return Err(format!(
-        "Cannot create an OptionId with an empty name. Given a scope of {:?}.",
-        scope
+        "Cannot create an OptionId with an empty name. Given a scope of {scope:?}."
       ));
     }
     Ok(OptionId(scope, name_components, switch))
@@ -121,5 +120,9 @@ impl OptionId {
       })
       .collect::<Vec<_>>()
       .join(sep)
+  }
+
+  pub fn name_underscored(&self) -> String {
+    self.name("_", NameTransform::None)
   }
 }

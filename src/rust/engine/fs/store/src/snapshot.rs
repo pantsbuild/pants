@@ -168,7 +168,7 @@ impl Snapshot {
       let path_stats = posix_fs
         .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
         .await
-        .map_err(|err| format!("Error expanding globs: {}", err))?;
+        .map_err(|err| format!("Error expanding globs: {err}"))?;
       Snapshot::from_path_stats(
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
@@ -177,14 +177,8 @@ impl Snapshot {
     }
   }
 
-  /// # Safety
-  ///
-  /// This should only be used for testing, as this will always create an invalid Snapshot.
-  pub unsafe fn create_for_testing_ffi(
-    digest: Digest,
-    files: Vec<String>,
-    dirs: Vec<String>,
-  ) -> Result<Self, String> {
+  /// Creates a snapshot containing empty Files for testing purposes.
+  pub fn create_for_testing(files: Vec<String>, dirs: Vec<String>) -> Result<Self, String> {
     // NB: All files receive the EMPTY_DIGEST.
     let file_digests = files
       .iter()
@@ -216,8 +210,7 @@ impl Snapshot {
       &file_digests,
     )?;
     Ok(Self {
-      // NB: The DigestTrie's computed digest is ignored in favor of the given Digest.
-      digest,
+      digest: tree.compute_root_digest(),
       tree,
     })
   }
@@ -276,9 +269,7 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
     let immutable = self.immutable;
     let res = async move {
       let path = posix_fs.file_path(&file);
-      store
-        .store_file(true, immutable, move || std::fs::File::open(&path))
-        .await
+      store.store_file(true, immutable, path).await
     };
     res.boxed()
   }

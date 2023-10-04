@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-from pants.backend.javascript.subsystems.npx_tool import NpxToolBase
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.option.option_types import ArgsListOption, SkipOption
 
 
-class SpectralSubsystem(NpxToolBase):
+class SpectralSubsystem(NodeJSToolBase):
     options_scope = "spectral"
     name = "Spectral"
     help = "A flexible JSON/YAML linter for creating automated style guides (https://github.com/stoplightio/spectral)."

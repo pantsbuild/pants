@@ -54,18 +54,19 @@ show_traceback = true
 
 [[tool.mypy.overrides]]
 module = [
-    "botocore",
-    "bs4",
-    "chevron",
-    "colors",
-    "dockerfile",
-    "fasteners",
-    "freezegun",
-    "gnupg",
-    "hdrh",
-    "hdrh.histogram",
-    "ijson.*",
-    "pex.*",
-    "psutil",
+  "botocore",
+  "bs4",
+  "chevron",
+  "colors",
+  "dockerfile",
+  "fasteners",
+  "freezegun",
+  "gnupg",
+  "hdrh",
+  "hdrh.histogram",
+  "ijson.*",
+  "nodesemver",
+  "pex.*",
+  "psutil",
 ]
 ignore_missing_imports = true

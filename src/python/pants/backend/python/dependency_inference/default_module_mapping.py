@@ -3,142 +3,125 @@
 
 # NB: The project names must follow the naming scheme at
 #  https://www.python.org/dev/peps/pep-0503/#normalized-names.
-DEFAULT_MODULE_MAPPING = {
+
+import re
+from functools import partial
+from typing import Dict, Iterable, Match, Tuple
+
+
+def all_hyphen_to_dot(m: Match[str]) -> str:
+    """Convert all hyphens to dots e.g. azure-foo-bar -> azure.foo.bar.
+
+    >>> all_hyphen_to_dot(re.match(r"^azure-.+", "azure-foo-bar"))
+    'azure.foo.bar'
+    """
+    return m.string.replace("-", ".")
+
+
+def first_group_hyphen_to_underscore(m: Match[str]) -> str:
+    """Convert the first group(regex match group) of hyphens to underscores. Only returns the first
+    group and must contain at least one group.
+
+    >>> first_group_hyphen_to_underscore(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"))
+    'admin_cursor_paginator'
+    """
+    if m.re.groups == 0 or not m.groups():
+        raise ValueError(f"expected at least one group in the pattern{m.re.pattern} but got none.")
+    return str(m.groups()[0]).replace("-", "_")
+
+
+def two_groups_hyphens_two_replacements_with_suffix(
+    m: Match[str],
+    first_group_replacement: str = ".",
+    second_group_replacement: str = "",
+    custom_suffix: str = "",
+) -> str:
+    """take two groups, and by default, the first will have '-' replaced with '.', the second will
+    have '-' replaced with '' e.g. google-cloud-foo-bar -> group1(google.cloud.)group2(foobar)
+
+    >>> two_groups_hyphens_two_replacements_with_suffix(re.match(r"^(google-cloud-)([^.]+)", "google-cloud-foo-bar"))
+    'google.cloud.foobar'
+    """
+    if m.re.groups < 2 or not m.groups():
+        raise ValueError(f"expected at least two groups in the pattern{m.re.pattern}.")
+    prefix = m.string[m.start(1) : m.end(1)].replace("-", first_group_replacement)
+    suffix = m.string[m.start(2) : m.end(2)].replace("-", second_group_replacement)
+    return f"{prefix}{suffix}{custom_suffix}"
+
+
+"""
+A mapping of Patterns and their replacements. will be used with `re.sub`.
+The match is either a string or a function`(str) -> str`; that takes a re.Match and returns
+the replacement. see re.sub for more information
+
+then if an import in the python code is google.cloud.foo, then the package of
+google-cloud-foo will be used.
+"""
+DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, Iterable] = {
+    re.compile(r"""^azure-.+"""): [all_hyphen_to_dot],
+    re.compile(r"""^django-((.+(-.+)?))"""): [first_group_hyphen_to_underscore],
+    # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
+    # libraries. We only add libraries in GA, not beta.
+    re.compile(r"""^(google-cloud-)([^.]+)"""): [
+        partial(two_groups_hyphens_two_replacements_with_suffix, custom_suffix=custom_suffix)
+        for custom_suffix in ("", "_v1", "_v2", "_v3")
+    ],
+    re.compile(r"""^(opentelemetry-instrumentation-)([^.]+)"""): [
+        partial(two_groups_hyphens_two_replacements_with_suffix, second_group_replacement="_"),
+    ],
+    re.compile(r"""^(oslo-.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^python-(.+)"""): [first_group_hyphen_to_underscore],
+}
+
+DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "absl-py": ("absl",),
+    "acryl-datahub": ("datahub",),
     "ansicolors": ("colors",),
     "apache-airflow": ("airflow",),
     "atlassian-python-api": ("atlassian",),
-    "attrs": ("attr",),
-    # Azure
-    "azure-common": ("azure.common",),
-    "azure-core": ("azure.core",),
-    "azure-graphrbac": ("azure.graphrbac",),
-    "azure-identity": ("azure.identity",),
-    "azure-keyvault-certificates": ("azure.keyvault.certificates",),
-    "azure-keyvault-keys": ("azure.keyvault.keys",),
-    "azure-keyvault-secrets": ("azure.keyvault.secrets",),
-    "azure-keyvault": ("azure.keyvault",),
-    "azure-mgmt-apimanagement": ("azure.mgmt.apimanagement",),
-    "azure-mgmt-authorization": ("azure.mgmt.authorization",),
-    "azure-mgmt-automation": ("azure.mgmt.automation",),
-    "azure-mgmt-batch": ("azure.mgmt.batch",),
-    "azure-mgmt-compute": ("azure.mgmt.compute",),
-    "azure-mgmt-containerinstance": ("azure.mgmt.containerinstance",),
-    "azure-mgmt-containerregistry": ("azure.mgmt.containerregistry",),
-    "azure-mgmt-containerservice": ("azure.mgmt.containerservice",),
-    "azure-mgmt-core": ("azure.mgmt.core",),
-    "azure-mgmt-cosmosdb": ("azure.mgmt.cosmosdb",),
-    "azure-mgmt-frontdoor": ("azure.mgmt.frontdoor",),
-    "azure-mgmt-hybridkubernetes": ("azure.mgmt.hybridkubernetes",),
-    "azure-mgmt-keyvault": ("azure.mgmt.keyvault",),
-    "azure-mgmt-logic": ("azure.mgmt.logic",),
-    "azure-mgmt-managementgroups": ("azure.mgmt.managementgroups",),
-    "azure-mgmt-monitor": ("azure.mgmt.monitor",),
-    "azure-mgmt-msi": ("azure.mgmt.msi",),
-    "azure-mgmt-network": ("azure.mgmt.network",),
-    "azure-mgmt-rdbms": ("azure.mgmt.rdbms",),
-    "azure-mgmt-resource": ("azure.mgmt.resource",),
-    "azure-mgmt-security": ("azure.mgmt.security",),
-    "azure-mgmt-servicefabric": ("azure.mgmt.servicefabric",),
-    "azure-mgmt-sql": ("azure.mgmt.sql",),
-    "azure-mgmt-storage": ("azure.mgmt.storage",),
-    "azure-mgmt-subscription": ("azure.mgmt.subscription",),
-    "azure-mgmt-web": ("azure.mgmt.web",),
-    "azure-storage-blob": ("azure.storage.blob",),
-    "azure-storage-queue": ("azure.storage.queue",),
+    "attrs": ("attr", "attrs"),
     "beautifulsoup4": ("bs4",),
     "bitvector": ("BitVector",),
     "cattrs": ("cattr",),
-    "django-admin-cursor-paginator": ("admin_cursor_paginator",),
-    "django-cors-headers": ("corsheaders",),
-    "django-csp": ("csp",),
-    "django-debug-toolbar": ("debug_toolbar",),
-    "django-dotenv": ("dotenv",),
     "django-filter": ("django_filters",),
-    "django-import-export": ("import_export",),
-    "django-ipware": ("ipware",),
-    "django-model-utils": ("model_utils",),
-    "django-ninja": ("ninja",),
-    "django-ninja-extra": ("ninja_extra",),
-    "django-safedelete": ("safedelete",),
-    "django-simple-history": ("simple_history",),
-    "django-storages": ("storages",),
-    "django-taggit": ("taggit",),
-    "django-taggit-autosuggest": ("taggit_autosuggest",),
+    "django-postgres-extra": ("psqlextra",),
+    "django-cors-headers": ("corsheaders",),
     "djangorestframework": ("rest_framework",),
     "djangorestframework-dataclasses": ("rest_framework_dataclasses",),
     "djangorestframework-simplejwt": ("rest_framework_simplejwt",),
+    "elastic-apm": ("elasticapm",),
     "enum34": ("enum",),
     "factory-boy": ("factory",),
     "fluent-logger": ("fluent",),
     "gitpython": ("git",),
-    # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
-    # libraries. We only add libraries in GA, not beta.
-    "google-cloud-aiplatform": ("google.cloud.aiplatform",),
-    "google-cloud-bigquery": ("google.cloud.bigquery",),
-    "google-cloud-bigtable": ("google.cloud.bigtable",),
-    "google-cloud-datastore": ("google.cloud.datastore",),
-    "google-cloud-firestore": ("google.cloud.firestore",),
-    "google-cloud-functions": ("google.cloud.functions_v1", "google.cloud.functions"),
-    "google-cloud-iam": ("google.cloud.iam_credentials_v1",),
-    "google-cloud-iot": ("google.cloud.iot_v1",),
-    "google-cloud-logging": ("google.cloud.logging_v2", "google.cloud.logging"),
-    "google-cloud-pubsub": ("google.cloud.pubsub_v1", "google.cloud.pubsub"),
-    "google-cloud-secret-manager": ("google.cloud.secretmanager",),
-    "google-cloud-storage": ("google.cloud.storage",),
+    "graphql-core": ("graphql",),
     "grpcio": ("grpc",),
     "ipython": ("IPython",),
     "jack-client": ("jack",),
     "kafka-python": ("kafka",),
     "lark-parser": ("lark",),
+    "launchdarkly-server-sdk": ("ldclient",),
     "mail-parser": ("mailparser",),
+    "mysql-connector-python": ("mysql.connector",),
     "opencv-python": ("cv2",),
+    "opensearch-py": ("opensearchpy",),
     # opentelemetry
     "opentelemetry-api": ("opentelemetry",),
+    "opentelemetry-instrumentation-kafka-python": ("opentelemetry.instrumentation.kafka",),
+    "opentelemetry-exporter-otlp": ("opentelemetry.exporter",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
     "opentelemetry-exporter-otlp-proto-http": ("opentelemetry.exporter.otlp.proto.http",),
-    "opentelemetry-instrumentation-aiohttp-client": (
-        "opentelemetry.instrumentation.aiohttp_client",
-    ),
-    "opentelemetry-instrumentation-grpc": ("opentelemetry.instrumentation.grpc",),
-    "opentelemetry-instrumentation-pymongo": ("opentelemetry.instrumentation.pymongo",),
-    "opentelemetry-instrumentation-requests": ("opentelemetry.instrumentation.requests",),
-    "opentelemetry-instrumentation-botocore": ("opentelemetry.instrumentation.botocore",),
-    "opentelemetry-instrumentation-django": ("opentelemetry.instrumentation.django",),
-    "opentelemetry-instrumentation-httpx": ("opentelemetry.instrumentation.httpx",),
-    "opentelemetry-instrumentation-elasticsearch": ("opentelemetry.instrumentation.elasticsearch",),
-    "opentelemetry-instrumentation-psycopg2": ("opentelemetry.instrumentation.psycopg2",),
-    "opentelemetry-instrumentation-jinja2": ("opentelemetry.instrumentation.jinja2",),
     "opentelemetry-sdk": ("opentelemetry.sdk",),
     "opentelemetry-test-utils": ("opentelemetry.test",),
-    "oslo-cache": ("oslo_cache",),
-    "oslo-concurrency": ("oslo_concurrency",),
-    "oslo-config": ("oslo_config",),
-    "oslo-context": ("oslo_context",),
-    "oslo-db": ("oslo_db",),
-    "oslo-i18n": ("oslo_i18n",),
-    "oslo-limit": ("oslo_limit",),
-    "oslo-log": ("oslo_log",),
-    "oslo-messaging": ("oslo_messaging",),
-    "oslo-metrics": ("oslo_metrics",),
-    "oslo-middleware": ("oslo_middleware",),
-    "oslo-policy": ("oslo_policy",),
-    "oslo-privsep": ("oslo_privsep",),
-    "oslo-reports": ("oslo_reports",),
-    "oslo-rootwrap": ("oslo_rootwrap",),
-    "oslo-serialization": ("oslo_serialization",),
-    "oslo-service": ("oslo_service",),
-    "oslo-upgradecheck": ("oslo_upgradecheck",),
-    "oslo-utils": ("oslo_utils",),
-    "oslo-versionedobjects": ("oslo_versionedobjects",),
-    "oslo-vmware": ("oslo_vmware",),
     "paho-mqtt": ("paho",),
+    "phonenumberslite": ("phonenumbers",),
     "pillow": ("PIL",),
     "pip-tools": ("piptools",),
     "progressbar2": ("progressbar",),
     "protobuf": ("google.protobuf",),
     "psycopg2-binary": ("psycopg2",),
     "pycrypto": ("Crypto",),
+    "pykube-ng": ("pykube",),
     "pyhamcrest": ("hamcrest",),
     "pygithub": ("github",),
     "pygobject": ("gi",),
@@ -148,37 +131,33 @@ DEFAULT_MODULE_MAPPING = {
     "pypi-kenlm": ("kenlm",),
     "pysocks": ("socks",),
     "pytest": ("pytest", "_pytest"),
-    "python-dateutil": ("dateutil",),
-    "python-docx": ("docx",),
-    "python-dotenv": ("dotenv",),
-    "python-editor": ("editor",),
-    "python-hcl2": ("hcl2",),
-    "python-jose": ("jose",),
-    "python-json-logger": ("pythonjsonlogger",),
-    "python-levenshtein": ("Levenshtein",),
-    "python-lsp-jsonrpc": ("pylsp_jsonrpc",),
-    "python-magic": ("magic",),
-    "python-pptx": ("pptx",),
-    "python-socketio": ("socketio",),
-    "python-statsd": ("statsd",),
     "pyyaml": ("yaml",),
     "pymongo": ("bson", "gridfs", "pymongo"),
     "pymupdf": ("fitz",),
     "pytest-runner": ("ptr",),
+    "python-json-logger": ("pythonjsonlogger",),
+    "python-levenshtein": ("Levenshtein",),
+    "python-lsp-jsonrpc": ("pylsp_jsonrpc",),
     "pywinrm": ("winrm",),
     "randomwords": ("random_words",),
     "scikit-image": ("skimage",),
     "scikit-learn": ("sklearn",),
+    "scikit-video": ("skvideo",),
     "sseclient-py": ("sseclient",),
     "setuptools": ("easy_install", "pkg_resources", "setuptools"),
     "snowflake-connector-python": ("snowflake.connector",),
+    "snowflake-snowpark-python": ("snowflake.snowpark",),
+    "snowflake-sqlalchemy": ("snowflake.sqlalchemy",),
+    "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
-    "opensearch-py": ("opensearchpy",),
+    "unleashclient": ("UnleashClient",),
+    "websocket-client": ("websocket",),
 }
 
 DEFAULT_TYPE_STUB_MODULE_MAPPING = {
     "djangorestframework-types": ("rest_framework",),
     "lark-stubs": ("lark",),
+    "types-beautifulsoup4": ("bs4",),
     "types-enum34": ("enum34",),
     "types-pillow": ("PIL",),
     "types-protobuf": ("google.protobuf",),
@@ -188,3 +167,8 @@ DEFAULT_TYPE_STUB_MODULE_MAPPING = {
     "types-python-dateutil": ("dateutil",),
     "types-setuptools": ("easy_install", "pkg_resources", "setuptools"),
 }
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

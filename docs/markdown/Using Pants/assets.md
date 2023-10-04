@@ -4,7 +4,6 @@ slug: "assets"
 excerpt: "How to include assets such as images and config files in your project."
 hidden: false
 createdAt: "2020-09-28T23:07:26.956Z"
-updatedAt: "2022-01-29T16:32:14.551Z"
 ---
 There are two ways to include asset files in your project: `resource` and `file` targets.
 
@@ -81,8 +80,8 @@ Note that we open the file with its full path, including the `src/python` prefix
 
 > 🚧 `file` targets are not included with binaries like `pex_binary`
 > 
-> Pants will not include dependencies on `file` / `files` targets when creating binaries like `pex_binary` and `python_awslambda` via `./pants package`. Filesystem APIs like Python's `open()` are relative to the current working directory, and they would try to read the files from where the binary is executed, rather than reading from the binary itself.
 > 
+> Pants will not include dependencies on `file` / `files` targets when creating binaries like `pex_binary` and `python_aws_lambda_function` via `pants package`. Filesystem APIs like Python's `open()` are relative to the current working directory, and they would try to read the files from where the binary is executed, rather than reading from the binary itself.
 > Instead, use `resource` / `resources` targets or an `archive` target.
 
 When to use each asset target type
@@ -98,11 +97,11 @@ Use `file` / `files` for files that aren't tightly coupled to any specific code,
 
 When writing tests, it is also often more convenient to open a file than to load a resource.
 
-|                       | `resource`                                                                                      | `file`                                                |
-| :-------------------- | :---------------------------------------------------------------------------------------------- | :---------------------------------------------------- |
-| **Runtime path**      | Relative to source root                                                                         | Relative to repo root                                 |
-| **Loading mechanism** | Language's package loader, relative to package                                                  | Language's file loading idioms, relative to repo root |
-| **Use with**          | Targets that produce binaries, such as `pex_binary`, `python_distribution`, `python_awslambda`. | `archive` targets, tests                              |
+|                       | `resource`                                                                                                | `file`                                                |
+|:----------------------|:----------------------------------------------------------------------------------------------------------|:------------------------------------------------------|
+| **Runtime path**      | Relative to source root                                                                                   | Relative to repo root                                 |
+| **Loading mechanism** | Language's package loader, relative to package                                                            | Language's file loading idioms, relative to repo root |
+| **Use with**          | Targets that produce binaries, such as `pex_binary`, `python_distribution`, `python_aws_lambda_function`. | `archive` targets, tests                              |
 
 `relocated_files`
 -----------------
@@ -138,7 +137,7 @@ The `relocated_files` target only accepts `file` and `files` targets in its `fil
 `archive`: create a `zip` or `tar` file
 ---------------------------------------
 
-Running `./pants package` on an `archive` target will create a zip or tar file with built packages and/or loose files included. This is often useful when you want to create a binary and bundle it with some loose config files.
+Running `pants package` on an `archive` target will create a zip or tar file with built packages and/or loose files included. This is often useful when you want to create a binary and bundle it with some loose config files.
 
 For example:
 
@@ -153,8 +152,8 @@ archive(
 
 The format can be `zip`, `tar`, `tar.xz`, `tar.gz`, or `tar.bz2`.
 
-The `packages` field is a list of targets that can be built using `./pants package`, such as `pex_binary`, `python_awslambda`, and even other `archive` targets. Pants will build the packages as if you had run `./pants package`. It will include the results in your archive using the same name they would normally have, but without the `dist/` prefix.
+The `packages` field is a list of targets that can be built using `pants package`, such as `pex_binary`, `python_aws_lambda_function`, and even other `archive` targets. Pants will build the packages as if you had run `pants package`. It will include the results in your archive using the same name they would normally have, but without the `dist/` prefix.
 
-The `files` field is a list of `file`, `files`, and `relocated_files` targets. See [resources](doc:resources) for more details.
+The `files` field is a list of `file`, `files`, and `relocated_files` targets.
 
 You can optionally set the field `output_path` to change the generated archive's name.

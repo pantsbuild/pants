@@ -3,7 +3,6 @@ title: "1.29.x"
 slug: "release-notes-1-29"
 hidden: true
 createdAt: "2020-05-20T00:54:47.325Z"
-updatedAt: "2020-07-15T19:26:39.918Z"
 ---
 Some highlights:
 

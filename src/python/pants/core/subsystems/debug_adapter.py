@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from pants.option.option_types import IntOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class DebugAdapterSubsystem(Subsystem):
     options_scope = "debug-adapter"
-    help = softwrap(
+    help = help_text(
         """
         Options used to configure and launch a Debug Adapter server.
 

@@ -10,11 +10,11 @@ from typing import Callable, Iterable, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
+from pants.backend.python.goals.lockfile import synthetic_lockfile_target_name
 from pants.backend.python.macros.common_fields import (
     ModuleMappingField,
     TypeStubsModuleMappingField,
 )
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
@@ -30,7 +30,7 @@ from pants.core.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, rule_helper
+from pants.engine.rules import Get
 from pants.engine.target import (
     Dependencies,
     GenerateTargetsRequest,
@@ -38,13 +38,13 @@ from pants.engine.target import (
     SingleSourceField,
 )
 from pants.engine.unions import UnionMembership
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 ParseRequirementsCallback = Callable[[bytes, str], Iterable[PipRequirement]]
 
 
-@rule_helper
 async def _generate_requirements(
     request: GenerateTargetsRequest,
     union_membership: UnionMembership,
@@ -84,7 +84,7 @@ async def _generate_requirements(
     if lockfile:
         lockfile_address = Address(
             os.path.dirname(lockfile),
-            target_name=resolve,
+            target_name=synthetic_lockfile_target_name(resolve),
         )
         target_adaptor = await Get(
             TargetAdaptor,
@@ -94,7 +94,7 @@ async def _generate_requirements(
             ),
         )
         if target_adaptor.type_alias == "_lockfiles":
-            req_deps.append(f"{lockfile}:{resolve}")
+            req_deps.append(f"{lockfile}:{synthetic_lockfile_target_name(resolve)}")
         else:
             logger.warning(
                 softwrap(

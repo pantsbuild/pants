@@ -20,13 +20,12 @@ dir_layout = {
 
 @ensure_daemon
 def test_unicode_containing_exception(use_pantsd: bool) -> None:
-
     with setup_tmpdir(dir_layout) as tmpdir:
         pants_run = run_pants(
             [
                 "--backend-packages=pants.backend.python",
                 "run",
-                os.path.join(tmpdir, "exiter_integration_test_harness", "main.py"),
+                os.path.join(tmpdir, "exiter_integration_test_harness:bin"),
             ],
             use_pantsd=use_pantsd,
         )

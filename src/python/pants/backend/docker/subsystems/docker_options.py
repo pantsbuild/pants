@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from typing import Any
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.engine.env_vars import EnvironmentVars
+from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -20,7 +19,6 @@ from pants.option.option_types import (
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.memo import memoized_method
-from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, softwrap
 
 doc_links = {
@@ -34,7 +32,7 @@ class DockerOptions(Subsystem):
     options_scope = "docker"
     help = "Options for interacting with Docker."
 
-    class EnvironmentAware:
+    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         _env_vars = ShellStrListOption(
             help=softwrap(
                 """
@@ -46,35 +44,15 @@ class DockerOptions(Subsystem):
             ),
             advanced=True,
         )
-        _executable_search_paths = StrListOption(
-            default=["<PATH>"],
-            help=softwrap(
-                """
-            The PATH value that will be used to find the Docker client and any tools required.
-
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+        executable_search_paths_help = softwrap(
             """
-            ),
-            advanced=True,
-            metavar="<binary-paths>",
+            The PATH value that will be used to find the Docker client and any tools required.
+            """
         )
 
         @property
         def env_vars(self) -> tuple[str, ...]:
             return tuple(sorted(set(self._env_vars)))
-
-        @memoized_method
-        def executable_search_path(self, env: EnvironmentVars) -> tuple[str, ...]:
-            def iter_path_entries():
-                for entry in self._executable_search_paths:
-                    if entry == "<PATH>":
-                        path = env.get("PATH")
-                        if path:
-                            yield from path.split(os.pathsep)
-                    else:
-                        yield entry
-
-            return tuple(OrderedSet(iter_path_entries()))
 
     _registries = DictOption[Any](
         help=softwrap(
@@ -88,6 +66,7 @@ class DockerOptions(Subsystem):
                         "extra_image_tags": [],
                         "skip_push": bool,
                         "repository": str,
+                        "use_local_alias": bool,
                     },
                     ...
                 }
@@ -113,6 +92,10 @@ class DockerOptions(Subsystem):
             `docker_image.repository` or the default repository. Using the placeholders
             `{target_repository}` or `{default_repository}` those overridden values may be
             incorporated into the registry specific repository value.
+
+            If `use_local_alias` is true, a built image is additionally tagged locally using the
+            registry alias as the value for repository (i.e. the additional image tag is not pushed)
+            and will be used for any `pants run` requests.
             """
         ),
         fromfile=True,
@@ -191,6 +174,26 @@ class DockerOptions(Subsystem):
             build for at execution time.
             """
         ),
+    )
+    build_hosts = DictOption[str](
+        default={},
+        help=softwrap(
+            f"""
+            Hosts entries to be added to the `/etc/hosts` file in all built images.
+
+            Example:
+
+                [{options_scope}]
+                build_hosts = {{"docker": "10.180.0.1", "docker2": "10.180.0.2"}}
+
+            Use the `extra_build_hosts` field on a `docker_image` target for additional
+            image specific host entries.
+            """
+        ),
+    )
+    build_no_cache = BoolOption(
+        default=False,
+        help="Do not use the Docker cache when building images.",
     )
     build_verbose = BoolOption(
         default=False,

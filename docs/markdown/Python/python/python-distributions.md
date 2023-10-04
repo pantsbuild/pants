@@ -4,7 +4,6 @@ slug: "python-distributions"
 excerpt: "Packaging your code into an sdist or a wheel."
 hidden: false
 createdAt: "2020-03-16T16:19:55.626Z"
-updatedAt: "2022-05-10T00:44:24.595Z"
 ---
 A standard packaging format for Python code is the _distribution_: an archive that is published to a package index such as [PyPI](https://pypi.org/), and can be installed by [pip](https://packaging.python.org/key_projects/#pip). The two standard distribution archive types are [sdists](https://packaging.python.org/overview/#python-source-distributions) and [wheels](https://packaging.python.org/overview/#python-binary-distributions).
 
@@ -60,7 +59,7 @@ python_distribution(
 )
 ```
 
-Running `./pants package example/dists:mydist` will cause Pants to inspect the `[build-system]` table in `pyproject.toml`, install the requirements specified in that table's `requires` key, and then execute the entry point specified in the `build-backend` key to build an sdist and a wheel, just as PEP 517 requires.
+Running `pants package example/dists:mydist` will cause Pants to inspect the `[build-system]` table in `pyproject.toml`, install the requirements specified in that table's `requires` key, and then execute the entry point specified in the `build-backend` key to build an sdist and a wheel, just as PEP 517 requires.
 
 If you want to build just a wheel or just an sdist, you can set `sdist=False` or `wheel=False` on the `python_distribution` target.
 
@@ -82,11 +81,11 @@ python_distribution(
 )
 ```
 
-Running `./pants package example/dists:mydist` will cause Pants to run Setuptools, which will in turn run the `setup.py` script in the `python_distribution` target's directory. If no such script exists, Pants can generate one for you (see below).
+Running `pants package example/dists:mydist` will cause Pants to run Setuptools, which will in turn run the `setup.py` script in the `python_distribution` target's directory. If no such script exists, Pants can generate one for you (see below).
 
 > 📘 See `package` for other package formats
 > 
-> This page focuses on building sdists and wheels with the `./pants package` goal. See [package](doc:python-package-goal) for information on other formats that can be built with `./pants package`, such as PEX binaries and zip/tar archives.
+> This page focuses on building sdists and wheels with the `pants package` goal. See [package](doc:python-package-goal) for information on other formats that can be built with `pants package`, such as PEX binaries and zip/tar archives.
 
 setup.py
 --------
@@ -95,9 +94,17 @@ Although alternatives exist, and PEP 517 enables them, Setuptools is still by fa
 
 You can either author `setup.py` yourself (which is necessary if building native extensions), or have Pants generate one for you (see below).
 
-By default Pants will generate a `setup.py` for every `python_distribution` target, unless you set `generate_setup = False` on the target. But you can flip this behavior by setting `generate_setup_default = false` in the `[setup-py-generation]` section of your `pants.toml` config file. In that case Pants will only generate a `setup.py` for `python_distribution` targets that have `generate_setup = True` set on them.
+By default, Pants will generate a `setup.py` for every `python_distribution` target, unless you set `generate_setup = False` on the target. But you can flip this behavior by setting `generate_setup_default = false` in the `[setup-py-generation]` section of your `pants.toml` config file. In that case Pants will only generate a `setup.py` for `python_distribution` targets that have `generate_setup = True` set on them.
 
 So if you expect to use handwritten `setup.py` scripts for most distributions in your repo, you probably want to set `generate-setup-default = false` and override it as needed. If you expect to mostly use generated `setup.py` scripts, you can set `generate-setup-default = true` (or just not set it, since that is the default).
+
+> 📘 3rdparty requirements in `setup.py`
+>
+> If you use a handwritten `setup.py`, the generated distribution will have requirements on the packages you list in the `install_requires` key, as expected. But Pants will not automatically use those as dependencies of the underlying sources, e.g., when running tests. They are strictly used when generating a distribution.
+>
+> Instead, the "universe" of possible requirements of your source files must be specified as described [here](doc:python-third-party-dependencies), and Pants will use dependency inference to select an appropriate subset as needed.
+>
+> If Pants generates a `setup.py` for you then the `install_requires` value will be generated from the actual requirements of your source files.
 
 Using a generated `setup.py`
 ----------------------------
@@ -148,7 +155,7 @@ However, you cannot use `data_files`, `install_requires`, `namespace_packages`, 
 > )
 > ```
 > 
-> Pants will infer dependencies on each entry point, which you can confirm by running `./pants dependencies path/to:python_dist`.
+> Pants will infer dependencies on each entry point, which you can confirm by running `pants dependencies path/to:python_dist`.
 > 
 > In addition to using the format `path.to.module:func`, you can use an [address](doc:targets) to a `pex_binary` target, like `src/py/project:pex_binary` or `:sibling_pex_binary`. Pants will use the `entry_point` already specified by the `pex_binary`, and it will infer a dependency on the `pex_binary` target. This allows you to better DRY your project's entry points.
 
@@ -192,17 +199,17 @@ The generated `setup.py` will have its `install_requires` set to include the 3rd
 > 
 > When a `python_distribution` depends on another `python_distribution`, Pants will add it to the `install_requires` value in the generated `setup.py`. 
 > 
-> By default, Pants will use exact requirements for first-party dependencies, like `other_dist==1.0.1`. You can set `first_party_depenency_version_scheme` in the `[setup-py-generation]` scope to `'compatible'` to use `~=` instead of `==`, and `any` to leave off the version.
+> By default, Pants will use exact requirements for first-party dependencies, like `other_dist==1.0.1`. You can set `first_party_dependency_version_scheme` in the `[setup-py-generation]` scope to `'compatible'` to use `~=` instead of `==`, and `any` to leave off the version.
 > 
 > For example:
 > 
 > ```toml
 > [setup-py-generation]
-> first_party_depenency_version_scheme = "compatible"
+> first_party_dependency_version_scheme = "compatible"
 > ```
 > 
 > See <https://www.python.org/dev/peps/pep-0440/#version-specifiers> for more information on the `~=` specifier.
 
 > 📘 How to publish your distributions to a package index
 > 
-> See [publish](doc:python-publish-goal) for example support publishing distributions using Twine.
+> See [publish](doc:python-publish-goal) for how to use Pants to publish distributions using Twine.

@@ -8,15 +8,9 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
-
-# Note: we use humbug to report telemetry. When upgrading, ensure the new version maintains the
-# anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
-humbug==0.2.7
-
-importlib_resources==5.0.*
 ijson==3.1.4
 packaging==21.3
-pex==2.1.120
+pex==2.1.137
 psutil==5.9.0
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
@@ -38,6 +32,7 @@ types-setuptools==62.6.1
 types-toml==0.10.8
 typing-extensions==4.3.0
 mypy-typing-asserts==0.1.1
+node-semver==0.9.0
 
 
 # This dependency is only for debugging Pants itself, and should never be imported
@@ -52,3 +47,6 @@ uvicorn[standard]==0.17.6
 
 beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
 python-gnupg==0.4.9 # For validating signatures
+
+# Only used for release management
+PyGithub==2.0.0rc1

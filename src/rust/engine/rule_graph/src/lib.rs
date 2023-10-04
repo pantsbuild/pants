@@ -37,7 +37,7 @@ use internment::Intern;
 
 pub use crate::builder::Builder;
 pub use crate::rules::{
-  DependencyKey, DisplayForGraph, DisplayForGraphArgs, ParamTypes, Query, Rule, TypeId,
+  DependencyKey, DisplayForGraph, DisplayForGraphArgs, ParamTypes, Query, Rule, RuleId, TypeId,
 };
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -190,7 +190,7 @@ impl<R: Rule> DisplayForGraph for Entry<R> {
   fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
     match self {
       Entry::WithDeps(e) => e.fmt_for_graph(display_args),
-      Entry::Param(type_id) => format!("Param({})", type_id),
+      Entry::Param(type_id) => format!("Param({type_id})"),
     }
   }
 }
@@ -207,13 +207,13 @@ impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
         display_args.line_separator(),
         params_str(params)
       ),
-      &EntryWithDeps::Root(ref root) => format!(
+      EntryWithDeps::Root(root) => format!(
         "Query({}){}for {}",
         root.0.product,
         display_args.line_separator(),
         params_str(&root.0.params)
       ),
-      &EntryWithDeps::Reentry(ref reentry) => format!(
+      EntryWithDeps::Reentry(reentry) => format!(
         "Reentry({}){}for {}",
         reentry.query.product,
         display_args.line_separator(),
@@ -232,7 +232,7 @@ pub fn visualize_entry<R: Rule>(
 ) -> GraphVizEntryWithAttrs {
   let entry_str = entry.fmt_for_graph(display_args);
   let attrs_str = match entry {
-    &Entry::WithDeps(ref e) => {
+    Entry::WithDeps(e) => {
       // Color "singleton" entries (with no params)!
       if e.params().is_empty() {
         Some(Palette::Olive.fmt_for_graph(display_args))
@@ -302,7 +302,7 @@ impl<R: Rule> RuleGraph<R> {
           _ => None,
         }));
       } else {
-        return Err(format!("Unknown entry in RuleGraph: {:?}", entry));
+        return Err(format!("Unknown entry in RuleGraph: {entry:?}"));
       }
     }
 
@@ -397,7 +397,7 @@ impl<R: Rule> RuleGraph<R> {
             suggestions.join("\n  ")
           )
         };
-        Err(format!("No installed QueryRules {}", suggestions_str,))
+        Err(format!("No installed QueryRules {suggestions_str}",))
       }
       _ => {
         let match_strs = subset_matches
@@ -422,7 +422,7 @@ impl<R: Rule> RuleGraph<R> {
     if let Entry::WithDeps(ref e) = entry {
       self.rule_dependency_edges.get(e).cloned()
     } else {
-      panic!("not an inner entry! {:?}", entry)
+      panic!("not an inner entry! {entry:?}")
     }
   }
 
@@ -444,7 +444,18 @@ impl<R: Rule> RuleGraph<R> {
       .collect::<Vec<String>>();
     queries_strs.sort();
     writeln!(f, "digraph {{")?;
-    writeln!(f, "  // queries: {}", queries_strs.join(", "))?;
+    writeln!(f, "  /*")?;
+    writeln!(f, "  queries:")?;
+    writeln!(
+      f,
+      "{}",
+      queries_strs
+        .iter()
+        .map(|q| format!("    {}", q))
+        .collect::<Vec<String>>()
+        .join(",\n")
+    )?;
+    writeln!(f, "  */")?;
     writeln!(f, "  // root entries")?;
     let mut root_rule_strs = self
       .rule_dependency_edges

@@ -24,7 +24,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *docker_rules(),
             *source_files_rules(),
-            package.find_all_packageable_targets,
+            *package.rules(),
             QueryRule(BuiltPackage, [DockerPackageFieldSet]),
         ],
         target_types=[DockerImageTarget],

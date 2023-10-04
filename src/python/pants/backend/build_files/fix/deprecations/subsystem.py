@@ -3,19 +3,20 @@
 
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class BUILDDeprecationsFixer(Subsystem):
     options_scope = "build-deprecations-fixer"
     name = "BUILD Deprecations Fixer"
-    help = softwrap(
+    help = help_text(
         """
         A tool/plugin for fixing BUILD file deprecations (where possible).
 
         This includes deprecations for:
-        - Renamed targets
-        - Renamed fields
+
+          - Renamed targets
+          - Renamed fields
         """
     )
 

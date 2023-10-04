@@ -27,9 +27,9 @@ def test_resolves_to_constraints_file() -> None:
     def create(resolves_to_constraints_file: dict[str, str]) -> dict[str, str]:
         return create_subsystem(
             PythonSetup,
-            resolves={"a": "a.lock"},
+            resolves={"a": "a.lock", "tool1": "tool1.lock", "tool2": "tool2.lock"},
             resolves_to_constraints_file=resolves_to_constraints_file,
-        ).resolves_to_constraints_file(all_python_tool_resolve_names=("tool1", "tool2"))
+        ).resolves_to_constraints_file()
 
     assert create({"a": "c1.txt", "tool1": "c2.txt"}) == {"a": "c1.txt", "tool1": "c2.txt"}
     assert create({"__default__": "c.txt", "tool2": "override.txt"}) == {
@@ -45,16 +45,12 @@ def test_resolves_to_no_binary_and_only_binary() -> None:
     def create(resolves_to_projects: dict[str, list[str]]) -> dict[str, list[str]]:
         subsystem = create_subsystem(
             PythonSetup,
-            resolves={"a": "a.lock"},
+            resolves={"a": "a.lock", "tool1": "tool1.lock", "tool2": "tool2.lock"},
             resolves_to_no_binary=resolves_to_projects,
             resolves_to_only_binary=resolves_to_projects,
         )
-        only_binary = subsystem.resolves_to_only_binary(
-            all_python_tool_resolve_names=("tool1", "tool2")
-        )
-        no_binary = subsystem.resolves_to_no_binary(
-            all_python_tool_resolve_names=("tool1", "tool2")
-        )
+        only_binary = subsystem.resolves_to_only_binary()
+        no_binary = subsystem.resolves_to_no_binary()
         assert only_binary == no_binary
         return only_binary
 

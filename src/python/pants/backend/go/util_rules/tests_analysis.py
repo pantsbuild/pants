@@ -37,15 +37,17 @@ class GeneratedTestMain:
     has_xtests: bool
     failed_exit_code_and_stderr: tuple[int, str] | None
 
-    TEST_MAIN_FILE = "_testmain.go"
+    TEST_MAIN_FILE = "testmain.go"
     TEST_PKG = "_test"
     XTEST_PKG = "_xtest"
 
 
 @rule
 async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMain:
+    generator_binary_name = "./generator"
     analyzer = await Get(
-        LoadedGoBinary, LoadedGoBinaryRequest("generate_testmain", ("main.go",), "./analyzer")
+        LoadedGoBinary,
+        LoadedGoBinaryRequest("generate_testmain", ("main.go",), generator_binary_name),
     )
     input_digest = await Get(Digest, MergeDigests([request.digest, analyzer.digest]))
 
@@ -59,7 +61,13 @@ async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMa
     result = await Get(
         FallibleProcessResult,
         Process(
-            argv=("./analyzer", request.import_path, *test_paths, *xtest_paths),
+            argv=(
+                generator_binary_name,
+                GeneratedTestMain.TEST_MAIN_FILE,
+                request.import_path,
+                *test_paths,
+                *xtest_paths,
+            ),
             input_digest=input_digest,
             env=env,
             description=f"Analyze Go test sources for {request.address}",

@@ -2,12 +2,10 @@
 name = "local_execution_server"
 version = "0.1.0"
 edition = "2021"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
 protos = { path = "../../protos" }
 mock = { path = "../mock" }
-clap = "3"
-structopt = "0.3.26"
-
+clap = { workspace = true, features = ["derive"] }

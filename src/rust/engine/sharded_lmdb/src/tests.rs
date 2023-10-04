@@ -32,10 +32,8 @@ async fn shard_counts() {
 
     // Confirm that each database gets an even share.
     let mut databases = HashMap::new();
-    for prefix_byte in 0u8..=255u8 {
-      *databases
-        .entry(s.get_raw(&[prefix_byte]).0.clone())
-        .or_insert(0) += 1;
+    for prefix_byte in 0_u8..=255_u8 {
+      *databases.entry(s.get_raw(&[prefix_byte]).0).or_insert(0) += 1;
     }
     assert_eq!(databases.len(), shard_count as usize);
     for (_, count) in databases {
@@ -47,18 +45,23 @@ async fn shard_counts() {
 #[tokio::test]
 async fn store_immutable() {
   let (s, _tempdir) = new_store(1);
-  let digest = s.store(true, true, || Ok(bytes(0).reader())).await.unwrap();
-  assert_eq!(digest, Digest::of_bytes(&bytes(0)));
+  let _ = s
+    .store(true, true, Digest::of_bytes(&bytes(0)), || {
+      Ok(bytes(0).reader())
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
 async fn store_stable() {
   let (s, _tempdir) = new_store(1);
-  let digest = s
-    .store(true, false, || Ok(bytes(0).reader()))
+  let _ = s
+    .store(true, false, Digest::of_bytes(&bytes(0)), || {
+      Ok(bytes(0).reader())
+    })
     .await
     .unwrap();
-  assert_eq!(digest, Digest::of_bytes(&bytes(0)));
 }
 
 #[tokio::test]
@@ -69,13 +72,12 @@ async fn store_changing() {
   // fourth.
   let contents = Mutex::new(vec![bytes(0), bytes(1), bytes(2), bytes(2)].into_iter());
 
-  let digest = s
-    .store(true, false, move || {
+  let _ = s
+    .store(true, false, Digest::of_bytes(&bytes(2)), move || {
       Ok(contents.lock().next().unwrap().reader())
     })
     .await
     .unwrap();
-  assert_eq!(digest, Digest::of_bytes(&bytes(2)));
 }
 
 #[tokio::test]
@@ -83,10 +85,10 @@ async fn store_failure() {
   let (s, _tempdir) = new_store(1);
 
   // Produces Readers that never stabilize.
-  let contents = Mutex::new((0..100).map(|b| bytes(b)));
+  let contents = Mutex::new((0..100).map(bytes));
 
   let result = s
-    .store(true, false, move || {
+    .store(true, false, Digest::of_bytes(&bytes(101)), move || {
       Ok(contents.lock().next().unwrap().reader())
     })
     .await;

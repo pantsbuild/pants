@@ -9,6 +9,7 @@ import itertools
 import logging
 import os.path
 import sys
+import typing
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Sequence, cast
@@ -31,14 +32,19 @@ from pants.engine.internals.dep_rules import (
     MaybeBuildFileDependencyRulesImplementation,
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMap
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
+from pants.engine.internals.parser import (
+    BuildFilePreludeSymbols,
+    BuildFileSymbolsInfo,
+    Parser,
+    error_on_imports,
+)
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
@@ -88,18 +94,22 @@ async def evaluate_preludes(
     )
     globals: dict[str, Any] = {
         **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
+        **{name: getattr(typing, name) for name in typing.__all__},
         # Ensure the globals for each prelude includes the builtin symbols (E.g. `python_sources`)
-        **parser.builtin_symbols,
+        # and any build file aliases (e.g. from plugins)
+        **parser.symbols,
     }
     locals: dict[str, Any] = {}
+    env_vars: set[str] = set()
     for file_content in prelude_digest_contents:
         try:
             file_content_str = file_content.content.decode()
-            content = compile(file_content_str, file_content.path, "exec")
+            content = compile(file_content_str, file_content.path, "exec", dont_inherit=True)
             exec(content, globals, locals)
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
         error_on_imports(file_content_str, file_content.path)
+        env_vars.update(BUILDFileEnvVarExtractor.get_env_vars(file_content))
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
@@ -107,7 +117,16 @@ async def evaluate_preludes(
     # Ensure preludes can reference each other by populating the shared globals object with references
     # to the other symbols
     globals.update(locals)
-    return BuildFilePreludeSymbols(FrozenDict(locals))
+    return BuildFilePreludeSymbols.create(locals, env_vars)
+
+
+@rule
+async def get_all_build_file_symbols_info(
+    parser: Parser, prelude_symbols: BuildFilePreludeSymbols
+) -> BuildFileSymbolsInfo:
+    return BuildFileSymbolsInfo.from_info(
+        parser.symbols_info.info.values(), prelude_symbols.info.values()
+    )
 
 
 @rule
@@ -207,7 +226,7 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
                 self.env_vars.add(value)
                 return
             else:
-                logging.warning(
+                logger.warning(
                     f"{self.filename}:{arg.lineno}: Only constant string values as variable name to "
                     f"`env()` is currently supported. This `env()` call will always result in "
                     "the default value only."
@@ -217,24 +236,10 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
             self.visit(kwarg)
 
 
-@rule_helper
-async def _extract_env_vars(
-    file_content: FileContent, env: CompleteEnvironmentVars
-) -> EnvironmentVars:
-    """For BUILD file env vars, we only ever consult the local systems env."""
-    env_vars = BUILDFileEnvVarExtractor.get_env_vars(file_content)
-    return await Get(
-        EnvironmentVars,
-        {
-            EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
-            env: CompleteEnvironmentVars,
-        },
-    )
-
-
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
+    bootstrap_status: BootstrapStatus,
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
     directory: AddressFamilyDir,
@@ -299,10 +304,25 @@ async def parse_address_family(
         dependents_rules_parser_state = None
         dependencies_rules_parser_state = None
 
-    all_env_vars = [
-        await _extract_env_vars(fc, session_values[CompleteEnvironmentVars])
+    def _extract_env_vars(
+        file_content: FileContent, extra_env: Sequence[str], env: CompleteEnvironmentVars
+    ) -> Get[EnvironmentVars]:
+        """For BUILD file env vars, we only ever consult the local systems env."""
+        env_vars = (*BUILDFileEnvVarExtractor.get_env_vars(file_content), *extra_env)
+        return Get(
+            EnvironmentVars,
+            {
+                EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
+                env: CompleteEnvironmentVars,
+            },
+        )
+
+    all_env_vars = await MultiGet(
+        _extract_env_vars(
+            fc, prelude_symbols.referenced_env_vars, session_values[CompleteEnvironmentVars]
+        )
         for fc in digest_contents
-    ]
+    )
 
     address_maps = [
         AddressMap.parse(
@@ -311,6 +331,7 @@ async def parse_address_family(
             parser,
             prelude_symbols,
             env_vars,
+            bootstrap_status.in_progress,
             defaults_parser_state,
             dependents_rules_parser_state,
             dependencies_rules_parser_state,
@@ -398,11 +419,43 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
 
 
 def _rules_path(address: Address) -> str:
-    if address.is_file_target and os.path.sep in address._relative_file_path:  # type: ignore[operator]
+    if address.is_file_target and os.path.sep in address.relative_file_path:  # type: ignore[operator]
         # The file is in a subdirectory of spec_path
         return os.path.dirname(address.filename)
     else:
         return address.spec_path
+
+
+async def _get_target_family_and_adaptor_for_dep_rules(
+    *addresses: Address, description_of_origin: str
+) -> tuple[tuple[AddressFamily, TargetAdaptor], ...]:
+    # Fetch up to 2 sets of address families per address, as we want the rules from the directory
+    # the file is in rather than the directory where the target generator was declared, if not the
+    # same.
+    rules_paths = set(
+        itertools.chain.from_iterable(
+            {address.spec_path, _rules_path(address)} for address in addresses
+        )
+    )
+    maybe_address_families = await MultiGet(
+        Get(OptionalAddressFamily, AddressFamilyDir(rules_path)) for rules_path in rules_paths
+    )
+    maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
+
+    return tuple(
+        (
+            (
+                maybe_families[_rules_path(address)].address_family
+                or maybe_families[address.spec_path].ensure()
+            ),
+            _get_target_adaptor(
+                address,
+                maybe_families[address.spec_path].ensure(),
+                description_of_origin,
+            ),
+        )
+        for address in addresses
+    )
 
 
 @rule
@@ -416,41 +469,19 @@ async def get_dependencies_rule_application(
     if build_file_dependency_rules_class is None:
         return DependenciesRuleApplication.allow_all()
 
-    # Fetch up to 4 sets of address families, one each for the target adaptors, and then one each
-    # for the dep rules (as we want the rules from the directory the file is in rather than the
-    # directory where the target generator was declared, if not the same)
-    rules_paths = set(
-        itertools.chain.from_iterable(
-            {address.spec_path, _rules_path(address)}
-            for address in (request.address, *request.dependencies)
-        )
+    (
+        origin_rules_family,
+        origin_target,
+    ), *dependencies_family_adaptor = await _get_target_family_and_adaptor_for_dep_rules(
+        request.address,
+        *request.dependencies,
+        description_of_origin=request.description_of_origin,
     )
-    maybe_address_families = await MultiGet(
-        Get(OptionalAddressFamily, AddressFamilyDir(rules_path)) for rules_path in rules_paths
-    )
-    maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
-    origin_tgt_address = request.address.maybe_convert_to_target_generator()
-    origin_target = _get_target_adaptor(
-        origin_tgt_address,
-        maybe_families[origin_tgt_address.spec_path].ensure(),
-        request.description_of_origin,
-    )
-    origin_rules_family = (
-        maybe_families[_rules_path(request.address)].address_family
-        or maybe_families[request.address.spec_path].ensure()
-    )
+
     dependencies_rule: dict[Address, DependencyRuleApplication] = {}
-    for dependency_address in request.dependencies:
-        dependency_tgt_address = dependency_address.maybe_convert_to_target_generator()
-        dependency_target = _get_target_adaptor(
-            dependency_tgt_address,
-            maybe_families[dependency_tgt_address.spec_path].ensure(),
-            f"{request.description_of_origin} on {dependency_address}",
-        )
-        dependency_rules_family = (
-            maybe_families[_rules_path(dependency_address)].address_family
-            or maybe_families[dependency_address.spec_path].ensure()
-        )
+    for dependency_address, (dependency_rules_family, dependency_target) in zip(
+        request.dependencies, dependencies_family_adaptor
+    ):
         dependencies_rule[
             dependency_address
         ] = build_file_dependency_rules_class.check_dependency_rules(
@@ -465,4 +496,10 @@ async def get_dependencies_rule_application(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        # The `BuildFileSymbolsInfo` is consumed by the `HelpInfoExtracter` and uses the scheduler
+        # session `product_request()` directly so we need an explicit QueryRule to provide this type
+        # as an valid entrypoint into the rule graph.
+        QueryRule(BuildFileSymbolsInfo, ()),
+    )

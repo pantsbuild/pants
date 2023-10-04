@@ -5,7 +5,6 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
-from pants.util.docutil import git_url
 
 
 class OpenAPIGenerator(JvmToolBase):
@@ -18,10 +17,6 @@ class OpenAPIGenerator(JvmToolBase):
         "pants.backend.openapi.subsystems",
         "openapi_generator.default.lockfile.txt",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/openapi/subsystems/openapi_generator.default.lockfile.txt"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)
 
 
 class OpenAPIGeneratorLockfileSentinel(GenerateToolLockfileSentinel):

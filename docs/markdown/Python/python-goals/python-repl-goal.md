@@ -4,7 +4,6 @@ slug: "python-repl-goal"
 excerpt: "Open a REPL for interactive development."
 hidden: false
 createdAt: "2020-03-16T16:19:56.329Z"
-updatedAt: "2022-02-09T01:01:10.431Z"
 ---
 Pants will load a [REPL](https://en.wikipedia.org/wiki/REPL) with all of your specified source code and any of its third-party dependencies, which allows you to import those values.
 
@@ -13,7 +12,7 @@ IPython
 
 In addition to the default Python shell, Pants supports the improved [IPython shell](https://ipython.org).
 
-To use IPython, run `./pants repl --shell=ipython`. To permanently use IPython, add this to your `pants.toml`:
+To use IPython, run `pants repl --shell=ipython`. To permanently use IPython, add this to your `pants.toml`:
 
 ```toml pants.toml
 [repl]
@@ -55,7 +54,7 @@ Examples
 --------
 
 ```text Shell
-$ ./pants repl helloworld/greet/greeting.py
+$ pants repl helloworld/greet/greeting.py
 
 Python 3.7.6 (default, Feb 26 2020, 08:28:08)
 [Clang 11.0.0 (clang-1100.0.33.8)] on darwin
@@ -72,7 +71,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 This will not load any of your code:
 
 ```text Shell
-❯ ./pants repl --shell=ipython
+❯ pants repl --shell=ipython
 Python 3.9.12 (main, Mar 26 2022, 15:45:34)
 Type 'copyright', 'credits' or 'license' for more information
 IPython 7.34.0 -- An enhanced Interactive Python. Type '?' for help.
@@ -81,7 +80,13 @@ In [1]: 21 * 4
 Out[1]: 84
 ```
 
-`./pants repl ::` will load all your code.
+`pants repl ::` will load all your code.
+
+To pass arguments to the repl program, use `--` at the end of the command, like this:
+```text Shell
+$ pants repl --shell=ipython -- -i helloworld/main.py
+```
+Check the documentation for the `--repl-args` option in `pants help repl` to see which shells support passing arguments.  
 
 > 📘 Tip: how to exit the REPL
 > 

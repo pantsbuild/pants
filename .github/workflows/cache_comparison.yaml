@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
-# To change, edit `build-support/bin/generate_github_workflows.py` and run:
-#   ./pants run build-support/bin/generate_github_workflows.py
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
 
 
 jobs:
@@ -11,22 +11,10 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        '
+        python-version: '3.9'
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - env:
@@ -51,10 +39,6 @@ jobs:
       run: "dist/build-support.bin/cache_comparison_py.pex \\\n  --args=\"$PANTS_ARGS\"\
         \ \\\n  --build-commit=\"$BUILD_COMMIT\" \\\n  --source-diffspec=\"$SOURCE_DIFFSPEC\"\
         \ \\\n  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP\n"
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
     timeout-minutes: 90
 name: Cache Comparison
 'on':

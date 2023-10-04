@@ -2,21 +2,21 @@
 version = "0.0.1"
 edition = "2021"
 name = "logging"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-arc-swap = "1.5"
-colored = "2.0.0"
-chrono = "0.4.22"
-lazy_static = "1"
-log = "0.4"
-num_enum = "0.5"
-parking_lot = "0.12"
-regex = "1"
+arc-swap = { workspace = true }
+colored = { workspace = true }
+chrono = { workspace = true }
+lazy_static = { workspace = true }
+log = { workspace = true }
+num_enum = { workspace = true }
+parking_lot = { workspace = true }
+regex = { workspace = true }
 stdio = { path = "../stdio" }
-tokio = { version = "1.21" }
-uuid = { version = "1.1", features = ["v4"] }
+tokio = { version = "1.32" }
+uuid = { workspace = true, features = ["v4"] }
 
 [build-dependencies]
 cargo_metadata = "0.15"

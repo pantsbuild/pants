@@ -4,7 +4,6 @@ slug: "style-guide"
 excerpt: "Some conventions we encourage."
 hidden: false
 createdAt: "2020-05-17T04:29:11.796Z"
-updatedAt: "2022-04-26T23:57:26.701Z"
 ---
 Reminder: running the autoformatters and linters
 ------------------------------------------------
@@ -12,7 +11,7 @@ Reminder: running the autoformatters and linters
 Most of Pants' style is enforced via Black, isort, Docformatter, Flake8, and MyPy. You may find it helpful to run these commands before pushing a PR:
 
 ```bash
-$ ./pants --changed-since=HEAD fmt
+$ pants --changed-since=HEAD fmt
 $ build-support/githooks/pre-commit
 ```
 
@@ -22,7 +21,7 @@ $ build-support/githooks/pre-commit
 > 
 > ```python
 > StrOption(
->     default="./pants",
+>     default="pants",
 >     help="The name of the script or binary used to invoke pants. "
 >     "Useful when printing help messages.",
 > )
@@ -32,7 +31,7 @@ $ build-support/githooks/pre-commit
 > 
 > ```python
 > StrOption(
->     default="./pants",
+>     default="pants",
 >     help=(
 >         "The name of the script or binary used to invoke pants. "
 >         "Useful when printing help messages."
@@ -87,7 +86,7 @@ Good:
 ```
 def __hash__(self):
     # By overriding __hash__ here, rather than using the default implementation, 
-    # we get a 10% speedup to `./pants list ::` (1000 targets) thanks to more
+    # we get a 10% speedup to `pants list ::` (1000 targets) thanks to more
     # cache hits. This is safe to do because ...
     ...
 
@@ -275,21 +274,18 @@ class Example:
             )
 ```
 
-If you need a custom constructor, such as to transform the parameters, use `@frozen_after_init` and `unsafe_hash=True` instead of `frozen=True`.
+If you need a custom constructor, such as to transform the parameters, the Python docs say to use `object.__setattr__` to set the attributes.
 
 ```python
 from dataclasses import dataclass
 from typing import Iterable, Tuple
 
-from pants.util.meta import frozen_after_init
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Example:
     values: Tuple[str, ...]
 
     def __init__(self, values: Iterable[str]) -> None:
-        self.values = tuple(values)
+        object.__setattr__(self, "values", tuple(values))
 ```
 
 Type hints
@@ -329,7 +325,7 @@ Prefer fixing the underlying API if easy to do, but otherwise, prefer using `cas
 from typing import cast
 
 # Good
-x = cast(str, untyped_method()
+x = cast(str, untyped_method())
 
 # Discouraged
 x: str = untyped_method()
@@ -409,4 +405,36 @@ def test_demo() -> None:
 class TestDemo(unittest.TestCase):
     def test_demo(self) -> None:
         self.assertEqual(y, 2)
+```
+
+Documentation
+-------------
+
+User documentation uploaded to the [Pantsbuild web docs site](https://www.pantsbuild.org/docs) consists of two sections:
+* the reference docs that are generated from help strings in the source code
+* the guides that are generated from the `docs/` directory's Markdown files.
+
+### Reference docs
+
+Not every help string will make it to the website: currently only help strings for global options, goals, subsystems, and targets are published. Please be extra vigilant when writing these and remember that they are going to be rendered as Markdown. 
+
+It may be helpful to consider the following:
+
+* use the `softwrap` helper function to turn a multiline string into a softwrapped string
+* if you experience `mypy` typing issues using the `softwrap` for documenting subclasses of `Field` and `Target` classes, consider using the `help_text` convenience function
+* text inside the angle brackets (e.g. `<value>`) will be ignored when rendered if not wrapped in backticks
+* to create a numbered or bullet list, use 2 space indentation (or use the `bullet_list` convenience function)
+* to create a codeblock, use 4 space indentation (no need for triple backticks) and add one empty line between the code block and the text
+* make sure to use backticks to highlight config sections, command-line arguments, target names, and inline code examples.    
+
+It may be difficult to confirm the accuracy of text formatting in plain Python, so you may want to generate the relevant Markdown files to be able to preview them to confirm your help strings are rendered as expected. They can be converted into Markdown files for visual inspection using a custom build script.
+
+You can run these commands to convert help strings to Markdown files for the `main` and your local feature branches to identify the changed files and then preview only the relevant files to confirm the rendering makes sense.
+
+```text
+$ git checkout main
+$ pants run build-support/bin/generate_docs.py -- --no-prompt --output main-docs
+$ git checkout <your-branch>
+$ pants run build-support/bin/generate_docs.py -- --no-prompt --output branch-docs
+$ diff -qr main-docs branch-docs
 ```

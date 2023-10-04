@@ -8,7 +8,6 @@ from pants.backend.shell.target_types import (
     ShellCommandRunTarget,
     ShellCommandTarget,
     ShellCommandTestTarget,
-    ShellRunInSandboxTarget,
     ShellSourcesGeneratorTarget,
     ShellSourceTarget,
     Shunit2TestsGeneratorTarget,
@@ -21,7 +20,6 @@ from pants.backend.shell.util_rules import shell_command
 def target_types():
     return [
         ShellCommandTarget,
-        ShellRunInSandboxTarget,
         ShellCommandRunTarget,
         ShellCommandTestTarget,
         ShellSourcesGeneratorTarget,

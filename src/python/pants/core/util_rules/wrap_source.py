@@ -14,7 +14,7 @@ from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     GeneratedSources,
@@ -27,7 +27,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class WrapSourceInputsField(SpecialCasedDependencies):
 class WrapSourceOutputsField(StringSequenceField):
     alias = "outputs"
     required = False
-    help = softwrap(
+    help = help_text(
         "The output files that are made available in the new context by this target. If not "
         "specified, the target will capture all files with the expected extensions for this "
         "source format: see the help for the target for the specific extensions. If no extensions "
@@ -63,7 +63,6 @@ class WrapSourceOutputsField(StringSequenceField):
     )
 
 
-@rule_helper
 async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     request = wrapper.protocol_target
     default_extensions = {i for i in (wrapper.output.expected_file_extensions or ()) if i}
@@ -102,7 +101,6 @@ async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
 def wrap_source_rule_and_target(
     source_field_type: type[SourcesField], target_name_suffix: str
 ) -> WrapSource:
-
     if source_field_type.expected_file_extensions:
         outputs_help = (
             "If `outputs` is not specified, all files with the following extensions will be "
@@ -110,7 +108,7 @@ def wrap_source_rule_and_target(
             + ", ".join(ext for ext in source_field_type.expected_file_extensions if ext)
         )
     else:
-        outputs_help = "If `outputs` is not specified, all files from `inputs` will be matched"
+        outputs_help = "If `outputs` is not specified, all files from `inputs` will be matched."
 
     class ActivateWrapSourceTargetField(ActivateWrapSourceTargetFieldBase):
         pass
@@ -127,7 +125,7 @@ def wrap_source_rule_and_target(
             WrapSourceInputsField,
             WrapSourceOutputsField,
         )
-        help = softwrap(
+        help = help_text(
             "Allow files and sources produced by the targets specified by `inputs` to be consumed "
             f"by rules that specifically expect a `{source_field_type.__name__}`.\n\n"
             f"Note that this target does not modify the files in any way. {outputs_help}\n\n"
@@ -138,7 +136,10 @@ def wrap_source_rule_and_target(
         )
 
     # need to use `_param_type_overrides` to stop `@rule` from inspecting the function's source
-    @rule(_param_type_overrides={"request": GenerateWrapSourceSourcesRequest})
+    @rule(
+        canonical_name_suffix=source_field_type.__name__,
+        _param_type_overrides={"request": GenerateWrapSourceSourcesRequest},
+    )
     async def wrap_source(request: GenerateSourcesRequest) -> GeneratedSources:
         return await _wrap_source(request)
 

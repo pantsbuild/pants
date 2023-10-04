@@ -13,7 +13,7 @@ from pants.backend.go.lint.vet import skip_field
 from pants.backend.go.lint.vet.rules import GoVetFieldSet, GoVetRequest
 from pants.backend.go.lint.vet.rules import rules as go_vet_rules
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
-from pants.backend.go.target_types import GoModTarget, GoPackageTarget, GoSdkTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -28,7 +28,6 @@ from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.rules import SubsystemRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -36,7 +35,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoModTarget, GoPackageTarget, GoSdkTarget],
+        target_types=[GoModTarget, GoPackageTarget],
         rules=[
             *skip_field.rules(),
             *go_vet_rules(),
@@ -52,7 +51,7 @@ def rule_runner() -> RuleRunner:
             *assembly.rules(),
             QueryRule(Partitions, [GoVetRequest.PartitionRequest]),
             QueryRule(LintResult, [GoVetRequest.Batch]),
-            SubsystemRule(GoVetSubsystem),
+            *GoVetSubsystem.rules(),
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
@@ -131,8 +130,8 @@ def test_passing(rule_runner: RuleRunner) -> None:
 
 
 def _check_err_msg(result_stderr: str) -> None:
-    # go vet sometimes emits "fmt.Printf" and sometimes just "Printf", depending on conditions
-    # I'm clear on. We elide this nuance.
+    # Note: `go vet` sometimes emits "fmt.Printf" and sometimes just "Printf", depending on conditions
+    # which are unclear so let the `fmt.` part be optional.
     assert re.search(
         r"./f.go:4:5: (fmt\.)?Printf format %s reads arg #1, but call has 0 args", result_stderr
     )
@@ -149,7 +148,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_go_vet(rule_runner, [tgt])
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 2
+    assert lint_results[0].exit_code != 0
     _check_err_msg(lint_results[0].stderr)
 
 
@@ -170,7 +169,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     lint_results = run_go_vet(rule_runner, tgts)
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 2
+    assert lint_results[0].exit_code != 0
     _check_err_msg(lint_results[0].stderr)
     assert "good/f.go" not in lint_results[0].stdout
 

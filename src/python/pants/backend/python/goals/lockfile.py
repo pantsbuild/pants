@@ -8,18 +8,17 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
-from typing import Iterable
 
-from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
+from pants.backend.python.target_types import (
+    PythonRequirementFindLinksField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
-from pants.backend.python.util_rules.pex_requirements import (  # noqa: F401
-    GeneratePythonToolLockfileSentinel as GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ResolvePexConfig,
@@ -40,52 +39,20 @@ from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, M
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.pip_requirement import PipRequirement
 
 
 @dataclass(frozen=True)
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
+    find_links: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
-    use_pex: bool | None = None
-
-    @classmethod
-    def from_tool(
-        cls,
-        subsystem: PythonToolRequirementsBase,
-        interpreter_constraints: InterpreterConstraints | None = None,
-        *,
-        use_pex: bool | None = None,
-        extra_requirements: Iterable[str] = (),
-    ) -> GeneratePythonLockfile:
-        """Create a request for a dedicated lockfile for the tool.
-
-        If the tool determines its interpreter constraints by using the constraints of user code,
-        rather than the option `--interpreter-constraints`, you must pass the arg
-        `interpreter_constraints`.
-        """
-        if not subsystem.uses_custom_lockfile:
-            return cls(
-                requirements=FrozenOrderedSet(),
-                interpreter_constraints=InterpreterConstraints(),
-                resolve_name=subsystem.options_scope,
-                lockfile_dest=subsystem.lockfile,
-            )
-        return cls(
-            requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
-            interpreter_constraints=(
-                interpreter_constraints
-                if interpreter_constraints is not None
-                else subsystem.interpreter_constraints
-            ),
-            resolve_name=subsystem.options_scope,
-            lockfile_dest=subsystem.lockfile,
-        )
 
     @property
     def requirements_hex_digest(self) -> str:
@@ -105,7 +72,6 @@ class _PipArgsAndConstraintsSetup:
     digest: Digest
 
 
-@rule_helper
 async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAndConstraintsSetup:
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 
@@ -153,7 +119,7 @@ async def generate_lockfile(
                 # want to let users change this, as `style=strict` is safer.
                 "--style=universal",
                 "--pip-version",
-                python_setup.pip_version.value,
+                python_setup.pip_version,
                 "--resolver-version",
                 "pip-2020-resolver",
                 # PEX files currently only run on Linux and Mac machines; so we hard code this
@@ -170,6 +136,7 @@ async def generate_lockfile(
                 "mac",
                 # This makes diffs more readable when lockfiles change.
                 "--indent=2",
+                *(f"--find-links={link}" for link in req.find_links),
                 *pip_args_setup.args,
                 *req.interpreter_constraints.generate_pex_arg_list(),
                 *req.requirements,
@@ -221,7 +188,15 @@ async def generate_lockfile(
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
     )
-    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
+
+    if req.diff:
+        diff = await _generate_python_lockfile_diff(
+            final_lockfile_digest, req.resolve_name, req.lockfile_dest
+        )
+    else:
+        diff = None
+
+    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest, diff)
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):
@@ -251,17 +226,20 @@ async def setup_user_lockfile_requests(
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
+    find_links: set[str] = set()
     for tgt in all_targets:
         if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
             continue
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
         resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
+        find_links.update(tgt[PythonRequirementFindLinksField].value or ())
 
     return UserGenerateLockfiles(
         GeneratePythonLockfile(
             requirements=PexRequirements.req_strings_from_requirement_fields(
                 resolve_to_requirements_fields[resolve]
             ),
+            find_links=FrozenOrderedSet(find_links),
             interpreter_constraints=InterpreterConstraints(
                 python_setup.resolves_to_interpreter_constraints.get(
                     resolve, python_setup.interpreter_constraints
@@ -269,6 +247,7 @@ async def setup_user_lockfile_requests(
             ),
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
+            diff=False,
         )
         for resolve in requested
     )
@@ -286,6 +265,10 @@ class PythonSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
     path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 
 
+def synthetic_lockfile_target_name(resolve: str) -> str:
+    return f"_{resolve}_lockfile"
+
+
 @rule
 async def python_lockfile_synthetic_targets(
     request: PythonSyntheticLockfileTargetsRequest,
@@ -298,13 +281,19 @@ async def python_lockfile_synthetic_targets(
         (os.path.dirname(lockfile), os.path.basename(lockfile), name)
         for name, lockfile in python_setup.resolves.items()
     ]
+
     return SyntheticAddressMaps.for_targets_request(
         request,
         [
             (
                 os.path.join(spec_path, "BUILD.python-lockfiles"),
                 tuple(
-                    TargetAdaptor("_lockfiles", name=name, sources=[lockfile])
+                    TargetAdaptor(
+                        "_lockfiles",
+                        name=synthetic_lockfile_target_name(name),
+                        sources=[lockfile],
+                        __description_of_origin__=f"the [python].resolves option {name!r}",
+                    )
                     for _, lockfile, name in lockfiles
                 ),
             )

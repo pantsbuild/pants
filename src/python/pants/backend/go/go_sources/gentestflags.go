@@ -55,7 +55,7 @@ func testFlags() map[string]bool {
 		name := strings.TrimPrefix(f.Name, "test.")
 
 		switch name {
-		case "testlogfile", "paniconexit0", "fuzzcachedir", "fuzzworker":
+		case "testlogfile", "paniconexit0", "fuzzcachedir", "fuzzworker", "gocoverdir":
 		// These flags are only for use by cmd/go.
 		default:
 			expectsValue := true

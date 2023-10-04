@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pants.option.option_types import BoolOption, EnumOption, IntOption
+from pants.option.option_types import BoolOption, EnumOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
@@ -54,7 +54,9 @@ class PythonInferSubsystem(Subsystem):
         help=softwrap(
             """
             Infer a target's dependencies based on strings that look like dynamic
-            dependencies, such as Django settings files expressing dependencies as strings.
+            dependencies, such as Django settings files expressing dependencies as strings or
+            pytest plugins listed in the `pytest_plugins` variable in a test module or a
+            conftest file.
 
             To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
             the string or put `!{bad_address}` in the `dependencies` field of your target.
@@ -65,7 +67,7 @@ class PythonInferSubsystem(Subsystem):
         default=2,
         help=softwrap(
             """
-            If --string-imports is True, treat valid-looking strings with at least this many
+            If `--string-imports` is True, treat valid-looking strings with at least this many
             dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be
             treated as a potential dependency if this option is set to 2 but not if set to 3.
             """
@@ -87,7 +89,7 @@ class PythonInferSubsystem(Subsystem):
         default=1,
         help=softwrap(
             """
-            If --assets is True, treat valid-looking strings with at least this many forward
+            If `--assets` is True, treat valid-looking strings with at least this many forward
             slash characters as potential assets. E.g. `'data/databases/prod.db'` will be
             treated as a potential candidate if this option is set to 2 but not to 3.
             """
@@ -117,7 +119,7 @@ class PythonInferSubsystem(Subsystem):
         default=True,
         help=softwrap(
             """
-            Infer a test target's dependencies on any conftest.py files in the current
+            Infer a test target's dependencies on any `conftest.py` files in the current
             directory and ancestor directories.
             """
         ),
@@ -127,7 +129,7 @@ class PythonInferSubsystem(Subsystem):
         help=softwrap(
             """
             Infer dependencies on targets' entry points, e.g. `pex_binary`'s
-            `entry_point` field, `python_awslambda`'s `handler` field and
+            `entry_point` field, `python_aws_lambda_function`'s `handler` field and
             `python_distribution`'s `entry_points` field.
             """
         ),
@@ -163,6 +165,57 @@ class PythonInferSubsystem(Subsystem):
             This is useful when multiple projects in different source roots provide the same
             symbols (because of repeated first-party module paths or overlapping
             requirements.txt) and you want to resolve the ambiguity locally in each project.
+            """
+        ),
+    )
+
+    ignored_unowned_imports = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            Unowned imports that should be ignored.
+
+            If there are any unowned import statements and adding the `# pants: no-infer-dep`
+            to the lines of the import is impractical, you can instead provide a list of imports
+            that Pants should ignore. You can declare a specific import or a path to a package
+            if you would like any of the package imports to be ignored.
+
+            For example, you could ignore all the following imports of the code
+
+                import src.generated.app
+                from src.generated.app import load
+                from src.generated.app import start
+                from src.generated.client import connect
+
+            by setting `ignored-unowned-imports=["src.generated.app", "src.generated.client.connect"]`.
+            """
+        ),
+    )
+
+    use_rust_parser = BoolOption(
+        default=True,
+        help=softwrap(
+            f"""
+            Use the new Rust-based, multithreaded, in-process dependency parser.
+
+            Pants 2.17 introduced a new paradigm to dependency parsing for Python by leveraging a
+            Rust-based parser that's called in the same process as Pants itself, instead of farming
+            out to one-python-process-per-file.
+
+            As a result of the switch, cold-cache performance improved by a factor of about 12x,
+            while hot-cache had no difference. Additionally, Pants can now infer dependencies from
+            Python scripts with syntax errors.
+
+            After leaving this defaulted to disabled for a release cycle, Pants 2.18 started
+            defaulting to enabling this.
+
+            If you think the new behaviour is causing problems, it is recommended that you run
+            `{bin_name()} peek :: > before.json` and then
+            `{bin_name()} --python-infer-use-rust-parser=False peek :: > after.json` and compare the
+            two results.
+
+            If you think there is a bug and need to disable it, please file an issue:
+            https://github.com/pantsbuild/pants/issues/new/choose.
             """
         ),
     )

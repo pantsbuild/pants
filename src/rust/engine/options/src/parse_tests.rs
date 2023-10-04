@@ -35,7 +35,7 @@ fn list_edit<I: IntoIterator<Item = &'static str>>(
   }
 }
 
-const EMPTY_STRING_LIST: [&'static str; 0] = [];
+const EMPTY_STRING_LIST: [&str; 0] = [];
 
 #[test]
 fn test_parse_string_list_replace() {
@@ -101,6 +101,10 @@ fn test_parse_string_list_implicit_add() {
   assert_eq!(
     vec![list_edit(ListEditAction::Add, vec!["foo bar"])],
     parse_string_list("foo bar").unwrap()
+  );
+  assert_eq!(
+    vec![list_edit(ListEditAction::Add, ["--bar"])],
+    parse_string_list("--bar").unwrap()
   );
 }
 

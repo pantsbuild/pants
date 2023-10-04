@@ -6,7 +6,7 @@ use std::path::Path;
 
 pub fn list_dir(path: &Path) -> Vec<String> {
   let mut v: Vec<_> = std::fs::read_dir(path)
-    .unwrap_or_else(|err| panic!("Listing dir {:?}: {:?}", path, err))
+    .unwrap_or_else(|err| panic!("Listing dir {path:?}: {err:?}"))
     .map(|entry| {
       entry
         .expect("Error reading entry")

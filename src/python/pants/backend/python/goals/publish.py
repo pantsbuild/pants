@@ -23,14 +23,14 @@ from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, StringSequenceField
 from pants.option.global_options import GlobalOptions
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
 
 class PythonRepositoriesField(StringSequenceField):
     alias = "repositories"
-    help = softwrap(
+    help = help_text(
         """
         List of URL addresses or Twine repository aliases where to publish the Python package.
 

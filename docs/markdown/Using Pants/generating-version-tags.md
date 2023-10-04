@@ -50,7 +50,7 @@ on the fly, as needed.  If you want to inspect the generated contents manually, 
 `export-codegen` goal:
 
 ```shell
-./pants export-codegen src/foo:version
+pants export-codegen src/foo:version
 ```
 
 Using the generated version

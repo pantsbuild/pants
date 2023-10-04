@@ -251,7 +251,6 @@ def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
-
     coordinate = ArtifactRequirement(
         coordinate=Coordinate(
             group="org.hamcrest",
@@ -272,7 +271,6 @@ def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
-
     requirement = ArtifactRequirement(
         coordinate=Coordinate(
             group="apache-commons-local",
@@ -311,7 +309,6 @@ def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
-
     rule_runner.write_files(
         {
             "BUILD": textwrap.dedent(
@@ -420,7 +417,6 @@ def test_fetch_one_coord_with_jar(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_fetch_one_coord_with_no_deps(rule_runner: RuleRunner) -> None:
-
     classpath_entry = rule_runner.request(
         ClasspathEntry,
         [

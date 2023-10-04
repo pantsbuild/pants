@@ -67,12 +67,12 @@ impl EngineAwareReturnType {
       return None;
     }
 
-    let artifacts_dict = artifacts_val.cast_as::<PyDict>().ok()?;
+    let artifacts_dict = artifacts_val.downcast::<PyDict>().ok()?;
     let mut output = Vec::new();
 
     for kv_pair in artifacts_dict.items().into_iter() {
       let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-      let artifact_output = if value.is_instance_of::<PyFileDigest>().unwrap_or(false) {
+      let artifact_output = if value.is_instance_of::<PyFileDigest>() {
         lift_file_digest(value).map(ArtifactOutput::FileDigest)
       } else {
         let digest_value = value.getattr("digest").ok()?;
@@ -112,7 +112,7 @@ fn metadata_for(obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
   }
 
   let mut output = Vec::new();
-  let metadata_dict = metadata_val.cast_as::<PyDict>().ok()?;
+  let metadata_dict = metadata_val.downcast::<PyDict>().ok()?;
 
   for kv_pair in metadata_dict.items().into_iter() {
     let (key, py_any): (String, &PyAny) = kv_pair.extract().ok()?;

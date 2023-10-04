@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.python.goals.setup_py import DistBuildEnvironment, DistBuildEnvironmentRequest
 from pants.backend.python.target_types import PythonDistribution
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
@@ -13,18 +12,22 @@ from pants.backend.python.typecheck.mypy.subsystem import (
     MyPyFirstPartyPlugins,
 )
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.package_dists import (
+    DistBuildEnvironment,
+    DistBuildEnvironmentRequest,
+)
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class UsesMyPycField(BoolField):
     alias = "uses_mypyc"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If true, this distribution is built using mypyc.
 
@@ -33,8 +36,8 @@ class UsesMyPycField(BoolField):
         extra type stubs, and the distribution's own requirements (which normally would not
         be needed at build time, but in this case may provide necessary type annotations).
 
-        You will typically set this field on distributions whose setup.py uses
-        mypyc.build.mypycify(). See https://mypyc.readthedocs.io/en/latest/index.html .
+        You will typically set this field on distributions whose `setup.py` uses
+        `mypyc.build.mypycify()`. See https://mypyc.readthedocs.io/en/latest/index.html .
         """
     )
 
@@ -68,14 +71,9 @@ async def get_mypyc_build_environment(
             hardcoded_interpreter_constraints=request.interpreter_constraints,
         ),
     )
-    extra_type_stubs_pex_get = Get(
-        Pex, PexRequest, mypy.extra_type_stubs_pex_request(request.interpreter_constraints)
-    )
-    mypy_pex, requirements_pex, extra_type_stubs_pex = await MultiGet(
-        mypy_pex_get, requirements_pex_get, extra_type_stubs_pex_get
-    )
+    mypy_pex, requirements_pex = await MultiGet(mypy_pex_get, requirements_pex_get)
     return DistBuildEnvironment(
-        extra_build_time_requirements=(mypy_pex, requirements_pex, extra_type_stubs_pex),
+        extra_build_time_requirements=(mypy_pex, requirements_pex),
         extra_build_time_inputs=mypy_config_file.digest,
     )
 

@@ -5,50 +5,51 @@ authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
 edition = "2021"
 
 [dependencies]
-async-stream = "0.3"
-async-trait = "0.1"
+async-stream = { workspace = true }
+async-trait = { workspace = true }
 protos = { path = "../../protos" }
-bytes = "1.2"
+bytes = { workspace = true }
 concrete_time = { path = "../../concrete_time" }
-async-oncecell = "0.2"
-# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
+async-oncecell = { workspace = true }
+deepsize = { workspace = true }
 fs = { path = ".." }
-futures = "0.3"
-glob = "0.3.0"
+fs-set-times = { workspace = true }
+futures = { workspace = true }
+glob = { workspace = true }
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
-http = "0.2"
-http-body = "0.4"
-indexmap = "1.9"
-itertools = "0.10"
-lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
-log = "0.4"
-madvise = "0.1"
-memmap = "0.7"
-parking_lot = "0.12"
-prost = "0.9"
-prost-types = "0.9"
-serde = "1.0"
-serde_derive = "1.0"
+http = { workspace = true }
+http-body = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+lmdb-rkv = { workspace = true }
+log = { workspace = true }
+madvise = { workspace = true }
+parking_lot = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
 sharded_lmdb = { path = "../../sharded_lmdb" }
 task_executor = { path = "../../task_executor" }
-tempfile = "3"
-tokio-rustls = "0.23"
-tokio = { version = "1.21", features = ["fs"] }
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
-tower-service = "0.3"
+tempfile = { workspace = true }
+tokio-rustls = { workspace = true }
+tokio = { workspace = true, features = ["fs"] }
+tokio-util = { workspace = true, features = ["io"] }
+tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tower-service = { workspace = true }
 tryfuture = { path = "../../tryfuture" }
-uuid = { version = "1.1.2", features = ["v4"] }
-workunit_store = {path = "../../workunit_store" }
+uuid = { workspace = true, features = ["v4"] }
+workunit_store = { path = "../../workunit_store" }
+opendal = { workspace = true }
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = { workspace = true }
 mock = { path = "../../testutil/mock" }
-num_cpus = "1"
+num_cpus = { workspace = true }
 testutil = { path = "../../testutil" }
-tokio = { version = "1.21", features = ["rt", "macros"] }
-walkdir = "2"
+tokio = { workspace = true, features = ["rt", "macros"] }
+walkdir = { workspace = true }
 
 [[bench]]
 name = "store"

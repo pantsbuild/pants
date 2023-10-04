@@ -33,8 +33,6 @@ from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel
 
-_EXECUTOR = PyExecutor(core_threads=2, max_threads=4)
-
 
 def create_scheduler(rules, validate=True):
     """Create a Scheduler."""
@@ -47,7 +45,7 @@ def create_scheduler(rules, validate=True):
         ca_certs_path=None,
         rules=rules,
         union_membership=UnionMembership({}),
-        executor=_EXECUTOR,
+        executor=PyExecutor(core_threads=2, max_threads=4),
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
         validate_reachability=validate,
@@ -69,6 +67,7 @@ def fmt_rule(
     line_sep = "\n" if multiline else " "
     optional_line_sep = "\n" if multiline else ""
 
+    rule = rule.rule.func  # type: ignore[attr-defined]
     type_hints = get_type_hints(rule)
     product = type_hints.pop("return").__name__
     params = f",{line_sep}".join(t.__name__ for t in type_hints.values())
@@ -317,22 +316,22 @@ class TestRuleArgumentAnnotation:
         def a_named_rule(a: int, b: str) -> bool:
             return False
 
-        assert a_named_rule.rule is not None
+        assert a_named_rule.rule is not None  # type: ignore[attr-defined]
         assert (
-            a_named_rule.rule.canonical_name
+            a_named_rule.rule.canonical_name  # type: ignore[attr-defined]
             == "pants.engine.rules_test.TestRuleArgumentAnnotation.test_annotations_kwargs.a_named_rule"
         )
-        assert a_named_rule.rule.desc is None
-        assert a_named_rule.rule.level == LogLevel.INFO
+        assert a_named_rule.rule.desc is None  # type: ignore[attr-defined]
+        assert a_named_rule.rule.level == LogLevel.INFO  # type: ignore[attr-defined]
 
         @rule(canonical_name="something_different", desc="Human readable desc")
         def another_named_rule(a: int, b: str) -> bool:
             return False
 
-        assert a_named_rule.rule is not None
-        assert another_named_rule.rule.canonical_name == "something_different"
-        assert another_named_rule.rule.desc == "Human readable desc"
-        assert another_named_rule.rule.level == LogLevel.TRACE
+        assert a_named_rule.rule is not None  # type: ignore[attr-defined]
+        assert another_named_rule.rule.canonical_name == "something_different"  # type: ignore[attr-defined]
+        assert another_named_rule.rule.desc == "Human readable desc"  # type: ignore[attr-defined]
+        assert another_named_rule.rule.level == LogLevel.TRACE  # type: ignore[attr-defined]
 
     def test_bogus_rules(self) -> None:
         with pytest.raises(UnrecognizedRuleArgument):
@@ -353,7 +352,7 @@ class TestRuleArgumentAnnotation:
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        name = some_goal_rule.rule.canonical_name
+        name = some_goal_rule.rule.canonical_name  # type: ignore[attr-defined]
         assert name == "some_other_name"
 
 
@@ -421,11 +420,11 @@ class TestRuleGraph:
     def test_ruleset_with_ambiguity(self) -> None:
         @rule
         def a_from_b_and_c(b: B, c: C) -> A:
-            pass
+            return A()
 
         @rule
         def a_from_c_and_b(c: C, b: B) -> A:
-            pass
+            return A()
 
         rules = [a_from_b_and_c, a_from_c_and_b, QueryRule(A, (B, C))]
         with pytest.raises(Exception) as cm:
@@ -447,7 +446,7 @@ class TestRuleGraph:
     def test_ruleset_with_valid_root(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
-            pass
+            return A()
 
         rules = [a_from_b, QueryRule(A, (B,))]
         create_scheduler(rules)
@@ -455,7 +454,7 @@ class TestRuleGraph:
     def test_ruleset_with_unreachable_root(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
-            pass
+            return A()
 
         rules = [a_from_b, QueryRule(A, ())]
         with pytest.raises(Exception) as cm:
@@ -480,11 +479,11 @@ class TestRuleGraph:
 
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_d(d: D) -> B:
-            pass
+            return B()
 
         @rule
         async def d_from_a_and_suba(a: A, suba: SubA) -> D:  # type: ignore[return]
@@ -549,7 +548,7 @@ class TestRuleGraph:
     def test_smallest_full_test(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         rules = [a_from_suba, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules)
@@ -557,7 +556,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                       Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -571,11 +573,11 @@ class TestRuleGraph:
     def test_smallest_full_test_multiple_root_subject_types(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_a(a: A) -> B:
-            pass
+            return B()
 
         rules = [a_from_suba, QueryRule(A, (SubA,)), b_from_a, QueryRule(B, (A,))]
         fullgraph = self.create_full_graph(rules)
@@ -583,7 +585,11 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA), Query(B for A)
+                  /*
+                  queries:
+                    Query(A for SubA),
+                    Query(B for A)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -600,7 +606,7 @@ class TestRuleGraph:
     def test_single_rule_depending_on_subject_selection(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         rules = [a_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -608,7 +614,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -622,11 +631,11 @@ class TestRuleGraph:
     def test_multiple_selects(self) -> None:
         @rule
         def a_from_suba_and_b(suba: SubA, b: B) -> A:
-            pass
+            return A()
 
         @rule
         def b() -> B:
-            pass
+            return B()
 
         rules = [a_from_suba_and_b, b, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -634,7 +643,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba_and_b))}
@@ -661,11 +673,11 @@ class TestRuleGraph:
 
         @rule
         def b_from_suba(suba: SubA) -> B:
-            pass
+            return B()
 
         @rule
         def suba_from_c(c: C) -> SubA:
-            pass
+            return SubA()
 
         rules = [a, b_from_suba, suba_from_c, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -673,7 +685,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, return_func=RuleFormatRequest(a, gets=[("B", "C")]))}
@@ -690,11 +705,11 @@ class TestRuleGraph:
     def test_one_level_of_recursion(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_suba(suba: SubA) -> B:
-            pass
+            return B()
 
         rules = [a_from_b, b_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -702,7 +717,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_b))}
@@ -719,11 +737,11 @@ class TestRuleGraph:
     def test_noop_removal_in_subgraph(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def a() -> A:
-            pass
+            return A()
 
         @rule
         def b_singleton() -> B:
@@ -735,7 +753,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, ())}
                 {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
@@ -752,11 +773,11 @@ class TestRuleGraph:
     def test_noop_removal_full_single_subject_type(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def a() -> A:
-            pass
+            return A()
 
         rules = [a_from_c, a, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules, validate=False)
@@ -764,7 +785,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, ())}
                 {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
@@ -781,11 +805,11 @@ class TestRuleGraph:
     def test_root_tuple_removed_when_no_matches(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_d_and_a(d: D, a: A) -> B:
-            pass
+            return B()
 
         rules = [
             a_from_c,
@@ -820,15 +844,15 @@ class TestRuleGraph:
 
         @rule
         def b_from_c(c: C) -> B:
-            pass
+            return B()
 
         @rule
         def a_from_b(b: B) -> A:
-            pass
+            return A()
 
         @rule
         def a() -> A:
-            pass
+            return A()
 
         rules = [
             b_from_c,
@@ -868,7 +892,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -886,15 +913,15 @@ class TestRuleGraph:
     def test_depends_on_multiple_one_noop(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_a(a: A) -> B:
-            pass
+            return B()
 
         rules = [a_from_c, a_from_suba, b_from_a, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
@@ -902,7 +929,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(B, SubA)}
                 {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
@@ -917,15 +947,15 @@ class TestRuleGraph:
     def test_multiple_depend_on_same_rule(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_a(a: A) -> B:
-            pass
+            return B()
 
         @rule
         def c_from_a(a: A) -> C:
-            pass
+            return C()
 
         rules = [
             a_from_suba,
@@ -940,7 +970,12 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA), Query(B for SubA), Query(C for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA),
+                    Query(B for SubA),
+                    Query(C for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -966,7 +1001,7 @@ class TestRuleGraph:
 
         @rule
         async def b_from_d(d: D) -> B:
-            pass
+            return B()
 
         rules = [a, b_from_d, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -974,7 +1009,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, ())}
                 {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
@@ -1021,7 +1059,7 @@ def test_param_type_overrides() -> None:
     async def dont_injure_humans(param1: str, param2, param3: list) -> A:
         return A()
 
-    assert dont_injure_humans.rule.input_selectors == (int, dict, list)
+    assert dont_injure_humans.rule.input_selectors == (int, dict, list)  # type: ignore[attr-defined]
 
     with pytest.raises(ValueError, match="paramX"):
 
@@ -1041,11 +1079,11 @@ def test_invalid_rule_helper_name() -> None:
 
         @rule_helper
         async def foo() -> A:
-            pass
+            return A()
 
     @rule_helper(_public=True)
     async def bar() -> A:
-        pass
+        return A()
 
 
 def test_cant_be_both_rule_and_rule_helper() -> None:
@@ -1054,14 +1092,14 @@ def test_cant_be_both_rule_and_rule_helper() -> None:
         @rule_helper
         @rule
         async def _func1() -> A:
-            pass
+            return A()
 
     with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
 
         @rule
         @rule_helper
         async def _func2() -> A:
-            pass
+            return A()
 
 
 def test_synchronous_rule_helper() -> None:
@@ -1069,4 +1107,4 @@ def test_synchronous_rule_helper() -> None:
 
         @rule_helper
         def _foo() -> A:
-            pass
+            return A()

@@ -88,7 +88,7 @@ def test_validation(caplog, bc_builder: BuildConfiguration.Builder) -> None:
     def mk_dummy_tgt(_alias: str) -> Type[Target]:
         class DummyTarget(Target):
             alias = _alias
-            core_fields = tuple()  # type: ignore[var-annotated]
+            core_fields = tuple()
 
         return DummyTarget
 
@@ -150,7 +150,7 @@ def test_register_target_types(bc_builder: BuildConfiguration.Builder) -> None:
     def mk_dummy_tgt(_alias: str) -> Type[Target]:
         class DummyTarget(Target):
             alias = _alias
-            core_fields = tuple()  # type: ignore[var-annotated]
+            core_fields = tuple()
 
         return DummyTarget
 

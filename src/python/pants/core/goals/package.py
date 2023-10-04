@@ -7,10 +7,12 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -18,11 +20,16 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
+    Dependencies,
+    DepsTraversalBehavior,
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
+    ShouldTraverseDepsPredicate,
+    SpecialCasedDependencies,
     StringField,
+    Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
@@ -30,7 +37,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +67,7 @@ class BuiltPackage:
 
 class OutputPathField(StringField, AsyncFieldMixin):
     alias = "output_path"
-    help = softwrap(
+    help = help_text(
         f"""
         Where the built asset should be located.
 
@@ -160,7 +168,13 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
     )
 
     merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
-    workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
+    all_relpaths = [
+        artifact.relpath for pkg in packages for artifact in pkg.artifacts if artifact.relpath
+    ]
+
+    workspace.write_digest(
+        merged_digest, path_prefix=str(dist_dir.relpath), clear_paths=all_relpaths
+    )
     for pkg in packages:
         for artifact in pkg.artifacts:
             msg = []
@@ -170,6 +184,48 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
             if msg:
                 logger.info("\n".join(msg))
     return Package(exit_code=0)
+
+
+@dataclass(frozen=True)
+class TraverseIfNotPackageTarget(ShouldTraverseDepsPredicate):
+    """This predicate stops dep traversal after package targets.
+
+    When traversing deps, such as when collecting a list of transitive deps,
+    this predicate effectively turns any package targets into graph leaf nodes.
+    The package targets are included, but the deps of package targets are not.
+
+    Also, this excludes dependencies from any SpecialCasedDependencies fields,
+    which mirrors the behavior of the default predicate: TraverseIfDependenciesField.
+    """
+
+    package_field_set_types: FrozenOrderedSet[PackageFieldSet]
+    roots: FrozenOrderedSet[Address]
+    always_traverse_roots: bool  # traverse roots even if they are package targets
+
+    def __init__(
+        self,
+        *,
+        union_membership: UnionMembership,
+        roots: Iterable[Address],
+        always_traverse_roots: bool = True,
+    ) -> None:
+        object.__setattr__(self, "package_field_set_types", union_membership.get(PackageFieldSet))
+        object.__setattr__(self, "roots", FrozenOrderedSet(roots))
+        object.__setattr__(self, "always_traverse_roots", always_traverse_roots)
+        super().__init__()
+
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        if isinstance(field, SpecialCasedDependencies):
+            return DepsTraversalBehavior.EXCLUDE
+        if self.always_traverse_roots and target.address in self.roots:
+            return DepsTraversalBehavior.INCLUDE
+        if any(
+            field_set_type.is_applicable(target) for field_set_type in self.package_field_set_types
+        ):
+            return DepsTraversalBehavior.EXCLUDE
+        return DepsTraversalBehavior.INCLUDE
 
 
 def rules():

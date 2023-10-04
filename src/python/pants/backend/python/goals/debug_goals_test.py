@@ -27,14 +27,15 @@ from pants.build_graph.address import Address
 from pants.core.target_types import FileTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.internals.parametrize import Parametrize
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def imports_rule_runner() -> RuleRunner:
+def imports_rule_runner() -> PythonRuleRunner:
     resolves = {"python-default": "", "other": ""}
 
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
@@ -63,7 +64,7 @@ def imports_rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_debug_goals(imports_rule_runner: RuleRunner):
+def test_debug_goals(imports_rule_runner: PythonRuleRunner):
     filedir = "project"
     filename = "t.py"
 

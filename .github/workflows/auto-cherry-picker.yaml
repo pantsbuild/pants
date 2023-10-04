@@ -1,0 +1,105 @@
+name: Auto Cherry-Picker
+
+on:
+  # NB: This is safe since we already have merged the PR.
+  # See https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      PR_number:
+        description: The PR number to cherry-pick
+        type: string
+        required: true
+
+jobs:
+  prerequisites:
+    name: Gather Prerequisites
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'needs-cherrypick') )
+    runs-on: ubuntu-latest
+    outputs:
+      pr_num: ${{ steps.get-prereqs.outputs.pr_num }}
+      merge_commit: ${{ steps.get-prereqs.outputs.merge_commit }}
+      matrix: ${{ steps.get-prereqs.outputs.matrix }}
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Check out code
+        uses: actions/checkout@v3
+      - run: npm install ./build-support/cherry_pick
+      - id: get-prereqs
+        name: Get Cherry-Pick prerequisites
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+          script: |
+            const Helper = require('./build-support/cherry_pick/helper.js');
+            const helper = new Helper({octokit: github, context, core});
+            const prereqs = await helper.get_prereqs();
+
+            if (prereqs !== null) {
+              core.setOutput("pr_num", prereqs.pr_num);
+              core.setOutput("merge_commit", prereqs.merge_commit);
+              core.setOutput("matrix", prereqs.milestones.map(
+                milestone => {return {
+                  milestone,
+                  branch_name: `cherry-pick-${prereqs.pr_num}-to-${milestone}`,
+                }}
+              ));
+            }
+
+  cherry_picker:
+    name: Cherry-Pick
+    needs: prerequisites
+    runs-on: ubuntu-latest
+    continue-on-error: true # Don't cancel other jobs if this one fails
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.prerequisites.outputs.matrix) }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+      - name: Prepare cherry-pick branch
+        if: ${{ !env.ACT }}
+        run: |
+          git config --local user.email "pantsbuild+github-automation@gmail.com"
+          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+
+          git fetch --depth=2 origin "${{ needs.prerequisites.outputs.merge_commit }}"
+          # NB: If this fetch fails, we assume that means the milestone branch hasn't been created yet
+          git fetch --depth 1 origin "${{ matrix.milestone }}" || exit 0
+          git checkout -b "${{ matrix.branch_name }}" FETCH_HEAD
+          git cherry-pick "${{ needs.prerequisites.outputs.merge_commit }}"
+          git push -u origin "${{ matrix.branch_name }}"
+
+          # Now we go back to `main` to ensure we're running the latest `make_pr.sh`.
+          # (this only really should matter if we're cherry-picking changed to `make_pr.sh` itself).
+          git checkout main
+      - name: Create Cherry-Pick Branch
+        env:
+          GH_TOKEN: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+        run: |
+          bash build-support/cherry_pick/make_pr.sh "${{ needs.prerequisites.outputs.pr_num }}" "${{ matrix.milestone }}" "${{ matrix.branch_name }}"
+
+  post_pick:
+    name: Post-Pick Actions
+    needs: [cherry_picker, prerequisites]
+    runs-on: ubuntu-latest
+    # NB: We don't want to run if the prerequisites job failed or was skipped
+    if: needs.prerequisites.result == 'success' && (success() || failure())
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - run: npm install ./build-support/cherry_pick
+      - name: Run Script
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
+          script: |
+            const Helper = require('./build-support/cherry_pick/helper.js');
+            const helper = new Helper({octokit: github, context, core});
+            await helper.cherry_pick_finished("${{ needs.prerequisites.outputs.merge_commit }}", ${{ needs.prerequisites.outputs.matrix }});

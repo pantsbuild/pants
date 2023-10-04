@@ -4,27 +4,26 @@ slug: "release-strategy"
 excerpt: "Our approach to semantic versioning + time-based releases."
 hidden: false
 createdAt: "2020-05-17T03:02:12.315Z"
-updatedAt: "2022-04-29T21:43:57.204Z"
 ---
 Pants release cycles flow through:
 
 1. `dev` releases from the `main` branch,
 2. an `a` (alpha) release, which is the first on a stable branch,
-3. `rc` releases, which have begun to stabilize, and might viably become a stable release
+3. `rc` releases, which have begun to stabilize on a stable branch, and will become a stable release
 4. stable releases, which are our most trusted.
 
 Pants follows semantic versioning, along with using regular time-based dev releases. We follow a strict [Deprecation policy](doc:deprecation-policy).
 
 > 📘 Tip: join the mailing group for release announcements
 > 
-> See [Community](doc:community).
+> See [Community](doc:the-pants-community).
 > 
 > Also see [Upgrade tips](doc:upgrade-tips) for suggestions on how to effectively upgrade Pants versions.
 
 Stable releases
 ---------------
 
-Stable releases occur roughly every month. They have been vetted through at least one alpha and one release candidate.
+Stable releases occur roughly every six weeks. They have been vetted through at least one alpha and one release candidate.
 
 Stable releases are named with the major, minor, and patch version (with no suffix). For example, `2.1.0` or `2.2.1`.
 
@@ -42,7 +41,7 @@ Patch versions after `*.0` (i.e.: `2.2.1`) must have also had at least one relea
 > 
 > We try our best to write bug-free code, but, like everyone, we sometimes make mistakes.
 > 
-> If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](doc:community).
+> If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](doc:the-pants-community).
 
 Release candidates
 ------------------
@@ -63,7 +62,7 @@ Release candidates are subject to the constraints on cherry-picks mentioned in t
 > 
 > We greatly appreciate when users test out release candidates. While we do our best to have comprehensive CI—and we "dogfood" release candidates—we are not able to test all the ways Pants is used in the wild.
 > 
-> If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](doc:community).
+> If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](doc:the-pants-community).
 
 Alpha releases
 --------------

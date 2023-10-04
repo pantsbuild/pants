@@ -92,7 +92,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -107,8 +107,8 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             instance of the scalar type or `None`, but __must__ be provided.
             For Non-scalar types (like ListOption subclasses or DictOption) the default can't be
             `None`, but does have an "empty" default value.
-        :param help: The help message to use when users run `./pants help` or
-            `./pants help-advanced`
+        :param help: The help message to use when users run `pants help` or
+            `pants help-advanced`
         :param register_if: A callable (usually a lambda) which, if provided, can be used to
             specify if the option should be registered. This is useful for "Base" subsystem
             classes, who might/might not want to register options based on information provided
@@ -122,7 +122,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             to "#cores")
         :param fromfile: If True, allows the user to specify a string value (starting with "@")
             which represents a file to read the option's value from.
-        :param metvar: Sets what users see in `./pants help` as possible values for the flag.
+        :param metavar: Sets what users see in `pants help` as possible values for the flag.
             The default is based on the option type (E.g. "<str>" or "<int>").
         :param mutually_exclusive_group: If specified disallows all other options using the same
             value to also be specified by the user.
@@ -137,7 +137,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         self._flag_names = (flag_name,) if flag_name else None
         self._default = default
         self._help = help
-        self._register_if = register_if or (lambda cls: True)  # type: ignore[assignment]
+        self._register_if = register_if or (lambda cls: True)
         self._extra_kwargs = {
             k: v
             for k, v in {
@@ -170,11 +170,19 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         return cast("_OptT", val)
 
     def get_flag_options(self, subsystem_cls) -> dict:
+        rh = "removal_hint"
+        if rh in self._extra_kwargs:
+            extra_kwargs: dict[str, Any] = {
+                **self._extra_kwargs,
+                rh: _eval_maybe_dynamic(self._extra_kwargs[rh], subsystem_cls),
+            }
+        else:
+            extra_kwargs = self._extra_kwargs
         return dict(
             help=_eval_maybe_dynamic(self._help, subsystem_cls),
             default=_eval_maybe_dynamic(self._default, subsystem_cls),
             type=self.get_option_type(subsystem_cls),
-            **self._extra_kwargs,
+            **extra_kwargs,
         )
 
     @overload
@@ -207,9 +215,9 @@ class _ListOptionBase(
     _OptionBase["tuple[_ListMemberT, ...]", "tuple[_ListMemberT, ...]"],
     Generic[_ListMemberT],
 ):
-    """Descriptor base for a  subsystem option of  ahomogenous list of some type.
+    """Descriptor base for a subsystem option of an homogenous list of some type.
 
-    Don't use this class directly, instead use one of the conrete classes below.
+    Don't use this class directly, instead use one of the concrete classes below.
 
     The default value will always be set as an empty list, and the Python property always returns
     a tuple (for immutability).
@@ -231,7 +239,7 @@ class _ListOptionBase(
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -448,7 +456,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -473,7 +481,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -498,7 +506,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -591,7 +599,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -616,7 +624,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -640,7 +648,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -695,8 +703,12 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         if enum_type is None:
             if not default:
                 raise ValueError(
-                    "`enum_type` must be provided to the constructor if `default` isn't provided "
-                    "or is empty."
+                    softwrap(
+                        """
+                        `enum_type` must be provided to the constructor if `default` isn't provided
+                        or is empty.
+                        """
+                    )
                 )
             return type(default[0])
         return enum_type
@@ -746,7 +758,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,

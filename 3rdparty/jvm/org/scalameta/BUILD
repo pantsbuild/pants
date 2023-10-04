@@ -6,7 +6,7 @@ jvm_artifact(
     name="scalameta",
     group="org.scalameta",
     artifact="scalameta_2.13",
-    version="4.4.30",
+    version="4.8.7",
     packages=["scala.meta.**"],
     resolve="scala_parser_dev",
 )

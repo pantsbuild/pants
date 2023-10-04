@@ -251,7 +251,7 @@ def fetch_versions(
 
 if __name__ == "__main__":
     versions_url = "https://releases.hashicorp.com/terraform/"
-    number_of_supported_versions = 32
+    number_of_supported_versions = 43
 
     keydata = requests.get("https://keybase.io/hashicorp/pgp_keys.asc").content
     verifier = GPGVerifier(keydata)

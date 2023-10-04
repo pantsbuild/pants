@@ -5,11 +5,13 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
@@ -18,7 +20,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
 )
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
     FormatWithYapfRequest,
@@ -33,7 +34,7 @@ from pants.core.goals.update_build_files import (
 from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
 from pants.engine.fs import EMPTY_DIGEST
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import rule
 from pants.engine.unions import UnionRule
 from pants.option.ranked_value import Rank, RankedValue
 from pants.testutil.option_util import create_subsystem
@@ -73,7 +74,7 @@ def generic_goal_rule_runner() -> RuleRunner:
             update_build_files,
             add_line,
             reverse_lines,
-            SubsystemRule(UpdateBuildFilesSubsystem),
+            *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
             UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
         )
@@ -131,7 +132,7 @@ def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
     )
 
 
-def test_find_python_interpreter_constraints_from_lockfile() -> None:
+def test_get_lockfile_interpreter_constraints() -> None:
     default_metadata = PythonLockfileMetadata.new(
         valid_for_interpreter_constraints=InterpreterConstraints(["==2.7.*"]),
         requirements=set(),
@@ -142,17 +143,19 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
     )
 
     def assert_ics(
-        lockfile: str,
-        expected: list[str],
+        lckfile: str,
+        expected: Iterable[str],
         *,
-        ics: RankedValue = RankedValue(Rank.HARDCODED, Black.default_interpreter_constraints),
+        ics: RankedValue = RankedValue(Rank.HARDCODED, list(Black.default_interpreter_constraints)),
         metadata: PythonLockfileMetadata | None = default_metadata,
     ) -> None:
         black = create_subsystem(
             Black,
-            lockfile=lockfile,
+            lockfile=lckfile,
             interpreter_constraints=ics,
             version="v",
+            requirements=["v"],
+            install_from_resolve=None,
             extra_requirements=[],
         )
         loaded_lock = LoadedLockfile(
@@ -163,11 +166,11 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
             is_pex_native=True,
             as_constraints_strings=None,
             original_lockfile=Lockfile(
-                "black.lock", file_path_description_of_origin="foo", resolve_name="black"
+                "black.lock", url_description_of_origin="foo", resolve_name="black"
             ),
         )
         result = run_rule_with_mocks(
-            Black._find_python_interpreter_constraints_from_lockfile,
+            get_lockfile_interpreter_constraints,
             rule_args=[black],
             mock_gets=[
                 MockGet(
@@ -180,14 +183,9 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
         assert result == InterpreterConstraints(expected)
 
     # If ICs are set by user, always use those.
-    for lockfile in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE, "black.lock"):
-        assert_ics(lockfile, ["==3.8.*"], ics=RankedValue(Rank.CONFIG, ["==3.8.*"]))
-
-    assert_ics(NO_TOOL_LOCKFILE, Black.default_interpreter_constraints)
-    assert_ics(DEFAULT_TOOL_LOCKFILE, Black.default_interpreter_constraints)
-
+    assert_ics("black.lock", ["==3.8.*"], ics=RankedValue(Rank.CONFIG, ["==3.8.*"]))
+    # Otherwise use what's in the lockfile metadata.
     assert_ics("black.lock", ["==2.7.*"])
-    assert_ics("black.lock", Black.default_interpreter_constraints, metadata=None)
 
 
 # ------------------------------------------------------------------------------------------
@@ -206,8 +204,8 @@ def black_rule_runner() -> RuleRunner:
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
-            SubsystemRule(Black),
-            SubsystemRule(UpdateBuildFilesSubsystem),
+            *Black.rules(),
+            *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
         ),
         target_types=[GenericTarget],
@@ -279,8 +277,8 @@ def run_yapf(
             update_build_files,
             *config_files.rules(),
             *pex.rules(),
-            SubsystemRule(Yapf),
-            SubsystemRule(UpdateBuildFilesSubsystem),
+            *Yapf.rules(),
+            *UpdateBuildFilesSubsystem.rules(),
             UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
         ),
         target_types=[GenericTarget],

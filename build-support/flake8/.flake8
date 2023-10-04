@@ -21,5 +21,5 @@ extend-ignore:
 
 [flake8:local-plugins]
 extension =
-    PNT10 = bin_name_checker:check_for_hardcoded_pants_bin_name
     PNT20 = dedent_use_checker:check_for_dedent_imports
+    PNT30 = await_in_loop:check_for_await_in_loop

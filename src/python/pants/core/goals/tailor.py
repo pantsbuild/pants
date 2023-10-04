@@ -10,9 +10,10 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs import AncestorGlobSpec, RawSpecs, Specs
+from pants.base.specs import AncestorGlobSpec, DirLiteralSpec, RawSpecs, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -48,8 +49,7 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +81,19 @@ def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     return tuple()
 
 
-@frozen_after_init
-@dataclass(order=True, unsafe_hash=True)
+def has_source_or_sources_field(tgt_type: type[Target]) -> bool:
+    """Tell whether a given target type has a `source` or `sources` field.
+
+    This may be useful when determining whether it's possible to tailor a target with the passed
+    source(s) field value if the target doesn't have such a field in the first place.
+    """
+    for field in tgt_type.core_fields:
+        if issubclass(field, (OptionalSingleSourceField, MultipleSourcesField)):
+            return True
+    return False
+
+
+@dataclass(order=True, frozen=True)
 class PutativeTarget:
     """A potential target to add, detected by various heuristics.
 
@@ -147,8 +158,9 @@ class PutativeTarget:
                 )
             )
 
-        default_sources = default_sources_for_target_type(target_type)
-        if (explicit_sources or triggering_sources) and not default_sources:
+        if (explicit_sources or triggering_sources) and not has_source_or_sources_field(
+            target_type
+        ):
             raise AssertionError(
                 softwrap(
                     f"""
@@ -158,6 +170,7 @@ class PutativeTarget:
                     """
                 )
             )
+        default_sources = default_sources_for_target_type(target_type)
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
             path,
@@ -180,13 +193,13 @@ class PutativeTarget:
         kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
     ) -> None:
-        self.path = path
-        self.name = name
-        self.type_alias = type_alias
-        self.triggering_sources = tuple(triggering_sources)
-        self.owned_sources = tuple(owned_sources)
-        self.kwargs = FrozenDict(kwargs or {})
-        self.comments = tuple(comments)
+        object.__setattr__(self, "path", path)
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "type_alias", type_alias)
+        object.__setattr__(self, "triggering_sources", tuple(triggering_sources))
+        object.__setattr__(self, "owned_sources", tuple(owned_sources))
+        object.__setattr__(self, "kwargs", FrozenDict(kwargs or {}))
+        object.__setattr__(self, "comments", tuple(comments))
 
     @property
     def address(self) -> Address:
@@ -257,7 +270,7 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
 class TailorSubsystem(GoalSubsystem):
     name = "tailor"
-    help = softwrap(
+    help = help_text(
         """
         Auto-generate BUILD file targets for new source files.
 
@@ -393,15 +406,6 @@ class TailorSubsystem(GoalSubsystem):
 class TailorGoal(Goal):
     subsystem_cls = TailorSubsystem
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
-
-
-def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
-    """For a list of file paths, returns a dict of directory path -> files in that dir."""
-    ret = defaultdict(set)
-    for path in paths:
-        dirname, filename = os.path.split(path)
-        ret[dirname].add(filename)
-    return ret
 
 
 def group_by_build_file(
@@ -568,6 +572,48 @@ async def edit_build_files(
     return EditedBuildFiles(new_digest, tuple(sorted(created)), tuple(sorted(updated)))
 
 
+def spec_with_build_to_dir(spec: RawSpecs, build_file_patterns: tuple[str, ...]) -> RawSpecs:
+    """Convert a spec like `path/to/BUILD` into `path/to`, which is probably the intention."""
+
+    filespec_matcher = FilespecMatcher(build_file_patterns, ())
+
+    def is_build_file(s: str):
+        return bool(filespec_matcher.matches([s]))
+
+    new_file_literals = []
+    new_dir_literals = []
+
+    # handles existing BUILD files
+    for file_literal in spec.file_literals:
+        path = Path(file_literal.file)
+        if is_build_file(path.name):
+            # convert FileLiteralSpec into DirLiteralSpec
+            new_dir_literals.append(DirLiteralSpec(path.parent.as_posix()))
+        else:
+            new_file_literals.append(file_literal)
+
+    # If the BUILD file doesn't exist (possibly because it was deleted)
+    # it will appear as a dir_literal
+    for dir_literal in spec.dir_literals:
+        path = Path(dir_literal.directory)
+        if is_build_file(path.name):
+            new_dir_literals.append(DirLiteralSpec(path.parent.as_posix()))
+        else:
+            new_dir_literals.append(dir_literal)
+
+    return dataclasses.replace(
+        spec, dir_literals=tuple(new_dir_literals), file_literals=tuple(new_file_literals)
+    )
+
+
+def resolve_specs_with_build(specs: Specs, build_file_patterns: tuple[str, ...]) -> Specs:
+    """Convert Specs with specs like `path/to/BUILD` into `path/to`, which is probably the
+    intention."""
+    new_includes = spec_with_build_to_dir(specs.includes, build_file_patterns)
+    new_ignores = spec_with_build_to_dir(specs.ignores, build_file_patterns)
+    return dataclasses.replace(specs, includes=new_includes, ignores=new_ignores)
+
+
 @goal_rule
 async def tailor(
     tailor_subsystem: TailorSubsystem,
@@ -578,6 +624,9 @@ async def tailor(
     build_file_options: BuildFileOptions,
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
+
+    specs = resolve_specs_with_build(specs, build_file_options.patterns)
+
     if not specs:
         if not specs.includes.from_change_detection:
             logger.warning(
@@ -590,6 +639,7 @@ async def tailor(
                       * `{bin_name()} tailor ::` to run on everything
                       * `{bin_name()} tailor dir::` to run on `dir` and subdirs
                       * `{bin_name()} tailor dir` to run on `dir`
+                      * `{bin_name()} tailor dir/{tailor_subsystem.build_file_name}` to run on `dir`
                       * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
                     """
                 )

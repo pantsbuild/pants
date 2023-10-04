@@ -11,9 +11,11 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
+from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
+    EnvironmentAwarePackageRequest,
     OutputPathField,
     PackageFieldSet,
 )
@@ -28,11 +30,12 @@ from pants.engine.fs import (
     FileDigest,
     FileEntry,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
     Snapshot,
 )
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
@@ -46,6 +49,7 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InvalidFieldTypeException,
     MultipleSourcesField,
+    OptionalSingleSourceField,
     OverridesField,
     SingleSourceField,
     SourcesField,
@@ -58,11 +62,11 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 # -----------------------------------------------------------------------------------------------
 # `per_platform` object
@@ -155,8 +159,7 @@ class per_platform(Generic[_T]):
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
+@dataclass(frozen=True)
 class http_source:
     url: str
     len: int
@@ -170,11 +173,16 @@ class http_source:
             if not isinstance(value, getattr(builtins, cast(str, field.type))):
                 raise TypeError(f"`{field.name}` must be a `{field.type}`, got `{type(value)!r}`.")
 
-        self.url = url
-        self.len = len
-        self.sha256 = sha256
-        self.filename = filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+        object.__setattr__(self, "url", url)
+        object.__setattr__(self, "len", len)
+        object.__setattr__(self, "sha256", sha256)
+        object.__setattr__(
+            self, "filename", filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+        )
 
+        self.__post_init__()
+
+    def __post_init__(self):
         if not self.filename:
             raise ValueError(
                 softwrap(
@@ -195,31 +203,31 @@ class AssetSourceField(SingleSourceField):
     value: str | http_source | per_platform[http_source]  # type: ignore[assignment]
     # @TODO: Don't document http_source, link to it once https://github.com/pantsbuild/pants/issues/14832
     # is implemented.
-    help = softwrap(
+    help = help_text(
         """
         The source of this target.
 
         If a string is provided, represents a path that is relative to the BUILD file's directory,
         e.g. `source='example.ext'`.
 
-        If an http_source is provided, represents the network location to download the source from.
+        If an `http_source` is provided, represents the network location to download the source from.
         The downloaded file will exist in the sandbox in the same directory as the target.
 
         `http_source` has the following signature:
 
             http_source(url: str, *, len: int, sha256: str, filename: str = "")
 
-        The filename defaults to the last part of the URL path (E.g. `example.ext`), but can also be
+        The filename defaults to the last part of the URL path (e.g. `example.ext`), but can also be
         specified if you wish to have control over the file name. You cannot, however, specify a
         path separator to download the file into a subdirectory (you must declare a target in desired
         subdirectory).
 
         You can easily get the len and checksum with the following command:
 
-            `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+            curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null
 
         If a `per_platform` is provided, represents a mapping from platform to `http_source`, where
-        the platform is one of (linux_arm64, linux_x86_64, macos_arm64, macos_x86_64) and is
+        the platform is one of (`linux_arm64`, `linux_x86_64`, `macos_arm64`, `macos_x86_64`) and is
         resolved in the execution target. Each `http_source` value MUST have the same filename provided.
         """
     )
@@ -280,7 +288,6 @@ class AssetSourceField(SingleSourceField):
         return os.path.join(self.address.spec_path, filename)
 
 
-@rule_helper
 async def _hydrate_asset_source(
     request: GenerateSourcesRequest, platform: Platform
 ) -> GeneratedSources:
@@ -326,7 +333,7 @@ class FileDependenciesField(Dependencies):
 class FileTarget(Target):
     alias = "file"
     core_fields = (*COMMON_TARGET_FIELDS, FileDependenciesField, FileSourceField)
-    help = softwrap(
+    help = help_text(
         """
         A single loose file that lives outside of code packages.
 
@@ -340,7 +347,6 @@ class FileTarget(Target):
 class GenerateFileSourceRequest(GenerateSourcesRequest):
     input = FileSourceField
     output = FileSourceField
-    exportable = False
 
 
 @rule
@@ -398,7 +404,7 @@ class RelocatedFilesSourcesField(MultipleSourcesField):
 class RelocatedFilesOriginalTargetsField(SpecialCasedDependencies):
     alias = "files_targets"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         Addresses to the original `file` and `files` targets that you want to relocate, such as
         `['//:json_files']`.
@@ -412,7 +418,7 @@ class RelocatedFilesOriginalTargetsField(SpecialCasedDependencies):
 class RelocatedFilesSrcField(StringField):
     alias = "src"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         The original prefix that you want to replace, such as `src/resources`.
 
@@ -425,7 +431,7 @@ class RelocatedFilesSrcField(StringField):
 class RelocatedFilesDestField(StringField):
     alias = "dest"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         The new prefix that you want to add to the beginning of the path, such as `data`.
 
@@ -444,7 +450,7 @@ class RelocatedFiles(Target):
         RelocatedFilesSrcField,
         RelocatedFilesDestField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Loose files with path manipulation applied.
 
@@ -546,7 +552,7 @@ class ResourceSourceField(AssetSourceField):
 class ResourceTarget(Target):
     alias = "resource"
     core_fields = (*COMMON_TARGET_FIELDS, ResourceDependenciesField, ResourceSourceField)
-    help = softwrap(
+    help = help_text(
         """
         A single resource file embedded in a code package and accessed in a
         location-independent manner.
@@ -561,7 +567,6 @@ class ResourceTarget(Target):
 class GenerateResourceSourceRequest(GenerateSourcesRequest):
     input = ResourceSourceField
     output = ResourceSourceField
-    exportable = False
 
 
 @rule
@@ -630,7 +635,7 @@ class GenericTargetDependenciesField(Dependencies):
 class GenericTarget(Target):
     alias = "target"
     core_fields = (*COMMON_TARGET_FIELDS, GenericTargetDependenciesField)
-    help = softwrap(
+    help = help_text(
         """
         A generic target with no specific type.
 
@@ -646,21 +651,13 @@ class GenericTarget(Target):
 
 
 @dataclass(frozen=True)
-class AllAssetTargetsRequest:
-    pass
-
-
-@dataclass(frozen=True)
 class AllAssetTargets:
     resources: tuple[Target, ...]
     files: tuple[Target, ...]
 
 
 @rule(desc="Find all assets in project")
-def find_all_assets(
-    all_targets: AllTargets,
-    _: AllAssetTargetsRequest,
-) -> AllAssetTargets:
+def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
     resources = []
     files = []
     for tgt in all_targets:
@@ -681,7 +678,6 @@ class AllAssetTargetsByPath:
 def map_assets_by_path(
     all_asset_targets: AllAssetTargets,
 ) -> AllAssetTargetsByPath:
-
     resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for resource_tgt in all_asset_targets.resources:
         resources_by_path[PurePath(resource_tgt[ResourceSourceField].file_path)].add(resource_tgt)
@@ -717,7 +713,7 @@ class TargetGeneratorSourcesHelperTarget(Target):
 
     alias = "_generator_sources_helper"
     core_fields = (*COMMON_TARGET_FIELDS, TargetGeneratorSourcesHelperSourcesField)
-    help = softwrap(
+    help = help_text(
         """
         A private helper target type used by some target generators.
 
@@ -734,13 +730,13 @@ class TargetGeneratorSourcesHelperTarget(Target):
 
 class ArchivePackagesField(SpecialCasedDependencies):
     alias = "packages"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to any targets that can be built with `{bin_name()} package`, e.g.
         `["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`.
         It will include the results in your archive using the same name they would normally have,
         but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can
-        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_awslambda`, or even another
+        be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_aws_lambda_function`, or even another
         `archive`.
         """
     )
@@ -748,7 +744,7 @@ class ArchivePackagesField(SpecialCasedDependencies):
 
 class ArchiveFilesField(SpecialCasedDependencies):
     alias = "files"
-    help = softwrap(
+    help = help_text(
         """
         Addresses to any `file`, `files`, or `relocated_files` targets to include in the
         archive, e.g. `["resources:logo"]`.
@@ -811,7 +807,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
     )
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
     )
 
@@ -856,9 +852,19 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 # -----------------------------------------------------------------------------------------------
 
 
-class LockfileSourceField(SingleSourceField):
+class LockfileSourceField(OptionalSingleSourceField):
+    """Source field for synthesized `_lockfile` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
     uses_source_roots = False
     required = True
+    value: str
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
 class LockfileDependenciesField(Dependencies):
@@ -868,7 +874,7 @@ class LockfileDependenciesField(Dependencies):
 class LockfileTarget(Target):
     alias = "_lockfile"
     core_fields = (*COMMON_TARGET_FIELDS, LockfileSourceField, LockfileDependenciesField)
-    help = softwrap(
+    help = help_text(
         """
         A target for lockfiles in order to include them in the dependency graph of other targets.
 
@@ -879,7 +885,16 @@ class LockfileTarget(Target):
 
 
 class LockfilesGeneratorSourcesField(MultipleSourcesField):
+    """Sources field for synthesized `_lockfiles` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
     help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
 class LockfilesGeneratorTarget(TargetFilesGenerator):
@@ -898,6 +913,7 @@ def rules():
     return (
         *collect_rules(),
         *archive_rules(),
+        *package.rules(),
         UnionRule(GenerateSourcesRequest, GenerateResourceSourceRequest),
         UnionRule(GenerateSourcesRequest, GenerateFileSourceRequest),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),

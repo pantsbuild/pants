@@ -3,7 +3,6 @@ title: "Internal architecture"
 slug: "internal-rules-architecture"
 hidden: false
 createdAt: "2020-08-26T19:22:24.769Z"
-updatedAt: "2022-04-27T00:01:20.031Z"
 ---
 Rule Graph Construction
 =======================

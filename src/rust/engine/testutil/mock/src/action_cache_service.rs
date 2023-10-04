@@ -95,8 +95,7 @@ impl ActionCache for ActionCacheResponder {
       Some(ar) => ar.clone(),
       None => {
         return Err(Status::not_found(format!(
-          "ActionResult for Action {:?} does not exist",
-          action_digest
+          "ActionResult for Action {action_digest:?} does not exist"
         )));
       }
     };
@@ -111,6 +110,10 @@ impl ActionCache for ActionCacheResponder {
     sleep(self.write_delay).await;
 
     let request = request.into_inner();
+
+    if self.always_errors.load(Ordering::SeqCst) {
+      return Err(Status::unavailable("unavailable".to_owned()));
+    }
 
     let action_digest: Digest = match require_digest(request.action_digest.as_ref()) {
       Ok(digest) => digest,

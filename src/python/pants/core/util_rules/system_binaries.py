@@ -11,10 +11,11 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
+
+from typing_extensions import Self
 
 from pants.core.subsystems import python_bootstrap
-from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
@@ -24,8 +25,8 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
 
@@ -39,15 +40,16 @@ logger = logging.getLogger(__name__)
 SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class BinaryPath:
     path: str
     fingerprint: str
 
     def __init__(self, path: str, fingerprint: str | None = None) -> None:
-        self.path = path
-        self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
+        object.__setattr__(self, "path", path)
+        object.__setattr__(
+            self, "fingerprint", self._fingerprint() if fingerprint is None else fingerprint
+        )
 
     @staticmethod
     def _fingerprint(content: bytes | bytearray | memoryview | None = None) -> str:
@@ -57,26 +59,24 @@ class BinaryPath:
     @classmethod
     def fingerprinted(
         cls, path: str, representative_content: bytes | bytearray | memoryview
-    ) -> BinaryPath:
+    ) -> Self:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathTest:
     args: tuple[str, ...]
     fingerprint_stdout: bool
 
     def __init__(self, args: Iterable[str], fingerprint_stdout: bool = True) -> None:
-        self.args = tuple(args)
-        self.fingerprint_stdout = fingerprint_stdout
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "fingerprint_stdout", fingerprint_stdout)
 
 
 class SearchPath(DeduplicatedCollection[str]):
     """The search path for binaries; i.e.: the $PATH."""
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
     """Request to find a binary of a given name.
@@ -106,21 +106,20 @@ class BinaryPathRequest:
         check_file_entries: bool = False,
         test: BinaryPathTest | None = None,
     ) -> None:
-        self.search_path = SearchPath(search_path)
-        self.binary_name = binary_name
-        self.check_file_entries = check_file_entries
-        self.test = test
+        object.__setattr__(self, "search_path", SearchPath(search_path))
+        object.__setattr__(self, "binary_name", binary_name)
+        object.__setattr__(self, "check_file_entries", check_file_entries)
+        object.__setattr__(self, "test", test)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class BinaryPaths(EngineAwareReturnType):
     binary_name: str
     paths: tuple[BinaryPath, ...]
 
     def __init__(self, binary_name: str, paths: Iterable[BinaryPath] | None = None):
-        self.binary_name = binary_name
-        self.paths = tuple(OrderedSet(paths) if paths else ())
+        object.__setattr__(self, "binary_name", binary_name)
+        object.__setattr__(self, "paths", tuple(OrderedSet(paths) if paths else ()))
 
     def message(self) -> str:
         if not self.paths:
@@ -182,7 +181,6 @@ class BinaryNotFoundError(EnvironmentError):
 class BinaryShimsRequest:
     """Request to create shims for one or more system binaries."""
 
-    output_directory: str
     rationale: str = dataclasses.field(compare=False)
 
     # Create shims for provided binary paths
@@ -193,7 +191,7 @@ class BinaryShimsRequest:
 
     @classmethod
     def for_binaries(
-        cls, *names: str, rationale: str, output_directory: str, search_path: Sequence[str]
+        cls, *names: str, rationale: str, search_path: Sequence[str]
     ) -> BinaryShimsRequest:
         return cls(
             requests=tuple(
@@ -201,30 +199,42 @@ class BinaryShimsRequest:
                 for binary_name in names
             ),
             rationale=rationale,
-            output_directory=output_directory,
         )
 
     @classmethod
     def for_paths(
-        cls, *paths: BinaryPath, rationale: str, output_directory: str
+        cls,
+        *paths: BinaryPath,
+        rationale: str,
     ) -> BinaryShimsRequest:
-        return cls(paths=paths, rationale=rationale, output_directory=output_directory)
+        return cls(
+            paths=paths,
+            rationale=rationale,
+        )
 
 
 @dataclass(frozen=True)
 class BinaryShims:
     """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
 
-    The purpose of these shims is so that a Process may be executed with `bin_directory` added to
-    PATH so that the binaries are available for execution.
+    The purpose of these shims is so that a Process may be executed with `immutable_input_digests`
+    provided to the `Process`, and `path_component` included in its `PATH` environment variable.
 
     The alternative is to add the directories hosting the binaries directly, but that opens up for
     many more unrelated binaries to also be executable from PATH, leaking into the sandbox
     unnecessarily.
     """
 
-    bin_directory: str
     digest: Digest
+    cache_name: str
+
+    @property
+    def immutable_input_digests(self) -> Mapping[str, Digest]:
+        return FrozenDict({self.cache_name: self.digest})
+
+    @property
+    def path_component(self) -> str:
+        return os.path.join("{chroot}", self.cache_name)
 
 
 # -------------------------------------------------------------------------------------------
@@ -236,21 +246,6 @@ class BashBinary(BinaryPath):
     """The `bash` binary."""
 
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
-
-
-@dataclass(frozen=True)
-class BashBinaryRequest:
-    search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
-
-
-class PythonBinary(BinaryPath):
-    """A Python3 interpreter for use by `@rule` code as an alternative to BashBinary scripts.
-
-    Python is usable for `@rule` scripting independently of `pants.backend.python`, but currently
-    thirdparty dependencies are not supported, because PEX lives in that backend.
-
-    TODO: Consider extracting PEX out into the core in order to support thirdparty dependencies.
-    """
 
 
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
@@ -277,27 +272,6 @@ class UnzipBinary(BinaryPath):
 
 
 @dataclass(frozen=True)
-class GunzipBinary:
-    python: PythonBinary
-
-    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
-        archive_name = os.path.basename(archive_path)
-        dest_file_name = os.path.splitext(archive_name)[0]
-        dest_path = os.path.join(extract_path, dest_file_name)
-        script = dedent(
-            f"""
-            import gzip
-            import shutil
-            with gzip.GzipFile(filename={archive_path!r}, mode="rb") as source:
-                with open({dest_path!r}, "wb") as dest:
-                    shutil.copyfileobj(source, dest)
-            """
-        )
-        return (self.python.path, "-c", script)
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class TarBinary(BinaryPath):
     platform: Platform
 
@@ -336,6 +310,10 @@ class MkdirBinary(BinaryPath):
     pass
 
 
+class MktempBinary(BinaryPath):
+    pass
+
+
 class TouchBinary(BinaryPath):
     pass
 
@@ -345,6 +323,10 @@ class CpBinary(BinaryPath):
 
 
 class MvBinary(BinaryPath):
+    pass
+
+
+class LnBinary(BinaryPath):
     pass
 
 
@@ -415,13 +397,13 @@ class GitBinary(BinaryPath):
 async def create_binary_shims(
     binary_shims_request: BinaryShimsRequest,
     bash: BashBinary,
-    mkdir: MkdirBinary,
-    chmod: ChmodBinary,
 ) -> BinaryShims:
     """Creates a bin directory with shims for all requested binaries.
 
-    Useful as input digest for a Process to setup a `bin` directory for PATH.
+    This can be provided to a `Process` as an `immutable_input_digest`, or can be merged into the
+    input digest.
     """
+
     paths = binary_shims_request.paths
     requests = binary_shims_request.requests
     if requests:
@@ -434,50 +416,34 @@ async def create_binary_shims(
         )
         paths += first_paths
 
-    all_paths = (binary.path for binary in paths)
-    bin_relpath = binary_shims_request.output_directory
-    script = ";".join(
-        (
-            f"{mkdir.path} -p {bin_relpath}",
-            *(
-                " && ".join(
-                    [
-                        # The `printf` cmd is a bash builtin, so always available.
-                        f"printf '{_create_shim(bash.path, binary_path)}' > '{bin_relpath}/{os.path.basename(binary_path)}'",
-                        f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
-                    ]
-                )
-                for binary_path in all_paths
-            ),
+    scripts = [
+        FileContent(
+            os.path.basename(path.path), _create_shim(bash.path, path.path), is_executable=True
         )
-    )
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=(bash.path, "-c", script),
-            description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
-            output_directories=(bin_relpath,),
-            level=LogLevel.DEBUG,
-        ),
-    )
-    return BinaryShims(bin_relpath, result.output_digest)
+        for path in paths
+    ]
+
+    digest = await Get(Digest, CreateDigest(scripts))
+    cache_name = f"_binary_shims_{digest.fingerprint}"
+
+    return BinaryShims(digest, cache_name)
 
 
-def _create_shim(bash: str, binary: str) -> str:
+def _create_shim(bash: str, binary: str) -> bytes:
     """The binary shim script to be placed in the output directory for the digest."""
     return dedent(
         f"""\
         #!{bash}
         exec "{binary}" "$@"
         """
-    )
+    ).encode()
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
-async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
+async def get_bash() -> BashBinary:
     request = BinaryPathRequest(
         binary_name="bash",
-        search_path=bash_request.search_path,
+        search_path=BashBinary.DEFAULT_SEARCH_PATH,
         test=BinaryPathTest(args=["--version"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
@@ -485,12 +451,6 @@ async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
     if not first_path:
         raise BinaryNotFoundError.from_request(request)
     return BashBinary(first_path.path, first_path.fingerprint)
-
-
-@rule
-async def get_bash() -> BashBinary:
-    # Expose bash to external consumers.
-    return await Get(BashBinary, BashBinaryRequest())
 
 
 @rule
@@ -503,7 +463,7 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash = await Get(BashBinary, BashBinaryRequest())
+        bash = await Get(BashBinary)
         shebang = f"#!{bash.path}"
 
     script_path = "./find_binary.sh"
@@ -591,80 +551,6 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
     )
 
 
-@rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
-async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
-    # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
-    # for maximum compatibility with internal scripts.
-    interpreter_search_paths = python_bootstrap.interpreter_search_paths
-    all_python_binary_paths = await MultiGet(
-        Get(
-            BinaryPaths,
-            BinaryPathRequest(
-                search_path=interpreter_search_paths,
-                binary_name=binary_name,
-                check_file_entries=True,
-                test=BinaryPathTest(
-                    args=[
-                        "-c",
-                        # N.B.: The following code snippet must be compatible with Python 3.6+.
-                        #
-                        # We hash the underlying Python interpreter executable to ensure we detect
-                        # changes in the real interpreter that might otherwise be masked by Pyenv
-                        # shim scripts found on the search path. Naively, just printing out the full
-                        # version_info would be enough, but that does not account for supported abi
-                        # changes (e.g.: a pyenv switch from a py27mu interpreter to a py27m
-                        # interpreter.)
-                        #
-                        # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
-                        # (writes) since it's a common OS buffer size and an even multiple of the
-                        # hash block size.
-                        dedent(
-                            """\
-                            import sys
-
-                            major, minor = sys.version_info[:2]
-                            if not (major == 3 and minor >= 6):
-                                sys.exit(1)
-
-                            import hashlib
-                            hasher = hashlib.sha256()
-                            with open(sys.executable, "rb") as fp:
-                                for chunk in iter(lambda: fp.read(8192), b""):
-                                    hasher.update(chunk)
-                            sys.stdout.write(hasher.hexdigest())
-                            """
-                        ),
-                    ],
-                    fingerprint_stdout=False,  # We already emit a usable fingerprint to stdout.
-                ),
-            ),
-        )
-        for binary_name in python_bootstrap.interpreter_names
-    )
-
-    for binary_paths in all_python_binary_paths:
-        path = binary_paths.first_path
-        if path:
-            return PythonBinary(
-                path=path.path,
-                fingerprint=path.fingerprint,
-            )
-
-    raise BinaryNotFoundError(
-        # TODO(#7735): Update error message to mention local_environment.
-        softwrap(
-            f"""
-            Was not able to locate a Python interpreter to execute rule code.
-
-            Please ensure that Python is available in one of the locations identified by
-            `[python-bootstrap].search_path`, which currently expands to:
-
-            {interpreter_search_paths}
-        """
-        )
-    )
-
-
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
 async def find_zip() -> ZipBinary:
     request = BinaryPathRequest(
@@ -685,11 +571,6 @@ async def find_unzip() -> UnzipBinary:
         request, rationale="download the tools Pants needs to run"
     )
     return UnzipBinary(first_path.path, first_path.fingerprint)
-
-
-@rule
-def find_gunzip(python: PythonBinary) -> GunzipBinary:
-    return GunzipBinary(python)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
@@ -720,6 +601,14 @@ async def find_mkdir() -> MkdirBinary:
     return MkdirBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `mktempt` binary", level=LogLevel.DEBUG)
+async def find_mktemp() -> MktempBinary:
+    request = BinaryPathRequest(binary_name="mktemp", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="create temporary files/directories")
+    return MktempBinary(first_path.path, first_path.fingerprint)
+
+
 @rule(desc="Finding the `touch` binary", level=LogLevel.DEBUG)
 async def find_touch() -> TouchBinary:
     request = BinaryPathRequest(binary_name="touch", search_path=SEARCH_PATHS)
@@ -742,6 +631,14 @@ async def find_mv() -> MvBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="move files")
     return MvBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `ln` binary", level=LogLevel.DEBUG)
+async def find_ln() -> LnBinary:
+    request = BinaryPathRequest(binary_name="ln", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="link files")
+    return LnBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `chmod` binary", level=LogLevel.DEBUG)
@@ -786,112 +683,6 @@ async def find_git() -> GitBinary:
         request, rationale="track changes to files in your build environment"
     )
     return GitBinary(first_path.path, first_path.fingerprint)
-
-
-# -------------------------------------------------------------------------------------------
-# Rules for lazy requests
-# TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
-# -------------------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class ZipBinaryRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class UnzipBinaryRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class GunzipBinaryRequest:
-    pass
-
-
-class CatBinaryRequest:
-    pass
-
-
-class TarBinaryRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class MkdirBinaryRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class ChmodBinaryRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class DiffBinaryRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class ReadlinkBinaryRequest:
-    pass
-
-
-@dataclass(frozen=True)
-class GitBinaryRequest:
-    pass
-
-
-@rule
-async def find_zip_wrapper(_: ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBinary:
-    return zip_binary
-
-
-@rule
-async def find_unzip_wrapper(_: UnzipBinaryRequest, unzip_binary: UnzipBinary) -> UnzipBinary:
-    return unzip_binary
-
-
-@rule
-async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> GunzipBinary:
-    return gunzip
-
-
-@rule
-async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
-    return tar_binary
-
-
-@rule
-async def find_cat_wrapper(_: CatBinaryRequest, cat_binary: CatBinary) -> CatBinary:
-    return cat_binary
-
-
-@rule
-async def find_mkdir_wrapper(_: MkdirBinaryRequest, mkdir_binary: MkdirBinary) -> MkdirBinary:
-    return mkdir_binary
-
-
-@rule
-async def find_readlink_wrapper(
-    _: ReadlinkBinaryRequest, readlink_binary: ReadlinkBinary
-) -> ReadlinkBinary:
-    return readlink_binary
-
-
-@rule
-async def find_chmod_wrapper(_: ChmodBinaryRequest, chmod_binary: ChmodBinary) -> ChmodBinary:
-    return chmod_binary
-
-
-@rule
-async def find_diff_wrapper(_: DiffBinaryRequest, diff_binary: DiffBinary) -> DiffBinary:
-    return diff_binary
-
-
-@rule
-async def find_git_wrapper(_: GitBinaryRequest, git_binary: GitBinary) -> GitBinary:
-    return git_binary
 
 
 def rules():

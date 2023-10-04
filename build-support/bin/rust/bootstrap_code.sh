@@ -31,9 +31,9 @@ case "${KERNEL}" in
 esac
 
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
+export NATIVE_CLIENT_BINARY="${REPO_ROOT}/src/python/pants/bin/native_client"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
-readonly NATIVE_CLIENT_PATH="${REPO_ROOT}/.pants"
 readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 
 function _build_native_code() {
@@ -55,7 +55,7 @@ function bootstrap_native_code() {
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
 
-  if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f "${NATIVE_CLIENT_PATH}" &&
+  if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f "${NATIVE_CLIENT_BINARY}" &&
     "${engine_version_calculated}" == "${engine_version_in_metadata}" ]]; then
     return 0
   fi
@@ -79,9 +79,9 @@ function bootstrap_native_code() {
   # Create the native engine resource.
   # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
   #  process from being killed when recompiling.
-  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_PATH}"
+  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}"
   cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
-  cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_PATH}"
+  cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_BINARY}"
 
   # Create the accompanying metadata file.
   local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)

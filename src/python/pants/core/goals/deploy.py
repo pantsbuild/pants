@@ -15,7 +15,7 @@ from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -115,7 +115,6 @@ async def publish_process_for_target(
     )
 
 
-@rule_helper
 async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
     processes_per_target = await MultiGet(
         Get(PublishProcesses, _PublishProcessesForTargetRequest(target)) for target in targets
@@ -124,7 +123,6 @@ async def _all_publish_processes(targets: Iterable[Target]) -> PublishProcesses:
     return PublishProcesses(chain.from_iterable(processes_per_target))
 
 
-@rule_helper
 async def _invoke_process(
     console: Console,
     process: InteractiveProcess | None,

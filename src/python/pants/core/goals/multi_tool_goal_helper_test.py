@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from pants.core.goals.check import CheckResult, CheckResults
-from pants.core.goals.multi_tool_goal_helper import determine_specified_tool_names, write_reports
+from pants.core.goals.multi_tool_goal_helper import determine_specified_tool_ids, write_reports
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import EMPTY_DIGEST, Workspace
 from pants.testutil.rule_runner import RuleRunner
@@ -17,14 +17,14 @@ from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 
-def test_determine_specified_tool_names() -> None:
+def test_determine_specified_tool_ids() -> None:
     class StyleReq:
         @classproperty
-        def tool_name(cls) -> str:
+        def tool_id(cls) -> str:
             return "my-tool"
 
     with pytest.raises(ValueError) as exc:
-        determine_specified_tool_names(
+        determine_specified_tool_ids(
             "fake-goal",
             only_option=["bad"],
             all_requests=[StyleReq],

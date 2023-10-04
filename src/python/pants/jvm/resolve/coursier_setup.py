@@ -11,17 +11,19 @@ from hashlib import sha256
 from typing import ClassVar, Iterable, Tuple
 
 from pants.core.util_rules import external_tool
+from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.core.util_rules.system_binaries import BashBinary, PythonBinary
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.option_types import StrListOption
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
@@ -43,8 +45,8 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(  # noqa: PNT20
     for dep in report['dependencies']:
         if not dep.get('file'):
             raise Exception(
-                f"No jar found for {dep['coord']}. Check that it's available in the "
-                "repositories configured in [coursier].repos in pants.toml."
+                f"No jar found for {dep['coord']}. Check that it's available in the"
+                + " repositories configured in [coursier].repos in pants.toml."
             )
         source = PurePath(dep['file'])
         dest_name = dep['coord'].replace(":", "_")
@@ -157,6 +159,7 @@ class Coursier:
     coursier: DownloadedExternalTool
     _digest: Digest
     repos: FrozenOrderedSet[str]
+    _append_only_caches: FrozenDict[str, str]
 
     bin_dir: ClassVar[str] = "__coursier"
     fetch_wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_fetch_wrapper_script.sh"
@@ -200,7 +203,7 @@ class Coursier:
 
     @property
     def append_only_caches(self) -> dict[str, str]:
-        return {self.cache_name: self.cache_dir}
+        return {self.cache_name: self.cache_dir, **self._append_only_caches}
 
     @property
     def immutable_input_digests(self) -> dict[str, Digest]:
@@ -209,7 +212,6 @@ class Coursier:
 
 @dataclass(frozen=True)
 class CoursierFetchProcess:
-
     args: Tuple[str, ...]
     input_digest: Digest
     output_directories: Tuple[str, ...]
@@ -223,7 +225,6 @@ async def invoke_coursier_wrapper(
     coursier: Coursier,
     request: CoursierFetchProcess,
 ) -> Process:
-
     return Process(
         argv=coursier.args(
             request.args,
@@ -243,7 +244,7 @@ async def invoke_coursier_wrapper(
 @rule
 async def setup_coursier(
     coursier_subsystem: CoursierSubsystem,
-    python: PythonBinary,
+    python: PythonBuildStandaloneBinary,
     platform: Platform,
 ) -> Coursier:
     repos_args = (
@@ -302,6 +303,7 @@ async def setup_coursier(
             ),
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
+        _append_only_caches=python.APPEND_ONLY_CACHES,
     )
 
 

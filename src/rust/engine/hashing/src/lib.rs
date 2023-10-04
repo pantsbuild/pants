@@ -26,8 +26,10 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::fmt;
-use std::io::{self, Write};
+use std::io::{self, Error, Write};
+use std::pin::Pin;
 use std::str::FromStr;
+use std::task::{Context, Poll};
 
 use byteorder::ByteOrder;
 use deepsize::DeepSizeOf;
@@ -37,6 +39,7 @@ use serde::de::{MapAccess, Visitor};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest as Sha256Digest, Sha256};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
@@ -73,7 +76,7 @@ impl Fingerprint {
   pub fn from_hex_string(hex_string: &str) -> Result<Fingerprint, String> {
     <[u8; FINGERPRINT_SIZE] as hex::FromHex>::from_hex(hex_string)
       .map(Fingerprint)
-      .map_err(|e| format!("{:?}", e))
+      .map_err(|e| format!("{e:?}"))
   }
 
   pub fn as_bytes(&self) -> &[u8; FINGERPRINT_SIZE] {
@@ -82,9 +85,10 @@ impl Fingerprint {
 
   #[allow(clippy::wrong_self_convention)]
   pub fn to_hex(&self) -> String {
+    // TODO: Switch to `hex::encode` from the `hex` crate.
     let mut s = String::new();
     for &byte in &self.0 {
-      fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
+      fmt::Write::write_fmt(&mut s, format_args!("{byte:02x}")).unwrap();
     }
     s
   }
@@ -145,8 +149,8 @@ impl<'de> Deserialize<'de> for Fingerprint {
       {
         Fingerprint::from_hex_string(v).map_err(|err| {
           serde::de::Error::invalid_value(
-            serde::de::Unexpected::Str(&format!("{:?}: {}", v, err)),
-            &format!("A hex representation of a {} byte value", FINGERPRINT_SIZE).as_str(),
+            serde::de::Unexpected::Str(&format!("{v:?}: {err}")),
+            &format!("A hex representation of a {FINGERPRINT_SIZE} byte value").as_str(),
           )
         })
       }
@@ -170,6 +174,14 @@ impl TryFrom<&str> for Fingerprint {
   fn try_from(s: &str) -> Result<Self, Self::Error> {
     Fingerprint::from_hex_string(s)
   }
+}
+
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
+pub struct AgedFingerprint {
+  // expired_seconds_ago must be the first field for the Ord implementation.
+  pub expired_seconds_ago: u64,
+  pub fingerprint: Fingerprint,
+  pub size_bytes: usize,
 }
 
 ///
@@ -266,20 +278,45 @@ impl Digest {
   }
 }
 
+/// A thin wrapper around a Sha256 hasher to preserve the length as well.
+pub struct Hasher {
+  hasher: Sha256,
+  byte_count: usize,
+}
+
+impl Hasher {
+  pub fn new() -> Self {
+    Self {
+      hasher: Sha256::default(),
+      byte_count: 0,
+    }
+  }
+
+  pub fn update(&mut self, buf: &[u8]) {
+    self.hasher.update(buf);
+    self.byte_count += buf.len();
+  }
+
+  pub fn finish(self) -> Digest {
+    Digest::new(
+      Fingerprint::from_bytes(self.hasher.finalize()),
+      self.byte_count,
+    )
+  }
+}
+
 ///
 /// A Write instance that fingerprints all data that passes through it.
 ///
-pub struct WriterHasher<W: Write> {
-  hasher: Sha256,
-  byte_count: usize,
-  inner: W,
+pub struct WriterHasher<T> {
+  hasher: Hasher,
+  inner: T,
 }
 
-impl<W: Write> WriterHasher<W> {
-  pub fn new(inner: W) -> WriterHasher<W> {
+impl<T> WriterHasher<T> {
+  pub fn new(inner: T) -> WriterHasher<T> {
     WriterHasher {
-      hasher: Sha256::default(),
-      byte_count: 0,
+      hasher: Hasher::new(),
       inner: inner,
     }
   }
@@ -287,14 +324,8 @@ impl<W: Write> WriterHasher<W> {
   ///
   /// Returns the result of fingerprinting this stream, and Drops the stream.
   ///
-  pub fn finish(self) -> (Digest, W) {
-    (
-      Digest::new(
-        Fingerprint::from_bytes(self.hasher.finalize()),
-        self.byte_count,
-      ),
-      self.inner,
-    )
+  pub fn finish(self) -> (Digest, T) {
+    (self.hasher.finish(), self.inner)
   }
 }
 
@@ -303,12 +334,112 @@ impl<W: Write> Write for WriterHasher<W> {
     let written = self.inner.write(buf)?;
     // Hash the bytes that were successfully written.
     self.hasher.update(&buf[0..written]);
-    self.byte_count += written;
     Ok(written)
   }
 
   fn flush(&mut self) -> io::Result<()> {
     self.inner.flush()
+  }
+}
+
+impl<AW: ?Sized + AsyncWrite + Unpin> AsyncWrite for WriterHasher<&mut AW> {
+  fn poll_write(
+    mut self: Pin<&mut Self>,
+    cx: &mut Context<'_>,
+    buf: &[u8],
+  ) -> Poll<Result<usize, Error>> {
+    let inner = Pin::new(&mut *self.inner);
+    let result = inner.poll_write(cx, buf);
+    if let Poll::Ready(Ok(written)) = result {
+      // Hash the bytes that were successfully written.
+      self.hasher.update(&buf[0..written]);
+    }
+    result
+  }
+
+  fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    let inner = Pin::new(&mut *self.inner);
+    inner.poll_flush(cx)
+  }
+
+  fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    let inner = Pin::new(&mut *self.inner);
+    inner.poll_shutdown(cx)
+  }
+}
+
+///
+/// Copy the data from reader and hash the bytes in one pass.
+/// Use hash() to just hash without copying the data anywhere.
+///
+pub fn sync_copy_and_hash<R: ?Sized, W: ?Sized>(
+  reader: &mut R,
+  writer: &mut W,
+) -> io::Result<Digest>
+where
+  R: io::Read,
+  W: io::Write,
+{
+  let mut hasher = WriterHasher::new(writer);
+  let _ = io::copy(reader, &mut hasher)?;
+  Ok(hasher.finish().0)
+}
+
+///
+/// Copy from reader to writer and return whether the copied data matches expected_digest.
+///
+pub fn sync_verified_copy<R: ?Sized, W: ?Sized>(
+  expected_digest: Digest,
+  data_is_immutable: bool,
+  reader: &mut R,
+  writer: &mut W,
+) -> io::Result<bool>
+where
+  R: io::Read,
+  W: io::Write,
+{
+  if data_is_immutable {
+    // Trust that the data hasn't changed, and only validate its length.
+    let copied = io::copy(reader, writer)?;
+    Ok(copied as usize == expected_digest.size_bytes)
+  } else {
+    Ok(expected_digest == sync_copy_and_hash(reader, writer)?)
+  }
+}
+
+///
+/// Copy the data from reader and hash the bytes in one pass.
+/// Use hash() to just hash without copying the data anywhere.
+///
+pub async fn async_copy_and_hash<R, W>(reader: &mut R, writer: &mut W) -> tokio::io::Result<Digest>
+where
+  R: AsyncRead + Unpin + ?Sized,
+  W: AsyncWrite + Unpin + ?Sized,
+{
+  let mut hasher = WriterHasher::new(writer);
+  let _ = tokio::io::copy(reader, &mut hasher).await?;
+  Ok(hasher.finish().0)
+}
+
+///
+/// Copy from reader to writer and return whether the copied data matches expected_digest.
+///
+pub async fn async_verified_copy<R, W>(
+  expected_digest: Digest,
+  data_is_immutable: bool,
+  reader: &mut R,
+  writer: &mut W,
+) -> tokio::io::Result<bool>
+where
+  R: AsyncRead + Unpin + ?Sized,
+  W: AsyncWrite + Unpin + ?Sized,
+{
+  if data_is_immutable {
+    // Trust that the data hasn't changed, and only validate its length.
+    let copied = tokio::io::copy(reader, writer).await?;
+    Ok(copied as usize == expected_digest.size_bytes)
+  } else {
+    Ok(expected_digest == async_copy_and_hash(reader, writer).await?)
   }
 }
 

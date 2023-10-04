@@ -142,7 +142,7 @@ fn hex_16_digit_string_actually_uses_input_number() {
     SpanId(0x_ffff_ffff_ffff_ffff).to_string(),
     "ffffffffffffffff"
   );
-  assert_eq!(SpanId(0x_1).to_string(), "0000000000000001");
+  assert_eq!(SpanId(0x0001).to_string(), "0000000000000001");
   assert_eq!(
     SpanId(0x_0123_4567_89ab_cdef).to_string(),
     "0123456789abcdef"
@@ -219,6 +219,6 @@ fn wu(span_id: u64, parent_id: u64) -> AnonymousWorkunit {
 
 fn wu_level(span_id: u64, parent_id: Option<u64>, level: Level) -> AnonymousWorkunit {
   let mut metadata = WorkunitMetadata::default();
-  metadata.desc = Some(format!("{}", span_id));
+  metadata.desc = Some(format!("{span_id}"));
   (level, SpanId(span_id), parent_id.map(SpanId), metadata)
 }

@@ -22,7 +22,7 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 from pants.vcs.git import GitWorktree
 
 
@@ -100,7 +100,7 @@ class ChangedOptions:
     """A wrapper for the options from the `Changed` Subsystem.
 
     This is necessary because parsing of these options happens before conventional subsystems are
-    configured, so the normal mechanisms like `SubsystemRule` would not work properly.
+    configured, so the normal mechanisms like `Subsystem.rules()` would not work properly.
     """
 
     since: str | None
@@ -141,7 +141,7 @@ class ChangedOptions:
 
 class Changed(Subsystem):
     options_scope = "changed"
-    help = softwrap(
+    help = help_text(
         f"""
         Tell Pants to detect what files and targets have changed from Git.
 

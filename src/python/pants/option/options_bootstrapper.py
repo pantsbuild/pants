@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
-from pants.base.build_environment import get_default_pants_config_file, pants_version
+from pants.base.build_environment import get_buildroot, get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
 from pants.engine.unions import UnionMembership
 from pants.option.alias import CliAlias
@@ -24,7 +24,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import ensure_text
+from pants.util.strutil import ensure_text, softwrap
 
 if TYPE_CHECKING:
     from pants.build_graph.build_configuration import BuildConfiguration
@@ -178,7 +178,9 @@ class OptionsBootstrapper:
             # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
             # earliest place it makes sense to do so and is generically used by both the local and
             # remote pants runners.
-            os.environ["PANTS_BIN_NAME"] = bootstrap_option_values.pants_bin_name
+            os.environ["__PANTS_BIN_NAME"] = munge_bin_name(
+                bootstrap_option_values.pants_bin_name, get_buildroot()
+            )
 
             env_tuples = tuple(
                 sorted(
@@ -285,8 +287,12 @@ class OptionsBootstrapper:
         global_bootstrap_options = self.get_bootstrap_options().for_global_scope()
         if global_bootstrap_options.pants_version != pants_version():
             raise BuildConfigurationError(
-                f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
-                f"our version is {pants_version()}."
+                softwrap(
+                    f"""
+                    Version mismatch: Requested version was {global_bootstrap_options.pants_version},
+                    our version is {pants_version()}.
+                    """
+                )
             )
 
         # Parse and register options.
@@ -299,5 +305,23 @@ class OptionsBootstrapper:
             allow_unknown_options=build_configuration.allow_unknown_options,
         )
         GlobalOptions.validate_instance(options.for_global_scope())
-        self.alias.check_name_conflicts(options.known_scope_to_info)
+        self.alias.check_name_conflicts(
+            options.known_scope_to_info, options.known_scope_to_scoped_args
+        )
         return options
+
+
+def munge_bin_name(pants_bin_name: str, build_root: str) -> str:
+    # Determine a useful bin name to embed in help strings.
+    # The bin name gets embedded in help comments in generated lockfiles,
+    # so we never want to use an abspath.
+    if os.path.isabs(pants_bin_name):
+        pants_bin_name = os.path.realpath(pants_bin_name)
+        build_root = os.path.realpath(os.path.abspath(build_root))
+        # If it's in the buildroot, use the relpath from there. Otherwise use the basename.
+        pants_bin_relpath = os.path.relpath(pants_bin_name, build_root)
+        if pants_bin_relpath.startswith(".."):
+            pants_bin_name = os.path.basename(pants_bin_name)
+        else:
+            pants_bin_name = os.path.join(".", pants_bin_relpath)
+    return pants_bin_name

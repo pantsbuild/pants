@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type, cast
+from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 
@@ -33,12 +34,13 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     AllUnexpandedTargets,
+    AlwaysTraverseDeps,
     AsyncFieldMixin,
     CoarsenedTargets,
     Dependencies,
     DependenciesRequest,
+    DepsTraversalBehavior,
     ExplicitlyProvidedDependencies,
     Field,
     FieldDefaultFactoryRequest,
@@ -51,9 +53,10 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
+    InvalidTargetException,
     MultipleSourcesField,
     OverridesField,
-    SecondaryOwnerMixin,
+    ShouldTraverseDepsPredicate,
     SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -67,7 +70,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -144,8 +146,8 @@ class MockTargetGenerator(TargetFilesGenerator):
 def transitive_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(AllTargets, [AllTargetsRequest]),
-            QueryRule(AllUnexpandedTargets, [AllTargetsRequest]),
+            QueryRule(AllTargets, []),
+            QueryRule(AllUnexpandedTargets, []),
             QueryRule(CoarsenedTargets, [Addresses]),
             QueryRule(Targets, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
@@ -314,7 +316,12 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
     assert direct_deps == Targets()
 
     direct_deps = transitive_targets_rule_runner.request(
-        Targets, [DependenciesRequest(root[Dependencies], include_special_cased_deps=True)]
+        Targets,
+        [
+            DependenciesRequest(
+                root[Dependencies], should_traverse_deps_predicate=AlwaysTraverseDeps()
+            )
+        ],
     )
     assert direct_deps == Targets([d1, d2, d3])
 
@@ -327,7 +334,12 @@ def test_special_cased_dependencies(transitive_targets_rule_runner: RuleRunner) 
 
     transitive_targets = transitive_targets_rule_runner.request(
         TransitiveTargets,
-        [TransitiveTargetsRequest([root.address, d2.address], include_special_cased_deps=True)],
+        [
+            TransitiveTargetsRequest(
+                [root.address, d2.address],
+                should_traverse_deps_predicate=AlwaysTraverseDeps(),
+            )
+        ],
     )
     assert transitive_targets.roots == (root, d2)
     assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
@@ -365,6 +377,80 @@ def test_transitive_targets_tolerates_generated_target_cycles(
         Address("", relative_file_path="t1.txt", target_name="t1"),
         Address("", relative_file_path="dep.txt", target_name="dep"),
     ]
+
+
+def test_transitive_targets_with_should_traverse_deps_predicate(
+    transitive_targets_rule_runner: RuleRunner,
+) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                target(name='t1')
+                target(name='t2', dependencies=[':t1'])
+                target(name='t3')
+                target(name='d1', dependencies=[':t1'])
+                target(name='d2', dependencies=[':t2'])
+                target(name='d3')
+                target(name='skipped', dependencies=[':t3'])
+                target(name='d4', tags=['skip_deps'], dependencies=[':skipped'])
+                target(name='root', dependencies=[':d1', ':d2', ':d3', ':d4'])
+                """
+            ),
+        }
+    )
+
+    def get_target(name: str) -> Target:
+        return transitive_targets_rule_runner.get_target(Address("", target_name=name))
+
+    t1 = get_target("t1")
+    t2 = get_target("t2")
+    t3 = get_target("t3")
+    d1 = get_target("d1")
+    d2 = get_target("d2")
+    d3 = get_target("d3")
+    skipped = get_target("skipped")
+    d4 = get_target("d4")
+    root = get_target("root")
+
+    direct_deps = transitive_targets_rule_runner.request(
+        Targets, [DependenciesRequest(root[Dependencies])]
+    )
+    assert direct_deps == Targets([d1, d2, d3, d4])
+
+    class SkipDepsTagOrTraverse(ShouldTraverseDepsPredicate):
+        def __call__(
+            self, target: Target, field: Dependencies | SpecialCasedDependencies
+        ) -> DepsTraversalBehavior:
+            if "skip_deps" in (target[Tags].value or []):
+                return DepsTraversalBehavior.EXCLUDE
+            return DepsTraversalBehavior.INCLUDE
+
+    predicate = SkipDepsTagOrTraverse()
+    # Assert the class is frozen even though it was not decorated with @dataclass(frozen=True)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        # The dataclass(frozen=True) decorator is only needed if the subclass adds fields.
+        predicate._callable = SkipDepsTagOrTraverse.__call__  # type: ignore[misc] # noqa
+
+    transitive_targets = transitive_targets_rule_runner.request(
+        TransitiveTargets,
+        [
+            TransitiveTargetsRequest(
+                [root.address, d2.address], should_traverse_deps_predicate=predicate
+            )
+        ],
+    )
+    assert transitive_targets.roots == (root, d2)
+    # NB: `//:d2` is both a target root and a dependency of `//:root`.
+    assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, d4, t2, t1])
+    assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, d4, t2, t1])
+    # `//:d4` depends on `//:skipped` which depends on `//:t3`.
+    # Nothing else depends on `//:skipped` or `//:t3`, so they should not
+    # be present in the list of transitive deps thanks to `should_traverse_deps_predicate`.
+    assert skipped not in transitive_targets.dependencies
+    assert t3 not in transitive_targets.dependencies
+    assert skipped not in transitive_targets.closure
+    assert t3 not in transitive_targets.closure
 
 
 def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
@@ -669,7 +755,7 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
             "dir/BUILD": "target()",
         }
     )
-    all_tgts = transitive_targets_rule_runner.request(AllTargets, [AllTargetsRequest()])
+    all_tgts = transitive_targets_rule_runner.request(AllTargets, [])
     expected = {
         Address("", target_name="generator", relative_file_path="f1.txt"),
         Address("", target_name="generator", relative_file_path="f2.txt"),
@@ -678,24 +764,26 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     }
     assert {t.address for t in all_tgts} == expected
 
-    all_unexpanded = transitive_targets_rule_runner.request(
-        AllUnexpandedTargets, [AllTargetsRequest()]
-    )
+    all_unexpanded = transitive_targets_rule_runner.request(AllUnexpandedTargets, [])
     assert {t.address for t in all_unexpanded} == {*expected, Address("", target_name="generator")}
 
 
-class MockSecondaryOwnerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
-    alias = "secondary_owner_field"
-    required = True
+def test_invalid_target(transitive_targets_rule_runner: RuleRunner) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "path/to/BUILD": dedent(
+                """\
+                target(name='t1', frobnot='is-unknown')
+                """
+            ),
+        }
+    )
 
-    @property
-    def filespec(self) -> Filespec:
-        return {"includes": [os.path.join(self.address.spec_path, cast(str, self.value))]}
+    def get_target(name: str) -> Target:
+        return transitive_targets_rule_runner.get_target(Address("path/to", target_name=name))
 
-
-class MockSecondaryOwnerTarget(Target):
-    alias = "secondary_owner"
-    core_fields = (MockSecondaryOwnerField,)
+    with engine_error(InvalidTargetException, contains="path/to/BUILD:1: Unrecognized field"):
+        get_target("t1")
 
 
 @pytest.fixture
@@ -708,7 +796,6 @@ def owners_rule_runner() -> RuleRunner:
             MockTarget,
             MockTargetGenerator,
             MockGeneratedTarget,
-            MockSecondaryOwnerTarget,
         ],
         # NB: The `graph` module masks the environment is most/all positions. We disable the
         # inherent environment so that the positions which do require the environment are
@@ -749,7 +836,6 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
                 """\
                 target(name='not-generator', sources=['*.txt'])
                 generator(name='generator', sources=['*.txt'])
-                secondary_owner(name='secondary', secondary_owner_field='deleted.txt')
                 """
             ),
         }
@@ -760,7 +846,6 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
         expected={
             Address("demo", target_name="generator"),
             Address("demo", target_name="not-generator"),
-            Address("demo", target_name="secondary"),
         },
     )
 
@@ -783,7 +868,6 @@ def test_owners_source_file_does_not_exist(owners_rule_runner: RuleRunner) -> No
             Address("demo", target_name="generator", relative_file_path="f.txt"),
             Address("demo", target_name="generator"),
             Address("demo", target_name="not-generator"),
-            Address("demo", target_name="secondary"),
         },
     )
 
@@ -799,7 +883,6 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
                 target(name='not-generator-f2', sources=['f2.txt'])
                 generator(name='generator-all', sources=['*.txt'])
                 generator(name='generator-f2', sources=['f2.txt'])
-                secondary_owner(name='secondary', secondary_owner_field='f1.txt')
                 """
             ),
         }
@@ -810,7 +893,6 @@ def test_owners_multiple_owners(owners_rule_runner: RuleRunner) -> None:
         expected={
             Address("demo", target_name="generator-all", relative_file_path="f1.txt"),
             Address("demo", target_name="not-generator-all"),
-            Address("demo", target_name="secondary"),
         },
     )
     assert_owners(
@@ -837,7 +919,6 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
                 target(name='f2_first', sources=['f2.txt'])
                 target(name='f2_second', sources=['f2.txt'])
                 generator(name='generated', sources=['*.txt'])
-                secondary_owner(name='secondary', secondary_owner_field='f1.txt')
                 """
             ),
         }
@@ -856,7 +937,6 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             Address("demo", target_name="f1"),
             Address("demo", target_name="f2_first"),
             Address("demo", target_name="f2_second"),
-            Address("demo", target_name="secondary"),
             Address("demo", target_name="generated", relative_file_path="f1.txt"),
             Address("demo", target_name="generated", relative_file_path="f2.txt"),
         },
@@ -919,7 +999,7 @@ def assert_generated(
     if expected_dependencies is not None:
         # TODO: Adjust the `TransitiveTargets` API to expose the complete mapping.
         #   see https://github.com/pantsbuild/pants/issues/11270
-        specs = SpecsParser(rule_runner.build_root).parse_specs(
+        specs = SpecsParser(root_dir=rule_runner.build_root).parse_specs(
             ["::"], description_of_origin="tests"
         )
         addresses = rule_runner.request(Addresses, [specs])
@@ -1373,13 +1453,34 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
     ],
 )
 def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:
-    with engine_error(InvalidFieldException, contains=f"Unrecognized field `{field_content}`"):
+    with engine_error(
+        InvalidTargetException, contains=f"demo/BUILD:1: Unrecognized field `{field_content}`"
+    ):
         assert_generated(
             generated_targets_rule_runner,
             Address("demo"),
             f"generator({field_content}, sources=['*.ext'])",
             ["f1.ext", "f2.ext"],
         )
+
+
+def test_parametrize_single_value_16978(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generated(resolve=parametrize('demo'), source='f1.ext')",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "demo"},
+                Address("demo", parameters={"resolve": "demo"}),
+                residence_dir="demo",
+            ),
+        },
+        expected_dependencies={
+            "demo@resolve=demo": set(),
+        },
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1954,6 +2055,23 @@ def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
     )
     assert_dependencies_resolved(dependencies_rule_runner, Address("no_deps"), expected=[])
     assert_dependencies_resolved(dependencies_rule_runner, Address("ignore"), expected=[])
+
+
+def test_target_error_message_for_bad_field_values(dependencies_rule_runner: RuleRunner) -> None:
+    dependencies_rule_runner.write_files(
+        {
+            "src/BUILD": "smalltalk_libraries(sources=['//'])",
+            "dep/BUILD": "target(dependencies=['//::typo#addr'])",
+        }
+    )
+    err = "src/BUILD:1: Invalid field value for 'sources' in target src:src: Absolute paths not supported: \"//\""
+    with engine_error(InvalidFieldException, contains=err):
+        dependencies_rule_runner.get_target(Address("src"))
+
+    err = "dep/BUILD:1: Failed to get dependencies for dep:dep: Failed to parse address spec"
+    with engine_error(InvalidFieldException, contains=err):
+        target = dependencies_rule_runner.get_target(Address("dep"))
+        dependencies_rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
 
 
 def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> None:

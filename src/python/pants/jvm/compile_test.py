@@ -221,7 +221,6 @@ def test_request_classification(
         members: Sequence[type[ClasspathEntryRequest]],
         generators: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]],
     ) -> tuple[type[ClasspathEntryRequest], type[ClasspathEntryRequest] | None]:
-
         factory = ClasspathEntryRequestFactory(tuple(members), generators)
 
         req = factory.for_targets(

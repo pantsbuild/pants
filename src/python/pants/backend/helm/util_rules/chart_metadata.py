@@ -190,7 +190,7 @@ class HelmChartMetadata:
         if self.maintainers:
             d["maintainers"] = [item.to_json_dict() for item in self.maintainers]
         if self.annotations:
-            d["annotations"] = {key: value for key, value in self.annotations.items()}
+            d["annotations"] = dict(self.annotations.items())
         if self.keywords:
             d["keywords"] = list(self.keywords)
         if self.sources:

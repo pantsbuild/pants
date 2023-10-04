@@ -4,7 +4,6 @@ slug: "plugins-overview"
 excerpt: "An intro to the Pants engine's core concepts."
 hidden: false
 createdAt: "2020-05-07T22:38:39.922Z"
-updatedAt: "2022-05-16T19:56:56.104Z"
 ---
 Pants is designed for extensibility: you can extend Pants by writing custom _plugins_, using a standard Plugin API. In fact, all of Pants's built-in functionality uses the same API!
 
@@ -74,7 +73,14 @@ pythonpath = ["%(buildroot)s/pants-plugins"]
 > 
 > In-repo plugin code should not depend on other in-repo code outside of the `pants-plugins` folder.  The `pants-plugins` folder helps isolate plugins from regular code, which is necessary due to how Pants's startup sequence works.
 
-You can depend on third-party dependencies in your in-repo plugin by adding them to the `plugins` option:
+You can depend on third-party dependencies in your in-repo plugin by adding a `requirements.txt` file next to
+the plugin `register.py` module:
+
+```
+ansicolors==1.18.0
+```
+
+Or, although less recommended, you can add them to the `plugins` option:
 
 ```toml pants.toml
 [GLOBAL]
@@ -166,7 +172,7 @@ python-default = "3rdparty/python/default_lock.txt"
 pants-plugins = [">=3.7,<3.10"]
 ```
 
-Then, update your `pants_requirements` target generator with `resolve="pants-plugins"`, and run `./pants generate-lockfiles`. You will also need to update the relevant `python_source` / `python_sources` and `python_test` / `python_tests` targets to set `resolve="pants-plugins"` (along with possibly the `interpreter_constraints` field).
+Then, update your `pants_requirements` target generator with `resolve="pants-plugins"`, and run `pants generate-lockfiles`. You will also need to update the relevant `python_source` / `python_sources` and `python_test` / `python_tests` targets to set `resolve="pants-plugins"` (along with possibly the `interpreter_constraints` field).
 
 Publishing a plugin
 -------------------

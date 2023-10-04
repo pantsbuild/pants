@@ -39,11 +39,17 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.base.build_root import BuildRoot
 from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.system_binaries import CpBinary, MkdirBinary, MvBinary
+from pants.core.util_rules.system_binaries import (
+    CpBinary,
+    LnBinary,
+    MkdirBinary,
+    MktempBinary,
+    MvBinary,
+)
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
@@ -73,7 +79,6 @@ class MyPyRequest(CheckRequest):
     tool_name = MyPy.options_scope
 
 
-@rule_helper
 async def _generate_argv(
     mypy: MyPy,
     *,
@@ -134,11 +139,12 @@ async def mypy_typecheck_partition(
     mypy: MyPy,
     python_setup: PythonSetup,
     mkdir: MkdirBinary,
+    mktemp: MktempBinary,
     cp: CpBinary,
     mv: MvBinary,
+    ln: LnBinary,
     global_options: GlobalOptions,
 ) -> CheckResult:
-
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
     # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
@@ -168,9 +174,6 @@ async def mypy_typecheck_partition(
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
         ),
     )
-    extra_type_stubs_pex_get = Get(
-        Pex, PexRequest, mypy.extra_type_stubs_pex_request(partition.interpreter_constraints)
-    )
 
     mypy_pex_get = Get(
         VenvPex,
@@ -181,10 +184,13 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    (roots_sources, mypy_pex, extra_type_stubs_pex, requirements_pex,) = await MultiGet(
+    (
+        roots_sources,
+        mypy_pex,
+        requirements_pex,
+    ) = await MultiGet(
         roots_sources_get,
         mypy_pex_get,
-        extra_type_stubs_pex_get,
         requirements_pex_get,
     )
 
@@ -207,7 +213,7 @@ async def mypy_typecheck_partition(
         PexRequest(
             output_filename="requirements_venv.pex",
             internal_only=True,
-            pex_path=[requirements_pex, extra_type_stubs_pex],
+            pex_path=[requirements_pex],
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )
@@ -222,7 +228,8 @@ async def mypy_typecheck_partition(
     py_version = config_file.python_version_to_autoset(
         partition.interpreter_constraints, python_setup.interpreter_versions_universe
     )
-    named_cache_dir = f".cache/mypy_cache/{sha256(build_root.path.encode()).hexdigest()}"
+    named_cache_dir = ".cache/mypy_cache"
+    mypy_cache_dir = f"{named_cache_dir}/{sha256(build_root.path.encode()).hexdigest()}"
     run_cache_dir = ".tmp_cache/mypy_cache"
     argv = await _generate_argv(
         mypy,
@@ -253,11 +260,20 @@ async def mypy_typecheck_partition(
                             # db, as it issues at least 2 single-row queries per source file at different
                             # points in time (therefore SQLite's own safety guarantees don't apply).
                             #
-                            # To workaround this we make a copy of the db from the append_only_cache,
-                            # run MyPy on it, then move the updated cache back to the append_only_cache.
-                            # This is multiprocess-safe as mv on the same filesystem is an atomic "rename",
-                            # and any processes copying the "old" file will still have valid file
-                            # descriptors for the "old" file.
+                            # Our workaround depends on whether we can hardlink between the sandbox
+                            # and cache or not.
+                            #
+                            # If we can hardlink (this means the two sides of the link are on the
+                            # same filesystem), then after mypy runs, we hardlink from the sandbox
+                            # back to the named cache.
+                            #
+                            # If we can't hardlink, we resort to copying the result next to the
+                            # cache under a temporary name, and finally doing an atomic mv from the
+                            # tempfile to the real one.
+                            #
+                            # In either case, the result is an atomic replacement of the "old" named
+                            # cache db, such that old references (via opened file descriptors) are
+                            # still valid, but new references use the new contents.
                             #
                             # There is a chance of multiple processes thrashing on the cache, leaving
                             # it in a state that doesn't reflect reality at the current point in time,
@@ -271,14 +287,25 @@ async def mypy_typecheck_partition(
                             # Lastly, we expect that since this is run through Pants which attempts
                             # to partition MyPy runs by python version (which the DB is independent
                             # for different versions) and uses a one-process-at-a-time daemon by default,
-                            # multuple MyPy processes operating on a single db cache should be rare.
+                            # multiple MyPy processes operating on a single db cache should be rare.
 
-                            {mkdir.path} -p {run_cache_dir}/{py_version} > /dev/null 2>&1 || true
-                            {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+                            NAMED_CACHE_DIR="{mypy_cache_dir}/{py_version}"
+                            NAMED_CACHE_DB="$NAMED_CACHE_DIR/cache.db"
+                            SANDBOX_CACHE_DIR="{run_cache_dir}/{py_version}"
+                            SANDBOX_CACHE_DB="$SANDBOX_CACHE_DIR/cache.db"
+
+                            {mkdir.path} -p "$SANDBOX_CACHE_DIR" > /dev/null 2>&1
+                            {cp.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1
+
                             {' '.join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
-                            {mkdir.path} -p {named_cache_dir}/{py_version} > /dev/null 2>&1 || true
-                            {mv.path} {run_cache_dir}/{py_version}/cache.db {named_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+
+                            if ! {ln.path} "$SANDBOX_CACHE_DB" "$NAMED_CACHE_DB" > /dev/null 2>&1; then
+                                TMP_CACHE=$({mktemp.path} "$SANDBOX_CACHE_DB.tmp.XXXXXX")
+                                {cp.path} "$SANDBOX_CACHE_DB" "$TMP_CACHE" > /dev/null 2>&1
+                                {mv.path} "$TMP_CACHE" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                            fi
+
                             exit $EXIT_CODE
                         """
                     ).encode(),
@@ -341,7 +368,7 @@ async def mypy_typecheck_partition(
         result,
         partition_description=partition.description(),
         report=report,
-        strip_formatting=not global_options.colors,
+        output_simplifier=global_options.output_simplifier(),
     )
 
 

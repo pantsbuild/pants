@@ -105,7 +105,7 @@ where
   T: Iterator,
   T::Item: fmt::Display,
 {
-  let mut items: Vec<_> = items.map(|p| format!("{}", p)).collect();
+  let mut items: Vec<_> = items.map(|p| format!("{p}")).collect();
   match items.len() {
     0 => "()".to_string(),
     1 => items.pop().unwrap(),
@@ -145,9 +145,7 @@ impl TypeId {
   }
 
   pub fn is_union(&self) -> bool {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    externs::is_union(py, self.as_py_type(py)).unwrap()
+    Python::with_gil(|py| externs::is_union(py, self.as_py_type(py)).unwrap())
   }
 
   pub fn union_in_scope_types(&self) -> Option<Vec<TypeId>> {
@@ -169,14 +167,14 @@ impl fmt::Debug for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     Python::with_gil(|py| {
       let name = self.as_py_type(py).name().unwrap();
-      write!(f, "{}", name)
+      write!(f, "{name}")
     })
   }
 }
 
 impl fmt::Display for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -207,7 +205,7 @@ impl Function {
       let line_no: u64 = externs::getattr(obj, "__line_number__").unwrap();
       (module, name, line_no)
     });
-    format!("{}:{}:{}", module, line_no, name)
+    format!("{module}:{line_no}:{name}")
   }
 }
 
@@ -219,7 +217,7 @@ impl fmt::Debug for Function {
 
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -253,7 +251,7 @@ impl fmt::Debug for Key {
 
 impl fmt::Display for Key {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -271,9 +269,7 @@ impl Key {
   }
 
   pub fn from_value(val: Value) -> PyResult<Key> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    externs::INTERNS.key_insert(py, val.consume_into_py_object(py))
+    Python::with_gil(|py| externs::INTERNS.key_insert(py, val.consume_into_py_object(py)))
   }
 
   pub fn to_value(&self) -> Value {
@@ -339,13 +335,13 @@ impl fmt::Debug for Value {
       let obj = (*self.0).as_ref(py);
       externs::val_to_str(obj)
     });
-    write!(f, "{}", repr)
+    write!(f, "{repr}")
   }
 }
 
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -379,9 +375,7 @@ impl From<PyObject> for Value {
 
 impl From<PyErr> for Value {
   fn from(py_err: PyErr) -> Self {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Value::new(py_err.into_py(py))
+    Python::with_gil(|py| Value::new(py_err.into_py(py)))
   }
 }
 
@@ -470,8 +464,7 @@ impl Failure {
           py_err.set_cause(py, Some(PyErr::from_value((*val.0).as_ref(py))));
           (
             format!(
-              "{}\nDuring handling of the above exception, another exception occurred:\n\n",
-              python_traceback
+              "{python_traceback}\nDuring handling of the above exception, another exception occurred:\n\n"
             ),
             engine_traceback,
           )
@@ -512,10 +505,7 @@ impl Failure {
   }
 
   pub fn native_traceback(msg: &str) -> String {
-    format!(
-      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
-      msg
-    )
+    format!("Traceback (no traceback):\n  <pants native internals>\nException: {msg}")
   }
 }
 
@@ -547,7 +537,7 @@ impl fmt::Display for Failure {
           let obj = (*val.0).as_ref(py);
           externs::val_to_str(obj)
         });
-        write!(f, "{}", repr)
+        write!(f, "{repr}")
       }
     }
   }
@@ -585,18 +575,15 @@ impl From<String> for Failure {
 
 impl From<PyErr> for Failure {
   fn from(py_err: PyErr) -> Self {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Failure::from_py_err_with_gil(py, py_err)
+    Python::with_gil(|py| Failure::from_py_err_with_gil(py, py_err))
   }
 }
 
 pub fn throw(msg: String) -> Failure {
   let python_traceback = Failure::native_traceback(&msg);
-  let gil = Python::acquire_gil();
-  Failure::Throw {
-    val: externs::create_exception(gil.python(), msg),
+  Python::with_gil(|py| Failure::Throw {
+    val: externs::create_exception(py, msg),
     python_traceback,
     engine_traceback: Vec::new(),
-  }
+  })
 }

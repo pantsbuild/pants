@@ -14,9 +14,10 @@ from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import ProcessResult
+from pants.engine.process import ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
+from pants.option.global_options import KeepSandboxes
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -62,7 +63,9 @@ def generate_argv(
 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
-async def isort_fmt(request: IsortRequest.Batch, isort: Isort) -> FmtResult:
+async def isort_fmt(
+    request: IsortRequest.Batch, isort: Isort, keep_sandboxes: KeepSandboxes
+) -> FmtResult:
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
@@ -80,6 +83,7 @@ async def isort_fmt(request: IsortRequest.Batch, isort: Isort) -> FmtResult:
         Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
+    description = f"Run isort on {pluralize(len(request.files), 'file')}."
     result = await Get(
         ProcessResult,
         VenvPexProcess(
@@ -87,11 +91,21 @@ async def isort_fmt(request: IsortRequest.Batch, isort: Isort) -> FmtResult:
             argv=generate_argv(request.files, isort, is_isort5=is_isort5),
             input_digest=input_digest,
             output_files=request.files,
-            description=f"Run isort on {pluralize(len(request.files), 'file')}.",
+            description=description,
             level=LogLevel.DEBUG,
         ),
     )
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+
+    if b"Failed to pull configuration information" in result.stderr:
+        raise ProcessExecutionFailure(
+            -1,
+            result.stdout,
+            result.stderr,
+            description,
+            keep_sandboxes=keep_sandboxes,
+        )
+
+    return await FmtResult.create(request, result)
 
 
 def rules():

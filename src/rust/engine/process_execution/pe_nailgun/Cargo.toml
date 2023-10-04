@@ -1,0 +1,38 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "pe_nailgun"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+nails = { workspace = true }
+store = { path = "../../fs/store" }
+task_executor = { path = "../../task_executor" }
+tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+workunit_store = { path = "../../workunit_store" }
+itertools = { workspace = true }
+process_execution = { path = ".." }
+lazy_static = { workspace = true }
+regex = { workspace = true }
+tempfile = { workspace = true }
+hashing = { path = "../../hashing" }
+
+
+[dev-dependencies]
+env_logger = { workspace = true }
+maplit = { workspace = true }
+mock = { path = "../../testutil/mock" }
+parking_lot = { workspace = true }
+sharded_lmdb = { path = "../../sharded_lmdb" }
+tempfile = { workspace = true }
+testutil = { path = "../../testutil" }
+tokio = { workspace = true, features = ["macros"] }
+process_execution = { path = ".." }

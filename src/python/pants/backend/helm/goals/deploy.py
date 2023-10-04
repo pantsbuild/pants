@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DeployHelmDeploymentFieldSet(HelmDeploymentFieldSet, DeployFieldSet):
-
     timeout: HelmDeploymentTimeoutField
 
 

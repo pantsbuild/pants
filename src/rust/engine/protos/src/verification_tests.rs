@@ -80,8 +80,7 @@ fn empty_child_name() {
   let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
   assert!(
     error.contains("A child name must not be empty"),
-    "Bad error message: {}",
-    error
+    "Bad error message: {error}"
   );
 }
 
@@ -99,7 +98,7 @@ fn multiple_path_segments_in_directory() {
   };
 
   let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
-  assert!(error.contains("pets/cats"), "Bad error message: {}", error);
+  assert!(error.contains("pets/cats"), "Bad error message: {error}");
 }
 
 #[test]
@@ -117,11 +116,7 @@ fn multiple_path_segments_in_file() {
   };
 
   let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
-  assert!(
-    error.contains("cats/roland"),
-    "Bad error message: {}",
-    error
-  );
+  assert!(error.contains("cats/roland"), "Bad error message: {error}");
 }
 
 #[test]
@@ -147,7 +142,7 @@ fn duplicate_path_in_directory() {
   };
 
   let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
-  assert!(error.contains("cats"), "Bad error message: {}", error);
+  assert!(error.contains("cats"), "Bad error message: {error}");
 }
 
 #[test]
@@ -175,7 +170,7 @@ fn duplicate_path_in_file() {
   };
 
   let error = verify_directory_canonical(EMPTY_DIGEST, &directory).expect_err("Want error");
-  assert!(error.contains("roland"), "Bad error message: {}", error);
+  assert!(error.contains("roland"), "Bad error message: {error}");
 }
 
 #[test]

@@ -21,10 +21,10 @@ pub fn status_is_retryable(status: &Status) -> bool {
 
 /// Retry a gRPC client operation using exponential back-off to delay between attempts.
 #[inline]
-pub async fn retry_call<T, E, C, F, G, Fut>(client: C, f: F, is_retryable: G) -> Result<T, E>
+pub async fn retry_call<T, E, C, F, G, Fut>(client: C, mut f: F, is_retryable: G) -> Result<T, E>
 where
   C: Clone,
-  F: Fn(C) -> Fut,
+  F: FnMut(C, u32) -> Fut,
   G: Fn(&E) -> bool,
   Fut: Future<Output = Result<T, E>>,
 {
@@ -43,7 +43,7 @@ where
     }
 
     let client2 = client.clone();
-    let result_fut = f(client2);
+    let result_fut = f(client2, num_retries);
     let last_error = match result_fut.await {
       Ok(r) => return Ok(r),
       Err(err) => {
@@ -97,45 +97,56 @@ mod tests {
 
   #[tokio::test]
   async fn retry_call_works_as_expected() {
+    // several retryable errors
     let client = MockClient::new(vec![
       Err(MockError(true, "first")),
       Err(MockError(true, "second")),
-      Ok(3isize),
-      Ok(4isize),
+      Ok(3_isize),
+      Ok(4_isize),
     ]);
+    let mut expected_attempt = 0;
     let result = retry_call(
       client.clone(),
-      |client| async move { client.next().await },
+      |client, attempt| {
+        // check `attempt` is being passed through as expected: starting with 0 for the first
+        // call, and incriminating for each one after
+        assert_eq!(attempt, expected_attempt);
+        expected_attempt += 1;
+
+        async move { client.next().await }
+      },
       |err| err.0,
     )
     .await;
-    assert_eq!(result, Ok(3isize));
+    assert_eq!(result, Ok(3_isize));
     assert_eq!(client.values.lock().len(), 1);
 
+    // a non retryable error
     let client = MockClient::new(vec![
       Err(MockError(true, "first")),
       Err(MockError(false, "second")),
-      Ok(3isize),
-      Ok(4isize),
+      Ok(3_isize),
+      Ok(4_isize),
     ]);
     let result = retry_call(
       client.clone(),
-      |client| async move { client.next().await },
+      |client, _| async move { client.next().await },
       |err| err.0,
     )
     .await;
     assert_eq!(result, Err(MockError(false, "second")));
     assert_eq!(client.values.lock().len(), 2);
 
+    // retryable errors, but too many
     let client = MockClient::new(vec![
       Err(MockError(true, "first")),
       Err(MockError(true, "second")),
       Err(MockError(true, "third")),
-      Ok(1isize),
+      Ok(1_isize),
     ]);
     let result = retry_call(
       client.clone(),
-      |client| async move { client.next().await },
+      |client, _| async move { client.next().await },
       |err| err.0,
     )
     .await;

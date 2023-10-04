@@ -25,7 +25,7 @@ fn handle_postconnect_stdio(err: io::Error, msg: &str) -> NailgunClientError {
     // the Python runtime has a special error type and handling for.
     NailgunClientError::BrokenPipe
   } else {
-    NailgunClientError::PostConnect(format!("{}: {}", msg, err))
+    NailgunClientError::PostConnect(format!("{msg}: {err}"))
   }
 }
 
@@ -112,12 +112,12 @@ pub async fn client_execute(
   };
 
   let signal_stream = signal(SignalKind::interrupt()).map_err(|err| {
-    NailgunClientError::PreConnect(format!("Failed to install interrupt handler: {}", err))
+    NailgunClientError::PreConnect(format!("Failed to install interrupt handler: {err}"))
   })?;
   let socket = TcpStream::connect((Ipv4Addr::new(127, 0, 0, 1), port))
     .await
     .map_err(|err| {
-      NailgunClientError::PreConnect(format!("Failed to connect to localhost: {}", err))
+      NailgunClientError::PreConnect(format!("Failed to connect to localhost: {err}"))
     })?;
 
   let mut child = nails::client::handle_connection(config, socket, command, async {
@@ -126,7 +126,7 @@ pub async fn client_execute(
     stdin_read
   })
   .await
-  .map_err(|err| NailgunClientError::PreConnect(format!("Failed to start: {}", err)))?;
+  .map_err(|err| NailgunClientError::PreConnect(format!("Failed to start: {err}")))?;
 
   handle_client_output(
     child.output_stream.take().unwrap(),
@@ -150,7 +150,7 @@ pub async fn client_execute(
             although you will miss out on additional caching."
           .to_owned()
       }
-      _ => format!("Failed during execution: {}", err),
+      _ => format!("Failed during execution: {err}"),
     };
     NailgunClientError::PostConnect(err_str)
   })?;

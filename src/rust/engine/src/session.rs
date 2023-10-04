@@ -7,13 +7,13 @@ use std::sync::atomic::{self, AtomicU32};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
-use crate::context::Core;
+use crate::context::{Core, SessionCore};
 use crate::nodes::{NodeKey, Select};
 use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
 use futures::future::{self, FutureExt};
-use graph::LastObserved;
+use graph::{Context, LastObserved};
 use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
@@ -31,7 +31,7 @@ const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
 // Root requests are limited to Select nodes, which produce (python) Values.
 pub type Root = Select;
 
-pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
+pub type ObservedValueResult = (Result<Value, Failure>, Option<LastObserved>);
 
 ///
 /// An enum for the two cases of `--[no-]dynamic-ui`.
@@ -175,7 +175,7 @@ impl Session {
       display,
     });
     core.sessions.add(&handle)?;
-    let run_id = core.sessions.generate_run_id();
+    let run_id = core.graph.generate_run_id();
     let preceding_graph_size = core.graph.len();
     Ok(Session {
       handle,
@@ -189,6 +189,16 @@ impl Session {
         tail_tasks: TailTasks::new(),
       }),
     })
+  }
+
+  ///
+  /// Return a `graph::Context` for this Session.
+  ///
+  pub fn graph_context(&self) -> Context<NodeKey> {
+    self
+      .core()
+      .graph
+      .context_with_run_id(SessionCore::new(self.clone()), self.run_id())
   }
 
   ///
@@ -286,7 +296,7 @@ impl Session {
 
   pub fn new_run_id(&self) {
     self.state.run_id.store(
-      self.state.core.sessions.generate_run_id().0,
+      self.state.core.graph.generate_run_id().0,
       atomic::Ordering::SeqCst,
     );
   }
@@ -394,9 +404,6 @@ pub struct Sessions {
   sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>>,
   /// Handle to kill the signal monitoring task when this object is killed.
   signal_task_handle: JoinHandle<()>,
-  /// A generator for RunId values. Although this is monotonic, there is no meaning assigned to
-  /// ordering: only equality is relevant.
-  run_id_generator: AtomicU32,
 }
 
 impl Sessions {
@@ -407,7 +414,7 @@ impl Sessions {
     // non-isolated Sessions.
     let signal_task_handle = {
       let mut signal_stream = signal(SignalKind::interrupt())
-        .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
+        .map_err(|err| format!("Failed to install interrupt handler: {err}"))?;
       let sessions = sessions.clone();
       executor.native_spawn(async move {
         loop {
@@ -433,7 +440,6 @@ impl Sessions {
     Ok(Sessions {
       sessions,
       signal_task_handle,
-      run_id_generator: AtomicU32::new(0),
     })
   }
 
@@ -446,10 +452,6 @@ impl Sessions {
     } else {
       Err("The scheduler is shutting down: no new sessions may be created.".to_string())
     }
-  }
-
-  fn generate_run_id(&self) -> RunId {
-    RunId(self.run_id_generator.fetch_add(1, atomic::Ordering::SeqCst))
   }
 
   ///
@@ -480,7 +482,7 @@ impl Sessions {
         log::info!("Waiting for shutdown of: {:?}", build_ids);
         tokio::time::timeout(timeout, future::join_all(cancellation_latches))
           .await
-          .map_err(|_| format!("Some Sessions did not shutdown within {:?}.", timeout))?;
+          .map_err(|_| format!("Some Sessions did not shutdown within {timeout:?}."))?;
       }
     }
     Ok(())

@@ -14,7 +14,7 @@ import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, DefaultDict, Iterator, Sequence, overload
+from typing import Any, Callable, DefaultDict, Iterable, Iterator, Sequence, overload
 
 from typing_extensions import Literal
 
@@ -84,7 +84,9 @@ def safe_mkdir_for(path: str | Path, clean: bool = False) -> None:
 
     If it's not there, create it. If it is, no-op.
     """
-    safe_mkdir(os.path.dirname(path), clean=clean)
+    dirname = os.path.dirname(path)
+    if dirname:
+        safe_mkdir(dirname, clean=clean)
 
 
 def safe_file_dump(
@@ -438,3 +440,24 @@ def rm_rf(name: str) -> None:
         elif e.errno != errno.ENOENT:
             # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
             raise
+
+
+def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
+    """For a list of file paths, returns a dict of directory path -> files in that dir."""
+    ret = defaultdict(set)
+    for path in paths:
+        dirname, filename = os.path.split(path)
+        ret[dirname].add(filename)
+    return ret
+
+
+def find_nearest_ancestor_file(files: set[str], dir: str, filename: str) -> str | None:
+    """Given a filename return the nearest ancestor file of that name in the directory hierarchy."""
+    while True:
+        candidate_config_file_path = os.path.join(dir, filename)
+        if candidate_config_file_path in files:
+            return candidate_config_file_path
+
+        if dir == "":
+            return None
+        dir = os.path.dirname(dir)

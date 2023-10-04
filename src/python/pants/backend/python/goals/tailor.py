@@ -13,6 +13,9 @@ from typing import Iterable
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
 from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements
 from pants.backend.python.macros.poetry_requirements import PyProjectToml, parse_pyproject_toml
+from pants.backend.python.macros.python_requirements import (
+    parse_pyproject_toml as parse_pep621_pyproject_toml,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
@@ -24,7 +27,6 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
-    parse_requirements_file,
 )
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
@@ -32,16 +34,18 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
-    group_by_dir,
 )
+from pants.core.target_types import ResourceTarget
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
+from pants.util.requirements import parse_requirements_file
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +94,27 @@ def is_entry_point(content: bytes) -> bool:
     return _entry_point_re.search(content) is not None
 
 
-@rule_helper
+async def _find_resource_py_typed_targets(
+    py_typed_files_globs: PathGlobs, all_owned_sources: AllOwnedSources
+) -> list[PutativeTarget]:
+    """Find resource targets that may be created after discovering any `py.typed` files."""
+    all_py_typed_files = await Get(Paths, PathGlobs, py_typed_files_globs)
+    unowned_py_typed_files = set(all_py_typed_files.files) - set(all_owned_sources)
+
+    putative_targets = []
+    for dirname, filenames in group_by_dir(unowned_py_typed_files).items():
+        putative_targets.append(
+            PutativeTarget.for_target_type(
+                ResourceTarget,
+                kwargs={"source": "py.typed"},
+                path=dirname,
+                name="py_typed",
+                triggering_sources=sorted(filenames),
+            )
+        )
+    return putative_targets
+
+
 async def _find_source_targets(
     py_files_globs: PathGlobs, all_owned_sources: AllOwnedSources, python_setup: PythonSetup
 ) -> list[PutativeTarget]:
@@ -153,6 +177,13 @@ async def find_putative_targets(
         )
         pts.extend(source_targets)
 
+    if python_setup.tailor_py_typed_targets:
+        all_py_typed_files_globs: PathGlobs = req.path_globs("py.typed")
+        resource_targets = await _find_resource_py_typed_targets(
+            all_py_typed_files_globs, all_owned_sources
+        )
+        pts.extend(resource_targets)
+
     if python_setup.tailor_requirements_targets:
         # Find requirements files.
         (
@@ -172,7 +203,7 @@ async def find_putative_targets(
                 path, name = os.path.split(fp)
 
                 try:
-                    validate(fp, contents[fp], alias)
+                    validate(fp, contents[fp], alias, target_name)
                 except Exception as e:
                     logger.warning(
                         f"An error occurred when validating `{fp}`: {e}.\n\n"
@@ -197,8 +228,10 @@ async def find_putative_targets(
                     )
                 )
 
-        def validate(path: str, contents: bytes, alias: str) -> None:
+        def validate(path: str, contents: bytes, alias: str, target_name: str) -> None:
             if alias == "python_requirements":
+                if path.endswith("pyproject.toml"):
+                    return validate_pep621_requirements(path, contents)
                 return validate_python_requirements(path, contents)
             elif alias == "pipenv_requirements":
                 return validate_pipenv_requirements(contents)
@@ -208,6 +241,9 @@ async def find_putative_targets(
         def validate_python_requirements(path: str, contents: bytes) -> None:
             for _ in parse_requirements_file(contents.decode(), rel_path=path):
                 pass
+
+        def validate_pep621_requirements(path: str, contents: bytes) -> None:
+            list(parse_pep621_pyproject_toml(contents.decode(), rel_path=path))
 
         def validate_pipenv_requirements(contents: bytes) -> None:
             parse_pipenv_requirements(contents)
@@ -222,6 +258,21 @@ async def find_putative_targets(
             {fc for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
             "poetry_requirements",
             "poetry",
+        )
+
+        def pyproject_toml_has_pep621(fc) -> bool:
+            try:
+                return (
+                    len(list(parse_pep621_pyproject_toml(fc.content.decode(), rel_path=fc.path)))
+                    > 0
+                )
+            except Exception:
+                return False
+
+        add_req_targets(
+            {fc for fc in all_pyproject_toml_contents if pyproject_toml_has_pep621(fc)},
+            "python_requirements",
+            "reqs",
         )
 
     if python_setup.tailor_pex_binary_targets:

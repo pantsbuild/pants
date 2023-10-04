@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass, replace
 from typing import Iterable
 
 import toml
 
-from pants.backend.javascript.subsystems.nodejs import NpxProcess
+from pants.backend.javascript.subsystems import nodejs_tool
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -24,7 +26,13 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.partition import (
     _partition_by_interpreter_constraints_and_resolve,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexRequest,
+    VenvPex,
+    VenvPexProcess,
+    VenvPexRequest,
+)
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -39,11 +47,10 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, Rule, collect_rules, rule, rule_helper
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
+from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
@@ -85,7 +92,6 @@ class PyrightPartitions(Collection[PyrightPartition]):
     pass
 
 
-@rule_helper
 async def _patch_config_file(
     config_files: ConfigFiles, venv_dir: str, source_roots: Iterable[str]
 ) -> Digest:
@@ -93,7 +99,7 @@ async def _patch_config_file(
     requirements_venv_pex). If there is no config file, create a dummy pyrightconfig.json with the
     `venv` key populated.
 
-    The incoming venv directory works alongside the `--venv-path` CLI argument.
+    The incoming venv directory works alongside the `--venvpath` CLI argument.
 
     Additionally, add source roots to the `extraPaths` key in the config file.
     """
@@ -150,14 +156,13 @@ async def pyright_typecheck_partition(
     pyright: Pyright,
     pex_environment: PexEnvironment,
 ) -> CheckResult:
-
     root_sources_get = Get(
         SourceFiles,
         SourceFilesRequest(fs.sources for fs in partition.field_sets),
     )
 
-    # Grab the inferred and supporting files for the root source files to be typechecked
-    coarsened_sources_get = Get(
+    # Grab the closure of the root source files to be typechecked
+    transitive_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets.closure())
     )
 
@@ -170,70 +175,76 @@ async def pyright_typecheck_partition(
         ),
     )
 
-    # Look for any/all of the Pyright configuration files (the config is modified below for the `venv` workaround)
+    # Look for any/all of the Pyright configuration files (the config is modified below
+    # for the `venv` workaround)
     config_files_get = Get(
         ConfigFiles,
         ConfigFilesRequest,
         pyright.config_request(),
     )
 
-    root_sources, coarsened_sources, requirements_pex, config_files = await MultiGet(
+    root_sources, transitive_sources, requirements_pex, config_files = await MultiGet(
         root_sources_get,
-        coarsened_sources_get,
+        transitive_sources_get,
         requirements_pex_get,
         config_files_get,
     )
 
-    requirements_venv_pex_get = Get(
+    # This is a workaround for https://github.com/pantsbuild/pants/issues/19946.
+    # complete_pex_env needs to be created here so that the test `test_passing_cache_clear`
+    # test can pass using the appropriate caching directory.
+    # See https://github.com/pantsbuild/pants/pull/19430#discussion_r1337851780
+    # for more discussion.
+    complete_pex_env = pex_environment.in_workspace()
+    requirements_pex_request = PexRequest(
+        output_filename="requirements_venv.pex",
+        internal_only=True,
+        pex_path=[requirements_pex],
+        interpreter_constraints=partition.interpreter_constraints,
+    )
+    requirements_venv_pex = await Get(
         VenvPex,
-        PexRequest(
-            output_filename="requirements_venv.pex",
-            internal_only=True,
-            pex_path=[requirements_pex],
-            interpreter_constraints=partition.interpreter_constraints,
+        VenvPexRequest(requirements_pex_request, complete_pex_env),
+    )
+
+    # Force the requirements venv to materialize always by running a no-op.
+    # This operation must be called with `ProcessCacheScope.SESSION`
+    # so that it runs every time.
+    await Get(
+        ProcessResult,
+        VenvPexProcess(
+            requirements_venv_pex,
+            description="Force venv to materialize",
+            argv=["-c", "''"],
+            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
-    )
-
-    source_roots_get = Get(
-        SourceRootsResult,
-        SourceRootsRequest,
-        SourceRootsRequest.for_files(root_sources.snapshot.files),
-    )
-
-    requirements_venv_pex, source_roots = await MultiGet(
-        requirements_venv_pex_get,
-        source_roots_get,
     )
 
     # Patch the config file to use the venv directory from the requirements pex,
     # and add source roots to the `extraPaths` key in the config file.
-    unique_source_roots = FrozenOrderedSet(
-        [root.path for root in source_roots.path_to_root.values()]
-    )
     patched_config_digest = await _patch_config_file(
-        config_files, requirements_venv_pex.venv_rel_dir, unique_source_roots
+        config_files, requirements_venv_pex.venv_rel_dir, transitive_sources.source_roots
     )
 
     input_digest = await Get(
         Digest,
         MergeDigests(
             [
-                coarsened_sources.source_files.snapshot.digest,
+                transitive_sources.source_files.snapshot.digest,
                 requirements_venv_pex.digest,
                 patched_config_digest,
             ]
         ),
     )
 
-    complete_pex_env = pex_environment.in_workspace()
     process = await Get(
         Process,
-        NpxProcess(
-            npm_package=pyright.version,
+        NodeJSToolRequest,
+        pyright.request(
             args=(
-                f"--venv-path={complete_pex_env.pex_root}",  # Used with `venv` in config
+                f"--venvpath={complete_pex_env.pex_root}",  # Used with `venv` in config
                 *pyright.args,  # User-added arguments
-                *root_sources.snapshot.files,
+                *(os.path.join("{chroot}", file) for file in root_sources.snapshot.files),
             ),
             input_digest=input_digest,
             description=f"Run Pyright on {pluralize(len(root_sources.snapshot.files), 'file')}.",
@@ -256,7 +267,6 @@ async def pyright_determine_partitions(
     pyright: Pyright,
     python_setup: PythonSetup,
 ) -> PyrightPartitions:
-
     resolve_and_interpreter_constraints_to_field_sets = (
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
@@ -307,5 +317,6 @@ def rules() -> Iterable[Rule | UnionRule]:
         *collect_rules(),
         *config_files.rules(),
         *pex_from_targets.rules(),
+        *nodejs_tool.rules(),
         UnionRule(CheckRequest, PyrightRequest),
     )

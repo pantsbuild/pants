@@ -6,10 +6,11 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.build_files.fix.deprecations.renamed_targets_rules import (
-    RenameRequest,
+    RenamedTargetTypes,
     RenameTargetsInFileRequest,
     fix_single,
 )
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.mark.parametrize(
@@ -28,9 +29,9 @@ from pants.backend.build_files.fix.deprecations.renamed_targets_rules import (
 )
 def test_rename_deprecated_target_types_noops(lines: list[str]) -> None:
     content = "\n".join(lines).encode("utf-8")
-    result = fix_single(
-        RenameRequest("BUILD", content=content),
-        RenameTargetsInFileRequest({"deprecated_name": "new_name"}),
+    result = fix_single.rule.func(  # type: ignore[attr-defined]
+        RenameTargetsInFileRequest("BUILD", content=content),
+        RenamedTargetTypes(FrozenDict({"deprecated_name": "new_name"})),
     )
     assert result.content == content
 
@@ -45,8 +46,8 @@ def test_rename_deprecated_target_types_noops(lines: list[str]) -> None:
     ),
 )
 def test_rename_deprecated_target_types_rewrite(lines: list[str], expected: list[str]) -> None:
-    result = fix_single(
-        RenameRequest("BUILD", content="\n".join(lines).encode("utf-8")),
-        RenameTargetsInFileRequest({"deprecated_name": "new_name"}),
+    result = fix_single.rule.func(  # type: ignore[attr-defined]
+        RenameTargetsInFileRequest("BUILD", content="\n".join(lines).encode("utf-8")),
+        RenamedTargetTypes(FrozenDict({"deprecated_name": "new_name"})),
     )
     assert result.content == "\n".join(expected).encode("utf-8")

@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pytest
 
-from pants.backend.docker.utils import format_rename_suggestion, get_hash, suggest_renames
-from pants.util.frozendict import FrozenDict
+from pants.backend.docker.utils import format_rename_suggestion, suggest_renames
 
 
 @pytest.mark.parametrize(
@@ -171,19 +168,3 @@ def test_suggest_renames(
 def test_format_rename_suggestion(src: str, dst: str) -> None:
     actual = format_rename_suggestion(src, dst, colors=False)
     assert actual == f"{src} => {dst}"
-
-
-def test_hash() -> None:
-    @dataclass(frozen=True)
-    class Data:
-        mapping: FrozenDict[str, str]
-
-    data = Data(
-        FrozenDict(
-            {alpha: alpha.lower() for alpha in [chr(a) for a in range(ord("A"), ord("Z") + 1)]}
-        )
-    )
-    assert (
-        get_hash(data).hexdigest()
-        == "e4da3c55de6ce98ddcbd5b854ff01f5c8b47fdcb2e10ddd5176505e39a332730"
-    )

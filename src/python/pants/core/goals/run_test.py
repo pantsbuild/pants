@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass
 from typing import Iterable, Mapping, cast
 
 import pytest
@@ -29,16 +28,13 @@ from pants.engine.internals.specs_rules import (
 )
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.target import (
-    Field,
     FieldSet,
-    SecondaryOwnerMixin,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, KeepSandboxes
-from pants.source.filespec import Filespec
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import (
     MockEffect,
@@ -74,14 +70,6 @@ class TestRunFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
 
-@dataclass(frozen=True)
-class TestRunSecondaryFieldSet(RunFieldSet):
-    required_fields = ()
-    run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
-
-    just_borrowing: SecondaryOwnerField
-
-
 class TestBinaryTarget(Target):
     alias = "binary"
     core_fields = ()
@@ -102,7 +90,7 @@ def single_target_run(
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
 
     with mock_console(rule_runner.options_bootstrapper) as (console, _):
-        res = run_rule_with_mocks(
+        return run_rule_with_mocks(
             run,
             rule_args=[
                 create_goal_subsystem(RunSubsystem, args=[], cleanup=True, debug_adapter=False),
@@ -144,12 +132,11 @@ def single_target_run(
             ],
             union_membership=UnionMembership(
                 {
-                    RunFieldSet: [TestRunFieldSet, TestRunSecondaryFieldSet],
-                    RunDebugAdapterRequest: [TestRunFieldSet, TestRunSecondaryFieldSet],
+                    RunFieldSet: [TestRunFieldSet],
+                    RunDebugAdapterRequest: [TestRunFieldSet],
                 },
             ),
         )
-        return cast(Run, res)
 
 
 def test_normal_run(rule_runner: RuleRunner) -> None:
@@ -198,78 +185,6 @@ def test_multi_field_set_error(rule_runner: RuleRunner) -> None:
     target = TestBinaryTarget({}, Address("some/addr"))
     fs1 = TestRunFieldSet.create(target)
     fs2 = TestRunFieldSet.create(target)
-    with pytest.raises(AmbiguousImplementationsException):
-        single_target_run(
-            rule_runner, program_text=program_text, targets_to_field_sets={target: [fs1, fs2]}
-        )
-
-
-class SecondaryOwnerField(SecondaryOwnerMixin, Field):
-    alias = "borrowed"
-    default = None
-
-    def filespec(self) -> Filespec:
-        return Filespec(includes=[])
-
-
-def test_filters_secondary_owners_single_target(rule_runner: RuleRunner) -> None:
-    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
-    target = TestBinaryTarget({}, Address("some/addr"))
-    fs1 = TestRunFieldSet.create(target)
-    fs2 = TestRunSecondaryFieldSet.create(target)
-    res = single_target_run(
-        rule_runner,
-        program_text=program_text,
-        targets_to_field_sets={target: [fs1, fs2]},
-    )
-    assert res.exit_code == 0
-
-
-def test_filters_secondary_owners_multi_target(rule_runner: RuleRunner) -> None:
-    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
-    t1 = TestBinaryTarget({}, Address("some/addr1"))
-    fs1 = TestRunFieldSet.create(t1)
-    t2 = TestBinaryTarget({}, Address("some/addr2"))
-    fs2 = TestRunSecondaryFieldSet.create(t2)
-    res = single_target_run(
-        rule_runner,
-        program_text=program_text,
-        targets_to_field_sets={t1: [fs1], t2: [fs2]},
-    )
-    assert res.exit_code == 0
-
-
-def test_only_secondary_owner_ok_single_target(rule_runner: RuleRunner) -> None:
-    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
-    target = TestBinaryTarget({}, Address("some/addr"))
-    field_set = TestRunSecondaryFieldSet.create(target)
-    res = single_target_run(
-        rule_runner,
-        program_text=program_text,
-        targets_to_field_sets={target: [field_set]},
-    )
-    assert res.exit_code == 0
-
-
-def test_only_secondary_owner_error_multi_target(rule_runner: RuleRunner) -> None:
-    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
-    t1 = TestBinaryTarget({}, Address("some/addr1"))
-    fs1 = TestRunSecondaryFieldSet.create(t1)
-    t2 = TestBinaryTarget({}, Address("some/addr2"))
-    fs2 = TestRunSecondaryFieldSet.create(t2)
-    with pytest.raises(TooManyTargetsException):
-        single_target_run(
-            rule_runner,
-            program_text=program_text,
-            targets_to_field_sets={t1: [fs1], t2: [fs2]},
-        )
-
-
-def test_only_secondary_multi_field_set_error(rule_runner: RuleRunner) -> None:
-    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
-    target = TestBinaryTarget({}, Address("some/addr"))
-    fs1 = TestRunSecondaryFieldSet.create(target)
-    fs2 = TestRunSecondaryFieldSet.create(target)
     with pytest.raises(AmbiguousImplementationsException):
         single_target_run(
             rule_runner, program_text=program_text, targets_to_field_sets={target: [fs1, fs2]}

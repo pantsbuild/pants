@@ -3,7 +3,6 @@ title: "1.30.x"
 slug: "release-notes-1-30"
 hidden: true
 createdAt: "2020-06-09T00:14:07.234Z"
-updatedAt: "2020-06-20T01:21:59.525Z"
 ---
 Some highlights:
 

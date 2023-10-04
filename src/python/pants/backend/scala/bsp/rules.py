@@ -36,13 +36,13 @@ from pants.bsp.util_rules.targets import (
     BSPResourcesRequest,
     BSPResourcesResult,
 )
-from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary, ReadlinkBinaryRequest
+from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule, rule_helper
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
@@ -147,7 +147,6 @@ async def collect_thirdparty_modules(
     )
 
 
-@rule_helper
 async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
     tool_classpath = await Get(
         ToolClasspath,
@@ -182,6 +181,7 @@ async def bsp_resolve_scala_metadata(
     jvm: JvmSubsystem,
     scala: ScalaSubsystem,
     build_root: BuildRoot,
+    readlink: ReadlinkBinary,
 ) -> BSPBuildTargetsMetadataResult:
     resolves = {fs.resolve.normalized_value(jvm) for fs in request.field_sets}
     jdk_versions = {fs.jdk for fs in request.field_sets}
@@ -213,11 +213,7 @@ async def bsp_resolve_scala_metadata(
     # The maximum JDK version will be compatible with all the specified targets
     jdk_requests = [JdkRequest.from_field(version) for version in jdk_versions]
     jdk_request = max(jdk_requests, key=_jdk_request_sort_key(jvm))
-
-    jdk, readlink, = await MultiGet(
-        Get(JdkEnvironment, JdkRequest, jdk_request),
-        Get(ReadlinkBinary, ReadlinkBinaryRequest()),
-    )
+    jdk = await Get(JdkEnvironment, JdkRequest, jdk_request)
 
     if any(i.version == DefaultJdk.SYSTEM for i in jdk_requests):
         system_jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.SYSTEM)
@@ -273,7 +269,8 @@ async def bsp_resolve_scala_metadata(
         coursier_java_home = jdk_home
 
     scala_jar_uris = tuple(
-        build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
+        # TODO: Why is this hardcoded and not under pants_workdir?
+        build_root.pathlib_path.joinpath(".pants.d", "bsp", p).as_uri()
         for p in scala_runtime.files
     )
 

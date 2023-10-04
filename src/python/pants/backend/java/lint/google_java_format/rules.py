@@ -94,7 +94,7 @@ async def google_java_format_fmt(
             level=LogLevel.DEBUG,
         ),
     )
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+    return await FmtResult.create(request, result)
 
 
 @rule

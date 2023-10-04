@@ -24,12 +24,18 @@ from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, ProcessResultMetadata
+from pants.engine.process import (
+    FallibleProcessResult,
+    ProcessExecutionEnvironment,
+    ProcessResultMetadata,
+)
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
+from pants.util.strutil import Simplifier
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -63,7 +69,11 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
 
 
 class SuccessfulRequest(MockCheckRequest):
-    tool_name = "SuccessfulChecker"
+    tool_name = "Successful Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "successfulchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -71,7 +81,11 @@ class SuccessfulRequest(MockCheckRequest):
 
 
 class FailingRequest(MockCheckRequest):
-    tool_name = "FailingChecker"
+    tool_name = "Failing Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "failingchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -79,7 +93,11 @@ class FailingRequest(MockCheckRequest):
 
 
 class ConditionallySucceedsRequest(MockCheckRequest):
-    tool_name = "ConditionallySucceedsChecker"
+    tool_name = "Conditionally Succeeds Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "conditionallysucceedschecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -89,7 +107,11 @@ class ConditionallySucceedsRequest(MockCheckRequest):
 
 
 class SkippedRequest(MockCheckRequest):
-    tool_name = "SkippedChecker"
+    tool_name = "Skipped Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "skippedchecker"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -110,7 +132,11 @@ class InvalidFieldSet(MockCheckFieldSet):
 
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    tool_name = "InvalidChecker"
+    tool_name = "Invalid Checker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "invalidchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -186,22 +212,22 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        ✕ ConditionallySucceedsChecker failed.
-        ✕ FailingChecker failed.
-        ✓ SuccessfulChecker succeeded.
+        ✕ Conditionally Succeeds Checker failed.
+        ✕ Failing Checker failed.
+        ✓ Successful Checker succeeded.
         """
     )
 
     exit_code, stderr = run_typecheck_rule(
         request_types=requests,
         targets=targets,
-        only=[FailingRequest.tool_name, SuccessfulRequest.tool_name],
+        only=[FailingRequest.tool_id, SuccessfulRequest.tool_id],
     )
     assert stderr == dedent(
         """\
 
-        ✕ FailingChecker failed.
-        ✓ SuccessfulChecker succeeded.
+        ✕ Failing Checker failed.
+        ✓ Successful Checker succeeded.
         """
     )
 
@@ -260,32 +286,36 @@ def test_streaming_output_partitions() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("strip_chroot_path", "strip_formatting", "expected"),
-    [
-        (False, False, "\033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m"),
-        (False, True, "/var/pants-sandbox-123/red/path.py bold"),
-        (True, False, "\033[0;31mred/path.py\033[0m \033[1mbold\033[0m"),
-        (True, True, "red/path.py bold"),
-    ],
-)
-def test_from_fallible_process_result_output_prepping(
-    strip_chroot_path: bool, strip_formatting: bool, expected: str
-) -> None:
-    result = CheckResult.from_fallible_process_result(
-        FallibleProcessResult(
-            exit_code=0,
-            stdout=b"stdout \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr=b"stderr \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
-            stderr_digest=EMPTY_FILE_DIGEST,
-            output_digest=EMPTY_DIGEST,
-            platform=Platform.create_for_localhost(),
-            metadata=ProcessResultMetadata(0, "ran_locally", 0),
-        ),
-        strip_chroot_path=strip_chroot_path,
-        strip_formatting=strip_formatting,
-    )
+def test_from_fallible_process_result_output_prepping() -> None:
+    # Check that this calls the simplifier.
+    class DistinctiveException(Exception):
+        pass
 
-    assert result.stdout == "stdout " + expected
-    assert result.stderr == "stderr " + expected
+    class SubSimplifier(Simplifier):
+        def simplify(self, v: bytes | str) -> str:
+            raise DistinctiveException()
+
+    with pytest.raises(DistinctiveException):
+        CheckResult.from_fallible_process_result(
+            FallibleProcessResult(
+                exit_code=0,
+                stdout=b"",
+                stdout_digest=EMPTY_FILE_DIGEST,
+                stderr=b"",
+                stderr_digest=EMPTY_FILE_DIGEST,
+                output_digest=EMPTY_DIGEST,
+                metadata=ProcessResultMetadata(
+                    0,
+                    ProcessExecutionEnvironment(
+                        environment_name=None,
+                        platform=Platform.create_for_localhost().value,
+                        docker_image=None,
+                        remote_execution=False,
+                        remote_execution_extra_platform_properties=[],
+                    ),
+                    "ran_locally",
+                    0,
+                ),
+            ),
+            output_simplifier=SubSimplifier(),
+        )

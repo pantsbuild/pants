@@ -6,11 +6,14 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Sequence
+from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
+
+from typing_extensions import Protocol
 
 from pants.engine.collection import Collection
+from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -18,8 +21,11 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import StrListOption, StrOption
+from pants.help.maybe_color import MaybeColor
+from pants.option.global_options import GlobalOptions
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.util.docutil import bin_name, doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
@@ -32,6 +38,7 @@ class GenerateLockfileResult:
     digest: Digest
     resolve_name: str
     path: str
+    diff: LockfileDiff | None = None
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -49,6 +56,7 @@ class GenerateLockfile:
 
     resolve_name: str
     lockfile_dest: str
+    diff: bool
 
 
 @dataclass(frozen=True)
@@ -124,8 +132,152 @@ class RequestedUserResolveNames(Collection[str]):
     """
 
 
+class PackageVersion(Protocol):
+    """Protocol for backend specific implementations, to support language ecosystem specific version
+    formats and sort rules.
+
+    May support the `int` properties `major`, `minor` and `micro` to color diff based on semantic
+    step taken.
+    """
+
+    def __eq__(self, other) -> bool:
+        ...
+
+    def __gt__(self, other) -> bool:
+        ...
+
+    def __lt__(self, other) -> bool:
+        ...
+
+    def __str__(self) -> str:
+        ...
+
+
+PackageName = str
+LockfilePackages = FrozenDict[PackageName, PackageVersion]
+ChangedPackages = FrozenDict[PackageName, Tuple[PackageVersion, PackageVersion]]
+
+
+@dataclass(frozen=True)
+class LockfileDiff:
+    path: str
+    resolve_name: str
+    added: LockfilePackages
+    downgraded: ChangedPackages
+    removed: LockfilePackages
+    unchanged: LockfilePackages
+    upgraded: ChangedPackages
+
+    @classmethod
+    def create(
+        cls, path: str, resolve_name: str, old: LockfilePackages, new: LockfilePackages
+    ) -> LockfileDiff:
+        diff = {
+            name: (old[name], new[name])
+            for name in sorted({*old.keys(), *new.keys()})
+            if name in old and name in new
+        }
+        return cls(
+            path=path,
+            resolve_name=resolve_name,
+            added=cls.__get_lockfile_packages(new, old),
+            downgraded=cls.__get_changed_packages(diff, lambda prev, curr: prev > curr),
+            removed=cls.__get_lockfile_packages(old, new),
+            unchanged=LockfilePackages(
+                {name: curr for name, (prev, curr) in diff.items() if prev == curr}
+            ),
+            upgraded=cls.__get_changed_packages(diff, lambda prev, curr: prev < curr),
+        )
+
+    @staticmethod
+    def __get_lockfile_packages(
+        src: Mapping[str, PackageVersion], exclude: Iterable[str]
+    ) -> LockfilePackages:
+        return LockfilePackages(
+            {name: version for name, version in src.items() if name not in exclude}
+        )
+
+    @staticmethod
+    def __get_changed_packages(
+        src: Mapping[str, tuple[PackageVersion, PackageVersion]],
+        predicate: Callable[[PackageVersion, PackageVersion], bool],
+    ) -> ChangedPackages:
+        return ChangedPackages(
+            {name: prev_curr for name, prev_curr in src.items() if predicate(*prev_curr)}
+        )
+
+
+class LockfileDiffPrinter(MaybeColor):
+    def __init__(self, console: Console, color: bool, include_unchanged: bool) -> None:
+        super().__init__(color)
+        self.console = console
+        self.include_unchanged = include_unchanged
+
+    def print(self, diff: LockfileDiff) -> None:
+        output = "\n".join(self.output_sections(diff))
+        if not output:
+            return
+        self.console.print_stderr(
+            self.style(" " * 66, style="underline")
+            + f"\nLockfile diff: {diff.path} [{diff.resolve_name}]\n"
+            + output
+        )
+
+    def output_sections(self, diff: LockfileDiff) -> Iterator[str]:
+        if self.include_unchanged:
+            yield from self.output_reqs("Unchanged dependencies", diff.unchanged, fg="blue")
+        yield from self.output_changed("Upgraded dependencies", diff.upgraded)
+        yield from self.output_changed("!! Downgraded dependencies !!", diff.downgraded)
+        yield from self.output_reqs("Added dependencies", diff.added, fg="green", style="bold")
+        yield from self.output_reqs("Removed dependencies", diff.removed, fg="magenta")
+
+    def style(self, text: str, **kwargs) -> str:
+        return cast(str, self.maybe_color(text, **kwargs))
+
+    def title(self, text: str) -> str:
+        heading = f"== {text:^60} =="
+        return self.style("\n".join((" " * len(heading), heading, "")), style="underline")
+
+    def output_reqs(self, heading: str, reqs: LockfilePackages, **kwargs) -> Iterator[str]:
+        if not reqs:
+            return
+
+        yield self.title(heading)
+        for name, version in reqs.items():
+            name_s = self.style(f"{name:30}", fg="yellow")
+            version_s = self.style(str(version), **kwargs)
+            yield f"  {name_s} {version_s}"
+
+    def output_changed(self, title: str, reqs: ChangedPackages) -> Iterator[str]:
+        if not reqs:
+            return
+
+        yield self.title(title)
+        label = "-->"
+        for name, (prev, curr) in reqs.items():
+            bump_attrs = self.get_bump_attrs(prev, curr)
+            name_s = self.style(f"{name:30}", fg="yellow")
+            prev_s = self.style(f"{str(prev):10}", fg="cyan")
+            bump_s = self.style(f"{label:^7}", **bump_attrs)
+            curr_s = self.style(str(curr), **bump_attrs)
+            yield f"  {name_s} {prev_s} {bump_s} {curr_s}"
+
+    _BUMPS = (
+        ("major", dict(fg="red", style="bold")),
+        ("minor", dict(fg="yellow")),
+        ("micro", dict(fg="green")),
+        # Default style
+        (None, dict(fg="magenta")),
+    )
+
+    def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> dict[str, str]:
+        for key, attrs in self._BUMPS:
+            if key is None or getattr(prev, key, None) != getattr(curr, key, None):
+                return attrs
+        return {}  # Should never happen, but let's be safe.
+
+
 DEFAULT_TOOL_LOCKFILE = "<default>"
-NO_TOOL_LOCKFILE = "<none>"
 
 
 class UnrecognizedResolveNamesError(Exception):
@@ -161,77 +313,30 @@ class _ResolveProviderType(Enum):
 @dataclass(frozen=True, order=True)
 class _ResolveProvider:
     option_name: str
-    type_: _ResolveProviderType
 
 
 class AmbiguousResolveNamesError(Exception):
     def __init__(self, ambiguous_name: str, providers: set[_ResolveProvider]) -> None:
-        tool_providers = []
-        user_providers = []
-        for provider in sorted(providers):
-            if provider.type_ == _ResolveProviderType.TOOL:
-                tool_providers.append(provider.option_name)
-            else:
-                user_providers.append(provider.option_name)
+        msg = softwrap(
+            f"""
+            The same resolve name `{ambiguous_name}` is used by multiple options, which
+            causes ambiguity: {providers}
 
-        if tool_providers:
-            if not user_providers:
-                raise AssertionError(
-                    softwrap(
-                        f"""
-                        {len(tool_providers)} tools have the same options_scope: {ambiguous_name}.
-                        If you're writing a plugin, rename your `GenerateToolLockfileSentinel`s so
-                        that there is no ambiguity. Otherwise, please open a bug at
-                        https://github.com/pantsbuild/pants/issues/new.
-                        """
-                    )
-                )
-            if len(user_providers) == 1:
-                msg = softwrap(
-                    f"""
-                    A resolve name from the option `{user_providers[0]}` collides with the
-                    name of a tool resolve: {ambiguous_name}
-
-                    To fix, please update `{user_providers[0]}` to use a different resolve name.
-                    """
-                )
-            else:
-                msg = softwrap(
-                    f"""
-                    Multiple options define the resolve name `{ambiguous_name}`, but it is
-                    already claimed by a tool: {user_providers}
-
-                    To fix, please update these options so that none of them use
-                    `{ambiguous_name}`.
-                    """
-                )
-        else:
-            assert len(user_providers) > 1
-            msg = softwrap(
-                f"""
-                The same resolve name `{ambiguous_name}` is used by multiple options, which
-                causes ambiguity: {user_providers}
-
-                To fix, please update these options so that `{ambiguous_name}` is not used more
-                than once.
-                """
-            )
+            To fix, please update these options so that `{ambiguous_name}` is not used more
+            than once.
+            """
+        )
         super().__init__(msg)
 
 
 def _check_ambiguous_resolve_names(
     all_known_user_resolve_names: Iterable[KnownUserResolveNames],
-    all_tool_sentinels: Iterable[type[GenerateToolLockfileSentinel]],
 ) -> None:
     resolve_name_to_providers = defaultdict(set)
-    for sentinel in all_tool_sentinels:
-        resolve_name_to_providers[sentinel.resolve_name].add(
-            _ResolveProvider(sentinel.resolve_name, _ResolveProviderType.TOOL)
-        )
     for known_user_resolve_names in all_known_user_resolve_names:
         for resolve_name in known_user_resolve_names.names:
             resolve_name_to_providers[resolve_name].add(
-                _ResolveProvider(known_user_resolve_names.option_name, _ResolveProviderType.USER)
+                _ResolveProvider(known_user_resolve_names.option_name)
             )
 
     for resolve_name, providers in resolve_name_to_providers.items():
@@ -248,11 +353,21 @@ def determine_resolves_to_generate(
 
     Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.
     """
-    _check_ambiguous_resolve_names(all_known_user_resolve_names, all_tool_sentinels)
+    # Let user resolve names silently shadow tools with the same name.
+    # This is necessary since we now support installing a tool from a named resolve,
+    # and it's not reasonable to ban the name of the tool as the resolve name, when it
+    # is the most obvious choice for that...
+    # This is likely only an issue if you were going to, e.g., have a named resolve called flake8
+    # but not use it as the resolve for the flake8 tool, which seems pretty unlikely.
+    all_known_user_resolve_name_strs = set(
+        itertools.chain.from_iterable(akurn.names for akurn in all_known_user_resolve_names)
+    )
+    all_tool_sentinels = [
+        ts for ts in all_tool_sentinels if ts.resolve_name not in all_known_user_resolve_name_strs
+    ]
 
-    resolve_names_to_sentinels = {
-        sentinel.resolve_name: sentinel for sentinel in all_tool_sentinels
-    }
+    # Resolve names must be globally unique, so check for ambiguity across backends.
+    _check_ambiguous_resolve_names(all_known_user_resolve_names)
 
     if not requested_resolve_names:
         return [
@@ -270,9 +385,9 @@ def determine_resolves_to_generate(
             )
 
     specified_sentinels = []
-    for resolve, sentinel in resolve_names_to_sentinels.items():
-        if resolve in requested_resolve_names:
-            requested_resolve_names.discard(resolve)
+    for sentinel in all_tool_sentinels:
+        if sentinel.resolve_name in requested_resolve_names:
+            requested_resolve_names.discard(sentinel.resolve_name)
             specified_sentinels.append(sentinel)
 
     if requested_resolve_names:
@@ -283,7 +398,7 @@ def determine_resolves_to_generate(
                     known_resolve_names.names
                     for known_resolve_names in all_known_user_resolve_names
                 ),
-                *resolve_names_to_sentinels.keys(),
+                *(sentinel.resolve_name for sentinel in all_tool_sentinels),
             },
             description_of_origin="the option `--generate-lockfiles-resolve`",
         )
@@ -297,7 +412,7 @@ def filter_tool_lockfile_requests(
     result = []
     for wrapped_req in specified_requests:
         req = wrapped_req.request
-        if req.lockfile_dest not in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE):
+        if req.lockfile_dest != DEFAULT_TOOL_LOCKFILE:
             result.append(req)
             continue
         if resolve_specified:
@@ -362,6 +477,26 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             """
         ),
     )
+    diff = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Print a summary of changed distributions after generating the lockfile.
+            """
+        ),
+    )
+    diff_include_unchanged = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Include unchanged distributions in the diff summary output. Implies `diff=true`.
+            """
+        ),
+    )
+
+    @property
+    def request_diffs(self) -> bool:
+        return self.diff or self.diff_include_unchanged
 
 
 class GenerateLockfilesGoal(Goal):
@@ -375,6 +510,8 @@ async def generate_lockfiles_goal(
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     local_environment: ChosenLocalEnvironmentName,
+    console: Console,
+    global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
@@ -411,7 +548,12 @@ async def generate_lockfiles_goal(
     # Currently, since resolves specify a single filename for output, we pick a resonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
-    all_requests = itertools.chain(*all_specified_user_requests, applicable_tool_requests)
+    all_requests: Iterator[GenerateLockfile] = itertools.chain(
+        *all_specified_user_requests, applicable_tool_requests
+    )
+    if generate_lockfiles_subsystem.request_diffs:
+        all_requests = (replace(req, diff=True) for req in all_requests)
+
     results = await MultiGet(
         Get(
             GenerateLockfileResult,
@@ -427,14 +569,27 @@ async def generate_lockfiles_goal(
     # resolution behaviour if we start executing requests in multiple environments.
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
+
+    diffs: list[LockfileDiff] = []
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
+        if result.diff is not None:
+            diffs.append(result.diff)
+
+    if diffs:
+        diff_formatter = LockfileDiffPrinter(
+            console=console,
+            color=global_options.colors,
+            include_unchanged=generate_lockfiles_subsystem.diff_include_unchanged,
+        )
+        for diff in diffs:
+            diff_formatter.print(diff)
+        console.print_stderr("\n")
 
     return GenerateLockfilesGoal(exit_code=0)
 
 
 def _preferred_environment(request: GenerateLockfile, default: EnvironmentName) -> EnvironmentName:
-
     if not isinstance(request, GenerateLockfileWithEnvironments):
         return default  # This request has not been migrated to use environments.
 

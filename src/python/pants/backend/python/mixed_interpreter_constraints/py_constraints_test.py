@@ -110,7 +110,7 @@ def test_render_constraints(rule_runner: RuleRunner) -> None:
 
 def test_constraints_summary(rule_runner: RuleRunner) -> None:
     write_files(rule_runner)
-    result = run_goal(rule_runner, ["--summary", "--summary-use-new-header"])
+    result = run_goal(rule_runner, ["--summary"])
     assert result.stdout == dedent(
         """\
         Target,Constraints,Transitive Constraints,# Dependencies,# Dependents\r

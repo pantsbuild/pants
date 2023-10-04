@@ -12,7 +12,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use futures::{FutureExt, Stream};
-use grpc_util::hyper::AddrIncomingWithStream;
+use grpc_util::hyper_util::AddrIncomingWithStream;
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -190,11 +190,10 @@ impl Drop for TestServer {
       );
       if std::thread::panicking() {
         eprintln!(
-          "TestServer missing requests, but not panicking because caller is already panicking: {}",
-          message
+          "TestServer missing requests, but not panicking because caller is already panicking: {message}"
         );
       } else {
-        assert_eq!(remaining_expected_responses, 0, "{}", message,);
+        assert_eq!(remaining_expected_responses, 0, "{message}",);
       }
     }
   }
@@ -240,7 +239,7 @@ impl MockResponder {
   fn display_all<D: Debug>(items: &[D]) -> String {
     items
       .iter()
-      .map(|i| format!("{:?}\n", i))
+      .map(|i| format!("{i:?}\n"))
       .collect::<Vec<_>>()
       .concat()
   }
@@ -292,16 +291,14 @@ impl Execution for MockResponder {
           }
         } else {
           return Err(Status::invalid_argument(format!(
-            "Did not expect this request. Expected: {:?}, Got: {:?}",
-            execute_request, request
+            "Did not expect this request. Expected: {execute_request:?}, Got: {request:?}"
           )));
         }
       }
 
       Some(api_call) => {
         return Err(Status::invalid_argument(format!(
-          "Execute endpoint called. Expected: {:?}",
-          api_call
+          "Execute endpoint called. Expected: {api_call:?}"
         )));
       }
 
@@ -344,8 +341,7 @@ impl Execution for MockResponder {
 
       Some(api_call) => {
         return Err(Status::invalid_argument(format!(
-          "WaitExecution endpoint called. Expected: {:?}",
-          api_call,
+          "WaitExecution endpoint called. Expected: {api_call:?}",
         )));
       }
 
@@ -402,8 +398,7 @@ impl Operations for MockResponder {
       }
 
       Some(api_call) => Err(Status::invalid_argument(format!(
-        "GetOperation endpoint called. Expected: {:?}",
-        api_call,
+        "GetOperation endpoint called. Expected: {api_call:?}",
       ))),
 
       None => Err(Status::invalid_argument(
@@ -451,8 +446,7 @@ impl ActionCache for MockResponder {
             Ok(d) => d,
             Err(e) => {
               return Err(Status::invalid_argument(format!(
-                "GetActionResult endpoint called with bad digest: {:?}",
-                e,
+                "GetActionResult endpoint called with bad digest: {e:?}",
               )));
             }
           };
@@ -471,8 +465,7 @@ impl ActionCache for MockResponder {
       }
 
       Some(api_call) => Err(Status::invalid_argument(format!(
-        "GetActionResult endpoint called. Expected: {:?}",
-        api_call,
+        "GetActionResult endpoint called. Expected: {api_call:?}",
       ))),
 
       None => Err(Status::invalid_argument(

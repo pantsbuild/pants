@@ -42,12 +42,13 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
-from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllAssetTargetsRequest
+from pants.core.target_types import AllAssetTargetsByPath
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import Get, MultiGet, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -57,7 +58,6 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import OwnersNotFoundBehavior
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
@@ -206,6 +206,33 @@ def _collect_imports_info(
     )
 
 
+def _remove_ignored_imports(
+    unowned_imports: frozenset[str], ignored_paths: tuple[str, ...]
+) -> frozenset[str]:
+    """Remove unowned imports given a list of paths to ignore.
+
+    E.g. having
+    ```
+    import foo.bar
+    from foo.bar import baz
+    import foo.barley
+    ```
+
+    and passing `ignored-paths=["foo.bar"]`, only `foo.bar` and `foo.bar.baz` will be ignored.
+    """
+    if not ignored_paths:
+        return unowned_imports
+
+    unowned_imports_filtered = set()
+    for unowned_import in unowned_imports:
+        if not any(
+            unowned_import == ignored_path or unowned_import.startswith(f"{ignored_path}.")
+            for ignored_path in ignored_paths
+        ):
+            unowned_imports_filtered.add(unowned_import)
+    return frozenset(unowned_imports_filtered)
+
+
 @dataclass(frozen=True)
 class UnownedImportsPossibleOwnersRequest:
     """A request to find possible owners for several imports originating in a resolve."""
@@ -230,7 +257,6 @@ class UnownedImportPossibleOwners:
     value: list[tuple[Address, ResolveName]]
 
 
-@rule_helper
 async def _find_other_owners_for_unowned_imports(
     req: UnownedImportsPossibleOwnersRequest,
 ) -> UnownedImportsPossibleOwners:
@@ -272,7 +298,6 @@ async def find_other_owners_for_unowned_import(
     return UnownedImportPossibleOwners(other_owners)
 
 
-@rule_helper
 async def _handle_unowned_imports(
     address: Address,
     unowned_dependency_behavior: UnownedDependencyUsage,
@@ -330,10 +355,8 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
-@rule_helper
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
-    python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> ParsedPythonDependencies:
     interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
@@ -344,10 +367,6 @@ async def _exec_parse_deps(
         ParsePythonDependenciesRequest(
             field_set.source,
             interpreter_constraints,
-            string_imports=python_infer_subsystem.string_imports,
-            string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-            assets=python_infer_subsystem.assets,
-            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
         ),
     )
     return resp
@@ -411,8 +430,7 @@ async def resolve_parsed_dependencies(
         resolve_results = {}
 
     if parsed_assets:
-        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
-        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
+        assets_by_path = await Get(AllAssetTargetsByPath)
         asset_deps = _get_inferred_asset_deps(
             request.field_set.address,
             request.field_set.source.file_path,
@@ -439,9 +457,7 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    parsed_dependencies = await _exec_parse_deps(
-        request.field_set, python_infer_subsystem, python_setup
-    )
+    parsed_dependencies = await _exec_parse_deps(request.field_set, python_setup)
 
     resolve = request.field_set.resolve.normalized_value(python_setup)
 
@@ -450,12 +466,15 @@ async def infer_python_dependencies_via_source(
         ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
     )
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
+    unowned_imports = _remove_ignored_imports(
+        unowned_imports, python_infer_subsystem.ignored_unowned_imports
+    )
 
     asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
 
     inferred_deps = import_deps | asset_deps
 
-    _ = await _handle_unowned_imports(
+    await _handle_unowned_imports(
         request.field_set.address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,
@@ -544,7 +563,7 @@ async def infer_python_conftest_dependencies(
     owners = await MultiGet(
         # NB: Because conftest.py files effectively always have content, we require an
         # owning target.
-        Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
+        Get(Owners, OwnersRequest((f,), GlobMatchErrorBehavior.error))
         for f in conftest_files.snapshot.files
     )
 

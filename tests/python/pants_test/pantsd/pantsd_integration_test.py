@@ -347,6 +347,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             time.sleep(10)
             ctx.checker.assert_running()
 
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/18664")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_invalidation_file_tracking(self):
         test_dir = "testprojects/src/python/print_env"
         config = {"GLOBAL": {"pantsd_invalidation_globs": f'["{test_dir}/*"]'}}
@@ -354,8 +356,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ctx.runner(["help"])
             ctx.checker.assert_started()
 
-            # Let any fs events quiesce.
-            time.sleep(5)
+            # See comment in `test_pantsd_invalidation_pants_toml_file`.
+            time.sleep(15)
             ctx.checker.assert_running()
 
             def full_pants_log():
@@ -370,6 +372,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             self.assertIn("saw filesystem changes covered by invalidation globs", full_pants_log())
 
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/18664")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_invalidation_pants_toml_file(self):
         # Test tmp_pants_toml (--pants-config-files=$tmp_pants_toml)'s removal
         tmp_pants_toml = os.path.abspath("testprojects/test_pants.toml")
@@ -381,7 +385,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         with self.pantsd_successful_run_context() as ctx:
             ctx.runner([f"--pants-config-files={tmp_pants_toml}", "help"])
             ctx.checker.assert_started()
-            time.sleep(10)
+            # This accounts for the amount of time it takes for the SchedulerService to begin watching
+            # these files. That happens asynchronously after `pantsd` startup, and may take a long
+            # time in a heavily loaded test environment.
+            time.sleep(15)
 
             # Delete tmp_pants_toml
             os.unlink(tmp_pants_toml)

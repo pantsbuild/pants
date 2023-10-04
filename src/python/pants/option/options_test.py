@@ -9,6 +9,7 @@ import unittest.mock
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
+from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, Dict, cast
 
@@ -17,8 +18,8 @@ import toml
 import yaml
 from packaging.version import Version
 
+from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import CodeRemovedError, warn_or_error
-from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, shell_str, target_option
@@ -42,11 +43,12 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_types import StrOption
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.options_fingerprinter import OptionEncoder
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
-from pants.util.contextutil import temporary_file, temporary_file_path
+from pants.util.contextutil import pushd, temporary_dir, temporary_file, temporary_file_path
 
 _FAKE_CUR_VERSION = "1.0.0.dev0"
 
@@ -1183,8 +1185,8 @@ class OptionsTest(unittest.TestCase):
                 args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
             )
         assert (
-            "Specifying multiple goals (in this case: ['test', 'fmt']) along with passthrough args "
-            "(args after `--`) is ambiguous."
+            "Specifying multiple goals (in this case: ['test', 'fmt']) along with passthrough args"
+            + " (args after `--`) is ambiguous."
         ) in str(exc.value)
 
     def test_passthru_args_not_interpreted(self):
@@ -1264,8 +1266,8 @@ class OptionsTest(unittest.TestCase):
             options.for_scope("enum-opt")
 
         assert (
-            "Invalid choice 'invalid-value'. "
-            "Choose from: a-value, another-value, yet-another, one-more"
+            "Invalid choice 'invalid-value'."
+            + " Choose from: a-value, another-value, yet-another, one-more"
         ) in str(exc.value)
 
     def test_non_enum_option_type_parse_error(self) -> None:
@@ -1374,29 +1376,30 @@ class OptionsTest(unittest.TestCase):
 
         # NB: Passthrough args end up on our `--modifypassthrough` arg.
         pairs = options.get_fingerprintable_for_scope("compile")
-        assert [(str, "blah blah blah"), (str, ["-d", "-v"])] == pairs
+        assert [
+            ("modifycompile", str, "blah blah blah"),
+            ("modifypassthrough", str, ["-d", "-v"]),
+        ] == pairs
 
     def test_fingerprintable(self) -> None:
         options = self._parse(
-            flags="--implicitly-fingerprinted=shall_be_fingerprinted "
-            "--explicitly-fingerprinted=also_shall_be_fingerprinted "
-            "--explicitly-not-fingerprinted=shant_be_fingerprinted"
+            flags="--implicitly-fingerprinted=shall_be_fingerprinted"
+            + " --explicitly-fingerprinted=also_shall_be_fingerprinted"
+            + " --explicitly-not-fingerprinted=shant_be_fingerprinted"
         )
         pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE)
-        assert (str, "shall_be_fingerprinted") in pairs
-        assert (str, "also_shall_be_fingerprinted") in pairs
-        assert (str, "shant_be_fingerprinted") not in pairs
+        assert ("implicitly_fingerprinted", str, "shall_be_fingerprinted") in pairs
+        assert ("explicitly_fingerprinted", str, "also_shall_be_fingerprinted") in pairs
+        assert not any(value == "shant_be_fingerprinted" for _, _, value in pairs)
 
     def test_fingerprintable_daemon_only(self) -> None:
         options = self._parse(
-            flags="--explicitly-daemoned=shall_be_fingerprinted "
-            "--explicitly-not-daemoned=shant_be_fingerprinted "
-            "--implicitly-not-daemoned=also_shant_be_fingerprinted"
+            flags="--explicitly-daemoned=shall_be_fingerprinted"
+            + " --explicitly-not-daemoned=shant_be_fingerprinted"
+            + " --implicitly-not-daemoned=also_shant_be_fingerprinted"
         )
         pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE, daemon_only=True)
-        assert (str, "shall_be_fingerprinted") in pairs
-        assert (str, "shant_be_fingerprinted") not in pairs
-        assert (str, "also_shant_be_fingerprinted") not in pairs
+        assert [("explicitly_daemoned", str, "shall_be_fingerprinted")] == pairs
 
     def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
         def _do_assert_fromfile(dest, expected, contents, passthru_flags=""):
@@ -1517,6 +1520,15 @@ class OptionsTest(unittest.TestCase):
             options = self._parse(flags=f"fromfile --{'dictvalue'}=@{fp.name}")
             assert {"a": "multiline\n"} == options.for_scope("fromfile")["dictvalue"]
 
+    def test_fromfile_relative_to_build_root(self) -> None:
+        with temporary_dir(root_dir=get_buildroot()) as tempdir:
+            dirname = tempdir.split("/")[-1]
+            tempfile = Path(tempdir, "config")
+            tempfile.write_text("{'a': 'multiline\\n'}")
+            with pushd(tempdir):
+                options = self._parse(flags=f"fromfile --dictvalue=@{dirname}/config")
+                assert {"a": "multiline\n"} == options.for_scope("fromfile")["dictvalue"]
+
     def test_fromfile_error(self) -> None:
         options = self._parse(flags="fromfile --string=@/does/not/exist")
         with pytest.raises(FromfileError):
@@ -1563,7 +1575,7 @@ class OptionsTest(unittest.TestCase):
         # We serialize options to JSON e.g., when uploading stats.
         # This test spot-checks that enum types can be serialized.
         options = self._parse(flags="enum-opt --some-enum=another-value")
-        json.dumps({"foo": [options.for_scope("enum-opt").as_dict()]}, cls=CoercingEncoder)
+        json.dumps({"foo": [options.for_scope("enum-opt").as_dict()]}, cls=OptionEncoder)
 
     def test_list_of_enum_single_value(self) -> None:
         options = self._parse(flags="other-enum-scope --some-list-enum=another-value")

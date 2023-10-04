@@ -3,43 +3,70 @@ title: "Installing Pants"
 slug: "installation"
 hidden: false
 createdAt: "2020-02-21T17:44:53.022Z"
-updatedAt: "2022-07-12T00:00:00.000Z"
 ---
 
-Most installations can use our one-step setup script to get a minimal version of Pants set up. If you need to make use of an advanced or non-standard setup, see our [manual installation](doc:manual-installation) page.
-
-Using our one-step setup script
--------------------------------
-
-Pants has a launch script (called `./pants`) that handles downloading, bootstrapping, and upgrading Pants, which you need to save at the root of your repository. 
-
-Pants also needs a `pants.toml` file, where you will eventually add all of the configuration needed to run testing, linting, and formatting rules. For now, it just needs to specify the version of Pants that you want to use. 
-
-To streamline this, we provide a script that will create a minimal `pants.toml` file specifying the latest released version of Pants, download, and run the `./pants` launch script.
+You can download and run an installer script that will install the Pants binary with this command:
 
 ```
-/bin/bash -c "$(curl -fsSL https://static.pantsbuild.org/setup/one_step_setup.sh)" 
+curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash
 ```
 
-If the installation process was successful, you will see `Pants was installed successfully!` echoed to your terminal. 
+This script will install `pants` into `~/bin`, which must be on your PATH. The installer script will warn you if it is not.
 
-If you had difficulty installing Pants, see our [getting help](doc:getting-help) for community resources to help you resolve your issue.
+For security reasons, we don't recommend frequently curling this script directly to `bash`, e.g., on every CI run. If the script were compromised during some time window, you'd be more likely to download it during that window and be impacted. Instead, for regular use, we recommend checking this script into the root of your repo and pointing users and CI machines to that checked-in version. The script is very simple and need not be updated very often.
 
+Alternatively, on macOS you can also use homebrew to install `pants`:
 
-> 📘 Add `./pants` to version control
-> 
-> You should check the `./pants` script into your repo so that all users can easily run Pants.
+```
+brew install pantsbuild/tap/pants
+```
+
+You can also use the [`bin`](https://github.com/marcosnils/bin) tool to install `pants`:
+
+```
+bin i github.com/pantsbuild/scie-pants ~/.local/bin/pants
+```
+
+`pants` is a launcher binary that delegates to the underlying version of Pants in each repo. This allows you to have multiple repos, each using an independent version of Pants.
+
+- If you run `pants` in a repo that is already configured to use Pants, it will read the repo's Pants version from the `pants.toml` config file, install that version if necessary, and then run it.
+
+- If you run `pants` in a repo that is not yet configured to use Pants, it will prompt you to set up a skeleton `pants.toml` that uses that latest stable version of Pants. You'll then need to edit that config file to add [initial configuration](doc:initial-configuration).
+
+If you have difficulty installing Pants, see our [getting help](doc:getting-help) for community resources to help you resolve your issue.
 
 > 👍 Upgrading Pants
 > 
-> The `./pants` script will automatically install and use the Pants version specified in `pants.toml`, so upgrading Pants is as simple as editing `pants_version` in that file.
+> The `pants` launcher binary will automatically install and use the Pants version specified in `pants.toml`, so upgrading Pants in a repo is as simple as editing `pants_version` in that file.
+>
+> To upgrade the `pants` launcher binary itself, run
+> ```
+> SCIE_BOOT=update pants
+> ```
+
+Running Pants from sources
+--------------------------
+
+See [here](doc:running-pants-from-sources) for instructions on how to run Pants directly from its [sources](https://github.com/pantsbuild/pants).
+
+This is useful when making changes directly to Pants, to see how those changes impact your repo.
 
 
-Updating the `pants` launch script
-----------------------------------
+> 🚧 The old `./pants` script
+>
+> Before the creation of the `pants` launcher binary, the recommended way of installing Pants was to check a `./pants` launcher script into each repo. This script required an external Python interpreter, and was prone to errors and issues related to discovery and use of this interpreter. 
+> 
+> The `pants` launcher binary uses an embedded interpreter and does not rely on one being present on the system (although if your repo contains Python code then it naturally requires a Python interpreter).
+> 
+> We strongly recommend removing the `./pants` script from your repo and using the `pants` binary instead. You can keep a simple `./pants` script that delegates to `pants` to ease the transition. However, if you do need to continue to use the old installation method for some reason, it is described [here](doc:manual-installation). But please [let us know](doc:getting-help) so we can accommodate your use case in the launcher binary.
 
-To update to the latest `pants` launch script in an existing repo, run:
+The `pants` binary's implementation
+-----------------------------------
 
-```
-curl -L -O https://static.pantsbuild.org/setup/pants && chmod +x ./pants
-```
+You don't need to know this to use `pants`, but it may be of interest:
+
+The `pants` launcher binary is also known as [scie-pants](https://github.com/pantsbuild/scie-pants) (pronounced "ski pants"), It's implemented using [scie](https://github.com/a-scie/jump), a Self Contained Interpreted Executable launcher. scie is what allows `pants` to embed its own Python interpreter, instead of relying on a specific interpreter being available on your PATH.
+
+In fact, instead of literally embedding an interpreter in the `pants` binary, which would inflate its size, the binary is "hollowed out": Instead of the interpreter itself it contains metadata on how to download a platform-specific [standalone interpreter executable](https://gregoryszorc.com/docs/python-build-standalone/main/). The scie mechanism then downloads that interpreter file on first use, and caches it for future use. So if you update the `pants` launcher binary, you don't have to re-download the interpreter.
+
+See the links above for more details. We hope to soon add support in Pants for building scies out of your code, which will allow you to package and ship fully standalone Python binaries!

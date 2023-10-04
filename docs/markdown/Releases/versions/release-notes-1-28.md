@@ -3,7 +3,6 @@ title: "1.28.x"
 slug: "release-notes-1-28"
 hidden: true
 createdAt: "2020-05-05T16:51:04.132Z"
-updatedAt: "2020-05-20T02:52:35.046Z"
 ---
 Some highlights:
 

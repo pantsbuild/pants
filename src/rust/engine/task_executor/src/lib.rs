@@ -29,20 +29,13 @@ use std::collections::HashMap;
 use std::env;
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use arc_swap::ArcSwapOption;
 use futures::future::FutureExt;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle, Runtime};
 use tokio::task::{Id, JoinError, JoinHandle, JoinSet};
-
-lazy_static! {
-    // Lazily initialized in Executor::global.
-    static ref GLOBAL_EXECUTOR: ArcSwapOption<Runtime> = ArcSwapOption::from_pointee(None);
-}
 
 /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
 /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
@@ -61,9 +54,23 @@ fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::
   })
 }
 
+///
+/// Executors come in two flavors:
+/// * "borrowed"
+///     * Created with `Self::new()`, or `self::to_borrowed()`.
+///     * A borrowed Executor will not be shut down when all handles are dropped, and shutdown
+///       methods will have no impact.
+///     * Used when multiple runs of Pants will borrow a single Executor owned by `pantsd`, and in
+///       unit tests where the Runtime is created by macros.
+/// * "owned"
+///     * Created with `Self::new_owned()`.
+///     * When all handles of a owned Executor are dropped, its Runtime will be shut down.
+///       Additionally, the explicit shutdown methods can be used to shut down the Executor for all
+///       clones.
+///
 #[derive(Debug, Clone)]
 pub struct Executor {
-  _runtime: Option<Arc<Runtime>>,
+  runtime: Arc<Mutex<Option<Runtime>>>,
   handle: Handle,
 }
 
@@ -78,8 +85,8 @@ impl Executor {
   /// the scope of the tokio::{test, main} macros.
   ///
   pub fn new() -> Executor {
-    Executor {
-      _runtime: None,
+    Self {
+      runtime: Arc::new(Mutex::new(None)),
       handle: Handle::current(),
     }
   }
@@ -92,22 +99,14 @@ impl Executor {
   /// need thread configurability, but also want to know reliably when the Runtime will shutdown
   /// (which, because it is static, will only be at the entire process' exit).
   ///
-  pub fn global<F>(
+  pub fn new_owned<F>(
     num_worker_threads: usize,
     max_threads: usize,
     on_thread_start: F,
   ) -> Result<Executor, String>
   where
-    F: Fn() + Send + Sync + Clone + 'static,
+    F: Fn() + Send + Sync + 'static,
   {
-    let global = GLOBAL_EXECUTOR.load();
-    if let Some(ref runtime) = *global {
-      return Ok(Executor {
-        _runtime: Some(runtime.clone()),
-        handle: runtime.handle().clone(),
-      });
-    }
-
     let mut runtime_builder = Builder::new_multi_thread();
 
     runtime_builder
@@ -116,16 +115,29 @@ impl Executor {
       .enable_all();
 
     if env::var("PANTS_DEBUG").is_ok() {
-      runtime_builder.on_thread_start(on_thread_start.clone());
+      runtime_builder.on_thread_start(on_thread_start);
     };
 
     let runtime = runtime_builder
       .build()
-      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+      .map_err(|e| format!("Failed to start the runtime: {e}"))?;
 
-    // Attempt to swap, then recurse to retry.
-    GLOBAL_EXECUTOR.compare_and_swap(global, Some(Arc::new(runtime)));
-    Self::global(num_worker_threads, max_threads, on_thread_start)
+    let handle = runtime.handle().clone();
+    Ok(Executor {
+      runtime: Arc::new(Mutex::new(Some(runtime))),
+      handle,
+    })
+  }
+
+  ///
+  /// Creates a clone of this Executor which is disconnected from shutdown events. See the `Executor`
+  /// rustdoc.
+  ///
+  pub fn to_borrowed(&self) -> Executor {
+    Self {
+      runtime: Arc::new(Mutex::new(None)),
+      handle: self.handle.clone(),
+    }
   }
 
   ///
@@ -229,6 +241,31 @@ impl Executor {
   /// Return a reference to this executor's runtime handle.
   pub fn handle(&self) -> &Handle {
     &self.handle
+  }
+
+  ///
+  /// A blocking call to shut down the Runtime associated with this "owned" Executor. If tasks do
+  /// not shut down within the given timeout, they are leaked.
+  ///
+  /// This method has no effect for "borrowed" Executors: see the `Executor` rustdoc.
+  ///
+  pub fn shutdown(&self, timeout: Duration) {
+    let Some(runtime) = self.runtime.lock().take() else {
+      return;
+    };
+
+    let start = Instant::now();
+    runtime.shutdown_timeout(timeout + Duration::from_millis(250));
+    if start.elapsed() > timeout {
+      // Leaked tasks could lead to panics in some cases (see #16105), so warn for them.
+      log::warn!("Executor shutdown took unexpectedly long: tasks were likely leaked!");
+    }
+  }
+
+  /// Returns true if `shutdown` has been called for this Executor. Always returns true for
+  /// borrowed Executors.
+  pub fn is_shutdown(&self) -> bool {
+    self.runtime.lock().is_none()
   }
 }
 

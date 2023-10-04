@@ -4,7 +4,6 @@ slug: "thrift-python"
 excerpt: "How to generate Python from Thrift."
 hidden: false
 createdAt: "2022-02-04T18:42:02.513Z"
-updatedAt: "2022-03-05T00:21:17.402Z"
 ---
 When your Python code imports Thrift generated files, Pants will detect the imports and run the Apache Thrift compiler to generate those files.
 
@@ -39,7 +38,7 @@ You will also need to make sure that `thrift` is discoverable on your PATH, as P
 thrift_search_paths = ["/usr/bin"]
 ```
 
-This backend adds the new [`thrift_source`](doc:reference-thrift_source) target, which you can confirm by running `./pants help thrift_source`. 
+This backend adds the new [`thrift_source`](doc:reference-thrift_source) target, which you can confirm by running `pants help thrift_source`. 
 
 To reduce boilerplate, you can also use the [`thrift_sources`](doc:reference-thrift_sources) target, which generates one `thrift_source` target per file in the `sources` field.
 
@@ -70,15 +69,15 @@ Pants will then automatically add these dependencies to your `thrift_sources` ta
 Step 3: Generate `thrift_sources` target
 ----------------------------------------
 
-Run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) for Pants to create a `thrift_sources` target wherever you have `.thrift` files:
+Run [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) for Pants to create a `thrift_sources` target wherever you have `.thrift` files:
 
 ```
-$ ./pants tailor ::
+$ pants tailor ::
 Created src/thrift/BUILD:
   - Add thrift_sources target thrift
 ```
 
-Pants will use [dependency inference](doc:targets) for any `import` statements in your `.thrift` files, which you can confirm by running `./pants dependencies path/to/file.thrift`. You should also see the `python_requirement` target for the `thrift` library from the previous step.
+Pants will use [dependency inference](doc:targets) for any `import` statements in your `.thrift` files, which you can confirm by running `pants dependencies path/to/file.thrift`. You should also see the `python_requirement` target for the `thrift` library from the previous step.
 
 Step 4: Confirm Python imports are working
 ------------------------------------------
@@ -114,7 +113,7 @@ As shown in the table, your Python imports depend on whether the Thrift file use
 
 Imports behave the same regardless of whether you have [source roots](doc:source-roots), such as `src/thrift`. The import will still either be the top-level file like `user.ttypes` or the custom namespace.
 
-Pants's dependency inference will detect Python imports of Thrift modules, which you can confirm by running `./pants dependencies path/to/file.py`.
+Pants's dependency inference will detect Python imports of Thrift modules, which you can confirm by running `pants dependencies path/to/file.py`.
 
 You can also [manually add](doc:targets) the dependency:
 
@@ -130,9 +129,9 @@ python_sources(dependencies=["models:models"])
 > 
 > For example, compare `import user.ttypes` to `import codegen.models.user.ttypes`.
 
-> 📘 Run `./pants export-codegen ::` to inspect the files
+> 📘 Run `pants export-codegen ::` to inspect the files
 > 
-> `./pants export-codegen ::` will run all relevant code generators and write the files to `dist/codegen` using the same paths used normally by Pants.
+> `pants export-codegen ::` will run all relevant code generators and write the files to `dist/codegen` using the same paths used normally by Pants.
 > 
 > You do not need to run this goal for codegen to work when using Pants; `export-codegen` is only for external consumption outside of Pants.
 

@@ -19,13 +19,13 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
-    group_by_dir,
 )
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 
@@ -50,8 +50,8 @@ async def find_putative_targets(
     paths = tuple(targets)
 
     while paths:
-        digest = await Get(Digest, PathGlobs(paths))
-        result = await Get(
+        digest = await Get(Digest, PathGlobs(paths))  # noqa: PNT30: this is inherently sequential
+        result = await Get(  # noqa: PNT30: this is inherently sequential
             OpenApiDependencies,
             ParseOpenApiSources(
                 sources_digest=digest,

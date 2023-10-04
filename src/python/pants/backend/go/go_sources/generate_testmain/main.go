@@ -373,7 +373,12 @@ func generate(analysis *Analysis, genCover bool) ([]byte, error) {
 }
 
 func main() {
-	analysis, err := analyze(os.Args[1], os.Args[2:])
+	if len(os.Args) < 3 {
+		fmt.Fprintf(os.Stderr, "usage: generator TESTMAIN_PATH IMPORT_PATH [FILES...]\n")
+		os.Exit(1)
+	}
+
+	analysis, err := analyze(os.Args[2], os.Args[3:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
@@ -383,13 +388,13 @@ func main() {
 
 	testmain, err := generate(analysis, genCover)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to generate _testmain.go: %s\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to generate %s: %s\n", os.Args[1], err)
 		os.Exit(1)
 	}
 
-	err = os.WriteFile("_testmain.go", testmain, 0600)
+	err = os.WriteFile(os.Args[1], testmain, 0600)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write _testmain.go: %s\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to write %s: %s\n", os.Args[1], err)
 		os.Exit(1)
 	}
 

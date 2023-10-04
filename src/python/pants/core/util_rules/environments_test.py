@@ -81,14 +81,15 @@ def test_extract_process_config_from_environment() -> None:
             remote_execution=enable_remote_execution,
             remote_execution_extra_platform_properties=["global_k=v"],
         )
+        name = "name"
         env_subsystem = create_subsystem(
             EnvironmentsSubsystem,
-            names={"name": "addr"} if envs_enabled else {},
+            names={name: "addr"} if envs_enabled else {},
         )
         result = run_rule_with_mocks(
             extract_process_config_from_environment,
             rule_args=[
-                EnvironmentTarget(env_tgt),
+                EnvironmentTarget(name, env_tgt),
                 Platform.linux_arm64,
                 global_options,
                 env_subsystem,
@@ -343,7 +344,7 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 MockGet(
                     output_type=EnvironmentTarget,
                     input_types=(EnvironmentName,),
-                    mock=lambda _: EnvironmentTarget(env_tgt),
+                    mock=lambda name: EnvironmentTarget(name.val or "__local__", env_tgt),
                 ),
                 MockGet(
                     output_type=EnvironmentName,
@@ -352,7 +353,7 @@ def test_resolve_environment_name_local_and_docker_fallbacks(monkeypatch) -> Non
                 ),
             ],
         ).val
-        return result  # type: ignore[no-any-return]
+        return result
 
     def create_local_tgt(
         *, compatible_platforms: list[Platform] | None = None, fallback: bool = False
@@ -487,7 +488,9 @@ def test_executable_search_path_cache_scope() -> None:
         tgt: Target | None, *, cache_failures: bool, expected: ProcessCacheScope
     ) -> None:
         assert (
-            EnvironmentTarget(tgt).executable_search_path_cache_scope(cache_failures=cache_failures)
+            EnvironmentTarget("unused", tgt).executable_search_path_cache_scope(
+                cache_failures=cache_failures
+            )
             == expected
         )
 
