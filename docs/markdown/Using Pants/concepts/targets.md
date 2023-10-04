@@ -187,6 +187,10 @@ Default fields and values are validated against their target types, except when 
 
 This means, that it is legal to provide a default value for `all` targets, even if it is only a subset of targets that actually supports that particular field.
 
+> 📘 `__defaults__` does not apply to environment targets.
+>
+> The environment targets (such as `local_environment` and `docker_environment` etc) are special and used during a bootstrap phase before any targets are defined and as such can not be targeted by the `__defaults__` construct.
+
 Examples:
 
 ```python src/example/BUILD
