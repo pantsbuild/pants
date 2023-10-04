@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
+from pants.backend.python.target_types import MainSpecification
 from pants.core.goals.lint import LintTargetsRequest, LintResult, LintFilesRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.partitions import PartitionerType, Partitions, PartitionMetadata
@@ -19,16 +20,37 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
+
+@dataclass
+class SystemBinaryExecutable:
+    command: str
+    tools: List[str] = None
+
+
+@dataclass
+class PythonToolExecutable:
+    main: MainSpecification
+    requirements: list[str]
+    resolve: str
+
+
 @dataclass
 class ByoLinter:
     options_scope: str
     name: str
     help: str
-    command: str
+    executable: SystemBinaryExecutable
     file_extensions: List[str]  # deprecate
     file_glob_include: List[str]
     file_glob_exclude: List[str]
-    tools: List[str] = None
+
+    @property
+    def command(self):
+        return self.executable.command
+    
+    @property
+    def tools(self):
+        return self.executable.tools
 
     def rules(self):
         return build(self)
@@ -57,13 +79,6 @@ def build(conf: ByoLinter):
     ))
     fieldset_cls.__module__ = __name__
     fieldset_cls = dataclass(frozen=True)(fieldset_cls)
-
-    # lintreq_cls = type(LintTargetsRequest)(f'ByoLint_{conf.options_scope}_Request', (LintTargetsRequest,), dict(
-    #     tool_subsystem=subsystem_cls,
-    #     partitioner_type=PartitionerType.DEFAULT_SINGLE_PARTITION,
-    #     field_set_type=fieldset_cls,
-    # ))
-    # lintreq_cls.__module__ = __name__
 
     lint_files_req_cls = type(LintFilesRequest)(f'ByoLint_{conf.options_scope}_Request', (LintFilesRequest,), dict(
         tool_subsystem=subsystem_cls,
