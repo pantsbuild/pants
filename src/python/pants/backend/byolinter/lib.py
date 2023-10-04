@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import List
 
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import MainSpecification
+from pants.backend.python.util_rules.pex import Pex, PexRequest, PexProcess
 from pants.core.goals.lint import LintTargetsRequest, LintResult, LintFilesRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.partitions import PartitionerType, Partitions, PartitionMetadata
@@ -9,7 +11,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import SEARCH_PATHS, BinaryPathRequest, BinaryPaths, BinaryShimsRequest, \
     BinaryShims
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import FilespecMatcher, Snapshot
+from pants.engine.internals.native_engine import FilespecMatcher, Snapshot, Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
@@ -40,7 +42,6 @@ class ByoLinter:
     name: str
     help: str
     executable: SystemBinaryExecutable
-    file_extensions: List[str]  # deprecate
     file_glob_include: List[str]
     file_glob_exclude: List[str]
 
@@ -50,27 +51,30 @@ class ByoLinter:
 
 def build(conf: ByoLinter):
     assert conf.options_scope.isidentifier(), "The options scope must be a valid python identifier"
-    subsystem_cls = type(Subsystem)(f'ByoLint_{conf.options_scope}_Subsystem', (Subsystem,), dict(
-        options_scope=conf.options_scope,
-        skip=SkipOption("lint"),
-        name=conf.name,
-        help=conf.help,
-        _dynamic_subsystem=True,
-    ))
+
+    if isinstance(conf.executable, SystemBinaryExecutable):
+        subsystem_cls = type(Subsystem)(f'ByoLint_{conf.options_scope}_Subsystem', (Subsystem,), dict(
+            options_scope=conf.options_scope,
+            skip=SkipOption("lint"),
+            name=conf.name,
+            help=conf.help,
+            _dynamic_subsystem=True,
+        ))
+    elif isinstance(conf.executable, PythonToolExecutable):
+        subsystem_cls = type(PythonToolBase)(f'ByoLint_{conf.options_scope}_Subsystem', (PythonToolBase,), dict(
+            options_scope=conf.options_scope,
+            skip=SkipOption("lint"),
+            name=conf.name,
+            help=conf.help,
+            _dynamic_subsystem=True,
+            default_main=conf.executable.main,
+            default_requirements=conf.executable.requirements,
+            default_lockfile_resource=("pants.backend.byolinter.SHOULDNEVERBEUSED", "NOTNEEDED.lock"),
+            register_interpreter_constraints=True,
+            install_from_resolve=conf.executable.resolve,
+        ))
 
     subsystem_cls.__module__ = __name__
-
-    def opt_out(tgt: Target) -> bool:
-        source = tgt.get(FileSourceField).value
-        return not any(source.endswith(ext) for ext in conf.file_extensions)
-
-    fieldset_cls = type(FieldSet)(f'ByoLint_{conf.options_scope}_FieldSet', (FieldSet,), dict(
-        required_fields=(FileSourceField,),
-        opt_out=staticmethod(opt_out),
-        __annotations__=dict(source=FileSourceField)
-    ))
-    fieldset_cls.__module__ = __name__
-    fieldset_cls = dataclass(frozen=True)(fieldset_cls)
 
     lint_files_req_cls = type(LintFilesRequest)(f'ByoLint_{conf.options_scope}_Request', (LintFilesRequest,), dict(
         tool_subsystem=subsystem_cls,
@@ -137,6 +141,33 @@ def build(conf: ByoLinter):
                     immutable_input_digests=tools_input_digests,
                 ),
             )
+            return LintResult.create(request, process_result)
+
+    elif isinstance(conf.executable, PythonToolExecutable):
+        @rule(canonical_name_suffix=conf.options_scope)
+        async def run_byolint(
+                request: lint_files_req_cls.Batch,
+                subsystem: subsystem_cls
+        ) -> LintResult:
+            pex_request = subsystem.to_pex_request()
+            byo_bin = await Get(Pex, PexRequest, pex_request)
+            snapshot = await Get(Snapshot, PathGlobs(request.elements))
+            import pantsdebug;
+            pantsdebug.settrace_5678()
+
+            input_digest = await Get(
+                Digest,
+                MergeDigests((snapshot.digest, byo_bin.digest))
+            )
+
+            process = PexProcess(
+                byo_bin,
+                argv=snapshot.files,
+                input_digest=input_digest,
+                description=f"Run byo_flake8",
+                level=LogLevel.INFO
+            )
+            process_result = await Get(FallibleProcessResult, PexProcess, process)
             return LintResult.create(request, process_result)
 
     namespace = dict(locals())

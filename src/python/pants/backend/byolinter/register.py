@@ -21,7 +21,6 @@ confs = [
         name="Shellcheck",
         help="A shell linter based on your installed shellcheck",
         executable=SystemBinaryExecutable("shellcheck"),
-        file_extensions=[".sh"],
         file_glob_include=["**/*.sh"],
         file_glob_exclude=[],
     ),
@@ -30,10 +29,9 @@ confs = [
         name="MarkdownLint",
         help="A markdown linter based on your installed markdown lint.",
         executable=SystemBinaryExecutable("markdownlint", tools=["node"]),
-        file_extensions=[".md"],
         file_glob_include=["**/*.md"],
         file_glob_exclude=["README.md"],
-    )
+    ),
 ]
 
 
