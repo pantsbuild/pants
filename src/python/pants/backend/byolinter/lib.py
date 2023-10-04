@@ -44,14 +44,6 @@ class ByoLinter:
     file_glob_include: List[str]
     file_glob_exclude: List[str]
 
-    @property
-    def command(self):
-        return self.executable.command
-    
-    @property
-    def tools(self):
-        return self.executable.tools
-
     def rules(self):
         return build(self)
 
@@ -99,56 +91,53 @@ def build(conf: ByoLinter):
 
         return Partitions.single_partition(sorted(matching_filepaths))
 
-    @rule(canonical_name_suffix=conf.options_scope)
-    async def run_ByoLint(
-            request: lint_files_req_cls.Batch,
-    ) -> LintResult:
+    if isinstance(conf.executable, SystemBinaryExecutable):
+        @rule(canonical_name_suffix=conf.options_scope)
+        async def run_ByoLint_from_bin_executable(
+                request: lint_files_req_cls.Batch,
+        ) -> LintResult:
 
-        # sources = await Get(
-        #     SourceFiles,
-        #     SourceFilesRequest(field_set.source for field_set in request.elements),
-        # )
-        sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
+            executable = conf.executable
 
-        # Currently the hard-coded one but probably should become the
-        # shell search path based one.
-        search_paths = SEARCH_PATHS
+            sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
 
-        binary_request = BinaryPathRequest(binary_name=conf.command, search_path=search_paths)
-        command_paths = await Get(BinaryPaths, BinaryPathRequest, binary_request)
-        command_path = command_paths.first_path.path
+            search_paths = SEARCH_PATHS
 
-        tools_path_env = {}
-        tools_input_digests = FrozenDict()
+            binary_request = BinaryPathRequest(binary_name=executable.command, search_path=search_paths)
+            command_paths = await Get(BinaryPaths, BinaryPathRequest, binary_request)
+            command_path = command_paths.first_path.path
 
-        if conf.tools:
-            tool_resolution_request = BinaryShimsRequest.for_binaries(
-                *conf.tools,
-                rationale=f"Needed for {conf.options_scope} linter",
-                search_path=SEARCH_PATHS
+            tools_path_env = {}
+            tools_input_digests = FrozenDict()
+
+            if executable.tools:
+                tool_resolution_request = BinaryShimsRequest.for_binaries(
+                    *executable.tools,
+                    rationale=f"Needed for {conf.options_scope} linter",
+                    search_path=SEARCH_PATHS
+                )
+                resolved_tools = await Get(
+                    BinaryShims, BinaryShimsRequest, tool_resolution_request
+                )
+
+                tools_path_env = {'PATH': resolved_tools.path_component}
+                tools_input_digests = resolved_tools.immutable_input_digests
+
+            input_digest = sources_snapshot.digest
+
+            import pantsdebug; pantsdebug.settrace_5678()
+            process_result = await Get(
+                FallibleProcessResult,
+                Process(
+                    argv=(command_path, *sources_snapshot.files),
+                    input_digest=input_digest,
+                    description=f"Run {conf.name}",
+                    level=LogLevel.INFO,
+                    env=tools_path_env,
+                    immutable_input_digests=tools_input_digests,
+                ),
             )
-            resolved_tools = await Get(
-                BinaryShims, BinaryShimsRequest, tool_resolution_request
-            )
-
-            tools_path_env = {'PATH': resolved_tools.path_component}
-            tools_input_digests = resolved_tools.immutable_input_digests
-
-        input_digest = sources_snapshot.digest
-
-        import pantsdebug; pantsdebug.settrace_5678()
-        process_result = await Get(
-            FallibleProcessResult,
-            Process(
-                argv=(command_path, *sources_snapshot.files),
-                input_digest=input_digest,
-                description=f"Run {conf.name}",
-                level=LogLevel.INFO,
-                env=tools_path_env,
-                immutable_input_digests=tools_input_digests,
-            ),
-        )
-        return LintResult.create(request, process_result)
+            return LintResult.create(request, process_result)
 
     namespace = dict(locals())
 
