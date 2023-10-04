@@ -7,7 +7,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterator, Optional, cast
+from typing import Callable, ClassVar, Iterable, Iterator, Optional, Tuple, cast
 
 from typing_extensions import final
 
@@ -151,6 +151,21 @@ class DockerImageTagsField(StringSequenceField):
         See {doc_url('tagging-docker-images')}.
         """
     )
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if not value_or_default:
+            raise InvalidFieldException(
+                softwrap(
+                    f"""
+                    The `{cls.alias}` field in target {address} must not be empty.
+                    """
+                )
+            )
+        return value_or_default
 
 
 class DockerImageTargetStageField(StringField):
