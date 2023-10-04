@@ -23,14 +23,18 @@ from pants.util.logging import LogLevel
 
 
 
+class Executable:
+    pass
+
+
 @dataclass
-class SystemBinaryExecutable:
+class SystemBinaryExecutable(Executable):
     command: str
     tools: List[str] = None
 
 
 @dataclass
-class PythonToolExecutable:
+class PythonToolExecutable(Executable):
     main: MainSpecification
     requirements: list[str]
     resolve: str
@@ -41,7 +45,7 @@ class ByoLinter:
     options_scope: str
     name: str
     help: str
-    executable: SystemBinaryExecutable
+    executable: Executable
     file_glob_include: List[str]
     file_glob_exclude: List[str]
 

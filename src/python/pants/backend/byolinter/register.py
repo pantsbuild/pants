@@ -3,16 +3,12 @@ from dataclasses import dataclass
 from typing import List
 
 from . import lib, v2
-from .lib import ByoLinter, SystemBinaryExecutable
+from .lib import ByoLinter, SystemBinaryExecutable, PythonToolExecutable
 from ..python.target_types import ConsoleScript
 
 
 
-flake8_executor = dict(
-    main=ConsoleScript("flake8"),
-    requirements=["flake8>=5.0.4,<7"],
-    resolve="byo_flake8",
-)
+
 
 
 confs = [
@@ -31,6 +27,18 @@ confs = [
         executable=SystemBinaryExecutable("markdownlint", tools=["node"]),
         file_glob_include=["**/*.md"],
         file_glob_exclude=["README.md"],
+    ),
+    ByoLinter(
+        options_scope='byo_flake8',
+        name="byo_Flake8",
+        help="byo flake8",
+        executable=PythonToolExecutable(
+            main=ConsoleScript("flake8"),
+            requirements=["flake8>=5.0.4,<7"],
+            resolve="byo_flake8",
+        ),
+        file_glob_include=["**/*.py"],
+        file_glob_exclude=[],
     ),
 ]
 
