@@ -119,7 +119,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             # If the descriptor is an `OptionsInfo`, we can resolve it against the environment
             # target.
             if isinstance(v, OptionsInfo):
-                # If the the value is not defined in the `EnvironmentTarget`, return the value
+                # If the value is not defined in the `EnvironmentTarget`, return the value
                 # from the options system.
                 override = resolve_environment_sensitive_option(v.flag_names[0], self)
                 return override if override is not None else default

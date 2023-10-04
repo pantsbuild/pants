@@ -94,7 +94,7 @@ def find_python_runtime_library_or_raise_error(
             f"""
             Multiple `python_requirement` targets were found with the module `{runtime_library_module}`
             in your project{for_resolve_str}, so it is ambiguous which to use for the runtime library
-            for the Python code generated from the the target {codegen_address}:
+            for the Python code generated from the target {codegen_address}:
             {sorted(addr.spec for addr in addresses)}
 
             To fix, remove one of these `python_requirement` targets{for_resolve_str} so that
