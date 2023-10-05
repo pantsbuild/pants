@@ -10,13 +10,12 @@ use hashing::Digest;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::ActionResult;
+use remote_provider_traits::{ActionCacheProvider, RemoteCacheProviderOptions};
 use workunit_store::Metric;
 
-use crate::remote::apply_headers;
-use process_execution::Context;
 use tonic::{Code, Request};
 
-use super::{ActionCacheProvider, RemoteCacheProviderOptions};
+use crate::apply_headers;
 
 pub struct Provider {
   instance_name: Option<String>,
@@ -98,7 +97,7 @@ impl ActionCacheProvider for Provider {
   async fn get_action_result(
     &self,
     action_digest: Digest,
-    context: &Context,
+    build_id: &str,
   ) -> Result<Option<ActionResult>, String> {
     let client = self.action_cache_client.as_ref().clone();
     let response = retry_call(
@@ -109,7 +108,7 @@ impl ActionCacheProvider for Provider {
           instance_name: self.instance_name.clone().unwrap_or_default(),
           ..remexec::GetActionResultRequest::default()
         };
-        let request = apply_headers(Request::new(request), &context.build_id);
+        let request = apply_headers(Request::new(request), build_id);
         async move { client.get_action_result(request).await }
       },
       status_is_retryable,

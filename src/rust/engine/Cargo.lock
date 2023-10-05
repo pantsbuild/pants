@@ -2978,6 +2978,8 @@ dependencies = [
  "prost-types",
  "protos",
  "rand",
+ "remote_provider",
+ "remote_provider_reapi",
  "sharded_lmdb",
  "store",
  "strum",
@@ -2990,6 +2992,75 @@ dependencies = [
  "tokio-util 0.7.8",
  "tonic",
  "workunit_store",
+]
+
+[[package]]
+name = "remote_provider"
+version = "0.0.1"
+dependencies = [
+ "grpc_util",
+ "remote_provider_opendal",
+ "remote_provider_reapi",
+ "remote_provider_traits",
+]
+
+[[package]]
+name = "remote_provider_opendal"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "grpc_util",
+ "hashing",
+ "http",
+ "mock",
+ "opendal",
+ "parking_lot 0.12.1",
+ "prost",
+ "protos",
+ "remote_provider_traits",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "workunit_store",
+]
+
+[[package]]
+name = "remote_provider_reapi"
+version = "0.0.1"
+dependencies = [
+ "async-oncecell",
+ "async-stream",
+ "async-trait",
+ "bytes",
+ "futures",
+ "grpc_util",
+ "hashing",
+ "mock",
+ "parking_lot 0.12.1",
+ "protos",
+ "remote_provider_traits",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "tokio-util 0.7.8",
+ "tonic",
+ "uuid",
+ "workunit_store",
+]
+
+[[package]]
+name = "remote_provider_traits"
+version = "0.0.1"
+dependencies = [
+ "async-oncecell",
+ "async-trait",
+ "bytes",
+ "grpc_util",
+ "hashing",
+ "protos",
+ "tokio",
 ]
 
 [[package]]
@@ -3457,6 +3528,7 @@ dependencies = [
  "prost",
  "prost-types",
  "protos",
+ "remote_provider",
  "serde",
  "serde_derive",
  "sharded_lmdb",
@@ -3628,6 +3700,7 @@ dependencies = [
  "hashing",
  "prost",
  "protos",
+ "tempfile",
  "tokio",
 ]
 

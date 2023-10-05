@@ -33,6 +33,17 @@ impl TestData {
     )
   }
 
+  pub fn all_the_henries() -> TestData {
+    TestData::new(include_str!("./all_the_henries.txt"))
+  }
+
+  pub fn double_all_the_henries() -> TestData {
+    let big_file = TestData::all_the_henries();
+    TestData {
+      string: big_file.string.repeat(2),
+    }
+  }
+
   pub fn new(s: &str) -> TestData {
     TestData {
       string: s.to_owned(),

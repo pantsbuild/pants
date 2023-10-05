@@ -3,20 +3,19 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Debug};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use async_trait::async_trait;
 use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
-use grpc_util::tls;
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::{ActionResult, Command, Tree};
-use store::remote::REAPI_ADDRESS_SCHEMAS;
-use store::{RemoteOptions, Store, StoreError};
+use remote_provider::{choose_action_cache_provider, ActionCacheProvider};
+use store::{Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
@@ -28,12 +27,9 @@ use process_execution::{
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
 
-mod base_opendal;
-#[cfg(test)]
-mod base_opendal_tests;
-mod reapi;
-#[cfg(test)]
-mod reapi_tests;
+// Consumers of this crate shouldn't need to worry about the exact crate structure that comes
+// together to make a remote cache command runner.
+pub use remote_provider::RemoteCacheProviderOptions;
 
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
@@ -41,86 +37,6 @@ pub enum RemoteCacheWarningsBehavior {
   Ignore,
   FirstOnly,
   Backoff,
-}
-
-/// This `ActionCacheProvider` trait captures the operations required to be able to cache command
-/// executions remotely.
-#[async_trait]
-pub trait ActionCacheProvider: Sync + Send + 'static {
-  async fn update_action_result(
-    &self,
-    action_digest: Digest,
-    action_result: ActionResult,
-  ) -> Result<(), String>;
-
-  async fn get_action_result(
-    &self,
-    action_digest: Digest,
-    context: &Context,
-  ) -> Result<Option<ActionResult>, String>;
-}
-
-#[derive(Clone)]
-pub struct RemoteCacheProviderOptions {
-  // TODO: this is currently framed for the REAPI provider, with some options used by others, would
-  // be good to generalise
-  // TODO: this is structurally very similar to `RemoteOptions`: maybe they should be the same? (see
-  // comment in `choose_provider` too)
-  pub instance_name: Option<String>,
-  pub action_cache_address: String,
-  pub root_ca_certs: Option<Vec<u8>>,
-  pub mtls_data: Option<(Vec<u8>, Vec<u8>)>,
-  pub headers: BTreeMap<String, String>,
-  pub concurrency_limit: usize,
-  pub rpc_timeout: Duration,
-}
-
-async fn choose_provider(
-  options: RemoteCacheProviderOptions,
-) -> Result<Arc<dyn ActionCacheProvider>, String> {
-  let address = options.action_cache_address.clone();
-
-  // TODO: we shouldn't need to gin up a whole copy of this struct; it'd be better to have the two
-  // set of remoting options managed together.
-  let remote_options = RemoteOptions {
-    cas_address: address.clone(),
-    instance_name: options.instance_name.clone(),
-    headers: options.headers.clone(),
-    tls_config: tls::Config::new(options.root_ca_certs.clone(), options.mtls_data.clone())?,
-    rpc_timeout: options.rpc_timeout,
-    rpc_concurrency_limit: options.concurrency_limit,
-    // TODO: these should either be passed through or not synthesized here
-    chunk_size_bytes: 0,
-    rpc_retries: 0,
-    capabilities_cell_opt: None,
-    batch_api_size_limit: 0,
-  };
-
-  if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
-    Ok(Arc::new(reapi::Provider::new(options).await?))
-  } else if let Some(path) = address.strip_prefix("file://") {
-    // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
-    // testing.
-    Ok(Arc::new(base_opendal::Provider::fs(
-      path,
-      "action-cache".to_owned(),
-      remote_options,
-    )?))
-  } else if let Some(url) = address.strip_prefix("github-actions-cache+") {
-    // This is relying on python validating that it was set as `github-actions-cache+https://...` so
-    // incorrect values could easily slip through here and cause downstream confusion. We're
-    // intending to change the approach (https://github.com/pantsbuild/pants/issues/19902) so this
-    // is tolerable for now.
-    Ok(Arc::new(base_opendal::Provider::github_actions_cache(
-      url,
-      "action-cache".to_owned(),
-      remote_options,
-    )?))
-  } else {
-    Err(format!(
-      "Cannot initialise remote action cache provider with address {address}, as the scheme is not supported",
-    ))
-  }
 }
 
 pub struct RemoteCacheRunnerOptions {
@@ -198,7 +114,7 @@ impl CommandRunner {
     runner_options: RemoteCacheRunnerOptions,
     provider_options: RemoteCacheProviderOptions,
   ) -> Result<Self, String> {
-    let provider = choose_provider(provider_options).await?;
+    let provider = choose_action_cache_provider(provider_options).await?;
     Ok(Self::new(runner_options, provider))
   }
 
@@ -645,7 +561,7 @@ async fn check_action_cache(
 
       let start = Instant::now();
       let response = provider
-        .get_action_result(action_digest, context)
+        .get_action_result(action_digest, &context.build_id)
         .and_then(|action_result| async move {
           let Some(action_result) = action_result else {
             return Ok(None);

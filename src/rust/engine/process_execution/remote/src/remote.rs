@@ -25,7 +25,6 @@ use remexec::{
   execution_stage::Value as ExecutionStageValue, Action, Command, ExecuteRequest, ExecuteResponse,
   ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
 };
-use tonic::metadata::BinaryMetadataValue;
 use tonic::{Code, Request, Status};
 
 use concrete_time::TimeSpan;
@@ -34,6 +33,7 @@ use grpc_util::headers_to_http_header_map;
 use grpc_util::prost::MessageExt;
 use grpc_util::{layered_service, status_to_str, LayeredService};
 use hashing::{Digest, Fingerprint};
+use remote_provider_reapi::apply_headers;
 use store::{Store, StoreError};
 use task_executor::Executor;
 use workunit_store::{
@@ -1049,26 +1049,6 @@ async fn populate_fallible_execution_result_for_timeout(
       context.run_id,
     ),
   })
-}
-
-/// Apply REAPI request metadata header to a `tonic::Request`.
-pub(crate) fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
-  let reapi_request_metadata = remexec::RequestMetadata {
-    tool_details: Some(remexec::ToolDetails {
-      tool_name: "pants".into(),
-      ..remexec::ToolDetails::default()
-    }),
-    tool_invocation_id: build_id.to_string(),
-    ..remexec::RequestMetadata::default()
-  };
-
-  let md = request.metadata_mut();
-  md.insert_bin(
-    "google.devtools.remoteexecution.v1test.requestmetadata-bin",
-    BinaryMetadataValue::try_from(reapi_request_metadata.to_bytes()).unwrap(),
-  );
-
-  request
 }
 
 pub async fn store_proto_locally<P: prost::Message>(

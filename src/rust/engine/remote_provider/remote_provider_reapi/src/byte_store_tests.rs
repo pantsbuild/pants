@@ -5,17 +5,19 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint};
 use mock::{RequestType, StubCAS};
 use tempfile::TempDir;
 use testutil::data::TestData;
+use testutil::file::mk_tempfile;
 use tokio::fs::File;
+use workunit_store::WorkunitStore;
 
-use crate::remote::{ByteStoreProvider, RemoteOptions};
-use crate::tests::{big_file_bytes, big_file_fingerprint, mk_tempfile, new_cas};
-use crate::MEGABYTES;
+use remote_provider_traits::{ByteStoreProvider, RemoteOptions};
 
-use super::reapi::Provider;
+use crate::byte_store::Provider;
+
+const MEGABYTES: usize = 1024 * 1024;
+const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * MEGABYTES;
 
 fn remote_options(
   cas_address: String,
@@ -40,15 +42,19 @@ async fn new_provider(cas: &StubCAS) -> Provider {
   Provider::new(remote_options(
     cas.address(),
     10 * MEGABYTES,
-    crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    STORE_BATCH_API_SIZE_LIMIT,
   ))
   .await
   .unwrap()
 }
 
 async fn load_test(chunk_size: usize) {
+  let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
-  let cas = new_cas(chunk_size);
+  let cas = StubCAS::builder()
+    .chunk_size_bytes(chunk_size)
+    .file(&testdata)
+    .build();
 
   let provider = new_provider(&cas).await;
   let mut destination = Vec::new();
@@ -146,15 +152,9 @@ async fn load_existing_wrong_digest_error() {
   )
 }
 
-fn assert_cas_store(
-  cas: &StubCAS,
-  fingerprint: Fingerprint,
-  bytes: Bytes,
-  chunks: usize,
-  chunk_size: usize,
-) {
+fn assert_cas_store(cas: &StubCAS, testdata: &TestData, chunks: usize, chunk_size: usize) {
   let blobs = cas.blobs.lock();
-  assert_eq!(blobs.get(&fingerprint), Some(&bytes));
+  assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
 
   let write_message_sizes = cas.write_message_sizes.lock();
   assert_eq!(write_message_sizes.len(), chunks);
@@ -182,10 +182,12 @@ async fn store_file_one_chunk() {
     .await
     .unwrap();
 
-  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+  assert_cas_store(&cas, &testdata, 1, 1024)
 }
 #[tokio::test]
 async fn store_file_multiple_chunks() {
+  let testdata = TestData::all_the_henries();
+
   let cas = StubCAS::empty();
   let chunk_size = 10 * 1024;
   let provider = Provider::new(remote_options(
@@ -196,16 +198,15 @@ async fn store_file_multiple_chunks() {
   .await
   .unwrap();
 
-  let all_the_henries = big_file_bytes();
-  let fingerprint = big_file_fingerprint();
-  let digest = Digest::new(fingerprint, all_the_henries.len());
-
   provider
-    .store_file(digest, mk_tempfile(Some(&all_the_henries)).await)
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .unwrap();
 
-  assert_cas_store(&cas, fingerprint, all_the_henries, 98, chunk_size)
+  assert_cas_store(&cas, &testdata, 98, chunk_size)
 }
 
 #[tokio::test]
@@ -222,7 +223,7 @@ async fn store_file_empty_file() {
     .await
     .unwrap();
 
-  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+  assert_cas_store(&cas, &testdata, 1, 1024)
 }
 
 #[tokio::test]
@@ -256,7 +257,7 @@ async fn store_file_connection_error() {
   let provider = Provider::new(remote_options(
     "http://doesnotexist.example".to_owned(),
     10 * MEGABYTES,
-    crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    STORE_BATCH_API_SIZE_LIMIT,
   ))
   .await
   .unwrap();
@@ -307,10 +308,12 @@ async fn store_bytes_one_chunk() {
     .await
     .unwrap();
 
-  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+  assert_cas_store(&cas, &testdata, 1, 1024)
 }
 #[tokio::test]
 async fn store_bytes_multiple_chunks() {
+  let testdata = TestData::all_the_henries();
+
   let cas = StubCAS::empty();
   let chunk_size = 10 * 1024;
   let provider = Provider::new(remote_options(
@@ -321,16 +324,12 @@ async fn store_bytes_multiple_chunks() {
   .await
   .unwrap();
 
-  let all_the_henries = big_file_bytes();
-  let fingerprint = big_file_fingerprint();
-  let digest = Digest::new(fingerprint, all_the_henries.len());
-
   provider
-    .store_bytes(digest, all_the_henries.clone())
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .unwrap();
 
-  assert_cas_store(&cas, fingerprint, all_the_henries, 98, chunk_size)
+  assert_cas_store(&cas, &testdata, 98, chunk_size)
 }
 
 #[tokio::test]
@@ -344,7 +343,7 @@ async fn store_bytes_empty_file() {
     .await
     .unwrap();
 
-  assert_cas_store(&cas, testdata.fingerprint(), testdata.bytes(), 1, 1024)
+  assert_cas_store(&cas, &testdata, 1, 1024)
 }
 
 #[tokio::test]
@@ -374,6 +373,7 @@ async fn store_bytes_batch_grpc_error() {
 
 #[tokio::test]
 async fn store_bytes_write_stream_grpc_error() {
+  let testdata = TestData::all_the_henries();
   let cas = StubCAS::cas_always_errors();
   let chunk_size = 10 * 1024;
   let provider = Provider::new(remote_options(
@@ -384,12 +384,8 @@ async fn store_bytes_write_stream_grpc_error() {
   .await
   .unwrap();
 
-  let all_the_henries = big_file_bytes();
-  let fingerprint = big_file_fingerprint();
-  let digest = Digest::new(fingerprint, all_the_henries.len());
-
   let error = provider
-    .store_bytes(digest, all_the_henries)
+    .store_bytes(testdata.digest(), testdata.bytes())
     .await
     .expect_err("Want err");
   assert!(
@@ -410,7 +406,7 @@ async fn store_bytes_connection_error() {
   let provider = Provider::new(remote_options(
     "http://doesnotexist.example".to_owned(),
     10 * MEGABYTES,
-    crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    STORE_BATCH_API_SIZE_LIMIT,
   ))
   .await
   .unwrap();
@@ -427,13 +423,15 @@ async fn store_bytes_connection_error() {
 
 #[tokio::test]
 async fn list_missing_digests_none_missing() {
-  let cas = new_cas(1024);
+  let testdata = TestData::roland();
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder().file(&testdata).build();
 
   let provider = new_provider(&cas).await;
 
   assert_eq!(
     provider
-      .list_missing_digests(&mut vec![TestData::roland().digest()].into_iter())
+      .list_missing_digests(&mut vec![testdata.digest()].into_iter())
       .await,
     Ok(HashSet::new())
   )

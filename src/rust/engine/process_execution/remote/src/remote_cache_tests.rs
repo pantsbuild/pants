@@ -16,14 +16,13 @@ use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use remote_provider::RemoteCacheProviderOptions;
 use store::{RemoteOptions, Store};
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::ensure_action_stored_locally;
-use crate::remote_cache::{
-  RemoteCacheProviderOptions, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
-};
+use crate::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use process_execution::{
   make_execute_request, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,

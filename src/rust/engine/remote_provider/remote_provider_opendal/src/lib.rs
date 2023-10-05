@@ -1,6 +1,29 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-#![allow(dead_code)]
+
+#![deny(warnings)]
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
+)]
+// It is often more clear to show that nothing is being moved.
+#![allow(clippy::match_ref_pats)]
+// Subjective style.
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![allow(clippy::mutex_atomic)]
 
 use std::collections::HashSet;
 use std::time::Instant;
@@ -8,14 +31,25 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future;
+use grpc_util::prost::MessageExt;
 use hashing::{async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
 use http::header::AUTHORIZATION;
 use opendal::layers::{ConcurrentLimitLayer, RetryLayer, TimeoutLayer};
 use opendal::{Builder, Operator};
+use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use remexec::ActionResult;
 use tokio::fs::File;
 use workunit_store::ObservationMetric;
 
-use super::{ByteStoreProvider, LoadDestination, RemoteOptions};
+use remote_provider_traits::{
+  ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteOptions,
+};
+
+#[cfg(test)]
+mod action_cache_tests;
+#[cfg(test)]
+mod byte_store_tests;
 
 const GITHUB_ACTIONS_CACHE_VERSION: &str = "pants-1";
 
@@ -26,9 +60,7 @@ pub enum LoadMode {
 }
 
 pub struct Provider {
-  /// This is public for easier testing of the action cache provider
-  // TODO: move all the providers into a single crate so that the pub isn't necessary
-  pub operator: Operator,
+  operator: Operator,
   base_path: String,
 }
 
@@ -275,5 +307,37 @@ impl ByteStoreProvider for Provider {
     .await?;
 
     Ok(existences.into_iter().flatten().collect())
+  }
+}
+
+#[async_trait]
+impl ActionCacheProvider for Provider {
+  async fn update_action_result(
+    &self,
+    action_digest: Digest,
+    action_result: ActionResult,
+  ) -> Result<(), String> {
+    let bytes = action_result.to_bytes();
+    self.store_bytes(action_digest, bytes).await
+  }
+  async fn get_action_result(
+    &self,
+    action_digest: Digest,
+    _build_id: &str,
+  ) -> Result<Option<ActionResult>, String> {
+    let mut destination = Vec::new();
+
+    match self
+      .load_without_validation(action_digest, &mut destination)
+      .await?
+    {
+      false => Ok(None),
+      true => {
+        let bytes = Bytes::from(destination);
+        Ok(Some(ActionResult::decode(bytes).map_err(|e| {
+          format!("failed to decode action result for digest {action_digest:?}: {e}")
+        })?))
+      }
+    }
   }
 }

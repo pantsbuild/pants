@@ -84,9 +84,12 @@ mod local;
 pub mod local_tests;
 
 pub mod remote;
-pub use remote::RemoteOptions;
 #[cfg(test)]
 mod remote_tests;
+
+// Consumers of this crate shouldn't need to worry about the exact crate structure that comes
+// together to make a store.
+pub use remote_provider::RemoteOptions;
 
 pub struct LocalOptions {
   pub files_max_size_bytes: usize,
