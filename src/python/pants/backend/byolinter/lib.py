@@ -4,6 +4,7 @@ from typing import List
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.util_rules.pex import Pex, PexRequest, PexProcess
+from pants.core.goals.fmt import FmtFilesRequest, FmtResult
 from pants.core.goals.lint import LintTargetsRequest, LintResult, LintFilesRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.partitions import PartitionerType, Partitions, PartitionMetadata
@@ -41,19 +42,20 @@ class PythonToolExecutable(Executable):
 
 
 @dataclass
-class ByoLinter:
+class ByoTool:
     options_scope: str
     name: str
     help: str
     executable: Executable
     file_glob_include: List[str]
     file_glob_exclude: List[str]
+    goal: str
 
     def rules(self):
         return build(self)
 
 
-def build(conf: ByoLinter):
+def build(conf: ByoTool):
     assert conf.options_scope.isidentifier(), "The options scope must be a valid python identifier"
 
     if isinstance(conf.executable, SystemBinaryExecutable):
@@ -65,7 +67,7 @@ def build(conf: ByoLinter):
             _dynamic_subsystem=True,
         ))
     elif isinstance(conf.executable, PythonToolExecutable):
-        subsystem_cls = type(PythonToolBase)(f'ByoLint_{conf.options_scope}_Subsystem', (PythonToolBase,), dict(
+        subsystem_cls = type(PythonToolBase)(f'ByoTool_{conf.options_scope}_Subsystem', (PythonToolBase,), dict(
             options_scope=conf.options_scope,
             skip=SkipOption("lint"),
             name=conf.name,
@@ -80,14 +82,20 @@ def build(conf: ByoLinter):
 
     subsystem_cls.__module__ = __name__
 
-    lint_files_req_cls = type(LintFilesRequest)(f'ByoLint_{conf.options_scope}_Request', (LintFilesRequest,), dict(
+    if conf.goal == 'lint':
+        request_super_cls = LintFilesRequest
+    elif conf.goal == 'fmt':
+        request_super_cls = FmtFilesRequest
+
+    req_cls = type(request_super_cls)(f'ByoTool_{conf.options_scope}_Request', (request_super_cls,), dict(
         tool_subsystem=subsystem_cls,
     ))
-    lint_files_req_cls.__module__ = __name__
+
+    req_cls.__module__ = __name__
 
     @rule(canonical_name_suffix=conf.options_scope)
     async def partition_inputs(
-            request: lint_files_req_cls.PartitionRequest,
+            request: req_cls.PartitionRequest,
             subsystem: subsystem_cls
     ) -> Partitions[str, PartitionMetadata]:
         if subsystem.skip:
@@ -99,11 +107,16 @@ def build(conf: ByoLinter):
 
         return Partitions.single_partition(sorted(matching_filepaths))
 
+    if conf.goal == 'lint':
+        result_cls = LintResult
+    elif conf.goal == 'fmt':
+        result_cls = FmtResult
+
     if isinstance(conf.executable, SystemBinaryExecutable):
         @rule(canonical_name_suffix=conf.options_scope)
-        async def run_ByoLint_from_bin_executable(
-                request: lint_files_req_cls.Batch,
-        ) -> LintResult:
+        async def run_byotool(
+                request: req_cls.Batch,
+        ) -> result_cls:
 
             executable = conf.executable
 
@@ -133,6 +146,11 @@ def build(conf: ByoLinter):
 
             input_digest = sources_snapshot.digest
 
+            if conf.goal == 'fmt':
+                extra_args = {'output_files': request.files}
+            else:
+                extra_args = {}
+
             import pantsdebug; pantsdebug.settrace_5678()
             process_result = await Get(
                 FallibleProcessResult,
@@ -143,16 +161,18 @@ def build(conf: ByoLinter):
                     level=LogLevel.INFO,
                     env=tools_path_env,
                     immutable_input_digests=tools_input_digests,
+                    **extra_args
                 ),
             )
-            return LintResult.create(request, process_result)
+
+            return result_cls.create(request, process_result)
 
     elif isinstance(conf.executable, PythonToolExecutable):
         @rule(canonical_name_suffix=conf.options_scope)
-        async def run_byolint(
-                request: lint_files_req_cls.Batch,
+        async def run_byotool(
+                request: req_cls.Batch,
                 subsystem: subsystem_cls
-        ) -> LintResult:
+        ) -> result_cls:
             pex_request = subsystem.to_pex_request()
             byo_bin = await Get(Pex, PexRequest, pex_request)
             snapshot = await Get(Snapshot, PathGlobs(request.elements))
@@ -172,13 +192,14 @@ def build(conf: ByoLinter):
                 level=LogLevel.INFO
             )
             process_result = await Get(FallibleProcessResult, PexProcess, process)
-            return LintResult.create(request, process_result)
+
+            return result_cls.create(request, process_result)
 
     namespace = dict(locals())
 
     return [
         *collect_rules(namespace),
-        *lint_files_req_cls.rules()
+        *req_cls.rules()
     ]
 
 

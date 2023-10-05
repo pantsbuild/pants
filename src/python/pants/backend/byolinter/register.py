@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List
 
 from . import lib, v2
-from .lib import ByoLinter, SystemBinaryExecutable, PythonToolExecutable
+from .lib import ByoTool, SystemBinaryExecutable, PythonToolExecutable
 from ..python.target_types import ConsoleScript
 
 
@@ -12,23 +12,16 @@ from ..python.target_types import ConsoleScript
 
 
 confs = [
-    ByoLinter(
-        options_scope='byo_shellcheck',
-        name="Shellcheck",
-        help="A shell linter based on your installed shellcheck",
-        executable=SystemBinaryExecutable("shellcheck"),
-        file_glob_include=["**/*.sh"],
-        file_glob_exclude=[],
-    ),
-    ByoLinter(
+    ByoTool(
         options_scope='byo_markdownlint',
         name="MarkdownLint",
         help="A markdown linter based on your installed markdown lint.",
         executable=SystemBinaryExecutable("markdownlint", tools=["node"]),
         file_glob_include=["**/*.md"],
         file_glob_exclude=["README.md"],
+        goal="lint",
     ),
-    ByoLinter(
+    ByoTool(
         options_scope='byo_flake8',
         name="byo_Flake8",
         help="byo flake8",
@@ -39,7 +32,24 @@ confs = [
         ),
         file_glob_include=["**/*.py"],
         file_glob_exclude=[],
+        goal="lint",
     ),
+    ByoTool(
+        options_scope='byo_black',
+        name="byo_Black",
+        help="byo black",
+        executable=PythonToolExecutable(
+            main=ConsoleScript("black"),
+            requirements=[
+                "black>=22.6.0,<24",
+                'typing-extensions>=3.10.0.0; python_version < "3.10"',
+            ],
+            resolve="byo_black",
+        ),
+        file_glob_include=["**/*.py"],
+        file_glob_exclude=["pants-plugins/**"],
+        goal="fmt",
+    )
 ]
 
 
