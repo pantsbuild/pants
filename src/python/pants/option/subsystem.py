@@ -194,6 +194,9 @@ class Subsystem(metaclass=_SubsystemMeta):
         partial_construct_subsystem.__module__ = cls.__module__
         partial_construct_subsystem.__doc__ = cls.help
 
+        # This is hacked to allow for dynamically generating
+        # subsystem classes with configuration-driven names
+        # They are not findable with `inspect.getsourcelines`
         if getattr(cls, '_dynamic_subsystem', False):
             class_definition_lineno = 1
         else:

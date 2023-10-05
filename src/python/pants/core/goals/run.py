@@ -234,7 +234,6 @@ async def run(
     workspace: Workspace,  # Needed to enable sideeffecting.
     complete_env: CompleteEnvironmentVars,
 ) -> Run:
-    import pantsdebug; pantsdebug.settrace_5678()
     field_set, target = await _find_what_to_run("the `run` goal")
 
     await _warn_on_non_local_environments((target,), "the `run` goal")
@@ -244,8 +243,6 @@ async def run(
         if not run_subsystem.debug_adapter
         else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
     )
-    import pantsdebug;
-    pantsdebug.settrace_5678()
     restartable = target.get(RestartableField).value
     if run_subsystem.debug_adapter:
         logger.info(
@@ -257,19 +254,18 @@ async def run(
             )
         )
 
-    interactive_process = InteractiveProcess(
-        argv=(*request.args, *run_subsystem.args),
-        env={**complete_env, **request.extra_env},
-        input_digest=request.digest,
-        run_in_workspace=True,
-        restartable=restartable,
-        keep_sandboxes=global_options.keep_sandboxes,
-        immutable_input_digests=request.immutable_input_digests,
-        append_only_caches=request.append_only_caches,
-    )
-
     result = await Effect(
-        InteractiveProcessResult, InteractiveProcess, interactive_process
+        InteractiveProcessResult,
+        InteractiveProcess(
+            argv=(*request.args, *run_subsystem.args),
+            env={**complete_env, **request.extra_env},
+            input_digest=request.digest,
+            run_in_workspace=True,
+            restartable=restartable,
+            keep_sandboxes=global_options.keep_sandboxes,
+            immutable_input_digests=request.immutable_input_digests,
+            append_only_caches=request.append_only_caches,
+        ),
     )
 
     return Run(result.exit_code)

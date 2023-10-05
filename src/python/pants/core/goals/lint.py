@@ -329,7 +329,6 @@ async def _get_partitions_by_request_type(
     make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
     make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
-    import pantsdebug; pantsdebug.settrace_5678()
     specified_ids = determine_specified_tool_ids(
         subsystem.name,
         subsystem.only,
@@ -364,13 +363,10 @@ async def _get_partitions_by_request_type(
     _get_specs_paths = Get(SpecsPaths, Specs, specs if file_partitioners else Specs.empty())
 
     targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
-    import pantsdebug; pantsdebug.settrace_5678()
 
     await _warn_on_non_local_environments(targets, f"the {subsystem.name} goal")
-    import pantsdebug; pantsdebug.settrace_5678()
 
     def partition_request_get(request_type: type[AbstractLintRequest]) -> Get[Partitions]:
-        import pantsdebug; pantsdebug.settrace_5678()
         partition_request_type: type = getattr(request_type, "PartitionRequest")
         if partition_request_type in target_partitioners:
             partition_targets_type = cast(LintTargetsRequest, request_type)
@@ -390,11 +386,9 @@ async def _get_partitions_by_request_type(
                 partition_files_type.PartitionRequest(specs_paths.files)  # type: ignore[arg-type]
             )
 
-    import pantsdebug; pantsdebug.settrace_5678()
     all_partitions = await MultiGet(
         partition_request_get(request_type) for request_type in filtered_core_request_types
     )
-    import pantsdebug; pantsdebug.settrace_5678()
     partitions_by_request_type = defaultdict(list)
     for request_type, partition in zip(filtered_core_request_types, all_partitions):
         partitions_by_request_type[request_type].append(partition)
@@ -411,7 +405,6 @@ async def lint(
     union_membership: UnionMembership,
     dist_dir: DistDir,
 ) -> Lint:
-    import pantsdebug; pantsdebug.settrace_5678()
     lint_request_types = union_membership.get(AbstractLintRequest)
     target_partitioners = union_membership.get(LintTargetsRequest.PartitionRequest)
     file_partitioners = union_membership.get(LintFilesRequest.PartitionRequest)
@@ -431,7 +424,6 @@ async def lint(
         lambda request_type: Get(Partitions, LintFilesRequest.PartitionRequest, request_type),
     )
 
-    import pantsdebug; pantsdebug.settrace_5678()
     if not partitions_by_request_type:
         return Lint(exit_code=0)
 
@@ -477,7 +469,6 @@ async def lint(
     all_batch_results = await MultiGet(
         Get(LintResult, AbstractLintRequest.Batch, request) for request in batches
     )
-    import pantsdebug; pantsdebug.settrace_5678()
 
     core_request_types_by_batch_type = {
         request_type.Batch: request_type for request_type in lint_request_types
