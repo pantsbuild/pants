@@ -79,14 +79,19 @@ def test_find_protobuf_python_requirement() -> None:
     )
 
     # If multiple from the same resolve, error.
-    rule_runner.write_files({"xyz/grpc2/BUILD": "python_requirement(requirements=['grpc'])"})
+    rule_runner.write_files(
+        {"codegen/dir/grpc2/BUILD": "python_requirement(requirements=['grpc'])"}
+    )
     with engine_error(
-        AmbiguousPythonCodegenRuntimeLibrary, contains="['grpc1:grpc1', 'xyz/grpc2:grpc2']"
+        AmbiguousPythonCodegenRuntimeLibrary, contains="['codegen/dir/grpc2:grpc2', 'grpc1:grpc1']"
     ):
         rule_runner.request(InferredDependencies, [request])
-    rule_runner.write_files({"xyz/proto2/BUILD": "python_requirement(requirements=['protobuf'])"})
+    rule_runner.write_files(
+        {"codegen/dir/proto2/BUILD": "python_requirement(requirements=['protobuf'])"}
+    )
     with engine_error(
-        AmbiguousPythonCodegenRuntimeLibrary, contains="['proto1:proto1', 'xyz/proto2:proto2']"
+        AmbiguousPythonCodegenRuntimeLibrary,
+        contains="['codegen/dir/proto2:proto2', 'proto1:proto1']",
     ):
         rule_runner.request(InferredDependencies, [request])
 
@@ -98,9 +103,10 @@ def test_find_protobuf_python_requirement() -> None:
             # Turn off python synthetic lockfile targets to make the test simpler.
             "--no-python-enable-lockfile-targets",
             "--python-infer-ambiguity-resolution=by_source_root",
+            "--source-root-patterns=['codegen/dir']",
         ]
     )
 
     assert rule_runner.request(InferredDependencies, [request]) == InferredDependencies(
-        [Address("proto1"), Address("grpc1")]
+        [Address("codegen/dir/grpc2"), Address("codegen/dir/proto2")]
     )

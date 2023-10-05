@@ -127,7 +127,6 @@ async def infer_dependencies(
         ),
     )
 
-    print(addresses_for_protobuf, locality)
     result = [
         find_python_runtime_library_or_raise_error(
             addresses_for_protobuf,

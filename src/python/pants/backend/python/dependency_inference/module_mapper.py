@@ -488,19 +488,18 @@ async def map_module_to_address(
             providers = val[1]
             if len(providers) < 2:
                 continue
-            providers_with_shortest_relative_path: list[ModuleProvider] = []
-            shortest_relative_path_len = 9999
+            providers_with_closest_common_ancestor: list[ModuleProvider] = []
+            closest_common_ancestor_len = 0
             for provider in providers:
                 common_ancestor_len = len(
-                    os.path.relpath(request.locality, provider.addr.spec_path).split(os.path.sep)
+                    os.path.commonpath([request.locality, provider.addr.spec_path])
                 )
-
-                if common_ancestor_len < shortest_relative_path_len:
-                    shortest_relative_path_len = common_ancestor_len
-                    providers_with_shortest_relative_path = []
-                if common_ancestor_len == shortest_relative_path_len:
-                    providers_with_shortest_relative_path.append(provider)
-            providers[:] = providers_with_shortest_relative_path
+                if common_ancestor_len > closest_common_ancestor_len:
+                    closest_common_ancestor_len = common_ancestor_len
+                    providers_with_closest_common_ancestor = []
+                if common_ancestor_len == closest_common_ancestor_len:
+                    providers_with_closest_common_ancestor.append(provider)
+            providers[:] = providers_with_closest_common_ancestor
 
     remaining_providers: list[ModuleProvider] = list(
         itertools.chain(*[val[1] for val in type_to_closest_providers.values()])
