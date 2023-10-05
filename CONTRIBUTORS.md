@@ -171,6 +171,7 @@ Created as part of the release process.
 + Kevin Sweeney
 + Koki Nishihara
 + Kris Wilson
++ Krishnan Chandra
 + Kushal Dave
 + Kyle Derr
 + Kyujin Cho
