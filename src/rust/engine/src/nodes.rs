@@ -40,7 +40,7 @@ use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
 use graph::{CompoundNode, Node, NodeError};
 use hashing::Digest;
-use rule_graph::{DependencyKey, Query, RuleId};
+use rule_graph::{DependencyKey, Query};
 use store::{self, Store, StoreError, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
@@ -1013,9 +1013,8 @@ impl Task {
 
     let context = context.clone();
     let mut params = params.clone();
-    let dependency_key =
-      DependencyKey::for_known_rule(RuleId::from_string(call.rule_id.clone()), call.output_type)
-        .provided_params(call.inputs.iter().map(|t| *t.type_id()));
+    let dependency_key = DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type)
+      .provided_params(call.inputs.iter().map(|t| *t.type_id()));
     params.extend(call.inputs.iter().cloned());
 
     let edges = context
@@ -1024,12 +1023,11 @@ impl Task {
       .edges_for_inner(&entry)
       .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
-    // Find the entry for the Get.
+    // Find the entry for the Call.
     let select = edges
       .entry_for(&dependency_key)
       .map(|entry| {
-        // The subject of the Get is a new parameter that replaces an existing param of the same
-        // type.
+        // The params for the Call replace existing params of the same type.
         Select::new(params.clone(), call.output_type, entry)
       })
       .ok_or_else(|| {

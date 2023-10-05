@@ -18,6 +18,7 @@ use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
 
 use logging::PythonLogLevel;
+use rule_graph::RuleId;
 
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
@@ -435,7 +436,7 @@ impl PyGeneratorResponseCall {
     let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
     Ok(Self(RefCell::new(Some(Call {
-      rule_id,
+      rule_id: RuleId::from_string(rule_id),
       output_type,
       input_types,
       inputs,
@@ -577,8 +578,7 @@ impl PyGeneratorResponseGetMulti {
 
 #[derive(Debug)]
 pub struct Call {
-  // TODO: This should be a `Function` to avoid allocating strings.
-  pub rule_id: String,
+  pub rule_id: RuleId,
   pub output_type: TypeId,
   pub input_types: SmallVec<[TypeId; 2]>,
   pub inputs: SmallVec<[Key; 2]>,
