@@ -1,9 +1,11 @@
+import itertools
 from dataclasses import dataclass
-from typing import List
+from typing import List, Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.util_rules.pex import Pex, PexRequest, PexProcess
+from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult
 from pants.core.goals.lint import LintTargetsRequest, LintResult, LintFilesRequest
 from pants.core.target_types import FileSourceField
@@ -21,7 +23,7 @@ from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-
+from pants.util.strutil import Simplifier
 
 
 class Executable:
@@ -53,6 +55,10 @@ class ByoTool:
 
     def rules(self):
         return build(self)
+
+
+def collect_byo_rules(confs: Iterable[ByoTool]):
+    return list(itertools.chain.from_iterable(conf.rules() for conf in confs))
 
 
 def build(conf: ByoTool):
@@ -165,7 +171,18 @@ def build(conf: ByoTool):
                 ),
             )
 
-            return result_cls.create(request, process_result)
+            output = await Get(Snapshot, Digest, process_result.output_digest)
+
+            if result_cls is LintResult:
+                return result_cls.create(request, process_result)
+            elif result_cls is FmtResult:
+                return FmtResult(
+                    input=request.snapshot,
+                    output=output,
+                    stdout=Simplifier().simplify(process_result.stdout),
+                    stderr=Simplifier().simplify(process_result.stderr),
+                    tool_name=request.tool_name,
+                )
 
     elif isinstance(conf.executable, PythonToolExecutable):
         @rule(canonical_name_suffix=conf.options_scope)
@@ -184,16 +201,33 @@ def build(conf: ByoTool):
                 MergeDigests((snapshot.digest, byo_bin.digest))
             )
 
+            if conf.goal == 'fmt':
+                extra_args = {'output_files': request.files}
+            else:
+                extra_args = {}
+
             process = PexProcess(
                 byo_bin,
                 argv=snapshot.files,
                 input_digest=input_digest,
                 description=f"Run byo_flake8",
-                level=LogLevel.INFO
+                level=LogLevel.INFO,
+                **extra_args
             )
             process_result = await Get(FallibleProcessResult, PexProcess, process)
 
-            return result_cls.create(request, process_result)
+            output = await Get(Snapshot, Digest, process_result.output_digest)
+
+            if result_cls is LintResult:
+                return result_cls.create(request, process_result)
+            elif result_cls is FmtResult:
+                return FmtResult(
+                    input=request.snapshot,
+                    output=output,
+                    stdout=Simplifier().simplify(process_result.stdout),
+                    stderr=Simplifier().simplify(process_result.stderr),
+                    tool_name=request.tool_name,
+                )
 
     namespace = dict(locals())
 
