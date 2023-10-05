@@ -34,22 +34,22 @@ confs = [
         file_glob_exclude=[],
         goal="lint",
     ),
-    ByoTool(
-        options_scope='byo_black',
-        name="byo_Black",
-        help="byo black",
-        executable=PythonToolExecutable(
-            main=ConsoleScript("black"),
-            requirements=[
-                "black>=22.6.0,<24",
-                'typing-extensions>=3.10.0.0; python_version < "3.10"',
-            ],
-            resolve="byo_black",
-        ),
-        file_glob_include=["**/*.py"],
-        file_glob_exclude=["pants-plugins/**"],
-        goal="fmt",
-    )
+    # ByoTool(
+    #     options_scope='byo_black',
+    #     name="byo_Black",
+    #     help="byo black",
+    #     executable=PythonToolExecutable(
+    #         main=ConsoleScript("black"),
+    #         requirements=[
+    #             "black>=22.6.0,<24",
+    #             'typing-extensions>=3.10.0.0; python_version < "3.10"',
+    #         ],
+    #         resolve="byo_black",
+    #     ),
+    #     file_glob_include=["**/*.py"],
+    #     file_glob_exclude=["pants-plugins/**"],
+    #     goal="fmt",
+    # )
 ]
 
 
