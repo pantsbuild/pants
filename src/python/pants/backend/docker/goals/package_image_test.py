@@ -1778,18 +1778,40 @@ def test_image_ref_formatting(test: ImageRefTest) -> None:
         assert tuple(image_refs) == test.expect_refs
 
 
-def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="plugin")'})
+@pytest.mark.parametrize(
+    "BUILD, plugin_tags, tag_flags",
+    [
+        (
+            'docker_image(name="plugin")',
+            ("1.2.3",),
+            (
+                "--tag",
+                "plugin:latest",
+                "--tag",
+                "plugin:1.2.3",
+            ),
+        ),
+        (
+            'docker_image(name="plugin", image_tags=[])',
+            ("1.2.3",),
+            (
+                "--tag",
+                "plugin:1.2.3",
+            ),
+        ),
+    ],
+)
+def test_docker_image_tags_from_plugin_hook(
+    rule_runner: RuleRunner, BUILD: str, plugin_tags: tuple[str, ...], tag_flags: tuple[str, ...]
+) -> None:
+    rule_runner.write_files({"docker/test/BUILD": BUILD})
 
     def check_docker_proc(process: Process):
         assert process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
-            "--tag",
-            "plugin:latest",
-            "--tag",
-            "plugin:1.2.3",
+            *tag_flags,
             "--file",
             "docker/test/Dockerfile",
             ".",
@@ -1799,8 +1821,19 @@ def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="plugin"),
         process_assertions=check_docker_proc,
-        plugin_tags=("1.2.3",),
+        plugin_tags=plugin_tags,
     )
+
+
+def test_docker_image_tags_defined(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="no-tags", image_tags=[])'})
+
+    err = "The `image_tags` field in target docker/test:no-tags must not be empty, unless"
+    with pytest.raises(InvalidFieldException, match=err):
+        assert_build(
+            rule_runner,
+            Address("docker/test", target_name="no-tags"),
+        )
 
 
 def test_docker_info_serialize() -> None:
