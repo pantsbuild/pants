@@ -24,7 +24,8 @@ pub trait TypeId:
 }
 
 // Identifies a specific Rule when called by name.
-// TODO: Turn into a generic type param? For now this is just a newtype, for clarity.
+// TODO: Turn into a generic type param, so that production code can wrap `Function`. For now this
+// is just a newtype, for clarity.
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug, PartialOrd, Ord)]
 pub struct RuleId(String);
 

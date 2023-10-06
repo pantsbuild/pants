@@ -18,6 +18,7 @@ use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
 
 use logging::PythonLogLevel;
+use rule_graph::RuleId;
 
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
@@ -288,9 +289,7 @@ pub fn generator_send(
       TypeId::new(b.0.as_ref(py).get_type()),
     ))
   } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>() {
-    // TODO: When we begin using https://github.com/pantsbuild/pants/pull/19755, this will likely
-    // use a different syntax.
-    Ok(GeneratorResponse::Get(call.take()?))
+    Ok(GeneratorResponse::Call(call.take()?))
   } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
     Ok(GeneratorResponse::Get(get.take()?))
   } else if let Ok(get_multi) = response.extract::<PyRef<PyGeneratorResponseGetMulti>>() {
@@ -421,42 +420,37 @@ fn interpret_get_inputs(
 }
 
 #[pyclass(subclass)]
-pub struct PyGeneratorResponseCall {
-  output_type: Option<TypeId>,
-  input_types: SmallVec<[TypeId; 2]>,
-  inputs: SmallVec<[Key; 2]>,
-}
+pub struct PyGeneratorResponseCall(RefCell<Option<Call>>);
 
 #[pymethods]
 impl PyGeneratorResponseCall {
   #[new]
-  fn __new__(py: Python, input_arg0: Option<&PyAny>, input_arg1: Option<&PyAny>) -> PyResult<Self> {
+  fn __new__(
+    py: Python,
+    rule_id: String,
+    output_type: &PyType,
+    input_arg0: Option<&PyAny>,
+    input_arg1: Option<&PyAny>,
+  ) -> PyResult<Self> {
+    let output_type = TypeId::new(output_type);
     let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
-    Ok(Self {
-      output_type: None,
+    Ok(Self(RefCell::new(Some(Call {
+      rule_id: RuleId::from_string(rule_id),
+      output_type,
       input_types,
       inputs,
-    })
-  }
-
-  fn set_output_type(&mut self, output_type: &PyType) {
-    self.output_type = Some(TypeId::new(output_type))
+    }))))
   }
 }
 
 impl PyGeneratorResponseCall {
-  fn take(&self) -> Result<Get, String> {
-    if let Some(output_type) = self.output_type {
-      Ok(Get {
-        output: output_type,
-        // TODO: Similar to `PyGeneratorResponseGet::take`, this should avoid these clones.
-        input_types: self.input_types.clone(),
-        inputs: self.inputs.clone(),
-      })
-    } else {
-      Err("Cannot convert a Call into a Get until its output_type has been set.".to_owned())
-    }
+  fn take(&self) -> Result<Call, String> {
+    self
+      .0
+      .borrow_mut()
+      .take()
+      .ok_or_else(|| "A `Call` may only be consumed once.".to_owned())
   }
 }
 
@@ -583,6 +577,35 @@ impl PyGeneratorResponseGetMulti {
 }
 
 #[derive(Debug)]
+pub struct Call {
+  pub rule_id: RuleId,
+  pub output_type: TypeId,
+  pub input_types: SmallVec<[TypeId; 2]>,
+  pub inputs: SmallVec<[Key; 2]>,
+}
+
+impl fmt::Display for Call {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    write!(f, "Call({}, {}", self.rule_id, self.output_type)?;
+    match self.input_types.len() {
+      0 => write!(f, ")"),
+      1 => write!(f, ", {}, {})", self.input_types[0], self.inputs[0]),
+      _ => write!(
+        f,
+        ", {{{}}})",
+        self
+          .input_types
+          .iter()
+          .zip(self.inputs.iter())
+          .map(|(t, k)| { format!("{k}: {t}") })
+          .collect::<Vec<_>>()
+          .join(", ")
+      ),
+    }
+  }
+}
+
+#[derive(Debug)]
 pub struct Get {
   pub output: TypeId,
   pub input_types: SmallVec<[TypeId; 2]>,
@@ -612,6 +635,7 @@ impl fmt::Display for Get {
 
 pub enum GeneratorResponse {
   Break(Value, TypeId),
+  Call(Call),
   Get(Get),
   GetMulti(Vec<Get>),
 }

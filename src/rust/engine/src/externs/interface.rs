@@ -1169,11 +1169,16 @@ fn tasks_task_end(py_tasks: &PyTasks) {
 }
 
 #[pyfunction]
-fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, inputs: Vec<&PyType>) {
+fn tasks_add_get(
+  py_tasks: &PyTasks,
+  output: &PyType,
+  inputs: Vec<&PyType>,
+  rule_id: Option<String>,
+) {
   let output = TypeId::new(output);
   let inputs = inputs.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_get(output, inputs);
+  tasks.add_get(output, inputs, rule_id);
 }
 
 #[pyfunction]

@@ -1001,6 +1001,45 @@ pub struct Task {
 }
 
 impl Task {
+  async fn gen_call(
+    context: &Context,
+    workunit: &mut RunningWorkunit,
+    params: &Params,
+    entry: Intern<rule_graph::Entry<Rule>>,
+    call: externs::Call,
+  ) -> NodeResult<Value> {
+    // While waiting for dependencies, mark the workunit for this Task blocked.
+    let _blocking_token = workunit.blocking();
+
+    let context = context.clone();
+    let mut params = params.clone();
+    let dependency_key = DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type)
+      .provided_params(call.inputs.iter().map(|t| *t.type_id()));
+    params.extend(call.inputs.iter().cloned());
+
+    let edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(&entry)
+      .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
+
+    // Find the entry for the Call.
+    let select = edges
+      .entry_for(&dependency_key)
+      .map(|entry| {
+        // The params for the Call replace existing params of the same type.
+        Select::new(params.clone(), call.output_type, entry)
+      })
+      .ok_or_else(|| {
+        // NB: The Python constructor for `Call()` will have already errored if
+        // `type(input) != input_type`.
+        throw(format!(
+          "{call} was not detected in your @rule body at rule compile time."
+        ))
+      })?;
+    select.run_node(context).await
+  }
+
   async fn gen_get(
     context: &Context,
     workunit: &mut RunningWorkunit,
@@ -1093,6 +1132,20 @@ impl Task {
       let params = params.clone();
       let response = Python::with_gil(|py| externs::generator_send(py, &generator, input, err))?;
       match response {
+        externs::GeneratorResponse::Call(call) => {
+          let result = Self::gen_call(&context, workunit, &params, entry, call).await;
+          match result {
+            Ok(value) => {
+              input = Some(value);
+              err = None;
+            }
+            Err(throw @ Failure::Throw { .. }) => {
+              input = None;
+              err = Some(PyErr::from(throw));
+            }
+            Err(failure) => break Err(failure),
+          }
+        }
         externs::GeneratorResponse::Get(get) => {
           let result = Self::gen_get(&context, workunit, &params, entry, vec![get]).await;
           match result {
