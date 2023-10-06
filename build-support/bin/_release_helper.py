@@ -821,7 +821,7 @@ def publish() -> None:
     # Fetch and validate prebuilt wheels.
     if CONSTANTS.deploy_pants_wheel_dir.exists():
         shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
-    fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
+    fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
     check_pants_wheels_present(CONSTANTS.deploy_dir)
     reversion_prebuilt_wheels()
 
@@ -836,6 +836,7 @@ def publish() -> None:
 
 def do_github_release() -> None:
     version = CONSTANTS.pants_stable_version
+    is_prerelease = PackageVersionType.from_version(Version(version)) != PackageVersionType.STABLE
 
     def get_notes() -> str:
         maj, min = version.split(".")[:2]
@@ -858,7 +859,10 @@ def do_github_release() -> None:
                 f"release_{version}",
                 "--notes-file",
                 notes_file,
+                "--title",
+                version,
                 "--draft",
+                *(["--prerelease"] if is_prerelease else []),
             ],
             check=True,
         )
@@ -866,7 +870,7 @@ def do_github_release() -> None:
     stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / version
     for whl in stable_wheel_dir.glob("*.whl"):
         subprocess.run(
-            ["gh", "release", f"release_{version}", "upload", f"{whl}#{whl.name}"],
+            ["gh", "release", "upload", f"release_{version}", f"{whl}#{whl.name}"],
             check=True,
         )
 
@@ -897,16 +901,16 @@ def do_github_release() -> None:
                 check=True,
             )
         subprocess.run(
-            ["gh", "release", f"release_{version}", "upload", pex_name],
+            ["gh", "release", "upload", f"release_{version}", pex_name],
             check=True,
         )
 
-    build_local_pex(f"pants.{version}-cp39-darwin_arm64.pex", "darwin_arm64")
-    build_local_pex(f"pants.{version}-cp39-darwin_x86_64.pex", "darwin_x86_64")
+    build_local_pex(f"pants.{version}-cp39-darwin_arm64.pex", "macosx-11.0-arm64")
+    build_local_pex(f"pants.{version}-cp39-darwin_x86_64.pex", "macosx-10.15-x86_64")
     build_local_pex(f"pants.{version}-cp39-linux_aarch64.pex", "linux_aarch64")
     build_local_pex(f"pants.{version}-cp39-linux_x86_64.pex ", "linux_x86_64")
 
-    subprocess.run(["gh", "release", f"release_{version}", "edit", "--draft=false"], check=True)
+    subprocess.run(["gh", "release", "edit", f"release_{version}", "--draft=false"], check=True)
 
 
 def check_gh_cli() -> None:
