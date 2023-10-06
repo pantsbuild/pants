@@ -272,7 +272,7 @@ pub(crate) fn probe(
           &actual_command_line[0]
         }
       };
-      // It appears the the daemon only records a prefix of the process name, so we just check that.
+      // It appears that the daemon only records a prefix of the process name, so we just check that.
       if actual_argv0.starts_with(&expected_process_name_prefix) {
         Ok(port)
       } else {

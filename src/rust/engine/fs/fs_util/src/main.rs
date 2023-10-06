@@ -41,7 +41,7 @@ use fs::{
 use futures::future::{self, BoxFuture};
 use futures::FutureExt;
 use grpc_util::prost::MessageExt;
-use grpc_util::tls::{CertificateCheck, MtlsConfig};
+use grpc_util::tls::CertificateCheck;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protos::require_digest;
@@ -267,14 +267,14 @@ Destination must not exist before this command is run.",
         )
         .arg(
           Arg::new("mtls-client-certificate-chain-path")
-              .help("Path to certificate chain to use when using MTLS.")
+              .help("Path to certificate chain to use when using mTLS.")
               .takes_value(true)
               .long("mtls-client-certificate-chain-path")
               .required(false)
         )
         .arg(
           Arg::new("mtls-client-key-path")
-              .help("Path to private key to use when using MTLS.")
+              .help("Path to private key to use when using mTLS.")
               .takes_value(true)
               .long("mtls-client-key-path")
               .required(false)
@@ -369,7 +369,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                 "Failed to read mtls-client-certificate-chain-path from {cert_chain_path:?}: {err:?}"
               )
             })?;
-            Some(MtlsConfig { key, cert_chain })
+            Some((cert_chain, key))
           }
           (None, None) => None,
           _ => {
@@ -383,11 +383,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           CertificateCheck::Enabled
         };
 
-        let tls_config = grpc_util::tls::Config {
-          root_ca_certs,
-          mtls,
-          certificate_check,
-        };
+        let mut tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls)?;
+
+        tls_config.certificate_check = certificate_check;
 
         let mut headers = BTreeMap::new();
 

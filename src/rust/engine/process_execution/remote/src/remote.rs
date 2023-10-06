@@ -25,7 +25,6 @@ use remexec::{
   execution_stage::Value as ExecutionStageValue, Action, Command, ExecuteRequest, ExecuteResponse,
   ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
 };
-use tonic::metadata::BinaryMetadataValue;
 use tonic::{Code, Request, Status};
 
 use concrete_time::TimeSpan;
@@ -34,6 +33,7 @@ use grpc_util::headers_to_http_header_map;
 use grpc_util::prost::MessageExt;
 use grpc_util::{layered_service, status_to_str, LayeredService};
 use hashing::{Digest, Fingerprint};
+use remote_provider_reapi::apply_headers;
 use store::{Store, StoreError};
 use task_executor::Executor;
 use workunit_store::{
@@ -165,6 +165,7 @@ impl CommandRunner {
     process_cache_namespace: Option<String>,
     append_only_caches_base_path: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
+    mtls_data: Option<(Vec<u8>, Vec<u8>)>,
     headers: BTreeMap<String, String>,
     store: Store,
     executor: Executor,
@@ -173,19 +174,18 @@ impl CommandRunner {
     execution_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
-    let execution_use_tls = execution_address.starts_with("https://");
+    let needs_tls = execution_address.starts_with("https://");
 
-    let tls_client_config = if execution_use_tls {
-      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
+    let tls_client_config = if needs_tls {
+      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)?;
+      Some(tls_config.try_into()?)
     } else {
       None
     };
 
-    let execution_endpoint = grpc_util::create_channel(
-      execution_address,
-      tls_client_config.as_ref().filter(|_| execution_use_tls),
-    )
-    .await?;
+    let execution_endpoint =
+      grpc_util::create_channel(execution_address, tls_client_config.as_ref()).await?;
+
     let execution_http_headers = headers_to_http_header_map(&headers)?;
     let execution_channel = layered_service(
       execution_endpoint,
@@ -1049,26 +1049,6 @@ async fn populate_fallible_execution_result_for_timeout(
       context.run_id,
     ),
   })
-}
-
-/// Apply REAPI request metadata header to a `tonic::Request`.
-pub(crate) fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
-  let reapi_request_metadata = remexec::RequestMetadata {
-    tool_details: Some(remexec::ToolDetails {
-      tool_name: "pants".into(),
-      ..remexec::ToolDetails::default()
-    }),
-    tool_invocation_id: build_id.to_string(),
-    ..remexec::RequestMetadata::default()
-  };
-
-  let md = request.metadata_mut();
-  md.insert_bin(
-    "google.devtools.remoteexecution.v1test.requestmetadata-bin",
-    BinaryMetadataValue::try_from(reapi_request_metadata.to_bytes()).unwrap(),
-  );
-
-  request
 }
 
 pub async fn store_proto_locally<P: prost::Message>(

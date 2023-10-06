@@ -138,7 +138,7 @@ async def setup_pex_cli_process(
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     global_args = [
-        # Ensure Pex and its subprocesses create temporary files in the the process execution
+        # Ensure Pex and its subprocesses create temporary files in the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
         # perform. Making the TMPDIR local to the sandbox allows control via

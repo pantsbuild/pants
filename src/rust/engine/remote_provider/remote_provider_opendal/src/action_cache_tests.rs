@@ -9,13 +9,11 @@ use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::Digest;
 use opendal::services::Memory;
-use process_execution::Context;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use store::remote::RemoteOptions;
+use remote_provider_traits::{ActionCacheProvider, RemoteOptions};
 
-use super::base_opendal::Provider;
-use super::ActionCacheProvider;
+use super::Provider;
 
 const BASE: &str = "opendal-testing-base";
 
@@ -69,9 +67,7 @@ async fn get_action_result_existing() {
   write_test_data(&provider, action_digest, action_result.clone()).await;
 
   assert_eq!(
-    provider
-      .get_action_result(action_digest, &Context::default())
-      .await,
+    provider.get_action_result(action_digest, "").await,
     Ok(Some(action_result))
   );
 }
@@ -83,9 +79,7 @@ async fn get_action_result_missing() {
   let action_digest = Digest::of_bytes(b"update_action_cache test");
 
   assert_eq!(
-    provider
-      .get_action_result(action_digest, &Context::default())
-      .await,
+    provider.get_action_result(action_digest, "").await,
     Ok(None)
   );
 }

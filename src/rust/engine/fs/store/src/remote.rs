@@ -1,102 +1,19 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use async_oncecell::OnceCell;
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Future;
 use hashing::Digest;
 use log::Level;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remexec::ServerCapabilities;
+use remote_provider::{
+  choose_byte_store_provider, ByteStoreProvider, LoadDestination, RemoteOptions,
+};
 use tokio::fs::File;
-use tokio::io::{AsyncSeekExt, AsyncWrite};
 use workunit_store::{in_workunit, ObservationMetric};
-
-mod reapi;
-#[cfg(test)]
-mod reapi_tests;
-
-pub mod base_opendal;
-#[cfg(test)]
-mod base_opendal_tests;
-
-#[async_trait]
-pub trait ByteStoreProvider: Sync + Send + 'static {
-  /// Store the bytes readable from `file` into the remote store
-  async fn store_file(&self, digest: Digest, file: File) -> Result<(), String>;
-
-  /// Store the bytes in `bytes` into the remote store, as an optimisation of `store_file` when the
-  /// bytes are already in memory
-  async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String>;
-
-  /// Load the data stored (if any) in the remote store for `digest` into `destination`. Returns
-  /// true when found, false when not.
-  async fn load(
-    &self,
-    digest: Digest,
-    destination: &mut dyn LoadDestination,
-  ) -> Result<bool, String>;
-
-  /// Return any digests from `digests` that are not (currently) available in the remote store.
-  async fn list_missing_digests(
-    &self,
-    digests: &mut (dyn Iterator<Item = Digest> + Send),
-  ) -> Result<HashSet<Digest>, String>;
-}
-
-// TODO: Consider providing `impl Default`, similar to `super::LocalOptions`.
-#[derive(Clone)]
-pub struct RemoteOptions {
-  // TODO: this is currently framed for the REAPI provider, with some options used by others, would
-  // be good to generalise
-  pub cas_address: String,
-  pub instance_name: Option<String>,
-  pub headers: BTreeMap<String, String>,
-  pub tls_config: grpc_util::tls::Config,
-  pub chunk_size_bytes: usize,
-  pub rpc_timeout: Duration,
-  pub rpc_retries: usize,
-  pub rpc_concurrency_limit: usize,
-  pub capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
-  pub batch_api_size_limit: usize,
-}
-
-// TODO: this is probably better positioned somewhere else
-pub const REAPI_ADDRESS_SCHEMAS: [&str; 3] = ["grpc://", "grpcs://", "http://"];
-
-async fn choose_provider(options: RemoteOptions) -> Result<Arc<dyn ByteStoreProvider>, String> {
-  let address = options.cas_address.clone();
-  if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
-    Ok(Arc::new(reapi::Provider::new(options).await?))
-  } else if let Some(path) = address.strip_prefix("file://") {
-    // It's a bit weird to support local "file://" for a 'remote' store... but this is handy for
-    // testing.
-    Ok(Arc::new(base_opendal::Provider::fs(
-      path,
-      "byte-store".to_owned(),
-      options,
-    )?))
-  } else if let Some(url) = address.strip_prefix("github-actions-cache+") {
-    // This is relying on python validating that it was set as `github-actions-cache+https://...` so
-    // incorrect values could easily slip through here and cause downstream confusion. We're
-    // intending to change the approach (https://github.com/pantsbuild/pants/issues/19902) so this
-    // is tolerable for now.
-    Ok(Arc::new(base_opendal::Provider::github_actions_cache(
-      url,
-      "byte-store".to_owned(),
-      options,
-    )?))
-  } else {
-    Err(format!(
-      "Cannot initialise remote byte store provider with address {address}, as the scheme is not supported",
-    ))
-  }
-}
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -107,29 +24,6 @@ pub struct ByteStore {
 impl fmt::Debug for ByteStore {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "ByteStore(name={:?})", self.instance_name)
-  }
-}
-
-/// Places that write the result of a remote `load`
-#[async_trait]
-pub trait LoadDestination: AsyncWrite + Send + Sync + Unpin + 'static {
-  /// Clear out the writer and start again, if there's been previous contents written
-  async fn reset(&mut self) -> std::io::Result<()>;
-}
-
-#[async_trait]
-impl LoadDestination for tokio::fs::File {
-  async fn reset(&mut self) -> std::io::Result<()> {
-    self.rewind().await?;
-    self.set_len(0).await
-  }
-}
-
-#[async_trait]
-impl LoadDestination for Vec<u8> {
-  async fn reset(&mut self) -> std::io::Result<()> {
-    self.clear();
-    Ok(())
   }
 }
 
@@ -146,7 +40,7 @@ impl ByteStore {
 
   pub async fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
     let instance_name = options.instance_name.clone();
-    let provider = choose_provider(options).await?;
+    let provider = choose_byte_store_provider(options).await?;
     Ok(ByteStore::new(instance_name, provider))
   }
 
