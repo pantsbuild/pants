@@ -42,10 +42,10 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import InvalidFieldException, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 logger = logging.getLogger(__name__)
@@ -392,6 +392,16 @@ async def build_docker_image(
         )
     )
     tags = tuple(tag.full_name for registry in image_refs for tag in registry.tags)
+    if not tags:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                The `{DockerImageTagsField.alias}` field in target {field_set.address} must not be
+                empty, unless there is a custom plugin providing additional tags using the
+                `DockerImageTagsRequest` union type.
+                """
+            )
+        )
 
     # Mix the upstream image ids into the env to ensure that Pants invalidates this
     # image-building process correctly when an upstream image changes, even though the
