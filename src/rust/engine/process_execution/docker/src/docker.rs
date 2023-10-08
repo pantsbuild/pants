@@ -159,10 +159,7 @@ impl ImagePullCache {
     let image_cell = {
       let mut inner = self.inner.lock();
 
-      let scope = inner
-        .cache
-        .entry(image_pull_scope)
-        .or_default();
+      let scope = inner.cache.entry(image_pull_scope).or_default();
 
       let cell = scope
         .entry(image.to_string())
