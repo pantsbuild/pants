@@ -487,6 +487,15 @@ def build_all_wheels() -> None:
     )
 
 
+def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None = None) -> None:
+    with create_tmp_venv() as bin_dir:
+        for pkg in PACKAGES:
+            pip_req = f"{pkg.name}=={version}"
+            banner(f"Installing and testing {pip_req}")
+            pkg.validate(version, bin_dir, extra_pip_args or [])
+            green(f"Tests succeeded for {pip_req}")
+
+
 def build_pants_wheels() -> None:
     banner(f"Building Pants wheels with Python {CONSTANTS.python_version}")
     version = CONSTANTS.pants_stable_version
@@ -809,17 +818,30 @@ def prompt_to_generate_docs() -> None:
 
 def test_release() -> None:
     banner("Installing and testing the latest released packages")
-    install_and_test_packages(CONSTANTS.pants_stable_version)
-    banner("Successfully installed and tested the latest released packages")
+    smoke_test_install_and_version(CONSTANTS.pants_stable_version)
+    banner("Successfully ran a smoke test of the released packages")
 
 
-def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None = None) -> None:
-    with create_tmp_venv() as bin_dir:
-        for pkg in PACKAGES:
-            pip_req = f"{pkg.name}=={version}"
-            banner(f"Installing and testing {pip_req}")
-            pkg.validate(version, bin_dir, extra_pip_args or [])
-            green(f"Tests succeeded for {pip_req}")
+def smoke_test_install_and_version(version: str) -> None:
+    with temporary_dir() as dir:
+        (Path(dir) / "pants.toml").write_text(
+            f"""
+            [GLOBAL]
+            pants_version = "{version}"
+
+            backend_packages = []
+            """
+        )
+
+        result = subprocess.run(
+            ["pants", "version"],
+            cwd=dir,
+            check=True,
+            stdout=subprocess.PIPE,
+        )
+        printed_version = result.stdout.decode().strip()
+        if printed_version != version:
+            die(f"Failed to confirm pants version, expected {version!r}, got {printed_version!r}")
 
 
 # -----------------------------------------------------------------------------------------------
