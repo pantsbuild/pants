@@ -341,6 +341,9 @@ async fn main() {
         }
       };
 
+      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)
+        .expect("failed parsing root CA certs");
+
       if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
         let token =
           std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
@@ -355,8 +358,7 @@ async fn main() {
         process_metadata.instance_name.clone(),
         process_metadata.cache_key_gen_version.clone(),
         None,
-        root_ca_certs.clone(),
-        mtls_data.clone(),
+        tls_config.clone(),
         headers.clone(),
         store.clone(),
         executor.clone(),
@@ -388,8 +390,7 @@ async fn main() {
             RemoteCacheProviderOptions {
               instance_name: process_metadata.instance_name.clone(),
               action_cache_address: address,
-              root_ca_certs,
-              mtls_data,
+              tls_config,
               headers,
               concurrency_limit: args.cache_rpc_concurrency,
               rpc_timeout: Duration::from_secs(2),

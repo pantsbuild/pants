@@ -63,8 +63,7 @@ pub struct RemoteCacheProviderOptions {
   // comment in `choose_action_cache_provider` too)
   pub instance_name: Option<String>,
   pub action_cache_address: String,
-  pub root_ca_certs: Option<Vec<u8>>,
-  pub mtls_data: Option<(Vec<u8>, Vec<u8>)>,
+  pub tls_config: grpc_util::tls::Config,
   pub headers: BTreeMap<String, String>,
   pub concurrency_limit: usize,
   pub rpc_timeout: Duration,
