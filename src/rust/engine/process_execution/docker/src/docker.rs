@@ -162,7 +162,7 @@ impl ImagePullCache {
       let scope = inner
         .cache
         .entry(image_pull_scope)
-        .or_insert_with(BTreeMap::default);
+        .or_default();
 
       let cell = scope
         .entry(image.to_string())
