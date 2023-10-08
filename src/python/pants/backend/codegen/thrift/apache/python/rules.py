@@ -14,7 +14,14 @@ from pants.backend.codegen.thrift.apache.rules import (
 )
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
-from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    PythonModuleOwnersRequest,
+)
+from pants.backend.python.dependency_inference.subsystem import (
+    AmbiguityResolution,
+    PythonInferSubsystem,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourceField
 from pants.engine.fs import AddPrefix, Digest, Snapshot
@@ -82,16 +89,31 @@ async def find_apache_thrift_python_requirement(
     request: InferApacheThriftPythonDependencies,
     thrift_python: ThriftPythonSubsystem,
     python_setup: PythonSetup,
-    # TODO(#12946): Make this a lazy Get once possible.
-    module_mapping: ThirdPartyPythonModuleMapping,
+    python_infer_subsystem: PythonInferSubsystem,
 ) -> InferredDependencies:
     if not thrift_python.infer_runtime_dependency:
         return InferredDependencies([])
 
     resolve = request.field_set.python_resolve.normalized_value(python_setup)
 
+    locality = None
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
+        source_root = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        )
+        locality = source_root.path
+
+    addresses_for_thrift = await Get(
+        PythonModuleOwners,
+        PythonModuleOwnersRequest(
+            "thrift",
+            resolve=resolve,
+            locality=locality,
+        ),
+    )
+
     addr = find_python_runtime_library_or_raise_error(
-        module_mapping,
+        addresses_for_thrift,
         request.field_set.address,
         "thrift",
         resolve=resolve,

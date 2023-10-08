@@ -3,10 +3,7 @@
 
 from __future__ import annotations
 
-from pants.backend.python.dependency_inference.module_mapper import (
-    ModuleProviderType,
-    PythonModuleOwners,
-)
+from pants.backend.python.dependency_inference.module_mapper import PythonModuleOwners
 from pants.engine.addresses import Address
 from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
