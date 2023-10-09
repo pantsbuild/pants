@@ -263,21 +263,23 @@ pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyA
   func.call1(args_tuple)
 }
 
-pub fn generator_send(
+pub(crate) enum GeneratorInput {
+  Initial,
+  Arg(Value),
+  Err(PyErr),
+}
+
+pub(crate) fn generator_send(
   py: Python,
   generator: &Value,
-  arg: Option<Value>,
-  err: Option<PyErr>,
+  input: GeneratorInput,
 ) -> Result<GeneratorResponse, Failure> {
   let selectors = py.import("pants.engine.internals.selectors").unwrap();
   let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
-  let py_arg = match (arg, err) {
-    (Some(arg), None) => arg.to_object(py),
-    (None, Some(err)) => err.into_py(py),
-    (None, None) => py.None(),
-    (Some(arg), Some(err)) => {
-      panic!("generator_send got both value and error: arg={arg:?}, err={err:?}")
-    }
+  let py_arg = match input {
+    GeneratorInput::Arg(arg) => arg.to_object(py),
+    GeneratorInput::Err(err) => err.into_py(py),
+    GeneratorInput::Initial => py.None(),
   };
   let response = native_engine_generator_send
     .call1((generator.to_object(py), py_arg))

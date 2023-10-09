@@ -38,6 +38,7 @@ use process_execution::{
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
+use crate::externs::{GeneratorInput, GeneratorResponse};
 use graph::{CompoundNode, Node, NodeError};
 use hashing::Digest;
 use rule_graph::{DependencyKey, Query};
@@ -1125,56 +1126,49 @@ impl Task {
     entry: Intern<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
-    let mut input: Option<Value> = None;
-    let mut err: Option<PyErr> = None;
+    let mut input = GeneratorInput::Initial;
     loop {
       let context = context.clone();
       let params = params.clone();
-      let response = Python::with_gil(|py| externs::generator_send(py, &generator, input, err))?;
+      let response = Python::with_gil(|py| externs::generator_send(py, &generator, input))?;
       match response {
-        externs::GeneratorResponse::Call(call) => {
+        GeneratorResponse::Call(call) => {
           let result = Self::gen_call(&context, workunit, &params, entry, call).await;
           match result {
             Ok(value) => {
-              input = Some(value);
-              err = None;
+              input = GeneratorInput::Arg(value);
             }
             Err(throw @ Failure::Throw { .. }) => {
-              input = None;
-              err = Some(PyErr::from(throw));
+              input = GeneratorInput::Err(PyErr::from(throw));
             }
             Err(failure) => break Err(failure),
           }
         }
-        externs::GeneratorResponse::Get(get) => {
+        GeneratorResponse::Get(get) => {
           let result = Self::gen_get(&context, workunit, &params, entry, vec![get]).await;
           match result {
             Ok(values) => {
-              input = Some(values.into_iter().next().unwrap());
-              err = None;
+              input = GeneratorInput::Arg(values.into_iter().next().unwrap());
             }
             Err(throw @ Failure::Throw { .. }) => {
-              input = None;
-              err = Some(PyErr::from(throw));
+              input = GeneratorInput::Err(PyErr::from(throw));
             }
             Err(failure) => break Err(failure),
           }
         }
-        externs::GeneratorResponse::GetMulti(gets) => {
+        GeneratorResponse::GetMulti(gets) => {
           let result = Self::gen_get(&context, workunit, &params, entry, gets).await;
           match result {
             Ok(values) => {
-              input = Some(Python::with_gil(|py| externs::store_tuple(py, values)));
-              err = None;
+              input = GeneratorInput::Arg(Python::with_gil(|py| externs::store_tuple(py, values)));
             }
             Err(throw @ Failure::Throw { .. }) => {
-              input = None;
-              err = Some(PyErr::from(throw));
+              input = GeneratorInput::Err(PyErr::from(throw));
             }
             Err(failure) => break Err(failure),
           }
         }
-        externs::GeneratorResponse::Break(val, type_id) => {
+        GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));
         }
       }
