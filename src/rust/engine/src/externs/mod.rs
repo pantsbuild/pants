@@ -267,15 +267,28 @@ pub(crate) enum GeneratorInput {
   Err(PyErr),
 }
 
+///
+/// A specification for how the native engine interacts with @rule coroutines:
+/// - coroutines may await:
+///   - `Get`/`Effect`/`Call`,
+///   - other coroutines,
+///   - sequences of those types.
+/// - we will `send` back a single value or tupled values to the coroutine, or `throw` an exception.
+/// - a coroutine will eventually return a single return value.
+///
 pub(crate) fn generator_send(
   py: Python,
+  generator_type: &TypeId,
   generator: &Value,
   input: GeneratorInput,
 ) -> Result<GeneratorResponse, Failure> {
-  let response_unhandled = match &input {
-    GeneratorInput::Arg(arg) => generator
-      .getattr(py, intern!(py, "send"))?
-      .call1(py, (&**arg,)),
+  let (response_unhandled, maybe_thrown) = match input {
+    GeneratorInput::Arg(arg) => {
+      let response = generator
+        .getattr(py, intern!(py, "send"))?
+        .call1(py, (&*arg,));
+      (response, None)
+    }
     GeneratorInput::Err(err) => {
       let throw_method = generator.getattr(py, intern!(py, "throw"))?;
       if err.is_instance_of::<NativeEngineFailure>(py) {
@@ -284,14 +297,19 @@ pub(crate) fn generator_send(
           .getattr(intern!(py, "failure"))?
           .extract::<PyRef<PyFailure>>()?
           .get_error(py);
-        throw_method.call1(py, (&throw,))
+        let response = throw_method.call1(py, (&throw,));
+        (response, Some((throw, err)))
       } else {
-        throw_method.call1(py, (err,))
+        let response = throw_method.call1(py, (err,));
+        (response, None)
       }
     }
-    GeneratorInput::Initial => generator
-      .getattr(py, intern!(py, "send"))?
-      .call1(py, (&py.None(),)),
+    GeneratorInput::Initial => {
+      let response = generator
+        .getattr(py, intern!(py, "send"))?
+        .call1(py, (&py.None(),));
+      (response, None)
+    }
   };
 
   let response = match response_unhandled {
@@ -301,8 +319,8 @@ pub(crate) fn generator_send(
       return Ok(GeneratorResponse::Break(Value::new(value), type_id));
     }
     Err(e) => {
-      match (input, e.cause(py)) {
-        (GeneratorInput::Err(err), Some(cause)) if err.value(py).is(cause.value(py)) => {
+      match (maybe_thrown, e.cause(py)) {
+        (Some((thrown, err)), Some(cause)) if thrown.value(py).is(cause.value(py)) => {
           // Preserve the engine traceback by using the wrapped failure error as cause. The cause
           // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
           // traceback.
@@ -322,18 +340,28 @@ pub(crate) fn generator_send(
     // analysis of `@rule`s has already validated usage.
     Ok(GeneratorResponse::Get(get.take()?))
   } else if let Ok(get_multi) = response.downcast::<PySequence>(py) {
-    // Was a `MultiGet`.
-    let gets = get_multi
+    // Was an `All` or `MultiGet`.
+    let gogs = get_multi
       .iter()?
-      .map(|gr_get| {
-        let get = gr_get?
-          .extract::<PyRef<PyGeneratorResponseGet>>()
-          .map_err(|e| Failure::from_py_err_with_gil(py, e))?
-          .take()?;
-        Ok::<Get, Failure>(get)
+      .map(|gog| {
+        let gog = gog?;
+        // TODO: Find a better way to check whether something is a coroutine... this seems
+        // unnecessarily awkward.
+        if gog.is_instance(generator_type.as_py_type(py).into())? {
+          Ok(GetOrGenerator::Generator(Value::new(gog.into())))
+        } else if let Ok(get) = gog.extract::<PyRef<PyGeneratorResponseGet>>() {
+          Ok(GetOrGenerator::Get(
+            get.take().map_err(PyException::new_err)?,
+          ))
+        } else {
+          Err(PyValueError::new_err(format!(
+            "Expected an `All` or `MultiGet` to receive either `Get`s or calls to rules, \
+            but got: {response}"
+          )))
+        }
       })
       .collect::<Result<Vec<_>, _>>()?;
-    Ok(GeneratorResponse::GetMulti(gets))
+    Ok(GeneratorResponse::All(gogs))
   } else {
     Err(PyValueError::new_err(format!(
       "Async @rule error. Expected a rule query such as `Get(..)` or similar, but got: {response}"
@@ -643,9 +671,23 @@ impl fmt::Display for Get {
   }
 }
 
-pub enum GeneratorResponse {
-  Break(Value, TypeId),
-  Call(Call),
+pub enum GetOrGenerator {
   Get(Get),
-  GetMulti(Vec<Get>),
+  Generator(Value),
+}
+
+pub enum GeneratorResponse {
+  /// The generator has completed with the given value of the given type.
+  Break(Value, TypeId),
+  /// The generator is awaiting a call to a known rule.
+  Call(Call),
+  /// The generator is awaiting a call to an unknown rule.
+  Get(Get),
+  /// The generator is awaiting calls to a series of generators or Gets, all of which will
+  /// produce `Call`s or `Get`s.
+  ///
+  /// The generators used in this position will either be call-by-name `@rule` stubs (which will
+  /// immediately produce a `Call`, and then return its value), or async "rule helpers", which
+  /// might use either the call-by-name or `Get` syntax.
+  All(Vec<GetOrGenerator>),
 }

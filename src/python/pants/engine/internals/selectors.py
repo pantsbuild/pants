@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Coroutine,
     Generator,
     Generic,
     Iterable,
@@ -165,9 +166,9 @@ class Get(Generic[_Output], Awaitable[_Output]):
 
 @dataclass(frozen=True)
 class _MultiGet:
-    gets: tuple[Get, ...]
+    gets: tuple[Get | Coroutine, ...]
 
-    def __await__(self) -> Generator[tuple[Get, ...], None, tuple]:
+    def __await__(self) -> Generator[tuple[Get | Coroutine, ...], None, tuple]:
         result = yield self.gets
         return cast(Tuple, result)
 
@@ -188,143 +189,152 @@ _Out9 = TypeVar("_Out9")
 
 
 @overload
-async def MultiGet(__gets: Iterable[Get[_Output]]) -> tuple[_Output, ...]:  # noqa: F811
+async def MultiGet(
+    __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
+) -> tuple[_Output, ...]:  # noqa: F811
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Output],
-    __get1: Get[_Output],
-    __get2: Get[_Output],
-    __get3: Get[_Output],
-    __get4: Get[_Output],
-    __get5: Get[_Output],
-    __get6: Get[_Output],
-    __get7: Get[_Output],
-    __get8: Get[_Output],
-    __get9: Get[_Output],
-    __get10: Get[_Output],
-    *__gets: Get[_Output],
+    __get0: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get1: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get2: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get3: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get4: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get5: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get6: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get7: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get8: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get9: Get[_Output] | Coroutine[Any, Any, _Output],
+    __get10: Get[_Output] | Coroutine[Any, Any, _Output],
+    *__gets: Get[_Output] | Coroutine[Any, Any, _Output],
 ) -> tuple[_Output, ...]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0],
-    __get1: Get[_Out1],
-    __get2: Get[_Out2],
-    __get3: Get[_Out3],
-    __get4: Get[_Out4],
-    __get5: Get[_Out5],
-    __get6: Get[_Out6],
-    __get7: Get[_Out7],
-    __get8: Get[_Out8],
-    __get9: Get[_Out9],
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+    __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
+    __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
+    __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
+    __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
+    __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
+    __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
+    __get8: Get[_Out8] | Coroutine[Any, Any, _Out8],
+    __get9: Get[_Out9] | Coroutine[Any, Any, _Out9],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0],
-    __get1: Get[_Out1],
-    __get2: Get[_Out2],
-    __get3: Get[_Out3],
-    __get4: Get[_Out4],
-    __get5: Get[_Out5],
-    __get6: Get[_Out6],
-    __get7: Get[_Out7],
-    __get8: Get[_Out8],
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+    __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
+    __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
+    __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
+    __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
+    __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
+    __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
+    __get8: Get[_Out8] | Coroutine[Any, Any, _Out8],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0],
-    __get1: Get[_Out1],
-    __get2: Get[_Out2],
-    __get3: Get[_Out3],
-    __get4: Get[_Out4],
-    __get5: Get[_Out5],
-    __get6: Get[_Out6],
-    __get7: Get[_Out7],
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+    __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
+    __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
+    __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
+    __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
+    __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
+    __get7: Get[_Out7] | Coroutine[Any, Any, _Out7],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0],
-    __get1: Get[_Out1],
-    __get2: Get[_Out2],
-    __get3: Get[_Out3],
-    __get4: Get[_Out4],
-    __get5: Get[_Out5],
-    __get6: Get[_Out6],
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+    __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
+    __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
+    __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
+    __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
+    __get6: Get[_Out6] | Coroutine[Any, Any, _Out6],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0],
-    __get1: Get[_Out1],
-    __get2: Get[_Out2],
-    __get3: Get[_Out3],
-    __get4: Get[_Out4],
-    __get5: Get[_Out5],
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+    __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
+    __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
+    __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
+    __get5: Get[_Out5] | Coroutine[Any, Any, _Out5],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0],
-    __get1: Get[_Out1],
-    __get2: Get[_Out2],
-    __get3: Get[_Out3],
-    __get4: Get[_Out4],
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+    __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
+    __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
+    __get4: Get[_Out4] | Coroutine[Any, Any, _Out4],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0],
-    __get1: Get[_Out1],
-    __get2: Get[_Out2],
-    __get3: Get[_Out3],
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+    __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
+    __get3: Get[_Out3] | Coroutine[Any, Any, _Out3],
 ) -> tuple[_Out0, _Out1, _Out2, _Out3]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: Get[_Out0], __get1: Get[_Out1], __get2: Get[_Out2]
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+    __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
 ) -> tuple[_Out0, _Out1, _Out2]:
     ...
 
 
 @overload
-async def MultiGet(__get0: Get[_Out0], __get1: Get[_Out1]) -> tuple[_Out0, _Out1]:  # noqa: F811
+async def MultiGet(
+    __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
+    __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
+) -> tuple[_Out0, _Out1]:  # noqa: F811
     ...
 
 
 async def MultiGet(  # noqa: F811
-    __arg0: Iterable[Get[_Output]] | Get[_Out0],
-    __arg1: Get[_Out1] | None = None,
-    __arg2: Get[_Out2] | None = None,
-    __arg3: Get[_Out3] | None = None,
-    __arg4: Get[_Out4] | None = None,
-    __arg5: Get[_Out5] | None = None,
-    __arg6: Get[_Out6] | None = None,
-    __arg7: Get[_Out7] | None = None,
-    __arg8: Get[_Out8] | None = None,
-    __arg9: Get[_Out9] | None = None,
-    *__args: Get[_Output],
+    __arg0: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
+    | Get[_Out0]
+    | Coroutine[Any, Any, _Out0],
+    __arg1: Get[_Out1] | Coroutine[Any, Any, _Out1] | None = None,
+    __arg2: Get[_Out2] | Coroutine[Any, Any, _Out2] | None = None,
+    __arg3: Get[_Out3] | Coroutine[Any, Any, _Out3] | None = None,
+    __arg4: Get[_Out4] | Coroutine[Any, Any, _Out4] | None = None,
+    __arg5: Get[_Out5] | Coroutine[Any, Any, _Out5] | None = None,
+    __arg6: Get[_Out6] | Coroutine[Any, Any, _Out6] | None = None,
+    __arg7: Get[_Out7] | Coroutine[Any, Any, _Out7] | None = None,
+    __arg8: Get[_Out8] | Coroutine[Any, Any, _Out8] | None = None,
+    __arg9: Get[_Out9] | Coroutine[Any, Any, _Out9] | None = None,
+    *__args: Get[_Output] | Coroutine[Any, Any, _Output],
 ) -> (
     tuple[_Output, ...]
     | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]
@@ -364,16 +374,16 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet(tuple(__arg0))
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
-        and isinstance(__arg2, Get)
-        and isinstance(__arg3, Get)
-        and isinstance(__arg4, Get)
-        and isinstance(__arg5, Get)
-        and isinstance(__arg6, Get)
-        and isinstance(__arg7, Get)
-        and isinstance(__arg8, Get)
-        and isinstance(__arg9, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
+        and isinstance(__arg5, (Get, Coroutine))
+        and isinstance(__arg6, (Get, Coroutine))
+        and isinstance(__arg7, (Get, Coroutine))
+        and isinstance(__arg8, (Get, Coroutine))
+        and isinstance(__arg9, (Get, Coroutine))
         and all(isinstance(arg, Get) for arg in __args)
     ):
         return await _MultiGet(
@@ -393,15 +403,15 @@ async def MultiGet(  # noqa: F811
         )
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
-        and isinstance(__arg2, Get)
-        and isinstance(__arg3, Get)
-        and isinstance(__arg4, Get)
-        and isinstance(__arg5, Get)
-        and isinstance(__arg6, Get)
-        and isinstance(__arg7, Get)
-        and isinstance(__arg8, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
+        and isinstance(__arg5, (Get, Coroutine))
+        and isinstance(__arg6, (Get, Coroutine))
+        and isinstance(__arg7, (Get, Coroutine))
+        and isinstance(__arg8, (Get, Coroutine))
         and __arg9 is None
         and not __args
     ):
@@ -410,14 +420,14 @@ async def MultiGet(  # noqa: F811
         )
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
-        and isinstance(__arg2, Get)
-        and isinstance(__arg3, Get)
-        and isinstance(__arg4, Get)
-        and isinstance(__arg5, Get)
-        and isinstance(__arg6, Get)
-        and isinstance(__arg7, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
+        and isinstance(__arg5, (Get, Coroutine))
+        and isinstance(__arg6, (Get, Coroutine))
+        and isinstance(__arg7, (Get, Coroutine))
         and __arg8 is None
         and __arg9 is None
         and not __args
@@ -425,13 +435,13 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7))
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
-        and isinstance(__arg2, Get)
-        and isinstance(__arg3, Get)
-        and isinstance(__arg4, Get)
-        and isinstance(__arg5, Get)
-        and isinstance(__arg6, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
+        and isinstance(__arg5, (Get, Coroutine))
+        and isinstance(__arg6, (Get, Coroutine))
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
@@ -440,12 +450,12 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6))
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
-        and isinstance(__arg2, Get)
-        and isinstance(__arg3, Get)
-        and isinstance(__arg4, Get)
-        and isinstance(__arg5, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
+        and isinstance(__arg5, (Get, Coroutine))
         and __arg6 is None
         and __arg7 is None
         and __arg8 is None
@@ -455,11 +465,11 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5))
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
-        and isinstance(__arg2, Get)
-        and isinstance(__arg3, Get)
-        and isinstance(__arg4, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
         and __arg5 is None
         and __arg6 is None
         and __arg7 is None
@@ -470,10 +480,10 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4))
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
-        and isinstance(__arg2, Get)
-        and isinstance(__arg3, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
         and __arg4 is None
         and __arg5 is None
         and __arg6 is None
@@ -485,9 +495,9 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3))
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
-        and isinstance(__arg2, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
         and __arg3 is None
         and __arg4 is None
         and __arg5 is None
@@ -500,8 +510,8 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2))
 
     if (
-        isinstance(__arg0, Get)
-        and isinstance(__arg1, Get)
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
         and __arg2 is None
         and __arg3 is None
         and __arg4 is None
@@ -515,7 +525,7 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1))
 
     if (
-        isinstance(__arg0, Get)
+        isinstance(__arg0, (Get, Coroutine))
         and __arg1 is None
         and __arg2 is None
         and __arg3 is None
