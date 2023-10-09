@@ -9,25 +9,17 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Coroutine,
     Generator,
     Generic,
     Iterable,
     Sequence,
     Tuple,
     TypeVar,
-    Union,
     cast,
     overload,
 )
 
-from pants.base.exceptions import NativeEngineFailure
-from pants.engine.internals.native_engine import (
-    PyGeneratorResponseBreak,
-    PyGeneratorResponseCall,
-    PyGeneratorResponseGet,
-    PyGeneratorResponseGetMulti,
-)
+from pants.engine.internals.native_engine import PyGeneratorResponseCall, PyGeneratorResponseGet
 from pants.util.strutil import softwrap
 
 _Output = TypeVar("_Output")
@@ -111,7 +103,7 @@ class Awaitable(Generic[_Output], _BasePyGeneratorResponseGet[_Output]):
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
         The `yield`ed value `self` is interpreted by the engine within
-        `native_engine_generator_send()`. This class will yield a single Get instance, which is
+        `generator_send()`. This class will yield a single Get instance, which is
         a subclass of `PyGeneratorResponseGet`.
 
         This is how this method is eventually called:
@@ -349,7 +341,7 @@ async def MultiGet(  # noqa: F811
     """Yield a tuple of Get instances all at once.
 
     The `yield`ed value `self.gets` is interpreted by the engine within
-    `native_engine_generator_send()`. This class will yield a tuple of Get instances,
+    `generator_send()`. This class will yield a tuple of Get instances,
     which is converted into `PyGeneratorResponse::GetMulti`.
 
     The engine will fulfill these Get instances in parallel, and return a tuple of _Output
@@ -602,63 +594,3 @@ class Params:
 
     def __init__(self, *args: Any) -> None:
         object.__setattr__(self, "params", tuple(args))
-
-
-# A specification for how the native engine interacts with @rule coroutines:
-# - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines.
-# - we will send back a single `Any` or a tuple of `Any` to the coroutine, depending upon the variant of `Get`.
-# - a coroutine will eventually return a single `Any`.
-RuleInput = Union[
-    # The value used to "start" a Generator.
-    None,
-    # A single value requested by a Get.
-    Any,
-    # Multiple values requested by a MultiGet.
-    Tuple[Any, ...],
-    # An exception to be raised in the Generator.
-    NativeEngineFailure,
-]
-RuleOutput = Union[Get, Tuple[Get, ...]]
-RuleResult = Any
-RuleCoroutine = Coroutine[RuleOutput, RuleInput, RuleResult]
-NativeEngineGeneratorResponse = Union[
-    PyGeneratorResponseGet,
-    PyGeneratorResponseGetMulti,
-    PyGeneratorResponseBreak,
-]
-
-
-def native_engine_generator_send(
-    rule: RuleCoroutine, arg: RuleInput
-) -> NativeEngineGeneratorResponse:
-    err = arg if isinstance(arg, NativeEngineFailure) else None
-    throw = err and err.failure.get_error()
-    try:
-        res = rule.send(arg) if err is None else rule.throw(throw or err)
-    except StopIteration as e:
-        return PyGeneratorResponseBreak(e.value)
-    except Exception as e:
-        if throw and e.__cause__ is throw:
-            # Preserve the engine traceback by using the wrapped failure error as cause. The cause
-            # will be swapped back again in
-            # `src/rust/engine/src/python.rs:Failure::from_py_err_with_gil()` to preserve the python
-            # traceback.
-            e.__cause__ = err
-        raise
-    else:
-        # It isn't necessary to differentiate between `Get` and `Effect` here, as the static
-        # analysis of `@rule`s has already validated usage.
-        if isinstance(res, (Call, Get, Effect)):
-            return res
-        elif type(res) in (tuple, list):
-            return PyGeneratorResponseGetMulti(res)
-        else:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    Async @rule error: unrecognized await object
-
-                    Expected a rule query such as `Get(..)` or similar, but got: {res!r}
-                    """
-                )
-            )

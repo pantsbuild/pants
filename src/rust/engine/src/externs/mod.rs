@@ -10,9 +10,9 @@ use std::convert::TryInto;
 use std::fmt;
 
 use lazy_static::lazy_static;
-use pyo3::exceptions::{PyAssertionError, PyException, PyTypeError};
+use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
+use pyo3::types::{PyBytes, PyDict, PySequence, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
@@ -44,7 +44,6 @@ pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add_class::<PyGeneratorResponseBreak>()?;
   m.add_class::<PyGeneratorResponseCall>()?;
   m.add_class::<PyGeneratorResponseGet>()?;
-  m.add_class::<PyGeneratorResponseGetMulti>()?;
 
   m.add("EngineError", py.get_type::<EngineError>())?;
   m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
@@ -274,33 +273,63 @@ pub(crate) fn generator_send(
   generator: &Value,
   input: GeneratorInput,
 ) -> Result<GeneratorResponse, Failure> {
-  let selectors = py.import("pants.engine.internals.selectors").unwrap();
-  let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
-  let py_arg = match input {
-    GeneratorInput::Arg(arg) => arg.to_object(py),
-    GeneratorInput::Err(err) => err.into_py(py),
-    GeneratorInput::Initial => py.None(),
+  let response_unhandled = match &input {
+    GeneratorInput::Arg(arg) => generator
+      .getattr(py, intern!(py, "send"))?
+      .call1(py, (&**arg,)),
+    GeneratorInput::Err(err) => {
+      let throw_method = generator.getattr(py, intern!(py, "throw"))?;
+      if err.is_instance_of::<NativeEngineFailure>(py) {
+        let throw = err
+          .value(py)
+          .getattr(intern!(py, "failure"))?
+          .extract::<PyRef<PyFailure>>()?
+          .get_error(py);
+        throw_method.call1(py, (&throw,))
+      } else {
+        throw_method.call1(py, (err,))
+      }
+    }
+    GeneratorInput::Initial => generator
+      .getattr(py, intern!(py, "send"))?
+      .call1(py, (&py.None(),)),
   };
-  let response = native_engine_generator_send
-    .call1((generator.to_object(py), py_arg))
+
+  let response = response_unhandled
+    .or_else(|e| match e {
+      e if e.is_instance_of::<PyStopIteration>(py) => Ok(
+        PyGeneratorResponseBreak(e.into_value(py).getattr(py, intern!(py, "value"))?).into_py(py),
+      ),
+      e => match (input, e.cause(py)) {
+        (GeneratorInput::Err(err), Some(cause)) if err.value(py).is(cause.value(py)) => {
+          // Preserve the engine traceback by using the wrapped failure error as cause. The cause
+          // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
+          // traceback.
+          e.set_cause(py, Some(err));
+          Err(e)
+        }
+        _ => Err(e),
+      },
+    })
     .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
-  if let Ok(b) = response.extract::<PyRef<PyGeneratorResponseBreak>>() {
+  let result = if let Ok(b) = response.extract::<PyRef<PyGeneratorResponseBreak>>(py) {
     Ok(GeneratorResponse::Break(
       Value::new(b.0.clone_ref(py)),
       TypeId::new(b.0.as_ref(py).get_type()),
     ))
-  } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>() {
+  } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>(py) {
     Ok(GeneratorResponse::Call(call.take()?))
-  } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
+  } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>(py) {
+    // It isn't necessary to differentiate between `Get` and `Effect` here, as the static
+    // analysis of `@rule`s has already validated usage.
     Ok(GeneratorResponse::Get(get.take()?))
-  } else if let Ok(get_multi) = response.extract::<PyRef<PyGeneratorResponseGetMulti>>() {
+  } else if let Ok(get_multi) = response.downcast::<PySequence>(py) {
+    // Was a `MultiGet`.
     let gets = get_multi
-      .0
-      .as_ref(py)
-      .iter()
+      .iter()?
       .map(|gr_get| {
-        let get = gr_get
+        let get = gr_get?
           .extract::<PyRef<PyGeneratorResponseGet>>()
           .map_err(|e| Failure::from_py_err_with_gil(py, e))?
           .take()?;
@@ -309,8 +338,12 @@ pub(crate) fn generator_send(
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
   } else {
-    panic!("native_engine_generator_send returned unrecognized type: {response:?}");
-  }
+    Err(PyValueError::new_err(format!(
+      "Async @rule error. Expected a rule query such as `Get(..)` or similar, but got: {response}"
+    )))
+  };
+
+  Ok(result?)
 }
 
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
@@ -564,17 +597,6 @@ impl PyGeneratorResponseGet {
         )
       })?
     ))
-  }
-}
-
-#[pyclass]
-pub struct PyGeneratorResponseGetMulti(Py<PyTuple>);
-
-#[pymethods]
-impl PyGeneratorResponseGetMulti {
-  #[new]
-  fn __new__(gets: Py<PyTuple>) -> Self {
-    Self(gets)
   }
 }
 
