@@ -22,7 +22,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var, softwrap
+from pants.util.strutil import softwrap
 
 
 class PexSubsystem(Subsystem):
@@ -216,7 +216,7 @@ class CompletePexEnvironment:
         to avoid PEX from trying to find a new interpreter.
         """
         d = dict(
-            PATH=create_path_env_var(self._pex_environment.path),
+            PATH=os.pathsep.join(self._pex_environment.path),
             PEX_IGNORE_RCFILES="true",
             PEX_ROOT=(
                 os.path.relpath(self.pex_root, self._working_directory)
@@ -228,7 +228,7 @@ class CompletePexEnvironment:
         if python:
             d["PEX_PYTHON"] = python.path
         else:
-            d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
+            d["PEX_PYTHON_PATH"] = os.pathsep.join(self.interpreter_search_paths)
         return d
 
 
