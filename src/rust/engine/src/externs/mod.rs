@@ -41,7 +41,6 @@ pub mod workunits;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add_class::<PyFailure>()?;
-  m.add_class::<PyGeneratorResponseBreak>()?;
   m.add_class::<PyGeneratorResponseCall>()?;
   m.add_class::<PyGeneratorResponseGet>()?;
 
@@ -295,30 +294,28 @@ pub(crate) fn generator_send(
       .call1(py, (&py.None(),)),
   };
 
-  let response = response_unhandled
-    .or_else(|e| match e {
-      e if e.is_instance_of::<PyStopIteration>(py) => Ok(
-        PyGeneratorResponseBreak(e.into_value(py).getattr(py, intern!(py, "value"))?).into_py(py),
-      ),
-      e => match (input, e.cause(py)) {
+  let response = match response_unhandled {
+    Err(e) if e.is_instance_of::<PyStopIteration>(py) => {
+      let value = e.into_value(py).getattr(py, intern!(py, "value"))?;
+      let type_id = TypeId::new(value.as_ref(py).get_type());
+      return Ok(GeneratorResponse::Break(Value::new(value), type_id));
+    }
+    Err(e) => {
+      match (input, e.cause(py)) {
         (GeneratorInput::Err(err), Some(cause)) if err.value(py).is(cause.value(py)) => {
           // Preserve the engine traceback by using the wrapped failure error as cause. The cause
           // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
           // traceback.
           e.set_cause(py, Some(err));
-          Err(e)
         }
-        _ => Err(e),
-      },
-    })
-    .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
+        _ => (),
+      };
+      return Err(e.into());
+    }
+    Ok(r) => r,
+  };
 
-  let result = if let Ok(b) = response.extract::<PyRef<PyGeneratorResponseBreak>>(py) {
-    Ok(GeneratorResponse::Break(
-      Value::new(b.0.clone_ref(py)),
-      TypeId::new(b.0.as_ref(py).get_type()),
-    ))
-  } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>(py) {
+  let result = if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>(py) {
     Ok(GeneratorResponse::Call(call.take()?))
   } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>(py) {
     // It isn't necessary to differentiate between `Get` and `Effect` here, as the static
@@ -363,17 +360,6 @@ pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
 
 lazy_static! {
   pub static ref INTERNS: Interns = Interns::new();
-}
-
-#[pyclass]
-pub struct PyGeneratorResponseBreak(PyObject);
-
-#[pymethods]
-impl PyGeneratorResponseBreak {
-  #[new]
-  fn __new__(val: PyObject) -> Self {
-    Self(val)
-  }
 }
 
 /// Interprets the `Get` and `implicitly(..)` syntax, which reduces to two optional positional
