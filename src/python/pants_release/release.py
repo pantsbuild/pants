@@ -823,16 +823,26 @@ def test_release() -> None:
 
 
 def smoke_test_install_and_version(version: str) -> None:
-    with temporary_dir() as dir:
-        (Path(dir) / "pants.toml").write_text(
+    """Do two tests to confirm that both sets of artifacts (PEXes for running normally, and wheels
+    for plugins) have ended up somewhere plausible, to catch major infra failures."""
+    with temporary_dir() as dir_:
+        dir = Path(dir_)
+        (dir / "pants.toml").write_text(
             f"""
             [GLOBAL]
             pants_version = "{version}"
 
-            backend_packages = []
+            backend_packages = [
+                "pants.backend.python",
+                "pants.backend.plugin_development",
+            ]
+
+            [python]
+            interpreter_constraints = ["==3.9.*"]
             """
         )
 
+        # First: test that running pants normally reports the expected version:
         result = subprocess.run(
             ["pants", "version"],
             cwd=dir,
@@ -842,6 +852,23 @@ def smoke_test_install_and_version(version: str) -> None:
         printed_version = result.stdout.decode().strip()
         if printed_version != version:
             die(f"Failed to confirm pants version, expected {version!r}, got {printed_version!r}")
+
+        # Second: test that the wheels can be installed/imported (for plugins):
+        (dir / "BUILD").write_text("python_sources(name='py'); pants_requirements(name='pants')")
+        # We confirm the version from the main wheel, but only check that the testutil code can
+        # be imported at all.
+        (dir / "example.py").write_text(
+            "from pants import version, testutil; print(version.VERSION)"
+        )
+        result = subprocess.run(
+            ["pants", "run", "example.py"],
+            cwd=dir,
+            check=True,
+            stdout=subprocess.PIPE,
+        )
+        wheel_version = result.stdout.decode().strip()
+        if printed_version != version:
+            die(f"Failed to confirm wheel version, expected {version!r}, got {wheel_version!r}")
 
 
 # -----------------------------------------------------------------------------------------------
