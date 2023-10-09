@@ -20,6 +20,61 @@ A Pex can be bundled into a single `.pex` file. This file, when executed, knows 
 
 Check out [blog.pantsbuild.org/pants-pex-and-docker](https://blog.pantsbuild.org/pants-pex-and-docker/) for how this workflow gets even better when combined with Pants's Docker support!
 
+Building a Pex
+--------------
+
+You define a Pex using the [`pex_binary`](doc:reference-pex_binary) target type:
+
+```python path/to/mybinary/BUILD
+python_sources(name="lib")
+
+pex_binary(
+    name="bin",
+    dependencies=[":lib"],
+    execution_mode="venv",
+)
+```
+
+You then use the `package` goal to build the Pex, which will be output under the [dist/] directory.
+
+```shell
+$ pants package path/to/mybinary:bin
+```
+
+There are several fields you can set on a `pex_binary` to configure the layout, entry point and behavior of the resulting Pex.  See the [documentation](doc:reference-pex_binary) for details.
+
+
+Setting the target platforms for a Pex
+--------------------------------------
+
+By default, the `package` goal builds a Pex that runs on the local machine's architecture and OS, and on a locally found interpreter compatible with your code's [interpreter constraints](doc:python-interpreter-compatibility). However, you can also build a multiplatform Pex - one that will run on multiple architecture+OS+interpreter combinations.
+
+To do so, you must configure the [`complete_platforms`](doc:reference-pex_binary#codecomplete_platformscode) field on your `pex_binary` to point to `file` targets that provide detailed information about your target platforms. This is information that Pants can't determine itself because it's not running on those platforms:
+
+```python BUILD
+file(
+    name="platform1",
+    source="platform1.json",
+)
+
+file(
+    name="platform2",
+    source="platform2.json",
+)
+
+pex_binary(
+    ...
+    complete_platforms=[":platform1", ":platform2"]
+    ...
+)
+```
+
+You can generate the JSON content for these files by installing the [Pex](https://github.com/pantsbuild/pex) command-line tool on the target platform and running `pex3 interpreter inspect --markers --tags` against the appropriate interpreter. You can run `pex3 interpreter inspect --help` for more options, and in particular for how to select the desired target interpreter.
+
+> 🚧 Platform-specific dependencies must be available as wheels
+>
+> Pants can't cross-compile platform-specific sdists for the target platforms. All platform-specific third-party packages that your Pex transitively depends on must be available as prebuilt wheels for each platform you care about. If those wheels aren't available on PyPI you can always build them manually once and host them on a private package repository.
+
 Setting Pex and Pip versions
 ----------------------------
 
