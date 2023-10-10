@@ -1,14 +1,14 @@
 ---
-title: "Pex"
+title: "PEX"
 slug: "pex"
 hidden: false
 createdAt: "2020-03-21T20:47:00.042Z"
 ---
-Pex files
+PEX files
 ---------
-When working with Python code, Pants makes frequent use of the [Pex](https://github.com/pantsbuild/pex) (Python EXecutable) format. So, you'll see Pex referenced frequently in this documentation.
+When working with Python code, Pants makes frequent use of the [PEX](https://github.com/pantsbuild/pex) (Python EXecutable) format. So, you'll see PEX referenced frequently in this documentation.
 
-A Pex is a self-contained Python environment, similar in spirit to a virtualenv. A Pex can contain combinations of Python source files, 3rd-party requirements (sdists or wheels), resource files, and metadata describing the contents.
+A PEX is a self-contained Python environment, similar in spirit to a virtualenv. A Pex can contain combinations of Python source files, 3rd-party requirements (sdists or wheels), resource files, and metadata describing the contents.
 
 Importantly, this metadata can include:
 
@@ -16,14 +16,14 @@ Importantly, this metadata can include:
 - Python platforms, like `macosx_11_0_arm64-cp-39-cp39`.
 - An entry point or console script.
 
-A Pex can be bundled into a single `.pex` file. This file, when executed, knows how to unpack itself, find an interpreter that matches its constraints, and run itself on that interpreter. Therefore deploying code packaged in a Pex file is as simple as copying the file to an environment that has a suitable Python interpreter.
+A PEX can be bundled into a single `.pex` file. This file, when executed, knows how to unpack itself, find an interpreter that matches its constraints, and run itself on that interpreter. Therefore deploying code packaged in a Pex file is as simple as copying the file to an environment that has a suitable Python interpreter.
 
 Check out [blog.pantsbuild.org/pants-pex-and-docker](https://blog.pantsbuild.org/pants-pex-and-docker/) for how this workflow gets even better when combined with Pants's Docker support!
 
 Building a Pex
 --------------
 
-You define a Pex using the [`pex_binary`](doc:reference-pex_binary) target type:
+You define a PEX using the [`pex_binary`](doc:reference-pex_binary) target type:
 
 ```python path/to/mybinary/BUILD
 python_sources(name="lib")
@@ -35,36 +35,36 @@ pex_binary(
 )
 ```
 
-You then use the `package` goal to build the Pex, which will be output under the [dist/] directory.
+You then use the `package` goal to build the PEX, which will be output under the [dist/] directory.
 
 ```shell
 $ pants package path/to/mybinary:bin
 ```
 
-There are several fields you can set on a `pex_binary` to configure the layout, entry point and behavior of the resulting Pex.  See the [documentation](doc:reference-pex_binary) for details.
+There are several fields you can set on a `pex_binary` to configure the layout, entry point and behavior of the resulting PEX.  See the [documentation](doc:reference-pex_binary) for details.
 
 
-Setting the target platforms for a Pex
+Setting the target platforms for a PEX
 --------------------------------------
 
-By default, the `package` goal builds a Pex that runs on the local machine's architecture and OS, and on a locally found interpreter compatible with your code's [interpreter constraints](doc:python-interpreter-compatibility). However, you can also build a multiplatform Pex - one that will run on multiple architecture+OS+interpreter combinations.
+By default, the `package` goal builds a PEX that runs on the architecture and OS of the local machine (or local [environment](doc:environments)), and on a locally-found interpreter compatible with your code's [interpreter constraints](doc:python-interpreter-compatibility). However, you can also build a multiplatform PEX - one that will run on multiple architecture+OS+interpreter combinations.
 
 To do so, you must configure the [`complete_platforms`](doc:reference-pex_binary#codecomplete_platformscode) field on your `pex_binary` to point to `file` targets that provide detailed information about your target platforms. This is information that Pants can't determine itself because it's not running on those platforms:
 
 ```python BUILD
 file(
-    name="platform1",
-    source="platform1.json",
+    name="linux_x86_py39",
+    source="linux_x86_py39.json",
 )
 
 file(
-    name="platform2",
-    source="platform2.json",
+    name="linux_aarch64_py310",
+    source="linux_aarch64_py310.json",
 )
 
 pex_binary(
     ...
-    complete_platforms=[":platform1", ":platform2"]
+    complete_platforms=[":linux_x86_py39", ":linux_aarch64_py310"]
     ...
 )
 ```
@@ -73,12 +73,12 @@ You can generate the JSON content for these files by installing the [Pex](https:
 
 > 🚧 Platform-specific dependencies must be available as wheels
 >
-> Pants can't cross-compile platform-specific sdists for the target platforms. All platform-specific third-party packages that your Pex transitively depends on must be available as prebuilt wheels for each platform you care about. If those wheels aren't available on PyPI you can always build them manually once and host them on a private package repository.
+> Some Python distributions include native code, and therefore require platform-specific artifacts. Often, such artifacts are pre-built and available on PyPI as platform-specific wheels. But in some cases they are only available as source distributions (sdists) and must be compiled into platform-specific wheels at build time. Pants can only build platform-specific sdists for the local machine or [environment](doc:environments), and cannot cross-compile for other target platforms. Therefore, to build for platforms other than the local one, all the platform-specific third-party packages that your PEX transitively depends on must be available as prebuilt wheels for each platform you care about. If those wheels aren't available on PyPI you can always build them manually once and host them on a private package repository.
 
 Setting Pex and Pip versions
 ----------------------------
 
-Pants makes use of the [Pex](https://github.com/pantsbuild/pex) command-line tool internally for Pex building. The Pex version that Pants uses is specified by the `version` option under the `pex-cli` subsystem. The known Pex versions are specified by the `known_versions` option under the `pex-cli` subsystem. You can see all Pex tool options and their current values by running `pants help-advanced pex-cli`. To upgrade the Pex version, update these option values accordingly. For instance, in `pants.toml`, to upgrade to Pex 2.1.143:
+Pants makes use of the [Pex](https://github.com/pantsbuild/pex) command-line tool internally for building PEXes. The Pex version that Pants uses is specified by the `version` option under the `pex-cli` subsystem. The known Pex versions are specified by the `known_versions` option under the `pex-cli` subsystem. You can see all Pex tool options and their current values by running `pants help-advanced pex-cli`. To upgrade the Pex version, update these option values accordingly. For instance, in `pants.toml`, to upgrade to Pex 2.1.143:
 
 ```[pex-cli]
 version = "v2.1.143"
