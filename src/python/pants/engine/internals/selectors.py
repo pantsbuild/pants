@@ -375,6 +375,111 @@ async def MultiGet(  # noqa: F811
 
     if (
         isinstance(__arg0, (Get, Coroutine))
+        and __arg1 is None
+        and __arg2 is None
+        and __arg3 is None
+        and __arg4 is None
+        and __arg5 is None
+        and __arg6 is None
+        and __arg7 is None
+        and __arg8 is None
+        and __arg9 is None
+        and not __args
+    ):
+        return await _MultiGet((__arg0,))
+
+    if (
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and __arg2 is None
+        and __arg3 is None
+        and __arg4 is None
+        and __arg5 is None
+        and __arg6 is None
+        and __arg7 is None
+        and __arg8 is None
+        and __arg9 is None
+        and not __args
+    ):
+        return await _MultiGet((__arg0, __arg1))
+
+    if (
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and __arg3 is None
+        and __arg4 is None
+        and __arg5 is None
+        and __arg6 is None
+        and __arg7 is None
+        and __arg8 is None
+        and __arg9 is None
+        and not __args
+    ):
+        return await _MultiGet((__arg0, __arg1, __arg2))
+
+    if (
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and __arg4 is None
+        and __arg5 is None
+        and __arg6 is None
+        and __arg7 is None
+        and __arg8 is None
+        and __arg9 is None
+        and not __args
+    ):
+        return await _MultiGet((__arg0, __arg1, __arg2, __arg3))
+
+    if (
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
+        and __arg5 is None
+        and __arg6 is None
+        and __arg7 is None
+        and __arg8 is None
+        and __arg9 is None
+        and not __args
+    ):
+        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4))
+
+    if (
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
+        and isinstance(__arg5, (Get, Coroutine))
+        and __arg6 is None
+        and __arg7 is None
+        and __arg8 is None
+        and __arg9 is None
+        and not __args
+    ):
+        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5))
+
+    if (
+        isinstance(__arg0, (Get, Coroutine))
+        and isinstance(__arg1, (Get, Coroutine))
+        and isinstance(__arg2, (Get, Coroutine))
+        and isinstance(__arg3, (Get, Coroutine))
+        and isinstance(__arg4, (Get, Coroutine))
+        and isinstance(__arg5, (Get, Coroutine))
+        and isinstance(__arg6, (Get, Coroutine))
+        and __arg7 is None
+        and __arg8 is None
+        and __arg9 is None
+        and not __args
+    ):
+        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6))
+
+    if (
+        isinstance(__arg0, (Get, Coroutine))
         and isinstance(__arg1, (Get, Coroutine))
         and isinstance(__arg2, (Get, Coroutine))
         and isinstance(__arg3, (Get, Coroutine))
@@ -382,25 +487,11 @@ async def MultiGet(  # noqa: F811
         and isinstance(__arg5, (Get, Coroutine))
         and isinstance(__arg6, (Get, Coroutine))
         and isinstance(__arg7, (Get, Coroutine))
-        and isinstance(__arg8, (Get, Coroutine))
-        and isinstance(__arg9, (Get, Coroutine))
-        and all(isinstance(arg, Get) for arg in __args)
+        and __arg8 is None
+        and __arg9 is None
+        and not __args
     ):
-        return await _MultiGet(
-            (
-                __arg0,
-                __arg1,
-                __arg2,
-                __arg3,
-                __arg4,
-                __arg5,
-                __arg6,
-                __arg7,
-                __arg8,
-                __arg9,
-                *__args,
-            )
-        )
+        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7))
 
     if (
         isinstance(__arg0, (Get, Coroutine))
@@ -428,116 +519,25 @@ async def MultiGet(  # noqa: F811
         and isinstance(__arg5, (Get, Coroutine))
         and isinstance(__arg6, (Get, Coroutine))
         and isinstance(__arg7, (Get, Coroutine))
-        and __arg8 is None
-        and __arg9 is None
-        and not __args
+        and isinstance(__arg8, (Get, Coroutine))
+        and isinstance(__arg9, (Get, Coroutine))
+        and all(isinstance(arg, Get) for arg in __args)
     ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7))
-
-    if (
-        isinstance(__arg0, (Get, Coroutine))
-        and isinstance(__arg1, (Get, Coroutine))
-        and isinstance(__arg2, (Get, Coroutine))
-        and isinstance(__arg3, (Get, Coroutine))
-        and isinstance(__arg4, (Get, Coroutine))
-        and isinstance(__arg5, (Get, Coroutine))
-        and isinstance(__arg6, (Get, Coroutine))
-        and __arg7 is None
-        and __arg8 is None
-        and __arg9 is None
-        and not __args
-    ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6))
-
-    if (
-        isinstance(__arg0, (Get, Coroutine))
-        and isinstance(__arg1, (Get, Coroutine))
-        and isinstance(__arg2, (Get, Coroutine))
-        and isinstance(__arg3, (Get, Coroutine))
-        and isinstance(__arg4, (Get, Coroutine))
-        and isinstance(__arg5, (Get, Coroutine))
-        and __arg6 is None
-        and __arg7 is None
-        and __arg8 is None
-        and __arg9 is None
-        and not __args
-    ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5))
-
-    if (
-        isinstance(__arg0, (Get, Coroutine))
-        and isinstance(__arg1, (Get, Coroutine))
-        and isinstance(__arg2, (Get, Coroutine))
-        and isinstance(__arg3, (Get, Coroutine))
-        and isinstance(__arg4, (Get, Coroutine))
-        and __arg5 is None
-        and __arg6 is None
-        and __arg7 is None
-        and __arg8 is None
-        and __arg9 is None
-        and not __args
-    ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4))
-
-    if (
-        isinstance(__arg0, (Get, Coroutine))
-        and isinstance(__arg1, (Get, Coroutine))
-        and isinstance(__arg2, (Get, Coroutine))
-        and isinstance(__arg3, (Get, Coroutine))
-        and __arg4 is None
-        and __arg5 is None
-        and __arg6 is None
-        and __arg7 is None
-        and __arg8 is None
-        and __arg9 is None
-        and not __args
-    ):
-        return await _MultiGet((__arg0, __arg1, __arg2, __arg3))
-
-    if (
-        isinstance(__arg0, (Get, Coroutine))
-        and isinstance(__arg1, (Get, Coroutine))
-        and isinstance(__arg2, (Get, Coroutine))
-        and __arg3 is None
-        and __arg4 is None
-        and __arg5 is None
-        and __arg6 is None
-        and __arg7 is None
-        and __arg8 is None
-        and __arg9 is None
-        and not __args
-    ):
-        return await _MultiGet((__arg0, __arg1, __arg2))
-
-    if (
-        isinstance(__arg0, (Get, Coroutine))
-        and isinstance(__arg1, (Get, Coroutine))
-        and __arg2 is None
-        and __arg3 is None
-        and __arg4 is None
-        and __arg5 is None
-        and __arg6 is None
-        and __arg7 is None
-        and __arg8 is None
-        and __arg9 is None
-        and not __args
-    ):
-        return await _MultiGet((__arg0, __arg1))
-
-    if (
-        isinstance(__arg0, (Get, Coroutine))
-        and __arg1 is None
-        and __arg2 is None
-        and __arg3 is None
-        and __arg4 is None
-        and __arg5 is None
-        and __arg6 is None
-        and __arg7 is None
-        and __arg8 is None
-        and __arg9 is None
-        and not __args
-    ):
-        return await _MultiGet((__arg0,))
+        return await _MultiGet(
+            (
+                __arg0,
+                __arg1,
+                __arg2,
+                __arg3,
+                __arg4,
+                __arg5,
+                __arg6,
+                __arg7,
+                __arg8,
+                __arg9,
+                *__args,
+            )
+        )
 
     args = __arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8, __arg9, *__args
 
