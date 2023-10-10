@@ -865,7 +865,7 @@ def build_wheels_job(
                     [
                         {
                             "name": "Build Pants PEX",
-                            "run": "./pants package src/python/pants:pants-pex",
+                            "run": "./pants --python-interpreter-constraints=\"['==3.9.*']\" package src/python/pants:pants-pex",
                             "env": helper.platform_env(),
                         },
                         {
