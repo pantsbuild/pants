@@ -859,8 +859,6 @@ def do_github_release() -> None:
                 f"release_{version}",
                 "--notes-file",
                 notes_file,
-                "--title",
-                version,
                 "--draft",
                 *(["--prerelease"] if is_prerelease else []),
             ],
