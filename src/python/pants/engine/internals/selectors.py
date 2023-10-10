@@ -191,12 +191,12 @@ _Out9 = TypeVar("_Out9")
 @overload
 async def MultiGet(
     __gets: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
-) -> tuple[_Output, ...]:  # noqa: F811
+) -> tuple[_Output, ...]:
     ...
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Output] | Coroutine[Any, Any, _Output],
     __get1: Get[_Output] | Coroutine[Any, Any, _Output],
     __get2: Get[_Output] | Coroutine[Any, Any, _Output],
@@ -214,7 +214,7 @@ async def MultiGet(  # noqa: F811
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -230,7 +230,7 @@ async def MultiGet(  # noqa: F811
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -245,7 +245,7 @@ async def MultiGet(  # noqa: F811
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -259,7 +259,7 @@ async def MultiGet(  # noqa: F811
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -272,7 +272,7 @@ async def MultiGet(  # noqa: F811
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -284,7 +284,7 @@ async def MultiGet(  # noqa: F811
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -295,7 +295,7 @@ async def MultiGet(  # noqa: F811
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -305,7 +305,7 @@ async def MultiGet(  # noqa: F811
 
 
 @overload
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
     __get2: Get[_Out2] | Coroutine[Any, Any, _Out2],
@@ -317,11 +317,11 @@ async def MultiGet(  # noqa: F811
 async def MultiGet(
     __get0: Get[_Out0] | Coroutine[Any, Any, _Out0],
     __get1: Get[_Out1] | Coroutine[Any, Any, _Out1],
-) -> tuple[_Out0, _Out1]:  # noqa: F811
+) -> tuple[_Out0, _Out1]:
     ...
 
 
-async def MultiGet(  # noqa: F811
+async def MultiGet(
     __arg0: Iterable[Get[_Output] | Coroutine[Any, Any, _Output]]
     | Get[_Out0]
     | Coroutine[Any, Any, _Out0],
