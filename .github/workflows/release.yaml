@@ -67,7 +67,7 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
+      run: ./pants --python-interpreter-constraints="['==3.9.*']" package src/python/pants:pants-pex
     - if: needs.determine_ref.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
@@ -145,7 +145,7 @@ jobs:
       run: ./build-support/bin/deploy_to_s3.py
     - env: {}
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
+      run: ./pants --python-interpreter-constraints="['==3.9.*']" package src/python/pants:pants-pex
     - if: needs.determine_ref.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
@@ -224,7 +224,7 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
+      run: ./pants --python-interpreter-constraints="['==3.9.*']" package src/python/pants:pants-pex
     - if: needs.determine_ref.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
@@ -299,7 +299,7 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
+      run: ./pants --python-interpreter-constraints="['==3.9.*']" package src/python/pants:pants-pex
     - if: needs.determine_ref.outputs.is-release == 'true'
       name: Upload Wheel and Pex
       run: "PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c \"\
