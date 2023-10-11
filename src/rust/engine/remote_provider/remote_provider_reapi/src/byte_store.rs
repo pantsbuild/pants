@@ -29,9 +29,7 @@ use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
 
-use crate::RemoteOptions;
-
-use super::{ByteStoreProvider, LoadDestination};
+use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
 
 pub struct Provider {
   instance_name: Option<String>,
@@ -78,11 +76,11 @@ impl Provider {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
   // `super::LocalOptions`.
   pub async fn new(options: RemoteOptions) -> Result<Provider, String> {
-    let tls_client_config = if options.cas_address.starts_with("https://") {
-      Some(options.tls_config.try_into()?)
-    } else {
-      None
-    };
+    let tls_client_config = options
+      .cas_address
+      .starts_with("https://")
+      .then(|| options.tls_config.try_into())
+      .transpose()?;
 
     let channel =
       grpc_util::create_channel(&options.cas_address, tls_client_config.as_ref()).await?;

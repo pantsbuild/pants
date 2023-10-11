@@ -31,6 +31,8 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_rmtree
 
 
 @pytest.fixture
@@ -285,6 +287,43 @@ def test_skip(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pyright(rule_runner, [tgt], extra_args=["--pyright-skip"])
     assert not result
+
+
+def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
+    # Ensure that the requirements venv must be created, by adding in a third-party
+    # requirement to the test code.
+    rule_runner.write_files(
+        {
+            "BUILD": "python_requirement(name='more-itertools', requirements=['more-itertools==8.4.0'])",
+            f"{PACKAGE}/f.py": dedent(
+                """\
+            from more_itertools import is_sorted
+
+            assert is_sorted([1, 2, 3]) is True
+            """
+            ),
+            f"{PACKAGE}/BUILD": "python_sources()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+
+    with temporary_dir() as cache_dir:
+        # On the first run, Pyright should work as the venv will be created from scratch.
+        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "0 errors" in result[0].stdout
+        assert result[0].report == EMPTY_DIGEST
+
+        # Delete the cache directory containing the venv
+        safe_rmtree(cache_dir)
+
+        # Run again - should work as the venv will be created again from scratch.
+        result = run_pyright(rule_runner, [tgt], extra_args=[f"--named-caches-dir={cache_dir}"])
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "0 errors" in result[0].stdout
+        assert result[0].report == EMPTY_DIGEST
 
 
 @pytest.mark.parametrize(

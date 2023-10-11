@@ -10,8 +10,7 @@ from textwrap import dedent  # noqa: PNT20
 
 from pants.core.subsystems.python_bootstrap import PythonBootstrapSubsystem
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.core.util_rules.system_binaries import SEARCH_PATHS, BashBinary, TarBinary
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.core.util_rules.system_binaries import BashBinary, SystemBinariesSubsystem, TarBinary
 from pants.engine.fs import DownloadFile
 from pants.engine.internals.native_engine import Digest, FileDigest
 from pants.engine.internals.selectors import Get
@@ -63,8 +62,9 @@ async def download_python_binary(
     _: _DownloadPythonBuildStandaloneBinaryRequest,
     platform: Platform,
     tar_binary: TarBinary,
+    bash_binary: BashBinary,
     python_bootstrap: PythonBootstrapSubsystem,
-    bash: BashBinary,
+    system_binaries_environment: SystemBinariesSubsystem.EnvironmentAware,
 ) -> _PythonBuildStandaloneBinary:
     url, fingerprint, bytelen = python_bootstrap.internal_python_build_standalone_info[
         platform.value
@@ -87,7 +87,7 @@ async def download_python_binary(
         Process(
             argv=[tar_binary.path, "-xvf", filename],
             input_digest=python_archive,
-            env={"PATH": os.pathsep.join(SEARCH_PATHS)},
+            env={"PATH": os.pathsep.join(system_binaries_environment.system_binary_paths)},
             description="Extract Pants' execution Python",
             level=LogLevel.DEBUG,
             output_directories=("python",),
@@ -107,15 +107,14 @@ async def download_python_binary(
     """
     )
 
-    env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
     await Get(
         ProcessResult,
         Process(
-            [bash.path, "-c", installation_script],
+            [bash_binary.path, "-c", installation_script],
             level=LogLevel.DEBUG,
             input_digest=download_result.output_digest,
             description="Install Python for Pants usage",
-            env={"PATH": env_vars.get("PATH", "")},
+            env={"PATH": os.pathsep.join(system_binaries_environment.system_binary_paths)},
             append_only_caches=PythonBuildStandaloneBinary.APPEND_ONLY_CACHES,
             # Don't cache, we want this to always be run so that we can assume for the rest of the
             # session the named_cache destination for this Python is valid, as the Python ecosystem

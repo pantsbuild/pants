@@ -53,7 +53,10 @@ enum PythonLogLevel {
 
 async fn execute(start: SystemTime) -> Result<i32, String> {
   let build_root = BuildRoot::find()?;
-  let options_parser = OptionParser::new(Env::capture(), Args::argv())?;
+  let (env, dropped) = Env::capture_lossy();
+  let env_items = (&env).into();
+  let argv = env::args().collect::<Vec<_>>();
+  let options_parser = OptionParser::new(env, Args::argv())?;
 
   let use_pantsd = options_parser.parse_bool(&option_id!("pantsd"), true)?;
   if !use_pantsd.value {
@@ -82,10 +85,22 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   })?;
   env_logger::init_from_env(env_logger::Env::new().filter_or("__PANTS_LEVEL__", level.as_ref()));
 
+  // Now that the logger has been set up, we can retroactively log any dropped env vars.
+  let mut keys_with_non_utf8_values = dropped.keys_with_non_utf8_values;
+  keys_with_non_utf8_values.sort();
+  for name in keys_with_non_utf8_values {
+    log::warn!("Environment variable with non-UTF-8 value ignored: {name}");
+  }
+  let mut non_utf8_keys = dropped.non_utf8_keys;
+  non_utf8_keys.sort();
+  for name in non_utf8_keys {
+    log::warn!(
+      "Environment variable with non-UTF-8 name ignored: {}",
+      name.to_string_lossy()
+    );
+  }
   let pantsd_settings = find_pantsd(&build_root, &options_parser)?;
-  let env = env::vars().collect::<Vec<(_, _)>>();
-  let argv = env::args().collect::<Vec<_>>();
-  client::execute_command(start, pantsd_settings, env, argv).await
+  client::execute_command(start, pantsd_settings, env_items, argv).await
 }
 
 fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> {
@@ -95,7 +110,7 @@ fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> 
 
   let mut c_args = vec![c_exe.clone()];
   c_args.extend(
-    std::env::args_os()
+    env::args_os()
       .skip(1)
       .map(|arg| CString::new(arg.into_vec()).expect("Failed to convert argument to a C string.")),
   );

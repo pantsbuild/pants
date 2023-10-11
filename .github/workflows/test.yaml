@@ -38,7 +38,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.1-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -98,7 +98,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture --test-threads=8
+      run: ./cargo test --locked --tests -- --nocapture --test-threads=8
     timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
@@ -130,7 +130,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.1-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -198,7 +198,7 @@ jobs:
 
         ./build-support/bin/check_rust_pre_commit.sh
 
-        ./cargo test --all --tests -- --nocapture
+        ./cargo test --locked --all --tests -- --nocapture
 
         ./cargo check --benches
 
@@ -234,7 +234,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.1-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -294,7 +294,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture
+      run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
@@ -443,7 +443,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.1-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -510,7 +510,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.1-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 

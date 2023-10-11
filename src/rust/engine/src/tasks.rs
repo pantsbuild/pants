@@ -268,13 +268,19 @@ impl Tasks {
     });
   }
 
-  pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>) {
-    self
+  pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>, rule_id: Option<String>) {
+    let gets = &mut self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
-      .gets
-      .push(DependencyKey::new(output).provided_params(inputs));
+      .gets;
+    if let Some(rule_id) = rule_id {
+      gets.push(
+        DependencyKey::for_known_rule(RuleId::from_string(rule_id), output).provided_params(inputs),
+      )
+    } else {
+      gets.push(DependencyKey::new(output).provided_params(inputs));
+    }
   }
 
   pub fn add_get_union(&mut self, output: TypeId, inputs: Vec<TypeId>, in_scope: Vec<TypeId>) {

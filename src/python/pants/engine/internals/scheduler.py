@@ -198,6 +198,8 @@ class Scheduler:
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
+            client_certs_path=execution_options.remote_client_certs_path,
+            client_key_path=execution_options.remote_client_key_path,
             append_only_caches_base_path=execution_options.remote_execution_append_only_caches_base_path,
         )
         py_local_store_options = PyLocalStoreOptions(
@@ -691,7 +693,9 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_types)
+                native_engine.tasks_add_get(
+                    tasks, the_get.output_type, the_get.input_types, the_get.rule_id
+                )
 
         native_engine.tasks_task_end(tasks)
 

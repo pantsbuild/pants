@@ -11,9 +11,14 @@ from pathlib import PurePath
 
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.adhoc_binaries import GunzipBinary
-from pants.core.util_rules.system_binaries import SEARCH_PATHS
 from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat
-from pants.core.util_rules.system_binaries import BashBinary, TarBinary, UnzipBinary, ZipBinary
+from pants.core.util_rules.system_binaries import (
+    BashBinary,
+    SystemBinariesSubsystem,
+    TarBinary,
+    UnzipBinary,
+    ZipBinary,
+)
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -45,7 +50,9 @@ class CreateArchive:
 
 
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
-async def create_archive(request: CreateArchive) -> Digest:
+async def create_archive(
+    request: CreateArchive, system_binaries_environment: SystemBinariesSubsystem.EnvironmentAware
+) -> Digest:
     # #16091 -- if an arg list is really long, archive utilities tend to get upset.
     # passing a list of filenames into the utilities fixes this.
     FILE_LIST_FILENAME = "__pants_archive_filelist__"
@@ -77,7 +84,7 @@ async def create_archive(request: CreateArchive) -> Digest:
             input_file_list_filename=FILE_LIST_FILENAME,
         )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
-        env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
+        env = {"PATH": os.pathsep.join(system_binaries_environment.system_binary_paths)}
 
         # `tar` requires that the output filename's parent directory exists,so if the caller
         # wants the output in a directory we explicitly create it here.
@@ -135,7 +142,10 @@ async def convert_digest_to_MaybeExtractArchiveRequest(
 
 
 @rule(desc="Extracting an archive file", level=LogLevel.DEBUG)
-async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> ExtractedArchive:
+async def maybe_extract_archive(
+    request: MaybeExtractArchiveRequest,
+    system_binaries_environment: SystemBinariesSubsystem.EnvironmentAware,
+) -> ExtractedArchive:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     extract_archive_dir = "__extract_archive_dir"
     snapshot, output_dir_digest = await MultiGet(
@@ -167,7 +177,7 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
             archive_path, extract_archive_dir, archive_suffix=archive_suffix
         )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
-        env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
+        env = {"PATH": os.pathsep.join(system_binaries_environment.system_binary_paths)}
     else:
         input_digest, gunzip = await MultiGet(merge_digest_get, Get(GunzipBinary))
         argv = gunzip.extract_archive_argv(archive_path, extract_archive_dir)

@@ -171,6 +171,7 @@ Created as part of the release process.
 + Kevin Sweeney
 + Koki Nishihara
 + Kris Wilson
++ Krishnan Chandra
 + Kushal Dave
 + Kyle Derr
 + Kyujin Cho
@@ -308,6 +309,7 @@ Created as part of the release process.
 + Troy Howard
 + Tushar Singh
 + Ugo Di Girolamo
++ Ulugbek Adilbekov
 + Viktor Kleen
 + Vincent Tavernier
 + Walter Scheper

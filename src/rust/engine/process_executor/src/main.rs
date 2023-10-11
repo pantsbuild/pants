@@ -170,6 +170,16 @@ struct Opt {
   #[structopt(long)]
   cas_root_ca_cert_file: Option<PathBuf>,
 
+  /// Path to file containing client certificates for the CAS server.
+  /// If not set, client authentication will not be used when connecting to the CAS server.
+  #[structopt(long)]
+  cas_client_certs_file: Option<PathBuf>,
+
+  /// Path to file containing client key for the CAS server.
+  /// If not set, client authentication will not be used when connecting to the CAS server.
+  #[structopt(long)]
+  cas_client_key_file: Option<PathBuf>,
+
   /// Path to file containing oauth bearer token for communication with the CAS server.
   /// If not set, no authorization will be provided to remote servers.
   #[structopt(long)]
@@ -242,6 +252,24 @@ async fn main() {
         .as_ref()
         .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
+      let client_certs = args
+        .cas_client_certs_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading client authentication certs file"));
+
+      let client_key = args
+        .cas_client_key_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading client authentication key file"));
+
+      let mtls_data = match (client_certs, client_key) {
+        (Some(certs), Some(key)) => Some((certs, key)),
+        (None, None) => None,
+        _ => {
+          panic!("Must specify both --cas-client-certs-file and --cas-client-key-file or neither")
+        }
+      };
+
       let mut headers = BTreeMap::new();
       if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
         let token =
@@ -252,11 +280,14 @@ async fn main() {
         );
       }
 
+      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)
+        .expect("failed parsing root CA certs");
+
       local_only_store
         .into_with_remote(RemoteOptions {
           cas_address: cas_server.to_owned(),
           instance_name: args.remote_instance_name.clone(),
-          tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs),
+          tls_config,
           headers,
           chunk_size_bytes: args.upload_chunk_bytes,
           rpc_timeout: Duration::from_secs(30),
@@ -292,6 +323,27 @@ async fn main() {
         .execution_root_ca_cert_file
         .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
+      let client_certs = args
+        .cas_client_certs_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading root client certs file"));
+
+      let client_key = args
+        .cas_client_key_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading client authentication key file"));
+
+      let mtls_data = match (client_certs, client_key) {
+        (Some(certs), Some(key)) => Some((certs, key)),
+        (None, None) => None,
+        _ => {
+          panic!("Must specify both --cas-client-certs-file and --cas-client-key-file or neither")
+        }
+      };
+
+      let tls_config = grpc_util::tls::Config::new(root_ca_certs, mtls_data)
+        .expect("failed parsing root CA certs");
+
       if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
         let token =
           std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
@@ -306,7 +358,7 @@ async fn main() {
         process_metadata.instance_name.clone(),
         process_metadata.cache_key_gen_version.clone(),
         None,
-        root_ca_certs.clone(),
+        tls_config.clone(),
         headers.clone(),
         store.clone(),
         executor.clone(),
@@ -338,7 +390,7 @@ async fn main() {
             RemoteCacheProviderOptions {
               instance_name: process_metadata.instance_name.clone(),
               action_cache_address: address,
-              root_ca_certs,
+              tls_config,
               headers,
               concurrency_limit: args.cache_rpc_concurrency,
               rpc_timeout: Duration::from_secs(2),

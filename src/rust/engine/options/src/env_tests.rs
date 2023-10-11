@@ -5,6 +5,7 @@ use crate::env::Env;
 use crate::option_id;
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 use std::collections::HashMap;
+use std::ffi::OsString;
 
 fn env<I: IntoIterator<Item = (&'static str, &'static str)>>(vars: I) -> Env {
   Env {
@@ -13,6 +14,39 @@ fn env<I: IntoIterator<Item = (&'static str, &'static str)>>(vars: I) -> Env {
       .map(|(k, v)| (k.to_owned(), v.to_owned()))
       .collect::<HashMap<_, _>>(),
   }
+}
+
+#[test]
+#[cfg(not(target_os = "windows"))]
+fn test_capture_lossy() {
+  // OsString::from_vec(Vec[u8]) requires unix.
+  use std::os::unix::ffi::OsStringExt;
+
+  let fake_vars: Vec<(OsString, OsString)> = vec![
+    ("GOOD_KEY1".into(), "GOOD_VALUE".into()),
+    (
+      OsString::from_vec(b"BAD_\xa5KEY".to_vec()),
+      "GOOD_VALUE".into(),
+    ),
+    (
+      "GOOD_KEY2".into(),
+      OsString::from_vec(b"BAD_\xa5VALUE".to_vec()),
+    ),
+  ];
+  let (env, dropped) = Env::do_capture_lossy(fake_vars.into_iter());
+  let captured_vars: Vec<(String, String)> = (&env).into();
+  assert_eq!(
+    captured_vars,
+    vec![(String::from("GOOD_KEY1"), String::from("GOOD_VALUE"))]
+  );
+  assert_eq!(
+    dropped.non_utf8_keys,
+    vec![OsString::from_vec(b"BAD_\xa5KEY".to_vec())]
+  );
+  assert_eq!(
+    dropped.keys_with_non_utf8_values,
+    vec![String::from("GOOD_KEY2")]
+  );
 }
 
 #[test]

@@ -5,19 +5,17 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint};
 use opendal::services::Memory;
+use remote_provider_traits::{ByteStoreProvider, RemoteOptions};
 use testutil::data::TestData;
+use testutil::file::mk_tempfile;
 
-use crate::tests::{big_file_bytes, big_file_fingerprint, mk_tempfile};
-
-use super::base_opendal::Provider;
-use super::{ByteStoreProvider, RemoteOptions};
+use crate::Provider;
 
 const BASE: &str = "opendal-testing-base";
 
-fn test_path_fingerprint(fingerprint: Fingerprint) -> String {
-  let fingerprint = fingerprint.to_string();
+fn test_path(data: &TestData) -> String {
+  let fingerprint = data.fingerprint().to_string();
   format!(
     "{}/{}/{}/{}",
     BASE,
@@ -25,9 +23,6 @@ fn test_path_fingerprint(fingerprint: Fingerprint) -> String {
     &fingerprint[2..4],
     fingerprint
   )
-}
-fn test_path(data: &TestData) -> String {
-  test_path_fingerprint(data.fingerprint())
 }
 fn remote_options() -> RemoteOptions {
   RemoteOptions {
@@ -156,13 +151,9 @@ async fn load_without_validation_missing() {
   assert!(destination.is_empty())
 }
 
-async fn assert_store(provider: &Provider, fingerprint: Fingerprint, bytes: Bytes) {
-  let result = provider
-    .operator
-    .read(&test_path_fingerprint(fingerprint))
-    .await
-    .unwrap();
-  assert_eq!(result, bytes);
+async fn assert_store(provider: &Provider, testdata: &TestData) {
+  let result = provider.operator.read(&test_path(testdata)).await.unwrap();
+  assert_eq!(result, testdata.bytes());
 }
 
 #[tokio::test]
@@ -175,7 +166,7 @@ async fn store_bytes_data() {
     .await
     .unwrap();
 
-  assert_store(&provider, testdata.fingerprint(), testdata.bytes()).await;
+  assert_store(&provider, &testdata).await;
 }
 
 #[tokio::test]
@@ -208,25 +199,26 @@ async fn store_file_one_chunk() {
     )
     .await
     .unwrap();
-  assert_store(&provider, testdata.fingerprint(), testdata.bytes()).await;
+  assert_store(&provider, &testdata).await;
 }
 
 #[tokio::test]
 async fn store_file_multiple_chunks() {
+  let testdata = TestData::all_the_henries();
   let provider = new_provider();
 
-  let all_the_henries = big_file_bytes();
   // Our current chunk size is the tokio::io::copy default (8KiB at
   // the time of writing).
-  assert!(all_the_henries.len() > 8 * 1024);
-  let fingerprint = big_file_fingerprint();
-  let digest = Digest::new(fingerprint, all_the_henries.len());
+  assert!(testdata.len() > 8 * 1024);
 
   provider
-    .store_file(digest, mk_tempfile(Some(&all_the_henries)).await)
+    .store_file(
+      testdata.digest(),
+      mk_tempfile(Some(&testdata.bytes())).await,
+    )
     .await
     .unwrap();
-  assert_store(&provider, fingerprint, all_the_henries).await;
+  assert_store(&provider, &testdata).await;
 }
 
 #[tokio::test]

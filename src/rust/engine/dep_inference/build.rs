@@ -63,10 +63,7 @@ impl KindID {
   {
     if language.node_kind_is_named(id) {
       let kind = language.node_kind_for_id(id).unwrap().to_uppercase();
-      kinds_to_ids
-        .entry(kind)
-        .or_insert_with(HashSet::new)
-        .insert(id);
+      kinds_to_ids.entry(kind).or_default().insert(id);
     }
   }
 

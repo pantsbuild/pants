@@ -53,6 +53,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import Simplifier
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +166,9 @@ async def setup_helm_unittest(
     process = HelmProcess(
         argv=[
             unittest_subsystem.plugin_name,
-            *(("--color",) if unittest_subsystem.color else ()),
+            # Always include colors and strip them out for display below (if required), for better cache
+            # hit rates
+            "--color",
             *(("--strict",) if field_set.strict.value else ()),
             *(("--update-snapshot",) if request.update_snapshots else ()),
             "--output-type",
@@ -194,6 +197,7 @@ async def setup_helm_unittest(
 async def run_helm_unittest(
     batch: HelmUnitTestRequest.Batch[HelmUnitTestFieldSet, Any],
     test_subsystem: TestSubsystem,
+    unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
     field_set = batch.single_element
 
@@ -223,6 +227,7 @@ async def run_helm_unittest(
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=reports,
+        output_simplifier=Simplifier(strip_formatting=not unittest_subsystem.color),
     )
 
 

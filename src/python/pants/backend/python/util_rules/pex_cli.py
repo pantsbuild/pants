@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os.path
 from dataclasses import dataclass
 from typing import Iterable, List, Mapping, Optional, Tuple
 
@@ -27,7 +28,6 @@ from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_con
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
-from pants.util.strutil import create_path_env_var
 
 
 class PexCli(TemplatedExternalTool):
@@ -138,7 +138,7 @@ async def setup_pex_cli_process(
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     global_args = [
-        # Ensure Pex and its subprocesses create temporary files in the the process execution
+        # Ensure Pex and its subprocesses create temporary files in the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
         # perform. Making the TMPDIR local to the sandbox allows control via
@@ -161,7 +161,7 @@ async def setup_pex_cli_process(
     resolve_args = [
         *cert_args,
         "--python-path",
-        create_path_env_var(pex_env.interpreter_search_paths),
+        os.pathsep.join(pex_env.interpreter_search_paths),
     ]
     # All old-style pex runs take the --pip-version flag, but only certain subcommands of the
     # `pex3` console script do. So if invoked with a subcommand, the caller must selectively

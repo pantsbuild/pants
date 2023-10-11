@@ -26,7 +26,13 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.partition import (
     _partition_by_interpreter_constraints_and_resolve,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex
+from pants.backend.python.util_rules.pex import (
+    Pex,
+    PexRequest,
+    VenvPex,
+    VenvPexProcess,
+    VenvPexRequest,
+)
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
@@ -41,7 +47,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -184,13 +190,33 @@ async def pyright_typecheck_partition(
         config_files_get,
     )
 
+    # This is a workaround for https://github.com/pantsbuild/pants/issues/19946.
+    # complete_pex_env needs to be created here so that the test `test_passing_cache_clear`
+    # test can pass using the appropriate caching directory.
+    # See https://github.com/pantsbuild/pants/pull/19430#discussion_r1337851780
+    # for more discussion.
+    complete_pex_env = pex_environment.in_workspace()
+    requirements_pex_request = PexRequest(
+        output_filename="requirements_venv.pex",
+        internal_only=True,
+        pex_path=[requirements_pex],
+        interpreter_constraints=partition.interpreter_constraints,
+    )
     requirements_venv_pex = await Get(
         VenvPex,
-        PexRequest(
-            output_filename="requirements_venv.pex",
-            internal_only=True,
-            pex_path=[requirements_pex],
-            interpreter_constraints=partition.interpreter_constraints,
+        VenvPexRequest(requirements_pex_request, complete_pex_env),
+    )
+
+    # Force the requirements venv to materialize always by running a no-op.
+    # This operation must be called with `ProcessCacheScope.SESSION`
+    # so that it runs every time.
+    await Get(
+        ProcessResult,
+        VenvPexProcess(
+            requirements_venv_pex,
+            description="Force venv to materialize",
+            argv=["-c", "''"],
+            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
 
@@ -211,7 +237,6 @@ async def pyright_typecheck_partition(
         ),
     )
 
-    complete_pex_env = pex_environment.in_workspace()
     process = await Get(
         Process,
         NodeJSToolRequest,
