@@ -75,6 +75,17 @@ You can generate the JSON content for these files by installing the [Pex](https:
 >
 > Some Python distributions include native code, and therefore require platform-specific artifacts. Often, such artifacts are pre-built and available on PyPI as platform-specific wheels. But in some cases they are only available as source distributions (sdists) and must be compiled into platform-specific wheels at build time. Pants can only build platform-specific sdists for the local machine or [environment](doc:environments), and cannot cross-compile for other target platforms. Therefore, to build for platforms other than the local one, all the platform-specific third-party packages that your PEX transitively depends on must be available as prebuilt wheels for each platform you care about. If those wheels aren't available on PyPI you can always build them manually once and host them on a private package repository.
 
+Setting the .pex file's shebang
+-------------------------------
+
+You can invoke a `.pex` file either directly, as in `path/to/mybinary.pex`, or via an explicitly specified interpreter, as in `path/to/python3.11 path/to/mybinary.pex`. In the former case, PEX's bootstrapping logic will find an interpreter based on the `.pex` file's shebang. By default, this will be `#!/usr/bin/env pythonX.Y` where Python X.Y is some version compatible with your code's [interpreter constraints](doc:python-interpreter-compatibility). This default may not be appropriate in a few cases:
+- If your PEX is compatible with multiple versions and the chosen one (X.Y) is not present on one of your target systems.
+- If the interpreter on the target system is not present on the PATH.
+- If `/usr/bin/env` is not available on the target system.
+
+In these cases you can override the default shebang using the [`shebang`](doc:reference-pex_binary#codeshebangcode) field on the `pex_binary` target, or invoke the .pex via an explicit interpreter.
+
+
 Setting Pex and Pip versions
 ----------------------------
 
