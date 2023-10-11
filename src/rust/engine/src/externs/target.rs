@@ -203,7 +203,7 @@ impl Field {
   }
 
   fn cls_removal_version(cls: &PyAny) -> PyResult<Option<&str>> {
-    cls.getattr("removal_hint")?.extract()
+    cls.getattr("removal_version")?.extract()
   }
 
   fn cls_removal_hint(cls: &PyAny) -> PyResult<Option<&str>> {
