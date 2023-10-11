@@ -83,7 +83,7 @@ You can invoke a `.pex` file either directly, as in `path/to/mybinary.pex`, or v
 - If the interpreter on the target system is not present on the PATH.
 - If `/usr/bin/env` is not available on the target system.
 
-In these cases you can override the default shebang using the [`shebang`](doc:reference-pex_binary#codeshebangcode) field on the `pex_binary` target, or invoke the .pex via an explicit interpreter.
+In these cases you can override the default shebang using the [`shebang`](doc:reference-pex_binary#codeshebangcode) field on the `pex_binary` target, or invoke the `.pex` via an explicit interpreter.
 
 
 Setting Pex and Pip versions
