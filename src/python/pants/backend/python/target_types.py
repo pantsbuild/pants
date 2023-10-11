@@ -393,8 +393,8 @@ class PexEnvField(DictStringToStringField):
 
 class PexPlatformsField(StringSequenceField):
     alias = "platforms"
-    removal_version = "2.20.0.dev0",
-    removal_hint = "Use complete_platforms instead.",
+    removal_version = "2.20.0.dev0"
+    removal_hint = "Use complete_platforms instead."
     help = help_text(
         """
         The abbreviated platforms the built PEX should be compatible with.
