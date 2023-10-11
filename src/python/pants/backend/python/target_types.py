@@ -393,6 +393,8 @@ class PexEnvField(DictStringToStringField):
 
 class PexPlatformsField(StringSequenceField):
     alias = "platforms"
+    removal_version = "2.20.0.dev0",
+    removal_hint = "Use complete_platforms instead.",
     help = help_text(
         """
         The abbreviated platforms the built PEX should be compatible with.
@@ -427,7 +429,7 @@ class PexPlatformsField(StringSequenceField):
 class PexCompletePlatformsField(SpecialCasedDependencies):
     alias = "complete_platforms"
     help = help_text(
-        """
+        f"""
         The platforms the built PEX should be compatible with.
 
         There must be built wheels available for all of the foreign platforms, rather than sdists.
@@ -438,6 +440,8 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         Complete platforms should be addresses of `file` targets that point to files that contain
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
+
+        See {doc_url('pex')} for details.
         """
     )
 
