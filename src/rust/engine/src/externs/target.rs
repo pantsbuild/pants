@@ -51,6 +51,11 @@ impl Field {
     address: PyRef<Address>,
     py: Python,
   ) -> PyResult<Self> {
+    // NB: The deprecation check relies on the presence of NoFieldValue to detect if
+    //  the field was explicitly set, so this must come before we coerce the raw_value
+    //  to None below.
+    Self::check_deprecated(cls, raw_value.as_ref(), &address, py)?;
+
     let raw_value = match raw_value {
       Some(value)
         if value.extract::<NoFieldValue>(py).is_ok() && !Self::cls_none_is_valid_value(cls)? =>
@@ -59,8 +64,6 @@ impl Field {
       }
       rv => rv,
     };
-
-    Self::check_deprecated(cls, raw_value.as_ref(), &address, py)?;
 
     Ok(Self {
       value: cls
