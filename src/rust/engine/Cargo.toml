@@ -214,7 +214,7 @@ bytes = "1.2"
 chrono = "0.4.22"
 clap = "3"
 colored = "2.0.0"
-console = "0.15.2"
+console = "0.15.7"
 criterion = "0.4"
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
@@ -323,3 +323,6 @@ webpki = "0.22"
 tree-sitter = "0.20.10"
 tree-sitter-javascript = "0.20.0"
 tree-sitter-python = "0.20.4"
+
+[patch.crates-io]
+console = { version = "0.15.7", git = "https://github.com/tgolsson/console.git", rev = "5483880905f384679d322e83c37180f122951995" }

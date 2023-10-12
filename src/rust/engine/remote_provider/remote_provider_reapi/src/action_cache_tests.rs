@@ -13,8 +13,7 @@ async fn new_provider(cas: &StubCAS) -> Provider {
   Provider::new(RemoteCacheProviderOptions {
     instance_name: None,
     action_cache_address: cas.address(),
-    root_ca_certs: None,
-    mtls_data: None,
+    tls_config: Default::default(),
     headers: BTreeMap::new(),
     concurrency_limit: 256,
     rpc_timeout: Duration::from_secs(2),

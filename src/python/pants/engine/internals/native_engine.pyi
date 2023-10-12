@@ -735,9 +735,6 @@ def hash_prefix_zero_bits(item: str) -> int: ...
 # Selectors
 # ------------------------------------------------------------------------------
 
-class PyGeneratorResponseBreak:
-    def __init__(self, val: Any) -> None: ...
-
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
@@ -794,9 +791,6 @@ class PyGeneratorResponseGet(Generic[_Output]):
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
-
-class PyGeneratorResponseGetMulti:
-    def __init__(self, gets: tuple[PyGeneratorResponseGet, ...]) -> None: ...
 
 # ------------------------------------------------------------------------------
 # (uncategorized)

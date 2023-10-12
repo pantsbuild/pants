@@ -76,11 +76,11 @@ impl Provider {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
   // `super::LocalOptions`.
   pub async fn new(options: RemoteOptions) -> Result<Provider, String> {
-    let tls_client_config = if options.cas_address.starts_with("https://") {
-      Some(options.tls_config.try_into()?)
-    } else {
-      None
-    };
+    let tls_client_config = options
+      .cas_address
+      .starts_with("https://")
+      .then(|| options.tls_config.try_into())
+      .transpose()?;
 
     let channel =
       grpc_util::create_channel(&options.cas_address, tls_client_config.as_ref()).await?;
