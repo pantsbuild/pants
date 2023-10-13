@@ -10,9 +10,9 @@ use std::convert::TryInto;
 use std::fmt;
 
 use lazy_static::lazy_static;
-use pyo3::exceptions::{PyAssertionError, PyException, PyTypeError};
+use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
+use pyo3::types::{PyBytes, PyDict, PySequence, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
@@ -41,10 +41,8 @@ pub mod workunits;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add_class::<PyFailure>()?;
-  m.add_class::<PyGeneratorResponseBreak>()?;
   m.add_class::<PyGeneratorResponseCall>()?;
   m.add_class::<PyGeneratorResponseGet>()?;
-  m.add_class::<PyGeneratorResponseGetMulti>()?;
 
   m.add("EngineError", py.get_type::<EngineError>())?;
   m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
@@ -263,52 +261,114 @@ pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyA
   func.call1(args_tuple)
 }
 
-pub fn generator_send(
+pub(crate) enum GeneratorInput {
+  Initial,
+  Arg(Value),
+  Err(PyErr),
+}
+
+///
+/// A specification for how the native engine interacts with @rule coroutines:
+/// - coroutines may await:
+///   - `Get`/`Effect`/`Call`,
+///   - other coroutines,
+///   - sequences of those types.
+/// - we will `send` back a single value or tupled values to the coroutine, or `throw` an exception.
+/// - a coroutine will eventually return a single return value.
+///
+pub(crate) fn generator_send(
   py: Python,
+  generator_type: &TypeId,
   generator: &Value,
-  arg: Option<Value>,
-  err: Option<PyErr>,
+  input: GeneratorInput,
 ) -> Result<GeneratorResponse, Failure> {
-  let selectors = py.import("pants.engine.internals.selectors").unwrap();
-  let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
-  let py_arg = match (arg, err) {
-    (Some(arg), None) => arg.to_object(py),
-    (None, Some(err)) => err.into_py(py),
-    (None, None) => py.None(),
-    (Some(arg), Some(err)) => {
-      panic!("generator_send got both value and error: arg={arg:?}, err={err:?}")
+  let (response_unhandled, maybe_thrown) = match input {
+    GeneratorInput::Arg(arg) => {
+      let response = generator
+        .getattr(py, intern!(py, "send"))?
+        .call1(py, (&*arg,));
+      (response, None)
+    }
+    GeneratorInput::Err(err) => {
+      let throw_method = generator.getattr(py, intern!(py, "throw"))?;
+      if err.is_instance_of::<NativeEngineFailure>(py) {
+        let throw = err
+          .value(py)
+          .getattr(intern!(py, "failure"))?
+          .extract::<PyRef<PyFailure>>()?
+          .get_error(py);
+        let response = throw_method.call1(py, (&throw,));
+        (response, Some((throw, err)))
+      } else {
+        let response = throw_method.call1(py, (err,));
+        (response, None)
+      }
+    }
+    GeneratorInput::Initial => {
+      let response = generator
+        .getattr(py, intern!(py, "send"))?
+        .call1(py, (&py.None(),));
+      (response, None)
     }
   };
-  let response = native_engine_generator_send
-    .call1((generator.to_object(py), py_arg))
-    .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
-  if let Ok(b) = response.extract::<PyRef<PyGeneratorResponseBreak>>() {
-    Ok(GeneratorResponse::Break(
-      Value::new(b.0.clone_ref(py)),
-      TypeId::new(b.0.as_ref(py).get_type()),
-    ))
-  } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>() {
+  let response = match response_unhandled {
+    Err(e) if e.is_instance_of::<PyStopIteration>(py) => {
+      let value = e.into_value(py).getattr(py, intern!(py, "value"))?;
+      let type_id = TypeId::new(value.as_ref(py).get_type());
+      return Ok(GeneratorResponse::Break(Value::new(value), type_id));
+    }
+    Err(e) => {
+      match (maybe_thrown, e.cause(py)) {
+        (Some((thrown, err)), Some(cause)) if thrown.value(py).is(cause.value(py)) => {
+          // Preserve the engine traceback by using the wrapped failure error as cause. The cause
+          // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
+          // traceback.
+          e.set_cause(py, Some(err));
+        }
+        _ => (),
+      };
+      return Err(e.into());
+    }
+    Ok(r) => r,
+  };
+
+  let result = if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>(py) {
     Ok(GeneratorResponse::Call(call.take()?))
-  } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
+  } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>(py) {
+    // It isn't necessary to differentiate between `Get` and `Effect` here, as the static
+    // analysis of `@rule`s has already validated usage.
     Ok(GeneratorResponse::Get(get.take()?))
-  } else if let Ok(get_multi) = response.extract::<PyRef<PyGeneratorResponseGetMulti>>() {
-    let gets = get_multi
-      .0
-      .as_ref(py)
-      .iter()
-      .map(|gr_get| {
-        let get = gr_get
-          .extract::<PyRef<PyGeneratorResponseGet>>()
-          .map_err(|e| Failure::from_py_err_with_gil(py, e))?
-          .take()?;
-        Ok::<Get, Failure>(get)
+  } else if let Ok(get_multi) = response.downcast::<PySequence>(py) {
+    // Was an `All` or `MultiGet`.
+    let gogs = get_multi
+      .iter()?
+      .map(|gog| {
+        let gog = gog?;
+        // TODO: Find a better way to check whether something is a coroutine... this seems
+        // unnecessarily awkward.
+        if gog.is_instance(generator_type.as_py_type(py).into())? {
+          Ok(GetOrGenerator::Generator(Value::new(gog.into())))
+        } else if let Ok(get) = gog.extract::<PyRef<PyGeneratorResponseGet>>() {
+          Ok(GetOrGenerator::Get(
+            get.take().map_err(PyException::new_err)?,
+          ))
+        } else {
+          Err(PyValueError::new_err(format!(
+            "Expected an `All` or `MultiGet` to receive either `Get`s or calls to rules, \
+            but got: {response}"
+          )))
+        }
       })
       .collect::<Result<Vec<_>, _>>()?;
-    Ok(GeneratorResponse::GetMulti(gets))
+    Ok(GeneratorResponse::All(gogs))
   } else {
-    panic!("native_engine_generator_send returned unrecognized type: {response:?}");
-  }
+    Err(PyValueError::new_err(format!(
+      "Async @rule error. Expected a rule query such as `Get(..)` or similar, but got: {response}"
+    )))
+  };
+
+  Ok(result?)
 }
 
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
@@ -328,17 +388,6 @@ pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
 
 lazy_static! {
   pub static ref INTERNS: Interns = Interns::new();
-}
-
-#[pyclass]
-pub struct PyGeneratorResponseBreak(PyObject);
-
-#[pymethods]
-impl PyGeneratorResponseBreak {
-  #[new]
-  fn __new__(val: PyObject) -> Self {
-    Self(val)
-  }
 }
 
 /// Interprets the `Get` and `implicitly(..)` syntax, which reduces to two optional positional
@@ -565,17 +614,6 @@ impl PyGeneratorResponseGet {
   }
 }
 
-#[pyclass]
-pub struct PyGeneratorResponseGetMulti(Py<PyTuple>);
-
-#[pymethods]
-impl PyGeneratorResponseGetMulti {
-  #[new]
-  fn __new__(gets: Py<PyTuple>) -> Self {
-    Self(gets)
-  }
-}
-
 #[derive(Debug)]
 pub struct Call {
   pub rule_id: RuleId,
@@ -633,9 +671,23 @@ impl fmt::Display for Get {
   }
 }
 
-pub enum GeneratorResponse {
-  Break(Value, TypeId),
-  Call(Call),
+pub enum GetOrGenerator {
   Get(Get),
-  GetMulti(Vec<Get>),
+  Generator(Value),
+}
+
+pub enum GeneratorResponse {
+  /// The generator has completed with the given value of the given type.
+  Break(Value, TypeId),
+  /// The generator is awaiting a call to a known rule.
+  Call(Call),
+  /// The generator is awaiting a call to an unknown rule.
+  Get(Get),
+  /// The generator is awaiting calls to a series of generators or Gets, all of which will
+  /// produce `Call`s or `Get`s.
+  ///
+  /// The generators used in this position will either be call-by-name `@rule` stubs (which will
+  /// immediately produce a `Call`, and then return its value), or async "rule helpers", which
+  /// might use either the call-by-name or `Get` syntax.
+  All(Vec<GetOrGenerator>),
 }

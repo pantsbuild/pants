@@ -164,8 +164,7 @@ async fn create_cached_runner(
       RemoteCacheProviderOptions {
         instance_name: None,
         action_cache_address: store_setup.cas.address(),
-        root_ca_certs: None,
-        mtls_data: None,
+        tls_config: tls::Config::default(),
         headers: BTreeMap::default(),
         concurrency_limit: 256,
         rpc_timeout: CACHE_READ_TIMEOUT,
@@ -765,9 +764,7 @@ async fn make_action_result_basic() {
     RemoteCacheProviderOptions {
       instance_name: None,
       action_cache_address: cas.address(),
-      root_ca_certs: None,
-      mtls_data: None,
-
+      tls_config: tls::Config::default(),
       headers: BTreeMap::default(),
       concurrency_limit: 256,
       rpc_timeout: CACHE_READ_TIMEOUT,
