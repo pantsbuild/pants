@@ -136,6 +136,21 @@ See [Advanced target selection](doc:advanced-target-selection) for more informat
 > 
 >    The `git branch` commands are only included to print out all available branches before and after fetching `origin/main`.
 
+> 📘 Using partial clones in CI
+> 
+> Shallow clones are fast, but have the disadvantage of breaking `--changed-since` if an insufficient amount of depth is fetched from remote. This is particularly acute for feature branches that are very out-of-date or have a large number of commits.
+> 
+> [Partial clones](https://git-scm.com/docs/partial-clone) are still quite fast, have the advantage of not breaking `--changed-since`, and don't require any depth setting. Unlike shallow clones, Git will fetch trees and blobs on-demand as it needs them without failing.
+> 
+> If your CI does not support partial clones directly, you can define your own custom checkout strategy:
+>
+> * Treeless: `git clone --filter=tree:0 <repository>`
+> * Blobless: `git clone --filter=blob:none <repository>`
+> 
+> As a workaround to [#20027](https://github.com/pantsbuild/pants/issues/20027) permission errors, you might need to run this after the cloning the repo:
+> 
+> `git config core.sshCommand "env SSH_AUTH_SOCK=$SSH_AUTH_SOCK ssh"`
+
 ### Approach #2: run over everything
 
 Alternatively, you can simply run over all your code. Pants's caching means that you will not need to rerun on changed files.
