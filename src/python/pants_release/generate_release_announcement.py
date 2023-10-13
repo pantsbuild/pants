@@ -32,9 +32,9 @@ def announcement_text() -> str:
         f"""\
         Pants {VERSION} is now available!
 
-        Check the release notes at https://github.com/pantsbuild/pants/releases/tag/release_{VERSION}
-
         To upgrade, set `pants_version="{VERSION}"` in the `[GLOBAL]` section of your pants.toml.
+
+        Check the release notes at https://github.com/pantsbuild/pants/releases/tag/release_{VERSION} to see what's new in this release.
         """
     )
     if "dev" in VERSION or "a" in VERSION:
