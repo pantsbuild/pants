@@ -405,7 +405,7 @@ impl UnderlyingByteStore for ShardedFSDB {
   ) -> Result<(), String> {
     let mut attempts = 0;
     loop {
-      let reader = tokio::fs::File::open(src.clone())
+      let reader = tokio::fs::File::open(&src)
         .await
         .map_err(|e| format!("Failed to open {src:?}: {e}"))?;
 
@@ -798,12 +798,14 @@ impl ByteStore {
     src_is_immutable: bool,
     src: PathBuf,
   ) -> Result<Digest, String> {
-    let mut file = tokio::fs::File::open(src.clone())
-      .await
-      .map_err(|e| format!("Failed to open {src:?}: {e}"))?;
-    let digest = async_copy_and_hash(&mut file, &mut tokio::io::sink())
-      .await
-      .map_err(|e| format!("Failed to hash {src:?}: {e}"))?;
+    let digest = {
+      let mut file = tokio::fs::File::open(src.clone())
+        .await
+        .map_err(|e| format!("Failed to open {src:?}: {e}"))?;
+      async_copy_and_hash(&mut file, &mut tokio::io::sink())
+        .await
+        .map_err(|e| format!("Failed to hash {src:?}: {e}"))?
+    };
 
     if ByteStore::should_use_fsdb(entry_type, digest.size_bytes) {
       self
