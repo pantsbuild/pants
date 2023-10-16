@@ -117,90 +117,90 @@ peg::parser! {
 }
 
 mod err {
-  #[derive(Debug, Eq, PartialEq)]
-  pub(crate) struct ParseError {
-    template: String,
-  }
+    #[derive(Debug, Eq, PartialEq)]
+    pub(crate) struct ParseError {
+        template: String,
+    }
 
-  impl ParseError {
-    pub(super) fn new<S: AsRef<str>>(template: S) -> ParseError {
-      let template_ref = template.as_ref();
-      assert!(
-        template_ref.contains("{name}"),
-        "\
+    impl ParseError {
+        pub(super) fn new<S: AsRef<str>>(template: S) -> ParseError {
+            let template_ref = template.as_ref();
+            assert!(
+                template_ref.contains("{name}"),
+                "\
         Expected the template to contain at least one `{{name}}` placeholder, but found none: \
         {template}.\
         ",
-        template = template_ref
-      );
-      ParseError {
-        template: template_ref.to_owned(),
-      }
-    }
+                template = template_ref
+            );
+            ParseError {
+                template: template_ref.to_owned(),
+            }
+        }
 
-    pub(crate) fn render<S: AsRef<str>>(&self, name: S) -> String {
-      self.template.replace("{name}", name.as_ref())
+        pub(crate) fn render<S: AsRef<str>>(&self, name: S) -> String {
+            self.template.replace("{name}", name.as_ref())
+        }
     }
-  }
 }
 
 pub(crate) use err::ParseError;
 
 fn format_parse_error(
-  type_id: &str,
-  value: &str,
-  parse_error: peg::error::ParseError<peg::str::LineCol>,
+    type_id: &str,
+    value: &str,
+    parse_error: peg::error::ParseError<peg::str::LineCol>,
 ) -> ParseError {
-  let value_with_marker = value
-    .split('\n')
-    .enumerate()
-    .map(|(index, line)| (index + 1, line))
-    .map(|(line_no, line)| {
-      if line_no == parse_error.location.line {
-        format!(
-          "{}:{}\n  {}^",
-          line_no,
-          line,
-          "-".repeat(parse_error.location.column - 1)
-        )
-      } else {
-        format!("{}:{}", line_no, line)
-      }
-    })
-    .collect::<Vec<_>>()
-    .join("\n");
+    let value_with_marker = value
+        .split('\n')
+        .enumerate()
+        .map(|(index, line)| (index + 1, line))
+        .map(|(line_no, line)| {
+            if line_no == parse_error.location.line {
+                format!(
+                    "{}:{}\n  {}^",
+                    line_no,
+                    line,
+                    "-".repeat(parse_error.location.column - 1)
+                )
+            } else {
+                format!("{}:{}", line_no, line)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
 
-  let mut choices = parse_error.expected.tokens().collect::<Vec<_>>();
-  // N.B.: It appears to be the case that the peg parser parses alternatives concurrently and so
-  // the ordering of choices is observed to be unstable. As such sort them for consistent error
-  // messages.
-  choices.sort_unstable();
+    let mut choices = parse_error.expected.tokens().collect::<Vec<_>>();
+    // N.B.: It appears to be the case that the peg parser parses alternatives concurrently and so
+    // the ordering of choices is observed to be unstable. As such sort them for consistent error
+    // messages.
+    choices.sort_unstable();
 
-  ParseError::new(format!(
-    "\
+    ParseError::new(format!(
+        "\
     Problem parsing {{name}} {type_id} value:\n{value_with_marker}\nExpected {choices} at \
     line {line} column {column}\
     ",
-    type_id = type_id,
-    value_with_marker = value_with_marker,
-    choices = render_choice(choices.as_slice()).unwrap_or_else(|| "nothing".to_owned()),
-    line = parse_error.location.line,
-    column = parse_error.location.column,
-  ))
+        type_id = type_id,
+        value_with_marker = value_with_marker,
+        choices = render_choice(choices.as_slice()).unwrap_or_else(|| "nothing".to_owned()),
+        line = parse_error.location.line,
+        column = parse_error.location.column,
+    ))
 }
 
 pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
-  option_value_parser::string_list_edits(value)
-    .map_err(|e| format_parse_error("string list", value, e))
+    option_value_parser::string_list_edits(value)
+        .map_err(|e| format_parse_error("string list", value, e))
 }
 
 pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
-  match value.to_lowercase().as_str() {
-    "true" => Ok(true),
-    "false" => Ok(false),
-    _ => Err(ParseError::new(format!(
-      "Got '{value}' for {{name}}. Expected 'true' or 'false'.",
-      value = value
-    ))),
-  }
+    match value.to_lowercase().as_str() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(ParseError::new(format!(
+            "Got '{value}' for {{name}}. Expected 'true' or 'false'.",
+            value = value
+        ))),
+    }
 }

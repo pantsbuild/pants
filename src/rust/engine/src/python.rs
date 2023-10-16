@@ -27,94 +27,93 @@ use crate::externs;
 pub struct Params(SmallVec<[Key; 4]>);
 
 impl<'x> Params {
-  pub fn new<I: IntoIterator<Item = Key>>(param_inputs: I) -> Result<Params, String> {
-    let mut params = param_inputs.into_iter().collect::<SmallVec<[Key; 4]>>();
-    params.sort_by_key(|k| *k.type_id());
+    pub fn new<I: IntoIterator<Item = Key>>(param_inputs: I) -> Result<Params, String> {
+        let mut params = param_inputs.into_iter().collect::<SmallVec<[Key; 4]>>();
+        params.sort_by_key(|k| *k.type_id());
 
-    if params.len() > 1 {
-      let mut prev = &params[0];
-      for param in &params[1..] {
-        if param.type_id() == prev.type_id() {
-          return Err(format!(
-            "Values used as `Params` must have distinct types, but the following \
+        if params.len() > 1 {
+            let mut prev = &params[0];
+            for param in &params[1..] {
+                if param.type_id() == prev.type_id() {
+                    return Err(format!(
+                        "Values used as `Params` must have distinct types, but the following \
             values had the same type (`{}`):\n  {}\n  {}",
-            prev.type_id(),
-            prev,
-            param,
-          ));
+                        prev.type_id(),
+                        prev,
+                        param,
+                    ));
+                }
+                prev = param;
+            }
         }
-        prev = param;
-      }
+
+        Ok(Params(params))
     }
 
-    Ok(Params(params))
-  }
-
-  pub fn keys(&'x self) -> impl Iterator<Item = &'x Key> {
-    self.0.iter()
-  }
-
-  ///
-  /// Adds the given param Key to these Params, replacing an existing param with the same type if
-  /// it exists.
-  ///
-  pub fn put(&mut self, param: Key) {
-    match self.binary_search(param.type_id) {
-      Ok(idx) => self.0[idx] = param,
-      Err(idx) => self.0.insert(idx, param),
+    pub fn keys(&'x self) -> impl Iterator<Item = &'x Key> {
+        self.0.iter()
     }
-  }
 
-  ///
-  /// Filters this Params object in-place to contain only params matching the given predicate.
-  ///
-  pub fn retain<F: FnMut(&mut Key) -> bool>(&mut self, f: F) {
-    self.0.retain(f)
-  }
+    ///
+    /// Adds the given param Key to these Params, replacing an existing param with the same type if
+    /// it exists.
+    ///
+    pub fn put(&mut self, param: Key) {
+        match self.binary_search(param.type_id) {
+            Ok(idx) => self.0[idx] = param,
+            Err(idx) => self.0.insert(idx, param),
+        }
+    }
 
-  ///
-  /// Returns the Key for the given TypeId if it is represented in this set of Params.
-  ///
-  pub fn find(&self, type_id: TypeId) -> Option<&Key> {
-    self.binary_search(type_id).ok().map(|idx| &self.0[idx])
-  }
+    ///
+    /// Filters this Params object in-place to contain only params matching the given predicate.
+    ///
+    pub fn retain<F: FnMut(&mut Key) -> bool>(&mut self, f: F) {
+        self.0.retain(f)
+    }
 
-  fn binary_search(&self, type_id: TypeId) -> Result<usize, usize> {
-    self
-      .0
-      .binary_search_by(|probe| probe.type_id().cmp(&type_id))
-  }
+    ///
+    /// Returns the Key for the given TypeId if it is represented in this set of Params.
+    ///
+    pub fn find(&self, type_id: TypeId) -> Option<&Key> {
+        self.binary_search(type_id).ok().map(|idx| &self.0[idx])
+    }
 
-  pub fn type_ids(&self) -> impl Iterator<Item = TypeId> + '_ {
-    self.0.iter().map(|k| *k.type_id())
-  }
+    fn binary_search(&self, type_id: TypeId) -> Result<usize, usize> {
+        self.0
+            .binary_search_by(|probe| probe.type_id().cmp(&type_id))
+    }
 
-  pub fn is_empty(&self) -> bool {
-    self.0.is_empty()
-  }
+    pub fn type_ids(&self) -> impl Iterator<Item = TypeId> + '_ {
+        self.0.iter().map(|k| *k.type_id())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 ///
 pub fn display_sorted_in_parens<T>(items: T) -> String
 where
-  T: Iterator,
-  T::Item: fmt::Display,
+    T: Iterator,
+    T::Item: fmt::Display,
 {
-  let mut items: Vec<_> = items.map(|p| format!("{}", p)).collect();
-  match items.len() {
-    0 => "()".to_string(),
-    1 => items.pop().unwrap(),
-    _ => {
-      items.sort();
-      format!("({})", items.join(", "))
+    let mut items: Vec<_> = items.map(|p| format!("{}", p)).collect();
+    match items.len() {
+        0 => "()".to_string(),
+        1 => items.pop().unwrap(),
+        _ => {
+            items.sort();
+            format!("({})", items.join(", "))
+        }
     }
-  }
 }
 
 impl fmt::Display for Params {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "Params{}", display_sorted_in_parens(self.0.iter()))
-  }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Params{}", display_sorted_in_parens(self.0.iter()))
+    }
 }
 
 pub type Id = u64;
@@ -128,59 +127,59 @@ unsafe impl Send for TypeId {}
 unsafe impl Sync for TypeId {}
 
 impl TypeId {
-  pub fn new(py_type: &PyType) -> Self {
-    py_type.into()
-  }
+    pub fn new(py_type: &PyType) -> Self {
+        py_type.into()
+    }
 
-  pub fn as_py_type<'py>(&self, py: Python<'py>) -> &'py PyType {
-    // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
-    // type is not unloaded. That is true today, but would not be if we implemented support for hot
-    // reloading of plugins.
-    unsafe { PyType::from_type_ptr(py, self.0) }
-  }
+    pub fn as_py_type<'py>(&self, py: Python<'py>) -> &'py PyType {
+        // NB: Dereferencing a pointer to a PyTypeObject is safe as long as the module defining the
+        // type is not unloaded. That is true today, but would not be if we implemented support for hot
+        // reloading of plugins.
+        unsafe { PyType::from_type_ptr(py, self.0) }
+    }
 
-  pub fn is_union(&self) -> bool {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let unions_module = py.import("pants.engine.unions").unwrap();
-    let is_union_func = unions_module.getattr("is_union").unwrap();
-    is_union_func
-      .call1((self.as_py_type(py),))
-      .unwrap()
-      .extract()
-      .unwrap()
-  }
+    pub fn is_union(&self) -> bool {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let unions_module = py.import("pants.engine.unions").unwrap();
+        let is_union_func = unions_module.getattr("is_union").unwrap();
+        is_union_func
+            .call1((self.as_py_type(py),))
+            .unwrap()
+            .extract()
+            .unwrap()
+    }
 }
 
 impl From<&PyType> for TypeId {
-  fn from(py_type: &PyType) -> Self {
-    TypeId(py_type.as_type_ptr())
-  }
+    fn from(py_type: &PyType) -> Self {
+        TypeId(py_type.as_type_ptr())
+    }
 }
 
 impl fmt::Debug for TypeId {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    Python::with_gil(|py| {
-      let name = self.as_py_type(py).name().unwrap();
-      write!(f, "{}", name)
-    })
-  }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        Python::with_gil(|py| {
+            let name = self.as_py_type(py).name().unwrap();
+            write!(f, "{}", name)
+        })
+    }
 }
 
 impl fmt::Display for TypeId {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
-  }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl rule_graph::TypeId for TypeId {
-  /// Render a string for a collection of TypeIds.
-  fn display<I>(type_ids: I) -> String
-  where
-    I: Iterator<Item = TypeId>,
-  {
-    display_sorted_in_parens(type_ids)
-  }
+    /// Render a string for a collection of TypeIds.
+    fn display<I>(type_ids: I) -> String
+    where
+        I: Iterator<Item = TypeId>,
+    {
+        display_sorted_in_parens(type_ids)
+    }
 }
 
 /// An identifier for a Python function.
@@ -188,90 +187,90 @@ impl rule_graph::TypeId for TypeId {
 pub struct Function(pub Key);
 
 impl Function {
-  /// The function represented as `path.to.module:lineno:func_name`.
-  pub fn full_name(&self) -> String {
-    let (module, name, line_no) = Python::with_gil(|py| {
-      let val = self.0.to_value();
-      let obj = (*val).as_ref(py);
-      let module: String = externs::getattr(obj, "__module__").unwrap();
-      let name: String = externs::getattr(obj, "__name__").unwrap();
-      // NB: this is a custom dunder method that Python code should populate before sending the
-      // function (e.g. an `@rule`) through FFI.
-      let line_no: u64 = externs::getattr(obj, "__line_number__").unwrap();
-      (module, name, line_no)
-    });
-    format!("{}:{}:{}", module, line_no, name)
-  }
+    /// The function represented as `path.to.module:lineno:func_name`.
+    pub fn full_name(&self) -> String {
+        let (module, name, line_no) = Python::with_gil(|py| {
+            let val = self.0.to_value();
+            let obj = (*val).as_ref(py);
+            let module: String = externs::getattr(obj, "__module__").unwrap();
+            let name: String = externs::getattr(obj, "__name__").unwrap();
+            // NB: this is a custom dunder method that Python code should populate before sending the
+            // function (e.g. an `@rule`) through FFI.
+            let line_no: u64 = externs::getattr(obj, "__line_number__").unwrap();
+            (module, name, line_no)
+        });
+        format!("{}:{}:{}", module, line_no, name)
+    }
 }
 
 impl fmt::Debug for Function {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{}()", self.full_name())
-  }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}()", self.full_name())
+    }
 }
 
 impl fmt::Display for Function {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
-  }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 /// An interned key for a Value for use as a key in HashMaps and sets.
 #[derive(Clone, DeepSizeOf)]
 pub struct Key {
-  id: Id,
-  type_id: TypeId,
-  pub value: Value,
+    id: Id,
+    type_id: TypeId,
+    pub value: Value,
 }
 
 impl Eq for Key {}
 
 impl PartialEq for Key {
-  fn eq(&self, other: &Key) -> bool {
-    self.id == other.id
-  }
+    fn eq(&self, other: &Key) -> bool {
+        self.id == other.id
+    }
 }
 
 impl hash::Hash for Key {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.id.hash(state);
-  }
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
 }
 
 impl fmt::Debug for Key {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self.to_value())
-  }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.to_value())
+    }
 }
 
 impl fmt::Display for Key {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
-  }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl Key {
-  pub fn new(id: Id, type_id: TypeId, value: Value) -> Key {
-    Key { id, type_id, value }
-  }
+    pub fn new(id: Id, type_id: TypeId, value: Value) -> Key {
+        Key { id, type_id, value }
+    }
 
-  pub fn id(&self) -> Id {
-    self.id
-  }
+    pub fn id(&self) -> Id {
+        self.id
+    }
 
-  pub fn type_id(&self) -> &TypeId {
-    &self.type_id
-  }
+    pub fn type_id(&self) -> &TypeId {
+        &self.type_id
+    }
 
-  pub fn from_value(val: Value) -> PyResult<Key> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    externs::INTERNS.key_insert(py, val.consume_into_py_object(py))
-  }
+    pub fn from_value(val: Value) -> PyResult<Key> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        externs::INTERNS.key_insert(py, val.consume_into_py_object(py))
+    }
 
-  pub fn to_value(&self) -> Value {
-    self.value.clone()
-  }
+    pub fn to_value(&self) -> Value {
+        self.value.clone()
+    }
 }
 
 // NB: Although `PyObject` (aka `Py<PyAny>`) directly implements `Clone`, it's ~4% faster to wrap
@@ -285,249 +284,249 @@ pub struct Value(Arc<PyObject>);
 known_deep_size!(8; Value);
 
 impl Value {
-  pub fn new(obj: PyObject) -> Value {
-    Value(Arc::new(obj))
-  }
-
-  // NB: Longer name because overloaded in a few places.
-  pub fn consume_into_py_object(self, py: Python) -> PyObject {
-    match Arc::try_unwrap(self.0) {
-      Ok(obj) => obj,
-      Err(arc_handle) => arc_handle.clone_ref(py),
+    pub fn new(obj: PyObject) -> Value {
+        Value(Arc::new(obj))
     }
-  }
+
+    // NB: Longer name because overloaded in a few places.
+    pub fn consume_into_py_object(self, py: Python) -> PyObject {
+        match Arc::try_unwrap(self.0) {
+            Ok(obj) => obj,
+            Err(arc_handle) => arc_handle.clone_ref(py),
+        }
+    }
 }
 
 impl workunit_store::Value for Value {
-  fn as_any(&self) -> &dyn std::any::Any {
-    self
-  }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl PartialEq for Value {
-  fn eq(&self, other: &Value) -> bool {
-    Python::with_gil(|py| externs::equals((*self.0).as_ref(py), (*other.0).as_ref(py)))
-  }
+    fn eq(&self, other: &Value) -> bool {
+        Python::with_gil(|py| externs::equals((*self.0).as_ref(py), (*other.0).as_ref(py)))
+    }
 }
 
 impl Eq for Value {}
 
 impl Deref for Value {
-  type Target = PyObject;
+    type Target = PyObject;
 
-  fn deref(&self) -> &PyObject {
-    &self.0
-  }
+    fn deref(&self) -> &PyObject {
+        &self.0
+    }
 }
 
 impl AsRef<PyObject> for Value {
-  fn as_ref(&self) -> &PyObject {
-    &self.0
-  }
+    fn as_ref(&self) -> &PyObject {
+        &self.0
+    }
 }
 
 impl fmt::Debug for Value {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    let repr = Python::with_gil(|py| {
-      let obj = (*self.0).as_ref(py);
-      externs::val_to_str(obj)
-    });
-    write!(f, "{}", repr)
-  }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let repr = Python::with_gil(|py| {
+            let obj = (*self.0).as_ref(py);
+            externs::val_to_str(obj)
+        });
+        write!(f, "{}", repr)
+    }
 }
 
 impl fmt::Display for Value {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
-  }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl<'source> FromPyObject<'source> for Value {
-  fn extract(obj: &'source PyAny) -> PyResult<Self> {
-    let py = obj.py();
-    Ok(obj.into_py(py).into())
-  }
+    fn extract(obj: &'source PyAny) -> PyResult<Self> {
+        let py = obj.py();
+        Ok(obj.into_py(py).into())
+    }
 }
 
 impl ToPyObject for &Value {
-  fn to_object(&self, py: Python) -> PyObject {
-    self.0.clone_ref(py)
-  }
+    fn to_object(&self, py: Python) -> PyObject {
+        self.0.clone_ref(py)
+    }
 }
 
 impl From<Value> for PyObject {
-  fn from(value: Value) -> Self {
-    match Arc::try_unwrap(value.0) {
-      Ok(obj) => obj,
-      Err(arc_handle) => Python::with_gil(|py| arc_handle.clone_ref(py)),
+    fn from(value: Value) -> Self {
+        match Arc::try_unwrap(value.0) {
+            Ok(obj) => obj,
+            Err(arc_handle) => Python::with_gil(|py| arc_handle.clone_ref(py)),
+        }
     }
-  }
 }
 
 impl From<PyObject> for Value {
-  fn from(obj: PyObject) -> Self {
-    Value::new(obj)
-  }
+    fn from(obj: PyObject) -> Self {
+        Value::new(obj)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Failure {
-  /// A Node failed because a filesystem change invalidated it or its inputs.
-  /// A root requestor should usually immediately retry their request.
-  Invalidated,
-  /// A Digest was missing from the configured Stores. This error may be recoverable if the source
-  /// of the missing Digest can be identified and retried (such as if it was produced by a cache).
-  MissingDigest(String, Digest),
-  /// An unclassified error was thrown.
-  Throw {
-    // A python exception value, which might have a python-level stacktrace
-    val: Value,
-    // A pre-formatted python exception traceback.
-    python_traceback: String,
-    // A stack of engine-side "frame" information generated from Nodes.
-    engine_traceback: Vec<String>,
-  },
+    /// A Node failed because a filesystem change invalidated it or its inputs.
+    /// A root requestor should usually immediately retry their request.
+    Invalidated,
+    /// A Digest was missing from the configured Stores. This error may be recoverable if the source
+    /// of the missing Digest can be identified and retried (such as if it was produced by a cache).
+    MissingDigest(String, Digest),
+    /// An unclassified error was thrown.
+    Throw {
+        // A python exception value, which might have a python-level stacktrace
+        val: Value,
+        // A pre-formatted python exception traceback.
+        python_traceback: String,
+        // A stack of engine-side "frame" information generated from Nodes.
+        engine_traceback: Vec<String>,
+    },
 }
 
 impl Failure {
-  ///
-  /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
-  ///
-  pub fn with_pushed_frame(self, frame: &impl fmt::Display) -> Failure {
-    match self {
-      Failure::Invalidated => Failure::Invalidated,
-      md @ Failure::MissingDigest { .. } => {
-        // MissingDigest errors are usually handled at the WrappedNode boundary by restarting the
-        // producer of the missing digest. So a Failure will only end up with a new frame if it
-        // traversed the node boundary for some reason, in which case it is safe to discard the
-        // type information and convert into a Throw.
-        throw(md.to_string()).with_pushed_frame(frame)
-      }
-      Failure::Throw {
-        val,
-        python_traceback,
-        mut engine_traceback,
-      } => {
-        engine_traceback.push(format!("{}", frame));
-        Failure::Throw {
-          val,
-          python_traceback,
-          engine_traceback,
+    ///
+    /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
+    ///
+    pub fn with_pushed_frame(self, frame: &impl fmt::Display) -> Failure {
+        match self {
+            Failure::Invalidated => Failure::Invalidated,
+            md @ Failure::MissingDigest { .. } => {
+                // MissingDigest errors are usually handled at the WrappedNode boundary by restarting the
+                // producer of the missing digest. So a Failure will only end up with a new frame if it
+                // traversed the node boundary for some reason, in which case it is safe to discard the
+                // type information and convert into a Throw.
+                throw(md.to_string()).with_pushed_frame(frame)
+            }
+            Failure::Throw {
+                val,
+                python_traceback,
+                mut engine_traceback,
+            } => {
+                engine_traceback.push(format!("{}", frame));
+                Failure::Throw {
+                    val,
+                    python_traceback,
+                    engine_traceback,
+                }
+            }
         }
-      }
     }
-  }
 }
 
 impl Failure {
-  pub fn from_py_err(py_err: PyErr) -> Failure {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Failure::from_py_err_with_gil(py, py_err)
-  }
-
-  pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
-    // If this is a wrapped Failure, return it immediately.
-    if let Ok(n_e_failure) = py_err.value(py).downcast::<externs::NativeEngineFailure>() {
-      let failure = n_e_failure
-        .getattr("failure")
-        .unwrap()
-        .extract::<externs::PyFailure>()
-        .unwrap();
-      return failure.0;
+    pub fn from_py_err(py_err: PyErr) -> Failure {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        Failure::from_py_err_with_gil(py, py_err)
     }
 
-    let maybe_ptraceback = py_err
-      .traceback(py)
-      .map(|traceback| traceback.to_object(py));
-    let val = Value::from(py_err.into_py(py));
-    let python_traceback = if let Some(tb) = maybe_ptraceback {
-      let locals = PyDict::new(py);
-      locals
-        .set_item("traceback", py.import("traceback").unwrap())
-        .unwrap();
-      locals.set_item("tb", tb).unwrap();
-      locals.set_item("val", &val).unwrap();
-      py.eval(
-        "''.join(traceback.format_exception(None, value=val, tb=tb))",
-        None,
-        Some(locals),
-      )
-      .unwrap()
-      .extract::<String>()
-      .unwrap()
-    } else {
-      Self::native_traceback(&externs::val_to_str((*val).as_ref(py)))
-    };
-    Failure::Throw {
-      val,
-      python_traceback,
-      engine_traceback: Vec::new(),
-    }
-  }
+    pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
+        // If this is a wrapped Failure, return it immediately.
+        if let Ok(n_e_failure) = py_err.value(py).downcast::<externs::NativeEngineFailure>() {
+            let failure = n_e_failure
+                .getattr("failure")
+                .unwrap()
+                .extract::<externs::PyFailure>()
+                .unwrap();
+            return failure.0;
+        }
 
-  pub fn native_traceback(msg: &str) -> String {
-    format!(
-      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
-      msg
-    )
-  }
+        let maybe_ptraceback = py_err
+            .traceback(py)
+            .map(|traceback| traceback.to_object(py));
+        let val = Value::from(py_err.into_py(py));
+        let python_traceback = if let Some(tb) = maybe_ptraceback {
+            let locals = PyDict::new(py);
+            locals
+                .set_item("traceback", py.import("traceback").unwrap())
+                .unwrap();
+            locals.set_item("tb", tb).unwrap();
+            locals.set_item("val", &val).unwrap();
+            py.eval(
+                "''.join(traceback.format_exception(None, value=val, tb=tb))",
+                None,
+                Some(locals),
+            )
+            .unwrap()
+            .extract::<String>()
+            .unwrap()
+        } else {
+            Self::native_traceback(&externs::val_to_str((*val).as_ref(py)))
+        };
+        Failure::Throw {
+            val,
+            python_traceback,
+            engine_traceback: Vec::new(),
+        }
+    }
+
+    pub fn native_traceback(msg: &str) -> String {
+        format!(
+            "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+            msg
+        )
+    }
 }
 
 impl fmt::Display for Failure {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self {
-      Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
-      Failure::MissingDigest(s, d) => {
-        write!(f, "Missing digest: {s}: {d:?}")
-      }
-      Failure::Throw { val, .. } => {
-        let repr = Python::with_gil(|py| {
-          let obj = (*val.0).as_ref(py);
-          externs::val_to_str(obj)
-        });
-        write!(f, "{}", repr)
-      }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
+            Failure::MissingDigest(s, d) => {
+                write!(f, "Missing digest: {s}: {d:?}")
+            }
+            Failure::Throw { val, .. } => {
+                let repr = Python::with_gil(|py| {
+                    let obj = (*val.0).as_ref(py);
+                    externs::val_to_str(obj)
+                });
+                write!(f, "{}", repr)
+            }
+        }
     }
-  }
 }
 
 impl From<ProcessError> for Failure {
-  fn from(err: ProcessError) -> Self {
-    match err {
-      ProcessError::MissingDigest(s, d) => Self::MissingDigest(s, d),
-      ProcessError::Unclassified(s) => throw(s),
+    fn from(err: ProcessError) -> Self {
+        match err {
+            ProcessError::MissingDigest(s, d) => Self::MissingDigest(s, d),
+            ProcessError::Unclassified(s) => throw(s),
+        }
     }
-  }
 }
 
 impl From<StoreError> for Failure {
-  fn from(err: StoreError) -> Self {
-    match err {
-      StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
-      StoreError::Unclassified(s) => throw(s),
+    fn from(err: StoreError) -> Self {
+        match err {
+            StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
+            StoreError::Unclassified(s) => throw(s),
+        }
     }
-  }
 }
 
 impl From<Failure> for PyErr {
-  fn from(err: Failure) -> Self {
-    externs::NativeEngineFailure::new_err((err.to_string(), externs::PyFailure(err)))
-  }
+    fn from(err: Failure) -> Self {
+        externs::NativeEngineFailure::new_err((err.to_string(), externs::PyFailure(err)))
+    }
 }
 
 impl From<String> for Failure {
-  fn from(err: String) -> Self {
-    throw(err)
-  }
+    fn from(err: String) -> Self {
+        throw(err)
+    }
 }
 
 pub fn throw(msg: String) -> Failure {
-  let python_traceback = Failure::native_traceback(&msg);
-  let gil = Python::acquire_gil();
-  Failure::Throw {
-    val: externs::create_exception(gil.python(), msg),
-    python_traceback,
-    engine_traceback: Vec::new(),
-  }
+    let python_traceback = Failure::native_traceback(&msg);
+    let gil = Python::acquire_gil();
+    Failure::Throw {
+        val: externs::create_exception(gil.python(), msg),
+        python_traceback,
+        engine_traceback: Vec::new(),
+    }
 }

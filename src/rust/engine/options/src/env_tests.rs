@@ -7,160 +7,160 @@ use crate::{ListEdit, ListEditAction, OptionId, OptionsSource};
 use std::collections::HashMap;
 
 fn env<I: IntoIterator<Item = (&'static str, &'static str)>>(vars: I) -> Env {
-  Env {
-    env: vars
-      .into_iter()
-      .map(|(k, v)| (k.to_owned(), v.to_owned()))
-      .collect::<HashMap<_, _>>(),
-  }
+    Env {
+        env: vars
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect::<HashMap<_, _>>(),
+    }
 }
 
 #[test]
 fn test_display() {
-  let env = env([]);
-  assert_eq!("PANTS_NAME".to_owned(), env.display(&option_id!("name")));
-  assert_eq!(
-    "PANTS_SCOPE_NAME".to_owned(),
-    env.display(&option_id!(["scope"], "name"))
-  );
-  assert_eq!(
-    "PANTS_SCOPE_FULL_NAME".to_owned(),
-    env.display(&option_id!(-'f', ["scope"], "full", "name"))
-  );
+    let env = env([]);
+    assert_eq!("PANTS_NAME".to_owned(), env.display(&option_id!("name")));
+    assert_eq!(
+        "PANTS_SCOPE_NAME".to_owned(),
+        env.display(&option_id!(["scope"], "name"))
+    );
+    assert_eq!(
+        "PANTS_SCOPE_FULL_NAME".to_owned(),
+        env.display(&option_id!(-'f', ["scope"], "full", "name"))
+    );
 }
 
 #[test]
 fn test_scope() {
-  let env = env([("PANTS_PYTHON_EXAMPLE", "true")]);
-  assert_eq!(
-    true,
-    env
-      .get_bool(&option_id!(["python"], "example"))
-      .unwrap()
-      .unwrap()
-  );
+    let env = env([("PANTS_PYTHON_EXAMPLE", "true")]);
+    assert_eq!(
+        true,
+        env.get_bool(&option_id!(["python"], "example"))
+            .unwrap()
+            .unwrap()
+    );
 }
 
 #[test]
 fn test_string() {
-  let env = env([
-    ("PANTS_FOO", "bar"),
-    ("PANTS_BAZ_SPAM", "cheese"),
-    ("PANTS_EGGS", "swallow"),
-    ("PANTS_GLOBAL_BOB", "African"),
-    ("PANTS_PANTS_JANE", "elderberry"),
-  ]);
+    let env = env([
+        ("PANTS_FOO", "bar"),
+        ("PANTS_BAZ_SPAM", "cheese"),
+        ("PANTS_EGGS", "swallow"),
+        ("PANTS_GLOBAL_BOB", "African"),
+        ("PANTS_PANTS_JANE", "elderberry"),
+    ]);
 
-  let assert_string = |expected: &str, id: OptionId| {
-    assert_eq!(expected.to_owned(), env.get_string(&id).unwrap().unwrap())
-  };
+    let assert_string = |expected: &str, id: OptionId| {
+        assert_eq!(expected.to_owned(), env.get_string(&id).unwrap().unwrap())
+    };
 
-  assert_string("bar", option_id!("foo"));
-  assert_string("cheese", option_id!("baz", "spam"));
-  assert_string("swallow", option_id!("pants", "eggs"));
-  assert_string("African", option_id!("bob"));
-  assert_string("elderberry", option_id!("pants", "jane"));
+    assert_string("bar", option_id!("foo"));
+    assert_string("cheese", option_id!("baz", "spam"));
+    assert_string("swallow", option_id!("pants", "eggs"));
+    assert_string("African", option_id!("bob"));
+    assert_string("elderberry", option_id!("pants", "jane"));
 
-  assert!(env.get_string(&option_id!("dne")).unwrap().is_none());
+    assert!(env.get_string(&option_id!("dne")).unwrap().is_none());
 }
 
 #[test]
 fn test_bool() {
-  let env = env([
-    ("PANTS_FOO", "true"),
-    ("PANTS_BAR_BAZ", "False"),
-    ("PANTS_EGGS", "swallow"),
-  ]);
+    let env = env([
+        ("PANTS_FOO", "true"),
+        ("PANTS_BAR_BAZ", "False"),
+        ("PANTS_EGGS", "swallow"),
+    ]);
 
-  let assert_bool =
-    |expected: bool, id: OptionId| assert_eq!(expected, env.get_bool(&id).unwrap().unwrap());
+    let assert_bool =
+        |expected: bool, id: OptionId| assert_eq!(expected, env.get_bool(&id).unwrap().unwrap());
 
-  assert_bool(true, option_id!("foo"));
-  assert_bool(false, option_id!("bar", "baz"));
+    assert_bool(true, option_id!("foo"));
+    assert_bool(false, option_id!("bar", "baz"));
 
-  assert!(env.get_bool(&option_id!("dne")).unwrap().is_none());
-  assert_eq!(
-    "Got 'swallow' for PANTS_EGGS. Expected 'true' or 'false'.".to_owned(),
-    env.get_bool(&option_id!("pants", "eggs")).unwrap_err()
-  );
+    assert!(env.get_bool(&option_id!("dne")).unwrap().is_none());
+    assert_eq!(
+        "Got 'swallow' for PANTS_EGGS. Expected 'true' or 'false'.".to_owned(),
+        env.get_bool(&option_id!("pants", "eggs")).unwrap_err()
+    );
 }
 
 #[test]
 fn test_float() {
-  let env = env([
-    ("PANTS_FOO", "4"),
-    ("PANTS_BAR_BAZ", "3.14"),
-    ("PANTS_EGGS", "1.137"),
-    ("PANTS_BAD", "swallow"),
-  ]);
+    let env = env([
+        ("PANTS_FOO", "4"),
+        ("PANTS_BAR_BAZ", "3.14"),
+        ("PANTS_EGGS", "1.137"),
+        ("PANTS_BAD", "swallow"),
+    ]);
 
-  let assert_float =
-    |expected: f64, id: OptionId| assert_eq!(expected, env.get_float(&id).unwrap().unwrap());
+    let assert_float =
+        |expected: f64, id: OptionId| assert_eq!(expected, env.get_float(&id).unwrap().unwrap());
 
-  assert_float(4 as f64, option_id!("foo"));
-  assert_float(3.14, option_id!("bar", "baz"));
-  assert_float(1.137, option_id!("pants", "eggs"));
+    assert_float(4 as f64, option_id!("foo"));
+    assert_float(3.14, option_id!("bar", "baz"));
+    assert_float(1.137, option_id!("pants", "eggs"));
 
-  assert!(env.get_float(&option_id!("dne")).unwrap().is_none());
+    assert!(env.get_float(&option_id!("dne")).unwrap().is_none());
 
-  assert_eq!(
-    "Problem parsing PANTS_BAD value swallow as a float value: invalid float literal".to_owned(),
-    env.get_float(&option_id!("pants", "bad")).unwrap_err()
-  );
+    assert_eq!(
+        "Problem parsing PANTS_BAD value swallow as a float value: invalid float literal"
+            .to_owned(),
+        env.get_float(&option_id!("pants", "bad")).unwrap_err()
+    );
 }
 
 #[test]
 fn test_string_list() {
-  let env = env([
-    ("PANTS_BAD", "('mis', 'matched']"),
-    ("PANTS_IMPLICIT_ADD", "initial"),
-    ("PANTS_RESET", "['one']"),
-    ("PANTS_EDITS", "+['two','three'],-['one']"),
-  ]);
+    let env = env([
+        ("PANTS_BAD", "('mis', 'matched']"),
+        ("PANTS_IMPLICIT_ADD", "initial"),
+        ("PANTS_RESET", "['one']"),
+        ("PANTS_EDITS", "+['two','three'],-['one']"),
+    ]);
 
-  let get_string_list = |id| env.get_string_list(&id).unwrap().unwrap();
+    let get_string_list = |id| env.get_string_list(&id).unwrap().unwrap();
 
-  assert_eq!(
-    vec![ListEdit {
-      action: ListEditAction::Add,
-      items: vec!["initial".to_owned()]
-    },],
-    get_string_list(option_id!("implicit", "add"))
-  );
+    assert_eq!(
+        vec![ListEdit {
+            action: ListEditAction::Add,
+            items: vec!["initial".to_owned()]
+        },],
+        get_string_list(option_id!("implicit", "add"))
+    );
 
-  assert_eq!(
-    vec![ListEdit {
-      action: ListEditAction::Replace,
-      items: vec!["one".to_owned()]
-    },],
-    get_string_list(option_id!("reset"))
-  );
+    assert_eq!(
+        vec![ListEdit {
+            action: ListEditAction::Replace,
+            items: vec!["one".to_owned()]
+        },],
+        get_string_list(option_id!("reset"))
+    );
 
-  assert_eq!(
-    vec![
-      ListEdit {
-        action: ListEditAction::Add,
-        items: vec!["two".to_owned(), "three".to_owned()]
-      },
-      ListEdit {
-        action: ListEditAction::Remove,
-        items: vec!["one".to_owned()]
-      },
-    ],
-    get_string_list(option_id!("edits"))
-  );
+    assert_eq!(
+        vec![
+            ListEdit {
+                action: ListEditAction::Add,
+                items: vec!["two".to_owned(), "three".to_owned()]
+            },
+            ListEdit {
+                action: ListEditAction::Remove,
+                items: vec!["one".to_owned()]
+            },
+        ],
+        get_string_list(option_id!("edits"))
+    );
 
-  assert!(env.get_string_list(&option_id!("dne")).unwrap().is_none());
+    assert!(env.get_string_list(&option_id!("dne")).unwrap().is_none());
 
-  let expected_error_msg = "\
+    let expected_error_msg = "\
 Problem parsing PANTS_BAD string list value:
 1:('mis', 'matched']
   -----------------^
 Expected \",\" or the end of a tuple indicated by ')' at line 1 column 18"
-    .to_owned();
+        .to_owned();
 
-  assert_eq!(
-    expected_error_msg,
-    env.get_string_list(&option_id!("bad")).unwrap_err()
-  );
+    assert_eq!(
+        expected_error_msg,
+        env.get_string_list(&option_id!("bad")).unwrap_err()
+    );
 }
