@@ -9,88 +9,88 @@ use tempfile::TempDir;
 use crate::{ShardedLmdb, DEFAULT_LEASE_TIME};
 
 fn new_store(shard_count: u8) -> (ShardedLmdb, TempDir) {
-  let tempdir = TempDir::new().unwrap();
-  let s = ShardedLmdb::new(
-    tempdir.path().to_owned(),
-    15_000_000,
-    Executor::new(),
-    DEFAULT_LEASE_TIME,
-    shard_count,
-  )
-  .unwrap();
-  (s, tempdir)
+    let tempdir = TempDir::new().unwrap();
+    let s = ShardedLmdb::new(
+        tempdir.path().to_owned(),
+        15_000_000,
+        Executor::new(),
+        DEFAULT_LEASE_TIME,
+        shard_count,
+    )
+    .unwrap();
+    (s, tempdir)
 }
 
 #[tokio::test]
 async fn shard_counts() {
-  let shard_counts = vec![1, 2, 4, 8, 16, 32, 64, 128];
-  for shard_count in shard_counts {
-    let (s, _tempdir) = new_store(shard_count);
-    assert_eq!(s.all_lmdbs().len(), shard_count as usize);
+    let shard_counts = vec![1, 2, 4, 8, 16, 32, 64, 128];
+    for shard_count in shard_counts {
+        let (s, _tempdir) = new_store(shard_count);
+        assert_eq!(s.all_lmdbs().len(), shard_count as usize);
 
-    // Confirm that each database gets an even share.
-    let mut databases = HashMap::new();
-    for prefix_byte in 0u8..=255u8 {
-      *databases
-        .entry(s.get_raw(&[prefix_byte]).0.clone())
-        .or_insert(0) += 1;
+        // Confirm that each database gets an even share.
+        let mut databases = HashMap::new();
+        for prefix_byte in 0u8..=255u8 {
+            *databases
+                .entry(s.get_raw(&[prefix_byte]).0.clone())
+                .or_insert(0) += 1;
+        }
+        assert_eq!(databases.len(), shard_count as usize);
+        for (_, count) in databases {
+            assert_eq!(count, 256 / shard_count as usize);
+        }
     }
-    assert_eq!(databases.len(), shard_count as usize);
-    for (_, count) in databases {
-      assert_eq!(count, 256 / shard_count as usize);
-    }
-  }
 }
 
 #[tokio::test]
 async fn store_immutable() {
-  let (s, _tempdir) = new_store(1);
-  let digest = s.store(true, true, || Ok(bytes(0).reader())).await.unwrap();
-  assert_eq!(digest, Digest::of_bytes(&bytes(0)));
+    let (s, _tempdir) = new_store(1);
+    let digest = s.store(true, true, || Ok(bytes(0).reader())).await.unwrap();
+    assert_eq!(digest, Digest::of_bytes(&bytes(0)));
 }
 
 #[tokio::test]
 async fn store_stable() {
-  let (s, _tempdir) = new_store(1);
-  let digest = s
-    .store(true, false, || Ok(bytes(0).reader()))
-    .await
-    .unwrap();
-  assert_eq!(digest, Digest::of_bytes(&bytes(0)));
+    let (s, _tempdir) = new_store(1);
+    let digest = s
+        .store(true, false, || Ok(bytes(0).reader()))
+        .await
+        .unwrap();
+    assert_eq!(digest, Digest::of_bytes(&bytes(0)));
 }
 
 #[tokio::test]
 async fn store_changing() {
-  let (s, _tempdir) = new_store(1);
+    let (s, _tempdir) = new_store(1);
 
-  // Produces Readers that change during the first two reads, but stabilize on the third and
-  // fourth.
-  let contents = Mutex::new(vec![bytes(0), bytes(1), bytes(2), bytes(2)].into_iter());
+    // Produces Readers that change during the first two reads, but stabilize on the third and
+    // fourth.
+    let contents = Mutex::new(vec![bytes(0), bytes(1), bytes(2), bytes(2)].into_iter());
 
-  let digest = s
-    .store(true, false, move || {
-      Ok(contents.lock().next().unwrap().reader())
-    })
-    .await
-    .unwrap();
-  assert_eq!(digest, Digest::of_bytes(&bytes(2)));
+    let digest = s
+        .store(true, false, move || {
+            Ok(contents.lock().next().unwrap().reader())
+        })
+        .await
+        .unwrap();
+    assert_eq!(digest, Digest::of_bytes(&bytes(2)));
 }
 
 #[tokio::test]
 async fn store_failure() {
-  let (s, _tempdir) = new_store(1);
+    let (s, _tempdir) = new_store(1);
 
-  // Produces Readers that never stabilize.
-  let contents = Mutex::new((0..100).map(|b| bytes(b)));
+    // Produces Readers that never stabilize.
+    let contents = Mutex::new((0..100).map(|b| bytes(b)));
 
-  let result = s
-    .store(true, false, move || {
-      Ok(contents.lock().next().unwrap().reader())
-    })
-    .await;
-  assert!(result.is_err());
+    let result = s
+        .store(true, false, move || {
+            Ok(contents.lock().next().unwrap().reader())
+        })
+        .await;
+    assert!(result.is_err());
 }
 
 fn bytes(content: u8) -> Bytes {
-  Bytes::from(vec![content; 100])
+    Bytes::from(vec![content; 100])
 }

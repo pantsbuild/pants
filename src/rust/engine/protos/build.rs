@@ -4,10 +4,10 @@
 use prost_build::Config;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let mut config = Config::new();
-  config.bytes(&["."]);
+    let mut config = Config::new();
+    config.bytes(&["."]);
 
-  tonic_build::configure()
+    tonic_build::configure()
     .build_client(true)
     .build_server(true)
     .compile_with_config(
@@ -33,5 +33,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       ],
     )?;
 
-  Ok(())
+    Ok(())
 }
