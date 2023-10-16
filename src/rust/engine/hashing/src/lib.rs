@@ -426,7 +426,6 @@ where
 ///
 pub async fn async_verified_copy<R, W>(
   expected_digest: Digest,
-  data_is_immutable: bool,
   reader: &mut R,
   writer: &mut W,
 ) -> tokio::io::Result<bool>
@@ -434,13 +433,7 @@ where
   R: AsyncRead + Unpin + ?Sized,
   W: AsyncWrite + Unpin + ?Sized,
 {
-  if data_is_immutable {
-    // Trust that the data hasn't changed, and only validate its length.
-    let copied = tokio::io::copy(reader, writer).await?;
-    Ok(copied as usize == expected_digest.size_bytes)
-  } else {
-    Ok(expected_digest == async_copy_and_hash(reader, writer).await?)
-  }
+  Ok(expected_digest == async_copy_and_hash(reader, writer).await?)
 }
 
 #[cfg(test)]

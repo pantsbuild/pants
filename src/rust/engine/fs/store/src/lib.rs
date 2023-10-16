@@ -268,7 +268,7 @@ impl RemoteStore {
           );
           local_store
             .get_file_fsdb()
-            .write_using(digest.hash, |file| {
+            .write_using(digest.hash, |file, _path| {
               Self::remote_writer(&remote_store, digest, file)
             })
             .await?;

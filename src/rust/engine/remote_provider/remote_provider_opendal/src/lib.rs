@@ -186,7 +186,7 @@ impl Provider {
 
     match mode {
       LoadMode::Validate => {
-        let correct_digest = async_verified_copy(digest, false, &mut reader, destination)
+        let correct_digest = async_verified_copy(digest, &mut reader, destination)
           .await
           .map_err(|e| format!("failed to read {}: {}", path, e))?;
 

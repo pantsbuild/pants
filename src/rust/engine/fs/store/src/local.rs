@@ -21,7 +21,7 @@ use std::os::unix::fs::PermissionsExt;
 use task_executor::Executor;
 use tempfile::Builder;
 use tokio::fs::hard_link;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{Semaphore, SemaphorePermit};
 use workunit_store::ObservationMetric;
 
@@ -242,22 +242,54 @@ impl ShardedFSDB {
     Ok(file)
   }
 
-  async fn verified_copier<R>(
-    mut file: tokio::fs::File,
+  async fn verified_copier(
+    src: &Path,
+    mut dst_file: tokio::fs::File,
+    dst_path: PathBuf,
+    file_source: &FileSource,
     expected_digest: Digest,
     src_is_immutable: bool,
-    mut reader: R,
-  ) -> Result<tokio::fs::File, VerifiedCopyError>
-  where
-    R: AsyncRead + Unpin,
-  {
-    let matches = async_verified_copy(expected_digest, src_is_immutable, &mut reader, &mut file)
-      .await
-      .map_err(|e| VerifiedCopyError::CopyFailure(format!("Failed to copy bytes: {e}")))?;
-    if matches {
-      Ok(file)
+  ) -> Result<tokio::fs::File, VerifiedCopyError> {
+    let _permit = file_source.acquire().await?;
+    if src_is_immutable {
+      // If the source is immutable, copy the file using a native copy, which might allow
+      // offloading to syscalls rather than pulling the content into memory (see `std::fs::copy`
+      // for details). We close the existing file handle and reopen it after the copy.
+      std::mem::drop(dst_file);
+      tokio::fs::copy(src, &dst_path).await.map_err(|e| {
+        VerifiedCopyError::CopyFailure(format!(
+          "Failed to copy from {} to {}: {e}",
+          src.display(),
+          dst_path.display()
+        ))
+      })?;
+      Ok(tokio::fs::File::open(&dst_path).await.map_err(|e| {
+        VerifiedCopyError::CopyFailure(format!(
+          "Failed to reopen copied file at {}: {e}",
+          dst_path.display()
+        ))
+      })?)
     } else {
-      Err(VerifiedCopyError::DoesntMatch)
+      let mut reader = tokio::fs::File::open(src).await.map_err(|e| {
+        VerifiedCopyError::CopyFailure(format!(
+          "Failed to open input file at {}: {e}",
+          dst_path.display()
+        ))
+      })?;
+      let matches = async_verified_copy(expected_digest, &mut reader, &mut dst_file)
+        .await
+        .map_err(|e| {
+          VerifiedCopyError::CopyFailure(format!(
+            "Failed to copy bytes from {} to {}: {e}",
+            src.display(),
+            dst_path.display()
+          ))
+        })?;
+      if matches {
+        Ok(dst_file)
+      } else {
+        Err(VerifiedCopyError::DoesntMatch)
+      }
     }
   }
 
@@ -267,7 +299,7 @@ impl ShardedFSDB {
     writer_func: F,
   ) -> Result<(), E>
   where
-    F: FnOnce(tokio::fs::File) -> Fut,
+    F: FnOnce(tokio::fs::File, PathBuf) -> Fut,
     Fut: Future<Output = Result<tokio::fs::File, E>>,
     // NB: The error type must be convertible from a string
     E: std::convert::From<std::string::String>,
@@ -304,7 +336,7 @@ impl ShardedFSDB {
           .keep()
           .map_err(|e| format!("Failed to keep temp file: {e}"))?;
 
-        match writer_func(std_file.into()).await {
+        match writer_func(std_file.into(), tmp_path.clone()).await {
           Ok(mut tokio_file) => {
             tokio_file
               .shutdown()
@@ -394,7 +426,9 @@ impl UnderlyingByteStore for ShardedFSDB {
   ) -> Result<(), String> {
     try_join_all(items.iter().map(|(fingerprint, bytes)| async move {
       self
-        .write_using(*fingerprint, |file| Self::bytes_writer(file, bytes))
+        .write_using(*fingerprint, |dst_file, _| {
+          Self::bytes_writer(dst_file, bytes)
+        })
         .await?;
       Ok::<(), String>(())
     }))
@@ -413,17 +447,19 @@ impl UnderlyingByteStore for ShardedFSDB {
   ) -> Result<(), String> {
     let mut attempts = 0;
     loop {
-      let (reader, _permit) = file_source
-        .open_readonly(&src)
-        .await
-        .map_err(|e| format!("Failed to open {src:?}: {e}"))?;
-
       // TODO: Consider using `fclonefileat` on macOS or checking for same filesystem+rename on Linux,
       // which would skip actual copying (read+write), and instead just require verifying the
       // resulting content after the syscall (read only).
       let copy_result = self
-        .write_using(expected_digest.hash, |file| {
-          Self::verified_copier(file, expected_digest, src_is_immutable, reader)
+        .write_using(expected_digest.hash, |dst_file, dst_path| {
+          Self::verified_copier(
+            &src,
+            dst_file,
+            dst_path,
+            file_source,
+            expected_digest,
+            src_is_immutable,
+          )
         })
         .await;
       let should_retry = match copy_result {
@@ -535,12 +571,16 @@ struct FileSource {
 }
 
 impl FileSource {
-  async fn open_readonly(&self, path: &Path) -> Result<(tokio::fs::File, SemaphorePermit), String> {
-    let permit = self
+  async fn acquire(&self) -> Result<SemaphorePermit, String> {
+    self
       .open_files
       .acquire()
       .await
-      .map_err(|e| format!("Failed to acquire permit to open file: {e}"))?;
+      .map_err(|e| format!("Failed to acquire permit to open file: {e}"))
+  }
+
+  async fn open_readonly(&self, path: &Path) -> Result<(tokio::fs::File, SemaphorePermit), String> {
+    let permit = self.acquire().await?;
     let file = tokio::fs::File::open(path)
       .await
       .map_err(|e| e.to_string())?;
