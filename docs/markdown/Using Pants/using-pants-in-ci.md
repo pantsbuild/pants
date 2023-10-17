@@ -81,6 +81,10 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 Recommended commands
 --------------------
 
+> 🚧 Autofixing goals
+>
+> The goals `fmt` and `fix` will attempt to automatically correct your code and then return zero if they were able to do so.  This generally counts as "success" by most CI systems.  Prefer the `lint` goal to fail the CI job on formatting or linting problems.
+
 With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism. See [Advanced Target Selection](doc:advanced-target-selection#sharding-the-input-targets). (This is typically less necessary when using [remote caching](doc:remote-caching-execution).)
 
 ### Approach #1: only run over changed files
