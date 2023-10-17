@@ -2680,16 +2680,21 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
 class InferredDependencies:
     include: FrozenOrderedSet[Address]
     exclude: FrozenOrderedSet[Address]
+    transitive_excludes: FrozenOrderedSet[Address]
 
     def __init__(
         self,
         include: Iterable[Address],
         *,
         exclude: Iterable[Address] = (),
+        transitive_excludes: Iterable[Address] = (),
     ) -> None:
         """The result of inferring dependencies."""
         object.__setattr__(self, "include", FrozenOrderedSet(sorted(include)))
         object.__setattr__(self, "exclude", FrozenOrderedSet(sorted(exclude)))
+        object.__setattr__(
+            self, "transitive_excludes", FrozenOrderedSet(sorted(transitive_excludes))
+        )
 
 
 @union(in_scope_types=[EnvironmentName])

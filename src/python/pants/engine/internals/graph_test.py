@@ -1950,9 +1950,18 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
             AddressInput.parse(line[1:], description_of_origin="smalltalk rule"),
         )
         for line in all_lines
-        if line.startswith("!")
+        if line.startswith("!") and not line.startswith("!!")
     )
-    return InferredDependencies(include, exclude=exclude)
+    transitive_excludes = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(line[2:], description_of_origin="smalltalk rule"),
+        )
+        for line in all_lines
+        if line.startswith("!!")
+    )
+    return InferredDependencies(include, exclude=exclude, transitive_excludes=transitive_excludes)
 
 
 @pytest.fixture
@@ -1962,6 +1971,7 @@ def dependencies_rule_runner() -> RuleRunner:
             infer_smalltalk_dependencies,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
         target_types=[SmalltalkLibrary, SmalltalkLibraryGenerator, MockTarget],
@@ -2231,6 +2241,34 @@ def test_depends_on_generated_targets(dependencies_rule_runner: RuleRunner) -> N
             Address("src/smalltalk", relative_file_path="f2.st"),
         ],
     )
+
+
+def test_plugin_transitive_excludes(dependencies_rule_runner: RuleRunner) -> None:
+    dependencies_rule_runner.write_files(
+        {
+            "transitive_dep.st": "",
+            "direct_dep.st": "//:transitive_dep.st",
+            "file.st": dedent(
+                """\
+                //:direct_dep.st
+                !!//:transitive_dep.st
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                smalltalk_library(name="transitive_dep.st", source='transitive_dep.st')
+                smalltalk_library(name="direct_dep.st", source='direct_dep.st')
+                smalltalk_library(name="file.st", source='file.st')
+                """
+            ),
+        }
+    )
+    transitive_targets = dependencies_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequest([Address("", target_name="file.st")])]
+    )
+    assert {target.address for target in transitive_targets.dependencies} == {
+        Address("", target_name="direct_dep.st"),
+    }
 
 
 def test_depends_on_atom_via_14419(dependencies_rule_runner: RuleRunner) -> None:

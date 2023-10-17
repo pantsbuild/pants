@@ -681,6 +681,13 @@ class _DependencyMapping:
     mapping: FrozenDict[Address, tuple[Address, ...]]
     visited: FrozenOrderedSet[Target]
     roots_as_targets: Collection[Target]
+    transitive_excludes: FrozenOrderedSet[Address]
+
+
+@dataclass(frozen=True)
+class _DependenciesInfo:
+    addresses: Addresses
+    transitive_excludes: FrozenOrderedSet[Address]
 
 
 @rule
@@ -694,35 +701,48 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     visited: OrderedSet[Target] = OrderedSet()
     queued = FrozenOrderedSet(roots_as_targets)
     dependency_mapping: dict[Address, tuple[Address, ...]] = {}
+    transitive_excludes: OrderedSet[Address] = OrderedSet()
     while queued:
+        direct_dependencies_infos = await MultiGet(  # noqa: PNT30: this is inherently sequential
+            Get(
+                _DependenciesInfo,
+                DependenciesRequest(
+                    tgt.get(Dependencies),
+                    should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
+                ),
+            )
+            for tgt in queued
+        )
+
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
             direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
                 Get(
                     Targets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies),
-                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
-                    ),
+                    Addresses,
+                    info.addresses,
                 )
-                for tgt in queued
+                for info in direct_dependencies_infos
             )
         else:
             direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
                 Get(
                     UnexpandedTargets,
-                    DependenciesRequest(
-                        tgt.get(Dependencies),
-                        should_traverse_deps_predicate=request.tt_request.should_traverse_deps_predicate,
-                    ),
+                    Addresses,
+                    info.addresses,
                 )
-                for tgt in queued
+                for info in direct_dependencies_infos
             )
 
         dependency_mapping.update(
             zip(
                 (t.address for t in queued),
                 (tuple(t.address for t in deps) for deps in direct_dependencies),
+            )
+        )
+        transitive_excludes.update(
+            itertools.chain.from_iterable(
+                info.transitive_excludes for info in direct_dependencies_infos
             )
         )
 
@@ -737,7 +757,10 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     # TODO(#12871): Fix this to not be based on generated targets.
     _detect_cycles(tuple(t.address for t in roots_as_targets), dependency_mapping)
     return _DependencyMapping(
-        FrozenDict(dependency_mapping), FrozenOrderedSet(visited), roots_as_targets
+        FrozenDict(dependency_mapping),
+        FrozenOrderedSet(visited),
+        roots_as_targets,
+        FrozenOrderedSet(transitive_excludes),
     )
 
 
@@ -750,20 +773,25 @@ async def transitive_targets(
     dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
 
     # Apply any transitive excludes (`!!` ignores).
-    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
+    transitive_excludes: set[Target] = set()
     unevaluated_transitive_excludes = []
     for t in (*dependency_mapping.roots_as_targets, *dependency_mapping.visited):
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
         if unparsed.values:
             unevaluated_transitive_excludes.append(unparsed)
+
     if unevaluated_transitive_excludes:
         nested_transitive_excludes = await MultiGet(
             Get(Targets, UnparsedAddressInputs, unparsed)
             for unparsed in unevaluated_transitive_excludes
         )
-        transitive_excludes = FrozenOrderedSet(
+        transitive_excludes.update(
             itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
         )
+
+    if dependency_mapping.transitive_excludes:
+        exclude_targets = await Get(Targets, Addresses(dependency_mapping.transitive_excludes))
+        transitive_excludes.update(exclude_targets)
 
     return TransitiveTargets(
         tuple(dependency_mapping.roots_as_targets),
@@ -1281,6 +1309,13 @@ async def _fill_parameters(
     )
 
 
+# NB: For backwards-compatibility
+@rule
+async def resolve_dependencies_wrapper(request: DependenciesRequest) -> Addresses:
+    result = await Get(_DependenciesInfo, DependenciesRequest, request)
+    return result.addresses
+
+
 @rule(desc="Resolve direct dependencies of target", _masked_types=[EnvironmentName])
 async def resolve_dependencies(
     request: DependenciesRequest,
@@ -1289,7 +1324,7 @@ async def resolve_dependencies(
     subproject_roots: SubprojectRoots,
     field_defaults: FieldDefaults,
     local_environment_name: ChosenLocalEnvironmentName,
-) -> Addresses:
+) -> _DependenciesInfo:
     environment_name = local_environment_name.val
     wrapped_tgt = await Get(
         WrappedTarget,
@@ -1302,7 +1337,7 @@ async def resolve_dependencies(
     # including any explicit deps and any inferred deps.
     # For example, to avoid traversing the deps of package targets.
     if request.should_traverse_deps_predicate(tgt, request.field) == DepsTraversalBehavior.EXCLUDE:
-        return Addresses([])
+        return _DependenciesInfo(Addresses([]), FrozenOrderedSet())
 
     try:
         explicitly_provided = await Get(
@@ -1414,7 +1449,17 @@ async def resolve_dependencies(
     excluded = explicitly_provided_ignores.union(
         *itertools.chain(deps.exclude for deps in inferred)
     )
-    result = Addresses(
+
+    transitive_excludes = set(
+        itertools.chain.from_iterable(deps.transitive_excludes for deps in inferred)
+    )
+    if request.field.unevaluated_transitive_excludes:
+        explicit_transitive_excludes = await Get(
+            Addresses, UnparsedAddressInputs, request.field.unevaluated_transitive_excludes
+        )
+        transitive_excludes.update(explicit_transitive_excludes)
+
+    addresses = Addresses(
         sorted(
             {
                 addr
@@ -1434,7 +1479,7 @@ async def resolve_dependencies(
         Get(
             ValidatedDependencies,
             {
-                vd_request_type(vd_request_type.field_set_type.create(tgt), result): ValidateDependenciesRequest,  # type: ignore[misc]
+                vd_request_type(vd_request_type.field_set_type.create(tgt), addresses): ValidateDependenciesRequest,  # type: ignore[misc]
                 environment_name: EnvironmentName,
             },
         )
@@ -1442,7 +1487,7 @@ async def resolve_dependencies(
         if vd_request_type.field_set_type.is_applicable(tgt)  # type: ignore[misc]
     )
 
-    return result
+    return _DependenciesInfo(addresses, FrozenOrderedSet(sorted(transitive_excludes)))
 
 
 @rule(desc="Resolve addresses")
