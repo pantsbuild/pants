@@ -687,6 +687,7 @@ class _DependencyMapping:
 @dataclass(frozen=True)
 class _DependenciesInfo:
     addresses: Addresses
+    # These are the transitive excludes gathered from dependency inference plugins
     transitive_excludes: FrozenOrderedSet[Address]
 
 
