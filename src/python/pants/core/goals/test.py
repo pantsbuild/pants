@@ -622,6 +622,16 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a test target.",
     )
+    attempts_default = IntOption(
+        default=1,
+        help=softwrap(
+            """
+            The number of attempts to run tests, in case of a test failure.
+            Tests that were retried will include the number of attempts in the summary output.
+            """
+        ),
+    )
+
     batch_size = IntOption(
         "--batch-size",
         default=128,

@@ -510,9 +510,9 @@ async def run_python_tests(
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
     )
-    HARDCODED_RETRY_COUNT = 5  # TODO: get from global option or batch
+
     results = await Get(
-        ProcessResultWithRetries, RunProcWithRetry(setup.process, HARDCODED_RETRY_COUNT)
+        ProcessResultWithRetries, RunProcWithRetry(setup.process, test_subsystem.attempts_default)
     )
     last_result = results.last
 

@@ -191,6 +191,7 @@ extra_env_vars = [
   "RUST_BACKTRACE=1",
 ]
 timeout_default = 60
+attempts_default = 3
 
 [mypy]
 install_from_resolve = "mypy"
