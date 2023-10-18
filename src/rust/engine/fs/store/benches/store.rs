@@ -266,8 +266,11 @@ fn tempdir_containing(max_files: usize, file_target_size: usize) -> (TempDir, Ve
   let henries_lines = {
     let f = std::fs::File::open(
       PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("testdata")
-        .join("all_the_henries"),
+        .join("..")
+        .join("..")
+        .join("testutil")
+        .join("src")
+        .join("all_the_henries.txt"),
     )
     .expect("Error opening all_the_henries");
     BufReader::new(f).lines()
