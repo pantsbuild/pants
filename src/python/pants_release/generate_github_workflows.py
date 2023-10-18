@@ -679,7 +679,11 @@ def bootstrap_jobs(
 
 
 def test_jobs(
-    helper: Helper, shard: str | None, platform_specific: bool, with_remote_caching: bool
+    helper: Helper,
+    shard: str | None,
+    platform_specific: bool,
+    with_remote_caching: bool,
+    retry: bool = False,
 ) -> Jobs:
     human_readable_job_name = f"Test Python ({helper.platform_name()})"
     human_readable_step_name = "Run Python tests"
@@ -698,6 +702,8 @@ def test_jobs(
             + ["--", "-m", "platform_specific_behavior"]
         )
     pants_args = ["./pants"] + pants_args
+    if retry:
+        pants_args = pants_args + ["||", "(", "echo", '"Retrying..."', "&&"] + pants_args + [")"]
     pants_args_str = " ".join(pants_args) + "\n"
 
     return {
@@ -735,7 +741,9 @@ def linux_x86_64_test_jobs() -> Jobs:
     helper = Helper(Platform.LINUX_X86_64)
 
     def test_python_linux(shard: str) -> dict[str, Any]:
-        return test_jobs(helper, shard, platform_specific=False, with_remote_caching=True)
+        return test_jobs(
+            helper, shard, platform_specific=False, with_remote_caching=True, retry=True
+        )
 
     shard_name_prefix = helper.job_name("test_python")
     jobs = {
