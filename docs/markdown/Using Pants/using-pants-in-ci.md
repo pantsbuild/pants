@@ -83,7 +83,7 @@ Recommended commands
 
 > 🚧 Autofixing goals
 >
-> The goals `fmt` and `fix` will attempt to automatically correct your code and then return zero if they were able to do so.  This generally counts as "success" by most CI systems.  Prefer the `lint` goal to fail the CI job on formatting or linting problems.
+> The goals `fmt` and `fix` will attempt to automatically correct your code and then return zero if they were able to do so.  This generally counts as "success" for most CI systems.  In contrast the `lint` goal will not modify code and instead exit with a non-zero status if any tools detected a problem.  In other words the `lint` goal is like the "checking" version of `fmt/fix`.  Prefer `lint` if you want your CI system to return job failures to enforce linting and format rules.
 
 With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism. See [Advanced Target Selection](doc:advanced-target-selection#sharding-the-input-targets). (This is typically less necessary when using [remote caching](doc:remote-caching-execution).)
 
