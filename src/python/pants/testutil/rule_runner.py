@@ -15,11 +15,11 @@ from io import StringIO
 from pathlib import Path, PurePath
 from pprint import pformat
 from tempfile import mkdtemp
-from types import CoroutineType, GeneratorType
 from typing import (
     Any,
     Callable,
     Coroutine,
+    Generator,
     Generic,
     Iterable,
     Iterator,
@@ -377,7 +377,7 @@ class RuleRunner:
 
     @property
     def pants_workdir(self) -> str:
-        return os.path.join(self.build_root, ".pants.d")
+        return os.path.join(self.build_root, ".pants.d", "workdir")
 
     @property
     def target_types(self) -> tuple[type[Target], ...]:
@@ -694,6 +694,8 @@ def run_rule_with_mocks(
 
     task_rule = getattr(rule, "rule", None)
 
+    func: Callable[..., Coroutine[Any, Any, _O]] | Callable[..., _O]
+
     # Perform additional validation on `@rule` that the correct args are provided. We don't have
     # an easy way to do this for `@rule_helper` yet.
     if task_rule:
@@ -708,10 +710,15 @@ def run_rule_with_mocks(
                 f"{pformat(task_rule.input_gets)}\ngot:\n"
                 f"{pformat(mock_gets)}"
             )
+        # Access the original function, rather than the trampoline that we would get by calling
+        # it directly.
+        func = task_rule.func
+    else:
+        func = rule
 
-    res = rule(*(rule_args or ()))
-    if not isinstance(res, (CoroutineType, GeneratorType)):
-        return res  # type: ignore[misc,return-value]
+    res = func(*(rule_args or ()))
+    if not isinstance(res, (Coroutine, Generator)):
+        return res
 
     def get(res: Get | Effect):
         provider = next(
@@ -746,9 +753,9 @@ def run_rule_with_mocks(
             if isinstance(res, (Get, Effect)):
                 rule_input = get(res)
             elif type(res) in (tuple, list):
-                rule_input = [get(g) for g in res]  # type: ignore[attr-defined]
+                rule_input = [get(g) for g in res]  # type: ignore[union-attr]
             else:
-                return res  # type: ignore[misc,return-value]
+                return res  # type: ignore[return-value]
         except StopIteration as e:
             return e.value  # type: ignore[no-any-return]
 

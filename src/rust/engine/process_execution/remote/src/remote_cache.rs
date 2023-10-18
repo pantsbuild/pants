@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Debug};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use async_trait::async_trait;
 use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
@@ -14,6 +14,7 @@ use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::{ActionResult, Command, Tree};
+use remote_provider::{choose_action_cache_provider, ActionCacheProvider};
 use store::{Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
@@ -26,9 +27,9 @@ use process_execution::{
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
 
-mod reapi;
-#[cfg(test)]
-mod reapi_tests;
+// Consumers of this crate shouldn't need to worry about the exact crate structure that comes
+// together to make a remote cache command runner.
+pub use remote_provider::RemoteCacheProviderOptions;
 
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
@@ -36,33 +37,6 @@ pub enum RemoteCacheWarningsBehavior {
   Ignore,
   FirstOnly,
   Backoff,
-}
-
-/// This `ActionCacheProvider` trait captures the operations required to be able to cache command
-/// executions remotely.
-#[async_trait]
-pub trait ActionCacheProvider: Sync + Send + 'static {
-  async fn update_action_result(
-    &self,
-    action_digest: Digest,
-    action_result: ActionResult,
-  ) -> Result<(), String>;
-
-  async fn get_action_result(
-    &self,
-    action_digest: Digest,
-    context: &Context,
-  ) -> Result<Option<ActionResult>, String>;
-}
-
-#[derive(Clone)]
-pub struct RemoteCacheProviderOptions {
-  pub instance_name: Option<String>,
-  pub action_cache_address: String,
-  pub root_ca_certs: Option<Vec<u8>>,
-  pub headers: BTreeMap<String, String>,
-  pub concurrency_limit: usize,
-  pub rpc_timeout: Duration,
 }
 
 pub struct RemoteCacheRunnerOptions {
@@ -140,8 +114,7 @@ impl CommandRunner {
     runner_options: RemoteCacheRunnerOptions,
     provider_options: RemoteCacheProviderOptions,
   ) -> Result<Self, String> {
-    let provider = Arc::new(reapi::Provider::new(provider_options).await?);
-
+    let provider = choose_action_cache_provider(provider_options).await?;
     Ok(Self::new(runner_options, provider))
   }
 
@@ -588,7 +561,7 @@ async fn check_action_cache(
 
       let start = Instant::now();
       let response = provider
-        .get_action_result(action_digest, context)
+        .get_action_result(action_digest, &context.build_id)
         .and_then(|action_result| async move {
           let Some(action_result) = action_result else {
             return Ok(None);

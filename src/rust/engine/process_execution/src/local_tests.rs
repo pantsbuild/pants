@@ -732,6 +732,7 @@ async fn prepare_workdir_exclusive_relative() {
 
   let exclusive_spawn = local::prepare_workdir(
     work_dir.path().to_owned(),
+    work_dir.path(),
     &process,
     TestDirectory::recursive().directory_digest(),
     &store,

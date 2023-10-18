@@ -29,17 +29,16 @@ use std::convert::{AsRef, Infallible};
 use std::env;
 use std::ffi::{CString, OsString};
 use std::os::unix::ffi::OsStringExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::SystemTime;
 
-use log::debug;
 use nix::unistd::execv;
 use strum::VariantNames;
 use strum_macros::{AsRefStr, EnumString, EnumVariantNames};
 
-use client::pantsd;
-use options::{option_id, render_choice, OptionParser};
+use options::{option_id, render_choice, Args, BuildRoot, Env, OptionParser};
+use pantsd::find_pantsd;
 
 // TODO(John Sirois): Maybe consolidate with PythonLogLevel in src/rust/engine/logging/src/lib.rs.
 #[derive(AsRefStr, EnumString, EnumVariantNames)]
@@ -53,7 +52,11 @@ enum PythonLogLevel {
 }
 
 async fn execute(start: SystemTime) -> Result<i32, String> {
-  let options_parser = OptionParser::new()?;
+  let build_root = BuildRoot::find()?;
+  let (env, dropped) = Env::capture_lossy();
+  let env_items = (&env).into();
+  let argv = env::args().collect::<Vec<_>>();
+  let options_parser = OptionParser::new(env, Args::argv())?;
 
   let use_pantsd = options_parser.parse_bool(&option_id!("pantsd"), true)?;
   if !use_pantsd.value {
@@ -82,60 +85,22 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   })?;
   env_logger::init_from_env(env_logger::Env::new().filter_or("__PANTS_LEVEL__", level.as_ref()));
 
-  let working_dir =
-    env::current_dir().map_err(|e| format!("Could not detect current working directory: {e}"))?;
-  let pantsd_settings = find_pantsd(&working_dir, &options_parser)?;
-  let env = env::vars().collect::<Vec<(_, _)>>();
-  let argv = env::args().collect::<Vec<_>>();
-  client::execute_command(start, pantsd_settings, env, argv).await
-}
-
-fn find_pantsd(
-  working_dir: &Path,
-  options_parser: &OptionParser,
-) -> Result<client::ConnectionSettings, String> {
-  let pants_subprocessdir = option_id!("pants", "subprocessdir");
-  let option_value = options_parser.parse_string(&pants_subprocessdir, ".pids")?;
-  let metadata_dir = {
-    let path = PathBuf::from(&option_value.value);
-    if path.is_absolute() {
-      path
-    } else {
-      match working_dir.join(&path) {
-        p if p.is_absolute() => p,
-        p => p.canonicalize().map_err(|e| {
-          format!(
-            "Failed to resolve relative pants subprocessdir specified via {:?} as {}: {}",
-            option_value,
-            path.display(),
-            e
-          )
-        })?,
-      }
-    }
-  };
-  debug!(
-    "\
-    Looking for pantsd metadata in {metadata_dir} as specified by {option} = {value} via \
-    {source:?}.\
-    ",
-    metadata_dir = metadata_dir.display(),
-    option = pants_subprocessdir,
-    value = option_value.value,
-    source = option_value.source
-  );
-  let port = pantsd::probe(working_dir, &metadata_dir)?;
-  let mut pantsd_settings = client::ConnectionSettings::new(port);
-  pantsd_settings.timeout_limit = options_parser
-    .parse_float(
-      &option_id!("pantsd", "timeout", "when", "multiple", "invocations"),
-      pantsd_settings.timeout_limit,
-    )?
-    .value;
-  pantsd_settings.dynamic_ui = options_parser
-    .parse_bool(&option_id!("dynamic", "ui"), pantsd_settings.dynamic_ui)?
-    .value;
-  Ok(pantsd_settings)
+  // Now that the logger has been set up, we can retroactively log any dropped env vars.
+  let mut keys_with_non_utf8_values = dropped.keys_with_non_utf8_values;
+  keys_with_non_utf8_values.sort();
+  for name in keys_with_non_utf8_values {
+    log::warn!("Environment variable with non-UTF-8 value ignored: {name}");
+  }
+  let mut non_utf8_keys = dropped.non_utf8_keys;
+  non_utf8_keys.sort();
+  for name in non_utf8_keys {
+    log::warn!(
+      "Environment variable with non-UTF-8 name ignored: {}",
+      name.to_string_lossy()
+    );
+  }
+  let pantsd_settings = find_pantsd(&build_root, &options_parser)?;
+  client::execute_command(start, pantsd_settings, env_items, argv).await
 }
 
 fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> {
@@ -145,7 +110,7 @@ fn try_execv_fallback_client(pants_server: OsString) -> Result<Infallible, i32> 
 
   let mut c_args = vec![c_exe.clone()];
   c_args.extend(
-    std::env::args_os()
+    env::args_os()
       .skip(1)
       .map(|arg| CString::new(arg.into_vec()).expect("Failed to convert argument to a C string.")),
   );

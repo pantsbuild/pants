@@ -249,7 +249,6 @@ async def setup_pytest_for_target(
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
     test_extra_env: TestExtraEnv,
-    global_options: GlobalOptions,
 ) -> TestSetup:
     addresses = tuple(field_set.address for field_set in request.field_sets)
 
@@ -355,7 +354,11 @@ async def setup_pytest_for_target(
     # Don't forget to keep "Customize Pytest command line options per target" section in
     # docs/markdown/Python/python-goals/python-test-goal.md up to date when changing
     # which flags are added to `pytest_args`.
-    pytest_args = [f"--color={'yes' if global_options.colors else 'no'}"]
+    pytest_args = [
+        # Always include colors and strip them out for display below (if required), for better cache
+        # hit rates
+        "--color=yes"
+    ]
     output_files = []
 
     results_file_name = None
@@ -501,6 +504,7 @@ async def partition_python_tests(
 async def run_python_tests(
     batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
     test_subsystem: TestSubsystem,
+    global_options: GlobalOptions,
 ) -> TestResult:
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
@@ -548,6 +552,7 @@ async def run_python_tests(
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
         extra_output=extra_output_snapshot,
+        output_simplifier=global_options.output_simplifier(),
     )
 
 

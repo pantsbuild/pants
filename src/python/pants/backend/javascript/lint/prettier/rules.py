@@ -70,7 +70,7 @@ async def prettier_fmt(request: PrettierFmtRequest.Batch, prettier: Prettier) ->
             level=LogLevel.DEBUG,
         ),
     )
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+    return await FmtResult.create(request, result)
 
 
 def rules() -> Iterable[Rule | UnionRule]:

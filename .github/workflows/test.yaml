@@ -32,11 +32,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -82,7 +84,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-bootstrap-Linux-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
@@ -96,7 +98,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture --test-threads=8
+      run: ./cargo test --locked --tests -- --nocapture --test-threads=8
     timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
@@ -122,11 +124,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -172,7 +176,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-bootstrap-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
@@ -194,7 +198,7 @@ jobs:
 
         ./build-support/bin/check_rust_pre_commit.sh
 
-        ./cargo test --all --tests -- --nocapture
+        ./cargo test --locked --all --tests -- --nocapture
 
         ./cargo check --benches
 
@@ -224,11 +228,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -274,7 +280,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-bootstrap-macOS11-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     - name: Upload native binaries
       uses: actions/upload-artifact@v3
       with:
@@ -288,7 +294,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture
+      run: ./cargo test --locked --tests -- --nocapture
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
@@ -346,7 +352,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-Linux-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -406,7 +412,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -431,11 +437,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -471,7 +479,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-macOS10-15-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -496,11 +504,13 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
     - name: Cache Rust toolchain
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('src/rust/engine/rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.72.0-*
+        path: '~/.rustup/toolchains/1.73.0-*
 
           ~/.rustup/update-hashes
 
@@ -536,7 +546,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-wheels-and-pex-macOS11-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   check_labels:
     if: github.repository_owner == 'pantsbuild'
@@ -632,7 +642,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-lint-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 30
   merge_ok:
     if: always()
@@ -731,7 +741,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-Linux-ARM64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_0:
     env:
@@ -822,7 +832,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-0_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_1:
     env:
@@ -913,7 +923,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-1_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_2:
     env:
@@ -1004,7 +1014,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-2_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_3:
     env:
@@ -1095,7 +1105,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-3_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_4:
     env:
@@ -1186,7 +1196,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-4_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_5:
     env:
@@ -1277,7 +1287,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-5_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_6:
     env:
@@ -1368,7 +1378,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-6_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_7:
     env:
@@ -1459,7 +1469,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-7_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_8:
     env:
@@ -1550,7 +1560,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-8_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_linux_x86_64_9:
     env:
@@ -1641,7 +1651,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-9_10-Linux-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
   test_python_macos11_x86_64:
     env:
@@ -1699,7 +1709,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: logs-python-test-macOS11-x86_64
-        path: .pants.d/*.log
+        path: .pants.d/workdir/*.log
     timeout-minutes: 90
 name: Pull Request CI
 'on':

@@ -789,7 +789,7 @@ async def resolve_environment_name(
                 machine's platform: {localhost_platform}. The environment only works with the
                 platforms: {env_tgt.val[CompatiblePlatformsField].value}
 
-                Consider setting the the field `{FallbackEnvironmentField.alias}` for the target
+                Consider setting the field `{FallbackEnvironmentField.alias}` for the target
                 {env_tgt.val.address}, such as to a `docker_environment` or `remote_environment`
                 target. You can also set that field to another `local_environment` target, such as
                 one that is compatible with the current platform {localhost_platform}.

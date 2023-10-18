@@ -16,14 +16,13 @@ use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use remote_provider::RemoteCacheProviderOptions;
 use store::{RemoteOptions, Store};
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::ensure_action_stored_locally;
-use crate::remote_cache::{
-  RemoteCacheProviderOptions, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
-};
+use crate::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use process_execution::{
   make_execute_request, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
@@ -165,7 +164,7 @@ async fn create_cached_runner(
       RemoteCacheProviderOptions {
         instance_name: None,
         action_cache_address: store_setup.cas.address(),
-        root_ca_certs: None,
+        tls_config: tls::Config::default(),
         headers: BTreeMap::default(),
         concurrency_limit: 256,
         rpc_timeout: CACHE_READ_TIMEOUT,
@@ -765,7 +764,7 @@ async fn make_action_result_basic() {
     RemoteCacheProviderOptions {
       instance_name: None,
       action_cache_address: cas.address(),
-      root_ca_certs: None,
+      tls_config: tls::Config::default(),
       headers: BTreeMap::default(),
       concurrency_limit: 256,
       rpc_timeout: CACHE_READ_TIMEOUT,

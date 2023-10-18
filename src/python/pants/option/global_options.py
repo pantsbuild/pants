@@ -51,7 +51,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
-from pants.util.strutil import fmt_memory_size, softwrap
+from pants.util.strutil import Simplifier, fmt_memory_size, softwrap
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -74,6 +74,228 @@ class DynamicUIRenderer(Enum):
 
 
 _G = TypeVar("_G", bound="_GlobMatchErrorBehaviorOptionBase")
+
+_EXPERIMENTAL_SCHEME = "experimental:"
+
+
+def normalize_remote_address(addr: str | None) -> str | None:
+    if addr is None:
+        return None
+    return addr.removeprefix(_EXPERIMENTAL_SCHEME)
+
+
+@dataclass(frozen=True)
+class _RemoteAddressScheme:
+    schemes: tuple[str, ...]
+    supports_execution: bool
+    experimental: bool
+    description: str
+
+    def rendered_schemes(self) -> tuple[str, ...]:
+        """Convert the schemes into what the user needs to write.
+
+        For example: `experimental:some-scheme://` if experimental, or `some-scheme://` if not.
+
+        This includes the :// because that's clearer in docs etc, even if it's not 'technically'
+        part of the scheme.
+        """
+        # `experimental:` is used as a prefix-scheme, riffing on `view-source:https://...` in some
+        # web browsers. This ensures the experimental status is communicated right where a user is
+        # opting-in to using it.
+        experimental_prefix = _EXPERIMENTAL_SCHEME if self.experimental else ""
+        return tuple(f"{experimental_prefix}{scheme}://" for scheme in self.schemes)
+
+    @staticmethod
+    def _validate_address(
+        schemes: tuple[_RemoteAddressScheme, ...],
+        addr: str,
+        require_execution: bool,
+        context_for_diagnostics: str,
+    ) -> None:
+        addr_is_experimental = addr.startswith(_EXPERIMENTAL_SCHEME)
+        experimentalless_addr = addr.removeprefix(_EXPERIMENTAL_SCHEME)
+
+        matching_scheme = next(
+            (
+                (scheme_str, scheme)
+                for scheme in schemes
+                for scheme_str in scheme.schemes
+                if experimentalless_addr.startswith(f"{scheme_str}://")
+            ),
+            None,
+        )
+
+        if matching_scheme is None:
+            # This an address that doesn't seem to have a scheme we understand.
+            supported_schemes = ", ".join(
+                f"`{rendered}`" for scheme in schemes for rendered in scheme.rendered_schemes()
+            )
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    {context_for_diagnostics} has invalid value `{addr}`: it does not have a
+                    supported scheme.
+
+                    The value must start with one of: {supported_schemes}
+                    """
+                )
+            )
+
+        scheme_str, scheme = matching_scheme
+
+        if scheme.experimental and not addr_is_experimental:
+            # This is a URL like `some-scheme://` for a scheme that IS experimental, so let's tell
+            # the user they need to specify it as `experimental:some-scheme://`.
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    {context_for_diagnostics} has invalid value `{addr}`: the scheme `{scheme_str}`
+                    is experimental and thus must include the `{_EXPERIMENTAL_SCHEME}` prefix to
+                    opt-in to this less-stable Pants feature.
+
+                    Specify the value as `{_EXPERIMENTAL_SCHEME}{addr}`, with the
+                    `{_EXPERIMENTAL_SCHEME}` prefix.
+                    """
+                )
+            )
+
+        if not scheme.experimental and addr_is_experimental:
+            # This is a URL like `experimental:some-scheme://...` for a scheme that's NOT experimental,
+            # so let's tell the user to fix it up as `some-scheme://...`. It's low importance (we
+            # can unambigiously tell what they mean), so a warning is fine.
+            logger.warning(
+                softwrap(
+                    f"""
+                    {context_for_diagnostics} has value `{addr}` including `{_EXPERIMENTAL_SCHEME}`
+                    prefix, but the scheme `{scheme_str}` is not experimental.
+
+                    Specify the value as `{experimentalless_addr}`, without the `{_EXPERIMENTAL_SCHEME}`
+                    prefix.
+                    """
+                )
+            )
+
+        if require_execution and not scheme.supports_execution:
+            # The address is being used for remote execution, but the scheme doesn't support it.
+            supported_execution_schemes = ", ".join(
+                f"`{rendered}`"
+                for scheme in schemes
+                if scheme.supports_execution
+                for rendered in scheme.rendered_schemes()
+            )
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    {context_for_diagnostics} has invalid value `{addr}`: the scheme `{scheme_str}`
+                    does not support remote execution.
+
+                    Either remove the value (and disable remote execution), or use an address for a
+                    server does support remote execution, starting with one of:
+                    {supported_execution_schemes} """
+                )
+            )
+
+        # Validated, all good!
+
+    @staticmethod
+    def validate_address(addr: str, require_execution: bool, context_for_diagnostics: str) -> None:
+        _RemoteAddressScheme._validate_address(
+            _REMOTE_ADDRESS_SCHEMES,
+            addr=addr,
+            require_execution=require_execution,
+            context_for_diagnostics=context_for_diagnostics,
+        )
+
+    @staticmethod
+    def address_help(context: str, extra: str, requires_execution: bool) -> Callable[[object], str]:
+        def render_list_item(scheme_strs: tuple[str, ...], description: str) -> str:
+            schemes = ", ".join(f"`{s}`" for s in scheme_strs)
+            return f"- {schemes}: {description}"
+
+        def renderer(_: object) -> str:
+            supported_schemes = [
+                (scheme.rendered_schemes(), scheme.description)
+                for scheme in _REMOTE_ADDRESS_SCHEMES
+                if not requires_execution or (requires_execution and scheme.supports_execution)
+            ]
+            if requires_execution:
+                # If this is the help for remote execution, still include the schemes that don't
+                # support it, but mark them as such.
+                supported_schemes.append(
+                    (
+                        tuple(
+                            scheme_str
+                            for scheme in _REMOTE_ADDRESS_SCHEMES
+                            if not scheme.supports_execution
+                            for scheme_str in scheme.rendered_schemes()
+                        ),
+                        "Remote execution is not supported.",
+                    )
+                )
+
+            schemes = "\n\n".join(
+                render_list_item(scheme_strs, description)
+                for scheme_strs, description in supported_schemes
+            )
+            extra_inline = f"\n\n{extra}" if extra else ""
+            return softwrap(
+                f"""
+                The URI of a server/entity used as a {context}.{extra_inline}
+
+                Supported schemes:
+
+                {schemes}
+                """
+            )
+
+        return renderer
+
+
+# This duplicates logic/semantics around choosing a byte store/action cache (and, even, technically,
+# remote execution) provider: it'd be nice to have it in one place, but huonw thinks we do the
+# validation before starting the engine, and, in any case, we can refactor our way there (the remote
+# providers aren't configured in one place yet)
+_REMOTE_ADDRESS_SCHEMES = (
+    _RemoteAddressScheme(
+        schemes=("grpc", "grpcs"),
+        supports_execution=True,
+        experimental=False,
+        description=softwrap(
+            """
+            Use a [Remote Execution API](https://github.com/bazelbuild/remote-apis) remote
+            caching/execution server. `grpcs` uses TLS while `grpc` does not. Format:
+            `grpc[s]://$host:$port`.
+            """
+        ),
+    ),
+    _RemoteAddressScheme(
+        schemes=("file",),
+        supports_execution=False,
+        experimental=True,
+        description=softwrap(
+            """
+            Use a local directory as a 'remote' store, for testing, debugging, or potentially an NFS
+            mount. Format: `file://$path`. For example: `file:///tmp/remote-cache-example/` will
+            store within the `/tmp/remote-cache-example/` directory, creating it if necessary.
+            """
+        ),
+    ),
+    _RemoteAddressScheme(
+        schemes=("github-actions-cache+http", "github-actions-cache+https"),
+        supports_execution=False,
+        experimental=True,
+        description=softwrap(
+            f"""
+            Use the GitHub Actions Cache for fine-grained caching. This requires extracting
+            `ACTIONS_CACHE_URL` (passing it in `[GLOBAL].remote_store_address`) and
+            `ACTIONS_RUNTIME_TOKEN` (storing it in a file and passing
+            `[GLOBAL].remote_oauth_bearer_token_path` or setting `[GLOBAL].remote_store_headers` to
+            include `authorization: Bearer {{token...}}`). See
+            {doc_url('remote-caching#github-actions-cache')} for more details.
+            """
+        ),
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -149,10 +371,10 @@ class AuthPluginResult:
     the merge strategy if your plugin sets conflicting headers. Usually, you will want to preserve
     the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
 
-    If set, the returned `instance_name` will override `[GLOBAL].remote_instance_name`, `store_address`
-    will override `[GLOBAL].remote_store_address`, and `execution_address` will override
-    ``[GLOBAL].remote_execution_address``. The store address and execution address must be prefixed with
-    `grpc://` or `grpcs://`.
+    If set, the returned `instance_name` will override `[GLOBAL].remote_instance_name`,
+    `store_address` will override `[GLOBAL].remote_store_address`, and `execution_address` will
+    override ``[GLOBAL].remote_execution_address``. The addresses are interpreted and validated in
+    the same manner as the corresponding option.
     """
 
     state: AuthPluginState
@@ -165,23 +387,21 @@ class AuthPluginResult:
     plugin_name: str | None = None
 
     def __post_init__(self) -> None:
-        def assert_valid_address(addr: str | None, field_name: str) -> None:
-            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
-            if addr and not any(addr.startswith(scheme) for scheme in valid_schemes):
-                name = self.plugin_name or ""
-                raise ValueError(
-                    softwrap(
-                        f"""
-                        Invalid `{field_name}` in `AuthPluginResult` returned from
-                        `[GLOBAL].remote_auth_plugin` {name}.
+        name = self.plugin_name or ""
+        plugin_context = f"in `AuthPluginResult` returned from `[GLOBAL].remote_auth_plugin` {name}"
 
-                        Must start with `grpc://` or `grpcs://`, but was {addr}.
-                        """
-                    )
-                )
-
-        assert_valid_address(self.store_address, "store_address")
-        assert_valid_address(self.execution_address, "execution_address")
+        if self.store_address:
+            _RemoteAddressScheme.validate_address(
+                self.store_address,
+                require_execution=False,
+                context_for_diagnostics=f"`store_address` {plugin_context}",
+            )
+        if self.execution_address:
+            _RemoteAddressScheme.validate_address(
+                self.execution_address,
+                require_execution=True,
+                context_for_diagnostics=f"`execution_address` {plugin_context}",
+            )
 
     @property
     def is_available(self) -> bool:
@@ -468,6 +688,7 @@ class DynamicRemoteOptions:
         # NB: Tonic expects the schemes `http` and `https`, even though they are gRPC requests.
         # We validate that users set `grpc` and `grpcs` in the options system / plugin for clarity,
         # but then normalize to `http`/`https`.
+        # TODO: move this logic into the actual remote providers
         return re.sub(r"^grpc", "http", address) if address else None
 
 
@@ -485,6 +706,8 @@ class ExecutionOptions:
 
     remote_instance_name: str | None
     remote_ca_certs_path: str | None
+    remote_client_certs_path: str | None
+    remote_client_key_path: str | None
 
     keep_sandboxes: KeepSandboxes
     local_cache: bool
@@ -531,6 +754,8 @@ class ExecutionOptions:
             # General remote setup.
             remote_instance_name=dynamic_remote_options.instance_name,
             remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
+            remote_client_certs_path=bootstrap_options.remote_client_certs_path,
+            remote_client_key_path=bootstrap_options.remote_client_key_path,
             # Process execution setup.
             keep_sandboxes=GlobalOptions.resolve_keep_sandboxes(bootstrap_options),
             local_cache=bootstrap_options.local_cache,
@@ -615,6 +840,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # General remote setup.
     remote_instance_name=None,
     remote_ca_certs_path=None,
+    remote_client_certs_path=None,
+    remote_client_key_path=None,
     # Process execution setup.
     process_total_child_memory_usage=None,
     process_per_child_memory_usage=memory_size(_PER_CHILD_MEMORY_USAGE),
@@ -724,7 +951,9 @@ class BootstrapOptions:
         ),
     )
     log_levels_by_target = DictOption[str](
-        daemon=True,
+        # TODO: While we would like this option to be fingerprinted for the daemon, the Rust side
+        # option parser does not support dict options. See #19832.
+        # daemon=True,
         advanced=True,
         help=softwrap(
             """
@@ -791,7 +1020,7 @@ class BootstrapOptions:
     pants_workdir = StrOption(
         advanced=True,
         metavar="<dir>",
-        default=lambda _: os.path.join(get_buildroot(), ".pants.d"),
+        default=lambda _: os.path.join(get_buildroot(), ".pants.d", "workdir"),
         daemon=True,
         help="Write intermediate logs and output files to this dir.",
     )
@@ -816,7 +1045,7 @@ class BootstrapOptions:
     )
     pants_subprocessdir = StrOption(
         advanced=True,
-        default=lambda _: os.path.join(get_buildroot(), ".pids"),
+        default=lambda _: os.path.join(get_buildroot(), ".pants.d", "pids"),
         daemon=True,
         help=softwrap(
             """
@@ -1365,6 +1594,7 @@ class BootstrapOptions:
             """
         ),
     )
+    # TODO: update all these remote_... option helps for the new support for non-REAPI schemes
     remote_instance_name = StrOption(
         default=None,
         advanced=True,
@@ -1393,6 +1623,35 @@ class BootstrapOptions:
             """
         ),
     )
+    remote_client_certs_path = StrOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            Path to a PEM file containing client certificates used for verifying secure connections to
+            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address` when using
+            client authentication (mTLS).
+
+            If unspecified, will use regular TLS. Requires `remote_client_key_path` to also be
+            specified.
+            """
+        ),
+    )
+
+    remote_client_key_path = StrOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            Path to a PEM file containing a private key used for verifying secure connections to
+            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address` when using
+            client authentication (mTLS).
+
+            If unspecified, will use regular TLS. Requires `remote_client_certs_path` to also be
+            specified.
+            """
+        ),
+    )
     remote_oauth_bearer_token_path = StrOption(
         default=None,
         advanced=True,
@@ -1411,13 +1670,10 @@ class BootstrapOptions:
     remote_store_address = StrOption(
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_store_address),
-        help=softwrap(
-            """
-            The URI of a server used for the remote file store.
-
-            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
-            with TLS enabled. If `grpc` is used, TLS will be disabled.
-            """
+        help=_RemoteAddressScheme.address_help(
+            "remote file store",
+            extra="",
+            requires_execution=False,
         ),
     )
     remote_store_headers = DictOption(
@@ -1486,15 +1742,10 @@ class BootstrapOptions:
     remote_execution_address = StrOption(
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_execution_address),
-        help=softwrap(
-            """
-            The URI of a server used as a remote execution scheduler.
-
-            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
-            with TLS enabled. If `grpc` is used, TLS will be disabled.
-
-            You must also set `[GLOBAL].remote_store_address`, which will often be the same value.
-            """
+        help=_RemoteAddressScheme.address_help(
+            "remote execution scheduler",
+            extra="You must also set `[GLOBAL].remote_store_address`, which will often be the same value.",
+            requires_execution=True,
         ),
     )
     remote_execution_headers = DictOption(
@@ -1780,21 +2031,18 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 )
             )
 
-        def validate_remote_address(opt_name: str) -> None:
-            valid_schemes = [f"{scheme}://" for scheme in ("grpc", "grpcs")]
-            address = getattr(opts, opt_name)
-            if address and not any(address.startswith(scheme) for scheme in valid_schemes):
-                raise OptionsError(
-                    softwrap(
-                        f"""
-                        The `{opt_name}` option must begin with one of {valid_schemes}, but
-                        was {address}.
-                        """
-                    )
-                )
-
-        validate_remote_address("remote_execution_address")
-        validate_remote_address("remote_store_address")
+        if opts.remote_execution_address:
+            _RemoteAddressScheme.validate_address(
+                opts.remote_execution_address,
+                require_execution=True,
+                context_for_diagnostics="The `[GLOBAL].remote_execution_address` option",
+            )
+        if opts.remote_store_address:
+            _RemoteAddressScheme.validate_address(
+                opts.remote_store_address,
+                require_execution=False,
+                context_for_diagnostics="The `[GLOBAL].remote_store_address` option",
+            )
 
         # Ensure that remote headers are ASCII.
         def validate_remote_headers(opt_name: str) -> None:
@@ -1821,6 +2069,18 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         validate_remote_headers("remote_execution_headers")
         validate_remote_headers("remote_store_headers")
+
+        is_remote_client_key_set = opts.remote_client_key_path is not None
+        is_remote_client_certs_set = opts.remote_client_certs_path is not None
+        if is_remote_client_key_set != is_remote_client_certs_set:
+            raise OptionsError(
+                softwrap(
+                    """
+                    `--remote-client-key-path` and `--remote-client-certs-path` must be specified
+                    together.
+                    """
+                )
+            )
 
         illegal_build_ignores = [i for i in opts.build_ignore if i.startswith("!")]
         if illegal_build_ignores:
@@ -1934,6 +2194,15 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     @memoized_property
     def named_caches_dir(self) -> PurePath:
         return Path(self._named_caches_dir).resolve()
+
+    def output_simplifier(self) -> Simplifier:
+        """Create a `Simplifier` instance for use on stdout and stderr that will be shown to a
+        user."""
+        return Simplifier(
+            # it's ~never useful to show the chroot path to a user
+            strip_chroot_path=True,
+            strip_formatting=not self.colors,
+        )
 
 
 @dataclass(frozen=True)

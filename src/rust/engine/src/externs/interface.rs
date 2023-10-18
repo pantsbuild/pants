@@ -61,6 +61,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
   externs::process::register(m)?;
+  externs::pantsd::register(py, m)?;
   externs::scheduler::register(m)?;
   externs::target::register(m)?;
   externs::testutil::register(m)?;
@@ -82,10 +83,6 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_class::<PyTasks>()?;
   m.add_class::<PyThreadLocals>()?;
   m.add_class::<PyTypes>()?;
-
-  m.add_class::<externs::PyGeneratorResponseBreak>()?;
-  m.add_class::<externs::PyGeneratorResponseGet>()?;
-  m.add_class::<externs::PyGeneratorResponseGetMulti>()?;
 
   m.add_function(wrap_pyfunction!(stdio_initialize, m)?)?;
   m.add_function(wrap_pyfunction!(stdio_thread_console_set, m)?)?;
@@ -319,6 +316,8 @@ impl PyRemotingOptions {
     execution_process_cache_namespace: Option<String>,
     instance_name: Option<String>,
     root_ca_certs_path: Option<PathBuf>,
+    client_certs_path: Option<PathBuf>,
+    client_key_path: Option<PathBuf>,
     append_only_caches_base_path: Option<String>,
   ) -> Self {
     Self(RemotingOptions {
@@ -328,6 +327,8 @@ impl PyRemotingOptions {
       execution_process_cache_namespace,
       instance_name,
       root_ca_certs_path,
+      client_certs_path,
+      client_key_path,
       store_headers,
       store_chunk_bytes,
       store_rpc_retries,
@@ -1168,11 +1169,16 @@ fn tasks_task_end(py_tasks: &PyTasks) {
 }
 
 #[pyfunction]
-fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, inputs: Vec<&PyType>) {
+fn tasks_add_get(
+  py_tasks: &PyTasks,
+  output: &PyType,
+  inputs: Vec<&PyType>,
+  rule_id: Option<String>,
+) {
   let output = TypeId::new(output);
   let inputs = inputs.into_iter().map(TypeId::new).collect();
   let mut tasks = py_tasks.0.borrow_mut();
-  tasks.add_get(output, inputs);
+  tasks.add_get(output, inputs, rule_id);
 }
 
 #[pyfunction]
@@ -1659,8 +1665,9 @@ fn write_digest(
     let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
 
     // Python will have already validated that path_prefix is a relative path.
+    let path_prefix = Path::new(&path_prefix);
     let mut destination = PathBuf::new();
-    destination.push(core.build_root.clone());
+    destination.push(&core.build_root);
     destination.push(path_prefix);
 
     for subpath in &clear_paths {
@@ -1674,16 +1681,34 @@ fn write_digest(
     }
 
     block_in_place_and_wait(py, || async move {
-      core
-        .store()
+      let store = core.store();
+      store
         .materialize_directory(
           destination.clone(),
-          lifted_digest,
+          &core.build_root,
+          lifted_digest.clone(),
           true, // Force everything we write to be mutable
           &BTreeSet::new(),
           fs::Permissions::Writable,
         )
-        .await
+        .await?;
+
+      // Invalidate all the paths we've changed within `path_prefix`: both the paths we cleared and
+      // the files we've just written to.
+      let snapshot = store::Snapshot::from_digest(store, lifted_digest).await?;
+      let written_paths = snapshot.tree.leaf_paths();
+      let written_paths = written_paths.iter().map(|p| p as &Path);
+
+      let cleared_paths = clear_paths.iter().map(Path::new);
+
+      let changed_paths = written_paths
+        .chain(cleared_paths)
+        .map(|p| path_prefix.join(p))
+        .collect();
+
+      py_scheduler.0.invalidate_paths(&changed_paths);
+
+      Ok(())
     })
     .map_err(possible_store_missing_digest)
   })

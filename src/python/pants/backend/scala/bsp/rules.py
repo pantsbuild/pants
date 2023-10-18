@@ -269,7 +269,8 @@ async def bsp_resolve_scala_metadata(
         coursier_java_home = jdk_home
 
     scala_jar_uris = tuple(
-        build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
+        # TODO: Why is this hardcoded and not under pants_workdir?
+        build_root.pathlib_path.joinpath(".pants.d", "bsp", p).as_uri()
         for p in scala_runtime.files
     )
 

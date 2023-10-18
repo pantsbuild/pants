@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import os
 import re
 from dataclasses import dataclass, field
@@ -442,6 +443,10 @@ class Helper:
         return [
             install_protoc(),  # for `prost` crate
             {
+                "name": "Set rustup profile",
+                "run": "rustup set profile default",
+            },
+            {
                 "name": "Cache Rust toolchain",
                 "uses": "actions/cache@v3",
                 "with": {
@@ -547,7 +552,7 @@ class Helper:
             "continue-on-error": True,
             "with": {
                 "name": f"logs-{name.replace('/', '_')}-{self.platform_name()}",
-                "path": ".pants.d/*.log",
+                "path": ".pants.d/workdir/*.log",
             },
         }
 
@@ -607,7 +612,9 @@ def bootstrap_jobs(
         # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
         # pass on GHA MacOS containers.
         step_cmd = helper.wrap_cmd(
-            helper.maybe_append_cargo_test_parallelism("./cargo test --tests -- --nocapture")
+            helper.maybe_append_cargo_test_parallelism(
+                "./cargo test --locked --tests -- --nocapture"
+            )
         )
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
@@ -618,7 +625,7 @@ def bootstrap_jobs(
             [
                 "./build-support/bin/check_rust_pre_commit.sh",
                 helper.maybe_append_cargo_test_parallelism(
-                    "./cargo test --all --tests -- --nocapture"
+                    "./cargo test --locked --all --tests -- --nocapture"
                 ),
                 "./cargo check --benches",
                 "./cargo doc",
@@ -1173,10 +1180,12 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         # clone the repo, we're not so big as to need to optimize this.
                         "fetch-depth": "0",
                         "ref": f"{gha_expr('needs.release_info.outputs.build-ref')}",
+                        "fetch-tags": True,
                     },
                 },
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
+                *helper.bootstrap_caches(),
                 {
                     "name": "Generate announcement",
                     "run": dedent(
@@ -1222,6 +1231,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
                         """
                     ),
+                    "env": {
+                        "GH_TOKEN": "${{ github.token }}",
+                        "GH_REPO": "${{ github.repository }}",
+                    },
                 },
                 {
                     "name": "Publish GitHub Release",
@@ -1726,14 +1739,24 @@ def main() -> None:
     args = create_parser().parse_args()
     generated_yaml = generate()
     if args.check:
-        for path, content in generated_yaml.items():
-            if path.read_text() != content:
+        for path, expected in generated_yaml.items():
+            actual = path.read_text()
+            if actual != expected:
+                diff = difflib.unified_diff(
+                    actual.splitlines(),
+                    expected.splitlines(),
+                    fromfile="actual",
+                    tofile="expected",
+                    lineterm="",
+                )
                 die(
                     os.linesep.join(
                         (
                             f"Error: Generated path mismatched: {path}",
-                            "To re-generate, run: `./pants run src/python/pants_release/"
-                            "generate_github_workflows.py`",
+                            "To re-generate, run: `./pants run src/python/pants_release/generate_github_workflows.py`",
+                            "Also note that you might need to merge the latest changes to `main` to this branch.",
+                            "Diff:",
+                            *diff,
                         )
                     )
                 )

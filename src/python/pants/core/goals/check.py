@@ -8,8 +8,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generic, Iterable, TypeVar, cast
 
-import colors
-
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.multi_tool_goal_helper import (
     OnlyOption,
@@ -31,7 +29,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.strutil import Simplifier
 
 logger = logging.getLogger(__name__)
 
@@ -51,19 +49,13 @@ class CheckResult:
         process_result: FallibleProcessResult,
         *,
         partition_description: str | None = None,
-        strip_chroot_path: bool = False,
-        strip_formatting: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
         report: Digest = EMPTY_DIGEST,
     ) -> CheckResult:
-        def prep_output(s: bytes) -> str:
-            chroot = strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-            formatting = cast(str, colors.strip_color(chroot)) if strip_formatting else chroot
-            return formatting
-
         return CheckResult(
             exit_code=process_result.exit_code,
-            stdout=prep_output(process_result.stdout),
-            stderr=prep_output(process_result.stderr),
+            stdout=output_simplifier.simplify(process_result.stdout),
+            stderr=output_simplifier.simplify(process_result.stderr),
             partition_description=partition_description,
             report=report,
         )

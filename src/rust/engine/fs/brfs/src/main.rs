@@ -763,6 +763,14 @@ async fn main() {
 
   let runtime = task_executor::Executor::new();
 
+  let tls_config = match tls::Config::new(root_ca_certs, None) {
+    Ok(tls_config) => tls_config,
+    Err(err) => {
+      error!("Error when creating TLS configuration: {err:?}");
+      std::process::exit(1);
+    }
+  };
+
   let local_only_store =
     Store::local_only(runtime.clone(), store_path).expect("Error making local store.");
   let store = match args.value_of("server-address") {
@@ -770,7 +778,7 @@ async fn main() {
       .into_with_remote(RemoteOptions {
         cas_address: address.to_owned(),
         instance_name: args.value_of("remote-instance-name").map(str::to_owned),
-        tls_config: tls::Config::new_without_mtls(root_ca_certs),
+        tls_config,
         headers,
         chunk_size_bytes: 4 * 1024 * 1024,
         rpc_timeout: std::time::Duration::from_secs(5 * 60),

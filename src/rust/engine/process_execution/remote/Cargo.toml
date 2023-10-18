@@ -36,6 +36,9 @@ process_execution = { path = ".." }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 parking_lot = { workspace = true }
+opendal = { workspace = true }
+remote_provider = { path = "../../remote_provider" }
+remote_provider_reapi = { path = "../../remote_provider/remote_provider_reapi" }
 
 [dev-dependencies]
 env_logger = { workspace = true }

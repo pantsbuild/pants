@@ -1464,6 +1464,25 @@ def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_cont
         )
 
 
+def test_parametrize_single_value_16978(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generated(resolve=parametrize('demo'), source='f1.ext')",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", ResolveField.alias: "demo"},
+                Address("demo", parameters={"resolve": "demo"}),
+                residence_dir="demo",
+            ),
+        },
+        expected_dependencies={
+            "demo@resolve=demo": set(),
+        },
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # Test `SourcesField`. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------

@@ -59,7 +59,7 @@ class TestOptionsBootstrapper:
                 config=config,
                 env=env,
                 args=args,
-                pants_workdir=workdir or os.path.join(get_buildroot(), ".pants.d"),
+                pants_workdir=workdir or os.path.join(get_buildroot(), ".pants.d", "workdir"),
                 pants_distdir=distdir or os.path.join(get_buildroot(), "dist"),
             )
 

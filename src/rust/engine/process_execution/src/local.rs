@@ -211,6 +211,7 @@ impl super::CommandRunner for CommandRunner {
         // Prepare the workdir.
         let exclusive_spawn = prepare_workdir(
           workdir.path().to_owned(),
+          &self.work_dir_base,
           &req,
           req.input_digests.inputs.clone(),
           &self.store,
@@ -677,6 +678,7 @@ pub async fn prepare_workdir_digest(
 ///
 pub async fn prepare_workdir(
   workdir_path: PathBuf,
+  workdir_root_path: &Path,
   req: &Process,
   materialized_input_digest: DirectoryDigest,
   store: &Store,
@@ -717,6 +719,7 @@ pub async fn prepare_workdir(
     store
       .materialize_directory(
         workdir_path,
+        workdir_root_path,
         complete_input_digest,
         false,
         &mutable_paths,

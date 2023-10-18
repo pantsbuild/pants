@@ -38,6 +38,7 @@ use process_execution::{
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
+use crate::externs::{GeneratorInput, GeneratorResponse};
 use graph::{CompoundNode, Node, NodeError};
 use hashing::Digest;
 use rule_graph::{DependencyKey, Query};
@@ -1001,78 +1002,128 @@ pub struct Task {
 }
 
 impl Task {
+  // Handles the case where a generator requests a `Call` to a known `@rule`.
+  async fn gen_call(
+    context: &Context,
+    mut params: Params,
+    entry: Intern<rule_graph::Entry<Rule>>,
+    call: externs::Call,
+  ) -> NodeResult<Value> {
+    let context = context.clone();
+    let dependency_key = DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type)
+      .provided_params(call.inputs.iter().map(|t| *t.type_id()));
+    params.extend(call.inputs.iter().cloned());
+
+    let edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(&entry)
+      .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
+
+    // Find the entry for the Call.
+    let select = edges
+      .entry_for(&dependency_key)
+      .map(|entry| {
+        // The params for the Call replace existing params of the same type.
+        Select::new(params.clone(), call.output_type, entry)
+      })
+      .ok_or_else(|| {
+        // NB: The Python constructor for `Call()` will have already errored if
+        // `type(input) != input_type`.
+        throw(format!(
+          "{call} was not detected in your @rule body at rule compile time."
+        ))
+      })?;
+    select.run_node(context).await
+  }
+
+  // Handles the case where a generator produces a `Get` for an unknown `@rule`.
   async fn gen_get(
     context: &Context,
-    workunit: &mut RunningWorkunit,
-    params: &Params,
+    mut params: Params,
     entry: Intern<rule_graph::Entry<Rule>>,
-    gets: Vec<externs::Get>,
-  ) -> NodeResult<Vec<Value>> {
-    // While waiting for dependencies, mark the workunit for this Task blocked.
-    let _blocking_token = workunit.blocking();
-    let get_futures = gets
-      .into_iter()
-      .map(|get| {
-        let context = context.clone();
-        let mut params = params.clone();
-        async move {
-          let dependency_key =
-            DependencyKey::new(get.output).provided_params(get.inputs.iter().map(|t| *t.type_id()));
-          params.extend(get.inputs.iter().cloned());
+    get: externs::Get,
+  ) -> NodeResult<Value> {
+    let dependency_key =
+      DependencyKey::new(get.output).provided_params(get.inputs.iter().map(|t| *t.type_id()));
+    params.extend(get.inputs.iter().cloned());
 
-          let edges = context
-            .core
-            .rule_graph
-            .edges_for_inner(&entry)
-            .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
+    let edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(&entry)
+      .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
-          // Find the entry for the Get.
-          let select = edges
-            .entry_for(&dependency_key)
-            .map(|entry| {
-              // The subject of the Get is a new parameter that replaces an existing param of the same
-              // type.
-              Select::new(params.clone(), get.output, entry)
-            })
-            .or_else(|| {
-              // The Get might have involved a @union: if so, include its in_scope types in the
-              // lookup.
-              let in_scope_types = get
-                .input_types
-                .iter()
-                .find_map(|t| t.union_in_scope_types())?;
-              edges
-                .entry_for(
-                  &DependencyKey::new(get.output)
-                    .provided_params(get.inputs.iter().map(|k| *k.type_id()))
-                    .in_scope_params(in_scope_types),
-                )
-                .map(|entry| Select::new(params.clone(), get.output, entry))
-            })
-            .ok_or_else(|| {
-              if get.input_types.iter().any(|t| t.is_union()) {
-                throw(format!(
-                  "Invalid Get. Because an input type for `{get}` was annotated with `@union`, \
-                  the value for that type should be a member of that union. Did you \
-                  intend to register a `UnionRule`? If not, you may be using the incorrect \
-                  explicitly declared type.",
-                ))
-              } else {
-                // NB: The Python constructor for `Get()` will have already errored if
-                // `type(input) != input_type`.
-                throw(format!(
-                  "{get} was not detected in your @rule body at rule compile time. \
-                  Was the `Get` constructor called in a non async-function, or \
-                  was it inside an async function defined after the @rule? \
-                  Make sure the `Get` is defined before or inside the @rule body.",
-                ))
-              }
-            })?;
-          select.run_node(context).await
-        }
+    // Find the entry for the Get.
+    let select = edges
+      .entry_for(&dependency_key)
+      .map(|entry| {
+        // The subject of the Get is a new parameter that replaces an existing param of the same
+        // type.
+        Select::new(params.clone(), get.output, entry)
       })
-      .collect::<Vec<_>>();
-    future::try_join_all(get_futures).await
+      .or_else(|| {
+        // The Get might have involved a @union: if so, include its in_scope types in the
+        // lookup.
+        let in_scope_types = get
+          .input_types
+          .iter()
+          .find_map(|t| t.union_in_scope_types())?;
+        edges
+          .entry_for(
+            &DependencyKey::new(get.output)
+              .provided_params(get.inputs.iter().map(|k| *k.type_id()))
+              .in_scope_params(in_scope_types),
+          )
+          .map(|entry| Select::new(params.clone(), get.output, entry))
+      })
+      .ok_or_else(|| {
+        if get.input_types.iter().any(|t| t.is_union()) {
+          throw(format!(
+            "Invalid Get. Because an input type for `{get}` was annotated with `@union`, \
+             the value for that type should be a member of that union. Did you \
+             intend to register a `UnionRule`? If not, you may be using the incorrect \
+             explicitly declared type.",
+          ))
+        } else {
+          // NB: The Python constructor for `Get()` will have already errored if
+          // `type(input) != input_type`.
+          throw(format!(
+            "{get} was not detected in your @rule body at rule compile time. \
+             Was the `Get` constructor called in a non async-function, or \
+             was it inside an async function defined after the @rule? \
+             Make sure the `Get` is defined before or inside the @rule body.",
+          ))
+        }
+      })?;
+    select.run_node(context.clone()).await
+  }
+
+  // Handles the case where a generator produces either a `Get` or a generator.
+  fn gen_get_or_generator(
+    context: &Context,
+    params: Params,
+    entry: Intern<rule_graph::Entry<Rule>>,
+    gog: externs::GetOrGenerator,
+  ) -> BoxFuture<NodeResult<Value>> {
+    async move {
+      match gog {
+        externs::GetOrGenerator::Get(get) => Self::gen_get(context, params, entry, get).await,
+        externs::GetOrGenerator::Generator(generator) => {
+          // TODO: The generator may run concurrently with any other generators requested in an
+          // `All`/`MultiGet` (due to `future::try_join_all`), and so it needs its own workunit.
+          // Should look into removing this constraint: possibly by running all generators from an
+          // `All` on a tokio `LocalSet`.
+          in_workunit!("generator", Level::Trace, |workunit| async move {
+            let (value, _type_id) =
+              Self::generate(context, workunit, params, entry, generator).await?;
+            Ok(value)
+          })
+          .await
+        }
+      }
+    }
+    .boxed()
   }
 
   ///
@@ -1086,42 +1137,55 @@ impl Task {
     entry: Intern<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
-    let mut input: Option<Value> = None;
-    let mut err: Option<PyErr> = None;
+    let mut input = GeneratorInput::Initial;
     loop {
-      let context = context.clone();
-      let params = params.clone();
-      let response = Python::with_gil(|py| externs::generator_send(py, &generator, input, err))?;
+      let response = Python::with_gil(|py| {
+        externs::generator_send(py, &context.core.types.coroutine, &generator, input)
+      })?;
       match response {
-        externs::GeneratorResponse::Get(get) => {
-          let result = Self::gen_get(&context, workunit, &params, entry, vec![get]).await;
+        GeneratorResponse::Call(call) => {
+          let _blocking_token = workunit.blocking();
+          let result = Self::gen_call(context, params.clone(), entry, call).await;
           match result {
-            Ok(values) => {
-              input = Some(values.into_iter().next().unwrap());
-              err = None;
+            Ok(value) => {
+              input = GeneratorInput::Arg(value);
             }
             Err(throw @ Failure::Throw { .. }) => {
-              input = None;
-              err = Some(PyErr::from(throw));
+              input = GeneratorInput::Err(PyErr::from(throw));
             }
             Err(failure) => break Err(failure),
           }
         }
-        externs::GeneratorResponse::GetMulti(gets) => {
-          let result = Self::gen_get(&context, workunit, &params, entry, gets).await;
+        GeneratorResponse::Get(get) => {
+          let _blocking_token = workunit.blocking();
+          let result = Self::gen_get(context, params.clone(), entry, get).await;
           match result {
-            Ok(values) => {
-              input = Some(Python::with_gil(|py| externs::store_tuple(py, values)));
-              err = None;
+            Ok(value) => {
+              input = GeneratorInput::Arg(value);
             }
             Err(throw @ Failure::Throw { .. }) => {
-              input = None;
-              err = Some(PyErr::from(throw));
+              input = GeneratorInput::Err(PyErr::from(throw));
             }
             Err(failure) => break Err(failure),
           }
         }
-        externs::GeneratorResponse::Break(val, type_id) => {
+        GeneratorResponse::All(gogs) => {
+          let _blocking_token = workunit.blocking();
+          let get_futures = gogs
+            .into_iter()
+            .map(|gog| Self::gen_get_or_generator(context, params.clone(), entry, gog))
+            .collect::<Vec<_>>();
+          match future::try_join_all(get_futures).await {
+            Ok(values) => {
+              input = GeneratorInput::Arg(Python::with_gil(|py| externs::store_tuple(py, values)));
+            }
+            Err(throw @ Failure::Throw { .. }) => {
+              input = GeneratorInput::Err(PyErr::from(throw));
+            }
+            Err(failure) => break Err(failure),
+          }
+        }
+        GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));
         }
       }

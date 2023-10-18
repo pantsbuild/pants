@@ -33,7 +33,7 @@ def repo() -> Iterator[str]:
             ".gitignore": dedent(
                 f"""\
                 {Path(worktree).relative_to(get_buildroot())}
-                .pids
+                .pants.d/pids
                 __pycache__
                 .coverage.*  # For some reason, CI adds these files
                 """

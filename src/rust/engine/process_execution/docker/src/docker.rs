@@ -159,10 +159,7 @@ impl ImagePullCache {
     let image_cell = {
       let mut inner = self.inner.lock();
 
-      let scope = inner
-        .cache
-        .entry(image_pull_scope)
-        .or_insert_with(BTreeMap::default);
+      let scope = inner.cache.entry(image_pull_scope).or_default();
 
       let cell = scope
         .entry(image.to_string())
@@ -467,6 +464,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
         // DOCKER-NOTE: The input root will be bind mounted into the container.
         let exclusive_spawn = prepare_workdir(
           workdir.path().to_owned(),
+          &self.work_dir_base,
           &req,
           req.input_digests.inputs.clone(),
           &self.store,

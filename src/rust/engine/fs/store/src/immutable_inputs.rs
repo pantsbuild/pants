@@ -105,6 +105,7 @@ impl ImmutableInputs {
           .store
           .materialize_directory(
             dest.clone(),
+            self.0.workdir.path(),
             directory_digest,
             false,
             &BTreeSet::new(),

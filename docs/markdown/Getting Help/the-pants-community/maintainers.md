@@ -50,13 +50,27 @@ If there are demands on your time that prevent you from participating in the Pan
 If you no longer feel that you are able to contribute effectively as a maintainer, you may request to be converted to a [Maintainer Emeritus](doc:the-pants-community#former-team-members).
 
 
-### Release duty is optional
+### Maintainer of the Week
 
-Some maintainers also accept responsibility for publishing both development and stable releases of Pants. Releases are usually published once per week.
+Some maintainers also accept responsibility for being on the Maintainer of the Week (MOTW) rotation, which has three main responsibilities, in no particular order:
 
-We use a [Google Calendar](https://calendar.google.com/calendar/b/0/embed?src=hvd8qnf6fnp5klnk7u46q1noeo@group.calendar.google.com&ctz=America/Los_Angeles) to coordinate who is on release duty in a given week. When it is time for a release, the Maintainer who has release duty that week is responsible for updating the release documentation, creating release builds, and stewarding them through the review and [release process](doc:release-process).
+1. Shepherding [the week’s releases](doc:release-process):
+   - This includes updating the release documentation, creating release builds, and stewarding them through the review, as well as flagging (not necessarily fixing) any problems
+   - This will typically involve one dev release from `main`, and possibly one or more release candidates or stable releases (feel free to ask in #development for guidance on which releases).
+2. Greeting newcomers on the #welcome channel in Slack:
+   - The same script can be copy-pasted once or twice per week, depending on the number of newcomers.
+3. Triaging incoming GitHub PRs, issues and discussions. This includes:
+   - Ensuring that PRs have a `category:` label.
+   - Approving CI runs for first-time contributors.
+   - Assigning code reviewers for incoming PRs if not done so by the author.
+   - Responding to issues and/or assigning them to appropriate owners.
+   - Ensuring that [approved PRs](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+is%3Aopen+review%3Aapproved) are merged, if the author isn’t a Maintainer and so doesn’t have merge permissions.
 
-Release duty is a commitment beyond that of a Maintainer, and we do not expect Maintainers to take on this additional responsibility without enthusiastically opting in.
+The MOTW will also make a best-effort attempt to ensure that questions on Slack are responded to by someone. The MOTW is not personally expected to respond to every question thread, but to make sure things don’t fall through the cracks.
+
+The MOTW rotation is opt-in, and a maintainer is not required to join it, although we do encourage this. Please ask for help with any part in #development or #maintainers-confidential
+
+The MOTW rotation is managed on a dedicated Google calendar.
 
 
 Becoming a Maintainer
@@ -69,7 +83,7 @@ Maintainer candidates are nominated by existing Maintainers from among the wider
 -   Candidate understands the principles described on this page
 -   Candidate is committed to upholding Pants community standards, including the Code of Conduct
 
-Candidates will only be publicly nominated after one Maintainer has determined they are willing to become a Maintainer. 
+Candidates will only be publicly nominated after one Maintainer has determined they are willing to become a Maintainer.
 
 If a contributor has been nominated, and is willing to become a Maintainer, then their candidacy will be discussed and voted on by the existing Maintainers.
 

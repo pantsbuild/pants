@@ -23,7 +23,7 @@ use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{Graph, InvalidationResult};
 use hashing::Digest;
-use log::info;
+use log::{log, Level};
 use parking_lot::Mutex;
 // use docker::docker::{self, DOCKER, IMAGE_PULL_CACHE};
 use docker::docker;
@@ -40,7 +40,7 @@ use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
 use store::{self, ImmutableInputs, RemoteOptions, Store};
 use task_executor::Executor;
-use watch::{Invalidatable, InvalidationWatcher};
+use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
@@ -92,6 +92,8 @@ pub struct RemotingOptions {
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
   pub root_ca_certs_path: Option<PathBuf>,
+  pub client_certs_path: Option<PathBuf>,
+  pub client_key_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
   pub store_chunk_bytes: usize,
   pub store_rpc_retries: usize,
@@ -151,7 +153,7 @@ impl Core {
     enable_remote: bool,
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    tls_config: grpc_util::tls::Config,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Store, String> {
     let local_only = Store::local_only_with_options(
@@ -165,11 +167,12 @@ impl Core {
         .as_ref()
         .ok_or("Remote store required, but none configured")?
         .clone();
+
       local_only
         .into_with_remote(RemoteOptions {
           cas_address,
           instance_name: remoting_opts.instance_name.clone(),
-          tls_config: grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
+          tls_config,
           headers: remoting_opts.store_headers.clone(),
           chunk_size_bytes: remoting_opts.store_chunk_bytes,
           rpc_timeout: remoting_opts.store_rpc_timeout,
@@ -197,7 +200,7 @@ impl Core {
     named_caches: &NamedCaches,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    tls_config: grpc_util::tls::Config,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
@@ -278,7 +281,7 @@ impl Core {
           instance_name,
           process_cache_namespace,
           remoting_opts.append_only_caches_base_path.clone(),
-          root_ca_certs.clone(),
+          tls_config.clone(),
           remoting_opts.execution_headers.clone(),
           full_store.clone(),
           executor.clone(),
@@ -322,7 +325,7 @@ impl Core {
     local_cache: &PersistentCache,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    tls_config: grpc_util::tls::Config,
     remoting_opts: &RemotingOptions,
     remote_cache_read: bool,
     remote_cache_write: bool,
@@ -347,7 +350,7 @@ impl Core {
           RemoteCacheProviderOptions {
             instance_name,
             action_cache_address: remoting_opts.store_address.clone().unwrap(),
-            root_ca_certs: root_ca_certs.clone(),
+            tls_config,
             headers: remoting_opts.store_headers.clone(),
             concurrency_limit: remoting_opts.cache_rpc_concurrency,
             rpc_timeout: remoting_opts.cache_rpc_timeout,
@@ -384,7 +387,7 @@ impl Core {
     named_caches: &NamedCaches,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    tls_config: grpc_util::tls::Config,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
@@ -398,7 +401,7 @@ impl Core {
       named_caches,
       instance_name.clone(),
       process_cache_namespace.clone(),
-      root_ca_certs,
+      tls_config.clone(),
       exec_strategy_opts,
       remoting_opts,
       capabilities_cell_opt,
@@ -418,7 +421,7 @@ impl Core {
         local_cache,
         instance_name.clone(),
         process_cache_namespace.clone(),
-        root_ca_certs,
+        tls_config.clone(),
         remoting_opts,
         remote_cache_read,
         remote_cache_write,
@@ -439,7 +442,7 @@ impl Core {
         local_cache,
         instance_name.clone(),
         process_cache_namespace.clone(),
-        root_ca_certs,
+        tls_config,
         remoting_opts,
         false,
         remote_cache_write,
@@ -513,6 +516,37 @@ impl Core {
       None
     };
 
+    let client_certs = remoting_opts
+      .client_certs_path
+      .as_ref()
+      .map(|path| {
+        std::fs::read(path)
+          .map_err(|err| format!("Error reading client authentication certs file {path:?}: {err}"))
+      })
+      .transpose()?;
+
+    let client_key = remoting_opts
+      .client_key_path
+      .as_ref()
+      .map(|path| {
+        std::fs::read(path)
+          .map_err(|err| format!("Error reading client authentication key file {path:?}: {err}"))
+      })
+      .transpose()?;
+
+    let mtls_data = match (client_certs.as_ref(), client_key.as_ref()) {
+      (Some(cert), Some(key)) => Some((cert.deref(), key.deref())),
+      (None, None) => None,
+      _ => {
+        return Err(
+			"Both remote_client_certs_path and remote_client_key_path must be specified to enable client authentication, but only one was provided."
+            .to_owned(),
+        )
+      }
+    };
+
+    let tls_config = grpc_util::tls::Config::new(root_ca_certs.as_deref(), mtls_data)?;
+
     let need_remote_store = remoting_opts.execution_enable
       || exec_strategy_opts.remote_cache_read
       || exec_strategy_opts.remote_cache_write;
@@ -534,6 +568,7 @@ impl Core {
         local_store_options.store_dir, e
       )
     })?;
+
     let full_store = Self::make_store(
       &executor,
       &local_store_options,
@@ -541,7 +576,7 @@ impl Core {
       need_remote_store,
       &remoting_opts,
       &remoting_opts.store_address,
-      &root_ca_certs,
+      tls_config.clone(),
       capabilities_cell_opt.clone(),
     )
     .await
@@ -584,7 +619,7 @@ impl Core {
       &named_caches,
       remoting_opts.instance_name.clone(),
       remoting_opts.execution_process_cache_namespace.clone(),
-      &root_ca_certs,
+      tls_config.clone(),
       &exec_strategy_opts,
       &remoting_opts,
       capabilities_cell_opt,
@@ -684,8 +719,20 @@ impl Core {
 
 pub struct InvalidatableGraph(Graph<NodeKey>);
 
+fn caller_to_logging_info(caller: InvalidateCaller) -> (Level, &'static str) {
+  match caller {
+    // An external invalidation is driven by some other pants operation, and thus isn't as
+    // interesting, there's likely to be output about that action already, hence this can be logged
+    // quieter.
+    InvalidateCaller::External => (Level::Debug, "external"),
+    // A notify invalidation may have been triggered by a user-driven action that isn't otherwise
+    // visible in logs (e.g. file editing, branch switching), hence log it louder.
+    InvalidateCaller::Notify => (Level::Info, "notify"),
+  }
+}
+
 impl Invalidatable for InvalidatableGraph {
-  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize {
+  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: InvalidateCaller) -> usize {
     let InvalidationResult { cleared, dirtied } = self.invalidate_from_roots(false, move |node| {
       if let Some(fs_subject) = node.fs_subject() {
         paths.contains(fs_subject)
@@ -693,19 +740,28 @@ impl Invalidatable for InvalidatableGraph {
         false
       }
     });
-    info!(
+    let (level, caller) = caller_to_logging_info(caller);
+    log!(
+      level,
       "{} invalidation: cleared {} and dirtied {} nodes for: {:?}",
-      caller, cleared, dirtied, paths
+      caller,
+      cleared,
+      dirtied,
+      paths
     );
     cleared + dirtied
   }
 
-  fn invalidate_all(&self, caller: &str) -> usize {
+  fn invalidate_all(&self, caller: InvalidateCaller) -> usize {
     let InvalidationResult { cleared, dirtied } =
       self.invalidate_from_roots(false, |node| node.fs_subject().is_some());
-    info!(
+    let (level, caller) = caller_to_logging_info(caller);
+    log!(
+      level,
       "{} invalidation: cleared {} and dirtied {} nodes for all paths",
-      caller, cleared, dirtied
+      caller,
+      cleared,
+      dirtied
     );
     cleared + dirtied
   }

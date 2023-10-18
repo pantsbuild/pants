@@ -10,14 +10,15 @@ use std::convert::TryInto;
 use std::fmt;
 
 use lazy_static::lazy_static;
-use pyo3::exceptions::{PyAssertionError, PyException, PyTypeError};
+use pyo3::exceptions::{PyAssertionError, PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
+use pyo3::types::{PyBytes, PyDict, PySequence, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
 
 use logging::PythonLogLevel;
+use rule_graph::RuleId;
 
 use crate::interning::Interns;
 use crate::python::{Failure, Key, TypeId, Value};
@@ -30,6 +31,7 @@ mod interface;
 #[cfg(test)]
 mod interface_tests;
 pub mod nailgun;
+mod pantsd;
 pub mod process;
 pub mod scheduler;
 mod stdio;
@@ -39,6 +41,9 @@ pub mod workunits;
 
 pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add_class::<PyFailure>()?;
+  m.add_class::<PyGeneratorResponseCall>()?;
+  m.add_class::<PyGeneratorResponseGet>()?;
+
   m.add("EngineError", py.get_type::<EngineError>())?;
   m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
   m.add(
@@ -256,50 +261,114 @@ pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyA
   func.call1(args_tuple)
 }
 
-pub fn generator_send(
+pub(crate) enum GeneratorInput {
+  Initial,
+  Arg(Value),
+  Err(PyErr),
+}
+
+///
+/// A specification for how the native engine interacts with @rule coroutines:
+/// - coroutines may await:
+///   - `Get`/`Effect`/`Call`,
+///   - other coroutines,
+///   - sequences of those types.
+/// - we will `send` back a single value or tupled values to the coroutine, or `throw` an exception.
+/// - a coroutine will eventually return a single return value.
+///
+pub(crate) fn generator_send(
   py: Python,
+  generator_type: &TypeId,
   generator: &Value,
-  arg: Option<Value>,
-  err: Option<PyErr>,
+  input: GeneratorInput,
 ) -> Result<GeneratorResponse, Failure> {
-  let selectors = py.import("pants.engine.internals.selectors").unwrap();
-  let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
-  let py_arg = match (arg, err) {
-    (Some(arg), None) => arg.to_object(py),
-    (None, Some(err)) => err.into_py(py),
-    (None, None) => py.None(),
-    (Some(arg), Some(err)) => {
-      panic!("generator_send got both value and error: arg={arg:?}, err={err:?}")
+  let (response_unhandled, maybe_thrown) = match input {
+    GeneratorInput::Arg(arg) => {
+      let response = generator
+        .getattr(py, intern!(py, "send"))?
+        .call1(py, (&*arg,));
+      (response, None)
+    }
+    GeneratorInput::Err(err) => {
+      let throw_method = generator.getattr(py, intern!(py, "throw"))?;
+      if err.is_instance_of::<NativeEngineFailure>(py) {
+        let throw = err
+          .value(py)
+          .getattr(intern!(py, "failure"))?
+          .extract::<PyRef<PyFailure>>()?
+          .get_error(py);
+        let response = throw_method.call1(py, (&throw,));
+        (response, Some((throw, err)))
+      } else {
+        let response = throw_method.call1(py, (err,));
+        (response, None)
+      }
+    }
+    GeneratorInput::Initial => {
+      let response = generator
+        .getattr(py, intern!(py, "send"))?
+        .call1(py, (&py.None(),));
+      (response, None)
     }
   };
-  let response = native_engine_generator_send
-    .call1((generator.to_object(py), py_arg))
-    .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
-  if let Ok(b) = response.extract::<PyRef<PyGeneratorResponseBreak>>() {
-    Ok(GeneratorResponse::Break(
-      Value::new(b.0.clone_ref(py)),
-      TypeId::new(b.0.as_ref(py).get_type()),
-    ))
-  } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>() {
+  let response = match response_unhandled {
+    Err(e) if e.is_instance_of::<PyStopIteration>(py) => {
+      let value = e.into_value(py).getattr(py, intern!(py, "value"))?;
+      let type_id = TypeId::new(value.as_ref(py).get_type());
+      return Ok(GeneratorResponse::Break(Value::new(value), type_id));
+    }
+    Err(e) => {
+      match (maybe_thrown, e.cause(py)) {
+        (Some((thrown, err)), Some(cause)) if thrown.value(py).is(cause.value(py)) => {
+          // Preserve the engine traceback by using the wrapped failure error as cause. The cause
+          // will be swapped back again in `Failure::from_py_err_with_gil()` to preserve the python
+          // traceback.
+          e.set_cause(py, Some(err));
+        }
+        _ => (),
+      };
+      return Err(e.into());
+    }
+    Ok(r) => r,
+  };
+
+  let result = if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseCall>>(py) {
+    Ok(GeneratorResponse::Call(call.take()?))
+  } else if let Ok(get) = response.extract::<PyRef<PyGeneratorResponseGet>>(py) {
+    // It isn't necessary to differentiate between `Get` and `Effect` here, as the static
+    // analysis of `@rule`s has already validated usage.
     Ok(GeneratorResponse::Get(get.take()?))
-  } else if let Ok(get_multi) = response.extract::<PyRef<PyGeneratorResponseGetMulti>>() {
-    let gets = get_multi
-      .0
-      .as_ref(py)
-      .iter()
-      .map(|gr_get| {
-        let get = gr_get
-          .extract::<PyRef<PyGeneratorResponseGet>>()
-          .map_err(|e| Failure::from_py_err_with_gil(py, e))?
-          .take()?;
-        Ok::<Get, Failure>(get)
+  } else if let Ok(get_multi) = response.downcast::<PySequence>(py) {
+    // Was an `All` or `MultiGet`.
+    let gogs = get_multi
+      .iter()?
+      .map(|gog| {
+        let gog = gog?;
+        // TODO: Find a better way to check whether something is a coroutine... this seems
+        // unnecessarily awkward.
+        if gog.is_instance(generator_type.as_py_type(py).into())? {
+          Ok(GetOrGenerator::Generator(Value::new(gog.into())))
+        } else if let Ok(get) = gog.extract::<PyRef<PyGeneratorResponseGet>>() {
+          Ok(GetOrGenerator::Get(
+            get.take().map_err(PyException::new_err)?,
+          ))
+        } else {
+          Err(PyValueError::new_err(format!(
+            "Expected an `All` or `MultiGet` to receive either `Get`s or calls to rules, \
+            but got: {response}"
+          )))
+        }
       })
       .collect::<Result<Vec<_>, _>>()?;
-    Ok(GeneratorResponse::GetMulti(gets))
+    Ok(GeneratorResponse::All(gogs))
   } else {
-    panic!("native_engine_generator_send returned unrecognized type: {response:?}");
-  }
+    Err(PyValueError::new_err(format!(
+      "Async @rule error. Expected a rule query such as `Get(..)` or similar, but got: {response}"
+    )))
+  };
+
+  Ok(result?)
 }
 
 /// NB: Panics on failure. Only recommended for use with built-in types, such as
@@ -321,14 +390,116 @@ lazy_static! {
   pub static ref INTERNS: Interns = Interns::new();
 }
 
-#[pyclass]
-pub struct PyGeneratorResponseBreak(PyObject);
+/// Interprets the `Get` and `implicitly(..)` syntax, which reduces to two optional positional
+/// arguments, and results in input types and inputs.
+#[allow(clippy::type_complexity)]
+fn interpret_get_inputs(
+  py: Python,
+  input_arg0: Option<&PyAny>,
+  input_arg1: Option<&PyAny>,
+) -> PyResult<(SmallVec<[TypeId; 2]>, SmallVec<[Key; 2]>)> {
+  match (input_arg0, input_arg1) {
+    (None, None) => Ok((smallvec![], smallvec![])),
+    (None, Some(_)) => Err(PyAssertionError::new_err(
+      "input_arg1 set, but input_arg0 was None. This should not happen with PyO3.",
+    )),
+    (Some(input_arg0), None) => {
+      if input_arg0.is_instance_of::<PyType>() {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the shorthand form \
+            Get(OutputType, InputType(constructor args)), the second argument should be \
+            a constructor call, rather than a type, but given {input_arg0}."
+        )));
+      }
+      if let Ok(d) = input_arg0.downcast::<PyDict>() {
+        let mut input_types = SmallVec::new();
+        let mut inputs = SmallVec::new();
+        for (value, declared_type) in d.iter() {
+          input_types.push(TypeId::new(declared_type.downcast::<PyType>().map_err(
+            |_| {
+              PyTypeError::new_err(
+                "Invalid Get. Because the second argument was a dict, we expected the keys of the \
+            dict to be the Get inputs, and the values of the dict to be the declared \
+            types of those inputs.",
+              )
+            },
+          )?));
+          inputs.push(INTERNS.key_insert(py, value.into())?);
+        }
+        Ok((input_types, inputs))
+      } else {
+        Ok((
+          smallvec![TypeId::new(input_arg0.get_type())],
+          smallvec![INTERNS.key_insert(py, input_arg0.into())?],
+        ))
+      }
+    }
+    (Some(input_arg0), Some(input_arg1)) => {
+      let declared_type = input_arg0.downcast::<PyType>().map_err(|_| {
+        let input_arg0_type = input_arg0.get_type();
+        PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
+          input), the second argument must be a type, but given `{input_arg0}` of type \
+          {input_arg0_type}."
+        ))
+      })?;
+
+      if input_arg1.is_instance_of::<PyType>() {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. Because you are using the longhand form \
+          Get(OutputType, InputType, input), the third argument should be \
+          an object, rather than a type, but given {input_arg1}."
+        )));
+      }
+
+      let actual_type = input_arg1.get_type();
+      if !declared_type.is(actual_type) && !is_union(py, declared_type)? {
+        return Err(PyTypeError::new_err(format!(
+          "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
+          second argument, {declared_type}, but had the type {actual_type}."
+        )));
+      }
+
+      Ok((
+        smallvec![TypeId::new(declared_type)],
+        smallvec![INTERNS.key_insert(py, input_arg1.into())?],
+      ))
+    }
+  }
+}
+
+#[pyclass(subclass)]
+pub struct PyGeneratorResponseCall(RefCell<Option<Call>>);
 
 #[pymethods]
-impl PyGeneratorResponseBreak {
+impl PyGeneratorResponseCall {
   #[new]
-  fn __new__(val: PyObject) -> Self {
-    Self(val)
+  fn __new__(
+    py: Python,
+    rule_id: String,
+    output_type: &PyType,
+    input_arg0: Option<&PyAny>,
+    input_arg1: Option<&PyAny>,
+  ) -> PyResult<Self> {
+    let output_type = TypeId::new(output_type);
+    let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
+
+    Ok(Self(RefCell::new(Some(Call {
+      rule_id: RuleId::from_string(rule_id),
+      output_type,
+      input_types,
+      inputs,
+    }))))
+  }
+}
+
+impl PyGeneratorResponseCall {
+  fn take(&self) -> Result<Call, String> {
+    self
+      .0
+      .borrow_mut()
+      .take()
+      .ok_or_else(|| "A `Call` may only be consumed once.".to_owned())
   }
 }
 
@@ -364,76 +535,7 @@ impl PyGeneratorResponseGet {
     })?;
     let output = TypeId::new(product);
 
-    let (input_types, inputs) = match (input_arg0, input_arg1) {
-      (None, None) => (smallvec![], smallvec![]),
-      (None, Some(_)) => {
-        return Err(PyAssertionError::new_err(
-          "input_arg1 set, but input_arg0 was None. This should not happen with PyO3.",
-        ))
-      }
-      (Some(input_arg0), None) => {
-        if input_arg0.is_instance_of::<PyType>() {
-          return Err(PyTypeError::new_err(format!(
-            "Invalid Get. Because you are using the shorthand form \
-            Get(OutputType, InputType(constructor args)), the second argument should be \
-            a constructor call, rather than a type, but given {input_arg0}."
-          )));
-        }
-        if let Ok(d) = input_arg0.downcast::<PyDict>() {
-          let mut input_types = SmallVec::new();
-          let mut inputs = SmallVec::new();
-          for (value, declared_type) in d.iter() {
-            input_types.push(TypeId::new(declared_type.downcast::<PyType>().map_err(
-              |_| {
-                PyTypeError::new_err(
-              "Invalid Get. Because the second argument was a dict, we expected the keys of the \
-            dict to be the Get inputs, and the values of the dict to be the declared \
-            types of those inputs.",
-            )
-              },
-            )?));
-            inputs.push(INTERNS.key_insert(py, value.into())?);
-          }
-          (input_types, inputs)
-        } else {
-          (
-            smallvec![TypeId::new(input_arg0.get_type())],
-            smallvec![INTERNS.key_insert(py, input_arg0.into())?],
-          )
-        }
-      }
-      (Some(input_arg0), Some(input_arg1)) => {
-        let declared_type = input_arg0.downcast::<PyType>().map_err(|_| {
-          let input_arg0_type = input_arg0.get_type();
-          PyTypeError::new_err(format!(
-            "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
-          input), the second argument must be a type, but given `{input_arg0}` of type \
-          {input_arg0_type}."
-          ))
-        })?;
-
-        if input_arg1.is_instance_of::<PyType>() {
-          return Err(PyTypeError::new_err(format!(
-            "Invalid Get. Because you are using the longhand form \
-          Get(OutputType, InputType, input), the third argument should be \
-          an object, rather than a type, but given {input_arg1}."
-          )));
-        }
-
-        let actual_type = input_arg1.get_type();
-        if !declared_type.is(actual_type) && !is_union(py, declared_type)? {
-          return Err(PyTypeError::new_err(format!(
-            "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
-          second argument, {declared_type}, but had the type {actual_type}."
-          )));
-        }
-
-        (
-          smallvec![TypeId::new(declared_type)],
-          smallvec![INTERNS.key_insert(py, input_arg1.into())?],
-        )
-      }
-    };
+    let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
     Ok(Self(RefCell::new(Some(Get {
       output,
@@ -512,14 +614,32 @@ impl PyGeneratorResponseGet {
   }
 }
 
-#[pyclass]
-pub struct PyGeneratorResponseGetMulti(Py<PyTuple>);
+#[derive(Debug)]
+pub struct Call {
+  pub rule_id: RuleId,
+  pub output_type: TypeId,
+  pub input_types: SmallVec<[TypeId; 2]>,
+  pub inputs: SmallVec<[Key; 2]>,
+}
 
-#[pymethods]
-impl PyGeneratorResponseGetMulti {
-  #[new]
-  fn __new__(gets: Py<PyTuple>) -> Self {
-    Self(gets)
+impl fmt::Display for Call {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    write!(f, "Call({}, {}", self.rule_id, self.output_type)?;
+    match self.input_types.len() {
+      0 => write!(f, ")"),
+      1 => write!(f, ", {}, {})", self.input_types[0], self.inputs[0]),
+      _ => write!(
+        f,
+        ", {{{}}})",
+        self
+          .input_types
+          .iter()
+          .zip(self.inputs.iter())
+          .map(|(t, k)| { format!("{k}: {t}") })
+          .collect::<Vec<_>>()
+          .join(", ")
+      ),
+    }
   }
 }
 
@@ -551,8 +671,23 @@ impl fmt::Display for Get {
   }
 }
 
-pub enum GeneratorResponse {
-  Break(Value, TypeId),
+pub enum GetOrGenerator {
   Get(Get),
-  GetMulti(Vec<Get>),
+  Generator(Value),
+}
+
+pub enum GeneratorResponse {
+  /// The generator has completed with the given value of the given type.
+  Break(Value, TypeId),
+  /// The generator is awaiting a call to a known rule.
+  Call(Call),
+  /// The generator is awaiting a call to an unknown rule.
+  Get(Get),
+  /// The generator is awaiting calls to a series of generators or Gets, all of which will
+  /// produce `Call`s or `Get`s.
+  ///
+  /// The generators used in this position will either be call-by-name `@rule` stubs (which will
+  /// immediately produce a `Call`, and then return its value), or async "rule helpers", which
+  /// might use either the call-by-name or `Get` syntax.
+  All(Vec<GetOrGenerator>),
 }

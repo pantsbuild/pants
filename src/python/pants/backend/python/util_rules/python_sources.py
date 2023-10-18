@@ -56,6 +56,14 @@ class StrippedPythonSourceFiles:
 class PythonSourceFilesRequest:
     targets: tuple[Target, ...]
     include_resources: bool
+    # NB: Setting this to True may cause Digest merge collisions, in the presence of
+    #  relocated_files targets that relocate two different files to the same destination.
+    #  Set this to True only if you know this cannot logically happen (e.g., if it did
+    #  happen the underlying user operation would make no sense anyway).
+    #  For example, if the user relocates different config files to the same location
+    #  in different tests, there is no problem as long as we sandbox each test's sources
+    #  separately. The user may hit this issue if they run tests in batches, but in that
+    #  case they couldn't make that work even without Pants.
     include_files: bool
 
     def __init__(

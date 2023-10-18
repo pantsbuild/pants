@@ -29,7 +29,7 @@ from pants.util.frozendict import FrozenDict
 )
 def test_rename_deprecated_target_types_noops(lines: list[str]) -> None:
     content = "\n".join(lines).encode("utf-8")
-    result = fix_single(
+    result = fix_single.rule.func(  # type: ignore[attr-defined]
         RenameTargetsInFileRequest("BUILD", content=content),
         RenamedTargetTypes(FrozenDict({"deprecated_name": "new_name"})),
     )
@@ -46,7 +46,7 @@ def test_rename_deprecated_target_types_noops(lines: list[str]) -> None:
     ),
 )
 def test_rename_deprecated_target_types_rewrite(lines: list[str], expected: list[str]) -> None:
-    result = fix_single(
+    result = fix_single.rule.func(  # type: ignore[attr-defined]
         RenameTargetsInFileRequest("BUILD", content="\n".join(lines).encode("utf-8")),
         RenamedTargetTypes(FrozenDict({"deprecated_name": "new_name"})),
     )
