@@ -551,13 +551,12 @@ async def run_python_tests(
     )
 
     return TestResult.from_batched_fallible_process_result(
-        last_result,
+        results.results,
         batch=batch,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
         extra_output=extra_output_snapshot,
-        all_results=results.results,
         output_simplifier=global_options.output_simplifier(),
     )
 

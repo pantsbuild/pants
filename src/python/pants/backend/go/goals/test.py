@@ -709,7 +709,7 @@ async def run_go_tests(
         extra_output = await Get(Snapshot, Digest, output_digest)
 
     return TestResult.from_fallible_process_result(
-        process_result=result,
+        process_results=[result],
         address=field_set.address,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,

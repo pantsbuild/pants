@@ -247,7 +247,7 @@ async def run_javascript_tests(
         )
 
     return TestResult.from_batched_fallible_process_result(
-        result, batch, test.output, coverage_data=coverage_data
+        [result], batch, test.output, coverage_data=coverage_data
     )
 
 

@@ -137,7 +137,7 @@ class TestResult(EngineAwareReturnType):
 
     @staticmethod
     def from_fallible_process_result(
-        process_result: FallibleProcessResult,
+        process_results: List[FallibleProcessResult],
         address: Address,
         output_setting: ShowOutput,
         *,
@@ -145,9 +145,9 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
         log_extra_output: bool = False,
-        all_results: List[FallibleProcessResult] | None = None,
         output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
+        process_result = process_results[-1]
         return TestResult(
             exit_code=process_result.exit_code,
             stdout_bytes=process_result.stdout,
@@ -161,13 +161,13 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
             log_extra_output=log_extra_output,
-            all_results=all_results or [process_result],
+            all_results=process_results,
             output_simplifier=output_simplifier,
         )
 
     @staticmethod
     def from_batched_fallible_process_result(
-        process_result: FallibleProcessResult,
+        process_results: List[FallibleProcessResult],
         batch: TestRequest.Batch[_TestFieldSetT, Any],
         output_setting: ShowOutput,
         *,
@@ -175,9 +175,9 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
         log_extra_output: bool = False,
-        all_results: List[FallibleProcessResult] | None = None,
         output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
+        process_result = process_results[-1]
         return TestResult(
             exit_code=process_result.exit_code,
             stdout_bytes=process_result.stdout,
@@ -193,7 +193,7 @@ class TestResult(EngineAwareReturnType):
             log_extra_output=log_extra_output,
             output_simplifier=output_simplifier,
             partition_description=batch.partition_metadata.description,
-            all_results=all_results or [process_result],
+            all_results=process_results,
         )
 
     @property

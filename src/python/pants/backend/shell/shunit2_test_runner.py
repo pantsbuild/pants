@@ -252,7 +252,7 @@ async def run_tests_with_shunit2(
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return TestResult.from_fallible_process_result(
-        result,
+        process_results=[result],
         address=field_set.address,
         output_setting=test_subsystem.output,
         output_simplifier=global_options.output_simplifier(),
