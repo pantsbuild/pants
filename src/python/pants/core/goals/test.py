@@ -895,17 +895,15 @@ async def run_tests(
         )
 
     to_test = list(zip(test_batches, environment_names))
-    results = (
-        await MultiGet(  # noqa: PNT30: We only know that we need to rerun the test after we run it
-            Get(
-                TestResult,
-                {
-                    batch: TestRequest.Batch,
-                    environment_name: EnvironmentName,
-                },
-            )
-            for batch, environment_name in to_test
+    results = await MultiGet(
+        Get(
+            TestResult,
+            {
+                batch: TestRequest.Batch,
+                environment_name: EnvironmentName,
+            },
         )
+        for batch, environment_name in to_test
     )
 
     # Print summary.
@@ -1055,8 +1053,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    suffix = f"{elapsed_print}{source_desc}"
-    return f"{sigil} {result.description} {status}{attempt_msg} {suffix}."
+    return f"{sigil} {result.description} {status}{attempt_msg} {elapsed_print}{source_desc}."
 
 
 @dataclass(frozen=True)

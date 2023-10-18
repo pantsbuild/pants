@@ -514,7 +514,7 @@ async def run_python_tests(
     results = await Get(
         ProcessResultWithRetries, RunProcWithRetry(setup.process, HARDCODED_RETRY_COUNT)
     )
-    last_result = results.last  # TODO: report all for digestion
+    last_result = results.last
 
     def warning_description() -> str:
         description = batch.elements[0].address.spec
