@@ -22,6 +22,7 @@ use task_executor::Executor;
 use tempfile::Builder;
 use tokio::fs::hard_link;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::sync::{Semaphore, SemaphorePermit};
 use workunit_store::ObservationMetric;
 
 /// How big a file must be to be stored as a file on disk.
@@ -58,6 +59,7 @@ trait UnderlyingByteStore {
     initial_lease: bool,
     src_is_immutable: bool,
     expected_digest: Digest,
+    file_source: &FileSource,
     src: PathBuf,
   ) -> Result<(), String>;
 
@@ -115,6 +117,7 @@ impl UnderlyingByteStore for ShardedLmdb {
     initial_lease: bool,
     src_is_immutable: bool,
     expected_digest: Digest,
+    _file_source: &FileSource,
     src: PathBuf,
   ) -> Result<(), String> {
     self
@@ -122,7 +125,11 @@ impl UnderlyingByteStore for ShardedLmdb {
         initial_lease,
         src_is_immutable,
         expected_digest,
-        move || std::fs::File::open(&src),
+        move || {
+          // NB: This file access is bounded by the number of blocking threads on the runtime, and
+          // so we don't bother to acquire against the file handle limit in this case.
+          std::fs::File::open(&src)
+        },
       )
       .await
   }
@@ -401,11 +408,13 @@ impl UnderlyingByteStore for ShardedFSDB {
     _initial_lease: bool,
     src_is_immutable: bool,
     expected_digest: Digest,
+    file_source: &FileSource,
     src: PathBuf,
   ) -> Result<(), String> {
     let mut attempts = 0;
     loop {
-      let reader = tokio::fs::File::open(&src)
+      let (reader, _permit) = file_source
+        .open_readonly(&src)
         .await
         .map_err(|e| format!("Failed to open {src:?}: {e}"))?;
 
@@ -519,6 +528,26 @@ impl UnderlyingByteStore for ShardedFSDB {
   }
 }
 
+/// A best-effort limit on the number of concurrent attempts to open files.
+#[derive(Debug)]
+struct FileSource {
+  open_files: Semaphore,
+}
+
+impl FileSource {
+  async fn open_readonly(&self, path: &Path) -> Result<(tokio::fs::File, SemaphorePermit), String> {
+    let permit = self
+      .open_files
+      .acquire()
+      .await
+      .map_err(|e| format!("Failed to acquire permit to open file: {e}"))?;
+    let file = tokio::fs::File::open(path)
+      .await
+      .map_err(|e| e.to_string())?;
+    Ok((file, permit))
+  }
+}
+
 #[derive(Debug, Clone)]
 pub struct ByteStore {
   inner: Arc<InnerStore>,
@@ -532,6 +561,7 @@ struct InnerStore {
   file_lmdb: Result<Arc<ShardedLmdb>, String>,
   directory_lmdb: Result<Arc<ShardedLmdb>, String>,
   file_fsdb: ShardedFSDB,
+  file_source: FileSource,
 }
 
 impl ByteStore {
@@ -581,6 +611,13 @@ impl ByteStore {
           lease_time: options.lease_time,
           dest_initializer: Arc::new(Mutex::default()),
           hardlinkable_destinations: Arc::new(Mutex::default()),
+        },
+        // NB: This is much larger than the number of cores on modern machines, but still small
+        // enough to be a "reasonable" number of open files to set in `ulimit`. This is a
+        // best-effort limit (because it does-not/cannot cover all of the places where we open
+        // files).
+        file_source: FileSource {
+          open_files: Semaphore::new(1024),
         },
       }),
     })
@@ -799,7 +836,10 @@ impl ByteStore {
     src: PathBuf,
   ) -> Result<Digest, String> {
     let digest = {
-      let mut file = tokio::fs::File::open(src.clone())
+      let (mut file, _permit) = self
+        .inner
+        .file_source
+        .open_readonly(&src)
         .await
         .map_err(|e| format!("Failed to open {src:?}: {e}"))?;
       async_copy_and_hash(&mut file, &mut tokio::io::sink())
@@ -811,7 +851,13 @@ impl ByteStore {
       self
         .inner
         .file_fsdb
-        .store(initial_lease, src_is_immutable, digest, src)
+        .store(
+          initial_lease,
+          src_is_immutable,
+          digest,
+          &self.inner.file_source,
+          src,
+        )
         .await?;
     } else {
       let dbs = match entry_type {
@@ -820,6 +866,8 @@ impl ByteStore {
       };
       let _ = dbs
         .store(initial_lease, src_is_immutable, digest, move || {
+          // NB: This file access is bounded by the number of blocking threads on the runtime, and
+          // so we don't bother to acquire against the file handle limit in this case.
           std::fs::File::open(&src)
         })
         .await;
