@@ -129,11 +129,11 @@ To set environment variables, use the parameter `env: Mapping[str, str]`, like y
 
 The `Effect` will return an `InteractiveProcessResult`, which has a single field `exit_code: int`.
 
-### Retries in case of failure
+### ProcessWithRetries
 
-A `Process` can be retried by wrapping it in a `RunProcWithRetry` and requesting a `ProcessResultWithRetries`. The last result, whether succeeded or failed, is available with the `last` parameter. For example, the following will allow for up to 5 attempts at running `my_process`:
+A `Process` can be retried by wrapping it in a `ProcessWithRetries` and requesting a `ProcessResultWithRetries`. The last result, whether succeeded or failed, is available with the `last` parameter. For example, the following will allow for up to 5 attempts at running `my_process`:
 
 ```python
-results = await Get(ProcessResultWithRetries, RunProcWithRetry(my_process, 5))
+results = await Get(ProcessResultWithRetries, ProcessWithRetries(my_process, 5))
 last_result = results.last
 ```

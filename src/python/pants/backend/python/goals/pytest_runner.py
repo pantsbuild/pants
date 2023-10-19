@@ -71,7 +71,7 @@ from pants.engine.process import (
     Process,
     ProcessCacheScope,
     ProcessResultWithRetries,
-    RunProcWithRetry,
+    ProcessWithRetries,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -512,7 +512,8 @@ async def run_python_tests(
     )
 
     results = await Get(
-        ProcessResultWithRetries, RunProcWithRetry(setup.process, test_subsystem.attempts_default)
+        ProcessResultWithRetries,
+        ProcessWithRetries(setup.process, test_subsystem.attempts_default),
     )
     last_result = results.last
 

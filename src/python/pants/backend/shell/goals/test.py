@@ -71,7 +71,7 @@ async def test_shell_command(
 
     shell_result = await Get(FallibleProcessResult, Process, shell_process)
     return TestResult.from_fallible_process_result(
-        process_results=[shell_result],
+        process_results=(shell_result,),
         address=field_set.address,
         output_setting=test_subsystem.output,
     )

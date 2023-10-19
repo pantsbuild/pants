@@ -184,7 +184,7 @@ async def run_junit_test(
     xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir_prefix))
 
     return TestResult.from_fallible_process_result(
-        process_results=[process_result],
+        process_results=(process_result,),
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=xml_results,

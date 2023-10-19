@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, List, Optional, Sequence, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, Sequence, Tuple, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -97,7 +97,7 @@ class TestResult(EngineAwareReturnType):
     # True if the core test rules should log that extra output was written.
     log_extra_output: bool = False
     # All results including failed attempts
-    process_results: List[FallibleProcessResult] = field(default_factory=list)
+    process_results: Tuple[FallibleProcessResult, ...] = field(default_factory=tuple)
 
     output_simplifier: Simplifier = Simplifier()
 
@@ -137,7 +137,7 @@ class TestResult(EngineAwareReturnType):
 
     @staticmethod
     def from_fallible_process_result(
-        process_results: List[FallibleProcessResult],
+        process_results: Tuple[FallibleProcessResult, ...],
         address: Address,
         output_setting: ShowOutput,
         *,
@@ -167,7 +167,7 @@ class TestResult(EngineAwareReturnType):
 
     @staticmethod
     def from_batched_fallible_process_result(
-        process_results: List[FallibleProcessResult],
+        process_results: Tuple[FallibleProcessResult, ...],
         batch: TestRequest.Batch[_TestFieldSetT, Any],
         output_setting: ShowOutput,
         *,

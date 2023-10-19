@@ -7,7 +7,7 @@ import dataclasses
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, List, Mapping
+from typing import Iterable, List, Mapping, Tuple
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
@@ -148,7 +148,7 @@ class Process:
 
 
 @dataclass(frozen=True)
-class RunProcWithRetry:
+class ProcessWithRetries:
     proc: Process
     attempts: int
 
@@ -195,7 +195,7 @@ class FallibleProcessResult:
 
 @dataclass(frozen=True)
 class ProcessResultWithRetries:
-    results: List[FallibleProcessResult]
+    results: Tuple[FallibleProcessResult, ...]
 
     @property
     def last(self):
@@ -316,7 +316,7 @@ def fallible_to_exec_result_or_raise(
 
 
 @rule
-async def run_proc_with_retry(req: RunProcWithRetry) -> ProcessResultWithRetries:
+async def run_proc_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
     results: List[FallibleProcessResult] = []
     for attempt in range(0, req.attempts):
         proc = dataclasses.replace(req.proc, attempt=attempt)
@@ -328,7 +328,7 @@ async def run_proc_with_retry(req: RunProcWithRetry) -> ProcessResultWithRetries
         results.append(result)
         if result.exit_code == 0:
             break
-    return ProcessResultWithRetries(results)
+    return ProcessResultWithRetries(tuple(results))
 
 
 @dataclass(frozen=True)

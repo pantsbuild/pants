@@ -256,7 +256,7 @@ result = await Get(FallibleProcessResult, Process, my_test_process)
 Simply wrap the process in types that request the retries:
 ```python
 results = await Get(
-    ProcessResultWithRetries, RunProcWithRetry(my_test_process, retry_count)
+    ProcessResultWithRetries, ProcessWithRetries(my_test_process, retry_count)
 )
 last_result = results.last
 ```
