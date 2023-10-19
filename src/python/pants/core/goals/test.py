@@ -97,7 +97,7 @@ class TestResult(EngineAwareReturnType):
     # True if the core test rules should log that extra output was written.
     log_extra_output: bool = False
     # All results including failed attempts
-    all_results: List[FallibleProcessResult] = field(default_factory=list)
+    process_results: List[FallibleProcessResult] = field(default_factory=list)
 
     output_simplifier: Simplifier = Simplifier()
 
@@ -161,7 +161,7 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
             log_extra_output=log_extra_output,
-            all_results=process_results,
+            process_results=process_results,
             output_simplifier=output_simplifier,
         )
 
@@ -193,7 +193,7 @@ class TestResult(EngineAwareReturnType):
             log_extra_output=log_extra_output,
             output_simplifier=output_simplifier,
             partition_description=batch.partition_metadata.description,
-            all_results=process_results,
+            process_results=process_results,
         )
 
     @property
@@ -1026,7 +1026,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         result.result_metadata is not None
     ), "Skipped test results should not be outputted in the test summary"
     succeeded = result.exit_code == 0
-    retried = len(result.all_results) > 1
+    retried = len(result.process_results) > 1
 
     if succeeded:
         if not retried:
@@ -1039,7 +1039,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         status = "failed"
 
     if retried:
-        attempt_msg = f" after {len(result.all_results)} attempts"
+        attempt_msg = f" after {len(result.process_results)} attempts"
     else:
         attempt_msg = ""
 
