@@ -584,6 +584,13 @@ pub struct Process {
   pub execution_environment: ProcessExecutionEnvironment,
 
   pub remote_cache_speculation_delay: std::time::Duration,
+
+  ///
+  /// The attempt number, in the case this Process is being retried.
+  ///
+  /// This is included in hash/eq so it creates a unique node in the runtime graph.
+  ///
+  pub attempt: usize,
 }
 
 impl Process {
@@ -620,6 +627,7 @@ impl Process {
         strategy: ProcessExecutionStrategy::Local,
       },
       remote_cache_speculation_delay: std::time::Duration::from_millis(0),
+      attempt: 0,
     }
   }
 

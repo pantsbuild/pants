@@ -67,10 +67,11 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import (
-    FallibleProcessResult,
     InteractiveProcess,
     Process,
     ProcessCacheScope,
+    ProcessResultWithRetries,
+    ProcessWithRetries,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -509,7 +510,12 @@ async def run_python_tests(
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
     )
-    result = await Get(FallibleProcessResult, Process, setup.process)
+
+    results = await Get(
+        ProcessResultWithRetries,
+        ProcessWithRetries(setup.process, test_subsystem.attempts_default),
+    )
+    last_result = results.last
 
     def warning_description() -> str:
         description = batch.elements[0].address.spec
@@ -522,7 +528,7 @@ async def run_python_tests(
     coverage_data = None
     if test_subsystem.use_coverage:
         coverage_snapshot = await Get(
-            Snapshot, DigestSubset(result.output_digest, PathGlobs([".coverage"]))
+            Snapshot, DigestSubset(last_result.output_digest, PathGlobs([".coverage"]))
         )
         if coverage_snapshot.files == (".coverage",):
             coverage_data = PytestCoverageData(
@@ -534,19 +540,19 @@ async def run_python_tests(
     xml_results_snapshot = None
     if setup.results_file_name:
         xml_results_snapshot = await Get(
-            Snapshot, DigestSubset(result.output_digest, PathGlobs([setup.results_file_name]))
+            Snapshot, DigestSubset(last_result.output_digest, PathGlobs([setup.results_file_name]))
         )
         if xml_results_snapshot.files != (setup.results_file_name,):
             logger.warning(f"Failed to generate JUnit XML data for {warning_description()}.")
     extra_output_snapshot = await Get(
-        Snapshot, DigestSubset(result.output_digest, PathGlobs([f"{_EXTRA_OUTPUT_DIR}/**"]))
+        Snapshot, DigestSubset(last_result.output_digest, PathGlobs([f"{_EXTRA_OUTPUT_DIR}/**"]))
     )
     extra_output_snapshot = await Get(
         Snapshot, RemovePrefix(extra_output_snapshot.digest, _EXTRA_OUTPUT_DIR)
     )
 
     return TestResult.from_batched_fallible_process_result(
-        result,
+        results.results,
         batch=batch,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,

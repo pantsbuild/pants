@@ -218,6 +218,16 @@ The default test runners for these CI providers have the following resources. If
 | Circle CI, Linux, free plan  | 2      | 4 GB    | [link](https://circleci.com/docs/2.0/credits/#free-plan)                                                                                    |
 | GitLab, Linux shared runners | 1      | 3.75 GB | [link](https://docs.gitlab.com/ee/user/gitlab_com/#linux-shared-runners)                                                                    |
 
+Tip: automatically retry failed tests
+-------------------------------------
+
+Pants can automatically retry failed tests. This can help keep your builds passing even with flaky tests, like integration tests.
+
+```toml
+[test]
+attempts_default = 3
+```
+
 Tip: store Pants logs as artifacts
 ----------------------------------
 
