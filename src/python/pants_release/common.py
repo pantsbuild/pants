@@ -52,5 +52,5 @@ def sorted_contributors(git_range: str) -> list[str]:
         .stdout.decode()
         .splitlines()
     )
-    contributors -= {"dependabot[bot]"}
+    contributors -= {"dependabot[bot]", "Worker Pants (Pantsbuild GitHub Automation Bot)"}
     return sorted(contributors)
