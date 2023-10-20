@@ -258,10 +258,7 @@ notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bf
 num_cpus = "1"
 num_enum = "0.5"
 once_cell = "1.18"
-# TODO: this is waiting for several changes to be released (likely in 0.41):
-# https://github.com/apache/incubator-opendal/pull/3163
-# https://github.com/apache/incubator-opendal/pull/3177
-opendal = { git = "https://github.com/apache/incubator-opendal", rev = "97bcef60eb0b515bd2442ab5b671080766fa35eb", default-features = false, features = [
+opendal = { version = "0.41", default-features = false, features = [
   "services-memory",
   "services-fs",
   "services-ghac",
