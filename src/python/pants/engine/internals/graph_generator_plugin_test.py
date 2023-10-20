@@ -51,9 +51,6 @@ def build_rule_runner(*plugin_registrations) -> RuleRunner:
     return RuleRunner(
         rules=[
             QueryRule(Addresses, [Specs]),
-            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
-            QueryRule(Owners, [OwnersRequest]),
             QueryRule(AllTargets, []),
             *plugin_registrations,
         ],
