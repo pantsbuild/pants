@@ -433,7 +433,7 @@ def test_generated_plugin_field_parametrized() -> None:
             QueryRule(Owners, [OwnersRequest]),
             QueryRule(AllTargets, []),
             MockGeneratedTarget.register_plugin_field(PythonResolveField),
-            MockTargetGenerator.register_plugin_field(PythonResolveField),
+            MockTargetGenerator.register_plugin_field(PythonResolveField, as_moved_field=True),
             # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
             # resolve_field_default_factory,
         ],

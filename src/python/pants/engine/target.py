@@ -437,6 +437,10 @@ class Target:
             other.field_values,
         )
 
+    @classmethod
+    def _plugin_field_bases(cls) -> tuple[type, ...]:
+        return (cls.PluginField,)
+
     @final
     @classmethod
     @memoized_method
@@ -447,7 +451,8 @@ class Target:
             cls = classes.pop()
             classes.extend(cls.__bases__)
             if issubclass(cls, Target):
-                result.update(cast("set[type[Field]]", union_membership.get(cls.PluginField)))
+                for plugin_field_base in cls._plugin_field_bases():
+                    result.update(cast("set[type[Field]]", union_membership.get(plugin_field_base)))
 
         return tuple(result)
 
@@ -1056,11 +1061,17 @@ class TargetGenerator(Target):
                 "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
             )
 
-    # def register_plugin_field(cls, field: Type[Field], *, as_moved_field=False) -> UnionRule:
-    #     if as_moved_field:
-    #         return UnionRule(cls.MovedPluginField, )
-    #     else:
-    #         super().register_plugin_field(field)
+    @classmethod
+    def register_plugin_field(cls, field: Type[Field], *, as_moved_field=False) -> UnionRule:
+        if as_moved_field:
+            return UnionRule(cls.MovedPluginField, field)
+        else:
+            return super().register_plugin_field(field)
+
+    @classmethod
+    def _plugin_field_bases(cls) -> tuple[type, ...]:
+        return (*super()._plugin_field_bases(), cls.MovedPluginField)
+
 
 
 class TargetFilesGenerator(TargetGenerator):
