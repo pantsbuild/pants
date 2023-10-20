@@ -437,7 +437,6 @@ class Target:
             other.field_values,
         )
 
-
     @classmethod
     @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
@@ -1039,7 +1038,7 @@ class TargetGenerator(Target):
 
     @distinct_union_type_per_subclass
     class MovedPluginField:
-        """A plugin field that should be moved into the generated targets"""
+        """A plugin field that should be moved into the generated targets."""
 
     def validate(self) -> None:
         super().validate()
@@ -1063,7 +1062,6 @@ class TargetGenerator(Target):
         else:
             return super().register_plugin_field(field)
 
-
     @classmethod
     @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
@@ -1075,7 +1073,9 @@ class TargetGenerator(Target):
     @final
     @classmethod
     @memoized_method
-    def _find_moved_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+    def _find_moved_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
         result: set[type[Field]] = set()
         classes = [cls]
         while classes:
@@ -1089,7 +1089,9 @@ class TargetGenerator(Target):
     @final
     @classmethod
     @memoized_method
-    def _find_copied_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+    def _find_copied_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
         return super()._find_plugin_fields(union_membership)
 
 

@@ -417,7 +417,7 @@ def _parametrized_target_generators_with_templates(
     )
     moved_fields = (
         *target_type.moved_fields,
-        *target_type._find_moved_plugin_fields(union_membership)
+        *target_type._find_moved_plugin_fields(union_membership),
     )
     for field_type in copied_fields:
         field_value = generator_fields.get(field_type.alias, None)
