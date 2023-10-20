@@ -218,6 +218,67 @@ def test_non_generated_single_plugin_field() -> None:
     assert targets
 
 
+def test_generated_single_plugin_field() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            QueryRule(Addresses, [Specs]),
+            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
+            QueryRule(Owners, [OwnersRequest]),
+            QueryRule(AllTargets, []),
+            MockGeneratedTarget.register_plugin_field(PythonResolveField),
+            MockTargetGenerator.register_plugin_field(PythonResolveField),
+            # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
+            # resolve_field_default_factory,
+        ],
+        target_types=[MockTargetGenerator, MockGeneratedTarget],
+        objects={"parametrize": Parametrize},
+        # NB: The `graph` module masks the environment is most/all positions. We disable the
+        # inherent environment so that the positions which do require the environment are
+        # highlighted.
+        inherent_environment=None,
+    )
+
+    # build_content = "generator(tags=parametrize(t1=['t1'], t2=['t2']), sources=['f1.ext'])"
+    build_content = "generator(tags=['t1'], sources=['f1.ext'], python_resolve='gpu')"
+    files = ["f1.ext"]
+    address = Address("demo")
+
+    rule_runner.write_files(
+        {
+            f"{address.spec_path}/BUILD": build_content,
+            **{os.path.join(address.spec_path, f): "" for f in files},
+        }
+    )
+    owners = rule_runner.request(
+        Owners,
+        [
+            OwnersRequest(
+                tuple(["demo/BUILD"]),
+                match_if_owning_build_file_included_in_sources=True,
+            )
+        ],
+    )
+
+    assert {Address("demo", relative_file_path="f1.ext")} == set(owners)
+
+    targets = rule_runner.request(AllTargets, [])
+
+    expected = MockGeneratedTarget(
+        unhydrated_values={
+            SingleSourceField.alias: "f1.ext",
+            Tags.alias: ["t1"],
+            PythonResolveField.alias: "gpu",
+        },
+        union_membership=rule_runner.union_membership,
+        address=Address("demo", relative_file_path="f1.ext"),
+        residence_dir='demo',
+    )
+
+    assert targets[0] == expected
+    assert targets
+
+
 def test_non_generated_single_plugin_field_parametrized() -> None:
     rule_runner = RuleRunner(
         rules=[

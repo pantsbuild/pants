@@ -1037,6 +1037,10 @@ class TargetGenerator(Target):
     # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    @distinct_union_type_per_subclass
+    class MovedPluginField:
+        """A plugin field that should be moved into the generated targets"""
+
     def validate(self) -> None:
         super().validate()
 
@@ -1051,6 +1055,12 @@ class TargetGenerator(Target):
                 "`TargetGenerator.copied_field`. `Dependencies` fields should be "
                 "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
             )
+
+    # def register_plugin_field(cls, field: Type[Field], *, as_moved_field=False) -> UnionRule:
+    #     if as_moved_field:
+    #         return UnionRule(cls.MovedPluginField, )
+    #     else:
+    #         super().register_plugin_field(field)
 
 
 class TargetFilesGenerator(TargetGenerator):
