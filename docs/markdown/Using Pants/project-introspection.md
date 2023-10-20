@@ -88,6 +88,28 @@ helloworld/main.py:lib
 helloworld/translator/translator.py:lib
 ```
 
+> 📘 List third-party dependencies
+> 
+> To list third-party dependencies of one or more targets in a `requirements.txt` style format, you can pipe the output of the above into `pants peek` (see below for more details) filtering by `python_requirement`, and parsing the output with `jq`:
+> 
+> ```bash
+> ❯ pants dependencies --transitive helloworld/main.py:lib | xargs pants peek --filter-target-type=python_requirement | jq -r '.[]["requirements"][]'
+> ansicolors==1.1.8
+> beautifulsoup4==4.11.1
+> chevron==0.14.0
+> debugpy==1.6.0
+> fastapi==0.78.0
+> ...
+> ```
+> 
+> A more resilient version of this command is
+> ```bash
+> ❯ pants dependencies --transitive helloworld/main.py:lib | tr '\n' '\0' | xargs -0 pants peek --filter-target-type=python_requirement | jq -r '.[]["requirements"][]' | sort -u
+> ```
+> Note that:
+> - `tr '\n' '\0'` and `xargs -0` account for target names that contain characters that `xargs` would normally split on (e.g. spaces/tabs).
+> - `sort -u` combines the output in cases where `xargs` invokes `pants peek` more than once. (This may happen when `pants dependencies` outputs many targets, for example if you pass in `::`).
+
 `dependents` - find which targets depend on a target
 ----------------------------------------------------
 
