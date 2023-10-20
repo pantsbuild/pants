@@ -30,15 +30,13 @@ class PythonSourceRootField(StringField):
 
 
 def rules():
-    rules = [
+    return [
         ProtobufSourceTarget.register_plugin_field(ProtobufPythonInterpreterConstraintsField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(
             ProtobufPythonInterpreterConstraintsField
         ),
         ProtobufSourceTarget.register_plugin_field(ProtobufPythonResolveField),
-        ProtobufSourcesGeneratorTarget.register_plugin_field(ProtobufPythonResolveField, move=True),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(ProtobufPythonResolveField),
         ProtobufSourceTarget.register_plugin_field(PythonSourceRootField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PythonSourceRootField),
     ]
-
-    return rules

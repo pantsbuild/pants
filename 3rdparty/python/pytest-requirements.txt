@@ -6,4 +6,3 @@ pytest-asyncio
 pytest-html
 pytest-icdiff
 pygments
-pydevd-pycharm==232.9559.58

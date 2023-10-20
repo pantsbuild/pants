@@ -1,9 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from typing import Type
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.engine.internals.native_engine import Field
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -129,13 +127,6 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     )
     settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `protobuf_source` target for each file in the `sources` field."
-
-    @classmethod
-    def register_plugin_field(cls, field: Type[Field], move: bool = False) -> UnionRule:
-        rules = super().register_plugin_field(field)
-        if move and field not in cls.moved_fields:
-            cls.moved_fields = (*cls.moved_fields, field)
-        return rules
 
 
 def rules():
