@@ -437,11 +437,7 @@ class Target:
             other.field_values,
         )
 
-    @classmethod
-    def _plugin_field_bases(cls) -> tuple[type, ...]:
-        return (cls.PluginField,)
 
-    @final
     @classmethod
     @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
@@ -451,8 +447,7 @@ class Target:
             cls = classes.pop()
             classes.extend(cls.__bases__)
             if issubclass(cls, Target):
-                for plugin_field_base in cls._plugin_field_bases():
-                    result.update(cast("set[type[Field]]", union_membership.get(plugin_field_base)))
+                result.update(cast("set[type[Field]]", union_membership.get(cls.PluginField)))
 
         return tuple(result)
 
@@ -1068,10 +1063,34 @@ class TargetGenerator(Target):
         else:
             return super().register_plugin_field(field)
 
-    @classmethod
-    def _plugin_field_bases(cls) -> tuple[type, ...]:
-        return (*super()._plugin_field_bases(), cls.MovedPluginField)
 
+    @classmethod
+    @memoized_method
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+        return (
+            *cls._find_copied_plugin_fields(union_membership),
+            *cls._find_moved_plugin_fields(union_membership),
+        )
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_moved_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+        result: set[type[Field]] = set()
+        classes = [cls]
+        while classes:
+            cls = classes.pop()
+            classes.extend(cls.__bases__)
+            if issubclass(cls, TargetGenerator):
+                result.update(cast("set[type[Field]]", union_membership.get(cls.MovedPluginField)))
+
+        return tuple(result)
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_copied_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+        return super()._find_plugin_fields(union_membership)
 
 
 class TargetFilesGenerator(TargetGenerator):

@@ -45,16 +45,15 @@ class MockTargetGenerator(TargetFilesGenerator):
     moved_fields = (Tags,)
 
 
-def test_generate_single_simple() -> None:
-    rule_runner = RuleRunner(
+def build_rule_runner(*plugin_registrations) -> RuleRunner:
+    return RuleRunner(
         rules=[
             QueryRule(Addresses, [Specs]),
             QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
             QueryRule(Owners, [OwnersRequest]),
             QueryRule(AllTargets, []),
-            # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
-            # resolve_field_default_factory,
+            *plugin_registrations,
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
@@ -64,7 +63,10 @@ def test_generate_single_simple() -> None:
         inherent_environment=None,
     )
 
-    # build_content = "generator(tags=parametrize(t1=['t1'], t2=['t2']), sources=['f1.ext'])"
+
+def test_generate_single_simple() -> None:
+    rule_runner = build_rule_runner()
+
     build_content = "generator(tags=['t1'], sources=['f1.ext'])"
     files = ["f1.ext"]
     address = Address("demo")
@@ -103,23 +105,7 @@ def test_generate_single_simple() -> None:
 
 
 def test_non_generated_single() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(Addresses, [Specs]),
-            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
-            QueryRule(Owners, [OwnersRequest]),
-            QueryRule(AllTargets, []),
-            # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
-            # resolve_field_default_factory,
-        ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
-        objects={"parametrize": Parametrize},
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
-        inherent_environment=None,
-    )
+    rule_runner = build_rule_runner()
 
     build_content = "generated(tags=['t1'], source='f1.ext')"
     files = ["f1.ext"]
@@ -159,26 +145,10 @@ def test_non_generated_single() -> None:
 
 
 def test_non_generated_single_plugin_field() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(Addresses, [Specs]),
-            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
-            QueryRule(Owners, [OwnersRequest]),
-            QueryRule(AllTargets, []),
-            MockGeneratedTarget.register_plugin_field(PythonResolveField),
-            # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
-            # resolve_field_default_factory,
-        ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
-        objects={"parametrize": Parametrize},
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
-        inherent_environment=None,
+    rule_runner = build_rule_runner(
+        MockGeneratedTarget.register_plugin_field(PythonResolveField),
     )
 
-    # build_content = "generator(tags=parametrize(t1=['t1'], t2=['t2']), sources=['f1.ext'])"
     build_content = "generated(tags=['t1'], source='f1.ext', python_resolve='gpu')"
     files = ["f1.ext"]
     address = Address("demo")
@@ -219,24 +189,9 @@ def test_non_generated_single_plugin_field() -> None:
 
 
 def test_generated_single_plugin_field() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(Addresses, [Specs]),
-            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
-            QueryRule(Owners, [OwnersRequest]),
-            QueryRule(AllTargets, []),
+    rule_runner = build_rule_runner(
             MockGeneratedTarget.register_plugin_field(PythonResolveField),
             MockTargetGenerator.register_plugin_field(PythonResolveField),
-            # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
-            # resolve_field_default_factory,
-        ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
-        objects={"parametrize": Parametrize},
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
-        inherent_environment=None,
     )
 
     # build_content = "generator(tags=parametrize(t1=['t1'], t2=['t2']), sources=['f1.ext'])"
@@ -280,23 +235,8 @@ def test_generated_single_plugin_field() -> None:
 
 
 def test_non_generated_single_plugin_field_parametrized() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(Addresses, [Specs]),
-            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
-            QueryRule(Owners, [OwnersRequest]),
-            QueryRule(AllTargets, []),
+    rule_runner = build_rule_runner(
             MockGeneratedTarget.register_plugin_field(PythonResolveField),
-            # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
-            # resolve_field_default_factory,
-        ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
-        objects={"parametrize": Parametrize},
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
-        inherent_environment=None,
     )
 
     # build_content = "generator(tags=parametrize(t1=['t1'], t2=['t2']), sources=['f1.ext'])"
@@ -354,23 +294,8 @@ def test_non_generated_single_plugin_field_parametrized() -> None:
 
 
 def test_moved_field_parametrized() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(Addresses, [Specs]),
-            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
-            QueryRule(Owners, [OwnersRequest]),
-            QueryRule(AllTargets, []),
+    rule_runner = build_rule_runner(
             MockGeneratedTarget.register_plugin_field(PythonResolveField),
-            # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
-            # resolve_field_default_factory,
-        ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
-        objects={"parametrize": Parametrize},
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
-        inherent_environment=None,
     )
 
     build_content = "generator(tags=parametrize(pt1=['t1'], pt2=['t2']), sources=['f1.ext'])"
@@ -425,24 +350,9 @@ def test_moved_field_parametrized() -> None:
 
 
 def test_generated_plugin_field_parametrized() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(Addresses, [Specs]),
-            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
-            QueryRule(Owners, [OwnersRequest]),
-            QueryRule(AllTargets, []),
-            MockGeneratedTarget.register_plugin_field(PythonResolveField),
-            MockTargetGenerator.register_plugin_field(PythonResolveField, as_moved_field=True),
-            # UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
-            # resolve_field_default_factory,
-        ],
-        target_types=[MockTargetGenerator, MockGeneratedTarget],
-        objects={"parametrize": Parametrize},
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
-        inherent_environment=None,
+    rule_runner = build_rule_runner(
+        MockGeneratedTarget.register_plugin_field(PythonResolveField),
+        MockTargetGenerator.register_plugin_field(PythonResolveField, as_moved_field=True),
     )
 
     build_content = "generator(tags=['t1'], sources=['f1.ext'], python_resolve=parametrize(g='gpu',c='cpu'))"
