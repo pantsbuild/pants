@@ -85,72 +85,7 @@ def assert_generated(
     assert expected_targets == set(targets)
 
 
-def test_generate_single_simple() -> None:
-    rule_runner = build_rule_runner()
-    assert_generated(
-        rule_runner,
-        build_content="generator(tags=['t1'], sources=['f1.ext'])",
-        files=["f1.ext"],
-        address=Address("demo"),
-        expected_targets={
-            MockGeneratedTarget(
-                unhydrated_values={
-                    SingleSourceField.alias: "f1.ext",
-                    Tags.alias: ["t1"],
-                },
-                address=Address("demo", relative_file_path="f1.ext"),
-                residence_dir="demo",
-            )
-        },
-    )
-
-
-def test_non_generated_single() -> None:
-    rule_runner = build_rule_runner()
-
-    assert_generated(
-        rule_runner,
-        build_content="generated(tags=['t1'], source='f1.ext')",
-        files=["f1.ext"],
-        address=Address("demo"),
-        expected_targets={
-            MockGeneratedTarget(
-                unhydrated_values={
-                    SingleSourceField.alias: "f1.ext",
-                    Tags.alias: ["t1"],
-                },
-                address=Address("demo"),
-                residence_dir="demo",
-            )
-        },
-    )
-
-
-def test_non_generated_single_plugin_field() -> None:
-    rule_runner = build_rule_runner(
-        MockGeneratedTarget.register_plugin_field(PythonResolveField),
-    )
-    assert_generated(
-        rule_runner,
-        build_content="generated(tags=['t1'], source='f1.ext', python_resolve='gpu')",
-        files=["f1.ext"],
-        address=Address("demo"),
-        expected_targets={
-            MockGeneratedTarget(
-                unhydrated_values={
-                    SingleSourceField.alias: "f1.ext",
-                    Tags.alias: ["t1"],
-                    PythonResolveField.alias: "gpu",
-                },
-                union_membership=rule_runner.union_membership,
-                address=Address("demo"),
-                residence_dir="demo",
-            )
-        },
-    )
-
-
-def test_generated_single_plugin_field() -> None:
+def test_generate_target_with_a_plugin_field() -> None:
     rule_runner = build_rule_runner(
         MockGeneratedTarget.register_plugin_field(PythonResolveField),
         MockTargetGenerator.register_plugin_field(PythonResolveField),
@@ -175,7 +110,7 @@ def test_generated_single_plugin_field() -> None:
     )
 
 
-def test_non_generated_single_plugin_field_parametrized() -> None:
+def test_parametrize_target_with_a_plugin_field() -> None:
     rule_runner = build_rule_runner(
         MockGeneratedTarget.register_plugin_field(PythonResolveField),
     )
@@ -209,7 +144,7 @@ def test_non_generated_single_plugin_field_parametrized() -> None:
     )
 
 
-def test_moved_field_parametrized() -> None:
+def test_generate_target_with_parametrized_moved_normal_field() -> None:
     rule_runner = build_rule_runner(
         MockGeneratedTarget.register_plugin_field(PythonResolveField),
     )
@@ -241,16 +176,13 @@ def test_moved_field_parametrized() -> None:
     )
 
 
-def test_generated_plugin_field_parametrized() -> None:
+def test_generate_target_with_parametrized_moved_plugin_field() -> None:
     rule_runner = build_rule_runner(
         MockGeneratedTarget.register_plugin_field(PythonResolveField),
         MockTargetGenerator.register_plugin_field(PythonResolveField, as_moved_field=True),
     )
     assert_generated(
-        build_rule_runner(
-            MockGeneratedTarget.register_plugin_field(PythonResolveField),
-            MockTargetGenerator.register_plugin_field(PythonResolveField, as_moved_field=True),
-        ),
+        rule_runner,
         build_content="generator(tags=['t1'], sources=['f1.ext'], python_resolve=parametrize(g='gpu',c='cpu'))",
         files=["f1.ext"],
         address=Address("demo"),
