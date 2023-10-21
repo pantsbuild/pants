@@ -17,8 +17,6 @@ import toml
 import yaml
 from pants_release.common import die
 
-from pants.util.strutil import softwrap
-
 HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
