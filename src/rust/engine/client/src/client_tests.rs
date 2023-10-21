@@ -7,16 +7,16 @@ use std::time::SystemTime;
 
 #[tokio::test]
 async fn test_client() {
-  let (build_root, pants_subprocessdir) = launch_pantsd();
+    let (build_root, pants_subprocessdir) = launch_pantsd();
 
-  let port = pantsd::probe(&build_root, pants_subprocessdir.path()).unwrap();
-  let exit_code = execute_command(
-    SystemTime::now(),
-    ConnectionSettings::new(port),
-    std::env::vars().collect(),
-    ["pants", "-V"].iter().map(ToString::to_string).collect(),
-  )
-  .await
-  .unwrap();
-  assert_eq!(0, exit_code)
+    let port = pantsd::probe(&build_root, pants_subprocessdir.path()).unwrap();
+    let exit_code = execute_command(
+        SystemTime::now(),
+        ConnectionSettings::new(port),
+        std::env::vars().collect(),
+        ["pants", "-V"].iter().map(ToString::to_string).collect(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(0, exit_code)
 }
