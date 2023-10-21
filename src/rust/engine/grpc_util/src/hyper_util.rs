@@ -11,17 +11,17 @@ use hyper::server::conn::{AddrIncoming, AddrStream};
 pub struct AddrIncomingWithStream(pub AddrIncoming);
 
 impl Deref for AddrIncomingWithStream {
-  type Target = AddrIncoming;
+    type Target = AddrIncoming;
 
-  fn deref(&self) -> &Self::Target {
-    &self.0
-  }
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl Stream for AddrIncomingWithStream {
-  type Item = Result<AddrStream, std::io::Error>;
+    type Item = Result<AddrStream, std::io::Error>;
 
-  fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-    Pin::new(&mut self.0).poll_accept(cx)
-  }
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.0).poll_accept(cx)
+    }
 }
