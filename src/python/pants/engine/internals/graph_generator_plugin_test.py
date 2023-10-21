@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
 from pants.engine.internals.native_engine import Address
 from pants.engine.internals.parametrize import Parametrize
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
     AllTargets,
+    InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
@@ -82,7 +86,8 @@ def assert_generated(
         }
     )
     targets = rule_runner.request(AllTargets, [])
-    assert expected_targets == set(targets)
+    if expected_targets:
+        assert expected_targets == set(targets)
 
 
 def test_generate_target_with_a_plugin_field() -> None:
@@ -144,7 +149,7 @@ def test_parametrize_target_with_a_plugin_field() -> None:
     )
 
 
-def test_generate_target_with_parametrized_moved_normal_field() -> None:
+def test_generate_target_with_parametrized_moved_field() -> None:
     rule_runner = build_rule_runner(
         MockGeneratedTarget.register_plugin_field(PythonResolveField),
     )
@@ -213,3 +218,23 @@ def test_generate_target_with_parametrized_moved_plugin_field() -> None:
             ),
         },
     )
+
+
+def test_cannot_parametrize_generated_target_with_copied_plugin_field() -> None:
+    rule_runner = build_rule_runner(
+        MockGeneratedTarget.register_plugin_field(PythonResolveField),
+        MockTargetGenerator.register_plugin_field(PythonResolveField),  # no as_moved_field=True
+    )
+    with pytest.raises(ExecutionError) as e:
+        assert_generated(
+            rule_runner,
+            build_content="generator(tags=['t1'], sources=['f1.ext'], python_resolve=parametrize(g='gpu',c='cpu'))",
+            files=["f1.ext"],
+            address=Address("demo"),
+        )
+
+    (field_exception,) = e.value.wrapped_exceptions
+    assert isinstance(field_exception, InvalidFieldException)
+    msg = str(field_exception)
+
+    assert "Only fields which will be moved to generated targets may be parametrized" in msg
