@@ -641,7 +641,6 @@ jobs:
     name: Set Merge OK
     needs:
     - classify_changes
-    - check_labels
     - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
     - bootstrap_pants_macos11_x86_64
@@ -649,7 +648,6 @@ jobs:
     - build_wheels_linux_x86_64
     - build_wheels_macos10_15_x86_64
     - build_wheels_macos11_arm64
-    - check_labels
     - classify_changes
     - lint_python
     - test_python_linux_arm64
