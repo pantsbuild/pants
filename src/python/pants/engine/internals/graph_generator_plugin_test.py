@@ -6,8 +6,6 @@ import os
 
 import pytest
 
-from pants.base.specs import Specs
-from pants.engine.addresses import Addresses
 from pants.engine.internals.native_engine import Address
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
@@ -42,7 +40,6 @@ class PythonResolveField(StringField):
 class MockGeneratedTarget(Target):
     alias = "generated"
     core_fields = (
-        # MockDependencies,
         Tags,
         MockSingleSourceField,
     )
@@ -59,15 +56,11 @@ class MockTargetGenerator(TargetFilesGenerator):
 def build_rule_runner(*plugin_registrations) -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(Addresses, [Specs]),
             QueryRule(AllTargets, []),
             *plugin_registrations,
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
-        # NB: The `graph` module masks the environment is most/all positions. We disable the
-        # inherent environment so that the positions which do require the environment are
-        # highlighted.
         inherent_environment=None,
     )
 
