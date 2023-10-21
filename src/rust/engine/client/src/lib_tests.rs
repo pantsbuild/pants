@@ -5,14 +5,14 @@ use options::render_choice;
 
 #[test]
 fn test() {
-  assert!(render_choice(&[]).is_none());
-  assert_eq!("One".to_owned(), render_choice(&["One"]).unwrap());
-  assert_eq!(
-    "One or Two".to_owned(),
-    render_choice(&["One", "Two"]).unwrap()
-  );
-  assert_eq!(
-    "One, Two or Three".to_owned(),
-    render_choice(&["One", "Two", "Three"]).unwrap()
-  );
+    assert!(render_choice(&[]).is_none());
+    assert_eq!("One".to_owned(), render_choice(&["One"]).unwrap());
+    assert_eq!(
+        "One or Two".to_owned(),
+        render_choice(&["One", "Two"]).unwrap()
+    );
+    assert_eq!(
+        "One, Two or Three".to_owned(),
+        render_choice(&["One", "Two", "Three"]).unwrap()
+    );
 }
