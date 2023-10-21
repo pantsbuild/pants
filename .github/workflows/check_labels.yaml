@@ -1,0 +1,25 @@
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+
+jobs:
+  check_labels:
+    if: github.repository_owner == 'pantsbuild'
+    name: Ensure PR has a category label
+    runs-on:
+    - ubuntu-20.04
+    steps:
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      name: Ensure category label
+      uses: mheap/github-action-required-labels@v4.0.0
+      with:
+        count: 1
+        labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
+          category:documentation, category:internal
+        mode: exactly

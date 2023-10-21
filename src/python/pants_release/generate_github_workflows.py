@@ -145,29 +145,6 @@ def classify_changes() -> Jobs:
     }
 
 
-def ensure_category_label() -> Sequence[Step]:
-    """Check that exactly one category label is present on a pull request."""
-    return [
-        {
-            "if": "github.event_name == 'pull_request'",
-            "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v4.0.0",
-            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
-            "with": {
-                "mode": "exactly",
-                "count": 1,
-                "labels": softwrap(
-                    """
-                    category:new feature, category:user api change,
-                    category:plugin api change, category:performance, category:bugfix,
-                    category:documentation, category:internal
-                    """
-                ),
-            },
-        }
-    ]
-
-
 def checkout(
     *,
     fetch_depth: int = 10,
@@ -950,14 +927,7 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
 
 def test_workflow_jobs() -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
-    jobs: dict[str, Any] = {
-        "check_labels": {
-            "name": "Ensure PR has a category label",
-            "runs-on": linux_x86_64_helper.runs_on(),
-            "if": IS_PANTS_OWNER,
-            "steps": ensure_category_label(),
-        },
-    }
+    jobs: dict[str, Any] = {}
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
     jobs.update(**macos11_x86_64_test_jobs())
@@ -1593,7 +1563,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
             # NB: This always() condition is critical, as it ensures that this job is run even if
             #   jobs it depends on are skipped.
             "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
-            "needs": ["classify_changes", "check_labels"] + sorted(pr_jobs),
+            "needs": ["classify_changes"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -1635,7 +1605,7 @@ def generate() -> dict[Path, str]:
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "classify_changes"}:
+        if key in {"classify_changes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):

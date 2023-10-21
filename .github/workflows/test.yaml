@@ -546,22 +546,6 @@ jobs:
         name: logs-wheels-and-pex-macOS11-ARM64
         path: .pants.d/workdir/*.log
     timeout-minutes: 90
-  check_labels:
-    if: github.repository_owner == 'pantsbuild'
-    name: Ensure PR has a category label
-    runs-on:
-    - ubuntu-20.04
-    steps:
-    - env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: github.event_name == 'pull_request'
-      name: Ensure category label
-      uses: mheap/github-action-required-labels@v4.0.0
-      with:
-        count: 1
-        labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
-          category:documentation, category:internal
-        mode: exactly
   classify_changes:
     if: github.repository_owner == 'pantsbuild'
     name: Classify changes
