@@ -380,8 +380,24 @@ If multiple fields are parametrized, a target will be created for each value in 
 python_test(
     name="tests",
     source="tests.py",
-    interpreter_constraints=parametrize(py2=["==2.7.*"], py3=[">=3.6"]),
+    interpreter_constraints=parametrize(py2=["==2.7.*"], py3=[">=3.6,<3.7"]),
     resolve=parametrize("lock-a", "lock-b"),
+)
+```
+
+To parametrize multiple fields together in groups, put each parametrization group as an unnamed (positional) argument to the target with the field values to use for that group as parametrization arguments. This is useful to avoid a full cartesian product if not every combination of field values makes sense. i.e. The previous example uses both lockfile for both interpreter constraints, however if you only want to use one lockfile per interpreter, then grouping the lockfile value with the interpreter constraint may be the way to go.
+
+```python example/BUILD
+# Creates two targets:
+#
+#    example:tests@parametrization=py2
+#    example:tests@parametrization=py3
+
+python_test(
+    parametrize("py2", interpreter_constraints=["==2.7.*"], resolve="lock-a"),
+    parametrize("py3", interpreter_constraints=[">=3.6,<3.7"], resolve="lock-b"),
+    name="tests",
+    source="tests.py",
 )
 ```
 
@@ -417,7 +433,7 @@ shunit2_tests(
 )
 ```
 
-You can combine `parametrize` with the ` overrides` field to set more granular metadata for generated targets:
+You can combine `parametrize` with the `overrides` field to set more granular metadata for generated targets:
 
 ```python example/BUILD
 # Generates three `shunit2_test` targets:
