@@ -1175,6 +1175,37 @@ def test_parametrize_moved_plugin_field(generated_targets_rule_runner: RuleRunne
     )
 
 
+def test_cannot_parametrize_copied_plugin_field() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            QueryRule(Addresses, [Specs]),
+            QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
+            UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
+            resolve_field_default_factory,
+            MockGeneratedTarget.register_plugin_field(MockPluginField),
+            MockTargetGenerator.register_plugin_field(MockPluginField),  # not moved
+        ],
+        target_types=[MockTargetGenerator, MockGeneratedTarget],
+        objects={"parametrize": Parametrize},
+        inherent_environment=None,
+    )
+
+    with pytest.raises(ExecutionError) as e:
+        assert_generated(
+            rule_runner,
+            Address("demo"),
+            "generator(tags=['t1'], sources=['f1.ext'], plugin_string=parametrize(pa='a', pb='b'))",
+            ["f1.ext"],
+        )
+
+    (field_exception,) = e.value.wrapped_exceptions
+    assert isinstance(field_exception, InvalidFieldException)
+    msg = str(field_exception)
+
+    assert "Only fields which will be moved to generated targets may be parametrized" in msg
+
+
 def test_parametrize_multi(generated_targets_rule_runner: RuleRunner) -> None:
     assert_generated(
         generated_targets_rule_runner,
