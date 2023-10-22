@@ -40,10 +40,16 @@ class Parametrize:
 
     args: tuple[str, ...]
     kwargs: FrozenDict[str, ImmutableValue]
+    is_group: bool
 
     def __init__(self, *args: str, **kwargs: Any) -> None:
+        object.__setattr__(self, "is_group", False)
         object.__setattr__(self, "args", args)
         object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
+
+    def as_group(self) -> Parametrize:
+        object.__setattr__(self, "is_group", True)
+        return self
 
     def to_parameters(self) -> dict[str, Any]:
         """Validates and returns a mapping from aliases to parameter values.
@@ -74,6 +80,37 @@ class Parametrize:
             parameters[arg] = arg
         return parameters
 
+    @property
+    def group_name(self) -> str:
+        assert self.is_group
+        if len(self.args) == 1:
+            name = self.args[0]
+            banned_chars = BANNED_CHARS_IN_PARAMETERS & set(name)
+            if banned_chars:
+                raise Exception(
+                    f"In {self}:\n  Parametrization group name `{name}` contained separator characters "
+                    f"(`{'`,`'.join(banned_chars)}`)."
+                )
+            return name
+        else:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    A parametrize group must begin with the group name followed by the target field
+                    values for the group.
+
+                    Example:
+
+                        target(
+                            parametrize("group-a", field_a=1, field_b=True),
+                            ...
+                        )
+
+                    Got: `{self!r}`
+                    """
+                )
+            )
+
     @classmethod
     def expand(
         cls, address: Address, fields: dict[str, Any | Parametrize]
@@ -91,10 +128,18 @@ class Parametrize:
                     for alias, field_value in v.to_parameters().items()
                 ]
                 for field_name, v in fields.items()
-                if isinstance(v, Parametrize)
+                if isinstance(v, Parametrize) and not v.is_group
+            ]
+            parametrized_groups: list[tuple[str, str, Parametrize]] = [
+                ("parametrization", v.group_name, v)
+                for field_name, v in fields.items()
+                if isinstance(v, Parametrize) and v.is_group
             ]
         except Exception as e:
             raise Exception(f"Failed to parametrize `{address}`:\n{e}") from e
+
+        if parametrized_groups:
+            parametrized.append(parametrized_groups)
 
         if not parametrized:
             yield (address, fields)
@@ -111,14 +156,26 @@ class Parametrize:
                 {field_name: alias for field_name, alias, _ in parametrized_args}
             )
             parametrized_args_fields = tuple(
-                (field_name, field_value) for field_name, _, field_value in parametrized_args
+                (field_name, field_value)
+                for field_name, _, field_value in parametrized_args
+                if not isinstance(field_value, Parametrize)
             )
             expanded_fields: dict[str, Any] = dict(non_parametrized + parametrized_args_fields)
+            expanded_fields.update(
+                next(
+                    (
+                        group.kwargs
+                        for _, _, group in parametrized_args
+                        if isinstance(group, Parametrize)
+                    ),
+                    {},
+                )
+            )
             yield expanded_address, expanded_fields
 
     def __repr__(self) -> str:
-        strs = [str(s) for s in self.args]
-        strs.extend(f"{alias}={value}" for alias, value in self.kwargs.items())
+        strs = [repr(s) for s in self.args]
+        strs.extend(f"{alias}={value!r}" for alias, value in self.kwargs.items())
         return f"parametrize({', '.join(strs)})"
 
 

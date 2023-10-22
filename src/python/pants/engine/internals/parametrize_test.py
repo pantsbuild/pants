@@ -53,6 +53,19 @@ def test_to_parameters_failure(exception_str: str, args: list[Any], kwargs: dict
 
 
 @pytest.mark.parametrize(
+    "exception_str,args,kwargs",
+    [
+        ("A parametrize group must begin with the group name", [], {}),
+        ("group name `bladder:dust` contained separator characters (`:`).", ["bladder:dust"], {}),
+    ],
+)
+def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, Any]) -> None:
+    with pytest.raises(Exception) as exc:
+        Parametrize(*args, **kwargs).as_group().group_name
+    assert exception_str in str(exc.value)
+
+
+@pytest.mark.parametrize(
     "expected,fields",
     [
         ([("a:a", {"f": "b"})], {"f": "b"}),
@@ -72,6 +85,18 @@ def test_to_parameters_failure(exception_str: str, args: list[Any], kwargs: dict
                 ("a@f=c,x=e", {"f": "c", "x": "e"}),
             ],
             {"f": Parametrize("b", "c"), "x": Parametrize("d", "e")},
+        ),
+        (
+            [
+                ("a@parametrization=A", {"f0": "c", "f1": 1, "f2": 2}),
+                ("a@parametrization=B", {"f0": "c", "f1": 3, "f2": 4}),
+            ],
+            {
+                # The "field name" for the parametrization group is not used, it only has to be unique.
+                "__0__": Parametrize("A", f1=1, f2=2).as_group(),
+                "__1__": Parametrize("B", f1=3, f2=4).as_group(),
+                "f0": "c",
+            },
         ),
     ],
 )

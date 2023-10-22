@@ -543,6 +543,32 @@ def test_parametrize_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     assert target_adaptor.kwargs["tags"] == ParametrizeDefault(a=("a", "root"), b=("non-root", "b"))
 
 
+def test_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "hello/BUILD": dedent(
+                """\
+                mock_tgt(
+                  parametrize("a", tags=["opt-a"], resolve="lock-a"),
+                  parametrize("b", tags=["opt-b"], resolve="lock-b"),
+                  description="desc for a and b",
+                )
+                """
+            ),
+        }
+    )
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("hello"), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs == dict(
+        __0__=Parametrize("a", tags=["opt-a"], resolve="lock-a").as_group(),
+        __1__=Parametrize("b", tags=["opt-b"], resolve="lock-b").as_group(),
+        description="desc for a and b",
+    )
+
+
 def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {

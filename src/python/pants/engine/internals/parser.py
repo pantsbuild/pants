@@ -23,6 +23,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
 from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import Field, ImmutableValue, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -269,7 +270,7 @@ class Registrar:
         """
         return self._type_alias
 
-    def __call__(self, **kwargs: Any) -> TargetAdaptor:
+    def __call__(self, *args: Parametrize, **kwargs: Any) -> TargetAdaptor:
         # Target names default to the name of the directory their BUILD file is in
         # (as long as it's not the root directory).
         if "name" not in kwargs:
@@ -281,7 +282,17 @@ class Registrar:
 
         frame = inspect.currentframe()
         source_line = frame.f_back.f_lineno if frame and frame.f_back else "??"
-        kwargs["__description_of_origin__"] = f"{self._parse_state.filepath()}:{source_line}"
+        source = f"{self._parse_state.filepath()}:{source_line}"
+        kwargs["__description_of_origin__"] = source
+
+        for idx, arg in enumerate(args):
+            if isinstance(arg, Parametrize):
+                kwargs[f"__{idx}__"] = arg.as_group()
+            else:
+                raise ValueError(
+                    f"{source}: {self._type_alias}: Invalid positional argument {arg!r}."
+                )
+
         raw_values = dict(self._parse_state.defaults.get(self._type_alias))
         raw_values.update(kwargs)
         target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
