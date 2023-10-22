@@ -88,8 +88,8 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
         ),
         (
             [
-                ("a@parametrization=A", {"f0": "c", "f1": 1, "f2": 2}),
-                ("a@parametrization=B", {"f0": "c", "f1": 3, "f2": 4}),
+                ("a@parametrize=A", {"f0": "c", "f1": 1, "f2": 2}),
+                ("a@parametrize=B", {"f0": "c", "f1": 3, "f2": 4}),
             ],
             {
                 # The "field name" for the parametrization group is not used, it only has to be unique.

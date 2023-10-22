@@ -131,7 +131,7 @@ class Parametrize:
                 if isinstance(v, Parametrize) and not v.is_group
             ]
             parametrized_groups: list[tuple[str, str, Parametrize]] = [
-                ("parametrization", v.group_name, v)
+                ("parametrize", v.group_name, v)
                 for field_name, v in fields.items()
                 if isinstance(v, Parametrize) and v.is_group
             ]
@@ -139,6 +139,7 @@ class Parametrize:
             raise Exception(f"Failed to parametrize `{address}`:\n{e}") from e
 
         if parametrized_groups:
+            # Add the groups as one vector for the cross-product.
             parametrized.append(parametrized_groups)
 
         if not parametrized:
@@ -158,15 +159,17 @@ class Parametrize:
             parametrized_args_fields = tuple(
                 (field_name, field_value)
                 for field_name, _, field_value in parametrized_args
-                if not isinstance(field_value, Parametrize)
+                # Exclude any parametrize group
+                if not (isinstance(field_value, Parametrize) and field_value.is_group)
             )
             expanded_fields: dict[str, Any] = dict(non_parametrized + parametrized_args_fields)
             expanded_fields.update(
+                # There will be at most one group per cross product.
                 next(
                     (
-                        group.kwargs
-                        for _, _, group in parametrized_args
-                        if isinstance(group, Parametrize)
+                        field_value.kwargs
+                        for _, _, field_value in parametrized_args
+                        if isinstance(field_value, Parametrize) and field_value.is_group
                     ),
                     {},
                 )
