@@ -12,8 +12,8 @@ parser.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Mapping, Tuple, Union
+from dataclasses import dataclass, field
+from typing import Any, Callable, Iterable, Mapping, MutableMapping, Tuple, Union
 
 from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import Parametrize
@@ -28,12 +28,116 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
 
-SetDefaultsValueT = Mapping[str, Any]
+SetDefaultsValueT = Union[Mapping[str, Any], Tuple[Any, ...]]
 SetDefaultsKeyT = Union[str, Tuple[str, ...]]
 SetDefaultsT = Mapping[SetDefaultsKeyT, SetDefaultsValueT]
 
 
-class BuildFileDefaults(FrozenDict[str, FrozenDict[str, ImmutableValue]]):
+@dataclass(frozen=True)
+class TargetDefaults:
+    args: tuple[ImmutableValue, ...]
+    kwargs: FrozenDict[str, ImmutableValue]
+
+    @dataclass
+    class Builder:
+        target_type: type[Target]
+        union_membership: UnionMembership
+        args: list[Any] = field(default_factory=list)
+        kwargs: dict[str, Any] = field(default_factory=dict)
+
+        @classmethod
+        def from_defaults(
+            cls,
+            defaults: TargetDefaults,
+            target_type: type[Target],
+            union_membership: UnionMembership,
+        ) -> TargetDefaults.Builder:
+            return cls(
+                args=list(defaults.args),
+                kwargs=dict(defaults.kwargs),
+                target_type=target_type,
+                union_membership=union_membership,
+            )
+
+        def to_defaults(self, address: Address) -> TargetDefaults:
+            return TargetDefaults(
+                args=self._freeze_value(self.args),
+                kwargs=FrozenDict(
+                    {
+                        field_type.alias: self._freeze_field_value(field_type, default, address)
+                        for field_alias, default in self.kwargs.items()
+                        for field_type in self._field_types()
+                        if field_alias in (field_type.alias, field_type.deprecated_alias)
+                    }
+                ),
+            )
+
+        def __bool__(self) -> bool:
+            return bool(self.args or self.kwargs)
+
+        def _freeze_value(self, value: Any) -> ImmutableValue:
+            if isinstance(value, (list, set)):
+                return tuple(map(self._freeze_value, value))
+            elif isinstance(value, Parametrize):
+                return ParametrizeDefault.create(self._freeze_value, value)
+            elif isinstance(value, dict):
+                return FrozenDict.deep_freeze(value)
+            else:
+                return value
+
+        def _freeze_field_value(
+            self, field_type: type[Field], value: Any, address: Address
+        ) -> ImmutableValue:
+            if isinstance(value, ParametrizeDefault):
+                return value
+            elif isinstance(value, Parametrize):
+
+                def freeze(v: Any) -> ImmutableValue:
+                    return self._freeze_field_value(field_type, v, address)
+
+                return ParametrizeDefault.create(freeze, value)
+            else:
+                return field_type.compute_value(raw_value=value, address=address)
+
+        def _field_types(self) -> tuple[type[Field], ...]:
+            return (
+                *self.target_type.class_field_types(self.union_membership),
+                *(
+                    self.target_type.moved_fields
+                    if issubclass(self.target_type, TargetGenerator)
+                    else ()
+                ),
+            )
+
+        def update_field_defaults(
+            self, defaults: MutableMapping[str, Any], ignore_unknown_fields: bool
+        ) -> None:
+            # Copy default dict if we may mutate it.
+            raw_values = dict(defaults) if ignore_unknown_fields else defaults
+
+            # Validate that field exists on target
+            valid_field_aliases = set(
+                self.target_type._get_field_aliases_to_field_types(self._field_types()).keys()
+            )
+
+            for field_alias in defaults.keys():
+                if field_alias not in valid_field_aliases:
+                    if ignore_unknown_fields:
+                        del raw_values[field_alias]
+                    else:
+                        raise InvalidFieldException(
+                            f"Unrecognized field `{field_alias}` for target {self.target_type.alias}. "
+                            f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
+                        )
+
+            # Merge all provided defaults for this call.
+            self.kwargs.update(raw_values)
+
+        def update_args_defaults(self, defaults: Iterable[Any]) -> None:
+            self.args.extend(defaults)
+
+
+class BuildFileDefaults(FrozenDict[str, TargetDefaults]):
     """Map target types to default field values."""
 
 
@@ -57,7 +161,7 @@ class ParametrizeDefault(Parametrize):
 @dataclass
 class BuildFileDefaultsParserState:
     address: Address
-    defaults: dict[str, Mapping[str, Any]]
+    defaults: dict[str, TargetDefaults]
     registered_target_types: RegisteredTargetTypes
     union_membership: UnionMembership
 
@@ -76,37 +180,12 @@ class BuildFileDefaultsParserState:
             union_membership=union_membership,
         )
 
-    def _freeze_field_value(self, field_type: type[Field], value: Any) -> ImmutableValue:
-        if isinstance(value, ParametrizeDefault):
-            return value
-        elif isinstance(value, Parametrize):
-
-            def freeze(v: Any) -> ImmutableValue:
-                return self._freeze_field_value(field_type, v)
-
-            return ParametrizeDefault.create(freeze, value)
-        else:
-            return field_type.compute_value(raw_value=value, address=self.address)
-
     def get_frozen_defaults(self) -> BuildFileDefaults:
-        types = self.registered_target_types.aliases_to_types
-        return BuildFileDefaults(
-            {
-                target_alias: FrozenDict(
-                    {
-                        field_type.alias: self._freeze_field_value(field_type, default)
-                        for field_alias, default in fields.items()
-                        for field_type in self._target_type_field_types(types[target_alias])
-                        if field_alias in (field_type.alias, field_type.deprecated_alias)
-                    }
-                )
-                for target_alias, fields in self.defaults.items()
-            }
-        )
+        return BuildFileDefaults(FrozenDict(self.defaults))
 
-    def get(self, target_alias: str) -> Mapping[str, Any]:
+    def get(self, target_alias: str) -> TargetDefaults | None:
         # Used by `pants.engine.internals.parser.Parser._generate_symbols.Registrar.__call__`
-        return self.defaults.get(target_alias, {})
+        return self.defaults.get(target_alias)
 
     def set_defaults(
         self,
@@ -116,13 +195,13 @@ class BuildFileDefaultsParserState:
         ignore_unknown_fields: bool = False,
         ignore_unknown_targets: bool = False,
     ) -> None:
-        defaults: dict[str, dict[str, Any]] = (
-            {} if not extend else {k: dict(v) for k, v in self.defaults.items()}
+        builders: dict[str, TargetDefaults.Builder] = (
+            {} if not extend else self._create_target_defaults_builders()
         )
 
         if all is not None:
             self._process_defaults(
-                defaults,
+                builders,
                 {tuple(self.registered_target_types.aliases): all},
                 ignore_unknown_fields=True,
                 ignore_unknown_targets=ignore_unknown_targets,
@@ -130,28 +209,32 @@ class BuildFileDefaultsParserState:
 
         for arg in args:
             self._process_defaults(
-                defaults,
+                builders,
                 arg,
                 ignore_unknown_fields=ignore_unknown_fields,
                 ignore_unknown_targets=ignore_unknown_targets,
             )
 
         # Update with new defaults, dropping targets without any default values.
-        for tgt, default in defaults.items():
-            if not default:
+        for tgt, builder in builders.items():
+            if not builder:
                 self.defaults.pop(tgt, None)
             else:
-                self.defaults[tgt] = default
+                self.defaults[tgt] = builder.to_defaults(self.address)
 
-    def _target_type_field_types(self, target_type: type[Target]) -> tuple[type[Field], ...]:
-        return (
-            *target_type.class_field_types(self.union_membership),
-            *(target_type.moved_fields if issubclass(target_type, TargetGenerator) else ()),
-        )
+    def _create_target_defaults_builders(self) -> dict[str, TargetDefaults.Builder]:
+        return {
+            k: TargetDefaults.Builder.from_defaults(
+                v,
+                self.registered_target_types.aliases_to_types[k],
+                self.union_membership,
+            )
+            for k, v in self.defaults.items()
+        }
 
     def _process_defaults(
         self,
-        defaults: dict[str, dict[str, Any]],
+        builders: dict[str, TargetDefaults.Builder],
         targets_defaults: SetDefaultsT,
         ignore_unknown_fields: bool = False,
         ignore_unknown_targets: bool = False,
@@ -163,11 +246,11 @@ class BuildFileDefaultsParserState:
             )
 
         types = self.registered_target_types.aliases_to_types
-        for target, default in targets_defaults.items():
-            if not isinstance(default, dict):
+        for target, defaults in targets_defaults.items():
+            if not isinstance(defaults, (dict, list, tuple)):
                 raise ValueError(
                     f"Invalid default field values in {self.address} for target type {target}, "
-                    f"must be an `dict` but was {default!r} with type `{type(default).__name__}`."
+                    f"must be an `dict` or `list` but was {defaults!r} with type `{type(defaults).__name__}`."
                 )
 
             targets: Iterable[str]
@@ -180,25 +263,14 @@ class BuildFileDefaultsParserState:
                 else:
                     raise ValueError(f"Unrecognized target type {target_alias} in {self.address}.")
 
-                # Copy default dict if we may mutate it.
-                raw_values = dict(default) if ignore_unknown_fields else default
+                builder = builders.get(target_type.alias)
+                if builder is None:
+                    builder = TargetDefaults.Builder(
+                        target_type=target_type, union_membership=self.union_membership
+                    )
+                    builders[target_type.alias] = builder
 
-                # Validate that field exists on target
-                valid_field_aliases = set(
-                    target_type._get_field_aliases_to_field_types(
-                        self._target_type_field_types(target_type)
-                    ).keys()
-                )
-
-                for field_alias in default.keys():
-                    if field_alias not in valid_field_aliases:
-                        if ignore_unknown_fields:
-                            del raw_values[field_alias]
-                        else:
-                            raise InvalidFieldException(
-                                f"Unrecognized field `{field_alias}` for target {target_type.alias}. "
-                                f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
-                            )
-
-                # Merge all provided defaults for this call.
-                defaults.setdefault(target_type.alias, {}).update(raw_values)
+                if isinstance(defaults, dict):
+                    builder.update_field_defaults(defaults, ignore_unknown_fields)
+                else:
+                    builder.update_args_defaults(defaults)

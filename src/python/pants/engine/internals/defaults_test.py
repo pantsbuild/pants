@@ -12,6 +12,7 @@ from pants.engine.internals.defaults import (
     BuildFileDefaults,
     BuildFileDefaultsParserState,
     ParametrizeDefault,
+    TargetDefaults,
 )
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import (
@@ -82,7 +83,7 @@ def test_assumptions(
     frozen = defaults.get_frozen_defaults()
     assert frozen == BuildFileDefaults(
         {
-            "target": FrozenDict({"tags": ("foo", "bar")}),
+            "target": TargetDefaults(args=(), kwargs=FrozenDict({"tags": ("foo", "bar")})),
         }
     )
 
@@ -102,26 +103,14 @@ Scenario = namedtuple(
                 path="src/proj/a",
                 kwargs=dict(all=dict(tags=["tagged-2"])),
                 parent_defaults={
-                    "test_type_1": {
-                        "tags": ("tagged-1",),
-                    },
+                    "test_type_1": ((), {"tags": ("tagged-1",)}),
                 },
                 expected_defaults={
-                    "target": {
-                        "tags": ("tagged-2",),
-                    },
-                    "test_type_1": {
-                        "tags": ("tagged-2",),
-                    },
-                    "test_type_2": {
-                        "tags": ("tagged-2",),
-                    },
-                    "test_gen": {
-                        "tags": ("tagged-2",),
-                    },
-                    "test_gen_targets": {
-                        "tags": ("tagged-2",),
-                    },
+                    "target": ((), {"tags": ("tagged-2",)}),
+                    "test_type_1": ((), {"tags": ("tagged-2",)}),
+                    "test_type_2": ((), {"tags": ("tagged-2",)}),
+                    "test_gen": ((), {"tags": ("tagged-2",)}),
+                    "test_gen_targets": ((), {"tags": ("tagged-2",)}),
                 },
             ),
             id="simple inherit",
@@ -132,17 +121,17 @@ Scenario = namedtuple(
                 args=({Test2Target.alias: dict(description="only desc default")},),
                 kwargs=dict(extend=False),
                 parent_defaults={
-                    "target": {"tags": ("root-tag",)},
-                    "test_type_1": {"tags": ("root-tag",)},
-                    "test_type_2": {
-                        "tags": ("root-tag",),
-                        "description": "extend default with desc",
-                    },
+                    "target": ((), {"tags": ("root-tag",)}),
+                    "test_type_1": ((), {"tags": ("root-tag",)}),
+                    "test_type_2": (
+                        (),
+                        {"tags": ("root-tag",), "description": "extend default with desc"},
+                    ),
                 },
                 expected_defaults={
-                    "target": {"tags": ("root-tag",)},
-                    "test_type_1": {"tags": ("root-tag",)},
-                    "test_type_2": {"description": "only desc default"},
+                    "target": ((), {"tags": ("root-tag",)}),
+                    "test_type_1": ((), {"tags": ("root-tag",)}),
+                    "test_type_2": ((), {"description": "only desc default"}),
                 },
             ),
             id="extend test",
@@ -162,12 +151,12 @@ Scenario = namedtuple(
         ),
         pytest.param(
             Scenario(
-                args=({"test_type_1": ()},),
+                args=({"test_type_1": 42},),
                 expected_error=pytest.raises(
                     ValueError,
                     match=(
                         r"Invalid default field values in //#__defaults__ for target type "
-                        r"test_type_1, must be an `dict` but was \(\) with type `tuple`\."
+                        r"test_type_1, must be an `dict` or `list` but was 42 with type `int`\."
                     ),
                 ),
             ),
@@ -221,7 +210,7 @@ Scenario = namedtuple(
         pytest.param(
             Scenario(
                 args=({Test1Target.alias: {}},),
-                parent_defaults={"test_type_1": {"tags": ("foo-bar",)}},
+                parent_defaults={"test_type_1": ((), {"tags": ("foo-bar",)})},
                 expected_defaults={},
             ),
             id="reset default",
@@ -229,7 +218,7 @@ Scenario = namedtuple(
         pytest.param(
             Scenario(
                 args=({TestGenTargetGenerator.alias: {Dependencies.alias: ["some/dep"]}},),
-                expected_defaults={"test_gen_targets": {"dependencies": ("some/dep",)}},
+                expected_defaults={"test_gen_targets": ((), {"dependencies": ("some/dep",)})},
             ),
             id="default value for moved field",
         ),
@@ -237,9 +226,12 @@ Scenario = namedtuple(
             Scenario(
                 args=({Test1Target.alias: {"tags": Parametrize(["foo"], ["bar"], baz=["baz"])}},),
                 expected_defaults={
-                    "test_type_1": {
-                        "tags": ParametrizeDefault(("foo",), ("bar",), baz=("baz",)),  # type: ignore[arg-type]
-                    }
+                    "test_type_1": (
+                        (),
+                        {
+                            "tags": ParametrizeDefault(("foo",), ("bar",), baz=("baz",)),
+                        },
+                    )
                 },
             ),
             id="parametrize default field value",
@@ -249,19 +241,29 @@ Scenario = namedtuple(
                 args=(
                     {
                         ("test_gen_targets",): dict(
-                            overrides={"*_generated.py": {"skip_yapf": True}},
-                        ),
+                            overrides={"*_generated.py": {"skip_yapf": True}}
+                        )
                     },
                 ),
                 expected_defaults={
-                    "test_gen_targets": dict(
-                        overrides=FrozenDict.deep_freeze(
-                            {("*_generated.py",): {"skip_yapf": True}}
+                    "test_gen_targets": (
+                        (),
+                        dict(
+                            overrides=FrozenDict.deep_freeze(
+                                {("*_generated.py",): {"skip_yapf": True}}
+                            )
                         ),
                     ),
                 },
             ),
             id="overrides value not frozen (issue #18784)",
+        ),
+        pytest.param(
+            Scenario(
+                args=({Test1Target.alias: ["arg1", "arg2"]},),
+                expected_defaults={"test_type_1": (("arg1", "arg2"), {})},
+            ),
+            id="default parametrization groups",
         ),
     ],
 )
@@ -274,13 +276,17 @@ def test_set_defaults(
         defaults = BuildFileDefaultsParserState.create(
             scenario.path,
             BuildFileDefaults(
-                {tgt: FrozenDict(val) for tgt, val in scenario.parent_defaults.items()}
+                {
+                    tgt: TargetDefaults(args=args, kwargs=FrozenDict(kwargs))
+                    for tgt, (args, kwargs) in scenario.parent_defaults.items()
+                }
             ),
             registered_target_types,
             union_membership,
         )
         defaults.set_defaults(*scenario.args, **scenario.kwargs)
         actual_defaults = {
-            tgt: dict(field_values) for tgt, field_values in defaults.get_frozen_defaults().items()
+            tgt_alias: (tgt_defaults.args, dict(tgt_defaults.kwargs))
+            for tgt_alias, tgt_defaults in defaults.get_frozen_defaults().items()
         }
         assert scenario.expected_defaults == actual_defaults

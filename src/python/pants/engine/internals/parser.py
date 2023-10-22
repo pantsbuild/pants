@@ -282,8 +282,12 @@ class Registrar:
         frame = inspect.currentframe()
         source_line = frame.f_back.f_lineno if frame and frame.f_back else "??"
         kwargs["__description_of_origin__"] = f"{self._parse_state.filepath()}:{source_line}"
-        raw_values = dict(self._parse_state.defaults.get(self._type_alias))
-        raw_values.update(kwargs)
+        target_defaults = self._parse_state.defaults.get(self._type_alias)
+        if target_defaults is None:
+            raw_values = kwargs
+        else:
+            raw_values = dict(target_defaults.kwargs)
+            raw_values.update(kwargs)
         target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
         self._parse_state.add(target_adaptor)
         return target_adaptor
@@ -291,10 +295,10 @@ class Registrar:
     def _field_default_factory(self, field_type: type[Field]) -> Callable[[], Any]:
         def resolve_field_default() -> Any:
             target_defaults = self._parse_state.defaults.get(self._type_alias)
-            if target_defaults:
+            if target_defaults is not None and target_defaults.kwargs:
                 for field_alias in (field_type.alias, field_type.deprecated_alias):
-                    if field_alias and field_alias in target_defaults:
-                        return target_defaults[field_alias]
+                    if field_alias and field_alias in target_defaults.kwargs:
+                        return target_defaults.kwargs[field_alias]
             return field_type.default
 
         return resolve_field_default
