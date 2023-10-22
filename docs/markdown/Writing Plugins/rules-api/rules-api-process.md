@@ -128,3 +128,12 @@ You may either set the parameter `input_digest: Digest`, or you may set `run_in_
 To set environment variables, use the parameter `env: Mapping[str, str]`, like you would with `Process`. You can also set `hermetic_env=False` to inherit the environment variables from the parent `pants` process.
 
 The `Effect` will return an `InteractiveProcessResult`, which has a single field `exit_code: int`.
+
+### ProcessWithRetries
+
+A `Process` can be retried by wrapping it in a `ProcessWithRetries` and requesting a `ProcessResultWithRetries`. The last result, whether succeeded or failed, is available with the `last` parameter. For example, the following will allow for up to 5 attempts at running `my_process`:
+
+```python
+results = await Get(ProcessResultWithRetries, ProcessWithRetries(my_process, 5))
+last_result = results.last
+```

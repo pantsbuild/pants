@@ -6,10 +6,10 @@ from __future__ import annotations
 import itertools
 import logging
 from abc import ABC, ABCMeta
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, Sequence, Tuple, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -85,7 +85,7 @@ class TestResult(EngineAwareReturnType):
     # A None result_metadata indicates a backend that performs its own test discovery/selection
     # and either discovered no tests, or encounted an error, such as a compilation error, in
     # the attempt.
-    result_metadata: ProcessResultMetadata | None
+    result_metadata: ProcessResultMetadata | None  # TODO: Merge elapsed MS of all subproceses
     partition_description: str | None = None
 
     coverage_data: CoverageData | None = None
@@ -96,6 +96,8 @@ class TestResult(EngineAwareReturnType):
     extra_output: Snapshot | None = None
     # True if the core test rules should log that extra output was written.
     log_extra_output: bool = False
+    # All results including failed attempts
+    process_results: Tuple[FallibleProcessResult, ...] = field(default_factory=tuple)
 
     output_simplifier: Simplifier = Simplifier()
 
@@ -135,7 +137,7 @@ class TestResult(EngineAwareReturnType):
 
     @staticmethod
     def from_fallible_process_result(
-        process_result: FallibleProcessResult,
+        process_results: Tuple[FallibleProcessResult, ...],
         address: Address,
         output_setting: ShowOutput,
         *,
@@ -145,6 +147,7 @@ class TestResult(EngineAwareReturnType):
         log_extra_output: bool = False,
         output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
+        process_result = process_results[-1]
         return TestResult(
             exit_code=process_result.exit_code,
             stdout_bytes=process_result.stdout,
@@ -158,12 +161,13 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
             log_extra_output=log_extra_output,
+            process_results=process_results,
             output_simplifier=output_simplifier,
         )
 
     @staticmethod
     def from_batched_fallible_process_result(
-        process_result: FallibleProcessResult,
+        process_results: Tuple[FallibleProcessResult, ...],
         batch: TestRequest.Batch[_TestFieldSetT, Any],
         output_setting: ShowOutput,
         *,
@@ -173,6 +177,7 @@ class TestResult(EngineAwareReturnType):
         log_extra_output: bool = False,
         output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
+        process_result = process_results[-1]
         return TestResult(
             exit_code=process_result.exit_code,
             stdout_bytes=process_result.stdout,
@@ -188,6 +193,7 @@ class TestResult(EngineAwareReturnType):
             log_extra_output=log_extra_output,
             output_simplifier=output_simplifier,
             partition_description=batch.partition_metadata.description,
+            process_results=process_results,
         )
 
     @property
@@ -616,6 +622,16 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a test target.",
     )
+    attempts_default = IntOption(
+        default=1,
+        help=softwrap(
+            """
+            The number of attempts to run tests, in case of a test failure.
+            Tests that were retried will include the number of attempts in the summary output.
+            """
+        ),
+    )
+
     batch_size = IntOption(
         "--batch-size",
         default=128,
@@ -888,9 +904,16 @@ async def run_tests(
             test_batches, environment_names, test_subsystem, debug_adapter
         )
 
+    to_test = list(zip(test_batches, environment_names))
     results = await MultiGet(
-        Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName})
-        for batch, environment_name in zip(test_batches, environment_names)
+        Get(
+            TestResult,
+            {
+                batch: TestRequest.Batch,
+                environment_name: EnvironmentName,
+            },
+        )
+        for batch, environment_name in to_test
     )
 
     # Print summary.
@@ -1002,12 +1025,23 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
     assert (
         result.result_metadata is not None
     ), "Skipped test results should not be outputted in the test summary"
-    if result.exit_code == 0:
-        sigil = console.sigil_succeeded()
+    succeeded = result.exit_code == 0
+    retried = len(result.process_results) > 1
+
+    if succeeded:
+        if not retried:
+            sigil = console.sigil_succeeded()
+        else:
+            sigil = console.sigil_succeeded_with_edits()
         status = "succeeded"
     else:
         sigil = console.sigil_failed()
         status = "failed"
+
+    if retried:
+        attempt_msg = f" after {len(result.process_results)} attempts"
+    else:
+        attempt_msg = ""
 
     environment = result.result_metadata.execution_environment.name
     environment_type = result.result_metadata.execution_environment.environment_type
@@ -1029,8 +1063,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    suffix = f" {elapsed_print}{source_desc}"
-    return f"{sigil} {result.description} {status}{suffix}."
+    return f"{sigil} {result.description} {status}{attempt_msg} {elapsed_print}{source_desc}."
 
 
 @dataclass(frozen=True)
