@@ -98,6 +98,20 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
                 "f0": "c",
             },
         ),
+        (
+            [
+                ("a@parametrize=A", {"f": 1}),
+                ("a@parametrize=B", {"f": 2}),
+                ("a@parametrize=C", {"f": "x", "g": ()}),
+            ],
+            {
+                "__0__": Parametrize("A", f=1).as_group(),
+                "__1__": Parametrize("B", f=2).as_group(),
+                "__2__": Parametrize("C", g=[]).as_group(),
+                # Field overridden by some parametrize groups.
+                "f": "x",
+            },
+        ),
     ],
 )
 def test_expand(
@@ -107,6 +121,22 @@ def test_expand(
         (address.spec, result_fields)
         for address, result_fields in Parametrize.expand(Address("a"), fields)
     )
+
+
+def test_expand_fails_when_overriding_parametrized_field() -> None:
+    fields = {
+        "__0__": Parametrize("A", f=1).as_group(),
+        "__1__": Parametrize("B", g=2, x=3).as_group(),
+        "f": Parametrize("x", "y"),
+        "g": Parametrize("x", "y"),
+        "h": Parametrize("x", "y"),
+        "x": 5,
+        "z": 6,
+    }
+    with pytest.raises(Exception) as exc:
+        _ = list(Parametrize.expand(Address("a"), fields))
+    err_msg = "Failed to parametrize `a:a`:\nConflicting parametrizations for fields: f, g"
+    assert err_msg in str(exc.value)
 
 
 def test_get_superset_targets() -> None:

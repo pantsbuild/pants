@@ -20,7 +20,7 @@ from pants.engine.target import (
     TargetTypesToGenerateTargetsRequests,
 )
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 
 def _named_args_explanation(arg: str) -> str:
@@ -122,6 +122,7 @@ class Parametrize:
         separate calls.
         """
         try:
+            cls._check_parametrizations(fields)
             parametrized: list[list[tuple[str, str, Any]]] = [
                 [
                     (field_name, alias, field_value)
@@ -132,7 +133,7 @@ class Parametrize:
             ]
             parametrized_groups: list[tuple[str, str, Parametrize]] = [
                 ("parametrize", v.group_name, v)
-                for field_name, v in fields.items()
+                for v in fields.values()
                 if isinstance(v, Parametrize) and v.is_group
             ]
         except Exception as e:
@@ -175,6 +176,30 @@ class Parametrize:
                 )
             )
             yield expanded_address, expanded_fields
+
+    @staticmethod
+    def _check_parametrizations(fields: dict[str, Any | Parametrize]) -> None:
+        parametrize_field_names = set(
+            field_name
+            for field_name, v in fields.items()
+            if isinstance(v, Parametrize) and not v.is_group
+        )
+        parametrize_group_field_names = set(
+            field_name
+            for v in fields.values()
+            if isinstance(v, Parametrize) and v.is_group
+            for field_name in v.kwargs.keys()
+        )
+        conflicting = parametrize_field_names.intersection(parametrize_group_field_names)
+        if conflicting:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Conflicting parametrizations for {pluralize(len(conflicting), "field", include_count=False)}:
+                    {', '.join(sorted(conflicting))}
+                    """
+                )
+            )
 
     def __repr__(self) -> str:
         strs = [repr(s) for s in self.args]
