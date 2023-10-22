@@ -115,6 +115,11 @@ class MockMultipleSourcesField(MultipleSourcesField):
     pass
 
 
+class MockPluginField(StringField):
+    alias = "plugin_string"
+    required = False
+
+
 class MockTarget(Target):
     alias = "target"
     core_fields = (
@@ -957,6 +962,8 @@ def generated_targets_rule_runner() -> RuleRunner:
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest, EnvironmentName]),
             UnionRule(FieldDefaultFactoryRequest, ResolveFieldDefaultFactoryRequest),
             resolve_field_default_factory,
+            MockGeneratedTarget.register_plugin_field(MockPluginField),
+            MockTargetGenerator.register_plugin_field(MockPluginField, as_moved_field=True),
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
@@ -1028,11 +1035,13 @@ def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
                 {SingleSourceField.alias: "f1.ext", Tags.alias: ["tag"]},
                 Address("demo", relative_file_path="f1.ext"),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
             MockGeneratedTarget(
                 {SingleSourceField.alias: "f2.ext", Tags.alias: ["tag"]},
                 Address("demo", relative_file_path="f2.ext"),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
         },
     )
@@ -1049,6 +1058,7 @@ def test_generate_subdir(generated_targets_rule_runner: RuleRunner) -> None:
                 {SingleSourceField.alias: "subdir/demo.f95"},
                 Address("src/fortran", target_name="demo", relative_file_path="subdir/demo.f95"),
                 residence_dir="src/fortran/subdir",
+                union_membership=generated_targets_rule_runner.union_membership,
             )
         },
     )
@@ -1067,6 +1077,7 @@ def test_generate_overrides(generated_targets_rule_runner: RuleRunner) -> None:
                     Tags.alias: ["overridden"],
                 },
                 Address("example", relative_file_path="f1.ext"),
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
         },
     )
@@ -1096,11 +1107,13 @@ def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
                 {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"]},
                 Address("demo", relative_file_path="f1.ext", parameters={"tags": "t1"}),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
             MockGeneratedTarget(
                 {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"]},
                 Address("demo", relative_file_path="f1.ext", parameters={"tags": "t2"}),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
         },
         expected_dependencies={
@@ -1125,6 +1138,7 @@ def test_parametrize_multi(generated_targets_rule_runner: RuleRunner) -> None:
                     "demo", relative_file_path="f1.ext", parameters={"tags": "t1", "resolve": "a"}
                 ),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
             MockGeneratedTarget(
                 {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"], ResolveField.alias: "a"},
@@ -1132,6 +1146,7 @@ def test_parametrize_multi(generated_targets_rule_runner: RuleRunner) -> None:
                     "demo", relative_file_path="f1.ext", parameters={"tags": "t2", "resolve": "a"}
                 ),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
             MockGeneratedTarget(
                 {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], ResolveField.alias: "b"},
@@ -1139,6 +1154,7 @@ def test_parametrize_multi(generated_targets_rule_runner: RuleRunner) -> None:
                     "demo", relative_file_path="f1.ext", parameters={"tags": "t1", "resolve": "b"}
                 ),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
             MockGeneratedTarget(
                 {SingleSourceField.alias: "f1.ext", Tags.alias: ["t2"], ResolveField.alias: "b"},
@@ -1146,6 +1162,7 @@ def test_parametrize_multi(generated_targets_rule_runner: RuleRunner) -> None:
                     "demo", relative_file_path="f1.ext", parameters={"tags": "t2", "resolve": "b"}
                 ),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
         },
     )
@@ -1162,16 +1179,19 @@ def test_parametrize_overrides(generated_targets_rule_runner: RuleRunner) -> Non
                 {SingleSourceField.alias: "f1.ext", ResolveField.alias: "a"},
                 Address("demo", relative_file_path="f1.ext", parameters={"resolve": "a"}),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
             MockGeneratedTarget(
                 {SingleSourceField.alias: "f1.ext", ResolveField.alias: "b"},
                 Address("demo", relative_file_path="f1.ext", parameters={"resolve": "b"}),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
             MockGeneratedTarget(
                 {SingleSourceField.alias: "f2.ext", ResolveField.alias: "c"},
                 Address("demo", relative_file_path="f2.ext"),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
         },
         expected_dependencies={
@@ -1198,11 +1218,13 @@ def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
                 {SingleSourceField.alias: "f1.ext", ResolveField.alias: "a"},
                 Address("demo", target_name="demo", parameters={"resolve": "a"}),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
             MockGeneratedTarget(
                 {SingleSourceField.alias: "f1.ext", ResolveField.alias: "b"},
                 Address("demo", target_name="demo", parameters={"resolve": "b"}),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
         },
         expected_dependencies={
@@ -1475,6 +1497,7 @@ def test_parametrize_single_value_16978(generated_targets_rule_runner: RuleRunne
                 {SingleSourceField.alias: "f1.ext", ResolveField.alias: "demo"},
                 Address("demo", parameters={"resolve": "demo"}),
                 residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
             ),
         },
         expected_dependencies={
