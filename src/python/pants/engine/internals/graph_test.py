@@ -1047,6 +1047,27 @@ def test_generate_multiple(generated_targets_rule_runner: RuleRunner) -> None:
     )
 
 
+def test_generate_with_plugin_field(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(tags=['tag'], sources=['*.ext'], plugin_string='a')",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {
+                    SingleSourceField.alias: "f1.ext",
+                    Tags.alias: ["tag"],
+                    MockPluginField.alias: "a",
+                },
+                Address("demo", relative_file_path="f1.ext"),
+                residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
+            ),
+        },
+    )
+
+
 def test_generate_subdir(generated_targets_rule_runner: RuleRunner) -> None:
     assert_generated(
         generated_targets_rule_runner,
@@ -1121,6 +1142,35 @@ def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
             "demo@tags=t2": {"demo/f1.ext@tags=t2"},
             "demo/f1.ext@tags=t1": set(),
             "demo/f1.ext@tags=t2": set(),
+        },
+    )
+
+
+def test_parametrize_moved_plugin_field(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo"),
+        "generator(tags=['t1'], sources=['f1.ext'], plugin_string=parametrize(pa='a', pb='b'))",
+        ["f1.ext"],
+        {
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], MockPluginField.alias: "a"},
+                Address("demo", relative_file_path="f1.ext", parameters={"plugin_string": "pa"}),
+                residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
+            ),
+            MockGeneratedTarget(
+                {SingleSourceField.alias: "f1.ext", Tags.alias: ["t1"], MockPluginField.alias: "b"},
+                Address("demo", relative_file_path="f1.ext", parameters={"plugin_string": "pb"}),
+                residence_dir="demo",
+                union_membership=generated_targets_rule_runner.union_membership,
+            ),
+        },
+        expected_dependencies={
+            "demo@plugin_string=pa": {"demo/f1.ext@plugin_string=pa"},
+            "demo@plugin_string=pb": {"demo/f1.ext@plugin_string=pb"},
+            "demo/f1.ext@plugin_string=pa": set(),
+            "demo/f1.ext@plugin_string=pb": set(),
         },
     )
 
