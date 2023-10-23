@@ -126,7 +126,7 @@ class ExternalToolOptionsMixin:
           - `sha256` is the 64-character hex representation of the expected sha256
             digest of the download file, as emitted by `shasum -a 256`
           - `length` is the expected length of the download file in bytes, as emitted by
-            `wc -c`            
+            `wc -c`
           - (Optional) `url_override` is a specific url to use instead of the normally
             generated url for this version
 
