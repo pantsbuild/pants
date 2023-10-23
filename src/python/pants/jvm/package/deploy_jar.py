@@ -35,8 +35,8 @@ from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     DeployJarDuplicatePolicyField,
-    DeployJarShadingRulesField,
     DeployJarExcludeFilesField,
+    DeployJarShadingRulesField,
     JvmDependenciesField,
     JvmJdkField,
     JvmMainClassNameField,
