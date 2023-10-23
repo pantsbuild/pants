@@ -33,7 +33,6 @@ class FooBar(ExternalTool):
         "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
         "3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
         "3.4.7|macos_arm64 |aca5c1da0192e2fd46b7b55ab290a92c5f07309e7b0ebf4e45ba95731ae98291|145678|https://macfoo.org/bin/v3.4.7/mac-m1-v3.4.7.tgz",
-        "3.4.7|linux_arm64 |f59ff22d2149e5921a766fa62f43696810694e8e694c00aa57aef911f3ab891d|156789",
     ]
 
     def generate_url(self, plat: Platform) -> str:
@@ -43,8 +42,6 @@ class FooBar(ExternalTool):
             plat_str = "linux-x86_64"
         elif plat == Platform.macos_arm64:
             plat_str = "osx-aarch64"
-        elif plat == Platform.linux_arm64:
-            plat_str = "linux-aarch64"
         else:
             raise ExternalToolError()
         return f"https://foobar.org/bin/v{self.version}/foobar-{self.version}-{plat_str}.tgz"
@@ -64,14 +61,12 @@ class TemplatedFooBar(TemplatedExternalTool):
         "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
         "3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
         "3.4.7|macos_arm64 |aca5c1da0192e2fd46b7b55ab290a92c5f07309e7b0ebf4e45ba95731ae98291|145678|https://macfoo.org/bin/v3.4.7/mac-m1-v3.4.7.tgz",
-        "3.4.7|linux_arm64 |f59ff22d2149e5921a766fa62f43696810694e8e694c00aa57aef911f3ab891d|156789",
     ]
     default_url_template = "https://foobar.org/bin/v{version}/foobar-{version}-{platform}.tgz"
     default_url_platform_mapping = {
         "macos_x86_64": "osx-x86_64",
         "macos_arm64": "osx-aarch64",
         "linux_x86_64": "linux-x86_64",
-        "linux_arm64": "linux-aarch64",
     }
 
     def generate_exe(self, plat: Platform) -> str:
@@ -122,13 +117,6 @@ def test_generate_request() -> None:
         145678,
         "aca5c1da0192e2fd46b7b55ab290a92c5f07309e7b0ebf4e45ba95731ae98291",
         Platform.macos_arm64,
-        "3.4.7",
-    )
-    do_test(
-        "https://foobar.org/bin/v3.4.7/foobar-3.4.7-linux-aarch64.tgz",
-        156789,
-        "f59ff22d2149e5921a766fa62f43696810694e8e694c00aa57aef911f3ab891d",
-        Platform.linux_arm64,
         "3.4.7",
     )
 
