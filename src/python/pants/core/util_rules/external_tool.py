@@ -65,14 +65,20 @@ class ExternalToolVersion:
     platform: str
     sha256: str
     filesize: int
+    url_override: str | None = None
 
     def encode(self) -> str:
-        return "|".join([self.version, self.platform, self.sha256, str(self.filesize)])
+        parts = [self.version, self.platform, self.sha256, str(self.filesize)]
+        if self.url_override:
+            parts.append(self.url_override)
+        return "|".join(parts)
 
     @classmethod
     def decode(cls, version_str: str) -> ExternalToolVersion:
-        version, platform, sha256, filesize = [x.strip() for x in version_str.split("|")]
-        return cls(version, platform, sha256, int(filesize))
+        parts = [x.strip() for x in version_str.split("|")]
+        version, platform, sha256, filesize = parts[:4]
+        url_override = parts[4] if len(parts) > 4 else None
+        return cls(version, platform, sha256, int(filesize), url_override=url_override)
 
 
 class ExternalToolOptionsMixin:
