@@ -839,6 +839,7 @@ def smoke_test_install_and_version(version: str) -> None:
 
             [python]
             interpreter_constraints = ["==3.9.*"]
+            enable_resolves = true
             """
         )
 
@@ -859,6 +860,11 @@ def smoke_test_install_and_version(version: str) -> None:
         # be imported at all.
         (dir / "example.py").write_text(
             "from pants import version, testutil; print(version.VERSION)"
+        )
+        result = subprocess.run(
+            ["pants", "generate-lockfiles"],
+            cwd=dir,
+            check=True,
         )
         result = subprocess.run(
             ["pants", "run", "example.py"],
