@@ -210,8 +210,12 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
         for known_version in self.known_versions:
             version = self.decode_known_version(known_version)
             if plat.value == version.platform and version.version == self.version:
-                return self.get_request_for(version.platform, version.sha256, version.filesize,
-                                            url_override=version.url_override)
+                return self.get_request_for(
+                    version.platform,
+                    version.sha256,
+                    version.filesize,
+                    url_override=version.url_override,
+                )
         raise UnknownVersion(
             softwrap(
                 f"""
@@ -235,7 +239,9 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
         version = cls.decode_known_version(known_version)
         return version.version, version.platform, version.sha256, version.filesize
 
-    def get_request_for(self, plat_val: str, sha256: str, length: int, url_override: str | None = None) -> ExternalToolRequest:
+    def get_request_for(
+        self, plat_val: str, sha256: str, length: int, url_override: str | None = None
+    ) -> ExternalToolRequest:
         """Generate a request for this tool from the given info."""
         plat = Platform(plat_val)
         digest = FileDigest(fingerprint=sha256, serialized_bytes_length=length)
