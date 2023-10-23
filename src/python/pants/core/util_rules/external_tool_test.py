@@ -118,7 +118,7 @@ def test_generate_request() -> None:
         "3.4.7",
     )
     do_test(
-        "https://foobar.org/bin/v3.4.7/foobar-3.4.7-osx-aarch64.tgz",
+        "https://macfoo.org/bin/v3.4.7/mac-m1-v3.4.7.tgz",
         145678,
         "aca5c1da0192e2fd46b7b55ab290a92c5f07309e7b0ebf4e45ba95731ae98291",
         Platform.macos_arm64,
