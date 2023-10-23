@@ -118,16 +118,20 @@ class ExternalToolOptionsMixin:
             f"""
         Known versions to verify downloads against.
 
-        Each element is a pipe-separated string of `version|platform|sha256|length`, where:
+        Each element is a pipe-separated string of `version|platform|sha256|length` or
+        `version|platform|sha256|length|url_override`, where:
 
           - `version` is the version string
           - `platform` is one of `[{','.join(Platform.__members__.keys())}]`
           - `sha256` is the 64-character hex representation of the expected sha256
             digest of the download file, as emitted by `shasum -a 256`
           - `length` is the expected length of the download file in bytes, as emitted by
-            `wc -c`
+            `wc -c`            
+          - (Optional) `url_override` is a specific url to use instead of the normally
+            generated url for this version
 
         E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
+        and `3.1.2|macos_arm64 |aca5c1da0192e2fd46b7b55ab290a92c5f07309e7b0ebf4e45ba95731ae98291|50926|https://example.mac.org/bin/v3.1.2/mac-aarch64-v3.1.2.tgz`.
 
         Values are space-stripped, so pipes can be indented for readability if necessary.
         """
