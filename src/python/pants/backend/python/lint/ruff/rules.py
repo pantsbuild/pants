@@ -79,14 +79,14 @@ async def run_ruff(
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
 
-    additional_args = ()
+    extra_initial_args = ()
     if request.mode == RuffMode.FORMAT:
-        additional_args = ("format",)
+        extra_initial_args = ("format",)
     elif request.mode == RuffMode.FIX:
-        additional_args = ("--fix",)
+        extra_initial_args = ("--fix",)
 
     # `--force-exclude` applies file excludes from config to files provided explicitly
-    initial_args = ("--force-exclude",) + additional_args
+    initial_args = ("--force-exclude",) + extra_initial_args
 
     result = await Get(
         FallibleProcessResult,
