@@ -2695,7 +2695,7 @@ class InferredDependencies:
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
 class TransitivelyExcludeDependenciesRequest(Generic[FS], EngineAwareParameter):
-    """A request to transitvely exclude dependencies of a "root" note.
+    """A request to transitvely exclude dependencies of a "root" node.
 
     This is similar to `InferDependenciesRequest`, except the request is only made for "root" nodes
     in the dependency graph.
