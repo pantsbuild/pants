@@ -110,6 +110,7 @@ Created as part of the release process.
 + Grzegorz Kossakowski
 + Guy Marom
 + Harley Cooper
++ HeetVekariya
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
@@ -319,17 +320,21 @@ Created as part of the release process.
 + Win Wang
 + Wolfram Arnold
 + Xaelias
++ Xuanwo
 + Yarden Shoham
 + Yi Cheng
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ andreaimprovised
 + azban
 + bianca rosa
 + billybecker
 + eugene yokota
 + gyudoza
 + hephex
++ jgartdele/del
++ offsetcyan
 + olivercoleman-switchdin
 + philipp-sontag-by
 + sww
