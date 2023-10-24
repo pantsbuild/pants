@@ -215,15 +215,28 @@ class CompletePexEnvironment:
         If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
         to avoid PEX from trying to find a new interpreter.
         """
+        path = os.pathsep.join(self._pex_environment.path)
+        subprocess_env_dict = self._pex_environment.subprocess_environment_dict
+
+        if "PATH" in self._pex_environment.subprocess_environment_dict:
+            path = f"{path}{os.pathsep}{self._pex_environment.subprocess_environment_dict['PATH']}"
+            subprocess_env_dict = FrozenDict(
+                {
+                    k: v
+                    for k, v in self._pex_environment.subprocess_environment_dict.items()
+                    if k != "PATH"
+                }
+            )
+
         d = dict(
-            PATH=os.pathsep.join(self._pex_environment.path),
+            PATH=path,
             PEX_IGNORE_RCFILES="true",
             PEX_ROOT=(
                 os.path.relpath(self.pex_root, self._working_directory)
                 if self._working_directory
                 else str(self.pex_root)
             ),
-            **self._pex_environment.subprocess_environment_dict,
+            **subprocess_env_dict,
         )
         if python:
             d["PEX_PYTHON"] = python.path
