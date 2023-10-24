@@ -35,7 +35,7 @@ from pants.backend.python.util_rules.pex import (
     Pex,
     PexPlatforms,
     PexRequest,
-    ReqStrings,
+    PexRequirementsInfo,
 )
 from pants.backend.python.util_rules.pex_from_targets import (
     ChosenPythonResolve,
@@ -77,7 +77,7 @@ def rule_runner() -> PythonRuleRunner:
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
-            QueryRule(ReqStrings, (PexRequirements,)),
+            QueryRule(PexRequirementsInfo, (PexRequirements,)),
             QueryRule(GlobalRequirementConstraints, ()),
             QueryRule(ChosenPythonResolve, [ChosenPythonResolveRequest]),
             *setuptools.rules(),
@@ -655,7 +655,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     pex_req1 = get_pex_request(constraints1_filename, resolve_all_constraints=False)
     assert isinstance(pex_req1.requirements, PexRequirements)
     assert pex_req1.requirements.constraints_strings == FrozenOrderedSet(constraints1_strings)
-    req_strings_obj1 = rule_runner.request(ReqStrings, (pex_req1.requirements,))
+    req_strings_obj1 = rule_runner.request(PexRequirementsInfo, (pex_req1.requirements,))
     assert req_strings_obj1.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
 
     pex_req2 = get_pex_request(
@@ -666,7 +666,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     )
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
-    req_strings_obj2 = rule_runner.request(ReqStrings, (pex_req2_reqs,))
+    req_strings_obj2 = rule_runner.request(PexRequirementsInfo, (pex_req2_reqs,))
     assert req_strings_obj2.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
     assert isinstance(pex_req2_reqs.from_superset, Pex)
     repository_pex = pex_req2_reqs.from_superset
