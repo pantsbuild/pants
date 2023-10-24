@@ -46,6 +46,7 @@ from pants.engine.target import (
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
     FieldSet,
+    TransitivelyExcludeDependenciesRequest,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -53,6 +54,7 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
+    TransitivelyExcludeDependencies,
     InvalidTargetException,
     MultipleSourcesField,
     OverridesField,
@@ -1925,6 +1927,8 @@ class SmalltalkDependenciesInferenceFieldSet(FieldSet):
 class InferSmalltalkDependencies(InferDependenciesRequest):
     infer_from = SmalltalkDependenciesInferenceFieldSet
 
+class TransitivelyExcludeSmalltalkDependencies(TransitivelyExcludeDependenciesRequest):
+    infer_from = SmalltalkDependenciesInferenceFieldSet
 
 @rule
 async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
@@ -1950,19 +1954,43 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
             AddressInput.parse(line[1:], description_of_origin="smalltalk rule"),
         )
         for line in all_lines
-        if line.startswith("!")
+        if line.startswith("!") and not line.startswith("!!")
     )
     return InferredDependencies(include, exclude=exclude)
 
+@rule
+async def transitive_exclude_smalltalk_dependencies(request: TransitivelyExcludeSmalltalkDependencies) -> TransitivelyExcludeDependencies:
+    # (Similar to `infer_smalltalk_dependencies`, but for `!!` addresses)
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
+    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
+    all_lines = [
+        line.strip()
+        for line in itertools.chain.from_iterable(
+            file_content.content.decode().splitlines() for file_content in digest_contents
+        )
+    ]
+    transitive_excludes = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(line[2:], description_of_origin="smalltalk rule"),
+        )
+        for line in all_lines
+        if line.startswith("!!")
+    )
+    return TransitivelyExcludeDependencies(transitive_excludes)
 
 @pytest.fixture
 def dependencies_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             infer_smalltalk_dependencies,
+            transitive_exclude_smalltalk_dependencies,
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
+            UnionRule(TransitivelyExcludeDependenciesRequest, TransitivelyExcludeSmalltalkDependencies),
         ],
         target_types=[SmalltalkLibrary, SmalltalkLibraryGenerator, MockTarget],
         # NB: The `graph` module masks the environment is most/all positions. We disable the
@@ -2147,11 +2175,14 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
                 //:inferred_but_ignored2
                 """
             ),
+            # NB: The `!!//:inferred1` line shouldn't apply, since we aren't requesting transitive
+            # targets.
             "demo/f3.st": dedent(
                 """\
                 //:inferred1
                 !:inferred_and_provided1
                 !//:inferred_and_provided2
+                !!//:inferred1
                 """
             ),
             "demo/BUILD": dedent(
@@ -2300,3 +2331,31 @@ def test_resolve_unparsed_address_inputs() -> None:
     assert resolve(invalid_addresses, skip_invalid_addresses=True) == {t1}
     with engine_error(AddressParseException, contains="from my tests"):
         resolve(invalid_addresses)
+
+
+def test_plugin_transitive_excludes(dependencies_rule_runner: RuleRunner) -> None:
+    dependencies_rule_runner.write_files(
+        {
+            "transitive_dep.st": "",
+            "direct_dep.st": "//:transitive_dep.st",
+            "file.st": dedent(
+                """\
+                //:direct_dep.st
+                !!//:transitive_dep.st
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                smalltalk_library(name="transitive_dep.st", source='transitive_dep.st')
+                smalltalk_library(name="direct_dep.st", source='direct_dep.st')
+                smalltalk_library(name="file.st", source='file.st')
+                """
+            ),
+        }
+    )
+    transitive_targets = dependencies_rule_runner.request(
+        TransitiveTargets, [TransitiveTargetsRequest([Address("", target_name="file.st")])]
+    )
+    assert {target.address for target in transitive_targets.dependencies} == {
+        Address("", target_name="direct_dep.st"),
+    }
