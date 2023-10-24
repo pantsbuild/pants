@@ -390,8 +390,8 @@ To parametrize multiple fields together in groups, put each parametrization grou
 ```python example/BUILD
 # Creates two targets:
 #
-#    example:tests@parametrization=py2
-#    example:tests@parametrization=py3
+#    example:tests@parametrize=py2
+#    example:tests@parametrize=py3
 
 python_test(
     parametrize("py2", interpreter_constraints=["==2.7.*"], resolve="lock-a"),
