@@ -47,7 +47,7 @@ class Ruff(PythonToolBase):
     help = "The Ruff Python formatter (https://github.com/charliermarsh/ruff)."
 
     default_main = ConsoleScript("ruff")
-    default_requirements = ["ruff>=0.0.213,<1"]
+    default_requirements = ["ruff>=0.1.2,<1"]
 
     register_interpreter_constraints = True
 
