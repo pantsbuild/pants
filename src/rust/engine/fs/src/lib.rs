@@ -34,6 +34,8 @@ mod glob_matching;
 mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
+#[cfg(test)]
+mod testutil;
 
 pub use crate::directory::{
     DigestTrie, DirectoryDigest, Entry, SymlinkBehavior, TypedPath, EMPTY_DIGEST_TREE,

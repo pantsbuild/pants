@@ -1201,7 +1201,6 @@ dependencies = [
  "serde",
  "task_executor",
  "tempfile",
- "testutil",
  "tokio",
  "workunit_store",
 ]
