@@ -2708,7 +2708,6 @@ class TransitivelyExcludeDependenciesRequest(Generic[FS], EngineAwareParameter):
     field_set: FS
 
 
-
 class TransitivelyExcludeDependencies(FrozenOrderedSet[Address]):
     pass
 

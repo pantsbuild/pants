@@ -46,7 +46,6 @@ from pants.engine.target import (
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
     FieldSet,
-    TransitivelyExcludeDependenciesRequest,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -54,7 +53,6 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
-    TransitivelyExcludeDependencies,
     InvalidTargetException,
     MultipleSourcesField,
     OverridesField,
@@ -68,6 +66,8 @@ from pants.engine.target import (
     Target,
     TargetFilesGenerator,
     Targets,
+    TransitivelyExcludeDependencies,
+    TransitivelyExcludeDependenciesRequest,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -1927,8 +1927,10 @@ class SmalltalkDependenciesInferenceFieldSet(FieldSet):
 class InferSmalltalkDependencies(InferDependenciesRequest):
     infer_from = SmalltalkDependenciesInferenceFieldSet
 
+
 class TransitivelyExcludeSmalltalkDependencies(TransitivelyExcludeDependenciesRequest):
     infer_from = SmalltalkDependenciesInferenceFieldSet
+
 
 @rule
 async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
@@ -1958,8 +1960,11 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     )
     return InferredDependencies(include, exclude=exclude)
 
+
 @rule
-async def transitive_exclude_smalltalk_dependencies(request: TransitivelyExcludeSmalltalkDependencies) -> TransitivelyExcludeDependencies:
+async def transitive_exclude_smalltalk_dependencies(
+    request: TransitivelyExcludeSmalltalkDependencies,
+) -> TransitivelyExcludeDependencies:
     # (Similar to `infer_smalltalk_dependencies`, but for `!!` addresses)
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.source))
     digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
@@ -1980,6 +1985,7 @@ async def transitive_exclude_smalltalk_dependencies(request: TransitivelyExclude
     )
     return TransitivelyExcludeDependencies(transitive_excludes)
 
+
 @pytest.fixture
 def dependencies_rule_runner() -> RuleRunner:
     return RuleRunner(
@@ -1990,7 +1996,9 @@ def dependencies_rule_runner() -> RuleRunner:
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
-            UnionRule(TransitivelyExcludeDependenciesRequest, TransitivelyExcludeSmalltalkDependencies),
+            UnionRule(
+                TransitivelyExcludeDependenciesRequest, TransitivelyExcludeSmalltalkDependencies
+            ),
         ],
         target_types=[SmalltalkLibrary, SmalltalkLibraryGenerator, MockTarget],
         # NB: The `graph` module masks the environment is most/all positions. We disable the

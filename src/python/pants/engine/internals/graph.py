@@ -79,9 +79,9 @@ from pants.engine.target import (
     TargetGenerator,
     Targets,
     TargetTypesToGenerateTargetsRequests,
-    TransitiveTargets,
-    TransitivelyExcludeDependenciesRequest,
     TransitivelyExcludeDependencies,
+    TransitivelyExcludeDependenciesRequest,
+    TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
@@ -756,7 +756,6 @@ async def transitive_targets(
     targets = (*dependency_mapping.roots_as_targets, *dependency_mapping.visited)
 
     # Apply any transitive excludes (`!!` ignores).
-    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     unevaluated_transitive_excludes = []
     for t in targets:
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
@@ -774,7 +773,10 @@ async def transitive_targets(
         ]
 
     # Apply plugin-provided transitive excludes
-    if request_types := union_membership.get(TransitivelyExcludeDependenciesRequest):
+    if request_types := cast(
+        "Sequence[Type[TransitivelyExcludeDependenciesRequest]]",
+        union_membership.get(TransitivelyExcludeDependenciesRequest),
+    ):
         tgts_to_request_types = {
             tgt: [
                 inference_request_type
@@ -798,15 +800,10 @@ async def transitive_targets(
             for request_type in request_types
         )
         transitive_exclude_addresses.extend(
-            itertools.chain.from_iterable(
-                addresses for addresses in results
-            )
+            itertools.chain.from_iterable(addresses for addresses in results)
         )
 
-    transitive_excludes = await Get(
-        Targets,
-        Addresses(transitive_exclude_addresses)
-    )
+    transitive_excludes = await Get(Targets, Addresses(transitive_exclude_addresses))
 
     return TransitiveTargets(
         tuple(dependency_mapping.roots_as_targets),
