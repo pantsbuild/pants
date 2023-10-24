@@ -179,17 +179,17 @@ class Parametrize:
 
     @staticmethod
     def _check_parametrizations(fields: dict[str, Any | Parametrize]) -> None:
-        parametrize_field_names = set(
+        parametrize_field_names = {
             field_name
             for field_name, v in fields.items()
             if isinstance(v, Parametrize) and not v.is_group
-        )
-        parametrize_group_field_names = set(
+        }
+        parametrize_group_field_names = {
             field_name
             for v in fields.values()
             if isinstance(v, Parametrize) and v.is_group
             for field_name in v.kwargs.keys()
-        )
+        }
         conflicting = parametrize_field_names.intersection(parametrize_group_field_names)
         if conflicting:
             raise ValueError(
