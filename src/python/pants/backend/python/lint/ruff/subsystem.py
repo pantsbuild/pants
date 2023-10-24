@@ -44,7 +44,7 @@ class RuffFieldSet(FieldSet):
 class Ruff(PythonToolBase):
     options_scope = "ruff"
     name = "Ruff"
-    help = "The Ruff Python formatter (https://github.com/charliermarsh/ruff)."
+    help = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
 
     default_main = ConsoleScript("ruff")
     default_requirements = ["ruff>=0.1.2,<1"]
@@ -61,7 +61,7 @@ class Ruff(PythonToolBase):
         help=softwrap(
             f"""
             Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-            (https://github.com/charliermarsh/ruff#configuration).
+            (https://github.com/astral-sh/ruff#configuration).
 
             Setting this option will disable `[{options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
@@ -83,7 +83,7 @@ class Ruff(PythonToolBase):
     )
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
-        # See https://github.com/charliermarsh/ruff#configuration for how ruff discovers
+        # See https://github.com/astral-sh/ruff#configuration for how ruff discovers
         # config files.
         return ConfigFilesRequest(
             specified=self.config,
