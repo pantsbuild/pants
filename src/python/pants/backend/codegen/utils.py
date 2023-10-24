@@ -3,10 +3,7 @@
 
 from __future__ import annotations
 
-from pants.backend.python.dependency_inference.module_mapper import (
-    ModuleProviderType,
-    ThirdPartyPythonModuleMapping,
-)
+from pants.backend.python.dependency_inference.module_mapper import PythonModuleOwners
 from pants.engine.addresses import Address
 from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
@@ -21,7 +18,7 @@ class AmbiguousPythonCodegenRuntimeLibrary(Exception):
 
 
 def find_python_runtime_library_or_raise_error(
-    module_mapping: ThirdPartyPythonModuleMapping,
+    module_owners: PythonModuleOwners,
     codegen_address: Address,
     runtime_library_module: str,
     *,
@@ -31,15 +28,11 @@ def find_python_runtime_library_or_raise_error(
     recommended_requirement_url: str,
     disable_inference_option: str,
 ) -> Address:
-    addresses = [
-        possible_module_provider.provider.addr
-        for possible_module_provider in module_mapping.providers_for_module(
-            runtime_library_module, resolve=resolve
-        )
-        if possible_module_provider.provider.typ == ModuleProviderType.IMPL
-    ]
-    if len(addresses) == 1:
-        return addresses[0]
+    addresses = module_owners.unambiguous
+    if module_owners.unambiguous:
+        return module_owners.unambiguous[0]
+
+    addresses = module_owners.ambiguous
 
     for_resolve_str = f" for the resolve '{resolve}'" if resolves_enabled else ""
     if not addresses:
@@ -98,7 +91,9 @@ def find_python_runtime_library_or_raise_error(
             {sorted(addr.spec for addr in addresses)}
 
             To fix, remove one of these `python_requirement` targets{for_resolve_str} so that
-            there is no ambiguity and Pants can infer a dependency. {alternative_solution}
+            there is no ambiguity and Pants can infer a dependency. It
+            might also help to set
+            `[python-infer].ambiguity-resolution = "by_source_root"`. {alternative_solution}
             """
         )
     )
