@@ -30,8 +30,8 @@ from pants.backend.python.util_rules.pex import (
     PexPlatforms,
     PexProcess,
     PexRequest,
+    PexRequirementsInfo,
     PexResolveInfo,
-    ReqStrings,
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
@@ -703,6 +703,7 @@ def test_setup_pex_requirements() -> None:
         expected: _BuildPexRequirementsSetup,
         *,
         is_pex_lock: bool = True,
+        include_find_links: bool = False,
     ) -> None:
         request = PexRequest(
             output_filename="foo.pex",
@@ -724,12 +725,13 @@ def test_setup_pex_requirements() -> None:
                     mock=lambda _: create_loaded_lockfile(is_pex_lock),
                 ),
                 MockGet(
-                    output_type=ReqStrings,
+                    output_type=PexRequirementsInfo,
                     input_types=(PexRequirements,),
-                    mock=lambda _: ReqStrings(
+                    mock=lambda _: PexRequirementsInfo(
                         tuple(str(x) for x in requirements.req_strings_or_addrs)
                         if isinstance(requirements, PexRequirements)
-                        else tuple()
+                        else tuple(),
+                        ("imma/link",) if include_find_links else tuple(),
                     ),
                 ),
                 MockGet(
@@ -764,6 +766,11 @@ def test_setup_pex_requirements() -> None:
 
     # Normal resolves.
     assert_setup(PexRequirements(reqs), _BuildPexRequirementsSetup([], [*reqs, *pip_args], 2))
+    assert_setup(
+        PexRequirements(reqs),
+        _BuildPexRequirementsSetup([], [*reqs, *pip_args, "--find-links=imma/link"], 2),
+        include_find_links=True,
+    )
     assert_setup(
         PexRequirements(reqs, constraints_strings=["constraint"]),
         _BuildPexRequirementsSetup(

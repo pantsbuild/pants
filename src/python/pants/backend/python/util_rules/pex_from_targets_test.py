@@ -15,6 +15,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from pants.backend.plugin_development import pants_requirements
+from pants.backend.plugin_development.pants_requirements import PantsRequirementsTargetGenerator
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.subsystems import setuptools
@@ -35,7 +37,7 @@ from pants.backend.python.util_rules.pex import (
     Pex,
     PexPlatforms,
     PexRequest,
-    ReqStrings,
+    PexRequirementsInfo,
 )
 from pants.backend.python.util_rules.pex_from_targets import (
     ChosenPythonResolve,
@@ -73,16 +75,18 @@ def rule_runner() -> PythonRuleRunner:
     return PythonRuleRunner(
         rules=[
             *package_pex_binary.rules(),
+            *pants_requirements.rules(),
             *pex_test_utils.rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
-            QueryRule(ReqStrings, (PexRequirements,)),
+            QueryRule(PexRequirementsInfo, (PexRequirements,)),
             QueryRule(GlobalRequirementConstraints, ()),
             QueryRule(ChosenPythonResolve, [ChosenPythonResolveRequest]),
             *setuptools.rules(),
         ],
         target_types=[
+            PantsRequirementsTargetGenerator,
             PexBinary,
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
@@ -655,7 +659,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     pex_req1 = get_pex_request(constraints1_filename, resolve_all_constraints=False)
     assert isinstance(pex_req1.requirements, PexRequirements)
     assert pex_req1.requirements.constraints_strings == FrozenOrderedSet(constraints1_strings)
-    req_strings_obj1 = rule_runner.request(ReqStrings, (pex_req1.requirements,))
+    req_strings_obj1 = rule_runner.request(PexRequirementsInfo, (pex_req1.requirements,))
     assert req_strings_obj1.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
 
     pex_req2 = get_pex_request(
@@ -666,7 +670,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     )
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
-    req_strings_obj2 = rule_runner.request(ReqStrings, (pex_req2_reqs,))
+    req_strings_obj2 = rule_runner.request(PexRequirementsInfo, (pex_req2_reqs,))
     assert req_strings_obj2.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
     assert isinstance(pex_req2_reqs.from_superset, Pex)
     repository_pex = pex_req2_reqs.from_superset
@@ -688,6 +692,34 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
 
     # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
     get_pex_request(None, resolve_all_constraints=None)
+
+
+def test_pants_requirement(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "app.py": "",
+            "BUILD": dedent(
+                """
+                pants_requirements(name="pants")
+                python_source(name="app", source="app.py", dependencies=[":pants"])
+                """
+            ),
+        }
+    )
+    args = [
+        "--backend-packages=pants.backend.python",
+        "--backend-packages=pants.backend.plugin_development",
+        "--python-repos-indexes=[]",
+    ]
+    request = PexFromTargetsRequest(
+        [Address("", target_name="app")],
+        output_filename="demo.pex",
+        internal_only=False,
+    )
+    rule_runner.set_options(args, env_inherit={"PATH"})
+    pex_req = rule_runner.request(PexRequest, [request])
+    pex_reqs_info = rule_runner.request(PexRequirementsInfo, [pex_req.requirements])
+    assert pex_reqs_info.find_links == ("https://wheels.pantsbuild.org/simple",)
 
 
 @pytest.mark.parametrize("include_requirements", [False, True])
