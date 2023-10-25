@@ -201,7 +201,7 @@ default-members = [
 #  inheriting-a-dependency-from-a-workspace
 [workspace.dependencies]
 arc-swap = "1.6"
-async-lock = "2.5"
+async-lock = "2.8"
 async-oncecell = "0.2"
 async-stream = "0.3"
 async-trait = "0.1"
