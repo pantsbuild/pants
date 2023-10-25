@@ -216,17 +216,10 @@ class CompletePexEnvironment:
         to avoid PEX from trying to find a new interpreter.
         """
         path = os.pathsep.join(self._pex_environment.path)
-        subprocess_env_dict = self._pex_environment.subprocess_environment_dict
+        subprocess_env_dict = dict(self._pex_environment.subprocess_environment_dict)
 
         if "PATH" in self._pex_environment.subprocess_environment_dict:
-            path = f"{path}{os.pathsep}{self._pex_environment.subprocess_environment_dict['PATH']}"
-            subprocess_env_dict = FrozenDict(
-                {
-                    k: v
-                    for k, v in self._pex_environment.subprocess_environment_dict.items()
-                    if k != "PATH"
-                }
-            )
+            path = os.pathsep.join([path, subprocess_env_dict.pop("PATH")])
 
         d = dict(
             PATH=path,
