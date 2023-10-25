@@ -124,8 +124,8 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
+    use crate::testutil::make_file;
     use crate::{GitignoreStyleExcludes, PosixFS, Stat};
-    use testutil::make_file;
 
     async fn read_mock_files(input: Vec<PathBuf>, posix_fs: &Arc<PosixFS>) -> Vec<Stat> {
         input

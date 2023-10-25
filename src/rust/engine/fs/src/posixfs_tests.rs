@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use hashing::EMPTY_DIGEST;
-use testutil::make_file;
 
+use crate::testutil::make_file;
 use crate::{
     DigestTrie, Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction,
     GlobMatching, Link, PathGlobs, PathStat, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,

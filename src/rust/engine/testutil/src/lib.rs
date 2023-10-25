@@ -25,10 +25,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bytes::Bytes;
+use std::fs::File;
 use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+
+use bytes::Bytes;
 
 use fs::RelativePath;
 
@@ -53,11 +54,17 @@ pub fn as_bytes(str: &str) -> Bytes {
 }
 
 pub fn make_file(path: &Path, contents: &[u8], mode: u32) {
-    let mut file = std::fs::File::create(path).unwrap();
+    let mut file = File::create(path).unwrap();
     file.write_all(contents).unwrap();
-    let mut permissions = std::fs::metadata(path).unwrap().permissions();
-    permissions.set_mode(mode);
-    file.set_permissions(permissions).unwrap();
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mut permissions = std::fs::metadata(path).unwrap().permissions();
+        permissions.set_mode(mode);
+        file.set_permissions(permissions).unwrap();
+    }
 }
 
 pub fn append_to_existing_file(path: &Path, contents: &[u8]) {
