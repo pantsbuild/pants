@@ -476,7 +476,7 @@ async def get_req_strings(pex_reqs: PexRequirements) -> PexRequirementsInfo:
     addrs: list[Address] = []
     specs: list[str] = []
     req_strings: list[str] = []
-    find_links: list[str] = []
+    find_links: set[str] = set()
     for req_str_or_addr in pex_reqs.req_strings_or_addrs:
         if isinstance(req_str_or_addr, Address):
             addrs.append(req_str_or_addr)
@@ -507,7 +507,7 @@ async def get_req_strings(pex_reqs: PexRequirements) -> PexRequirementsInfo:
                 if tgt.has_field(PythonRequirementsField)
             )
         )
-        find_links.extend(
+        find_links.update(
             find_links
             for tgt in transitive_targets.closure
             if tgt.has_field(PythonRequirementFindLinksField)

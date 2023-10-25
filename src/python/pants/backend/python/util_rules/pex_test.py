@@ -703,6 +703,7 @@ def test_setup_pex_requirements() -> None:
         expected: _BuildPexRequirementsSetup,
         *,
         is_pex_lock: bool = True,
+        include_find_links: bool = False,
     ) -> None:
         request = PexRequest(
             output_filename="foo.pex",
@@ -730,7 +731,7 @@ def test_setup_pex_requirements() -> None:
                         tuple(str(x) for x in requirements.req_strings_or_addrs)
                         if isinstance(requirements, PexRequirements)
                         else tuple(),
-                        tuple(),
+                        ("imma/link",) if include_find_links else tuple(),
                     ),
                 ),
                 MockGet(
@@ -765,6 +766,11 @@ def test_setup_pex_requirements() -> None:
 
     # Normal resolves.
     assert_setup(PexRequirements(reqs), _BuildPexRequirementsSetup([], [*reqs, *pip_args], 2))
+    assert_setup(
+        PexRequirements(reqs),
+        _BuildPexRequirementsSetup([], [*reqs, *pip_args, "--find-links=imma/link"], 2),
+        include_find_links=True,
+    )
     assert_setup(
         PexRequirements(reqs, constraints_strings=["constraint"]),
         _BuildPexRequirementsSetup(

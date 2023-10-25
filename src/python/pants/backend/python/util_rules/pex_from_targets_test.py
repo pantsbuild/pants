@@ -15,6 +15,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from pants.backend.plugin_development import pants_requirements
+from pants.backend.plugin_development.pants_requirements import PantsRequirementsTargetGenerator
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.subsystems import setuptools
@@ -73,6 +75,7 @@ def rule_runner() -> PythonRuleRunner:
     return PythonRuleRunner(
         rules=[
             *package_pex_binary.rules(),
+            *pants_requirements.rules(),
             *pex_test_utils.rules(),
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
@@ -83,6 +86,7 @@ def rule_runner() -> PythonRuleRunner:
             *setuptools.rules(),
         ],
         target_types=[
+            PantsRequirementsTargetGenerator,
             PexBinary,
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
@@ -688,6 +692,34 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
 
     # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
     get_pex_request(None, resolve_all_constraints=None)
+
+
+def test_pants_requirement(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "app.py": "",
+            "BUILD": dedent(
+                f"""
+                pants_requirements(name="pants")
+                python_source(name="app", source="app.py", dependencies=[":pants"])
+                """
+            ),
+        }
+    )
+    args = [
+        "--backend-packages=pants.backend.python",
+        "--backend-packages=pants.backend.plugin_development",
+        "--python-repos-indexes=[]",
+    ]
+    request = PexFromTargetsRequest(
+        [Address("", target_name="app")],
+        output_filename="demo.pex",
+        internal_only=False,
+    )
+    rule_runner.set_options(args, env_inherit={"PATH"})
+    pex_req = rule_runner.request(PexRequest, [request])
+    pex_reqs_info = rule_runner.request(PexRequirementsInfo, [pex_req.requirements])
+    assert pex_reqs_info.find_links == ("https://wheels.pantsbuild.org/simple",)
 
 
 @pytest.mark.parametrize("include_requirements", [False, True])
