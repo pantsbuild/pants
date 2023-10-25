@@ -699,7 +699,7 @@ def test_pants_requirement(rule_runner: PythonRuleRunner) -> None:
         {
             "app.py": "",
             "BUILD": dedent(
-                f"""
+                """
                 pants_requirements(name="pants")
                 python_source(name="app", source="app.py", dependencies=[":pants"])
                 """
