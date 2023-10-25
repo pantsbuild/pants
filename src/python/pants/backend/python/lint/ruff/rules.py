@@ -47,9 +47,9 @@ class RuffFormatRequest(FmtTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-class RuffMode(Enum):
-    FORMAT = "format"
+class RuffMode(str, Enum):
     FIX = "fix"
+    FORMAT = "format"
     LINT = "lint"
 
 
