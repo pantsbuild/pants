@@ -20,6 +20,7 @@ __pycache__/
 .emacs.desktop*
 .idea
 /.vscode/
+!/.vscode/settings.json
 .cache
 .pants.d
 # TODO: We can probably delete these 3. They have not been used in a long time, if ever.
