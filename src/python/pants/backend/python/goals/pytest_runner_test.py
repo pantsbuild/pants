@@ -12,7 +12,7 @@ from pants.backend.python.goals.pytest_runner import (
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
-from pants.backend.python.util_rules.pex import ReqStrings
+from pants.backend.python.util_rules.pex import PexRequirementsInfo
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
@@ -109,7 +109,11 @@ def test_validate_pytest_cov_included(entire_lockfile: bool) -> None:
             validate_pytest_cov_included,
             rule_args=[tool],
             mock_gets=[
-                MockGet(ReqStrings, (PexRequirements,), lambda x: ReqStrings(tuple(reqs))),
+                MockGet(
+                    PexRequirementsInfo,
+                    (PexRequirements,),
+                    lambda x: PexRequirementsInfo(tuple(reqs), ()),
+                ),
                 MockGet(Lockfile, (Resolve,), lambda x: lockfile),
                 MockGet(
                     LoadedLockfile,
