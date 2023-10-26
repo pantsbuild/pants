@@ -79,11 +79,18 @@ async def run_ruff(
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
 
-    extra_initial_args = ()
     if request.mode == RuffMode.FORMAT:
         extra_initial_args = ("format",)
     elif request.mode == RuffMode.FIX:
+        # TODO: In ruff >= 0.1 this should be ("check", "--fix"), but we retain
+        # the old behavior for backwards compatibility. Change this when support
+        # for ruff < 0.1 is dropped.
+        # See https://docs.astral.sh/ruff/linter/ for more details.
         extra_initial_args = ("--fix",)
+    else:
+        # Same as above - this should be ("check") in Ruff >= 0.1, but we retain
+        # the old behavior for backwards compatibility.
+        extra_initial_args = ()
 
     # `--force-exclude` applies file excludes from config to files provided explicitly
     initial_args = ("--force-exclude",) + extra_initial_args
