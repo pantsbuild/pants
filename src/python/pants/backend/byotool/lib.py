@@ -72,9 +72,8 @@ class ByoTool(Subsystem):
     help = 'Bring your own Tool'
 
     skip = SkipOption('lint')
-    linter = '//:flake8_linter'
-    # linter = '//:markdownlint_linter'
-
+    # linter = '//:flake8_linter'
+    linter = '//:markdownlint_linter'
 
 
 class ByoToolRequest(LintFilesRequest):
@@ -205,14 +204,14 @@ async def run_byotool(request: ByoToolRequest.Batch,
 
     input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest, sources_snapshot.digest)))
 
-    extra_args = ()
+    extra_args = linter[AdhocToolArgumentsField].value or ()
 
     append_only_caches = {
         **merged_extras.append_only_caches,
     }
 
     proc = Process(
-        argv=tuple(run_request.args + sources_snapshot.files),
+        argv=tuple(run_request.args + extra_args + sources_snapshot.files),
         description='Running byotool',
         input_digest=input_digest,
         append_only_caches=append_only_caches,
