@@ -1,16 +1,23 @@
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
+from pants.core.util_rules.adhoc_process_support import ResolvedExecutionDependencies, \
+    ResolveExecutionDependenciesRequest, rules as adhoc_process_support_rules, ExtraSandboxContents, \
+    MergeExtraSandboxContents
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.partitions import Partitions, PartitionMetadata
 from pants.engine.addresses import Addresses
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import FilespecMatcher, Snapshot, Address, AddressInput
+from pants.engine.internals.native_engine import FilespecMatcher, Snapshot, Address, AddressInput, Digest, EMPTY_DIGEST, \
+    MergeDigests
 from pants.engine.internals.selectors import Get
+from pants.engine.process import Process, FallibleProcessResult
 from pants.engine.rules import rule, collect_rules
 from pants.engine.target import Targets, FieldSetsPerTarget, FieldSetsPerTargetRequest
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
-
+from pants.util.frozendict import FrozenDict
 
 """
 ByoTool(
@@ -80,26 +87,89 @@ async def run_byotool(request: ByoToolRequest.Batch,
     addresses.expect_single()
 
     runnable_targets = await Get(Targets, Addresses, addresses)
-    import pydevd_pycharm
-    pydevd_pycharm.settrace('localhost', port=5678, stdoutToServer=True, stderrToServer=True)
+
+    target = runnable_targets[0]
+
+    environment_name = await Get(
+        EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
+    )
+
     field_sets = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)
     )
-    import pydevd_pycharm
-    pydevd_pycharm.settrace('localhost', port=5678, stdoutToServer=True, stderrToServer=True)
+
+    run_field_set: RunFieldSet = field_sets.field_sets[0]
 
     run_request = await Get(
         RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
     )
 
-    run_field_set: RunFieldSet = field_sets.field_sets[0]
+    execution_environment = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(
+            target.address,
+            execution_dependencies=None,
+            runnable_dependencies=None
+        ),
+    )
+    dependencies_digest = execution_environment.digest
+    runnable_dependencies = execution_environment.runnable_dependencies
 
-    return LintResult(PANTS_SUCCEEDED_EXIT_CODE, "success", "", "byotool")
+    deps_snapshot = await Get(Snapshot, Digest, dependencies_digest)
+
+    extra_env: dict[str, str] = dict(run_request.extra_env or {})
+    extra_path = extra_env.pop("PATH", None)
+
+    extra_sandbox_contents = []
+
+    extra_sandbox_contents.append(
+        ExtraSandboxContents(
+            EMPTY_DIGEST,
+            extra_path,
+            run_request.immutable_input_digests or FrozenDict(),
+            run_request.append_only_caches or FrozenDict(),
+            run_request.extra_env or FrozenDict(),
+        )
+    )
+
+    if runnable_dependencies:
+        extra_sandbox_contents.append(
+            ExtraSandboxContents(
+                EMPTY_DIGEST,
+                f"{{chroot}}/{runnable_dependencies.path_component}",
+                runnable_dependencies.immutable_input_digests,
+                runnable_dependencies.append_only_caches,
+                runnable_dependencies.extra_env,
+            )
+        )
+
+    merged_extras = await Get(
+        ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
+    )
+    extra_env = dict(merged_extras.extra_env)
+    if merged_extras.path:
+        extra_env["PATH"] = merged_extras.path
+
+    input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest, sources_snapshot.digest)))
+
+    extra_args = ()
+
+    proc = Process(
+        argv=tuple(run_request.args + sources_snapshot.files),
+        description='Running byotool',
+        input_digest=input_digest,
+    )
+
+    proc_result = await Get(FallibleProcessResult, Process, proc)
+
+    return LintResult.create(request, proc_result)
+    # return LintResult(PANTS_SUCCEEDED_EXIT_CODE, "success", "", "byotool")
 
 # A requirement is runnable: //:flake8 is the name of the target. Could use it.
 
 def rules():
     return [
         *collect_rules(),
-        *ByoToolRequest.rules()
+        *ByoToolRequest.rules(),
+        *adhoc_process_support_rules(),
     ]
