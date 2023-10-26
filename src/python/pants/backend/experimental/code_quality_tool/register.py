@@ -1,44 +1,42 @@
 from pants.backend.adhoc import run_system_binary
 from pants.backend.adhoc.target_types import SystemBinaryTarget
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.backend.byotool.lib import ByoLinterTarget, ByoToolConfig, ByoLintGoal, ByoFmtGoal, build_rules
+from pants.backend.code_quality_tool.lib import CodeQualityToolTarget, ByoToolConfig, ByoLintGoal, ByoFmtGoal, build_rules
 
 markdownlinter = ByoToolConfig(
-    goal=ByoLintGoal,
+    goal='lint',
     target='//:markdownlint_linter',
-    options_scope='markdownlint',
+    scope='markdownlint',
     name="Markdown Lint",
-    help="ByoTool linter for markdownlint"
 )
 
 
 flake8linter = ByoToolConfig(
-    goal=ByoLintGoal,
+    goal='lint',
     target='//:flake8_linter',
-    options_scope='flake8linter',
-    name="Flake8 Lint",
-    help="ByoTool linter for flake8"
+    scope='flake8linter',
+    name="Flake8",
 )
 
 blacklinter = ByoToolConfig(
-    goal=ByoFmtGoal,
+    goal='fmt',
     target='//:black_formatter',
-    options_scope='blackformatter',
+    scope='blackformatter',
     name="Black",
-    help="ByoTool linter for black"
 )
 
 
-def target_types():
+def target_types(**kwargs):
     return [
         SystemBinaryTarget,
-        ByoLinterTarget,
+        CodeQualityToolTarget,
     ]
 
 
-def rules():
+def rules(**kwargs):
+    config = ByoToolConfig(**kwargs)
     return [
-        *build_rules(flake8linter),
+        *build_rules(config),
         *adhoc_process_support_rules(),
         *run_system_binary.rules(),
     ]

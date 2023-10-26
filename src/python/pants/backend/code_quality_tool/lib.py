@@ -39,8 +39,8 @@ class ByoFileGlobExcludeField(StringSequenceField):
     default = ()
 
 
-class ByoLinterTarget(Target):
-    alias: ClassVar[str] = "byolinter"
+class CodeQualityToolTarget(Target):
+    alias: ClassVar[str] = "code_quality_tool"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         AdhocToolRunnableField,
@@ -106,20 +106,28 @@ class ByoFmtGoal(ByoGoal):
 
 @dataclass
 class ByoToolConfig:
-    goal: Type[ByoGoal]
+    goal: str
     target: str
     name: str
-    options_scope: str
-    help: str
+    scope: str
+
+    @property
+    def _goal(self) -> ByoGoal:
+        if self.goal == 'fmt':
+            return ByoFmtGoal
+        elif self.goal == 'lint':
+            return ByoLintGoal
+        else:
+            raise ValueError(f'Unknown goal {self.goal}')
 
 
 def build_rules(cfg: ByoToolConfig):
-    goal = cfg.goal
+    goal = cfg._goal
 
     class ByoTool(Subsystem):
-        options_scope = cfg.options_scope
+        options_scope = cfg.scope
         name = cfg.name
-        help = cfg.help
+        help = f'{cfg.goal.capitalize()} with {cfg.name}. Tool defined in {cfg.target}'
 
         skip = SkipOption(*goal.skippable)
         linter = cfg.target
