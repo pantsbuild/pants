@@ -137,7 +137,7 @@ def build_rules(cfg: ByoToolConfig):
     class ByoToolRequest(request_superclass):
         tool_subsystem = ByoTool
 
-    @rule
+    @rule(canonical_name_suffix=cfg.scope)
     async def partition_inputs(
             request: ByoToolRequest.PartitionRequest,
             subsystem: ByoTool
@@ -168,7 +168,7 @@ def build_rules(cfg: ByoToolConfig):
 
     result_class = goal.result_class
 
-    @rule
+    @rule(canonical_name_suffix=cfg.scope)
     async def run_byotool(request: ByoToolRequest.Batch,
                           subsystem: ByoTool) -> result_class:
         sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
