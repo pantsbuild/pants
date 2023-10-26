@@ -1,3 +1,7 @@
+from typing import ClassVar
+
+from pants.backend.adhoc.target_types import AdhocToolRunnableField, AdhocToolArgumentsField, \
+    AdhocToolRunnableDependenciesField
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -14,7 +18,8 @@ from pants.engine.internals.native_engine import FilespecMatcher, Snapshot, Addr
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, FallibleProcessResult
 from pants.engine.rules import rule, collect_rules
-from pants.engine.target import Targets, FieldSetsPerTarget, FieldSetsPerTargetRequest
+from pants.engine.target import Targets, FieldSetsPerTarget, FieldSetsPerTargetRequest, Target, COMMON_TARGET_FIELDS, \
+    StringSequenceField
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -36,21 +41,40 @@ ByoTool(
 """
 
 
+class ByoFileGlobIncludeField(StringSequenceField):
+    alias: ClassVar[str] = "file_glob_include"
+    required = True
+
+
+class ByoFileGlobExcludeField(StringSequenceField):
+    alias: ClassVar[str] = "file_glob_exclude"
+    required = False
+    default = ()
+
+
+class ByoLinterTarget(Target):
+    alias: ClassVar[str] = "byolinter"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        AdhocToolRunnableField,
+        AdhocToolArgumentsField,
+        # will probably need AdhocToolExecutionDependenciesField, for config files
+        AdhocToolRunnableDependenciesField,
+        ByoFileGlobIncludeField,
+        ByoFileGlobExcludeField,
+    )
+
+
+
 class ByoTool(Subsystem):
     options_scope = 'byotool'
     name = 'ByoTool'
     help = 'Bring your own Tool'
 
     skip = SkipOption('lint')
-    # runnable = '//:flake8'
-    # runnable_dependencies = ()
-    # file_glob_include = ["**/*.py"]
-    # file_glob_exclude = ["pants-plugins/**"]
+    # linter = '//:flake8_linter'
+    linter = '//:markdownlint_linter'
 
-    runnable = '//:markdownlint'
-    runnable_dependencies = ('//:node',)
-    file_glob_include = ["**/*.md"]
-    file_glob_exclude = ["README.md"]
 
 
 class ByoToolRequest(LintFilesRequest):
@@ -65,11 +89,22 @@ async def partition_inputs(
     if subsystem.skip:
         return Partitions()
 
-    # import pydevd_pycharm
-    # pydevd_pycharm.settrace('localhost', port=5678, stdoutToServer=True, stderrToServer=True)
+    linter_address_str = subsystem.linter
+    linter_address = await Get(Address, AddressInput,
+                                 AddressInput.parse(
+                                    linter_address_str,
+                                     description_of_origin=f"ByoTool linter target"
+                                 ))
+
+    addresses = Addresses((linter_address,))
+    addresses.expect_single()
+
+    linter_targets = await Get(Targets, Addresses, addresses)
+    linter = linter_targets[0]
 
     matching_filepaths = FilespecMatcher(
-        includes=subsystem.file_glob_include, excludes=subsystem.file_glob_exclude
+        includes=linter[ByoFileGlobIncludeField].value,
+        excludes=linter[ByoFileGlobExcludeField].value
     ).matches(request.files)
 
     return Partitions.single_partition(sorted(matching_filepaths))
@@ -80,14 +115,27 @@ async def run_byotool(request: ByoToolRequest.Batch,
                       subsystem: ByoTool) -> LintResult:
     sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
 
-    runnable_address_str = subsystem.runnable
+    linter_address_str = subsystem.linter
+    linter_address = await Get(Address, AddressInput,
+                                 AddressInput.parse(
+                                    linter_address_str,
+                                     description_of_origin=f"ByoTool linter target"
+                                 ))
+
+    addresses = Addresses((linter_address,))
+    addresses.expect_single()
+
+    linter_targets = await Get(Targets, Addresses, addresses)
+    linter = linter_targets[0]
+
+
+    runnable_address_str = linter[AdhocToolRunnableField].value
     runnable_address = await Get(Address, AddressInput,
                                  AddressInput.parse(
                                     runnable_address_str,
+                                     # Need to add a relative_to=addresses
                                      description_of_origin=f"ByoTool runnable target"
                                  ))
-
-    # raise Exception('blah!')
 
     addresses = Addresses((runnable_address,))
     addresses.expect_single()
@@ -115,7 +163,7 @@ async def run_byotool(request: ByoToolRequest.Batch,
         ResolveExecutionDependenciesRequest(
             target.address,
             execution_dependencies=None,
-            runnable_dependencies=subsystem.runnable_dependencies
+            runnable_dependencies=linter[AdhocToolRunnableDependenciesField].value
         ),
     )
     dependencies_digest = execution_environment.digest
