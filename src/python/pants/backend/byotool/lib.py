@@ -42,9 +42,15 @@ class ByoTool(Subsystem):
     help = 'Bring your own Tool'
 
     skip = SkipOption('lint')
-    runnable = '//:flake8'
-    file_glob_include = ["**/*.py"]
-    file_glob_exclude = ["pants-plugins/**"]
+    # runnable = '//:flake8'
+    # runnable_dependencies = ()
+    # file_glob_include = ["**/*.py"]
+    # file_glob_exclude = ["pants-plugins/**"]
+
+    runnable = '//:markdownlint'
+    runnable_dependencies = ('//:node',)
+    file_glob_include = ["**/*.md"]
+    file_glob_exclude = ["README.md"]
 
 
 class ByoToolRequest(LintFilesRequest):
@@ -109,7 +115,7 @@ async def run_byotool(request: ByoToolRequest.Batch,
         ResolveExecutionDependenciesRequest(
             target.address,
             execution_dependencies=None,
-            runnable_dependencies=None
+            runnable_dependencies=subsystem.runnable_dependencies
         ),
     )
     dependencies_digest = execution_environment.digest
@@ -154,10 +160,17 @@ async def run_byotool(request: ByoToolRequest.Batch,
 
     extra_args = ()
 
+    append_only_caches = {
+        **merged_extras.append_only_caches,
+    }
+
     proc = Process(
         argv=tuple(run_request.args + sources_snapshot.files),
         description='Running byotool',
         input_digest=input_digest,
+        append_only_caches=append_only_caches,
+        immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
+        env=FrozenDict(extra_env)
     )
 
     proc_result = await Get(FallibleProcessResult, Process, proc)
