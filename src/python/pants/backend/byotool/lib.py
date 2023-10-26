@@ -3,7 +3,6 @@ from typing import ClassVar, Type
 
 from pants.backend.adhoc.target_types import AdhocToolRunnableField, AdhocToolArgumentsField, \
     AdhocToolRunnableDependenciesField, AdhocToolExecutionDependenciesField
-from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtFilesRequest
 from pants.core.goals.lint import LintFilesRequest, LintResult
@@ -281,37 +280,4 @@ def build_rules(cfg: ByoToolConfig):
     return [
         *collect_rules(namespace),
         *ByoToolRequest.rules(),
-    ]
-
-
-markdownlinter = ByoToolConfig(
-    goal=ByoLintGoal,
-    target='//:markdownlint_linter',
-    options_scope='markdownlint',
-    name="Markdown Lint",
-    help="ByoTool linter for markdownlint"
-)
-
-
-flake8linter = ByoToolConfig(
-    goal=ByoLintGoal,
-    target='//:flake8_linter',
-    options_scope='flake8linter',
-    name="Flake8 Lint",
-    help="ByoTool linter for flake8"
-)
-
-blacklinter = ByoToolConfig(
-    goal=ByoFmtGoal,
-    target='//:black_formatter',
-    options_scope='blackformatter',
-    name="Black",
-    help="ByoTool linter for black"
-)
-
-
-def rules():
-    return [
-        *build_rules(blacklinter),
-        *adhoc_process_support_rules(),
     ]
