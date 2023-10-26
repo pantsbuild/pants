@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from pants.backend.adhoc.target_types import AdhocToolRunnableField, AdhocToolArgumentsField, \
-    AdhocToolRunnableDependenciesField
+    AdhocToolRunnableDependenciesField, AdhocToolExecutionDependenciesField
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -58,7 +58,7 @@ class ByoLinterTarget(Target):
         *COMMON_TARGET_FIELDS,
         AdhocToolRunnableField,
         AdhocToolArgumentsField,
-        # will probably need AdhocToolExecutionDependenciesField, for config files
+        AdhocToolExecutionDependenciesField,
         AdhocToolRunnableDependenciesField,
         ByoFileGlobIncludeField,
         ByoFileGlobExcludeField,
@@ -72,8 +72,8 @@ class ByoTool(Subsystem):
     help = 'Bring your own Tool'
 
     skip = SkipOption('lint')
-    # linter = '//:flake8_linter'
-    linter = '//:markdownlint_linter'
+    linter = '//:flake8_linter'
+    # linter = '//:markdownlint_linter'
 
 
 
@@ -162,14 +162,13 @@ async def run_byotool(request: ByoToolRequest.Batch,
         ResolvedExecutionDependencies,
         ResolveExecutionDependenciesRequest(
             target.address,
-            execution_dependencies=None,
+            execution_dependencies=linter[AdhocToolExecutionDependenciesField].value,
             runnable_dependencies=linter[AdhocToolRunnableDependenciesField].value
         ),
     )
     dependencies_digest = execution_environment.digest
     runnable_dependencies = execution_environment.runnable_dependencies
 
-    deps_snapshot = await Get(Snapshot, Digest, dependencies_digest)
 
     extra_env: dict[str, str] = dict(run_request.extra_env or {})
     extra_path = extra_env.pop("PATH", None)
