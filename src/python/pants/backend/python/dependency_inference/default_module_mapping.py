@@ -82,7 +82,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "attrs": ("attr", "attrs"),
     "beautifulsoup4": ("bs4",),
     "bitvector": ("BitVector",),
-    "cattrs": ("cattr",),
+    "cattrs": ("cattr", "cattrs"),
     "django-filter": ("django_filters",),
     "django-postgres-extra": ("psqlextra",),
     "django-cors-headers": ("corsheaders",),
