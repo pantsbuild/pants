@@ -220,11 +220,19 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
                     version.filesize,
                     url_override=version.url_override,
                 )
+
+        suggestion = ""
+        if hasattr(type(self), "skip"):
+            suggestion = " " + softwrap(
+                f"""If {self.name} is not supported on your platform,
+                consider running pants with --{self.options_scope}-skip
+                """
+            )
         raise UnknownVersion(
             softwrap(
                 f"""
                 No known version of {self.name} {self.version} for {plat.value} found in
-                {self.known_versions}
+                {self.known_versions}.{suggestion}
                 """
             )
         )
