@@ -89,7 +89,9 @@ class PythonBootstrapSubsystem(Subsystem):
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
         search_path = StrListOption(
-            default=["<PYENV>", AsdfPathString.STANDARD, "<PATH>"],
+            # f"{AsdfPathString.STANDARD}" cannot be replaced with AsdfPathString.STANDARD here
+            # str(AsdfPathString.STANDARD) != f"{AsdfPathString.STANDARD}"
+            default=["<PYENV>", f"{AsdfPathString.STANDARD}", "<PATH>"],
             help=softwrap(
                 f"""
                 A list of paths to search for Python interpreters.
