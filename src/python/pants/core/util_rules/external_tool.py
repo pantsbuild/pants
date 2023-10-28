@@ -232,7 +232,9 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
             softwrap(
                 f"""
                 No known version of {self.name} {self.version} for {plat.value} found in
-                {self.known_versions}.{suggestion}
+                {self.known_versions}.
+                
+                {suggestion}
                 """
             )
         )
