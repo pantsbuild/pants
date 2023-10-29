@@ -109,6 +109,31 @@ pub struct RemotingOptions {
     pub append_only_caches_base_path: Option<String>,
 }
 
+impl RemotingOptions {
+    fn to_remote_store_options(
+        &self,
+        tls_config: grpc_util::tls::Config,
+    ) -> Result<RemoteStoreOptions, String> {
+        let store_address = self
+            .store_address
+            .as_ref()
+            .ok_or("Remote store required, but none configured")?
+            .clone();
+
+        Ok(RemoteStoreOptions {
+            store_address,
+            instance_name: self.instance_name.clone(),
+            tls_config,
+            headers: self.store_headers.clone(),
+            chunk_size_bytes: self.store_chunk_bytes,
+            timeout: self.store_rpc_timeout,
+            retries: self.store_rpc_retries,
+            concurrency_limit: self.store_rpc_concurrency,
+            batch_api_size_limit: self.store_batch_api_size_limit,
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ExecutionStrategyOptions {
     pub local_parallelism: usize,
@@ -151,7 +176,6 @@ impl Core {
         local_execution_root_dir: &Path,
         enable_remote: bool,
         remoting_opts: &RemotingOptions,
-        remote_store_address: &Option<String>,
         tls_config: grpc_util::tls::Config,
     ) -> Result<Store, String> {
         let local_only = Store::local_only_with_options(
@@ -161,23 +185,8 @@ impl Core {
             local_store_options.into(),
         )?;
         if enable_remote {
-            let store_address = remote_store_address
-                .as_ref()
-                .ok_or("Remote store required, but none configured")?
-                .clone();
-
             local_only
-                .into_with_remote(RemoteStoreOptions {
-                    store_address,
-                    instance_name: remoting_opts.instance_name.clone(),
-                    tls_config,
-                    headers: remoting_opts.store_headers.clone(),
-                    chunk_size_bytes: remoting_opts.store_chunk_bytes,
-                    timeout: remoting_opts.store_rpc_timeout,
-                    retries: remoting_opts.store_rpc_retries,
-                    concurrency_limit: remoting_opts.store_rpc_concurrency,
-                    batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
-                })
+                .into_with_remote(remoting_opts.to_remote_store_options(tls_config)?)
                 .await
         } else {
             Ok(local_only)
@@ -561,7 +570,6 @@ impl Core {
             &local_execution_root_dir,
             need_remote_store,
             &remoting_opts,
-            &remoting_opts.store_address,
             tls_config.clone(),
         )
         .await
