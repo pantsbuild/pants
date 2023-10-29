@@ -119,7 +119,7 @@ impl Provider {
         // extract the token from the `authorization: Bearer ...` header because OpenDAL's Ghac service
         // reasons about it separately (although does just stick it in its own `authorization: Bearer
         // ...` header internally).
-        let header_help_blurb = "Using GitHub Actions Cache remote cache requires a token set in a `authorization: Bearer ...` header, set via [GLOBAL].remote_store_headers or [GLOBAL].remote_oauth_bearer_token_path";
+        let header_help_blurb = "Using GitHub Actions Cache remote cache requires a token set in a `authorization: Bearer ...` header, set via [GLOBAL].remote_store_headers or [GLOBAL].remote_oauth_bearer_token";
         let Some(auth_header_value) = options.headers.get(AUTHORIZATION.as_str()) else {
             let existing_headers = options.headers.keys().collect::<Vec<_>>();
             return Err(format!(
