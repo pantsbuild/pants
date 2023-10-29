@@ -32,9 +32,7 @@ use process_execution::{
     ProcessExecutionStrategy,
 };
 use regex::Regex;
-use remote::remote_cache::{
-    RemoteCacheProviderOptions, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
-};
+use remote::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
 use store::{self, ImmutableInputs, RemoteStoreOptions, Store};
@@ -353,14 +351,7 @@ impl Core {
                             .append_only_caches_base_path
                             .clone(),
                     },
-                    RemoteCacheProviderOptions {
-                        instance_name,
-                        action_cache_address: remoting_opts.store_address.clone().unwrap(),
-                        tls_config,
-                        headers: remoting_opts.store_headers.clone(),
-                        concurrency_limit: remoting_opts.cache_rpc_concurrency,
-                        rpc_timeout: remoting_opts.cache_rpc_timeout,
-                    },
+                    remoting_opts.to_remote_store_options(tls_config)?,
                 )
                 .await?,
             );

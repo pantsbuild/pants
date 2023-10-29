@@ -30,8 +30,7 @@ use std::sync::Arc;
 // Re-export these so that consumers don't have to know about the exact arrangement of underlying
 // crates.
 pub use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteCacheProviderOptions,
-    RemoteStoreOptions,
+    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
 };
 
 const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", "https://"];
@@ -73,24 +72,9 @@ pub async fn choose_byte_store_provider(
 }
 
 pub async fn choose_action_cache_provider(
-    options: RemoteCacheProviderOptions,
+    options: RemoteStoreOptions,
 ) -> Result<Arc<dyn ActionCacheProvider>, String> {
-    let address = options.action_cache_address.clone();
-
-    // TODO: we shouldn't need to gin up a whole copy of this struct; it'd be better to have the two
-    // set of remoting options managed together.
-    let remote_options = RemoteStoreOptions {
-        store_address: address.clone(),
-        instance_name: options.instance_name.clone(),
-        headers: options.headers.clone(),
-        tls_config: options.tls_config.clone(),
-        timeout: options.rpc_timeout,
-        concurrency_limit: options.concurrency_limit,
-        // TODO: these should either be passed through or not synthesized here
-        chunk_size_bytes: 0,
-        retries: 0,
-        batch_api_size_limit: 0,
-    };
+    let address = options.store_address.clone();
 
     if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
         Ok(Arc::new(
@@ -102,7 +86,7 @@ pub async fn choose_action_cache_provider(
         Ok(Arc::new(remote_provider_opendal::Provider::fs(
             path,
             "action-cache".to_owned(),
-            remote_options,
+            options,
         )?))
     } else if let Some(url) = address.strip_prefix("github-actions-cache+") {
         // This is relying on python validating that it was set as `github-actions-cache+https://...` so
@@ -113,7 +97,7 @@ pub async fn choose_action_cache_provider(
             remote_provider_opendal::Provider::github_actions_cache(
                 url,
                 "action-cache".to_owned(),
-                remote_options,
+                options,
             )?,
         ))
     } else {

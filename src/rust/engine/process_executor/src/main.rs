@@ -44,7 +44,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
-use remote::remote_cache::{RemoteCacheProviderOptions, RemoteCacheRunnerOptions};
+use remote::remote_cache::RemoteCacheRunnerOptions;
 use store::{ImmutableInputs, RemoteStoreOptions, Store};
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
@@ -385,13 +385,16 @@ async fn main() {
                                 .named_cache_path
                                 .map(|p| p.to_string_lossy().to_string()),
                         },
-                        RemoteCacheProviderOptions {
+                        RemoteStoreOptions {
                             instance_name: process_metadata.instance_name.clone(),
-                            action_cache_address: address,
+                            store_address: address,
                             tls_config,
                             headers,
                             concurrency_limit: args.cache_rpc_concurrency,
-                            rpc_timeout: Duration::from_secs(2),
+                            timeout: Duration::from_secs(2),
+                            retries: 0,
+                            batch_api_size_limit: 0,
+                            chunk_size_bytes: 0,
                         },
                     )
                     .await

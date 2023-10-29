@@ -52,20 +52,6 @@ pub struct RemoteStoreOptions {
     pub batch_api_size_limit: usize,
 }
 
-#[derive(Clone)]
-pub struct RemoteCacheProviderOptions {
-    // TODO: this is currently framed for the REAPI provider, with some options used by others, would
-    // be good to generalise
-    // TODO: this is structurally very similar to `RemoteOptions`: maybe they should be the same? (see
-    // comment in `choose_action_cache_provider` too)
-    pub instance_name: Option<String>,
-    pub action_cache_address: String,
-    pub tls_config: grpc_util::tls::Config,
-    pub headers: BTreeMap<String, String>,
-    pub concurrency_limit: usize,
-    pub rpc_timeout: Duration,
-}
-
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
     /// Store the bytes readable from `file` into the remote store
