@@ -84,11 +84,11 @@ pub async fn choose_action_cache_provider(
         instance_name: options.instance_name.clone(),
         headers: options.headers.clone(),
         tls_config: options.tls_config.clone(),
-        rpc_timeout: options.rpc_timeout,
-        rpc_concurrency_limit: options.concurrency_limit,
+        timeout: options.rpc_timeout,
+        concurrency_limit: options.concurrency_limit,
         // TODO: these should either be passed through or not synthesized here
         chunk_size_bytes: 0,
-        rpc_retries: 0,
+        retries: 0,
         batch_api_size_limit: 0,
     };
 

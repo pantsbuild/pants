@@ -87,9 +87,9 @@ impl Provider {
         let http_headers = headers_to_http_header_map(&options.headers)?;
         let channel = layered_service(
             channel,
-            options.rpc_concurrency_limit,
+            options.concurrency_limit,
             http_headers,
-            Some((options.rpc_timeout, Metric::RemoteStoreRequestTimeouts)),
+            Some((options.timeout, Metric::RemoteStoreRequestTimeouts)),
         );
 
         let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
@@ -101,7 +101,7 @@ impl Provider {
         Ok(Provider {
             instance_name: options.instance_name,
             chunk_size_bytes: options.chunk_size_bytes,
-            _rpc_attempts: options.rpc_retries + 1,
+            _rpc_attempts: options.retries + 1,
             byte_stream_client,
             cas_client,
             capabilities_cell: Arc::new(OnceCell::new()),

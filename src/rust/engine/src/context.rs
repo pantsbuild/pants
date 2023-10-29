@@ -173,9 +173,9 @@ impl Core {
                     tls_config,
                     headers: remoting_opts.store_headers.clone(),
                     chunk_size_bytes: remoting_opts.store_chunk_bytes,
-                    rpc_timeout: remoting_opts.store_rpc_timeout,
-                    rpc_retries: remoting_opts.store_rpc_retries,
-                    rpc_concurrency_limit: remoting_opts.store_rpc_concurrency,
+                    timeout: remoting_opts.store_rpc_timeout,
+                    retries: remoting_opts.store_rpc_retries,
+                    concurrency_limit: remoting_opts.store_rpc_concurrency,
                     batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
                 })
                 .await

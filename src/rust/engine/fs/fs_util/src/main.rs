@@ -426,11 +426,11 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                             //
                             // Make fs_util have a very long deadline (because it's not configurable,
                             // like it is inside pants).
-                            rpc_timeout: Duration::from_secs(30 * 60),
-                            rpc_retries: top_match
+                            timeout: Duration::from_secs(30 * 60),
+                            retries: top_match
                                 .value_of_t::<usize>("rpc-attempts")
                                 .expect("Bad rpc-attempts flag"),
-                            rpc_concurrency_limit: top_match
+                            concurrency_limit: top_match
                                 .value_of_t::<usize>("rpc-concurrency-limit")
                                 .expect("Bad rpc-concurrency-limit flag"),
                             batch_api_size_limit: top_match

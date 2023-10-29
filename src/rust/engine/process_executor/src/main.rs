@@ -290,9 +290,9 @@ async fn main() {
           tls_config,
           headers,
           chunk_size_bytes: args.upload_chunk_bytes,
-          rpc_timeout: Duration::from_secs(30),
-          rpc_retries: args.store_rpc_retries,
-          rpc_concurrency_limit: args.store_rpc_concurrency,
+          timeout: Duration::from_secs(30),
+          retries: args.store_rpc_retries,
+          concurrency_limit: args.store_rpc_concurrency,
 
           batch_api_size_limit: args.store_batch_api_size_limit,
         })

@@ -1275,9 +1275,9 @@ fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteStoreOptions {
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes: 10 * 1024 * 1024,
-        rpc_timeout: Duration::from_secs(1),
-        rpc_retries: 1,
-        rpc_concurrency_limit: STORE_CONCURRENCY_LIMIT,
+        timeout: Duration::from_secs(1),
+        retries: 1,
+        concurrency_limit: STORE_CONCURRENCY_LIMIT,
         batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
     }
 }

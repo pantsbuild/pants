@@ -46,9 +46,9 @@ pub struct RemoteStoreOptions {
     pub headers: BTreeMap<String, String>,
     pub tls_config: grpc_util::tls::Config,
     pub chunk_size_bytes: usize,
-    pub rpc_timeout: Duration,
-    pub rpc_retries: usize,
-    pub rpc_concurrency_limit: usize,
+    pub timeout: Duration,
+    pub retries: usize,
+    pub concurrency_limit: usize,
     pub batch_api_size_limit: usize,
 }
 

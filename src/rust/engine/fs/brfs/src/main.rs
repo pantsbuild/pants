@@ -798,9 +798,9 @@ async fn main() {
                 tls_config,
                 headers,
                 chunk_size_bytes: 4 * 1024 * 1024,
-                rpc_timeout: std::time::Duration::from_secs(5 * 60),
-                rpc_retries: 1,
-                rpc_concurrency_limit: args
+                timeout: std::time::Duration::from_secs(5 * 60),
+                retries: 1,
+                concurrency_limit: args
                     .value_of_t::<usize>("rpc-concurrency-limit")
                     .expect("Bad rpc-concurrency-limit flag"),
                 batch_api_size_limit: args

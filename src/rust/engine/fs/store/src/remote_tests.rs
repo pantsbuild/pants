@@ -35,9 +35,9 @@ async fn smoke_test_from_options_reapi_provider() {
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes: 10 * MEGABYTES,
-        rpc_timeout: Duration::from_secs(5),
-        rpc_retries: 1,
-        rpc_concurrency_limit: 256,
+        timeout: Duration::from_secs(5),
+        retries: 1,
+        concurrency_limit: 256,
         batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
     })
     .await
@@ -83,9 +83,9 @@ async fn smoke_test_from_options_file_provider() {
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes: 10 * MEGABYTES,
-        rpc_timeout: Duration::from_secs(5),
-        rpc_retries: 1,
-        rpc_concurrency_limit: 256,
+        timeout: Duration::from_secs(5),
+        retries: 1,
+        concurrency_limit: 256,
         batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
     })
     .await

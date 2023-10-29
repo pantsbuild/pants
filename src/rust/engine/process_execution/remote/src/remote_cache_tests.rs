@@ -112,9 +112,9 @@ impl StoreSetup {
                 tls_config: tls::Config::default(),
                 headers: BTreeMap::new(),
                 chunk_size_bytes: 10 * 1024 * 1024,
-                rpc_timeout: Duration::from_secs(1),
-                rpc_retries: 1,
-                rpc_concurrency_limit: 256,
+                timeout: Duration::from_secs(1),
+                retries: 1,
+                concurrency_limit: 256,
                 batch_api_size_limit: 4 * 1024 * 1024,
             })
             .await

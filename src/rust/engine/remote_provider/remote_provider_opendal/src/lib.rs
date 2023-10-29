@@ -77,16 +77,16 @@ impl Provider {
                     B::SCHEME
                 )
             })?
-            .layer(ConcurrentLimitLayer::new(options.rpc_concurrency_limit))
+            .layer(ConcurrentLimitLayer::new(options.concurrency_limit))
             .layer(
                 // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
                 TimeoutLayer::new()
-                    .with_timeout(options.rpc_timeout)
+                    .with_timeout(options.timeout)
                     // TimeoutLayer requires specifying a non-zero minimum transfer speed too.
                     .with_speed(1),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
-            .layer(RetryLayer::new().with_max_times(options.rpc_retries + 1))
+            .layer(RetryLayer::new().with_max_times(options.retries + 1))
             .finish();
 
         let base_path = match options.instance_name {
