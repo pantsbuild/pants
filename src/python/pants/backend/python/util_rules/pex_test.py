@@ -417,6 +417,7 @@ def test_entry_point(rule_runner: RuleRunner) -> None:
     assert pex_info["entry_point"] == entry_point
 
 
+@pytest.mark.skip(reason="#20103 this is intermittently flaky in CI")
 def test_interpreter_constraints(rule_runner: RuleRunner) -> None:
     constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
     pex_info = create_pex_and_get_pex_info(
