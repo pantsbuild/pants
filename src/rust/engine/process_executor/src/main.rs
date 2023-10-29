@@ -45,7 +45,7 @@ use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use remote::remote_cache::{RemoteCacheProviderOptions, RemoteCacheRunnerOptions};
-use store::{ImmutableInputs, RemoteOptions, Store};
+use store::{ImmutableInputs, RemoteStoreOptions, Store};
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(Clone, Debug, Default)]
@@ -284,7 +284,7 @@ async fn main() {
         .expect("failed parsing root CA certs");
 
       local_only_store
-        .into_with_remote(RemoteOptions {
+        .into_with_remote(RemoteStoreOptions {
           cas_address: cas_server.to_owned(),
           instance_name: args.remote_instance_name.clone(),
           tls_config,

@@ -29,7 +29,7 @@ use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
 
-use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
+use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteStoreOptions};
 
 pub struct Provider {
     instance_name: Option<String>,
@@ -75,7 +75,7 @@ impl std::error::Error for ByteStoreError {}
 impl Provider {
     // TODO: Consider extracting these options to a struct with `impl Default`, similar to
     // `super::LocalOptions`.
-    pub async fn new(options: RemoteOptions) -> Result<Provider, String> {
+    pub async fn new(options: RemoteStoreOptions) -> Result<Provider, String> {
         let tls_client_config = options
             .cas_address
             .starts_with("https://")

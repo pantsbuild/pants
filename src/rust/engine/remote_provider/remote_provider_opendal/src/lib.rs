@@ -43,7 +43,7 @@ use tokio::fs::File;
 use workunit_store::ObservationMetric;
 
 use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteOptions,
+    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
 };
 
 #[cfg(test)]
@@ -68,7 +68,7 @@ impl Provider {
     pub fn new<B: Builder>(
         builder: B,
         scope: String,
-        options: RemoteOptions,
+        options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
         let operator = Operator::new(builder)
             .map_err(|e| {
@@ -100,7 +100,7 @@ impl Provider {
         })
     }
 
-    pub fn fs(path: &str, scope: String, options: RemoteOptions) -> Result<Provider, String> {
+    pub fn fs(path: &str, scope: String, options: RemoteStoreOptions) -> Result<Provider, String> {
         let mut builder = opendal::services::Fs::default();
         builder.root(path).enable_path_check();
         Provider::new(builder, scope, options)
@@ -109,7 +109,7 @@ impl Provider {
     pub fn github_actions_cache(
         url: &str,
         scope: String,
-        options: RemoteOptions,
+        options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
         let mut builder = opendal::services::Ghac::default();
 

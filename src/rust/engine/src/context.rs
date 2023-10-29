@@ -37,7 +37,7 @@ use remote::remote_cache::{
 };
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, RemoteOptions, Store};
+use store::{self, ImmutableInputs, RemoteStoreOptions, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
@@ -167,7 +167,7 @@ impl Core {
                 .clone();
 
             local_only
-                .into_with_remote(RemoteOptions {
+                .into_with_remote(RemoteStoreOptions {
                     cas_address,
                     instance_name: remoting_opts.instance_name.clone(),
                     tls_config,

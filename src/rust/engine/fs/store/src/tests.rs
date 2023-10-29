@@ -22,7 +22,7 @@ use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;
 use crate::{
-    EntryType, FileContent, RemoteOptions, Snapshot, Store, StoreError, StoreFileByDigest,
+    EntryType, FileContent, RemoteStoreOptions, Snapshot, Store, StoreError, StoreFileByDigest,
     UploadSummary, MEGABYTES,
 };
 
@@ -62,8 +62,8 @@ fn remote_options(
     cas_address: String,
     instance_name: Option<String>,
     headers: BTreeMap<String, String>,
-) -> RemoteOptions {
-    RemoteOptions {
+) -> RemoteStoreOptions {
+    RemoteStoreOptions {
         cas_address,
         instance_name,
         tls_config: tls::Config::default(),

@@ -14,7 +14,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::Operation;
 use remexec::{execution_stage::Value as ExecutionStageValue, ExecutedActionMetadata};
-use store::{RemoteOptions, SnapshotOps, Store, StoreError};
+use store::{RemoteStoreOptions, SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
@@ -1268,8 +1268,8 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
     assert!(result.stdout().contains("user timeout"));
 }
 
-fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteOptions {
-    RemoteOptions {
+fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteStoreOptions {
+    RemoteStoreOptions {
         cas_address: cas.address(),
         instance_name: None,
         tls_config: tls::Config::default(),

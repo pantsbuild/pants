@@ -6,7 +6,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use grpc_util::tls;
 use opendal::services::Memory;
-use remote_provider_traits::{ByteStoreProvider, RemoteOptions};
+use remote_provider_traits::{ByteStoreProvider, RemoteStoreOptions};
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
 
@@ -24,8 +24,8 @@ fn test_path(data: &TestData) -> String {
         fingerprint
     )
 }
-fn remote_options() -> RemoteOptions {
-    RemoteOptions {
+fn remote_options() -> RemoteStoreOptions {
+    RemoteStoreOptions {
         cas_address: "".to_owned(),
         instance_name: None,
         tls_config: tls::Config::default(),

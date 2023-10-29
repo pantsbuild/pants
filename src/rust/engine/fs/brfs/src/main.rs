@@ -42,7 +42,7 @@ use log::{debug, error, warn};
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
-use store::{RemoteOptions, Store, StoreError};
+use store::{RemoteStoreOptions, Store, StoreError};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task;
 use tokio_stream::wrappers::SignalStream;
@@ -792,7 +792,7 @@ async fn main() {
         Store::local_only(runtime.clone(), store_path).expect("Error making local store.");
     let store = match args.value_of("server-address") {
         Some(address) => local_only_store
-            .into_with_remote(RemoteOptions {
+            .into_with_remote(RemoteStoreOptions {
                 cas_address: address.to_owned(),
                 instance_name: args.value_of("remote-instance-name").map(str::to_owned),
                 tls_config,

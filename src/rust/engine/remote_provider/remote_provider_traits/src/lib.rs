@@ -38,7 +38,7 @@ use tokio::io::{AsyncSeekExt, AsyncWrite};
 
 // TODO: Consider providing `impl Default`, similar to `remote::LocalOptions`.
 #[derive(Clone)]
-pub struct RemoteOptions {
+pub struct RemoteStoreOptions {
     // TODO: this is currently framed for the REAPI provider, with some options used by others, would
     // be good to generalise
     pub cas_address: String,

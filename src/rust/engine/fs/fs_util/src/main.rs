@@ -48,7 +48,7 @@ use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use store::{
-    RemoteOptions, Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams,
+    RemoteStoreOptions, Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams,
     UploadSummary,
 };
 use workunit_store::WorkunitStore;
@@ -413,7 +413,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
 
                 (
                     local_only
-                        .into_with_remote(RemoteOptions {
+                        .into_with_remote(RemoteStoreOptions {
                             cas_address: cas_address.to_owned(),
                             instance_name: top_match
                                 .value_of("remote-instance-name")

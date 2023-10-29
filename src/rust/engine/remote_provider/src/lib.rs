@@ -31,14 +31,14 @@ use std::sync::Arc;
 // crates.
 pub use remote_provider_traits::{
     ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteCacheProviderOptions,
-    RemoteOptions,
+    RemoteStoreOptions,
 };
 
 const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", "https://"];
 
 // TODO(#19902): a unified view of choosing a provider would be nice
 pub async fn choose_byte_store_provider(
-    options: RemoteOptions,
+    options: RemoteStoreOptions,
 ) -> Result<Arc<dyn ByteStoreProvider>, String> {
     let address = options.cas_address.clone();
     if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
@@ -79,7 +79,7 @@ pub async fn choose_action_cache_provider(
 
     // TODO: we shouldn't need to gin up a whole copy of this struct; it'd be better to have the two
     // set of remoting options managed together.
-    let remote_options = RemoteOptions {
+    let remote_options = RemoteStoreOptions {
         cas_address: address.clone(),
         instance_name: options.instance_name.clone(),
         headers: options.headers.clone(),

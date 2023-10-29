@@ -17,7 +17,7 @@ use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remote_provider::RemoteCacheProviderOptions;
-use store::{RemoteOptions, Store};
+use store::{RemoteStoreOptions, Store};
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
@@ -106,7 +106,7 @@ impl StoreSetup {
         let store_dir = store_temp_dir.path().join("store_dir");
         let store = Store::local_only(executor.clone(), store_dir)
             .unwrap()
-            .into_with_remote(RemoteOptions {
+            .into_with_remote(RemoteStoreOptions {
                 cas_address: cas.address(),
                 instance_name: None,
                 tls_config: tls::Config::default(),

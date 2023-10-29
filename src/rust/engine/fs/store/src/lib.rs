@@ -89,7 +89,7 @@ mod remote_tests;
 
 // Consumers of this crate shouldn't need to worry about the exact crate structure that comes
 // together to make a store.
-pub use remote_provider::RemoteOptions;
+pub use remote_provider::RemoteStoreOptions;
 
 pub struct LocalOptions {
     pub files_max_size_bytes: usize,
@@ -379,7 +379,10 @@ impl Store {
     /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
     /// attempt to back-fill its local storage from the remote storage.
     ///
-    pub async fn into_with_remote(self, remote_options: RemoteOptions) -> Result<Store, String> {
+    pub async fn into_with_remote(
+        self,
+        remote_options: RemoteStoreOptions,
+    ) -> Result<Store, String> {
         Ok(Store {
             local: self.local,
             remote: Some(RemoteStore::new(
