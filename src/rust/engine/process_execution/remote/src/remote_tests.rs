@@ -1278,7 +1278,6 @@ fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteOptions {
         rpc_timeout: Duration::from_secs(1),
         rpc_retries: 1,
         rpc_concurrency_limit: STORE_CONCURRENCY_LIMIT,
-        capabilities_cell_opt: None,
         batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
     }
 }
@@ -1338,7 +1337,6 @@ async fn sends_headers() {
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .unwrap();
@@ -1498,7 +1496,6 @@ async fn ensure_inline_stdio_is_stored() {
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .unwrap();
@@ -1875,7 +1872,6 @@ async fn execute_missing_file_uploads_if_known() {
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .unwrap();
@@ -1927,7 +1923,6 @@ async fn execute_missing_file_errors_if_unknown() {
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .unwrap();
@@ -2639,7 +2634,6 @@ async fn create_command_runner(
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .expect("Failed to make command runner");

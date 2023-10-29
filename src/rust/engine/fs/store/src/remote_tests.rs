@@ -38,7 +38,6 @@ async fn smoke_test_from_options_reapi_provider() {
         rpc_timeout: Duration::from_secs(5),
         rpc_retries: 1,
         rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
         batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
     })
     .await
@@ -87,7 +86,6 @@ async fn smoke_test_from_options_file_provider() {
         rpc_timeout: Duration::from_secs(5),
         rpc_retries: 1,
         rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
         batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
     })
     .await

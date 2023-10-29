@@ -26,15 +26,13 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
 use std::time::Duration;
 
-use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use hashing::Digest;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remexec::{ActionResult, ServerCapabilities};
+use remexec::ActionResult;
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWrite};
 
@@ -51,7 +49,6 @@ pub struct RemoteOptions {
     pub rpc_timeout: Duration,
     pub rpc_retries: usize,
     pub rpc_concurrency_limit: usize,
-    pub capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     pub batch_api_size_limit: usize,
 }
 

@@ -89,7 +89,6 @@ pub async fn choose_action_cache_provider(
         // TODO: these should either be passed through or not synthesized here
         chunk_size_bytes: 0,
         rpc_retries: 0,
-        capabilities_cell_opt: None,
         batch_api_size_limit: 0,
     };
 

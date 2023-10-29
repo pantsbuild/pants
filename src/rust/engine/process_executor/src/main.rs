@@ -294,7 +294,6 @@ async fn main() {
           rpc_retries: args.store_rpc_retries,
           rpc_concurrency_limit: args.store_rpc_concurrency,
 
-          capabilities_cell_opt: None,
           batch_api_size_limit: args.store_batch_api_size_limit,
         })
         .await
@@ -364,7 +363,6 @@ async fn main() {
                 Duration::from_secs(args.overall_deadline_secs),
                 Duration::from_millis(100),
                 args.execution_rpc_concurrency,
-                None,
             )
             .await
             .expect("Failed to make remote command runner");

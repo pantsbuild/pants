@@ -803,7 +803,6 @@ async fn main() {
                 rpc_concurrency_limit: args
                     .value_of_t::<usize>("rpc-concurrency-limit")
                     .expect("Bad rpc-concurrency-limit flag"),
-                capabilities_cell_opt: None,
                 batch_api_size_limit: args
                     .value_of_t::<usize>("batch-api-size-limit")
                     .expect("Bad batch-api-size-limit flag"),

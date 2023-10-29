@@ -38,7 +38,6 @@ fn remote_options() -> RemoteOptions {
         rpc_timeout: Duration::from_secs(5),
         rpc_retries: 1,
         rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
         batch_api_size_limit: 10000,
     }
 }

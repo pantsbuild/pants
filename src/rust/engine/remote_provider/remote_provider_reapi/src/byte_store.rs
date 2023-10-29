@@ -104,9 +104,7 @@ impl Provider {
             _rpc_attempts: options.rpc_retries + 1,
             byte_stream_client,
             cas_client,
-            capabilities_cell: options
-                .capabilities_cell_opt
-                .unwrap_or_else(|| Arc::new(OnceCell::new())),
+            capabilities_cell: Arc::new(OnceCell::new()),
             capabilities_client,
             batch_api_size_limit: options.batch_api_size_limit,
         })
