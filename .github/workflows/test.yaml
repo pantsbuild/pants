@@ -198,9 +198,7 @@ jobs:
 
         ./build-support/bin/check_rust_pre_commit.sh
 
-        ./cargo test --locked --all --tests -- --nocapture
-
-        ./cargo check --benches
+        ./cargo test --locked --all --tests --benches -- --nocapture
 
         ./cargo doc'
     timeout-minutes: 60
