@@ -414,7 +414,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                 (
                     local_only
                         .into_with_remote(RemoteStoreOptions {
-                            cas_address: cas_address.to_owned(),
+                            store_address: cas_address.to_owned(),
                             instance_name: top_match
                                 .value_of("remote-instance-name")
                                 .map(str::to_owned),

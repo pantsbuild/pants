@@ -41,7 +41,7 @@ use tokio::io::{AsyncSeekExt, AsyncWrite};
 pub struct RemoteStoreOptions {
     // TODO: this is currently framed for the REAPI provider, with some options used by others, would
     // be good to generalise
-    pub cas_address: String,
+    pub store_address: String,
     pub instance_name: Option<String>,
     pub headers: BTreeMap<String, String>,
     pub tls_config: grpc_util::tls::Config,

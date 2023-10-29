@@ -20,12 +20,12 @@ const MEGABYTES: usize = 1024 * 1024;
 const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * MEGABYTES;
 
 fn remote_options(
-    cas_address: String,
+    store_address: String,
     chunk_size_bytes: usize,
     batch_api_size_limit: usize,
 ) -> RemoteStoreOptions {
     RemoteStoreOptions {
-        cas_address,
+        store_address,
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),

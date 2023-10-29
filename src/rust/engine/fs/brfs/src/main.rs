@@ -793,7 +793,7 @@ async fn main() {
     let store = match args.value_of("server-address") {
         Some(address) => local_only_store
             .into_with_remote(RemoteStoreOptions {
-                cas_address: address.to_owned(),
+                store_address: address.to_owned(),
                 instance_name: args.value_of("remote-instance-name").map(str::to_owned),
                 tls_config,
                 headers,

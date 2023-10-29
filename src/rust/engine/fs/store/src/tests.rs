@@ -59,12 +59,12 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
 }
 
 fn remote_options(
-    cas_address: String,
+    store_address: String,
     instance_name: Option<String>,
     headers: BTreeMap<String, String>,
 ) -> RemoteStoreOptions {
     RemoteStoreOptions {
-        cas_address,
+        store_address,
         instance_name,
         tls_config: tls::Config::default(),
         headers,

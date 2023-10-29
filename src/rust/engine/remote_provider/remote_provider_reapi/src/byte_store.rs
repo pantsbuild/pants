@@ -77,13 +77,13 @@ impl Provider {
     // `super::LocalOptions`.
     pub async fn new(options: RemoteStoreOptions) -> Result<Provider, String> {
         let tls_client_config = options
-            .cas_address
+            .store_address
             .starts_with("https://")
             .then(|| options.tls_config.try_into())
             .transpose()?;
 
         let channel =
-            grpc_util::create_channel(&options.cas_address, tls_client_config.as_ref()).await?;
+            grpc_util::create_channel(&options.store_address, tls_client_config.as_ref()).await?;
         let http_headers = headers_to_http_header_map(&options.headers)?;
         let channel = layered_service(
             channel,

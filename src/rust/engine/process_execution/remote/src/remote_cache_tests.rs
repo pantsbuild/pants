@@ -107,7 +107,7 @@ impl StoreSetup {
         let store = Store::local_only(executor.clone(), store_dir)
             .unwrap()
             .into_with_remote(RemoteStoreOptions {
-                cas_address: cas.address(),
+                store_address: cas.address(),
                 instance_name: None,
                 tls_config: tls::Config::default(),
                 headers: BTreeMap::new(),

@@ -30,7 +30,7 @@ async fn smoke_test_from_options_reapi_provider() {
     let cas = new_cas(10);
 
     let store = ByteStore::from_options(RemoteStoreOptions {
-        cas_address: cas.address(),
+        store_address: cas.address(),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
@@ -78,7 +78,7 @@ async fn smoke_test_from_options_file_provider() {
     let dir = TempDir::new().unwrap();
 
     let store = ByteStore::from_options(RemoteStoreOptions {
-        cas_address: format!("file://{}", dir.path().display()),
+        store_address: format!("file://{}", dir.path().display()),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),

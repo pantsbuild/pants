@@ -30,7 +30,7 @@ fn test_path(digest: Digest) -> String {
 
 fn remote_options() -> RemoteStoreOptions {
     RemoteStoreOptions {
-        cas_address: "".to_owned(),
+        store_address: "".to_owned(),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),

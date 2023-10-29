@@ -285,7 +285,7 @@ async fn main() {
 
       local_only_store
         .into_with_remote(RemoteStoreOptions {
-          cas_address: cas_server.to_owned(),
+          store_address: cas_server.to_owned(),
           instance_name: args.remote_instance_name.clone(),
           tls_config,
           headers,

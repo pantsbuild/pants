@@ -1270,7 +1270,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
 
 fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteStoreOptions {
     RemoteStoreOptions {
-        cas_address: cas.address(),
+        store_address: cas.address(),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),

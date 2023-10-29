@@ -40,7 +40,7 @@ const REAPI_ADDRESS_SCHEMAS: [&str; 4] = ["grpc://", "grpcs://", "http://", "htt
 pub async fn choose_byte_store_provider(
     options: RemoteStoreOptions,
 ) -> Result<Arc<dyn ByteStoreProvider>, String> {
-    let address = options.cas_address.clone();
+    let address = options.store_address.clone();
     if REAPI_ADDRESS_SCHEMAS.iter().any(|s| address.starts_with(s)) {
         Ok(Arc::new(
             remote_provider_reapi::byte_store::Provider::new(options).await?,
@@ -80,7 +80,7 @@ pub async fn choose_action_cache_provider(
     // TODO: we shouldn't need to gin up a whole copy of this struct; it'd be better to have the two
     // set of remoting options managed together.
     let remote_options = RemoteStoreOptions {
-        cas_address: address.clone(),
+        store_address: address.clone(),
         instance_name: options.instance_name.clone(),
         headers: options.headers.clone(),
         tls_config: options.tls_config.clone(),

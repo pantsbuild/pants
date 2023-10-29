@@ -161,14 +161,14 @@ impl Core {
             local_store_options.into(),
         )?;
         if enable_remote {
-            let cas_address = remote_store_address
+            let store_address = remote_store_address
                 .as_ref()
                 .ok_or("Remote store required, but none configured")?
                 .clone();
 
             local_only
                 .into_with_remote(RemoteStoreOptions {
-                    cas_address,
+                    store_address,
                     instance_name: remoting_opts.instance_name.clone(),
                     tls_config,
                     headers: remoting_opts.store_headers.clone(),
