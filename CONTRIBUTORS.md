@@ -4,6 +4,7 @@ Created as part of the release process.
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
++ Aditya Raj Verma
 + Alan Paulin
 + Alan Velasco
 + Alex Bancroft
@@ -106,6 +107,7 @@ Created as part of the release process.
 + Gautham Nair
 + Gerald Spencer
 + Gordon Cassie
++ Greg Niemann
 + Greg Shuflin
 + Grzegorz Kossakowski
 + Guy Marom
