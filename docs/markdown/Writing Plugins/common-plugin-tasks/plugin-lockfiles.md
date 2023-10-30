@@ -19,51 +19,51 @@ from pants.engine.rules import rule
 from pants.engine.target import AllTargets
 
 
-class KnownTerraformResolveNamesRequest(KnownUserResolveNamesRequest):
+class KnownFortranResolveNamesRequest(KnownUserResolveNamesRequest):
     pass
 
 
-class RequestedTerraformResolveNames(RequestedUserResolveNames):
+class RequestedFortranResolveNames(RequestedUserResolveNames):
     pass
 
 
 @rule
-async def identify_user_resolves_from_terraform_files(
-        _: KnownTerraformResolveNamesRequest,
+async def identify_user_resolves_from_fortran_files(
+        _: KnownFortranResolveNamesRequest,
         all_targets: AllTargets,
 ) -> KnownUserResolveNames:
     ...
     return KnownUserResolveNames(
         ...,
-        requested_resolve_names_cls=RequestedTerraformResolveNames
+        requested_resolve_names_cls=RequestedFortranResolveNames
     )
 ```
 
 # 2. Connect resolve names to requests to generate lockfiles
 
-Create a subclass of `GenerateLockfile`, (TODO: Why). Then create a rule from your subclass of `RequestedUserResolveNames` to `UserGenerateLockfiles`. Pants will use this rule to convert from a user's request to export a resolve by name into the information needed to export the resolve.
+Create a subclass of `GenerateLockfile`. Pants will use this to represent a lockfile to generate. Then create a rule from your subclass of `RequestedUserResolveNames` to `UserGenerateLockfiles`. Pants will use this rule to convert from a user's request to export a resolve by name into the information needed to export the resolve.
 
 ```python
 from dataclasses import dataclass
 
-from pants.backend.terraform.target_types import TerraformDeploymentTarget
+from pants.backend.fortran.target_types import FortranDeploymentTarget
 from pants.core.goals.generate_lockfiles import GenerateLockfile, UserGenerateLockfiles
 from pants.engine.rules import rule
 
 
 @dataclass(frozen=True)
-class GenerateTerraformLockfile(GenerateLockfile):
-    target: TerraformDeploymentTarget
+class GenerateFortranLockfile(GenerateLockfile):
+    target: FortranDeploymentTarget
 
 
 @rule
 async def setup_user_lockfile_requests(
-        requested: RequestedTerraformResolveNames,
+        requested: RequestedFortranResolveNames,
 ) -> UserGenerateLockfiles:
     ...
     return UserGenerateLockfiles(
         [
-            GenerateTerraformLockfile(
+            GenerateFortranLockfile(
                 ...
             )
         ]
@@ -75,7 +75,7 @@ async def setup_user_lockfile_requests(
 Create a rule from your subclass of `GenerateLockfile` to `GenerateLockfileResult`. This rule generates the lockfile. In the common case that you're running a process to generate this lockfile, you can use the `Process.output_files` to gather those files from the execution sandbox.
 
 ```python
-from pants.backend.terraform.tool import TerraformProcess
+from pants.backend.fortran.tool import FortranProcess
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
@@ -84,13 +84,13 @@ from pants.engine.rules import rule
 
 @rule
 async def generate_lockfile_from_sources(
-        request: GenerateTerraformLockfile,
+        request: GenerateFortranLockfile,
 ) -> GenerateLockfileResult:
     ...
 
     result = await Get(
         ProcessResult,
-        TerraformProcess(...),
+        FortranProcess(...),
     )
 
     return GenerateLockfileResult(result.output_digest, request.resolve_name, request.lockfile_dest)
@@ -101,7 +101,7 @@ async def generate_lockfile_from_sources(
 
 At the bottom of the file, let Pants know what your rules and types do. Update your plugin's `register.py` to tell Pants about them/
 
-```python pants-plugins/terraform/lockfiles.py
+```python pants-plugins/fortran/lockfiles.py
 
 
 from pants.core.goals.generate_lockfiles import GenerateLockfile, KnownUserResolveNamesRequest, RequestedUserResolveNames
@@ -112,14 +112,14 @@ from pants.engine.unions import UnionRule
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateLockfile, GenerateTerraformLockfile),
-        UnionRule(KnownUserResolveNamesRequest, KnownTerraformResolveNamesRequest),
-        UnionRule(RequestedUserResolveNames, RequestedTerraformResolveNames),
+        UnionRule(GenerateLockfile, GenerateFortranLockfile),
+        UnionRule(KnownUserResolveNamesRequest, KnownFortranResolveNamesRequest),
+        UnionRule(RequestedUserResolveNames, RequestedFortranResolveNames),
     )
 ```
 
-```python pants-plugins/terraform/register.py
-from terraform import lockfiles
+```python pants-plugins/fortran/register.py
+from fortran import lockfiles
 
 def rules():
     return [
@@ -142,9 +142,9 @@ from pants.engine.rules import rule
 
 
 @rule
-async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse:
+async def init_fortran(request: FortranInitRequest) -> FortranInitResponse:
     ...
-    Get(Snapshot, PathGlobs([(Path(request.root_module.address.spec_path) / ".terraform.lock.hcl").as_posix()])),
+    Get(Snapshot, PathGlobs([(Path(request.root_module.address.spec_path) / ".fortran.lock").as_posix()])),
 ```
 
 TODO: You can also reference this in the dependency inference. This dependency link will result in the lockfile being imported through the standard dependency request, and it will also cause all dependent source files to be marked as transitively changed
