@@ -89,8 +89,6 @@ class PythonBootstrapSubsystem(Subsystem):
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
         search_path = StrListOption(
-            # f"{AsdfPathString.STANDARD}" cannot be replaced with AsdfPathString.STANDARD here
-            # str(AsdfPathString.STANDARD) != f"{AsdfPathString.STANDARD}"
             default=["<PYENV>", AsdfPathString.STANDARD.value, "<PATH>"],
             help=softwrap(
                 f"""
