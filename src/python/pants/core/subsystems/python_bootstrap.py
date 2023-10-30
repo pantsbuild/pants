@@ -91,7 +91,7 @@ class PythonBootstrapSubsystem(Subsystem):
         search_path = StrListOption(
             # f"{AsdfPathString.STANDARD}" cannot be replaced with AsdfPathString.STANDARD here
             # str(AsdfPathString.STANDARD) != f"{AsdfPathString.STANDARD}"
-            default=["<PYENV>", f"{AsdfPathString.STANDARD}", "<PATH>"],
+            default=["<PYENV>", AsdfPathString.STANDARD.value, "<PATH>"],
             help=softwrap(
                 f"""
                 A list of paths to search for Python interpreters.
