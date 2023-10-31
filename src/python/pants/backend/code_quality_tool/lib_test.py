@@ -155,3 +155,97 @@ def test_fmt_built_rule():
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 0
     assert "black_formatter succeeded" in res.stderr
+
+
+def test_several_formatters():
+    black_cfg = CodeQualityToolConfig(
+        goal='fmt',
+        target='//:black_tool',
+        name='Black',
+        scope='black_formatter'
+    )
+
+    isort_cfg = CodeQualityToolConfig(
+        goal='fmt',
+        target='//:isort_tool',
+        name='isort',
+        scope='isort_formatter'
+    )
+
+
+    rule_runner = RuleRunner(
+        target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
+        rules=[
+            *source_files.rules(),
+            *core_rules(),
+            *process.rules(),
+            *list_rules(),
+            *adhoc_process_support.rules(),
+            *register_python.rules(),
+            *build_rules(black_cfg),
+            *build_rules(isort_cfg),
+        ],
+        preserve_tmpdirs=True,
+    )
+
+    rule_runner.write_files({
+        "BUILD": dedent(
+            """
+            python_requirement(
+                name="black",
+                requirements=["black==22.6.0"]
+            )
+
+            python_requirement(
+                name="isort",
+                requirements=["isort==5.9.3"]
+            )
+
+            code_quality_tool(
+                name="black_tool",
+                runnable=":black",
+                runnable_dependencies=[],
+                file_glob_include=["**/*.py"],
+            )
+            
+            code_quality_tool(
+                name="isort_tool",
+                runnable=":isort",
+                runnable_dependencies=[],
+                file_glob_include=["**/*.py"],
+            )
+            """
+        ),
+        "needs_repair.py": dedent(
+            """
+            import b
+            import a
+            
+            foo=a.a+b.b
+            """
+        ),
+    })
+
+    res = rule_runner.run_goal_rule(Lint, args=["::"])
+    assert res.exit_code == 1
+    assert "isort_formatter failed" in res.stderr
+    assert "black_formatter failed" in res.stderr
+
+    res = rule_runner.run_goal_rule(Fmt, args=["::"])
+    assert res.exit_code == 0
+    assert "isort_formatter made changes" in res.stderr
+    assert "black_formatter made changes" in res.stderr
+
+    assert dedent(
+        """
+        import a
+        import b
+    
+        foo = a.a + b.b
+        """
+    ) == rule_runner.read_file("needs_repair.py")
+
+    res = rule_runner.run_goal_rule(Lint, args=["::"])
+    assert res.exit_code == 0
+    assert "isort_formatter succeeded" in res.stderr
+    assert "black_formatter succeeded" in res.stderr
