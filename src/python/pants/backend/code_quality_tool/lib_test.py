@@ -58,12 +58,14 @@ def test_lint_built_rule():
                 runnable_dependencies=[],
                 execution_dependencies=[":flake8_conf"],
                 file_glob_include=["**/*.py"],
-                file_glob_exclude=["pants-plugins/**"],
+                file_glob_exclude=["messy_ignored_dir/**"],
             )
             """
         ),
         "good_fmt.py": "foo = 5\n",
         "unused_import_saved_by_conf.py": "import os\n",
+        "messy_ignored_dir/messy_file.py": "ignoreme=10",
+        "not_a_dot_py_file.nopy": "notpy=100",
         ".flake8": dedent(
             """
             [flake8]
