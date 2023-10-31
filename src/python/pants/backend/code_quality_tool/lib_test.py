@@ -223,7 +223,7 @@ def test_several_formatters():
             
             foo=a.a+b.b
             """
-        ),
+        ).lstrip(),
     })
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
@@ -243,7 +243,7 @@ def test_several_formatters():
     
         foo = a.a + b.b
         """
-    ) == rule_runner.read_file("needs_repair.py")
+    ).lstrip() == rule_runner.read_file("needs_repair.py")
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 0

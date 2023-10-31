@@ -189,7 +189,11 @@ def build_rules(cfg: CodeQualityToolConfig):
 
     @rule(canonical_name_suffix=cfg.scope)
     async def run_byotool(request: ByoToolRequest.Batch, subsystem: ByoTool) -> result_class:
-        sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
+
+        if goal is ByoLintGoal:
+            sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
+        else:
+            sources_snapshot = request.snapshot  # only available on Batches for Fmt or Fix
 
         linter_address_str = subsystem.linter
         linter_address = await Get(
