@@ -5,6 +5,7 @@ from textwrap import dedent  # noqa: PNT20
 from pants.backend.code_quality_tool.lib import CodeQualityToolConfig, build_rules, CodeQualityToolTarget
 from pants.backend.project_info.list_targets import List, rules as list_rules
 from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.goals.fmt import Fmt
 from pants.core.goals.lint import Lint
 from pants.core.target_types import FileTarget
 from pants.testutil.rule_runner import RuleRunner
@@ -95,3 +96,62 @@ def test_lint_built_rule():
     res = rule_runner.run_goal_rule(Lint, args=["good_fmt.py"])
     assert res.exit_code == 0
     assert "flake8_tool succeeded" in res.stderr
+
+
+def test_fmt_built_rule():
+    cfg = CodeQualityToolConfig(
+        goal='fmt',
+        target='//:black_tool',
+        name='Black',
+        scope='black_formatter'
+    )
+
+    code_quality_tool_rules = build_rules(cfg)
+
+    rule_runner = RuleRunner(
+        target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
+        rules=[
+            *source_files.rules(),
+            *core_rules(),
+            *process.rules(),
+            *list_rules(),
+            *adhoc_process_support.rules(),
+            *register_python.rules(),
+            *code_quality_tool_rules,
+        ],
+        preserve_tmpdirs=True,
+    )
+
+    rule_runner.write_files({
+        "BUILD": dedent(
+            """
+            python_requirement(
+                name="black",
+                requirements=["black==22.6.0"]
+            )
+
+            code_quality_tool(
+                name="black_tool",
+                runnable=":black",
+                runnable_dependencies=[],
+                file_glob_include=["**/*.py"],
+            )
+            """
+        ),
+        "good_fmt.py": "foo = 5\n",
+        "needs_repair.py": "bar=10\n",
+    })
+
+    res = rule_runner.run_goal_rule(Lint, args=["::"])
+    assert res.exit_code == 1
+    assert "black_formatter failed" in res.stderr
+
+    res = rule_runner.run_goal_rule(Fmt, args=["::"])
+    assert res.exit_code == 0
+    assert "black_formatter made changes" in res.stderr
+
+    assert "bar = 10\n" == rule_runner.read_file("needs_repair.py")
+
+    res = rule_runner.run_goal_rule(Lint, args=["::"])
+    assert res.exit_code == 0
+    assert "black_formatter succeeded" in res.stderr
