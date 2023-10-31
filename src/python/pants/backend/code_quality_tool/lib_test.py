@@ -6,6 +6,7 @@ from pants.backend.code_quality_tool.lib import CodeQualityToolConfig, build_rul
 from pants.backend.project_info.list_targets import List, rules as list_rules
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.goals.lint import Lint
+from pants.core.target_types import FileTarget
 from pants.testutil.rule_runner import RuleRunner
 
 from pants.core.register import rules as core_rules
@@ -25,7 +26,7 @@ def test_lint_built_rule():
     code_quality_tool_rules = build_rules(cfg)
 
     rule_runner = RuleRunner(
-        target_types=[CodeQualityToolTarget, PythonRequirementTarget],
+        target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
         rules=[
             *source_files.rules(),
             *core_rules(),
@@ -46,17 +47,28 @@ def test_lint_built_rule():
                 requirements=["flake8==5.0.4"]
             )
             
+            file(
+                name="flake8_conf",
+                source=".flake8"
+            )
+            
             code_quality_tool(
                 name="flake8_tool",
                 runnable=":flake8",
                 runnable_dependencies=[],
+                execution_dependencies=[":flake8_conf"],
                 file_glob_include=["**/*.py"],
                 file_glob_exclude=["pants-plugins/**"],
             )
             """
         ),
         "good_fmt.py": "foo = 5\n",
-        "another_good_file.py": "bar = 10\n",
+        "unused_import_saved_by_conf.py": "import os\n",
+        ".flake8": dedent(
+            """
+            [flake8]
+            extend-ignore = F401
+            """),
     })
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
