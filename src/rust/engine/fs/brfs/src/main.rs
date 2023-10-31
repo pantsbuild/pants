@@ -42,7 +42,7 @@ use log::{debug, error, warn};
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
-use store::{RemoteOptions, Store, StoreError};
+use store::{RemoteStoreOptions, Store, StoreError};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task;
 use tokio_stream::wrappers::SignalStream;
@@ -792,18 +792,17 @@ async fn main() {
         Store::local_only(runtime.clone(), store_path).expect("Error making local store.");
     let store = match args.value_of("server-address") {
         Some(address) => local_only_store
-            .into_with_remote(RemoteOptions {
-                cas_address: address.to_owned(),
+            .into_with_remote(RemoteStoreOptions {
+                store_address: address.to_owned(),
                 instance_name: args.value_of("remote-instance-name").map(str::to_owned),
                 tls_config,
                 headers,
                 chunk_size_bytes: 4 * 1024 * 1024,
-                rpc_timeout: std::time::Duration::from_secs(5 * 60),
-                rpc_retries: 1,
-                rpc_concurrency_limit: args
+                timeout: std::time::Duration::from_secs(5 * 60),
+                retries: 1,
+                concurrency_limit: args
                     .value_of_t::<usize>("rpc-concurrency-limit")
                     .expect("Bad rpc-concurrency-limit flag"),
-                capabilities_cell_opt: None,
                 batch_api_size_limit: args
                     .value_of_t::<usize>("batch-api-size-limit")
                     .expect("Bad batch-api-size-limit flag"),

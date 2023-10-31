@@ -8,7 +8,7 @@ use bytes::Bytes;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use remote_provider::{ByteStoreProvider, LoadDestination, RemoteOptions};
+use remote_provider::{ByteStoreProvider, LoadDestination, RemoteStoreOptions};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
@@ -29,16 +29,15 @@ async fn smoke_test_from_options_reapi_provider() {
 
     let cas = new_cas(10);
 
-    let store = ByteStore::from_options(RemoteOptions {
-        cas_address: cas.address(),
+    let store = ByteStore::from_options(RemoteStoreOptions {
+        store_address: cas.address(),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes: 10 * MEGABYTES,
-        rpc_timeout: Duration::from_secs(5),
-        rpc_retries: 1,
-        rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
+        timeout: Duration::from_secs(5),
+        retries: 1,
+        concurrency_limit: 256,
         batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
     })
     .await
@@ -78,16 +77,15 @@ async fn smoke_test_from_options_file_provider() {
     let _ = WorkunitStore::setup_for_tests();
     let dir = TempDir::new().unwrap();
 
-    let store = ByteStore::from_options(RemoteOptions {
-        cas_address: format!("file://{}", dir.path().display()),
+    let store = ByteStore::from_options(RemoteStoreOptions {
+        store_address: format!("file://{}", dir.path().display()),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes: 10 * MEGABYTES,
-        rpc_timeout: Duration::from_secs(5),
-        rpc_retries: 1,
-        rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
+        timeout: Duration::from_secs(5),
+        retries: 1,
+        concurrency_limit: 256,
         batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
     })
     .await
