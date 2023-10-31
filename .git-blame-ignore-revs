@@ -9,3 +9,6 @@ d0998872d8116edd5ebc8231dbdd28779591dc2b
 
 # This commit ran Black over the whole codebase.
 29cf9fc8b25a540f32e4a9e0aeeaaa6ea4dcc48f
+
+# README in german was reverted within a day by 208e941ce6281ee9ce7ba16815f643e116bfdbc9
+dc8227b9841a1057b6ca8629c430f072dd9a190f

@@ -4,6 +4,7 @@ Created as part of the release process.
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
++ Aditya Raj Verma
 + Alan Paulin
 + Alan Velasco
 + Alex Bancroft
@@ -106,10 +107,12 @@ Created as part of the release process.
 + Gautham Nair
 + Gerald Spencer
 + Gordon Cassie
++ Greg Niemann
 + Greg Shuflin
 + Grzegorz Kossakowski
 + Guy Marom
 + Harley Cooper
++ HeetVekariya
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
@@ -319,17 +322,21 @@ Created as part of the release process.
 + Win Wang
 + Wolfram Arnold
 + Xaelias
++ Xuanwo
 + Yarden Shoham
 + Yi Cheng
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ andreaimprovised
 + azban
 + bianca rosa
 + billybecker
 + eugene yokota
 + gyudoza
 + hephex
++ jgartdele/del
++ offsetcyan
 + olivercoleman-switchdin
 + philipp-sontag-by
 + sww

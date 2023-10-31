@@ -4,21 +4,21 @@
 #![deny(warnings)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
 #![deny(
-  clippy::all,
-  clippy::default_trait_access,
-  clippy::expl_impl_clone_on_copy,
-  clippy::if_not_else,
-  clippy::needless_continue,
-  clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+    clippy::all,
+    clippy::default_trait_access,
+    clippy::expl_impl_clone_on_copy,
+    clippy::if_not_else,
+    clippy::needless_continue,
+    clippy::unseparated_literal_suffix,
+    clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
 // Subjective style.
 #![allow(
-  clippy::len_without_is_empty,
-  clippy::redundant_field_names,
-  clippy::too_many_arguments
+    clippy::len_without_is_empty,
+    clippy::redundant_field_names,
+    clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
@@ -26,17 +26,17 @@
 #![allow(clippy::mutex_atomic)]
 
 pub struct AddressInput<'a> {
-  pub path: &'a str,
-  pub target: Option<&'a str>,
-  pub generated: Option<&'a str>,
-  pub parameters: Vec<(&'a str, &'a str)>,
+    pub path: &'a str,
+    pub target: Option<&'a str>,
+    pub generated: Option<&'a str>,
+    pub parameters: Vec<(&'a str, &'a str)>,
 }
 
 pub struct SpecInput<'a> {
-  /// The address (or literal, if no target/generated/parameters were specified) portion.
-  pub address: AddressInput<'a>,
-  /// If a spec wildcard was specified (`:` or `::`), its value.
-  pub wildcard: Option<&'a str>,
+    /// The address (or literal, if no target/generated/parameters were specified) portion.
+    pub address: AddressInput<'a>,
+    /// If a spec wildcard was specified (`:` or `::`), its value.
+    pub wildcard: Option<&'a str>,
 }
 
 peg::parser! {
@@ -90,5 +90,5 @@ peg::parser! {
 }
 
 pub fn parse_address_spec(value: &str) -> Result<SpecInput, String> {
-  parsers::spec(value).map_err(|e| format!("Failed to parse address spec `{value}`: {e}"))
+    parsers::spec(value).map_err(|e| format!("Failed to parse address spec `{value}`: {e}"))
 }

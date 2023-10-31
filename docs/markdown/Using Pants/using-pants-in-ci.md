@@ -81,6 +81,10 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 Recommended commands
 --------------------
 
+> 🚧 Autofixing goals
+>
+> The goals `fmt` and `fix` will attempt to automatically correct your code and then return zero if they were able to do so.  This generally counts as "success" for most CI systems.  In contrast the `lint` goal will not modify code and instead exit with a non-zero status if any tools detected a problem.  In other words the `lint` goal is like the "checking" version of `fmt/fix`.  Prefer `lint` if you want your CI system to return job failures to enforce linting and format rules.
+
 With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism. See [Advanced Target Selection](doc:advanced-target-selection#sharding-the-input-targets). (This is typically less necessary when using [remote caching](doc:remote-caching-execution).)
 
 ### Approach #1: only run over changed files
@@ -135,6 +139,21 @@ See [Advanced target selection](doc:advanced-target-selection) for more informat
 >    ```
 > 
 >    The `git branch` commands are only included to print out all available branches before and after fetching `origin/main`.
+
+> 📘 Using partial clones in CI
+> 
+> Shallow clones are fast, but have the disadvantage of breaking `--changed-since` if an insufficient amount of depth is fetched from remote. This is particularly acute for feature branches that are very out-of-date or have a large number of commits.
+> 
+> [Partial clones](https://git-scm.com/docs/partial-clone) are still quite fast, have the advantage of not breaking `--changed-since`, and don't require any depth setting. Unlike shallow clones, Git will fetch trees and blobs on-demand as it needs them without failing.
+> 
+> If your CI does not support partial clones directly, you can define your own custom checkout strategy:
+>
+> * Treeless: `git clone --filter=tree:0 <repository>`
+> * Blobless: `git clone --filter=blob:none <repository>`
+> 
+> As a workaround to [#20027](https://github.com/pantsbuild/pants/issues/20027) permission errors, you might need to run this after the cloning the repo:
+> 
+> `git config core.sshCommand "env SSH_AUTH_SOCK=$SSH_AUTH_SOCK ssh"`
 
 ### Approach #2: run over everything
 
@@ -202,6 +221,16 @@ The default test runners for these CI providers have the following resources. If
 | Travis, Linux                | 2      | 7.5 GB  | [link](https://docs.travis-ci.com/user/reference/overview/#virtualisation-environment-vs-operating-system)                                  |
 | Circle CI, Linux, free plan  | 2      | 4 GB    | [link](https://circleci.com/docs/2.0/credits/#free-plan)                                                                                    |
 | GitLab, Linux shared runners | 1      | 3.75 GB | [link](https://docs.gitlab.com/ee/user/gitlab_com/#linux-shared-runners)                                                                    |
+
+Tip: automatically retry failed tests
+-------------------------------------
+
+Pants can automatically retry failed tests. This can help keep your builds passing even with flaky tests, like integration tests.
+
+```toml
+[test]
+attempts_default = 3
+```
 
 Tip: store Pants logs as artifacts
 ----------------------------------

@@ -65,14 +65,20 @@ class ExternalToolVersion:
     platform: str
     sha256: str
     filesize: int
+    url_override: str | None = None
 
     def encode(self) -> str:
-        return "|".join([self.version, self.platform, self.sha256, str(self.filesize)])
+        parts = [self.version, self.platform, self.sha256, str(self.filesize)]
+        if self.url_override:
+            parts.append(self.url_override)
+        return "|".join(parts)
 
     @classmethod
     def decode(cls, version_str: str) -> ExternalToolVersion:
-        version, platform, sha256, filesize = [x.strip() for x in version_str.split("|")]
-        return cls(version, platform, sha256, int(filesize))
+        parts = [x.strip() for x in version_str.split("|")]
+        version, platform, sha256, filesize = parts[:4]
+        url_override = parts[4] if len(parts) > 4 else None
+        return cls(version, platform, sha256, int(filesize), url_override=url_override)
 
 
 class ExternalToolOptionsMixin:
@@ -112,7 +118,8 @@ class ExternalToolOptionsMixin:
             f"""
         Known versions to verify downloads against.
 
-        Each element is a pipe-separated string of `version|platform|sha256|length`, where:
+        Each element is a pipe-separated string of `version|platform|sha256|length` or
+        `version|platform|sha256|length|url_override`, where:
 
           - `version` is the version string
           - `platform` is one of `[{','.join(Platform.__members__.keys())}]`
@@ -120,8 +127,11 @@ class ExternalToolOptionsMixin:
             digest of the download file, as emitted by `shasum -a 256`
           - `length` is the expected length of the download file in bytes, as emitted by
             `wc -c`
+          - (Optional) `url_override` is a specific url to use instead of the normally
+            generated url for this version
 
         E.g., `3.1.2|macos_x86_64|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
+        and `3.1.2|macos_arm64 |aca5c1da0192e2fd46b7b55ab290a92c5f07309e7b0ebf4e45ba95731ae98291|50926|https://example.mac.org/bin/v3.1.2/mac-aarch64-v3.1.2.tgz`.
 
         Values are space-stripped, so pipes can be indented for readability if necessary.
         """
@@ -204,7 +214,12 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
         for known_version in self.known_versions:
             version = self.decode_known_version(known_version)
             if plat.value == version.platform and version.version == self.version:
-                return self.get_request_for(version.platform, version.sha256, version.filesize)
+                return self.get_request_for(
+                    version.platform,
+                    version.sha256,
+                    version.filesize,
+                    url_override=version.url_override,
+                )
         raise UnknownVersion(
             softwrap(
                 f"""
@@ -228,12 +243,14 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
         version = cls.decode_known_version(known_version)
         return version.version, version.platform, version.sha256, version.filesize
 
-    def get_request_for(self, plat_val: str, sha256: str, length: int) -> ExternalToolRequest:
+    def get_request_for(
+        self, plat_val: str, sha256: str, length: int, url_override: str | None = None
+    ) -> ExternalToolRequest:
         """Generate a request for this tool from the given info."""
         plat = Platform(plat_val)
         digest = FileDigest(fingerprint=sha256, serialized_bytes_length=length)
         try:
-            url = self.generate_url(plat)
+            url = url_override or self.generate_url(plat)
             exe = self.generate_exe(plat)
         except ExternalToolError as e:
             raise ExternalToolError(

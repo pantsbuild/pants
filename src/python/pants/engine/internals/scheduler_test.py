@@ -11,7 +11,7 @@ import pytest
 
 from pants.base.exceptions import IncorrectProductError
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, implicitly, rule
+from pants.engine.rules import Get, MultiGet, implicitly, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -142,6 +142,11 @@ def c() -> C:
 async def a() -> A:
     _ = await b(**implicitly(int(1)))
     _ = await c()
+    b1, c1, b2 = await MultiGet(
+        b(**implicitly(int(1))),
+        c(),
+        Get(B, int(1)),
+    )
     return A()
 
 
@@ -481,8 +486,6 @@ def test_trace_includes_nested_exception_traceback() -> None:
         The above exception was the direct cause of the following exception:
 
         Traceback (most recent call last):
-          File LOCATION-INFO, in native_engine_generator_send
-            res = rule.send(arg) if err is None else rule.throw(throw or err)
           File LOCATION-INFO, in catch_and_reraise
             raise Exception("nested exception!") from e
         Exception: nested exception!
