@@ -154,10 +154,11 @@ async def partition(
 
 
 # We have a hard-coded settings file to side-step
-# https://github.com/returntocorp/semgrep/issues/7102, and also provide more cacheability.
+# https://github.com/returntocorp/semgrep/issues/7102, and also provide more cacheability, NB. both
+# keys are required.
 _DEFAULT_SETTINGS = FileContent(
     path="__semgrep_settings.yaml",
-    content=b"has_shown_metrics_notification: true",
+    content=b"anonymous_user_id: 00000000-0000-0000-0000-000000000000\nhas_shown_metrics_notification: true",
 )
 
 
