@@ -14,7 +14,7 @@ from pants.engine import process
 from pants.backend.python import register as register_python
 
 
-def test_builds_rules():
+def test_lint_built_rule():
     cfg = CodeQualityToolConfig(
         goal='lint',
         target='//:flake8_tool',
@@ -55,37 +55,30 @@ def test_builds_rules():
             )
             """
         ),
-        "good_fmt.py": dedent(
-            """
-            foo = 5
-            """
-        ),
-        "bad_fmt.py": dedent(
-            """
-            bar=5
-            """
-        ),
+        "good_fmt.py": "foo = 5\n",
+        "another_good_file.py": "bar = 10\n",
     })
 
-    list_result = rule_runner.run_goal_rule(
-        List, args=["::"]
-    )
+    res = rule_runner.run_goal_rule(Lint, args=["::"])
+    assert res.exit_code == 0
+    assert "flake8_tool succeeded" in res.stderr
 
-    assert list_result.exit_code == 0
-    assert list(sorted(list_result.stdout.splitlines())) == [
-        "//:flake8",
-        "//:flake8_tool",
-    ]
+    res = rule_runner.run_goal_rule(Lint, args=["good_fmt.py"])
+    assert res.exit_code == 0
+    assert "flake8_tool succeeded" in res.stderr
 
-    good_file_lint_result = rule_runner.run_goal_rule(
-        Lint, args=["good_fmt.py"]
-    )
+    rule_runner.write_files({
+        "bad_fmt.py": "baz=5\n"
+    })
 
-    assert good_file_lint_result.exit_code == 0
-    assert "flake8_tool succeeded" in good_file_lint_result.stderr
+    res = rule_runner.run_goal_rule(Lint, args=["::"])
+    assert res.exit_code == 1
+    assert "flake8_tool failed" in res.stderr
 
-    bad_file_lint_result = rule_runner.run_goal_rule(
-        Lint, args=["bad_fmt.py"]
-    )
-    assert bad_file_lint_result.exit_code == 1
-    assert "flake8_tool failed" in bad_file_lint_result.stderr
+    res = rule_runner.run_goal_rule(Lint, args=["bad_fmt.py"])
+    assert res.exit_code == 1
+    assert "flake8_tool failed" in res.stderr
+
+    res = rule_runner.run_goal_rule(Lint, args=["good_fmt.py"])
+    assert res.exit_code == 0
+    assert "flake8_tool succeeded" in res.stderr
