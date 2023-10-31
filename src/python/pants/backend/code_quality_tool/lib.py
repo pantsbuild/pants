@@ -19,7 +19,6 @@ from pants.core.util_rules.adhoc_process_support import (
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
 )
-from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.partitions import PartitionMetadata, Partitions
 from pants.engine.addresses import Addresses
@@ -127,7 +126,7 @@ class ByoFmtGoal(ByoGoal):
 
 
 @dataclass
-class ByoToolConfig:
+class CodeQualityToolConfig:
     goal: str
     target: str
     name: str
@@ -143,7 +142,7 @@ class ByoToolConfig:
             raise ValueError(f"Unknown goal {self.goal}")
 
 
-def build_rules(cfg: ByoToolConfig):
+def build_rules(cfg: CodeQualityToolConfig):
     goal = cfg._goal
 
     class ByoTool(Subsystem):
@@ -203,6 +202,7 @@ def build_rules(cfg: ByoToolConfig):
         addresses.expect_single()
 
         linter_targets = await Get(Targets, Addresses, addresses)
+
         linter = linter_targets[0]
 
         runnable_address_str = linter[AdhocToolRunnableField].value
@@ -245,6 +245,7 @@ def build_rules(cfg: ByoToolConfig):
                 runnable_dependencies=linter[AdhocToolRunnableDependenciesField].value,
             ),
         )
+
         dependencies_digest = execution_environment.digest
         runnable_dependencies = execution_environment.runnable_dependencies
 
