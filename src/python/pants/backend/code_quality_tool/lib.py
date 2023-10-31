@@ -1,27 +1,50 @@
+# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 from typing import ClassVar, Type
 
-from pants.backend.adhoc.target_types import AdhocToolRunnableField, AdhocToolArgumentsField, \
-    AdhocToolRunnableDependenciesField, AdhocToolExecutionDependenciesField
+from pants.backend.adhoc.target_types import (
+    AdhocToolArgumentsField,
+    AdhocToolExecutionDependenciesField,
+    AdhocToolRunnableDependenciesField,
+    AdhocToolRunnableField,
+)
 from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtFilesRequest
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
-from pants.core.util_rules.adhoc_process_support import ResolvedExecutionDependencies, \
-    ResolveExecutionDependenciesRequest, rules as adhoc_process_support_rules, ExtraSandboxContents, \
-    MergeExtraSandboxContents
+from pants.core.util_rules.adhoc_process_support import (
+    ExtraSandboxContents,
+    MergeExtraSandboxContents,
+    ResolvedExecutionDependencies,
+    ResolveExecutionDependenciesRequest,
+)
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
-from pants.core.util_rules.partitions import Partitions, PartitionMetadata
+from pants.core.util_rules.partitions import PartitionMetadata, Partitions
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import FilespecMatcher, Snapshot, Address, AddressInput, Digest, EMPTY_DIGEST, \
-    MergeDigests
+from pants.engine.internals.native_engine import (
+    EMPTY_DIGEST,
+    Address,
+    AddressInput,
+    Digest,
+    FilespecMatcher,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, FallibleProcessResult
-from pants.engine.rules import rule, collect_rules
-from pants.engine.target import Targets, FieldSetsPerTarget, FieldSetsPerTargetRequest, Target, COMMON_TARGET_FIELDS, \
-    StringSequenceField
+from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
+    StringSequenceField,
+    Target,
+    Targets,
+)
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -68,10 +91,10 @@ class ByoGoal:
 
 
 class ByoLintGoal(ByoGoal):
-    goal='lint'
-    request_superclass=LintFilesRequest
-    skippable=['lint']
-    result_class=LintResult
+    goal = "lint"
+    request_superclass = LintFilesRequest
+    skippable = ["lint"]
+    result_class = LintResult
 
     @classmethod
     def create_result(cls, request, process_result, output):
@@ -83,10 +106,10 @@ class ByoLintGoal(ByoGoal):
 
 
 class ByoFmtGoal(ByoGoal):
-    goal='fmt'
-    request_superclass=FmtFilesRequest
-    skippable=['lint', 'fmt']
-    result_class=FixResult
+    goal = "fmt"
+    request_superclass = FmtFilesRequest
+    skippable = ["lint", "fmt"]
+    result_class = FixResult
 
     @classmethod
     def create_result(cls, request, process_result, output):
@@ -103,7 +126,6 @@ class ByoFmtGoal(ByoGoal):
         return request.files
 
 
-
 @dataclass
 class ByoToolConfig:
     goal: str
@@ -113,12 +135,12 @@ class ByoToolConfig:
 
     @property
     def _goal(self) -> ByoGoal:
-        if self.goal == 'fmt':
+        if self.goal == "fmt":
             return ByoFmtGoal
-        elif self.goal == 'lint':
+        elif self.goal == "lint":
             return ByoLintGoal
         else:
-            raise ValueError(f'Unknown goal {self.goal}')
+            raise ValueError(f"Unknown goal {self.goal}")
 
 
 def build_rules(cfg: ByoToolConfig):
@@ -127,7 +149,7 @@ def build_rules(cfg: ByoToolConfig):
     class ByoTool(Subsystem):
         options_scope = cfg.scope
         name = cfg.name
-        help = f'{cfg.goal.capitalize()} with {cfg.name}. Tool defined in {cfg.target}'
+        help = f"{cfg.goal.capitalize()} with {cfg.name}. Tool defined in {cfg.target}"
 
         skip = SkipOption(*goal.skippable)
         linter = cfg.target
@@ -139,18 +161,17 @@ def build_rules(cfg: ByoToolConfig):
 
     @rule(canonical_name_suffix=cfg.scope)
     async def partition_inputs(
-            request: ByoToolRequest.PartitionRequest,
-            subsystem: ByoTool
+        request: ByoToolRequest.PartitionRequest, subsystem: ByoTool
     ) -> Partitions[str, PartitionMetadata]:
         if subsystem.skip:
             return Partitions()
 
         linter_address_str = subsystem.linter
-        linter_address = await Get(Address, AddressInput,
-                                   AddressInput.parse(
-                                       linter_address_str,
-                                       description_of_origin=f"ByoTool linter target"
-                                   ))
+        linter_address = await Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
+        )
 
         addresses = Addresses((linter_address,))
         addresses.expect_single()
@@ -160,25 +181,23 @@ def build_rules(cfg: ByoToolConfig):
 
         matching_filepaths = FilespecMatcher(
             includes=linter[ByoFileGlobIncludeField].value,
-            excludes=linter[ByoFileGlobExcludeField].value
+            excludes=linter[ByoFileGlobExcludeField].value,
         ).matches(request.files)
 
         return Partitions.single_partition(sorted(matching_filepaths))
 
-
     result_class = goal.result_class
 
     @rule(canonical_name_suffix=cfg.scope)
-    async def run_byotool(request: ByoToolRequest.Batch,
-                          subsystem: ByoTool) -> result_class:
+    async def run_byotool(request: ByoToolRequest.Batch, subsystem: ByoTool) -> result_class:
         sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
 
         linter_address_str = subsystem.linter
-        linter_address = await Get(Address, AddressInput,
-                                   AddressInput.parse(
-                                       linter_address_str,
-                                       description_of_origin=f"ByoTool linter target"
-                                   ))
+        linter_address = await Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
+        )
 
         addresses = Addresses((linter_address,))
         addresses.expect_single()
@@ -187,12 +206,15 @@ def build_rules(cfg: ByoToolConfig):
         linter = linter_targets[0]
 
         runnable_address_str = linter[AdhocToolRunnableField].value
-        runnable_address = await Get(Address, AddressInput,
-                                     AddressInput.parse(
-                                         runnable_address_str,
-                                         # Need to add a relative_to=addresses
-                                         description_of_origin=f"ByoTool runnable target"
-                                     ))
+        runnable_address = await Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(
+                runnable_address_str,
+                # Need to add a relative_to=addresses
+                description_of_origin=f"ByoTool runnable target",
+            ),
+        )
 
         addresses = Addresses((runnable_address,))
         addresses.expect_single()
@@ -220,7 +242,7 @@ def build_rules(cfg: ByoToolConfig):
             ResolveExecutionDependenciesRequest(
                 target.address,
                 execution_dependencies=linter[AdhocToolExecutionDependenciesField].value,
-                runnable_dependencies=linter[AdhocToolRunnableDependenciesField].value
+                runnable_dependencies=linter[AdhocToolRunnableDependenciesField].value,
             ),
         )
         dependencies_digest = execution_environment.digest
@@ -259,8 +281,9 @@ def build_rules(cfg: ByoToolConfig):
         if merged_extras.path:
             extra_env["PATH"] = merged_extras.path
 
-        input_digest = await Get(Digest,
-                                 MergeDigests((dependencies_digest, run_request.digest, sources_snapshot.digest)))
+        input_digest = await Get(
+            Digest, MergeDigests((dependencies_digest, run_request.digest, sources_snapshot.digest))
+        )
 
         cmd_args = linter[AdhocToolArgumentsField].value or ()
 
@@ -270,12 +293,12 @@ def build_rules(cfg: ByoToolConfig):
 
         proc = Process(
             argv=tuple(run_request.args + cmd_args + sources_snapshot.files),
-            description='Running byotool',
+            description="Running byotool",
             input_digest=input_digest,
             append_only_caches=append_only_caches,
             immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
             env=FrozenDict(extra_env),
-            output_files=goal.output_files_to_read(request)
+            output_files=goal.output_files_to_read(request),
         )
 
         proc_result = await Get(FallibleProcessResult, Process, proc)

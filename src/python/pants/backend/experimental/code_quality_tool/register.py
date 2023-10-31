@@ -1,3 +1,5 @@
+# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.adhoc import run_system_binary
 from pants.backend.adhoc.target_types import SystemBinaryTarget
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
