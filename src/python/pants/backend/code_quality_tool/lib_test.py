@@ -55,7 +55,6 @@ def test_lint_built_rule():
             code_quality_tool(
                 name="flake8_tool",
                 runnable=":flake8",
-                runnable_dependencies=[],
                 execution_dependencies=[":flake8_conf"],
                 file_glob_include=["**/*.py"],
                 file_glob_exclude=["messy_ignored_dir/**"],
