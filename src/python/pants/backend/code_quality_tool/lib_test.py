@@ -216,6 +216,8 @@ def test_several_formatters():
             )
             """
         ),
+        # the import order will be fixed by isort
+        # the spacing on the foo line will be fixed by black
         "needs_repair.py": dedent(
             """
             import b
@@ -249,3 +251,51 @@ def test_several_formatters():
     assert res.exit_code == 0
     assert "isort_formatter succeeded" in res.stderr
     assert "black_formatter succeeded" in res.stderr
+
+    rule_runner.write_files({
+        "only_fix_imports.py": dedent(
+            """
+            import b
+            import a
+    
+            bar=a.a+b.b
+            """
+        ).lstrip(),
+    })
+    res = rule_runner.run_goal_rule(Fmt, args=["--only=isort_formatter", "only_fix_imports.py"])
+    assert res.exit_code == 0
+    assert "isort_formatter made changes" in res.stderr
+    assert "black" not in res.stderr
+    assert dedent(
+        """
+        import a
+        import b
+
+        bar=a.a+b.b
+        """
+    ).lstrip() == rule_runner.read_file("only_fix_imports.py")
+
+    rule_runner.write_files({
+        "skip_isort.py": dedent(
+            """
+            import b
+            import a
+
+            zap=a.a+b.b
+            """
+        ).lstrip(),
+    })
+    res = rule_runner.run_goal_rule(Fmt,
+                                    global_args=["--isort_formatter-skip"],
+                                    args=["skip_isort.py"])
+    assert res.exit_code == 0
+    assert "black_formatter made changes" in res.stderr
+    assert "isort" not in res.stderr
+    assert dedent(
+        """
+        import b
+        import a
+
+        zap = a.a + b.b
+        """
+    ).lstrip() == rule_runner.read_file("skip_isort.py")
