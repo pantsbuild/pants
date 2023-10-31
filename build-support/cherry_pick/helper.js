@@ -25,7 +25,7 @@ class CherryPickHelper {
   }
 
   get #run_link() {
-    return `:robot: [Beep Boop here's my run link](${this.context.serverUrl}/${this.context.repo.owner}/${this.context.repo.repo}/actions/runs/${this.context.runId}/jobs/${this.context.job})`;
+    return `:robot: [Beep Boop here's my run link](${this.context.serverUrl}/${this.context.repo.owner}/${this.context.repo.repo}/actions/runs/${this.context.runId})`;
   }
 
   async #add_failed_label() {
@@ -118,7 +118,8 @@ ${this.#run_link}`
     );
 
     let any_failed = false;
-    let comment_body = "";
+    let comment_body =
+      "I tried to automatically cherry-pick this change back to each relevant milestone, so that it is available in those older releases of Pants.\n\n";
     infos.forEach(({ pr_url, milestone, branch_name }) => {
       if (pr_url === undefined) {
         any_failed = true;
@@ -133,14 +134,13 @@ To resolve:
 1. (Ensure your git working directory is clean)
 2. Run the following script to reproduce the merge-conflicts:
     \`\`\`bash
-    git checkout https://github.com/pantsbuild/pants main \\
-      && git pull \\
+    git fetch https://github.com/pantsbuild/pants main \\
       && git fetch https://github.com/pantsbuild/pants ${milestone} \\
       && git checkout -b ${branch_name} FETCH_HEAD \\
       && git cherry-pick ${merge_commit_sha}
     \`\`\`
 3. Fix the merge conflicts and commit the changes
-4. Run \`build-support/cherry_pick/make_pr.sh -- "${this.pull_number}" "${milestone}"\`
+4. Run \`build-support/cherry_pick/make_pr.sh "${this.pull_number}" "${milestone}"\`
 
 Please note that I cannot re-run CI if a job fails. Please work with your PR approver(s) to re-run CI if necessary.
 
@@ -153,17 +153,14 @@ Successfully opened ${pr_url}.`;
       comment_body += "\n\n";
     });
 
-    await this.#add_comment(
-      `I tried to automatically cherry-pick this change back to each relevant milestone, so that it is available in those older releases of Pants.
-
-${comment_body}
-
----
-
-Thanks again for your contributions!
-
-${this.#run_link}`
-    );
+    comment_body += "---\n\n";
+    if (any_failed) {
+      comment_body +=
+        "When you're done manually cherry-picking, please remove the `needs-cherrypick` label on this PR.\n\n";
+    }
+    comment_body += "Thanks again for your contributions!\n\n";
+    comment_body += this.#run_link;
+    await this.#add_comment(comment_body);
     if (any_failed) {
       this.#add_failed_label();
     } else {

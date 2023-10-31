@@ -73,7 +73,14 @@ pythonpath = ["%(buildroot)s/pants-plugins"]
 > 
 > In-repo plugin code should not depend on other in-repo code outside of the `pants-plugins` folder.  The `pants-plugins` folder helps isolate plugins from regular code, which is necessary due to how Pants's startup sequence works.
 
-You can depend on third-party dependencies in your in-repo plugin by adding them to the `plugins` option:
+You can depend on third-party dependencies in your in-repo plugin by adding a `requirements.txt` file next to
+the plugin `register.py` module:
+
+```
+ansicolors==1.18.0
+```
+
+Or, although less recommended, you can add them to the `plugins` option:
 
 ```toml pants.toml
 [GLOBAL]
@@ -148,21 +155,21 @@ If you do not want your plugin requirements to mix with your normal requirements
 [python]
 enable_resolves = true
 # The repository's own constraints.
-interpreter_constraints = ["==3.9.*"]
+interpreter_constraints = ["==3.12.*"]
 
 [python.resolves]
 pants-plugins = "pants-plugins/lock.txt"
 python-default = "3rdparty/python/default_lock.txt"
 
 [python.resolves_to_interpreter_constraints]
-# Pants can run with 3.7-3.9, so this lets us 
-# use different interpreter constraints when 
-# generating the lockfile than the rest of our project. 
+# Pants runs with Python 3.9, so this lets us
+# use different interpreter constraints when
+# generating the lockfile than the rest of our project.
 #
-# Warning: it's still necessary to set the `interpreter_constraints` 
-# field on each `python_sources` and `python_tests` target in 
+# Warning: it's still necessary to set the `interpreter_constraints`
+# field on each `python_sources` and `python_tests` target in
 # our plugin! This only impacts how the lockfile is generated.
-pants-plugins = [">=3.7,<3.10"]
+pants-plugins = ["==3.9.*"]
 ```
 
 Then, update your `pants_requirements` target generator with `resolve="pants-plugins"`, and run `pants generate-lockfiles`. You will also need to update the relevant `python_source` / `python_sources` and `python_test` / `python_tests` targets to set `resolve="pants-plugins"` (along with possibly the `interpreter_constraints` field).

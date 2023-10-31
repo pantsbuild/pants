@@ -10,6 +10,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
+    DictStringToStringField,
     IntField,
     MultipleSourcesField,
     SpecialCasedDependencies,
@@ -82,9 +83,12 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     alias: ClassVar[str] = "output_dependencies"
 
     help = help_text(
-        lambda: """
+        lambda: f"""
         Any dependencies that need to be present (as transitive dependencies) whenever the outputs
         of this target are consumed (including as dependencies).
+
+        See also `{AdhocToolExecutionDependenciesField.alias}` and
+        `{AdhocToolRunnableDependenciesField.alias}`.
         """
     )
 
@@ -106,6 +110,9 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
 
         If this field is specified, dependencies from `{AdhocToolOutputDependenciesField.alias}`
         will not be added to the execution sandbox.
+
+        See also `{AdhocToolOutputDependenciesField.alias}` and
+        `{AdhocToolRunnableDependenciesField.alias}`.
         """
     )
 
@@ -117,7 +124,7 @@ class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
 
     help = help_text(
         lambda: f"""
-        The execution dependencies for this command.
+        The runnable dependencies for this command.
 
         Dependencies specified here are those required to exist on the `PATH` to make the command
         complete successfully (interpreters specified in a `#!` command, etc). Note that these
@@ -210,18 +217,38 @@ class AdhocToolWorkdirField(StringField):
     )
 
 
+class AdhocToolNamedCachesField(DictStringToStringField):
+    alias = "experimental_named_caches"
+    help = help_text(
+        """
+        Named caches to construct for the execution.
+        See https://www.pantsbuild.org/docs/reference-global#named_caches_dir.
+
+        The keys of the mapping are the directory name to be created in the named caches dir.
+        The values are the name of the symlink (relative to the sandbox root) in the sandbox which
+        points to the subdirectory in the named caches dir
+
+        NOTE: The named caches MUST be handled with great care. Processes accessing the named caches
+        can be run in parallel, and can be cancelled at any point in their execution (and
+        potentially restarted). That means that _every_ operation modifying the contents of the cache
+        MUST be concurrency and cancellation safe.
+        """
+    )
+
+
 class AdhocToolOutputRootDirField(StringField):
     alias: ClassVar[str] = "root_output_directory"
     default = "/"
     help = help_text(
-        """Adjusts the location of files output by this target, when consumed as a dependency.
+        """
+        Adjusts the location of files output by this target, when consumed as a dependency.
 
         Values are relative to the build root, except in the following cases:
 
-        * `.` specifies the location of the `BUILD` file.
-        * Values beginning with `./` are relative to the location of the `BUILD` file.
-        * `/` or the empty string specifies the build root.
-        * Values beginning with `/` are also relative to the build root.
+          * `.` specifies the location of the `BUILD` file.
+          * Values beginning with `./` are relative to the location of the `BUILD` file.
+          * `/` or the empty string specifies the build root.
+          * Values beginning with `/` are also relative to the build root.
         """
     )
 

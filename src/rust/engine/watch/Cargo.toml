@@ -6,17 +6,17 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-crossbeam-channel = "0.5"
+crossbeam-channel = { workspace = true }
 fs = { path = "../fs" }
-futures = "0.3"
+futures = { workspace = true }
 hashing = { path = "../hashing" }
-log = "0.4"
+log = { workspace = true }
 # TODO: See https://github.com/notify-rs/notify/issues/255.
-notify = { git = "https://github.com/pantsbuild/notify", rev = "276af0f3c5f300bfd534941386ba2f3b3a022df7" }
-parking_lot = "0.12"
+notify = { workspace = true }
+parking_lot = { workspace = true }
 task_executor = { path = "../task_executor" }
 
 [dev-dependencies]
-tempfile = "3.5.0"
+tempfile = { workspace = true }
 testutil = { path = "../testutil" }
-tokio = { version = "1.28", features = ["rt", "macros"] }
+tokio = { workspace = true, features = ["rt", "macros"] }

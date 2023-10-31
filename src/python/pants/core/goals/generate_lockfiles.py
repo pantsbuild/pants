@@ -481,7 +481,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
         ),
     )
     diff = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             """
             Print a summary of changed distributions after generating the lockfile.

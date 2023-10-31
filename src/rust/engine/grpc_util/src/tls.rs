@@ -1,138 +1,237 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::sync::Arc;
+use std::time::SystemTime;
 
-use rustls::{ClientConfig, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError};
-use webpki::DNSNameRef;
+use rustls::client::{ServerCertVerified, ServerCertVerifier};
+use tokio_rustls::rustls::{Certificate, ClientConfig, Error, RootCertStore, ServerName};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Config {
-  pub root_ca_certs: Option<Vec<u8>>,
-  pub mtls: Option<MtlsConfig>,
-  pub certificate_check: CertificateCheck,
+    pub root_ca_certs: Option<Vec<Certificate>>,
+    pub mtls: Option<MtlsConfig>,
+    pub certificate_check: CertificateCheck,
 }
 
 impl Config {
-  pub fn new_without_mtls(root_ca_certs: Option<Vec<u8>>) -> Self {
-    Self {
-      root_ca_certs,
-      mtls: None,
-      certificate_check: CertificateCheck::Enabled,
+    /// Creates a new config with the given root CA certs and mTLS config.
+    pub fn new<Buf: AsRef<[u8]>>(
+        root_ca_certs: Option<Buf>,
+        mtls: Option<(Buf, Buf)>,
+    ) -> Result<Self, String> {
+        let root_ca_certs = root_ca_certs
+            .map(|certs| {
+                let raw_certs = rustls_pemfile::certs(&mut std::io::Cursor::new(certs.as_ref()))
+                    .map_err(|e| format!("Failed to parse TLS certs data: {e:?}"))?;
+                Result::<_, String>::Ok(raw_certs.into_iter().map(rustls::Certificate).collect())
+            })
+            .transpose()?;
+
+        let mtls = mtls
+            .map(|buffers| MtlsConfig::from_pem_buffers(buffers.0.as_ref(), buffers.1.as_ref()))
+            .transpose()?;
+
+        Ok(Self {
+            root_ca_certs,
+            mtls,
+            certificate_check: CertificateCheck::Enabled,
+        })
     }
-  }
 }
 
 impl TryFrom<Config> for ClientConfig {
-  type Error = String;
+    type Error = String;
 
-  /// Create a rust-tls `ClientConfig` from root CA certs, falling back to the rust-tls-native-certs
-  /// crate if specific root CA certs were not given.
-  fn try_from(config: Config) -> Result<Self, Self::Error> {
-    let mut tls_config = ClientConfig::new();
+    /// Create a rust-tls `ClientConfig` from root CA certs, falling back to the rust-tls-native-certs
+    /// crate if specific root CA certs were not given.
+    fn try_from(config: Config) -> Result<Self, Self::Error> {
+        // let tls_config = ClientConfig::builder().with_safe_defaults();
+        let tls_config = ClientConfig::builder().with_safe_defaults();
 
-    // Must set HTTP/2 as ALPN protocol otherwise cannot connect over TLS to gRPC servers.
-    // Unfortunately, this is not a default value and, moreover, Tonic does not provide
-    // any helper function to encapsulate this knowledge.
-    tls_config.set_protocols(&[Vec::from("h2")]);
+        // Add the root certificate store.
+        let tls_config = match config.certificate_check {
+            CertificateCheck::DangerouslyDisabled => {
+                let tls_config = tls_config.with_custom_certificate_verifier(Arc::new(NoVerifier));
+                if let Some(MtlsConfig { cert_chain, key }) = config.mtls {
+                    tls_config
+                        .with_client_auth_cert(cert_chain, key)
+                        .map_err(|err| {
+                            format!("Error setting client authentication configuration: {err:?}")
+                        })?
+                } else {
+                    tls_config.with_no_client_auth()
+                }
+            }
+            CertificateCheck::Enabled => {
+                let tls_config = {
+                    let mut root_cert_store = RootCertStore::empty();
 
-    // Add the root store.
-    match config.root_ca_certs {
-      Some(pem_bytes) => {
-        let mut reader = std::io::Cursor::new(pem_bytes);
-        tls_config
-          .root_store
-          .add_pem_file(&mut reader)
-          .map_err(|_| {
-            "Unexpected state when adding PEM file from `--remote-ca-certs-path`. Please \
-          check that it points to a valid file."
-              .to_owned()
-          })?;
-      }
-      None => {
-        tls_config.root_store =
-          rustls_native_certs::load_native_certs().map_err(|(_maybe_store, e)| {
-            format!(
-              "Could not discover root CA cert files to use TLS with remote caching and remote \
+                    match config.root_ca_certs {
+                        Some(certs) => {
+                            for cert in &certs {
+                                root_cert_store.add(cert).map_err(|e| {
+                                    format!("failed adding CA cert to store: {e:?}")
+                                })?;
+                            }
+                        }
+                        None => {
+                            let native_root_certs = rustls_native_certs::load_native_certs()
+                                .map_err(|err| {
+                                    format!(
+                "Could not discover root CA cert files to use TLS with remote caching and remote \
             execution. Consider setting `--remote-ca-certs-path` instead to explicitly point to \
-            the correct PEM file.\n\n{e}"
-            )
-          })?;
-      }
-    }
+            the correct PEM file.\n\n{err}",
+              )
+                                })?;
 
-    if let Some(MtlsConfig { key, cert_chain }) = config.mtls {
-      tls_config
-        .set_single_client_cert(
-          cert_chain_from_pem_bytes(cert_chain)?,
-          der_key_from_pem_bytes(key)?,
-        )
-        .map_err(|err| format!("Error creating MTLS config: {err:?}"))?;
-    }
+                            for cert in native_root_certs {
+                                root_cert_store.add_parsable_certificates(&[cert.0]);
+                            }
+                        }
+                    }
 
-    if let CertificateCheck::DangerouslyDisabled = config.certificate_check {
-      tls_config
-        .dangerous()
-        .set_certificate_verifier(Arc::new(NoVerifier));
-    }
+                    tls_config.with_root_certificates(root_cert_store)
+                };
 
-    Ok(tls_config)
-  }
+                if let Some(MtlsConfig { cert_chain, key }) = config.mtls {
+                    tls_config
+                        .with_client_auth_cert(cert_chain, key)
+                        .map_err(|err| {
+                            format!("Error setting client authentication configuration: {err:?}")
+                        })?
+                } else {
+                    tls_config.with_no_client_auth()
+                }
+            }
+        };
+
+        Ok(tls_config)
+    }
 }
 
+#[derive(Clone)]
 pub struct MtlsConfig {
-  /// PEM bytes of the private key used for MTLS.
-  pub key: Vec<u8>,
-  /// PEM bytes of the certificate used for MTLS.
-  pub cert_chain: Vec<u8>,
+    /// DER bytes of the certificate used for mTLS.
+    pub cert_chain: Vec<rustls::Certificate>,
+    /// DER bytes of the private key used for mTLS.
+    pub key: rustls::PrivateKey,
 }
 
+impl MtlsConfig {
+    pub fn from_pem_buffers(certs: &[u8], key: &[u8]) -> Result<Self, String> {
+        let cert_chain = rustls_pemfile::certs(&mut std::io::Cursor::new(certs))
+            .map_err(|e| format!("Failed to parse client authentication (mTLS) certs data: {e:?}"))?
+            .into_iter()
+            .map(rustls::Certificate)
+            .collect();
+
+        let keys = rustls_pemfile::read_all(&mut std::io::Cursor::new(key))
+      .map_err(|e| format!("Failed to parse client authentication (mTLS) key data: {e:?}"))?
+      .into_iter()
+      .filter(|item| match item {
+        rustls_pemfile::Item::X509Certificate(_) => {
+          log::warn!("Found x509 certificate in client authentication (mTLS) key data. Ignoring.");
+          false
+        }
+        _ => true,
+      });
+
+        let mut key = None;
+        for item in keys {
+            use rustls_pemfile::Item;
+
+            match item {
+                Item::RSAKey(buf) | Item::PKCS8Key(buf) | Item::ECKey(buf) => {
+                    key = Some(rustls::PrivateKey(buf))
+                }
+                Item::X509Certificate(_) => unreachable!("filtered above"),
+                _ => unreachable!("rustls_pemfile::read_all returned an unexpected item"),
+            }
+        }
+
+        let key = key.ok_or_else(|| {
+            "No private key found in client authentication (mTLS) key data".to_owned()
+        })?;
+
+        Ok(Self { cert_chain, key })
+    }
+}
+
+#[derive(Clone)]
 pub enum CertificateCheck {
-  Enabled,
-  DangerouslyDisabled,
+    Enabled,
+    DangerouslyDisabled,
 }
 
 impl Default for CertificateCheck {
-  fn default() -> Self {
-    Self::Enabled
-  }
+    fn default() -> Self {
+        Self::Enabled
+    }
 }
 
-struct NoVerifier;
+pub(crate) struct NoVerifier;
 
 impl ServerCertVerifier for NoVerifier {
-  fn verify_server_cert(
-    &self,
-    _roots: &RootCertStore,
-    _presented_certs: &[rustls::Certificate],
-    _dns_name: DNSNameRef,
-    _ocsp_response: &[u8],
-  ) -> Result<ServerCertVerified, TLSError> {
-    Ok(ServerCertVerified::assertion())
-  }
-}
-
-fn cert_chain_from_pem_bytes(cert_chain: Vec<u8>) -> Result<Vec<rustls::Certificate>, String> {
-  rustls_pemfile::certs(&mut cert_chain.as_slice())
-    .and_then(|certs| {
-      certs
-        .into_iter()
-        .map(|cert| Ok(rustls::Certificate(cert)))
-        .collect::<Result<Vec<_>, _>>()
-    })
-    .map_err(|err| format!("Failed to parse certificates from PEM file {err:?}"))
-}
-
-fn der_key_from_pem_bytes(pem_bytes: Vec<u8>) -> Result<rustls::PrivateKey, String> {
-  let key = rustls_pemfile::read_one(&mut pem_bytes.as_slice())
-    .map_err(|err| format!("Failed to read PEM file: {err:?}"))?
-    .ok_or_else(|| "No private key found in PEM file".to_owned())?;
-  use rustls_pemfile::Item;
-  let key = match key {
-    Item::RSAKey(bytes) => bytes,
-    Item::PKCS8Key(bytes) => bytes,
-    Item::X509Certificate(_) => {
-      return Err("Found certificate in PEM file but expected private key".to_owned())
+    fn verify_server_cert(
+        &self,
+        _end_entity: &Certificate,
+        _intermediates: &[Certificate],
+        _server_name: &ServerName,
+        _scts: &mut dyn Iterator<Item = &[u8]>,
+        _ocsp_response: &[u8],
+        _now: SystemTime,
+    ) -> Result<ServerCertVerified, Error> {
+        Ok(ServerCertVerified::assertion())
     }
-  };
-  Ok(rustls::PrivateKey(key))
+}
+
+#[cfg(test)]
+mod test {
+    use super::Config;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_client_auth_cert_resolver_is_unconfigured_no_mtls() {
+        let cert_pem = std::fs::read(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("test-certs")
+                .join("cert.pem"),
+        )
+        .unwrap();
+
+        let config = Config::new(Some(&cert_pem), None).unwrap();
+
+        assert!(config.root_ca_certs.is_some());
+        assert!(config.mtls.is_none());
+
+        let rustls_config: rustls::ClientConfig = config.try_into().unwrap();
+
+        assert!(!rustls_config.client_auth_cert_resolver.has_certs());
+    }
+
+    #[test]
+    fn test_client_auth_cert_resolver_is_configured() {
+        let cert_pem = std::fs::read(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("test-certs")
+                .join("cert.pem"),
+        )
+        .unwrap();
+
+        let key_pem = std::fs::read(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("test-certs")
+                .join("key.pem"),
+        )
+        .unwrap();
+
+        let config = Config::new(Some(&cert_pem), Some((&cert_pem, &key_pem))).unwrap();
+
+        assert!(config.root_ca_certs.is_some());
+        assert!(config.mtls.is_some());
+
+        let rustls_config: rustls::ClientConfig = config.try_into().unwrap();
+
+        assert!(rustls_config.client_auth_cert_resolver.has_certs());
+    }
 }

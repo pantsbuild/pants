@@ -185,7 +185,7 @@ class CoverageSubsystem(PythonToolBase):
             Fail if the total combined coverage percentage for all tests is less than this
             number.
 
-            Use this instead of setting fail_under in a coverage.py config file,
+            Use this instead of setting `fail_under` in a coverage.py config file,
             as the config will apply to each test separately, while you typically want this
             to apply to the combined coverage for all tests run.
 
@@ -193,7 +193,7 @@ class CoverageSubsystem(PythonToolBase):
             check to trigger.
 
             Note also that if you specify a non-integral value, you must
-            also set [report] precision properly in the coverage.py config file to make use
+            also set `[report] precision` properly in the coverage.py config file to make use
             of the decimal places. See https://coverage.readthedocs.io/en/latest/config.html.
             """
         ),
@@ -313,6 +313,23 @@ def get_branch_value_from_config(fc: FileContent) -> bool:
     return cp.getboolean(run_section, "branch", fallback=False)
 
 
+def get_namespace_value_from_config(fc: FileContent) -> bool:
+    if PurePath(fc.path).suffix == ".toml":
+        all_config = _parse_toml_config(fc)
+        return bool(
+            all_config.get("tool", {})
+            .get("coverage", {})
+            .get("report", {})
+            .get("include_namespace_packages", False)
+        )
+
+    cp = _parse_ini_config(fc)
+    report_section = "coverage:report" if fc.path in ("tox.ini", "setup.cfg") else "report"
+    if not cp.has_section(report_section):
+        return False
+    return cp.getboolean(report_section, "include_namespace_packages", fallback=False)
+
+
 @rule
 async def create_or_update_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
     config_files = await Get(ConfigFiles, ConfigFilesRequest, coverage.config_request)
@@ -381,6 +398,9 @@ async def merge_coverage_data(
         # See https://github.com/pantsbuild/pants/issues/14542 .
         config_contents = await Get(DigestContents, Digest, coverage_config.digest)
         branch = get_branch_value_from_config(config_contents[0]) if config_contents else False
+        namespace_packages = (
+            get_namespace_value_from_config(config_contents[0]) if config_contents else False
+        )
         global_coverage_base_dir = PurePath("__global_coverage__")
         global_coverage_config_path = global_coverage_base_dir / "pyproject.toml"
         global_coverage_config_content = toml.dumps(
@@ -391,7 +411,10 @@ async def merge_coverage_data(
                             "relative_files": True,
                             "source": [source_root.path for source_root in source_roots],
                             "branch": branch,
-                        }
+                        },
+                        "report": {
+                            "include_namespace_packages": namespace_packages,
+                        },
                     }
                 }
             }
@@ -477,12 +500,11 @@ async def generate_coverage_reports(
     )
     sources = await Get(
         PythonSourceFiles,
-        # Coverage sometimes includes non-Python files in its `.coverage` data. We need to
-        # ensure that they're present when generating the report. We include all the files included
-        # by `pytest_runner.py`.
-        PythonSourceFilesRequest(
-            transitive_targets.closure, include_files=True, include_resources=True
-        ),
+        # Coverage sometimes includes non-Python files in its `.coverage` data, so we
+        # include resources here. We don't include files because relocated_files targets
+        # may cause digest merge collisions. So anything you compute coverage over must
+        # be a source file or a resource.
+        PythonSourceFilesRequest(transitive_targets.closure, include_resources=True),
     )
     input_digest = await Get(
         Digest,

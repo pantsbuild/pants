@@ -325,7 +325,7 @@ Prefer fixing the underlying API if easy to do, but otherwise, prefer using `cas
 from typing import cast
 
 # Good
-x = cast(str, untyped_method()
+x = cast(str, untyped_method())
 
 # Discouraged
 x: str = untyped_method()
@@ -405,4 +405,36 @@ def test_demo() -> None:
 class TestDemo(unittest.TestCase):
     def test_demo(self) -> None:
         self.assertEqual(y, 2)
+```
+
+Documentation
+-------------
+
+User documentation uploaded to the [Pantsbuild web docs site](https://www.pantsbuild.org/docs) consists of two sections:
+* the reference docs that are generated from help strings in the source code
+* the guides that are generated from the `docs/` directory's Markdown files.
+
+### Reference docs
+
+Not every help string will make it to the website: currently only help strings for global options, goals, subsystems, and targets are published. Please be extra vigilant when writing these and remember that they are going to be rendered as Markdown. 
+
+It may be helpful to consider the following:
+
+* use the `softwrap` helper function to turn a multiline string into a softwrapped string
+* if you experience `mypy` typing issues using the `softwrap` for documenting subclasses of `Field` and `Target` classes, consider using the `help_text` convenience function
+* text inside the angle brackets (e.g. `<value>`) will be ignored when rendered if not wrapped in backticks
+* to create a numbered or bullet list, use 2 space indentation (or use the `bullet_list` convenience function)
+* to create a codeblock, use 4 space indentation (no need for triple backticks) and add one empty line between the code block and the text
+* make sure to use backticks to highlight config sections, command-line arguments, target names, and inline code examples.    
+
+It may be difficult to confirm the accuracy of text formatting in plain Python, so you may want to generate the relevant Markdown files to be able to preview them to confirm your help strings are rendered as expected. They can be converted into Markdown files for visual inspection using a custom build script.
+
+You can run these commands to convert help strings to Markdown files for the `main` and your local feature branches to identify the changed files and then preview only the relevant files to confirm the rendering makes sense.
+
+```text
+$ git checkout main
+$ pants run build-support/bin/generate_docs.py -- --no-prompt --output main-docs
+$ git checkout <your-branch>
+$ pants run build-support/bin/generate_docs.py -- --no-prompt --output branch-docs
+$ diff -qr main-docs branch-docs
 ```

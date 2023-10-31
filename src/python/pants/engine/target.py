@@ -714,6 +714,19 @@ class UnexpandedTargets(Collection[Target]):
         return self[0]
 
 
+class DepsTraversalBehavior(Enum):
+    """The return value for ShouldTraverseDepsPredicate.
+
+    NB: This only indicates whether to traverse the deps of a target;
+    It does not control the inclusion of the target itself (though that
+    might be added in the future). By the time the predicate is called,
+    the target itself was already included.
+    """
+
+    INCLUDE = "include"
+    EXCLUDE = "exclude"
+
+
 @dataclass(frozen=True)
 class ShouldTraverseDepsPredicate(metaclass=ABCMeta):
     """This callable determines whether to traverse through deps of a given Target + Field.
@@ -733,15 +746,17 @@ class ShouldTraverseDepsPredicate(metaclass=ABCMeta):
     # That is extremely important because two predicates with different implementations but the same data
     # (or no data) need to have different hashes and compare unequal.
     _callable: Callable[
-        [Any, Target, Dependencies | SpecialCasedDependencies], bool
+        [Any, Target, Dependencies | SpecialCasedDependencies], DepsTraversalBehavior
     ] = dataclasses.field(init=False, repr=False)
 
     def __post_init__(self):
         object.__setattr__(self, "_callable", type(self).__call__)
 
     @abstractmethod
-    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
-        """If this predicate returns false, then the target's field's deps will be ignored."""
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        """This predicate decides when to INCLUDE or EXCLUDE the target's field's deps."""
 
 
 class TraverseIfDependenciesField(ShouldTraverseDepsPredicate):
@@ -751,8 +766,12 @@ class TraverseIfDependenciesField(ShouldTraverseDepsPredicate):
     subclasses of Dependencies.
     """
 
-    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
-        return isinstance(field, Dependencies)
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        if isinstance(field, Dependencies):
+            return DepsTraversalBehavior.INCLUDE
+        return DepsTraversalBehavior.EXCLUDE
 
 
 class AlwaysTraverseDeps(ShouldTraverseDepsPredicate):
@@ -761,8 +780,10 @@ class AlwaysTraverseDeps(ShouldTraverseDepsPredicate):
     This includes deps from fields like SpecialCasedDependencies which are ignored in most cases.
     """
 
-    def __call__(self, target: Target, field: Dependencies | SpecialCasedDependencies) -> bool:
-        return True
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        return DepsTraversalBehavior.INCLUDE
 
 
 class CoarsenedTarget(EngineAwareParameter):
@@ -1571,9 +1592,10 @@ class InvalidFieldTypeException(InvalidFieldException):
         expected_type: str,
         description_of_origin: str | None = None,
     ) -> None:
+        raw_type = f"with type `{type(raw_value).__name__}`"
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
-            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`.",
+            f"`{repr(raw_value)}` {raw_type}.",
             description_of_origin=description_of_origin,
         )
 
@@ -2411,44 +2433,6 @@ class SourcesPathsRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
-class SecondaryOwnerMixin(ABC):
-    """Add to a Field for the target to work with file arguments and `--changed-since`, without it
-    needing a `SourcesField`.
-
-    Why use this? In a dependency inference world, multiple targets including the same file in the
-    `sources` field causes issues due to ambiguity over which target to use. So, only one target
-    should have "primary ownership" of the file. However, you may still want other targets to be
-    used when that file is included in file arguments. For example, a `python_source` target
-    being the primary owner of the `.py` file, but a `pex_binary` still working with file
-    arguments for that file. Secondary ownership means that the target won't be used for things like
-    dependency inference and hydrating sources, but file arguments will still work.
-
-    There should be a primary owner of the file(s), e.g. the `python_source` in the above example.
-    Typically, you will want to add a dependency inference rule to infer a dep on that primary
-    owner.
-
-    All associated files must live in the BUILD target's directory or a subdirectory to work
-    properly, like the `sources` field.
-    """
-
-    @property
-    @abstractmethod
-    def filespec(self) -> Filespec:
-        """A dictionary in the form {'globs': ['full/path/to/f.ext']} representing the field's
-        associated files.
-
-        Typically, users should use a file name/glob relative to the BUILD file, like the `sources`
-        field. Then, you can use `os.path.join(self.address.spec_path, self.value)` to relative to
-        the build root.
-        """
-
-    @memoized_property
-    def filespec_matcher(self) -> FilespecMatcher:
-        # Note: memoized because parsing the globs is expensive:
-        # https://github.com/pantsbuild/pants/issues/16122
-        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
-
-
 def targets_with_sources_types(
     sources_types: Iterable[type[SourcesField]],
     targets: Iterable[Target],
@@ -2484,7 +2468,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     help = help_text(
         f"""
         Addresses to other targets that this target depends on, e.g.
-        ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
+        `['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django']`.
 
         This augments any dependencies inferred by Pants, such as by analyzing your imports. Use
         `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
@@ -2706,6 +2690,26 @@ class InferredDependencies:
         """The result of inferring dependencies."""
         object.__setattr__(self, "include", FrozenOrderedSet(sorted(include)))
         object.__setattr__(self, "exclude", FrozenOrderedSet(sorted(exclude)))
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class TransitivelyExcludeDependenciesRequest(Generic[FS], EngineAwareParameter):
+    """A request to transitvely exclude dependencies of a "root" node.
+
+    This is similar to `InferDependenciesRequest`, except the request is only made for "root" nodes
+    in the dependency graph.
+
+    This mirrors the public facing "transitive exclude" dependency feature (i.e. `!!<address>`).
+    """
+
+    infer_from: ClassVar[Type[FS]]  # type: ignore[misc]
+
+    field_set: FS
+
+
+class TransitivelyExcludeDependencies(FrozenOrderedSet[Address]):
+    pass
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -2994,9 +2998,11 @@ def generate_file_based_overrides_field_help_message(
                 field names to the overridden value.
 
                 For example:
+
+                {example}
                 """
             ),
-            example,
+            "",
             softwrap(
                 f"""
                 File paths and globs are relative to the BUILD file's directory. Every overridden file is

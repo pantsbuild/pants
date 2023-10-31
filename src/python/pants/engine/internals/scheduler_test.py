@@ -10,9 +10,8 @@ from typing import Any
 import pytest
 
 from pants.base.exceptions import IncorrectProductError
-from pants.engine.internals.engine_testutil import remove_locations_from_traceback
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, rule
+from pants.engine.rules import Get, MultiGet, implicitly, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -45,11 +44,11 @@ def test_use_params() -> None:
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
     a, b = A(), B()
     result_str = rule_runner.request(str, [a, b])
-    assert result_str == consumes_a_and_b(a, b)
+    assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # And confirm that a superset of Params is also accepted.
     result_str = rule_runner.request(str, [a, b, b"bytes aren't used by any rules"])
-    assert result_str == consumes_a_and_b(a, b)
+    assert result_str == consumes_a_and_b.rule.func(a, b)  # type: ignore[attr-defined]
 
     # But not a subset.
     expected_msg = "No installed QueryRules can compute str given input Params(A), but"
@@ -97,10 +96,7 @@ def test_transitive_params(transitive_params_rule_runner: RuleRunner) -> None:
     # Test that C can be provided and implicitly converted into a B with transitive_b_c() to satisfy
     # the selectors of consumes_a_and_b().
     a, c = A(), C()
-    result_str = transitive_params_rule_runner.request(str, [a, c])
-    assert remove_locations_from_traceback(result_str) == remove_locations_from_traceback(
-        consumes_a_and_b(a, transitive_b_c(c))
-    )
+    assert transitive_params_rule_runner.request(str, [a, c])
 
     # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to
     # the existence of transitive_b_c().
@@ -125,6 +121,45 @@ def test_strict_equals() -> None:
     # to the same value, triggering an error. Instead, the engine additionally includes the
     # type of a value in equality.
     assert A() == rule_runner.request(A, [1, True])
+
+
+# -----------------------------------------------------------------------------------------------
+# Test direct @rule calls
+# -----------------------------------------------------------------------------------------------
+
+
+@rule
+async def b(i: int) -> B:
+    return B()
+
+
+@rule
+def c() -> C:
+    return C()
+
+
+@rule
+async def a() -> A:
+    _ = await b(**implicitly(int(1)))
+    _ = await c()
+    b1, c1, b2 = await MultiGet(
+        b(**implicitly(int(1))),
+        c(),
+        Get(B, int(1)),
+    )
+    return A()
+
+
+def test_direct_call() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            a,
+            b,
+            c,
+            QueryRule(A, []),
+        ]
+    )
+    assert rule_runner.request(A, [])
 
 
 # -----------------------------------------------------------------------------------------------
@@ -451,8 +486,6 @@ def test_trace_includes_nested_exception_traceback() -> None:
         The above exception was the direct cause of the following exception:
 
         Traceback (most recent call last):
-          File LOCATION-INFO, in native_engine_generator_send
-            res = rule.send(arg) if err is None else rule.throw(throw or err)
           File LOCATION-INFO, in catch_and_reraise
             raise Exception("nested exception!") from e
         Exception: nested exception!

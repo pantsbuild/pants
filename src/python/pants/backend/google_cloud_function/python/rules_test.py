@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from io import BytesIO
 from textwrap import dedent
 from zipfile import ZipFile
@@ -20,10 +19,6 @@ from pants.backend.google_cloud_function.python.target_types import PythonGoogle
 from pants.backend.google_cloud_function.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.subsystems.lambdex import Lambdex
-from pants.backend.python.subsystems.lambdex import (
-    rules as python_google_cloud_function_subsystem_rules,
-)
 from pants.backend.python.target_types import (
     PexBinary,
     PythonRequirementTarget,
@@ -41,7 +36,6 @@ from pants.core.target_types import (
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
-from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
 
@@ -52,7 +46,6 @@ def rule_runner() -> PythonRuleRunner:
         rules=[
             *package_pex_binary.rules(),
             *python_google_cloud_function_rules(),
-            *python_google_cloud_function_subsystem_rules(),
             *target_rules(),
             *python_target_types_rules(),
             *core_target_types_rules(),
@@ -125,65 +118,6 @@ def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     ).stdout
 
 
-@pytest.mark.platform_specific_behavior
-@pytest.mark.parametrize(
-    "major_minor_interpreter",
-    all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
-)
-def test_create_hello_world_lambda_with_lambdex(
-    rule_runner: PythonRuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
-) -> None:
-    rule_runner.write_files(
-        {
-            "src/python/foo/bar/hello_world.py": dedent(
-                """
-                def handler(event, context):
-                    print('Hello, World!')
-                """
-            ),
-            "src/python/foo/bar/platform.json": complete_platform,
-            "src/python/foo/bar/BUILD": dedent(
-                """
-                python_sources(name='lib')
-
-                file(name="platform", source="platform.json")
-                python_google_cloud_function(
-                    name='lambda',
-                    dependencies=[':lib'],
-                    handler='foo.bar.hello_world:handler',
-                    runtime='python37',
-                    complete_platforms=[':platform'],
-                    type='event',
-                )
-                """
-            ),
-        }
-    )
-    zip_file_relpath, content = create_python_google_cloud_function(
-        rule_runner,
-        Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=(
-            "              Runtime: python37",
-            "    Complete platform: src/python/foo/bar/platform.json",
-            "              Handler: handler",
-        ),
-        extra_args=[
-            f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']",
-            "--lambdex-layout=lambdex",
-        ],
-    )
-    assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
-    zipfile = ZipFile(BytesIO(content))
-    names = set(zipfile.namelist())
-    assert "main.py" in names
-    assert "foo/bar/hello_world.py" in names
-    if sys.platform == "darwin":
-        assert (
-            "`python_google_cloud_function` targets built on macOS may fail to build."
-            in caplog.text
-        )
-
-
 def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
@@ -236,7 +170,6 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
             "    Runtime: python37",
             "    Handler: handler",
         ),
-        extra_args=["--lambdex-layout=lambdex"],
     )
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
@@ -249,7 +182,16 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     assert "assets:resources" not in caplog.text
 
 
-def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("ics", "runtime"),
+    [
+        pytest.param(["==3.7.*"], None, id="runtime inferred from ICs"),
+        pytest.param(None, "python37", id="runtime explicitly set"),
+    ],
+)
+def test_create_hello_world_gcf(
+    ics: list[str] | None, runtime: None | str, rule_runner: PythonRuleRunner
+) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -261,14 +203,14 @@ def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             "src/python/foo/bar/BUILD": dedent(
-                """
+                f"""
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
-                python_sources()
+                python_sources(interpreter_constraints={ics!r})
 
                 python_google_cloud_function(
                     name='gcf',
                     handler='foo.bar.hello_world:handler',
-                    runtime="python37",
+                    runtime={runtime!r},
                     type='event',
                 )
                 """
@@ -279,7 +221,10 @@ def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_google_cloud_function(
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),
-        expected_extra_log_lines=("    Handler: handler",),
+        expected_extra_log_lines=(
+            "    Runtime: python37",
+            "    Handler: handler",
+        ),
     )
     assert "src.python.foo.bar/gcf.zip" == zip_file_relpath
 

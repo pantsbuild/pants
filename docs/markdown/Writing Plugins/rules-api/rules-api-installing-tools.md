@@ -107,7 +107,7 @@ class Shellcheck(ExternalTool):
         return f"./shellcheck-{self.version}/shellcheck"
 ```
 
-You must define the class properties `default_version` and `default_known_version`. `default_known_version` is a list of pipe-separated strings in the form `version|platform|sha256|length`. Use the values you found earlier by running `shasum` and `wc` for sha256 and length, respectively. `platform` should be one of `linux_arm64`, `linux_x86_64`, `macos_arm64`, and `macos_x86_64`.
+You must define the class properties `default_version` and `default_known_versions`. `default_known_versions` is a list of pipe-separated strings in the form `version|platform|sha256|length`. Use the values you found earlier by running `shasum` and `wc` for sha256 and length, respectively. `platform` should be one of `linux_arm64`, `linux_x86_64`, `macos_arm64`, and `macos_x86_64`.
 
 You must also define the methods `generate_url`, which is the URL to make a GET request to download the file, and `generate_exe`, which is the relative path to the binary in the downloaded digest. Both methods take `plat: Platform` as a parameter.
 
@@ -182,7 +182,7 @@ There are several other optional parameters that may be helpful.
 
 The resulting `Pex` object has a `digest: Digest` field containing the built `.pex` file. This digest should be included in the `input_digest` to the `Process` you run.
 
-Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(ProcessResult, PexProcess)`, which will set up the environment properly for your Pex to execute. There is a predefined rule to go from `PexProcess -> Process`, so `Get(ProcessResult, Process)` will cause the engine to run `PexProcess -> Process -> ProcessResult`.
+Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(ProcessResult, PexProcess)`, which will set up the environment properly for your Pex to execute. There is a predefined rule to go from `PexProcess -> Process`, so `Get(ProcessResult, PexProcess)` will cause the engine to run `PexProcess -> Process -> ProcessResult`.
 
 `PexProcess` requires arguments for `pex: Pex`, `argv: Iterable[str]`, and `description: str`. It has several optional parameters that mirror the arguments to `Process`. If you specify `input_digest`, be careful to first use `Get(Digest, MergeDigests)` on the `pex.digest` and any of the other input digests.
 
@@ -203,10 +203,10 @@ Instead of the normal `Get(ProcessResult, Process)`, you should use `Get(Process
 >     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 >
 >     default_main = ConsoleScript("black")
->     
+>
 >     register_interpreter_constraints = True
 >     default_interpreter_constraints = ["CPython>=3.8,<3.9"]
-> 
+>
 >     default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
 >
 >     config = StrOption(

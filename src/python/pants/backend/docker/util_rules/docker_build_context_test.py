@@ -393,7 +393,8 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
                 """
               docker_environment(
                 name="python_38",
-                image="python:3.8",
+                image="python:3.8-buster@sha256:bc4b9fb034a871b285bea5418cedfcaa9d2ab5590fb5fb6f0c42aaebb2e2c911",
+                platform="linux_x86_64",
                 python_bootstrap_search_path=["<PATH>"],
               )
 
@@ -428,8 +429,8 @@ def test_packaged_pex_environment(rule_runner: RuleRunner) -> None:
     rule_runner.write_digest(context.digest, path_prefix="contents")
     with zipfile.ZipFile(os.path.join(rule_runner.build_root, "contents", pex_file), "r") as zf:
         assert json.loads(zf.read("PEX-INFO"))["distributions"].keys() == {
+            "psutil-5.9.2-cp37-cp37m-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
             "psutil-5.9.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-            "psutil-5.9.2-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
         }
 
 

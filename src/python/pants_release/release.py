@@ -20,18 +20,16 @@ from enum import Enum
 from functools import total_ordering
 from math import ceil
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, cast
-from urllib.parse import quote_plus
-from xml.etree import ElementTree
+from typing import Any, Callable, Iterable, Iterator, Sequence, cast
 
 import requests
 from packaging.version import Version
-from pants_release.common import banner, die, green
-from pants_release.reversion import reversion
+from pants_release.common import VERSION_PATH, banner, die, green
+from pants_release.git import git, git_rev_parse
 
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
-from pants.util.strutil import softwrap, strip_prefix
+from pants.util.strutil import softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -73,7 +71,7 @@ _known_packages = [
 # Disable the explorer backend, as that is packaged into a dedicated Python distribution and thus
 # not included in the pex either.
 DISABLED_BACKENDS_CONFIG = {
-    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants.explorer.server"]',
+    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants_explorer.server"]',
 }
 
 
@@ -378,43 +376,16 @@ PACKAGES = sorted({PANTS_PKG, TESTUTIL_PKG})
 
 class _Constants:
     def __init__(self) -> None:
-        self._head_sha = (
-            subprocess.run(
-                ["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE, check=True
-            )
-            .stdout.decode()
-            .strip()
-        )
-        self._head_committer_date = (
-            subprocess.run(
-                [
-                    "git",
-                    "show",
-                    "--no-patch",
-                    "--format=%cd",
-                    "--date=format:%Y%m%d%H%M",
-                    self._head_sha,
-                ],
-                stdout=subprocess.PIPE,
-                check=True,
-            )
-            .stdout.decode()
-            .strip()
-        )
-        self.pants_version_file = Path("src/python/pants/VERSION")
-        self.pants_stable_version = self.pants_version_file.read_text().strip()
-
-    @property
-    def binary_base_url(self) -> str:
-        return "https://binaries.pantsbuild.org"
+        self._head_sha = git_rev_parse("HEAD")
+        self.pants_stable_version = VERSION_PATH.read_text().strip()
 
     @property
     def deploy_3rdparty_wheels_path(self) -> str:
-        return f"wheels/3rdparty/{self._head_sha}"
+        return "wheels/3rdparty"
 
     @property
     def deploy_pants_wheels_path(self) -> str:
-        return f"wheels/pantsbuild.pants/{self._head_sha}"
+        return "wheels/pantsbuild.pants"
 
     @property
     def deploy_dir(self) -> Path:
@@ -427,12 +398,6 @@ class _Constants:
     @property
     def deploy_pants_wheel_dir(self) -> Path:
         return self.deploy_dir / self.deploy_pants_wheels_path
-
-    @property
-    def pants_unstable_version(self) -> str:
-        # include the commit's timestamp to make multiple builds of a single stable version more
-        # easily orderable
-        return f"{self.pants_stable_version}+{self._head_committer_date}.git{self._head_sha[:8]}"
 
     @property
     def twine_venv_dir(self) -> Path:
@@ -455,45 +420,16 @@ def get_pypi_config(section: str, option: str) -> str:
 
 
 def get_git_branch() -> str:
-    return (
-        subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], stdout=subprocess.PIPE, check=True
-        )
-        .stdout.decode()
-        .strip()
-    )
+    return git_rev_parse("HEAD", abbrev_ref=True)
 
 
 def get_pgp_key_id() -> str:
-    return (
-        subprocess.run(
-            ["git", "config", "--get", "user.signingkey"], stdout=subprocess.PIPE, check=False
-        )
-        .stdout.decode()
-        .strip()
-    )
+    return git("config", "--get", "user.signingkey", check=False)
 
 
 def get_pgp_program_name() -> str:
-    configured_name = (
-        subprocess.run(
-            ["git", "config", "--get", "gpg.program"], stdout=subprocess.PIPE, check=False
-        )
-        .stdout.decode()
-        .strip()
-    )
+    configured_name = git("config", "--get", "gpg.program", check=False)
     return configured_name or "gpg"
-
-
-@contextmanager
-def set_pants_version(version: str) -> Iterator[None]:
-    """Temporarily rewrite the VERSION file."""
-    original_content = CONSTANTS.pants_version_file.read_text()
-    CONSTANTS.pants_version_file.write_text(version)
-    try:
-        yield
-    finally:
-        CONSTANTS.pants_version_file.write_text(original_content)
 
 
 def is_cross_platform(wheel_paths: Iterable[Path]) -> bool:
@@ -531,35 +467,6 @@ def create_twine_venv() -> None:
     subprocess.run([bin_dir / "pip", "install", "--quiet", "twine"], check=True)
 
 
-@contextmanager
-def download_pex_bin() -> Iterator[Path]:
-    """Download PEX and return the path to the binary."""
-    try:
-        pex_version = next(
-            strip_prefix(ln, "pex==").rstrip()
-            for ln in Path("3rdparty/python/requirements.txt").read_text().splitlines()
-            if ln.startswith("pex==")
-        )
-    except (FileNotFoundError, StopIteration) as exc:
-        die(
-            softwrap(
-                f"""
-                Could not find a requirement starting with `pex==` in
-                3rdparty/python/requirements.txt: {repr(exc)}
-                """
-            )
-        )
-
-    with temporary_dir() as tempdir:
-        resp = requests.get(
-            f"https://github.com/pantsbuild/pex/releases/download/v{pex_version}/pex"
-        )
-        resp.raise_for_status()
-        result = Path(tempdir, "pex")
-        result.write_bytes(resp.content)
-        yield result
-
-
 # -----------------------------------------------------------------------------------------------
 # Build artifacts
 # -----------------------------------------------------------------------------------------------
@@ -569,20 +476,29 @@ def build_all_wheels() -> None:
     build_pants_wheels()
     build_3rdparty_wheels()
     install_and_test_packages(
-        CONSTANTS.pants_unstable_version,
+        CONSTANTS.pants_stable_version,
         extra_pip_args=[
             "--only-binary=:all:",
             "-f",
-            str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
+            str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_stable_version),
             "-f",
-            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
+            str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version),
         ],
     )
 
 
+def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None = None) -> None:
+    with create_tmp_venv() as bin_dir:
+        for pkg in PACKAGES:
+            pip_req = f"{pkg.name}=={version}"
+            banner(f"Installing and testing {pip_req}")
+            pkg.validate(version, bin_dir, extra_pip_args or [])
+            green(f"Tests succeeded for {pip_req}")
+
+
 def build_pants_wheels() -> None:
     banner(f"Building Pants wheels with Python {CONSTANTS.python_version}")
-    version = CONSTANTS.pants_unstable_version
+    version = CONSTANTS.pants_stable_version
 
     dest = CONSTANTS.deploy_pants_wheel_dir / version
     dest.mkdir(parents=True, exist_ok=True)
@@ -598,44 +514,48 @@ def build_pants_wheels() -> None:
         *(package.target for package in PACKAGES),
     )
 
-    with set_pants_version(CONSTANTS.pants_unstable_version):
-        try:
-            subprocess.run(args, check=True)
-        except subprocess.CalledProcessError as e:
-            failed_packages = ",".join(package.name for package in PACKAGES)
-            failed_targets = " ".join(package.target for package in PACKAGES)
+    try:
+        subprocess.run(args, check=True)
+    except subprocess.CalledProcessError as e:
+        failed_packages = ",".join(package.name for package in PACKAGES)
+        failed_targets = " ".join(package.target for package in PACKAGES)
+        die(
+            softwrap(
+                f"""
+                Failed to build packages {failed_packages} for {version} with targets
+                {failed_targets}.
+
+                {e!r}
+                """
+            )
+        )
+
+    for package in PACKAGES:
+        found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
+        # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
+        # top-level `dist` will only have wheels built for the current platform. This
+        # should be safe because it is not possible to build native wheels for another
+        # platform.
+        if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
             die(
                 softwrap(
                     f"""
-                    Failed to build packages {failed_packages} for {version} with targets
-                    {failed_targets}.
-
-                    {e!r}
+                    Found multiple wheels for {package} in the `dist/` folder, but was
+                    expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}.
                     """
                 )
             )
-
-        # TODO(#10718): Allow for sdist releases. We can build an sdist for
-        #  `pantsbuild.pants.testutil`, but need to wire it up to the rest of our release process.
-        for package in PACKAGES:
-            found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
-            # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
-            # top-level `dist` will only have wheels built for the current platform. This
-            # should be safe because it is not possible to build native wheels for another
-            # platform.
-            if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
-                die(
-                    softwrap(
-                        f"""
-                        Found multiple wheels for {package} in the `dist/` folder, but was
-                        expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}.
-                        """
-                    )
-                )
-            for wheel in found_wheels:
-                if not (dest / wheel.name).exists():
-                    # We use `copy2` to preserve metadata.
-                    shutil.copy2(wheel, dest)
+        for wheel in found_wheels:
+            wheel_dest = dest / wheel.name
+            if not wheel_dest.exists():
+                # We use `copy2` to preserve metadata.
+                shutil.copy2(wheel, dest)
+            # Rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/.
+            # We use manylinux2014 images.
+            os.rename(
+                wheel_dest,
+                wheel_dest.with_name(wheel_dest.name.replace("linux_", "manylinux2014_")),
+            )
 
     green(f"Wrote Pants wheels to {dest}.")
 
@@ -647,7 +567,7 @@ def build_pants_wheels() -> None:
 
 def build_3rdparty_wheels() -> None:
     banner(f"Building 3rdparty wheels with Python {CONSTANTS.python_version}")
-    dest = CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version
+    dest = CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_stable_version
     pkg_tgts = [pkg.target for pkg in PACKAGES]
     with create_tmp_venv() as bin_dir:
         deps = (
@@ -728,11 +648,7 @@ def build_fs_util() -> None:
         .strip()
     )
     dest_dir = (
-        Path(CONSTANTS.deploy_dir)
-        / "bin"
-        / "fs_util"
-        / current_os
-        / CONSTANTS.pants_unstable_version
+        Path(CONSTANTS.deploy_dir) / "bin" / "fs_util" / current_os / CONSTANTS.pants_stable_version
     )
     dest_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(
@@ -740,103 +656,6 @@ def build_fs_util() -> None:
         dest_dir,
     )
     green(f"Built fs_util at {dest_dir / 'fs_util'}.")
-
-
-# TODO: We should be using `./pants package` and `pex_binary` for this...If Pants is lacking in
-#  capabilities, we should improve Pants. When porting, using `runtime_package_dependencies` to do
-#  the validation.
-def build_pex(fetch: bool) -> None:
-    stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
-    if fetch:
-        # TODO: Support macos and linux arm64.
-        extra_pex_args = [
-            "--python-shebang",
-            "/usr/bin/env python",
-            *(f"--platform={plat}-cp-39-cp39" for plat in ("linux_x86_64", "macosx_11.0_x86_64")),
-        ]
-        pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
-        banner(f"Building {pex_name} by fetching wheels.")
-    else:
-        # TODO: Support macos and linux arm64. Will require qualifying the pex name with the arch.
-        major, minor = sys.version_info[:2]
-        extra_pex_args = [
-            f"--interpreter-constraint=CPython=={major}.{minor}.*",
-            f"--python={sys.executable}",
-        ]
-        plat = os.uname()[0].lower()
-        py = f"cp{major}{minor}"
-        pex_name = f"pants.{CONSTANTS.pants_unstable_version}.{plat}-{py}.pex"
-        banner(f"Building {pex_name} by building wheels.")
-
-    if CONSTANTS.deploy_dir.exists():
-        shutil.rmtree(CONSTANTS.deploy_dir)
-    CONSTANTS.deploy_dir.mkdir(parents=True)
-
-    if fetch:
-        fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
-        check_pants_wheels_present(CONSTANTS.deploy_dir)
-        if stable:
-            stable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_stable_version
-            reversion_prebuilt_wheels(str(stable_wheel_dir))
-    else:
-        build_pants_wheels()
-        build_3rdparty_wheels()
-
-    # We need to both run Pex and the Pants PEX we build with it with clean environments since we
-    # ourselves may be running via `./pants run ...` which injects confounding environment variables
-    # like PEX_EXTRA_SYS_PATH, PEX_PATH and PEX_ROOT that need not or should not apply to these
-    # sub-processes.
-    env = {k: v for k, v in os.environ.items() if not k.startswith("PEX_")}
-
-    dest = Path("dist") / pex_name
-    with download_pex_bin() as pex_bin:
-        subprocess.run(
-            [
-                sys.executable,
-                str(pex_bin),
-                "-o",
-                str(dest),
-                "--no-build",
-                "--no-pypi",
-                "--disable-cache",
-                "-f",
-                str(CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version),
-                "-f",
-                str(CONSTANTS.deploy_3rdparty_wheel_dir / CONSTANTS.pants_unstable_version),
-                "--no-strip-pex-env",
-                "--console-script=pants",
-                *extra_pex_args,
-                f"pantsbuild.pants=={CONSTANTS.pants_unstable_version}",
-                "--venv",
-            ],
-            env=env,
-            check=True,
-        )
-
-    if stable:
-        stable_dest = CONSTANTS.deploy_dir / "pex" / f"pants.{CONSTANTS.pants_stable_version}.pex"
-        stable_dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.rename(stable_dest)
-        dest = stable_dest
-    green(f"Built {dest}")
-
-
-# -----------------------------------------------------------------------------------------------
-# Fetch and stabilize the versions of wheels for publishing
-# -----------------------------------------------------------------------------------------------
-
-
-def fetch_and_stabilize(dest_dir: str) -> None:
-    # TODO: Because wheels are now built specifically for a particular tag, we could likely remove
-    # "reversioning".
-    banner(f"Fetching and stabilizing wheels to {dest_dir}.")
-    # Fetch and validate prebuilt wheels.
-    if CONSTANTS.deploy_pants_wheel_dir.exists():
-        shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
-    fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=False)
-    check_pants_wheels_present(CONSTANTS.deploy_dir)
-    reversion_prebuilt_wheels(dest_dir)
-    banner("Successfully fetched and stabilized wheels")
 
 
 # -----------------------------------------------------------------------------------------------
@@ -859,11 +678,7 @@ def tag_release() -> None:
 
 def check_clean_git_branch() -> None:
     banner("Checking for a clean Git branch")
-    git_status = (
-        subprocess.run(["git", "status", "--porcelain"], stdout=subprocess.PIPE, check=True)
-        .stdout.decode()
-        .strip()
-    )
+    git_status = git("status", "--porcelain")
     if git_status:
         die(
             softwrap(
@@ -905,43 +720,18 @@ def check_pgp() -> None:
         )
 
 
-def reversion_prebuilt_wheels(dest_dir: str) -> None:
-    # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We use
-    # manylinux2014 images.
-    source_platform = "linux_"
-    dest_platform = "manylinux2014_"
-    unstable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version
-    for whl in unstable_wheel_dir.glob(f"*{source_platform}*.whl"):
-        whl.rename(str(whl).replace(source_platform, dest_platform))
-
-    # Now, reversion to use the STABLE_VERSION.
-    Path(dest_dir).mkdir(parents=True, exist_ok=True)
-    for whl in unstable_wheel_dir.glob("*.whl"):
-        reversion(
-            whl_file=str(whl),
-            dest_dir=dest_dir,
-            target_version=CONSTANTS.pants_stable_version,
-            extra_globs=["pants/_version/VERSION"],
-        )
-
-
 def run_tag_release() -> None:
     tag_name = f"release_{CONSTANTS.pants_stable_version}"
-    subprocess.run(
-        [
-            "git",
-            "tag",
-            "-f",
-            f"--local-user={get_pgp_key_id()}",
-            "-m",
-            f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
-            tag_name,
-        ],
-        check=True,
+    git(
+        "tag",
+        "-f",
+        f"--local-user={get_pgp_key_id()}",
+        "-m",
+        f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
+        tag_name,
+        capture_stdout=False,
     )
-    subprocess.run(
-        ["git", "push", "-f", "git@github.com:pantsbuild/pants.git", tag_name], check=True
-    )
+    git("push", "-f", "git@github.com:pantsbuild/pants.git", tag_name, capture_stdout=False)
 
 
 def upload_wheels_via_twine() -> None:
@@ -1028,106 +818,63 @@ def prompt_to_generate_docs() -> None:
 
 def test_release() -> None:
     banner("Installing and testing the latest released packages")
-    install_and_test_packages(CONSTANTS.pants_stable_version)
-    banner("Successfully installed and tested the latest released packages")
+    smoke_test_install_and_version(CONSTANTS.pants_stable_version)
+    banner("Successfully ran a smoke test of the released packages")
 
 
-def install_and_test_packages(version: str, *, extra_pip_args: list[str] | None = None) -> None:
-    with create_tmp_venv() as bin_dir:
-        for pkg in PACKAGES:
-            pip_req = f"{pkg.name}=={version}"
-            banner(f"Installing and testing {pip_req}")
-            pkg.validate(version, bin_dir, extra_pip_args or [])
-            green(f"Tests succeeded for {pip_req}")
+def smoke_test_install_and_version(version: str) -> None:
+    """Do two tests to confirm that both sets of artifacts (PEXes for running normally, and wheels
+    for plugins) have ended up somewhere plausible, to catch major infra failures."""
+    with temporary_dir() as dir_:
+        dir = Path(dir_)
+        (dir / "pants.toml").write_text(
+            f"""
+            [GLOBAL]
+            pants_version = "{version}"
 
+            backend_packages = [
+                "pants.backend.python",
+                "pants.backend.plugin_development",
+            ]
 
-# -----------------------------------------------------------------------------------------------
-# Release introspection
-# -----------------------------------------------------------------------------------------------
-
-
-class PrebuiltWheel(NamedTuple):
-    path: str
-    url: str
-
-    @classmethod
-    def create(cls, path: str) -> PrebuiltWheel:
-        return cls(path, quote_plus(path))
-
-
-def determine_prebuilt_wheels(*, include_3rdparty: bool) -> list[PrebuiltWheel]:
-    def determine_wheels(wheel_path: str) -> list[PrebuiltWheel]:
-        response = requests.get(f"{CONSTANTS.binary_base_url}/?prefix={wheel_path}")
-        xml_root = ElementTree.fromstring(response.text)
-        return [
-            PrebuiltWheel.create(key.text)  # type: ignore[arg-type]
-            for key in xml_root.findall(
-                path="s3:Contents/s3:Key",
-                namespaces={"s3": "http://s3.amazonaws.com/doc/2006-03-01/"},
-            )
-        ]
-
-    res = determine_wheels(CONSTANTS.deploy_pants_wheels_path)
-    if include_3rdparty:
-        res.extend(determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path))
-    return res
-
-
-def list_prebuilt_wheels() -> None:
-    print(
-        "\n".join(
-            f"{CONSTANTS.binary_base_url}/{wheel.url}"
-            for wheel in determine_prebuilt_wheels(include_3rdparty=True)
+            [python]
+            interpreter_constraints = ["==3.9.*"]
+            enable_resolves = true
+            """
         )
-    )
 
-
-# -----------------------------------------------------------------------------------------------
-# Fetch and check prebuilt wheels
-# -----------------------------------------------------------------------------------------------
-
-
-def fetch_prebuilt_wheels(destination_dir: str | Path, *, include_3rdparty: bool) -> None:
-    banner(f"Fetching pre-built wheels for {CONSTANTS.pants_unstable_version}")
-    print(f"Saving to {destination_dir}.\n", file=sys.stderr)
-    session = requests.Session()
-    session.mount(CONSTANTS.binary_base_url, requests.adapters.HTTPAdapter(max_retries=4))
-    for wheel in determine_prebuilt_wheels(include_3rdparty=include_3rdparty):
-        full_url = f"{CONSTANTS.binary_base_url}/{wheel.url}"
-        print(f"Fetching {full_url}", file=sys.stderr)
-        response = session.get(full_url)
-        response.raise_for_status()
-        print(file=sys.stderr)
-
-        dest = Path(destination_dir, wheel.path)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(response.content)
-
-
-def check_pants_wheels_present(check_dir: str | Path) -> None:
-    banner(f"Checking prebuilt wheels for {CONSTANTS.pants_unstable_version}")
-    missing_packages = []
-    for package in PACKAGES:
-        local_files = package.find_locally(
-            version=CONSTANTS.pants_unstable_version, search_dir=check_dir
+        # First: test that running pants normally reports the expected version:
+        result = subprocess.run(
+            ["pants", "version"],
+            cwd=dir,
+            check=True,
+            stdout=subprocess.PIPE,
         )
-        if not local_files:
-            missing_packages.append(package.name)
-            continue
-        if is_cross_platform(local_files) and len(local_files) != 4:
-            formatted_local_files = "\n    ".join(sorted(f.name for f in local_files))
-            missing_packages.append(
-                softwrap(
-                    f"""
-                    {package.name}. Expected 4 wheels (linux/mac X x86_64/arm64),
-                    but found {len(local_files)}:\n    {formatted_local_files}
-                    """
-                )
-            )
-    if missing_packages:
-        formatted_missing = "\n  ".join(missing_packages)
-        die(f"Failed to find prebuilt wheels:\n  {formatted_missing}")
-    green(f"All {len(PACKAGES)} pantsbuild.pants packages were fetched and are valid.")
+        printed_version = result.stdout.decode().strip()
+        if printed_version != version:
+            die(f"Failed to confirm pants version, expected {version!r}, got {printed_version!r}")
+
+        # Second: test that the wheels can be installed/imported (for plugins):
+        (dir / "BUILD").write_text("python_sources(name='py'); pants_requirements(name='pants')")
+        # We confirm the version from the main wheel, but only check that the testutil code can
+        # be imported at all.
+        (dir / "example.py").write_text(
+            "from pants import version, testutil; print(version.VERSION)"
+        )
+        result = subprocess.run(
+            ["pants", "generate-lockfiles"],
+            cwd=dir,
+            check=True,
+        )
+        result = subprocess.run(
+            ["pants", "run", "example.py"],
+            cwd=dir,
+            check=True,
+            stdout=subprocess.PIPE,
+        )
+        wheel_version = result.stdout.decode().strip()
+        if printed_version != version:
+            die(f"Failed to confirm wheel version, expected {version!r}, got {wheel_version!r}")
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1149,11 +896,6 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("test-release")
     subparsers.add_parser("build-wheels")
     subparsers.add_parser("build-fs-util")
-    subparsers.add_parser("build-local-pex")
-    subparsers.add_parser("build-universal-pex")
-    subparsers.add_parser("validate-freshness")
-    subparsers.add_parser("list-prebuilt-wheels")
-    subparsers.add_parser("check-pants-wheels")
     return parser
 
 
@@ -1161,26 +903,12 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "tag-release":
         tag_release()
-    if args.command == "fetch-and-stabilize":
-        fetch_and_stabilize(args.dest)
     if args.command == "test-release":
         test_release()
     if args.command == "build-wheels":
         build_all_wheels()
     if args.command == "build-fs-util":
         build_fs_util()
-    if args.command == "build-local-pex":
-        build_pex(fetch=False)
-    if args.command == "build-universal-pex":
-        build_pex(fetch=True)
-    if args.command == "validate-freshness":
-        prompt_artifact_freshness()
-    if args.command == "list-prebuilt-wheels":
-        list_prebuilt_wheels()
-    if args.command == "check-pants-wheels":
-        with temporary_dir() as tempdir:
-            fetch_prebuilt_wheels(tempdir, include_3rdparty=False)
-            check_pants_wheels_present(tempdir)
 
 
 if __name__ == "__main__":

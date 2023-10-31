@@ -3,6 +3,7 @@ colors = true
 
 [test]
 report = true
+attempts_default = 3
 
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]

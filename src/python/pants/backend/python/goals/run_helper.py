@@ -129,7 +129,6 @@ async def _create_python_source_run_request(
             **complete_pex_environment.append_only_caches,
             **append_only_caches,
         },
-        immutable_input_digests=complete_pex_environment.immutable_input_digests,
     )
 
 

@@ -10,6 +10,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.base.specs import DirGlobSpec, DirLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -25,6 +26,7 @@ from pants.core.goals.tailor import (
     default_sources_for_target_type,
     has_source_or_sources_field,
     make_content_str,
+    resolve_specs_with_build,
 )
 from pants.core.util_rules import source_files
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
@@ -586,3 +588,44 @@ def test_filter_by_ignores() -> None:
         ),
     )
     assert set(result) == set(valid_ptgts)
+
+
+@pytest.mark.parametrize("build_file_name", ["BUILD", "OTHER_NAME"])
+def test_resolve_specs_targetting_build_files(build_file_name) -> None:
+    specs = Specs(
+        includes=RawSpecs(
+            description_of_origin="CLI arguments",
+            dir_literals=(DirLiteralSpec(f"src/{build_file_name}"), DirLiteralSpec("src/dir")),
+            dir_globs=(DirGlobSpec("src/other/"),),
+            file_literals=(FileLiteralSpec(f"src/exists/{build_file_name}.suffix"),),
+        ),
+        ignores=RawSpecs(
+            description_of_origin="CLI arguments",
+            dir_literals=(DirLiteralSpec(f"bad/{build_file_name}"), DirLiteralSpec("bad/dir")),
+            dir_globs=(DirGlobSpec("bad/other/"),),
+            file_literals=(FileLiteralSpec(f"bad/exists/{build_file_name}.suffix"),),
+        ),
+    )
+    build_file_patterns = (build_file_name, f"{build_file_name}.*")
+    resolved = resolve_specs_with_build(specs, build_file_patterns)
+
+    assert resolved.includes.file_literals == tuple()
+    assert resolved.ignores.file_literals == tuple()
+
+    assert resolved.includes.dir_literals == (
+        DirLiteralSpec("src/exists"),
+        DirLiteralSpec("src"),
+        DirLiteralSpec("src/dir"),
+    )
+    assert resolved.ignores.dir_literals == (
+        DirLiteralSpec("bad/exists"),
+        DirLiteralSpec("bad"),
+        DirLiteralSpec("bad/dir"),
+    )
+
+    assert resolved.includes.dir_globs == (
+        DirGlobSpec("src/other/"),
+    ), "did not passthrough other spec type"
+    assert resolved.ignores.dir_globs == (
+        DirGlobSpec("bad/other/"),
+    ), "did not passthrough other spec type"

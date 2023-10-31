@@ -210,24 +210,24 @@ class AssetSourceField(SingleSourceField):
         If a string is provided, represents a path that is relative to the BUILD file's directory,
         e.g. `source='example.ext'`.
 
-        If an http_source is provided, represents the network location to download the source from.
+        If an `http_source` is provided, represents the network location to download the source from.
         The downloaded file will exist in the sandbox in the same directory as the target.
 
         `http_source` has the following signature:
 
             http_source(url: str, *, len: int, sha256: str, filename: str = "")
 
-        The filename defaults to the last part of the URL path (E.g. `example.ext`), but can also be
+        The filename defaults to the last part of the URL path (e.g. `example.ext`), but can also be
         specified if you wish to have control over the file name. You cannot, however, specify a
         path separator to download the file into a subdirectory (you must declare a target in desired
         subdirectory).
 
         You can easily get the len and checksum with the following command:
 
-            `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+            curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null
 
         If a `per_platform` is provided, represents a mapping from platform to `http_source`, where
-        the platform is one of (linux_arm64, linux_x86_64, macos_arm64, macos_x86_64) and is
+        the platform is one of (`linux_arm64`, `linux_x86_64`, `macos_arm64`, `macos_x86_64`) and is
         resolved in the execution target. Each `http_source` value MUST have the same filename provided.
         """
     )

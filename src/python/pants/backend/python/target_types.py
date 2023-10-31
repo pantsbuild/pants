@@ -25,7 +25,6 @@ from typing import (
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
@@ -55,7 +54,6 @@ from pants.engine.target import (
     OptionalSingleSourceField,
     OverridesField,
     ScalarField,
-    SecondaryOwnerMixin,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -71,9 +69,9 @@ from pants.engine.target import (
 )
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
-from pants.source.filespec import Filespec
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.frozendict import FrozenDict
+from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
@@ -167,6 +165,9 @@ class PythonRunGoalUseSandboxField(TriBoolField):
         If false, runs of this target with the `run` goal will use the in-repo sources
         directly.
 
+        Note that this field only applies when running a target with the `run` goal. No other goals
+        (such as `test`, if applicable) consult this field.
+
         The former mode is more hermetic, and is closer to building and running the source as it
         were packaged in a `pex_binary`. Additionally, it may be necessary if your sources depend
         transitively on "generated" files which will be materialized in the sandbox in a source
@@ -174,7 +175,7 @@ class PythonRunGoalUseSandboxField(TriBoolField):
 
         The latter mode is similar to creating, activating, and using a virtual environment when
         running your files. It may also be necessary if the source being run writes files into the
-        repo and computes their location relative to the executed files. Django's makemigrations
+        repo and computes their location relative to the executed files. Django's `makemigrations`
         command is an example of such a process.
         """
     )
@@ -295,20 +296,18 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
+class EntryPointField(AsyncFieldMixin, Field):
     alias = "entry_point"
     default = None
     help = help_text(
         """
         Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a module.
 
-        You can specify a full module like 'path.to.module' and 'path.to.module:func', or use a
+        You can specify a full module like `'path.to.module'` and `'path.to.module:func'`, or use a
         shorthand to specify a file name, using the same syntax as the `sources` field:
 
-          1) 'app.py', Pants will convert into the module `path.to.app`;
-          2) 'app.py:func', Pants will convert into `path.to.app:func`.
-
-        You must use the file name shorthand for file arguments to work with this target.
+          1) `'app.py'`, Pants will convert into the module `path.to.app`;
+          2) `'app.py:func'`, Pants will convert into `path.to.app:func`.
 
         You may either set this field or the `script` field, but not both. Leave off both fields
         to have no entry point.
@@ -327,13 +326,6 @@ class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
             return EntryPoint.parse(value, provenance=f"for {address}")
         except ValueError as e:
             raise InvalidFieldException(str(e))
-
-    @property
-    def filespec(self) -> Filespec:
-        if self.value is None or not self.value.module.endswith(".py"):
-            return {"includes": []}
-        full_glob = os.path.join(self.address.spec_path, self.value.module)
-        return {"includes": [full_glob]}
 
 
 class PexEntryPointField(EntryPointField):
@@ -401,6 +393,14 @@ class PexEnvField(DictStringToStringField):
 
 class PexPlatformsField(StringSequenceField):
     alias = "platforms"
+    removal_version = "2.22.0.dev0"
+    removal_hint = softwrap(
+        """\
+    The platforms field is a hack. The abbreviated information it provides is sometimes insufficient,
+    leading to hard-to-debug build issues. Use complete_platforms instead.
+    See {doc_url('pex')} for details.
+    """
+    )
     help = help_text(
         """
         The abbreviated platforms the built PEX should be compatible with.
@@ -435,7 +435,7 @@ class PexPlatformsField(StringSequenceField):
 class PexCompletePlatformsField(SpecialCasedDependencies):
     alias = "complete_platforms"
     help = help_text(
-        """
+        f"""
         The platforms the built PEX should be compatible with.
 
         There must be built wheels available for all of the foreign platforms, rather than sdists.
@@ -446,6 +446,8 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         Complete platforms should be addresses of `file` targets that point to files that contain
         complete platform JSON as described by Pex
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
+
+        See {doc_url('pex')} for details.
         """
     )
 
@@ -491,7 +493,7 @@ class PexStripEnvField(BoolField):
 class PexIgnoreErrorsField(BoolField):
     alias = "ignore_errors"
     default = False
-    help = "Should PEX ignore when it cannot resolve dependencies?"
+    help = "Should PEX ignore errors when it cannot resolve dependencies?"
 
 
 class PexShebangField(StringField):
@@ -707,7 +709,7 @@ class PexBinary(Target):
         A Python target that can be converted into an executable PEX file.
 
         PEX files are self-contained executable files that contain a complete Python environment
-        capable of running the target. For more information, see {doc_url('pex-files')}.
+        capable of running the target. For more information, see {doc_url('pex')}.
         """
     )
 
@@ -752,13 +754,11 @@ class PexBinariesOverrideField(OverridesField):
 
         For example:
 
-            ```
             overrides={{
               "foo.py": {{"execution_mode": "venv"]}},
               "bar.py:main": {{"restartable": True]}},
               ("foo.py", "bar.py:main"): {{"tags": ["legacy"]}},
             }}
-            ```
 
         Every key is validated to belong to this target's `entry_points` field.
 
@@ -766,8 +766,8 @@ class PexBinariesOverrideField(OverridesField):
         generated by this target, change the field directly on this target rather than using the
         `overrides` field.
 
-        You can specify the same entry_point in multiple keys, so long as you don't override the
-        same field more than one time for the entry_point.
+        You can specify the same `entry_point` in multiple keys, so long as you don't override the
+        same field more than one time for the `entry_point`.
         """
     )
 
@@ -1270,6 +1270,14 @@ class PythonRequirementResolveField(PythonResolveField):
     )
 
 
+class PythonRequirementFindLinksField(StringSequenceField):
+    # NB: This is solely used for `pants_requirements` target generation
+    alias = "_find_links"
+    required = False
+    default = ()
+    help = "<Internal>"
+
+
 class PythonRequirementEntryPointField(EntryPointField):
     # Specialist subclass for matching `PythonRequirementTarget` when running.
     pass
@@ -1285,6 +1293,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,
         PythonRequirementEntryPointField,
+        PythonRequirementFindLinksField,
     )
     help = help_text(
         f"""
@@ -1315,20 +1324,6 @@ class PythonRequirementTarget(Target):
                     """
                 )
             )
-
-
-def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequirement]:
-    """Parse all `PipRequirement` objects from a requirements.txt-style file.
-
-    This will safely ignore any options starting with `--` and will ignore comments. Any pip-style
-    VCS requirements will fail, with a helpful error message describing how to use PEP 440.
-    """
-    for i, line in enumerate(content.splitlines(), start=1):
-        line, _, _ = line.partition("--")
-        line = line.strip().rstrip("\\")
-        if not line or line.startswith(("#", "-")):
-            continue
-        yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i}")
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1373,20 +1368,20 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
 
         Specify as a nested dictionary, with a dictionary for each type of entry point,
         e.g. `console_scripts` vs. `gui_scripts`. Each dictionary maps the entry point name to
-        either a setuptools entry point ("path.to.module:func") or a Pants target address to a
-        pex_binary target.
+        either a setuptools entry point (`"path.to.module:func"`) or a Pants target address to a
+        `pex_binary` target.
 
-            Example:
+        Example:
 
-                entry_points={{
-                  "console_scripts": {{
-                    "my-script": "project.app:main",
-                    "another-script": "project/subdir:pex_binary_tgt"
-                  }}
-                }}
+            entry_points={{
+              "console_scripts": {{
+                "my-script": "project.app:main",
+                "another-script": "project/subdir:pex_binary_tgt"
+              }}
+            }}
 
         Note that Pants will assume that any value that either starts with `:` or has `/` in it,
-        is a target address to a pex_binary target. Otherwise, it will assume it's a setuptools
+        is a target address to a `pex_binary` target. Otherwise, it will assume it's a setuptools
         entry point as defined by
         https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use
         `//` as a prefix for target addresses if you need to disambiguate.
@@ -1545,7 +1540,7 @@ class GenerateSetupField(TriBoolField):
         """
         Whether to generate setup information for this distribution, based on analyzing
         sources and dependencies. Set to False to use existing setup information, such as
-        existing setup.py, setup.cfg, pyproject.toml files or similar.
+        existing `setup.py`, `setup.cfg`, `pyproject.toml` files or similar.
         """
     )
 
@@ -1556,7 +1551,7 @@ class LongDescriptionPathField(StringField):
 
     help = help_text(
         """
-        Path to a file that will be used to fill the long_description field in setup.py.
+        Path to a file that will be used to fill the `long_description` field in `setup.py`.
 
         Path is relative to the build root.
 
@@ -1650,7 +1645,7 @@ class VersionTemplateField(StringField):
         """
         Generate the version data using this format string, which takes a version format kwarg.
 
-        E.g., 'version = "{version}"'
+        E.g., `'version = "{version}"'`
         """
     )
 

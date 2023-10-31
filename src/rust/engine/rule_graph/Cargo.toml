@@ -6,17 +6,14 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features = [
-  "internment",
-  "smallvec",
-] }
-fnv = "1.0.5"
-indexmap = "1.9"
-internment = "0.6"
-log = "0.4"
-petgraph = "0.6"
+deepsize = { workspace = true, features = ["internment", "smallvec"] }
+fnv = { workspace = true }
+indexmap = { workspace = true }
+internment = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+petgraph = { workspace = true }
 smallvec = { version = "1", features = ["union"] }
 
 [dev-dependencies]
-env_logger = "0.10.0"
+env_logger = { workspace = true }

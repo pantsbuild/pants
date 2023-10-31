@@ -8,13 +8,6 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.javascript import package_json
-from pants.backend.javascript.dependency_inference.import_parser.rules import (
-    JSImportStrings,
-    ParseJsImportStrings,
-)
-from pants.backend.javascript.dependency_inference.import_parser.rules import (
-    rules as import_parser_rules,
-)
 from pants.backend.javascript.package_json import (
     FirstPartyNodePackageTargets,
     NodePackageDependenciesField,
@@ -30,9 +23,18 @@ from pants.backend.javascript.target_types import JSDependenciesField, JSSourceF
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.native_dep_inference import NativeParsedJavascriptDependencies
+from pants.engine.internals.native_engine import InferenceMetadata, NativeDependenciesRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
-from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies, Targets
+from pants.engine.target import (
+    FieldSet,
+    HydratedSources,
+    HydrateSourcesRequest,
+    InferDependenciesRequest,
+    InferredDependencies,
+    Targets,
+)
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -99,20 +101,21 @@ async def map_candidate_node_packages(
     )
 
 
-async def _replace_subpath_imports(
-    req: InferJSDependenciesRequest, import_strings: JSImportStrings
-) -> JSImportStrings:
-    owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(req.field_set.address))
-    if owning_pkg.target:
-        subpath_imports = await Get(
-            PackageJsonImports, PackageJsonSourceField, owning_pkg.target[PackageJsonSourceField]
-        )
-        return JSImportStrings(
-            replace_string
-            for string in import_strings
-            for replace_string in subpath_imports.replacements(string) or (string,)
-        )
-    return import_strings
+@rule
+async def prepare_inference_metadata(imports: PackageJsonImports) -> InferenceMetadata:
+    return InferenceMetadata.javascript(
+        imports.root_dir,
+        {pattern: list(replacements) for pattern, replacements in imports.imports.items()},
+    )
+
+
+async def _prepare_inference_metadata(address: Address) -> InferenceMetadata:
+    owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(address))
+    if not owning_pkg.target:
+        return InferenceMetadata.javascript(address.spec_path, {})
+    return await Get(
+        InferenceMetadata, PackageJsonSourceField, owning_pkg.target[PackageJsonSourceField]
+    )
 
 
 @rule
@@ -124,21 +127,22 @@ async def infer_js_source_dependencies(
     if not nodejs_infer.imports:
         return InferredDependencies(())
 
-    import_strings = await Get(JSImportStrings, ParseJsImportStrings(source))
-    import_strings = await _replace_subpath_imports(request, import_strings)
+    sources = await Get(
+        HydratedSources, HydrateSourcesRequest(source, for_sources_types=[JSSourceField])
+    )
+    metadata = await _prepare_inference_metadata(request.field_set.address)
 
-    path_strings = FrozenOrderedSet(
-        os.path.normpath(os.path.join(os.path.dirname(source.file_path), import_string))
-        for import_string in import_strings
-        if import_string.startswith((os.path.curdir, os.path.pardir))
+    import_strings = await Get(
+        NativeParsedJavascriptDependencies,
+        NativeDependenciesRequest(sources.snapshot.digest, metadata),
     )
 
-    owners = await Get(Owners, OwnersRequest(tuple(path_strings)))
+    owners = await Get(Owners, OwnersRequest(tuple(import_strings.file_imports)))
     owning_targets = await Get(Targets, Addresses(owners))
 
     non_path_string_bases = FrozenOrderedSet(
         non_path_string.partition(os.path.sep)[0]
-        for non_path_string in import_strings - path_strings
+        for non_path_string in import_strings.package_imports
     )
 
     candidate_pkgs = await Get(
@@ -161,7 +165,6 @@ def rules() -> Iterable[Rule | UnionRule]:
     return [
         *collect_rules(),
         *package_json.rules(),
-        *import_parser_rules(),
         UnionRule(InferDependenciesRequest, InferNodePackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferJSDependenciesRequest),
     ]

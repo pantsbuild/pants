@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePath
@@ -38,7 +37,7 @@ class AsdfPathString(str, Enum):
                 """
             )
         if self is self.LOCAL:
-            return f"the ASDF {tool} with the version in BUILD_ROOT/.tool-versions"
+            return f"the ASDF {tool} with the version in `BUILD_ROOT/.tool-versions`"
         raise NotImplementedError(f"{self} has no description.")
 
 
@@ -134,7 +133,7 @@ async def _resolve_asdf_tool_paths(
         return ()
 
     asdf_paths: list[str] = []
-    asdf_versions: OrderedDict[str, str] = OrderedDict()
+    asdf_versions: dict[str, str] = {}
     tool_versions_file = None
 
     # Support "shell" based ASDF configuration

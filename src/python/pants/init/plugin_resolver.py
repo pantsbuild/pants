@@ -7,7 +7,7 @@ import logging
 import site
 import sys
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import Iterable, Optional, cast
 
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
@@ -40,6 +40,8 @@ class PluginsRequest:
     # Requirement constraints to resolve with. If plugins will be loaded into the global working_set
     # (i.e., onto the `sys.path`), then these should be the current contents of the working_set.
     constraints: tuple[Requirement, ...]
+    # Backend requirements to resolve
+    requirements: tuple[str, ...]
 
 
 class ResolvedPluginDistributions(DeduplicatedCollection[str]):
@@ -56,7 +58,8 @@ async def resolve_plugins(
     `named_caches` directory), but consequently needs to disable the process cache: see the
     ProcessCacheScope reference in the body.
     """
-    req_strings = sorted(global_options.plugins)
+    req_strings = sorted(global_options.plugins + request.requirements)
+
     requirements = PexRequirements(
         req_strings_or_addrs=req_strings,
         constraints_strings=(str(constraint) for constraint in request.constraints),
@@ -120,19 +123,22 @@ class PluginResolver:
     ) -> None:
         self._scheduler = scheduler
         self._working_set = working_set or global_working_set
-        self._request = PluginsRequest(
-            interpreter_constraints, tuple(dist.as_requirement() for dist in self._working_set)
-        )
+        self._interpreter_constraints = interpreter_constraints
 
     def resolve(
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironmentVars,
+        requirements: Iterable[str] = (),
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
-        for resolved_plugin_location in self._resolve_plugins(
-            options_bootstrapper, env, self._request
-        ):
+        request = PluginsRequest(
+            self._interpreter_constraints,
+            tuple(dist.as_requirement() for dist in self._working_set),
+            tuple(requirements),
+        )
+
+        for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env, request):
             site.addsitedir(
                 resolved_plugin_location
             )  # Activate any .pth files plugin wheels may have.

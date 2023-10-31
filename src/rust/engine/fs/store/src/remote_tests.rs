@@ -1,366 +1,420 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
 use grpc_util::tls;
-use hashing::Digest;
-use mock::StubCAS;
-use testutil::data::{TestData, TestDirectory};
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
+use hashing::{Digest, Fingerprint};
+use parking_lot::Mutex;
+use remote_provider::{ByteStoreProvider, LoadDestination, RemoteOptions};
+use tempfile::TempDir;
+use testutil::data::TestData;
+use testutil::file::mk_tempfile;
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use workunit_store::WorkunitStore;
 
 use crate::remote::ByteStore;
-use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
+use crate::tests::new_cas;
 use crate::MEGABYTES;
 
 #[tokio::test]
-async fn loads_file() {
-  let testdata = TestData::roland();
-  let cas = new_cas(10);
+async fn smoke_test_from_options_reapi_provider() {
+    // This runs through the various methods using the 'real' REAPI provider (talking to a stubbed
+    // CAS), as a double-check that the test provider is plausible and test provider selection works.
+    let roland = TestData::roland();
+    let empty = TestData::empty();
 
-  assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest())
-      .await
-      .unwrap(),
-    Some(testdata.bytes())
-  );
-}
+    let cas = new_cas(10);
 
-#[tokio::test]
-async fn loads_huge_file_via_temp_file() {
-  // 5MB of data
-  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
-
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::builder()
-    .chunk_size_bytes(MEGABYTES)
-    .file(&testdata)
-    .build();
-
-  let file = tokio::task::spawn_blocking(tempfile::tempfile)
+    let store = ByteStore::from_options(RemoteOptions {
+        cas_address: cas.address(),
+        instance_name: None,
+        tls_config: tls::Config::default(),
+        headers: BTreeMap::new(),
+        chunk_size_bytes: 10 * MEGABYTES,
+        rpc_timeout: Duration::from_secs(5),
+        rpc_retries: 1,
+        rpc_concurrency_limit: 256,
+        capabilities_cell_opt: None,
+        batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    })
     .await
-    .unwrap()
     .unwrap();
-  let file = tokio::fs::File::from_std(file);
 
-  let mut file = new_byte_store(&cas)
-    .load_file(testdata.digest(), file)
-    .await
-    .unwrap()
-    .unwrap();
-  file.rewind().await.unwrap();
+    let mut missing_set = HashSet::new();
+    missing_set.insert(empty.digest());
 
-  let mut buf = String::new();
-  file.read_to_string(&mut buf).await.unwrap();
-  assert_eq!(buf.len(), testdata.len());
-  // (assert_eq! means failures unhelpfully print a 5MB string)
-  assert!(buf == testdata.string());
-}
-
-#[tokio::test]
-async fn missing_file() {
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::empty();
-
-  assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), TestData::roland().digest()).await,
-    Ok(None)
-  );
-}
-
-#[tokio::test]
-async fn load_directory() {
-  let cas = new_cas(10);
-  let testdir = TestDirectory::containing_roland();
-
-  assert_eq!(
-    load_directory_proto_bytes(&new_byte_store(&cas), testdir.digest()).await,
-    Ok(Some(testdir.bytes()))
-  );
-}
-
-#[tokio::test]
-async fn missing_directory() {
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::empty();
-
-  assert_eq!(
-    load_directory_proto_bytes(
-      &new_byte_store(&cas),
-      TestDirectory::containing_roland().digest()
-    )
-    .await,
-    Ok(None)
-  );
-}
-
-#[tokio::test]
-async fn load_file_grpc_error() {
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::cas_always_errors();
-
-  let error = load_file_bytes(&new_byte_store(&cas), TestData::roland().digest())
-    .await
-    .expect_err("Want error");
-  assert!(
-    error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {error}"
-  )
-}
-
-#[tokio::test]
-async fn load_directory_grpc_error() {
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::cas_always_errors();
-
-  let error = load_directory_proto_bytes(
-    &new_byte_store(&cas),
-    TestDirectory::containing_roland().digest(),
-  )
-  .await
-  .expect_err("Want error");
-  assert!(
-    error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {error}"
-  )
-}
-
-#[tokio::test]
-async fn fetch_less_than_one_chunk() {
-  let testdata = TestData::roland();
-  let cas = new_cas(testdata.bytes().len() + 1);
-
-  assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()).await,
-    Ok(Some(testdata.bytes()))
-  )
-}
-
-#[tokio::test]
-async fn fetch_exactly_one_chunk() {
-  let testdata = TestData::roland();
-  let cas = new_cas(testdata.bytes().len());
-
-  assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()).await,
-    Ok(Some(testdata.bytes()))
-  )
-}
-
-#[tokio::test]
-async fn fetch_multiple_chunks_exact() {
-  let testdata = TestData::roland();
-  let cas = new_cas(1);
-
-  assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()).await,
-    Ok(Some(testdata.bytes()))
-  )
-}
-
-#[tokio::test]
-async fn fetch_multiple_chunks_nonfactor() {
-  let testdata = TestData::roland();
-  let cas = new_cas(9);
-
-  assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()).await,
-    Ok(Some(testdata.bytes()))
-  )
-}
-
-#[tokio::test]
-async fn write_file_one_chunk() {
-  let _ = WorkunitStore::setup_for_tests();
-  let testdata = TestData::roland();
-  let cas = StubCAS::empty();
-
-  let store = new_byte_store(&cas);
-  assert_eq!(store.store_bytes(testdata.bytes()).await, Ok(()));
-
-  let blobs = cas.blobs.lock();
-  assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
-}
-
-#[tokio::test]
-async fn write_file_multiple_chunks() {
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::empty();
-
-  let store = ByteStore::new(
-    &cas.address(),
-    None,
-    tls::Config::default(),
-    BTreeMap::new(),
-    10 * 1024,
-    Duration::from_secs(5),
-    1,
-    256,
-    None,
-    0, // disable batch API, force streaming API
-  )
-  .unwrap();
-
-  let all_the_henries = big_file_bytes();
-
-  let fingerprint = big_file_fingerprint();
-
-  assert_eq!(store.store_bytes(all_the_henries.clone()).await, Ok(()));
-
-  let blobs = cas.blobs.lock();
-  assert_eq!(blobs.get(&fingerprint), Some(&all_the_henries));
-
-  let write_message_sizes = cas.write_message_sizes.lock();
-  assert_eq!(
-    write_message_sizes.len(),
-    98,
-    "Wrong number of chunks uploaded"
-  );
-  for size in write_message_sizes.iter() {
-    assert!(
-      size <= &(10 * 1024),
-      "Size {} should have been <= {}",
-      size,
-      10 * 1024
+    // Only roland is in the CAS:
+    assert_eq!(
+        store.load_bytes(roland.digest()).await,
+        Ok(Some(roland.bytes()))
     );
-  }
+    assert_eq!(store.load_bytes(empty.digest()).await, Ok(None));
+    assert_eq!(
+        store
+            .list_missing_digests(vec![roland.digest(), empty.digest()])
+            .await,
+        Ok(missing_set)
+    );
+
+    // Insert empty:
+    assert_eq!(store.store_bytes(empty.bytes()).await, Ok(()));
+    assert_eq!(
+        store.load_bytes(empty.digest()).await,
+        Ok(Some(empty.bytes()))
+    );
 }
 
 #[tokio::test]
-async fn write_empty_file() {
-  let _ = WorkunitStore::setup_for_tests();
-  let empty_file = TestData::empty();
-  let cas = StubCAS::empty();
+async fn smoke_test_from_options_file_provider() {
+    // This runs through the various methods using the file:// provider, as a double-check that the
+    // test provider is plausible and test provider selection works.
+    let roland = TestData::roland();
+    let catnip = TestData::catnip();
 
-  let store = new_byte_store(&cas);
-  assert_eq!(store.store_bytes(empty_file.bytes()).await, Ok(()));
+    let _ = WorkunitStore::setup_for_tests();
+    let dir = TempDir::new().unwrap();
 
-  let blobs = cas.blobs.lock();
-  assert_eq!(
-    blobs.get(&empty_file.fingerprint()),
-    Some(&empty_file.bytes())
-  );
-}
-
-#[tokio::test]
-async fn write_file_errors() {
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::cas_always_errors();
-
-  let store = new_byte_store(&cas);
-  let error = store
-    .store_bytes(TestData::roland().bytes())
+    let store = ByteStore::from_options(RemoteOptions {
+        cas_address: format!("file://{}", dir.path().display()),
+        instance_name: None,
+        tls_config: tls::Config::default(),
+        headers: BTreeMap::new(),
+        chunk_size_bytes: 10 * MEGABYTES,
+        rpc_timeout: Duration::from_secs(5),
+        rpc_retries: 1,
+        rpc_concurrency_limit: 256,
+        capabilities_cell_opt: None,
+        batch_api_size_limit: crate::tests::STORE_BATCH_API_SIZE_LIMIT,
+    })
     .await
-    .expect_err("Want error");
-  assert!(
-    error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {error}"
-  );
+    .unwrap();
+
+    let mut missing_set = HashSet::new();
+    missing_set.insert(catnip.digest());
+
+    // Insert roland:
+    assert_eq!(store.store_bytes(roland.bytes()).await, Ok(()));
+    assert_eq!(
+        store.load_bytes(roland.digest()).await,
+        Ok(Some(roland.bytes()))
+    );
+    // Only roland is stored:
+    assert_eq!(store.load_bytes(catnip.digest()).await, Ok(None));
+    assert_eq!(
+        store
+            .list_missing_digests(vec![roland.digest(), catnip.digest()])
+            .await,
+        Ok(missing_set)
+    );
+
+    // Insert catnip:
+    assert_eq!(store.store_bytes(catnip.bytes()).await, Ok(()));
+    assert_eq!(
+        store.load_bytes(catnip.digest()).await,
+        Ok(Some(catnip.bytes()))
+    );
 }
 
 #[tokio::test]
-async fn write_connection_error() {
-  let _ = WorkunitStore::setup_for_tests();
-  let store = ByteStore::new(
-    "http://doesnotexist.example",
-    None,
-    tls::Config::default(),
-    BTreeMap::new(),
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    1,
-    256,
-    None,
-    super::tests::STORE_BATCH_API_SIZE_LIMIT,
-  )
-  .unwrap();
-  let error = store
-    .store_bytes(TestData::roland().bytes())
-    .await
-    .expect_err("Want error");
-  assert!(
-    error.contains("Unavailable: \"error trying to connect: dns error"),
-    "Bad error message, got: {error}"
-  );
+async fn load_bytes_existing() {
+    let _ = WorkunitStore::setup_for_tests();
+    let testdata = TestData::roland();
+    let store = new_byte_store(&testdata);
+
+    assert_eq!(
+        store.load_bytes(testdata.digest()).await,
+        Ok(Some(testdata.bytes()))
+    );
+}
+
+#[tokio::test]
+async fn load_bytes_missing() {
+    let _ = WorkunitStore::setup_for_tests();
+    let (store, _) = empty_byte_store();
+
+    assert_eq!(
+        store.load_bytes(TestData::roland().digest()).await,
+        Ok(None)
+    );
+}
+
+#[tokio::test]
+async fn load_bytes_provider_error() {
+    let _ = WorkunitStore::setup_for_tests();
+    let store = byte_store_always_error_provider();
+
+    assert_error(store.load_bytes(TestData::roland().digest()).await);
+}
+
+#[tokio::test]
+async fn load_file_existing() {
+    // 5MB of data
+    let testdata = TestData::new(&"12345".repeat(MEGABYTES));
+
+    let _ = WorkunitStore::setup_for_tests();
+    let store = new_byte_store(&testdata);
+
+    let file = mk_tempfile(None).await;
+
+    let file = store
+        .load_file(testdata.digest(), file)
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_file_contents(file, &testdata.string()).await;
+}
+
+#[tokio::test]
+async fn load_file_missing() {
+    let _ = WorkunitStore::setup_for_tests();
+    let (store, _) = empty_byte_store();
+
+    let file = mk_tempfile(None).await;
+
+    let result = store.load_file(TestData::roland().digest(), file).await;
+    assert!(result.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn load_file_provider_error() {
+    let _ = WorkunitStore::setup_for_tests();
+    let store = byte_store_always_error_provider();
+
+    let file = mk_tempfile(None).await;
+
+    assert_error(store.load_file(TestData::roland().digest(), file).await);
+}
+
+#[tokio::test]
+async fn store_bytes() {
+    let _ = WorkunitStore::setup_for_tests();
+    let testdata = TestData::roland();
+
+    let (store, provider) = empty_byte_store();
+    assert_eq!(store.store_bytes(testdata.bytes()).await, Ok(()));
+
+    let blobs = provider.blobs.lock();
+    assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
+}
+
+#[tokio::test]
+async fn store_bytes_provider_error() {
+    let _ = WorkunitStore::setup_for_tests();
+    let store = byte_store_always_error_provider();
+    assert_error(store.store_bytes(TestData::roland().bytes()).await)
+}
+
+#[tokio::test]
+async fn store_file() {
+    let _ = WorkunitStore::setup_for_tests();
+    let testdata = TestData::roland();
+
+    let (store, provider) = empty_byte_store();
+    assert_eq!(
+        store
+            .store_file(
+                testdata.digest(),
+                mk_tempfile(Some(&testdata.bytes())).await
+            )
+            .await,
+        Ok(())
+    );
+
+    let blobs = provider.blobs.lock();
+    assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
+}
+
+#[tokio::test]
+async fn store_file_provider_error() {
+    let _ = WorkunitStore::setup_for_tests();
+    let testdata = TestData::roland();
+    let store = byte_store_always_error_provider();
+    assert_error(
+        store
+            .store_file(
+                testdata.digest(),
+                mk_tempfile(Some(&testdata.bytes())).await,
+            )
+            .await,
+    );
 }
 
 #[tokio::test]
 async fn list_missing_digests_none_missing() {
-  let cas = new_cas(1024);
+    let _ = WorkunitStore::setup_for_tests();
+    let testdata = TestData::roland();
+    let store = new_byte_store(&testdata);
 
-  let store = new_byte_store(&cas);
-  assert_eq!(
-    store
-      .list_missing_digests(vec![TestData::roland().digest()])
-      .await,
-    Ok(HashSet::new())
-  );
+    assert_eq!(
+        store.list_missing_digests(vec![testdata.digest()]).await,
+        Ok(HashSet::new())
+    );
 }
 
 #[tokio::test]
 async fn list_missing_digests_some_missing() {
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::empty();
+    let _ = WorkunitStore::setup_for_tests();
+    let (store, _) = empty_byte_store();
 
-  let store = new_byte_store(&cas);
+    let digest = TestData::roland().digest();
 
-  let digest = TestData::roland().digest();
+    let mut digest_set = HashSet::new();
+    digest_set.insert(digest);
 
-  let mut digest_set = HashSet::new();
-  digest_set.insert(digest);
-
-  assert_eq!(
-    store.list_missing_digests(vec![digest]).await,
-    Ok(digest_set)
-  );
+    assert_eq!(
+        store.list_missing_digests(vec![digest]).await,
+        Ok(digest_set)
+    );
 }
 
 #[tokio::test]
-async fn list_missing_digests_error() {
-  let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::cas_always_errors();
+async fn list_missing_digests_provider_error() {
+    let _ = WorkunitStore::setup_for_tests();
+    let store = byte_store_always_error_provider();
 
-  let store = new_byte_store(&cas);
-
-  let error = store
-    .list_missing_digests(vec![TestData::roland().digest()])
-    .await
-    .expect_err("Want error");
-  assert!(
-    error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {error}"
-  );
+    assert_error(
+        store
+            .list_missing_digests(vec![TestData::roland().digest()])
+            .await,
+    )
 }
 
-fn new_byte_store(cas: &StubCAS) -> ByteStore {
-  ByteStore::new(
-    &cas.address(),
-    None,
-    tls::Config::default(),
-    BTreeMap::new(),
-    10 * MEGABYTES,
-    Duration::from_secs(1),
-    1,
-    256,
-    None,
-    super::tests::STORE_BATCH_API_SIZE_LIMIT,
-  )
-  .unwrap()
+#[tokio::test]
+async fn file_as_load_destination_reset() {
+    let mut file = mk_tempfile(Some(b"initial")).await;
+
+    file.reset().await.unwrap();
+    assert_file_contents(file, "").await;
 }
 
-pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  load_bytes(store, digest).await
+#[tokio::test]
+async fn vec_as_load_destination_reset() {
+    let mut vec: Vec<u8> = b"initial".to_vec();
+
+    vec.reset().await.unwrap();
+    assert!(vec.is_empty());
 }
 
-pub async fn load_directory_proto_bytes(
-  store: &ByteStore,
-  digest: Digest,
-) -> Result<Option<Bytes>, String> {
-  load_bytes(store, digest).await
+fn new_byte_store(data: &TestData) -> ByteStore {
+    let provider = TestProvider::new();
+    provider.add(data.bytes());
+    ByteStore::new(None, provider)
 }
 
-async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  store.load_bytes(digest).await
+fn empty_byte_store() -> (ByteStore, Arc<TestProvider>) {
+    let provider = TestProvider::new();
+    (ByteStore::new(None, provider.clone()), provider)
+}
+fn byte_store_always_error_provider() -> ByteStore {
+    ByteStore::new(None, AlwaysErrorProvider::new())
+}
+
+async fn assert_file_contents(mut file: tokio::fs::File, expected: &str) {
+    file.rewind().await.unwrap();
+
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).await.unwrap();
+    assert_eq!(buf.len(), expected.len());
+    // (assert_eq! means failures unhelpfully print a potentially-huge string)
+    assert!(buf == expected);
+}
+
+fn assert_error<T: std::fmt::Debug>(result: Result<T, String>) {
+    let error = result.expect_err("Want error");
+    assert!(
+        error.contains("AlwaysErrorProvider always fails"),
+        "Bad error message, got: {error}"
+    );
+}
+
+struct TestProvider {
+    blobs: Mutex<HashMap<Fingerprint, Bytes>>,
+}
+
+impl TestProvider {
+    #[allow(dead_code)]
+    fn new() -> Arc<TestProvider> {
+        Arc::new(TestProvider {
+            blobs: Mutex::new(HashMap::new()),
+        })
+    }
+
+    #[allow(dead_code)]
+    fn add(&self, bytes: Bytes) {
+        self.blobs
+            .lock()
+            .insert(Digest::of_bytes(&bytes).hash, bytes);
+    }
+}
+
+#[async_trait::async_trait]
+impl ByteStoreProvider for TestProvider {
+    async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String> {
+        self.blobs.lock().insert(digest.hash, bytes);
+        Ok(())
+    }
+
+    async fn store_file(&self, digest: Digest, mut file: File) -> Result<(), String> {
+        // just pull it all into memory
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).await.unwrap();
+        self.blobs.lock().insert(digest.hash, Bytes::from(bytes));
+        Ok(())
+    }
+
+    async fn load(
+        &self,
+        digest: Digest,
+        destination: &mut dyn LoadDestination,
+    ) -> Result<bool, String> {
+        let bytes = self.blobs.lock().get(&digest.hash).cloned();
+        match bytes {
+            None => Ok(false),
+            Some(bytes) => {
+                destination.write_all(&bytes).await.unwrap();
+                Ok(true)
+            }
+        }
+    }
+
+    async fn list_missing_digests(
+        &self,
+        digests: &mut (dyn Iterator<Item = Digest> + Send),
+    ) -> Result<HashSet<Digest>, String> {
+        let blobs = self.blobs.lock();
+        Ok(digests.filter(|d| !blobs.contains_key(&d.hash)).collect())
+    }
+}
+
+struct AlwaysErrorProvider;
+impl AlwaysErrorProvider {
+    fn new() -> Arc<AlwaysErrorProvider> {
+        Arc::new(AlwaysErrorProvider)
+    }
+}
+#[async_trait::async_trait]
+impl ByteStoreProvider for AlwaysErrorProvider {
+    async fn store_bytes(&self, _: Digest, _: Bytes) -> Result<(), String> {
+        Err("AlwaysErrorProvider always fails".to_owned())
+    }
+
+    async fn store_file(&self, _: Digest, _: File) -> Result<(), String> {
+        Err("AlwaysErrorProvider always fails".to_owned())
+    }
+
+    async fn load(&self, _: Digest, _: &mut dyn LoadDestination) -> Result<bool, String> {
+        Err("AlwaysErrorProvider always fails".to_owned())
+    }
+
+    async fn list_missing_digests(
+        &self,
+        _: &mut (dyn Iterator<Item = Digest> + Send),
+    ) -> Result<HashSet<Digest>, String> {
+        Err("AlwaysErrorProvider always fails".to_owned())
+    }
 }

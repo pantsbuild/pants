@@ -127,6 +127,9 @@ class HelpPrinter(MaybeColor):
                 self._all_help_info.name_to_api_type_info.keys(), self._print_api_type_help
             ),
             **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_rule_help),
+            **_help_table(
+                self._all_help_info.env_var_to_help_info.keys(), self._print_env_var_help
+            ),
         }
 
     @staticmethod
@@ -575,6 +578,18 @@ class HelpPrinter(MaybeColor):
                 else None,
             }
         )
+        print()
+
+    def _print_env_var_help(self, env_var: str, show_advanced_and_deprecated: bool) -> None:
+        ohi = self._all_help_info.env_var_to_help_info[env_var]
+        help_formatter = HelpFormatter(
+            show_advanced=show_advanced_and_deprecated,
+            show_deprecated=show_advanced_and_deprecated,
+            color=self.color,
+        )
+        for line in help_formatter.format_option(ohi):
+            print(line)
+
         print()
 
     def _get_help_json(self) -> str:

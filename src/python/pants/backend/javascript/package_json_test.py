@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from textwrap import dedent
 from typing import Iterable
 
@@ -305,14 +304,12 @@ def test_parses_subpath_imports(
 
     assert imports.imports == FrozenDict(
         {
-            re.compile(r"^\#a"): ("./yep.js",),  # noqa: W605 # Escape added by re.escape
-            re.compile(r"^\#b"): ("some-package",),  # noqa: W605 # Escape added by re.escape
-            re.compile("^\#c"): (  # noqa: W605 # Escape added by re.escape
+            "#a": ("./yep.js",),
+            "#b": ("some-package",),
+            "#c": (
                 "./polyfill.js",
                 "polyfill",
             ),
-            re.compile(r"^\#d/module/js/(.*)\.js"): (  # noqa: W605 # Escape added by re.escape
-                "./module/*.js",
-            ),
+            "#d/module/js/*.js": ("./module/*.js",),
         }
     )

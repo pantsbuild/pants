@@ -9,6 +9,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
     AdhocToolLogOutputField,
+    AdhocToolNamedCachesField,
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
@@ -149,6 +150,11 @@ async def run_in_sandbox_request(
 
     extra_args = target.get(AdhocToolArgumentsField).value or ()
 
+    append_only_caches = {
+        **merged_extras.append_only_caches,
+        **(target.get(AdhocToolNamedCachesField).value or {}),
+    }
+
     process_request = AdhocProcessRequest(
         description=description,
         address=target.address,
@@ -158,7 +164,7 @@ async def run_in_sandbox_request(
         timeout=None,
         input_digest=input_digest,
         immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
-        append_only_caches=FrozenDict.frozen(merged_extras.append_only_caches),
+        append_only_caches=FrozenDict(append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
         fetch_env_vars=target.get(AdhocToolExtraEnvVarsField).value or (),

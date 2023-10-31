@@ -57,7 +57,7 @@ class PythonToolRequirementsBase(Subsystem):
             f"""\
             If specified, install the tool using the lockfile for this named resolve.
 
-            This resolve must be defined in [python].resolves, as described in
+            This resolve must be defined in `[python].resolves`, as described in
             {doc_url("python-third-party-dependencies#user-lockfiles")}.
 
             The resolve's entire lockfile will be installed, unless specific requirements are
@@ -79,12 +79,12 @@ class PythonToolRequirementsBase(Subsystem):
         advanced=True,
         help=lambda cls: softwrap(
             """\
-            If install_from_resolve is specified, install these requirements,
+            If `install_from_resolve` is specified, install these requirements,
             at the versions provided by the specified resolve's lockfile.
 
             Values can be pip-style requirements (e.g., `tool` or `tool==1.2.3` or `tool>=1.2.3`),
-            or addresses of python_requirement targets (or targets that generate or depend on
-            python_requirement targets).
+            or addresses of `python_requirement` targets (or targets that generate or depend on
+            `python_requirement` targets).
 
             The lockfile will be validated against the requirements - if a lockfile doesn't
             provide the requirement (at a suitable version, if the requirement specifies version
@@ -223,7 +223,7 @@ class PythonToolBase(PythonToolRequirementsBase):
         help=softwrap(
             """
             The console script for the tool. Using this option is generally preferable to
-            (and mutually exclusive with) specifying an --entry-point since console script
+            (and mutually exclusive with) specifying an `--entry-point` since console script
             names have a higher expectation of staying stable across releases of the tool.
             Usually, you will not want to change this from the default.
             """
@@ -237,7 +237,7 @@ class PythonToolBase(PythonToolRequirementsBase):
         help=softwrap(
             """
             The entry point for the tool. Generally you only want to use this option if the
-            tool does not offer a --console-script (which this option is mutually exclusive
+            tool does not offer a `--console-script` (which this option is mutually exclusive
             with). Usually, you will not want to change this from the default.
             """
         ),

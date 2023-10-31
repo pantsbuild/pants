@@ -35,7 +35,10 @@ from pants.engine.fs import (
 from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
-from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
+from pants.engine.internals.native_dep_inference import (
+    NativeParsedJavascriptDependencies,
+    NativeParsedPythonDependencies,
+)
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
@@ -65,6 +68,7 @@ from pants.option.global_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
     ExecutionOptions,
     LocalStoreOptions,
+    normalize_remote_address,
 )
 from pants.util.contextutil import temporary_file_path
 from pants.util.logging import LogLevel
@@ -172,6 +176,7 @@ class Scheduler:
             docker_resolve_image_request=DockerResolveImageRequest,
             docker_resolve_image_result=DockerResolveImageResult,
             parsed_python_deps_result=NativeParsedPythonDependencies,
+            parsed_javascript_deps_result=NativeParsedJavascriptDependencies,
         )
         remoting_options = PyRemotingOptions(
             execution_enable=execution_options.remote_execution,
@@ -188,11 +193,13 @@ class Scheduler:
             execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
-            store_address=execution_options.remote_store_address,
-            execution_address=execution_options.remote_execution_address,
+            store_address=normalize_remote_address(execution_options.remote_store_address),
+            execution_address=normalize_remote_address(execution_options.remote_execution_address),
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
+            client_certs_path=execution_options.remote_client_certs_path,
+            client_key_path=execution_options.remote_client_key_path,
             append_only_caches_base_path=execution_options.remote_execution_append_only_caches_base_path,
         )
         py_local_store_options = PyLocalStoreOptions(
@@ -686,7 +693,9 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_types)
+                native_engine.tasks_add_get(
+                    tasks, the_get.output_type, the_get.input_types, the_get.rule_id
+                )
 
         native_engine.tasks_task_end(tasks)
 

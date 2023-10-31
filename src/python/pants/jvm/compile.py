@@ -37,7 +37,7 @@ from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.strutil import Simplifier
 
 logger = logging.getLogger(__name__)
 
@@ -338,19 +338,16 @@ class FallibleClasspathEntry(EngineAwareReturnType):
         process_result: FallibleProcessResult,
         output: ClasspathEntry | None,
         *,
-        strip_chroot_path: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> FallibleClasspathEntry:
-        def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-
         exit_code = process_result.exit_code
-        stderr = prep_output(process_result.stderr)
+        stderr = output_simplifier.simplify(process_result.stderr)
         return cls(
             description=description,
             result=(CompileResult.SUCCEEDED if exit_code == 0 else CompileResult.FAILED),
             output=output,
             exit_code=exit_code,
-            stdout=prep_output(process_result.stdout),
+            stdout=output_simplifier.simplify(process_result.stdout),
             stderr=stderr,
         )
 

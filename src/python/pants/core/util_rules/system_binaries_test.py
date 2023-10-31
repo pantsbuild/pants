@@ -3,10 +3,7 @@
 
 from __future__ import annotations
 
-import os
 import re
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 
@@ -19,30 +16,10 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryShims,
     BinaryShimsRequest,
-    PythonBinary,
 )
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import QueryRule, rule
+from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
-
-
-@dataclass(frozen=True)
-class PythonBinaryVersion:
-    version: str
-
-
-@rule
-async def python_binary_version(python_binary: PythonBinary) -> PythonBinaryVersion:
-    process_result = await Get(
-        ProcessResult,
-        Process(
-            argv=(python_binary.path, "--version"),
-            description=rf"Running `{python_binary.path} --version`",
-        ),
-    )
-    return PythonBinaryVersion(process_result.stdout.decode())
 
 
 @pytest.fixture
@@ -50,8 +27,6 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *system_binaries.rules(),
-            python_binary_version,
-            QueryRule(PythonBinaryVersion, []),
             QueryRule(BinaryPaths, [BinaryPathRequest]),
             QueryRule(BinaryShims, [BinaryShimsRequest]),
             QueryRule(DigestContents, [Digest]),
@@ -143,27 +118,6 @@ def test_find_binary_respects_search_path_order(rule_runner: RuleRunner, tmp_pat
     assert [str(p) for p in (binary_path_abs1, binary_path_abs2, binary_path_abs3)] == [
         binary_path.path for binary_path in binary_paths.paths
     ]
-
-
-def test_python_binary(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options((), env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-    python_binary_version = rule_runner.request(PythonBinaryVersion, [])
-    assert python_binary_version.version.startswith("Python 3.")
-
-
-def test_python_interpreter_search_path_file_entries() -> None:
-    rule_runner = RuleRunner(
-        rules=[*system_binaries.rules(), QueryRule(PythonBinary, input_types=())]
-    )
-    current_python = os.path.realpath(sys.executable)
-    rule_runner.set_options(
-        args=[
-            f"--python-bootstrap-search-path=[{current_python!r}]",
-            f"--python-bootstrap-names=[{os.path.basename(current_python)!r}]",
-        ]
-    )
-    python_binary = rule_runner.request(PythonBinary, inputs=())
-    assert current_python == python_binary.path
 
 
 def test_binary_shims_request(rule_runner: RuleRunner) -> None:

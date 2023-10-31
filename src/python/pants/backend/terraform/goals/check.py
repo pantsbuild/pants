@@ -1,16 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from pants.backend.terraform.dependency_inference import (
-    GetTerraformDependenciesRequest,
-    TerraformDependencies,
-)
-from pants.backend.terraform.partition import partition_files_by_directory
-from pants.backend.terraform.target_types import TerraformFieldSet
+from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
+from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -29,7 +22,7 @@ class TerraformValidateSubsystem(Subsystem):
 
 
 class TerraformCheckRequest(CheckRequest):
-    field_set_type = TerraformFieldSet
+    field_set_type = TerraformDeploymentFieldSet
     tool_name = TerraformValidateSubsystem.options_scope
 
 
@@ -40,20 +33,14 @@ async def terraform_check(
     if subsystem.skip:
         return CheckResults([], checker_name=request.tool_name)
 
-    source_files = await Get(
-        SourceFiles, SourceFilesRequest([field_set.sources for field_set in request.field_sets])
-    )
-    files_by_directory = partition_files_by_directory(source_files.files)
-
-    fetched_deps = await Get(
-        TerraformDependencies,
-        GetTerraformDependenciesRequest(source_files, tuple(files_by_directory.keys())),
-    )
-    # just merge them all for now. This will probably be a problem with multiple TF sources requesting different versions of the same providers
-    merged_fetched_deps = await Get(Digest, MergeDigests([x[1] for x in fetched_deps.fetched_deps]))
-
-    sources_and_deps = await Get(
-        Digest, MergeDigests([source_files.snapshot.digest, merged_fetched_deps])
+    initialised_terraforms = await MultiGet(
+        Get(
+            TerraformInitResponse,
+            TerraformInitRequest(
+                deployment.root_module, deployment.backend_config, deployment.dependencies
+            ),
+        )
+        for deployment in request.field_sets
     )
 
     results = await MultiGet(
@@ -61,20 +48,20 @@ async def terraform_check(
             FallibleProcessResult,
             TerraformProcess(
                 args=("validate",),
-                input_digest=sources_and_deps,
-                output_files=tuple(files),
-                description=f"Run `terraform fmt` on {pluralize(len(files), 'file')}.",
-                chdir=directory,
+                input_digest=deployment.sources_and_deps,
+                output_files=tuple(deployment.terraform_files),
+                description=f"Run `terraform fmt` on {pluralize(len(deployment.terraform_files), 'file')}.",
+                chdir=deployment.chdir,
             ),
         )
-        for directory, files in files_by_directory.items()
+        for deployment in initialised_terraforms
     )
 
     check_results = []
-    for directory, result in zip(files_by_directory, results):
+    for deployment, result, field_set in zip(initialised_terraforms, results, request.field_sets):
         check_results.append(
             CheckResult.from_fallible_process_result(
-                result, partition_description=f"`terraform validate` on `{directory}`"
+                result, partition_description=f"`terraform validate` on `{field_set.address}`"
             )
         )
 

@@ -129,7 +129,7 @@ class PathGlob:
 
     def _match_path(self, path: str, base: str) -> str | None:
         if self.anchor_mode is PathGlobAnchorMode.INVOKED_PATH:
-            path = os.path.relpath(path, base + "/.." * self.uplvl)
+            path = os.path.relpath(path or ".", base + "/.." * self.uplvl)
             if path.startswith(".."):
                 # The `path` is not in the sub tree of `base`.
                 return None
@@ -225,9 +225,9 @@ class TargetGlob:
             raise ValueError(f"Target spec must not be empty. {spec!r}")
 
         return cls.create(  # type: ignore[call-arg]
-            type_=spec_dict.get("type"),
-            name=spec_dict.get("name"),
-            path=spec_dict.get("path"),
+            type_=str(spec_dict["type"]) if "type" in spec_dict else None,
+            name=str(spec_dict["name"]) if "name" in spec_dict else None,
+            path=str(spec_dict["path"]) if "path" in spec_dict else None,
             base=base,
             tags=cls._parse_tags(spec_dict.get("tags")),
         )

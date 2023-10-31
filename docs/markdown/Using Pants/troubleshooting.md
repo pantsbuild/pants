@@ -54,9 +54,9 @@ To start with, first try using `--no-pantsd`. If that doesn't work, you can also
 If `--no-pantsd` worked, you can restart `pantsd`, either by:
 
 - Killing the `pantsd` process associated with your workspace. You can use `ps aux | grep pants` to find the PID, the `kill -9 <pid>`. 
-- Deleting the `<build root>/.pids` directory. 
+- Deleting the `<build root>/.pants.d/pids` directory. 
 
-If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/pantsd/pantsd.log` file.
+If this resolves the issue, please report that on the ticket and attach the recent content of the `.pants.d/workdir/pantsd/pantsd.log` file.
 
 If restarting `pantsd` is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
 
@@ -111,13 +111,13 @@ Is the missing import from first-party code? Common issues:
  Common issues with both first and third-party imports:
 
 - Ambiguity. >1 target exposes the same module/package.
-  - If it's a third-party dependency, you should likely use multiple "resolves" (lockfiles). Each resolve should have no more than one of the same requirement.  See [Python](doc:python-third-party-resolves#multiple-lockfiles) and [JVM](doc:jvm-overview).
+  - If it's a third-party dependency, you should likely use multiple "resolves" (lockfiles). Each resolve should have no more than one of the same requirement.  See [Python](doc:python-lockfiles#multiple-lockfiles) and [JVM](doc:jvm-overview).
   - If it's a first-party dependency, you may have unintentionally created multiple targets owning the same file. Run `pants list path/to/file.ext` to see all owners. This often happens from overlapping `sources` fields. If this was intentional, follow the instructions in the ambiguity warning to disambiguate via the `dependencies` field.
 - Some target types like `resources` and `files` often need to be explicitly added to the `dependencies` field and cannot be inferred (yet).
 - Multiple resolves (Python and JVM).
   - A target can only depend on targets that share the same "resolve" (lockfile).
   - Pants will warn when it detects that the import exists in another resolve. This usually implies you should either change the current target's `resolve` field, or use the `parametrize()` mechanism so that the code works with multiple resolves.
-  - See [Python](doc:python-third-party-resolves#multiple-lockfiles) and [JVM](doc:jvm-overview).
+  - See [Python](doc:python-lockfiles#multiple-lockfiles) and [JVM](doc:jvm-overview).
 
 When debugging dependency inference, it can help to explicitly add the problematic dependency to the `dependencies` field to see if it gets the code running. If so, you can then try to figure out why dependency inference is not working.
 
@@ -161,7 +161,7 @@ You may change any of these options in the `[GLOBAL]` section of your `pants.tom
     "1-2": "`~/.cache/pants/named_caches`",
     "2-0": "`pants_workdir`",
     "2-1": "Stores some project-specific logs; used as a temporary directory when running `pants repl` and `pants run`.  \n  \nThis is not used for caching.  \n  \nThis must be relative to the build root.",
-    "2-2": "`<build_root>/.pants.d/`",
+    "2-2": "`<build_root>/.pants.d/workdir`",
     "3-0": "`pants_distdir`",
     "3-1": "Where Pants writes artifacts to, such as the result of `pants package`.  \n  \nThis is not used for caching; you can delete this folder and still leverage the cache from `local_store_dir`.  \n  \nThis must be relative to the build root.",
     "3-2": "`<build_root>/dist/`"

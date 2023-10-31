@@ -31,6 +31,7 @@ from pants.engine.fs import SpecsPaths
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.specs_rules import NoApplicableTargetsException
+from pants.engine.internals.testutil import resolve_raw_specs_without_file_owners
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import (
     Dependencies,
@@ -41,7 +42,6 @@ from pants.engine.target import (
     MultipleSourcesField,
     NoApplicableTargetsBehavior,
     OverridesField,
-    SecondaryOwnerMixin,
     SingleSourceField,
     StringField,
     Tags,
@@ -52,7 +52,6 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -141,23 +140,6 @@ def rule_runner() -> RuleRunner:
 # -----------------------------------------------------------------------------------------------
 # RawSpecsWithoutFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
-
-
-def resolve_raw_specs_without_file_owners(
-    rule_runner: RuleRunner,
-    specs: Iterable[Spec],
-    ignore_nonexistent: bool = False,
-) -> list[Address]:
-    specs_obj = RawSpecs.create(
-        specs,
-        filter_by_global_options=True,
-        unmatched_glob_behavior=(
-            GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
-        ),
-        description_of_origin="tests",
-    )
-    result = rule_runner.request(Addresses, [RawSpecsWithoutFileOwners.from_raw_specs(specs_obj)])
-    return sorted(result)
 
 
 def test_raw_specs_without_file_owners_literals_vs_globs(rule_runner: RuleRunner) -> None:
@@ -1044,95 +1026,3 @@ def test_no_applicable_targets_exception() -> None:
     assert "However, you only specified target and file arguments with these target types:" in str(
         exc
     )
-
-
-class FortranSecondaryOwnerField(StringField, SecondaryOwnerMixin):
-    alias = "borrows"
-
-    @property
-    def filespec(self) -> Filespec:
-        assert self.value
-        return {"includes": [self.value]}
-
-
-def test_secondary_owner_warning(caplog) -> None:
-    class FortranTarget(Target):
-        alias = "fortran_target"
-        core_fields = (FortranSources,)
-
-    class SecondaryOwnerTarget(Target):
-        alias = "secondary_owner_target"
-        core_fields = (FortranSecondaryOwnerField,)
-
-    @union
-    class SomeGoalFieldSet(FieldSet):
-        pass
-
-    @dataclass(frozen=True)
-    class SecondaryOwnerFS(SomeGoalFieldSet):
-        required_fields = (FortranSecondaryOwnerField,)
-
-        secondary_owner: FortranSecondaryOwnerField
-
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(TargetRootsToFieldSets, [TargetRootsToFieldSetsRequest, Specs]),
-            UnionRule(SomeGoalFieldSet, SecondaryOwnerFS),
-        ],
-        target_types=[FortranTarget, SecondaryOwnerTarget],
-    )
-
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                fortran_target(name="primary", sources=["a.ft"])
-                secondary_owner_target(name="secondary1", borrows="a.ft")
-                secondary_owner_target(name="secondary2", borrows="a.ft")
-                """
-            ),
-            "a.ft": "",
-        }
-    )
-
-    request = TargetRootsToFieldSetsRequest(
-        SomeGoalFieldSet,
-        goal_description="some goal",
-        no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
-    )
-
-    def run_rule(specs: Iterable[Spec]):
-        caplog.clear()
-        return rule_runner.request(
-            TargetRootsToFieldSets,
-            [
-                request,
-                Specs(
-                    includes=RawSpecs.create(specs, description_of_origin="tests"),
-                    ignores=RawSpecs(description_of_origin="tests"),
-                ),
-            ],
-        )
-
-    result = run_rule([AddressLiteralSpec("", "primary"), AddressLiteralSpec("", "secondary1")])
-    # No warning because the secondary target was referred to by address literally
-    assert len(caplog.records) == 0
-    assert result.mapping
-
-    result = run_rule([AddressLiteralSpec("", "primary")])
-    assert len(caplog.records) == 1
-    assert "Refer to the following targets" not in caplog.text
-    assert not result.mapping
-
-    run_rule([FileLiteralSpec("a.ft")])
-    assert len(caplog.records) == 1
-    assert "Refer to the following targets by their addresses:\n\n  * //:secondary1" in caplog.text
-
-    run_rule([FileLiteralSpec("a.ft"), AddressLiteralSpec("", "secondary1")])
-    assert len(caplog.records) == 1
-    assert "secondary1" not in caplog.text
-    assert "secondary2" in caplog.text
-
-    result = run_rule([RecursiveGlobSpec("")])
-    assert len(caplog.records) == 0
-    assert result.mapping

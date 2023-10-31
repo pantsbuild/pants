@@ -931,3 +931,24 @@ def test_single_rules_declaration_per_build_file(rule_runner: RuleRunner) -> Non
             rule_runner,
             "test",
         )
+
+
+def test_target_type_in_verbose_selector_issue_19390(rule_runner: RuleRunner) -> None:
+    """This test is logically a better fit in `./glob_test.py:test_target_glob_parse_spec` but I
+    want to avoid hard coding any assumptions regarding a target types representation in the BUILD
+    file (the `Registrar` type)."""
+    rule_runner.write_files(
+        {
+            "test/BUILD": dedent(
+                """
+                target(name="test")
+
+                __dependencies_rules__(
+                  ({"type": files}, "*"),
+                )
+                """
+            ),
+        },
+    )
+
+    assert_dependency_rules(rule_runner, "test")

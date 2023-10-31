@@ -9,7 +9,7 @@ createdAt: "2022-01-10T20:58:57.450Z"
 > 
 > We are done implementing most functionality for Pants's Java and Scala support ([tracked here](https://github.com/pantsbuild/pants/labels/lang-jvm)). However, there may be use cases that we aren't yet handling.
 > 
-> Please share feedback for what you need to use Pants with your JVM project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:community)!
+> Please share feedback for what you need to use Pants with your JVM project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:the-pants-community)!
 
 > 📘 Example Java and Scala repository
 > 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os.path
 from dataclasses import dataclass
 from typing import Iterable, List, Mapping, Optional, Tuple
 
@@ -27,7 +28,6 @@ from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_con
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
-from pants.util.strutil import create_path_env_var
 
 
 class PexCli(TemplatedExternalTool):
@@ -35,7 +35,7 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.137"
+    default_version = "v2.1.148"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
     version_constraints = ">=2.1.135,<3.0"
 
@@ -46,8 +46,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "faad51a6a108fba9d40b2a10e82a2646fccbaf8c3d9be47818f4bffae02d94b8",
-                    "4098329",
+                    "5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7",
+                    "4197604",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -138,7 +138,7 @@ async def setup_pex_cli_process(
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     global_args = [
-        # Ensure Pex and its subprocesses create temporary files in the the process execution
+        # Ensure Pex and its subprocesses create temporary files in the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
         # perform. Making the TMPDIR local to the sandbox allows control via
@@ -161,14 +161,12 @@ async def setup_pex_cli_process(
     resolve_args = [
         *cert_args,
         "--python-path",
-        create_path_env_var(pex_env.interpreter_search_paths),
+        os.pathsep.join(pex_env.interpreter_search_paths),
     ]
     # All old-style pex runs take the --pip-version flag, but only certain subcommands of the
     # `pex3` console script do. So if invoked with a subcommand, the caller must selectively
     # set --pip-version only on subcommands that take it.
-    pip_version_args = (
-        [] if request.subcommand else ["--pip-version", python_setup.pip_version.value]
-    )
+    pip_version_args = [] if request.subcommand else ["--pip-version", python_setup.pip_version]
     args = [
         *request.subcommand,
         *global_args,
@@ -198,7 +196,6 @@ async def setup_pex_cli_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=complete_pex_env.append_only_caches,
-        immutable_input_digests=bootstrap_python.immutable_input_digests,
         level=request.level,
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,

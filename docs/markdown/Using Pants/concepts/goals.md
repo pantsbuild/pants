@@ -38,8 +38,7 @@ You can also run multiple goals in a single run of Pants, in which case they wil
 ❯ pants fmt test ::
 ```
 
-Finally, Pants supports running goals in a `--loop`. In this mode, all goals specified will run  
-sequentially, and then Pants will wait until a relevant file has changed to try running them again.
+Finally, Pants supports running goals in a `--loop`. In this mode, all goals specified will run sequentially, and then Pants will wait until a relevant file has changed to try running them again.
 
 ```bash
 # Re-run linters and testing continuously as files or their dependencies change:
@@ -64,13 +63,9 @@ You can use several argument types:
 
 You can combine argument types, e.g. `pants fmt src/go:: src/py/app.py`.
 
-To ignore something, prefix the argument with `-`. For example,  
-`pants test :: -project/integration_tests` will run all your tests except for those in the  
-directory `project/integration_tests`.
+You can address targets from the root of the repository by using plain `::` and `:`. For example, `pants package ::` would produce artifacts for all packages declared in the whole repository and `pants package :` would produce artifacts only for those packages that are declared in the root directory of the repository. 
 
-> 🚧 Set `[GLOBAL].use_deprecated_directory_cli_args_semantics = false` in `pants.toml`
-> 
-> This will become the default in Pants 2.14.
+To ignore something, prefix the argument with `-`. For example, `pants test :: -project/integration_tests` will run all your tests except for those in the directory `project/integration_tests` and `pants package project:: -project:` will package all targets in the subdirectories of the `project` directory, recursively, except for those declared directly under the `project` directory.  
 
 > 📘 Tip: advanced target selection, such as running over changed files
 > 

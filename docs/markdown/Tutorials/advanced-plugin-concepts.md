@@ -44,7 +44,7 @@ $ PANTS_UNMATCHED_BUILD_FILE_GLOBS=error pants project-version myapp:
 
 We would likely want to use the same name for the version file (`VERSION`) throughout the repo for consistency, so we should probably set a default value for the target to reduce the amount of boilerplate in the `BUILD` files. To change a default value, we have to subclass the original field. Visit [customizing fields through subclassing](https://www.pantsbuild.org/docs/target-api-concepts#customizing-fields-through-subclassing) to learn more.
 
-```python pants-plugins/project_version/targets.py
+```python pants-plugins/project_version/target_types.py
 from pants.engine.target import COMMON_TARGET_FIELDS, SingleSourceField, Target
 
 class ProjectVersionSourceField(SingleSourceField):
@@ -394,7 +394,7 @@ $ pants project-version --as-json myapp:
   ProjectVersionGitTagMismatch: Project version string '0.0.3' from 'myapp/VERSION' doesn't match latest Git tag '0.0.1'
 ```
 
-This happens because of how the Pants cache works. Modifying our repository tags doesn't qualify for the changes that should invalidate the cache. It is not safe to [cache the `Process` runs](https://www.pantsbuild.org/docs/rules-api-process) since we know that Git will access the repository (that is outside the sandbox), we should change its cacheability using the `ProcessCacheScope` parameter so that our Git call would run once per run of Pants.
+This happens because of how the Pants cache works. Modifying our repository tags doesn't qualify for the changes that should invalidate the cache. It is not safe to [cache the `Process` runs](https://www.pantsbuild.org/docs/rules-api-process) and since we know that Git will access the repository (that is outside the sandbox), we should change its cacheability using the `ProcessCacheScope` parameter so that our Git call would run once per run of Pants.
 
 ```python
 git_describe = await Get(
@@ -519,6 +519,7 @@ class ProjectVersionSubsystem(GoalSubsystem):
 
 class ProjectVersionGoal(Goal):
     subsystem_cls = ProjectVersionSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 class InvalidProjectVersionString(ValueError):

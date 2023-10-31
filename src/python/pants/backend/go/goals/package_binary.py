@@ -93,7 +93,7 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
         raise ValueError(
             f"{GoThirdPartyPackageTarget.alias if main_pkg.is_third_party else GoPackageTarget.alias} "
             f"target `{main_pkg.address}` is used as the main package for {GoBinaryTarget.alias} target "
-            f"`{field_set.address}` but uses package name `{analysis.name}` instead of `main`. Go "
+            f"`{field_set.address}` but uses package name `{package_name}` instead of `main`. Go "
             "requires that main packages actually use `main` as the package name."
         )
 

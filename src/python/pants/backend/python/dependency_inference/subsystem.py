@@ -54,7 +54,9 @@ class PythonInferSubsystem(Subsystem):
         help=softwrap(
             """
             Infer a target's dependencies based on strings that look like dynamic
-            dependencies, such as Django settings files expressing dependencies as strings.
+            dependencies, such as Django settings files expressing dependencies as strings or
+            pytest plugins listed in the `pytest_plugins` variable in a test module or a
+            conftest file.
 
             To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
             the string or put `!{bad_address}` in the `dependencies` field of your target.
@@ -65,7 +67,7 @@ class PythonInferSubsystem(Subsystem):
         default=2,
         help=softwrap(
             """
-            If --string-imports is True, treat valid-looking strings with at least this many
+            If `--string-imports` is True, treat valid-looking strings with at least this many
             dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be
             treated as a potential dependency if this option is set to 2 but not if set to 3.
             """
@@ -87,7 +89,7 @@ class PythonInferSubsystem(Subsystem):
         default=1,
         help=softwrap(
             """
-            If --assets is True, treat valid-looking strings with at least this many forward
+            If `--assets` is True, treat valid-looking strings with at least this many forward
             slash characters as potential assets. E.g. `'data/databases/prod.db'` will be
             treated as a potential candidate if this option is set to 2 but not to 3.
             """
@@ -117,7 +119,7 @@ class PythonInferSubsystem(Subsystem):
         default=True,
         help=softwrap(
             """
-            Infer a test target's dependencies on any conftest.py files in the current
+            Infer a test target's dependencies on any `conftest.py` files in the current
             directory and ancestor directories.
             """
         ),
@@ -170,7 +172,8 @@ class PythonInferSubsystem(Subsystem):
     ignored_unowned_imports = StrListOption(
         default=[],
         help=softwrap(
-            """Unowned imports that should be ignored.
+            """
+            Unowned imports that should be ignored.
 
             If there are any unowned import statements and adding the `# pants: no-infer-dep`
             to the lines of the import is impractical, you can instead provide a list of imports
@@ -179,15 +182,13 @@ class PythonInferSubsystem(Subsystem):
 
             For example, you could ignore all the following imports of the code
 
-                ```
                 import src.generated.app
                 from src.generated.app import load
                 from src.generated.app import start
                 from src.generated.client import connect
-                ```
 
             by setting `ignored-unowned-imports=["src.generated.app", "src.generated.client.connect"]`.
-        """
+            """
         ),
     )
 

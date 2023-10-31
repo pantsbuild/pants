@@ -59,13 +59,13 @@ class BatchSizeOption(IntOption):
 
                 {uppercase} processes are batched for a few reasons:
 
-                    1. to avoid OS argument length limits (in processes which don't support argument files)
-                    2. to support more stable cache keys than would be possible if all files were operated \
-                        on in a single batch.
-                    3. to allow for parallelism in {lowercase} processes which don't have internal \
-                    parallelism, or -- if they do support internal parallelism -- to improve scheduling \
-                    behavior when multiple processes are competing for cores and so internal \
-                    parallelism cannot be used perfectly.
+                  1. to avoid OS argument length limits (in processes which don't support argument files)
+                  2. to support more stable cache keys than would be possible if all files were operated \
+                     on in a single batch.
+                  3. to allow for parallelism in {lowercase} processes which don't have internal \
+                     parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+                     behavior when multiple processes are competing for cores and so internal \
+                     parallelism cannot be used perfectly.
 
                 In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
                 and so this value is only a "target" batch size (rather than an exact value).

@@ -305,7 +305,9 @@ class OptionsBootstrapper:
             allow_unknown_options=build_configuration.allow_unknown_options,
         )
         GlobalOptions.validate_instance(options.for_global_scope())
-        self.alias.check_name_conflicts(options.known_scope_to_info)
+        self.alias.check_name_conflicts(
+            options.known_scope_to_info, options.known_scope_to_scoped_args
+        )
         return options
 
 

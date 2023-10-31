@@ -67,17 +67,17 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
               helm_deployment(
                 name="foo",
                 description="Foo deployment",
-                namespace="uat",
-                create_namespace=True,
+                namespace=f"uat-{env('NS_SUFFIX')}",
                 skip_crds=True,
                 no_hooks=True,
-                dependencies=["//src/chart", "//src/docker/myimage"],
+                chart="//src/chart",
+                dependencies=["//src/docker/myimage"],
                 sources=["common.yaml", "*.yaml", "*-override.yaml", "subdir/*.yaml", "subdir/*-override.yaml", "subdir/last.yaml"],
                 values={
                     "key": "foo",
                     "amount": "300",
                     "long_string": "This is a long string",
-                    "build_number": "{env.BUILD_NUMBER}",
+                    "build_number": f"{env('BUILD_NUMBER')}",
                 },
                 timeout=150,
               )
@@ -105,6 +105,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
     )
 
     expected_build_number = "34"
+    expected_ns_suffix = "quxx"
     expected_value_files_order = [
         "common.yaml",
         "bar.yaml",
@@ -116,14 +117,13 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "subdir/last.yaml",
     ]
 
-    extra_env_vars = ["BUILD_NUMBER"]
-    deploy_args = ["--kubeconfig", "./kubeconfig"]
+    deploy_args = ["--kubeconfig", "./kubeconfig", "--create-namespace"]
     deploy_process = _run_deployment(
         rule_runner,
         "src/deployment",
         "foo",
-        args=[f"--helm-args={repr(deploy_args)}", f"--helm-extra-env-vars={repr(extra_env_vars)}"],
-        env={"BUILD_NUMBER": expected_build_number},
+        args=[f"--helm-args={repr(deploy_args)}"],
+        env={"BUILD_NUMBER": expected_build_number, "NS_SUFFIX": expected_ns_suffix},
     )
 
     helm = rule_runner.request(HelmBinary, [])
@@ -137,8 +137,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--description",
         '"Foo deployment"',
         "--namespace",
-        "uat",
-        "--create-namespace",
+        f"uat-{expected_ns_suffix}",
         "--skip-crds",
         "--no-hooks",
         "--post-renderer",
@@ -160,6 +159,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "150s",
         "--kubeconfig",
         "./kubeconfig",
+        "--create-namespace",
     )
 
 
@@ -173,7 +173,7 @@ def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunne
               helm_deployment(
                 name="bar",
                 namespace="uat",
-                dependencies=["//src/chart"],
+                chart="//src/chart",
                 sources=["*.yaml", "subdir/*.yml"]
               )
               """
@@ -215,7 +215,7 @@ def test_can_deploy_3rd_party_chart(rule_runner: RuleRunner) -> None:
                 """\
               helm_deployment(
                 name="deploy_3rd_party",
-                dependencies=["//3rdparty/helm:prometheus-stack"],
+                chart="//3rdparty/helm:prometheus-stack",
               )
               """
             ),

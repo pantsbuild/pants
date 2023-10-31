@@ -20,6 +20,7 @@ from pants.backend.helm.testutil import (
     K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import chart
+from pants.core.goals.generate_snapshots import GenerateSnapshotsResult
 from pants.core.goals.test import TestResult
 from pants.core.target_types import (
     FilesGeneratorTarget,
@@ -30,6 +31,7 @@ from pants.core.target_types import (
 from pants.core.target_types import rules as target_types_rules
 from pants.core.util_rules import external_tool, source_files, stripped_source_files
 from pants.engine.addresses import Address
+from pants.engine.fs import DigestContents
 from pants.engine.rules import QueryRule
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.rule_runner import RuleRunner
@@ -57,6 +59,7 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *target_types_rules(),
             QueryRule(TestResult, (HelmUnitTestRequest.Batch,)),
+            QueryRule(GenerateSnapshotsResult, (HelmUnitTestFieldSet,)),
         ],
     )
 
@@ -90,46 +93,6 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
         }
     )
 
-    target = rule_runner.get_target(Address("tests", target_name="test"))
-    field_set = HelmUnitTestFieldSet.create(target)
-
-    result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
-
-    assert result.exit_code == 0
-    assert result.xml_results and result.xml_results.files
-    assert result.xml_results.files == (f"{target.address.path_safe_spec}.xml",)
-
-
-def test_simple_success_with_legacy_tool(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": "helm_chart(name='mychart')",
-            "Chart.yaml": HELM_CHART_FILE,
-            "values.yaml": HELM_VALUES_FILE,
-            "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
-            "tests/BUILD": "helm_unittest_test(name='test', source='service_test.yaml')",
-            "tests/service_test.yaml": dedent(
-                """\
-                suite: test service
-                templates:
-                  - service.yaml
-                values:
-                  - ../values.yaml
-                tests:
-                  - it: should work
-                    asserts:
-                      - isKind:
-                          of: Service
-                      - equal:
-                          path: spec.type
-                          value: ClusterIP
-                """
-            ),
-        }
-    )
-
-    rule_runner.set_options(["--helm-unittest-version=0.2.8"])
     target = rule_runner.get_target(Address("tests", target_name="test"))
     field_set = HelmUnitTestFieldSet.create(target)
 
@@ -412,3 +375,161 @@ def test_test_with_relocated_file(rule_runner: RuleRunner) -> None:
 
     result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
     assert result.exit_code == 0
+
+
+def test_generate_snapshots(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": "helm_chart(name='mychart')",
+            "src/Chart.yaml": HELM_CHART_FILE,
+            "src/values.yaml": HELM_VALUES_FILE,
+            "src/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/templates/service.yaml": K8S_SERVICE_TEMPLATE,
+            "src/tests/BUILD": "helm_unittest_test(name='test', source='service_test.yaml')",
+            "src/tests/service_test.yaml": dedent(
+                """\
+                suite: test service
+                templates:
+                  - service.yaml
+                values:
+                  - ../values.yaml
+                tests:
+                  - it: should match snapshot
+                    asserts:
+                      - matchSnapshot: {}
+                """
+            ),
+        }
+    )
+
+    expected_snapshot_content = dedent(
+        """\
+        should match snapshot:
+          1: |
+            apiVersion: v1
+            kind: Service
+            metadata:
+              labels:
+                chart: mychart-0.1.0
+              name: RELEASE-NAME-mychart
+            spec:
+              ports:
+                - name: test
+                  port: 80
+                  protocol: TCP
+                  targetPort: 1223
+              selector:
+                app: RELEASE-NAME-mychart
+              type: ClusterIP
+        """
+    )
+
+    target = rule_runner.get_target(Address("src/tests", target_name="test"))
+    field_set = HelmUnitTestFieldSet.create(target)
+
+    result = rule_runner.request(GenerateSnapshotsResult, [field_set])
+
+    assert result.snapshot and result.snapshot.files
+    assert result.snapshot.files == ("src/tests/__snapshot__/service_test.yaml.snap",)
+
+    snapshot_contents = rule_runner.request(DigestContents, [result.snapshot.digest])
+    assert len(snapshot_contents) == 1
+    assert snapshot_contents[0].content.decode() == expected_snapshot_content
+
+
+def test_success_with_snapshot(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": "helm_chart(name='mychart')",
+            "src/Chart.yaml": HELM_CHART_FILE,
+            "src/values.yaml": HELM_VALUES_FILE,
+            "src/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/templates/service.yaml": K8S_SERVICE_TEMPLATE,
+            "src/tests/BUILD": dedent(
+                """\
+              helm_unittest_test(name='test', source='service_test.yaml', dependencies=[":snapshots"])
+
+              resources(name="snapshots", sources=["__snapshot__/*.snap"])
+              """
+            ),
+            "src/tests/service_test.yaml": dedent(
+                """\
+                suite: test service
+                templates:
+                  - service.yaml
+                values:
+                  - ../values.yaml
+                tests:
+                  - it: should match snapshot
+                    asserts:
+                      - matchSnapshot: {}
+                """
+            ),
+            "src/tests/__snapshot__/service_test.yaml.snap": dedent(
+                """\
+                should match snapshot:
+                  1: |
+                    apiVersion: v1
+                    kind: Service
+                    metadata:
+                      labels:
+                        chart: mychart-0.1.0
+                      name: RELEASE-NAME-mychart
+                    spec:
+                      ports:
+                        - name: test
+                          port: 80
+                          protocol: TCP
+                          targetPort: 1223
+                      selector:
+                        app: RELEASE-NAME-mychart
+                      type: ClusterIP
+                """
+            ),
+        }
+    )
+
+    target = rule_runner.get_target(Address("src/tests", target_name="test"))
+    field_set = HelmUnitTestFieldSet.create(target)
+
+    result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
+    assert result.exit_code == 0
+
+
+def test_failure_with_snapshot(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": "helm_chart(name='mychart')",
+            "src/Chart.yaml": HELM_CHART_FILE,
+            "src/values.yaml": HELM_VALUES_FILE,
+            "src/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/templates/service.yaml": K8S_SERVICE_TEMPLATE,
+            "src/tests/BUILD": dedent(
+                """\
+              helm_unittest_test(name='test', source='service_test.yaml', dependencies=[":snapshots"])
+
+              resources(name="snapshots", sources=["__snapshot__/*.snap"])
+              """
+            ),
+            "src/tests/service_test.yaml": dedent(
+                """\
+                suite: test service
+                templates:
+                  - service.yaml
+                values:
+                  - ../values.yaml
+                tests:
+                  - it: should match snapshot
+                    asserts:
+                      - matchSnapshot: {}
+                """
+            ),
+            "src/tests/__snapshot__/service_test.yaml.snap": "invalid",
+        }
+    )
+
+    target = rule_runner.get_target(Address("src/tests", target_name="test"))
+    field_set = HelmUnitTestFieldSet.create(target)
+
+    result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
+    assert result.exit_code == 1

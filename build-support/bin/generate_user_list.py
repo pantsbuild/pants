@@ -46,6 +46,11 @@ _orgs = (
         "https://www.astranis.com/",
         "https://files.readme.io/e4989d4-astranis-small.png",
     ),
+    Org(
+        "Aviva Credito",
+        "https://www.avivacredito.com/",
+        "https://files.readme.io/dfc2801-aviva.png",
+    ),
     Org("Brand24", "https://brand24.com/", "https://files.readme.io/e3203d1-brand24-small.png"),
     Org(
         "Chartbeat", "https://chartbeat.com/", "https://files.readme.io/861ace7-chartbeat-small.png"
@@ -59,6 +64,11 @@ _orgs = (
         "Doctrine",
         "https://www.doctrine.fr/",
         "https://files.readme.io/8497e9c-doctrine-small.png",
+    ),
+    Org(
+        "Embark Studios",
+        "https://www.embark-studios.com/",
+        "https://files.readme.io/6ed9278-embark-small.png",
     ),
     Org(
         "ESL Gaming",
@@ -124,11 +134,6 @@ _orgs = (
         "Tessian",
         "https://www.tessian.com",
         "https://files.readme.io/6ef9d57-tessian-small.png",
-    ),
-    Org(
-        "Toolchain",
-        "https://www.toolchain.com/",
-        "https://files.readme.io/43d674d-toolchain_logo_small.png",
     ),
     Org("Unit", "https://unit.co", "https://files.readme.io/eda8106-unit.png"),
     Org("Valon", "https://valon.com/", "https://files.readme.io/df5216a-valon-small.png"),

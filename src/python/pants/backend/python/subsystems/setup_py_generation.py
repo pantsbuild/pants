@@ -27,7 +27,7 @@ class SetupPyGeneration(Subsystem):
             """
             The default value for the `generate_setup` field on `python_distribution` targets.
             Can be overridden per-target by setting that field explicitly. Set this to False
-            if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar).
+            if you mostly rely on handwritten setup files (`setup.py`, `setup.cfg` and similar).
             Leave as True if you mostly rely on Pants generating setup files for you.
             """
         ),

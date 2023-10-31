@@ -294,7 +294,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
         """
         Platform properties to set on remote execution requests.
 
-        Format: property=value. Multiple values should be specified as multiple
+        Format: `property=value`. Multiple values should be specified as multiple
         occurrences of this flag.
 
         Pants itself may add additional platform properties.
@@ -313,7 +313,7 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
         Python value `None` to error when remote execution is disabled.
 
         Tip: if you are using a Docker image with your remote execution environment (usually
-        enabled by setting the field {RemoteExtraPlatformPropertiesField.alias}`), then it can be
+        enabled by setting the field `{RemoteExtraPlatformPropertiesField.alias}`), then it can be
         useful to fallback to an equivalent `docker_image` target so that you have a consistent
         execution environment.
         """
@@ -789,7 +789,7 @@ async def resolve_environment_name(
                 machine's platform: {localhost_platform}. The environment only works with the
                 platforms: {env_tgt.val[CompatiblePlatformsField].value}
 
-                Consider setting the the field `{FallbackEnvironmentField.alias}` for the target
+                Consider setting the field `{FallbackEnvironmentField.alias}` for the target
                 {env_tgt.val.address}, such as to a `docker_environment` or `remote_environment`
                 target. You can also set that field to another `local_environment` target, such as
                 one that is compatible with the current platform {localhost_platform}.

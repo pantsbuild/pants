@@ -79,9 +79,16 @@ class ParseKubeManifestRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
+class ParsedImageRefEntry:
+    document_index: int
+    path: YamlPath
+    unparsed_image_ref: str
+
+
+@dataclass(frozen=True)
 class ParsedKubeManifest(EngineAwareReturnType):
     filename: str
-    found_image_refs: tuple[tuple[int, YamlPath, str], ...]
+    found_image_refs: tuple[ParsedImageRefEntry, ...]
 
     def level(self) -> LogLevel | None:
         return LogLevel.DEBUG
@@ -115,7 +122,7 @@ async def parse_kube_manifest(
 
     if result.exit_code == 0:
         output = result.stdout.decode("utf-8").splitlines()
-        image_refs: list[tuple[int, YamlPath, str]] = []
+        image_refs: list[ParsedImageRefEntry] = []
         for line in output:
             parts = line.split(",")
             if len(parts) != 3:
@@ -128,7 +135,13 @@ async def parse_kube_manifest(
                     )
                 )
 
-            image_refs.append((int(parts[0]), YamlPath.parse(parts[1]), parts[2]))
+            image_refs.append(
+                ParsedImageRefEntry(
+                    document_index=int(parts[0]),
+                    path=YamlPath.parse(parts[1]),
+                    unparsed_image_ref=parts[2],
+                )
+            )
 
         return ParsedKubeManifest(filename=request.file.path, found_image_refs=tuple(image_refs))
     else:

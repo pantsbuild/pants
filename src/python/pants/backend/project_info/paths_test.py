@@ -48,10 +48,13 @@ def rule_runner() -> RuleRunner:
         {
             "base/base.txt": "",
             "base/BUILD": "tgt(source='base.txt')",
+            "base/subdir/base-subdir.txt": "",
+            "base/subdir/BUILD": "tgt(source='base-subdir.txt')",
             "intermediate/intermediate.txt": "",
             "intermediate/BUILD": "tgt(source='intermediate.txt', dependencies=['base'])",
             "intermediate2/BUILD": "tgt(dependencies=['base'])",
             "leaf/BUILD": "tgt(dependencies=['intermediate', 'intermediate2'])",
+            "leaf/subdir/BUILD": "tgt(dependencies=['base/subdir', 'base'])",
             "island/BUILD": "tgt()",
             "3rdparty/BUILD": dedent(
                 """\
@@ -94,6 +97,7 @@ def assert_paths(
     result = rule_runner.run_goal_rule(PathsGoal, args=[*args])
 
     if expected is not None:
+        print(sorted(json.loads(result.stdout)))
         assert sorted(json.loads(result.stdout)) == sorted(expected)
 
 
@@ -150,6 +154,45 @@ def test_multiple_paths(rule_runner: RuleRunner) -> None:
         expected=[
             ["leaf:leaf", "intermediate:intermediate", "base:base"],
             ["leaf:leaf", "intermediate2:intermediate2", "base:base"],
+        ],
+    )
+
+
+def test_paths_from_multiple_to_multiple(rule_runner: RuleRunner) -> None:
+    assert_paths(
+        rule_runner,
+        path_from="leaf::",
+        path_to="base::",
+        expected=[
+            ["leaf/subdir:subdir", "base/subdir:subdir"],
+            ["leaf/subdir:subdir", "base:base"],
+            ["leaf:leaf", "intermediate2:intermediate2", "base:base"],
+            ["leaf:leaf", "intermediate:intermediate", "base:base"],
+        ],
+    )
+
+
+def test_paths_from_single_to_multiple(rule_runner: RuleRunner) -> None:
+    assert_paths(
+        rule_runner,
+        path_from="leaf/subdir:subdir",
+        path_to="base::",
+        expected=[
+            ["leaf/subdir:subdir", "base/subdir:subdir"],
+            ["leaf/subdir:subdir", "base:base"],
+        ],
+    )
+
+
+def test_paths_from_multiple_to_single(rule_runner: RuleRunner) -> None:
+    assert_paths(
+        rule_runner,
+        path_from="leaf::",
+        path_to="base:base",
+        expected=[
+            ["leaf/subdir:subdir", "base:base"],
+            ["leaf:leaf", "intermediate2:intermediate2", "base:base"],
+            ["leaf:leaf", "intermediate:intermediate", "base:base"],
         ],
     )
 

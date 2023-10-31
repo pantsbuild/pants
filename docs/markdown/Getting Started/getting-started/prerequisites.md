@@ -30,7 +30,7 @@ System-specific notes
 > 
 > Pants for Linux is currently distributed as a manylinux wheel. Alpine Linux is not covered by manylinux (it uses MUSL libc while manylinux requires glibc), so at present Pants will not run on Alpine Linux. 
 > 
-> If you need to run Pants on Alpine, [let us know](doc:community), so we can prioritize this work. Meanwhile, you can try [building Pants yourself](doc:manual-installation#building-pants-from-sources) on Alpine.
+> If you need to run Pants on Alpine, [let us know](doc:the-pants-community), so we can prioritize this work. Meanwhile, you can try [building Pants yourself](doc:manual-installation#building-pants-from-sources) on Alpine.
 
 > 🚧 Linux on ARM will be supported from Pants 2.16
 > 

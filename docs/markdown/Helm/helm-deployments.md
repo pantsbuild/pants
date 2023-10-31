@@ -124,7 +124,7 @@ spec:
 ```
 ```python src/deployment/BUILD
 # Overrides the `image` value for the chart using the target address for the first-party docker image.
-helm_deployment(chart="src/chart", values={"image": "src/docker"})
+helm_deployment(chart="src/chart", values={"image": "src/docker:docker"})
 ```
 
 > 📘 Docker image references VS Pants' target addresses
@@ -209,34 +209,47 @@ helm_deployment(
 )
 ```
 
-### Using dynamic values
+Using dynamic values
+--------------------
 
-Inline values also support interpolation of environment variables. Since Pants runs all processes in a hermetic sandbox, to be able to use environment variables you must first tell Pants what variables to make available to the Helm process using the `[helm].extra_env_vars` option. Consider the following example:
+Pants has support for value interpolation in your BUILD files and you can make use of it when defining some of the values of your `helm_deployment`. This is not exclusive to the Helm backend but it's illustrated here to showcase how it could be leveraged to inject environment variables into your charts.
+
+Consider the following example:
 
 ```python src/deployment/BUILD
 helm_deployment(
   name="dev",
   chart="//src/chart",
   values={
-    "configmap.deployedAt": "{env.DEPLOY_TIME}",
+    "configmap.deployedAt": f"{env('DEPLOY_TIME')}",
   },
 )
 ```
-```toml pants.toml
-[helm]
-extra_env_vars = ["DEPLOY_TIME"]
-```
 
-Now you can launch a deployment using the following command:
+In the previous example, Pants will use the value of the `DEPLOY_TIME` environment variable in your inline values, which will be then forwarded to your chart. Now you can launch a deployment using the following command:
 
 ```
 DEPLOY_TIME=$(date) pants experimental-deploy src/deployment:dev
 ```
 
+This isn't restricted to just the `values` field and it can be used in others like shown in the following example:
+
+```python src/deployment/BUILD
+helm_deployment(
+  name="dev",
+  chart="//src/chart",
+  release=f"{env('ORGANIZATION_ID')}-dev",
+  namespace=f"product-{env('NAMESPACE_SUFFIX')}"
+)
+```
+
+As shown above, now the `release` and `namespace` fields are calculated at deploy-time by Pants and, as in the previous example, they will be forwarded to the Helm chart accordingly.
+
+
 > 🚧 Ensuring repeatable deployments
 > 
 > You should always favor using static values (or value files) VS dynamic values in your deployments. Using interpolated environment variables in your deployments can render your deployments non-repetable anymore if those values can affect the behaviour of the system deployed, or what gets deployed (i.e. Docker image addresses).
-> Dynamic values are supported to give the option of passing some info or metadata to the software being deployed (i.e. deploy time, commit hash, etc) or some less harmful settings of a deployment (i.e. replica count. etc). Be careful when chossing the values that are going to be calculated dynamically.
+> Be careful when chossing the values that are going to be calculated dynamically.
 
 Third party chart artifacts
 ---------------------------

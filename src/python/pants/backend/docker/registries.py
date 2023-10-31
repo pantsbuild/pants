@@ -8,6 +8,7 @@ from typing import Any, Iterator
 
 from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 ALL_DEFAULT_REGISTRIES = "<all default registries>"
 
@@ -22,6 +23,18 @@ class DockerRegistryOptionsNotFoundError(DockerRegistryError):
             f"{message}\n\n"
             "Use the [docker].registries configuration option to define custom registries."
         )
+
+
+class DockerRegistryAddressCollisionError(DockerRegistryError):
+    def __init__(self, first, second):
+        message = softwrap(
+            f"""
+            Duplicated docker registry address for aliases: {first.alias}, {second.alias}.
+            Each registry `address` in `[docker].registries` must be unique.
+            """
+        )
+
+        super().__init__(message)
 
 
 @dataclass(frozen=True)
@@ -49,6 +62,9 @@ class DockerRegistryOptions:
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:
+        if self.address in registries:
+            collision = registries[self.address]
+            raise DockerRegistryAddressCollisionError(collision, self)
         registries[self.address] = self
         if self.alias:
             registries[f"@{self.alias}"] = self

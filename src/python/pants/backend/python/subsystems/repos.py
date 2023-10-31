@@ -70,7 +70,7 @@ class PythonRepos(Subsystem):
             are different on different users' machines. For example, the
             path `file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could
             become `file://${{WHEELS_DIR}}/django-3.1.1-py3-none-any.whl`, where each user can
-            configure what WHEELS_DIR points to on their machine.
+            configure what `WHEELS_DIR` points to on their machine.
 
             Expects values in the form `NAME|PATH`, e.g.
             `WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels`. You can specify multiple

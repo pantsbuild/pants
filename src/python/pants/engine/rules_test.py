@@ -67,6 +67,7 @@ def fmt_rule(
     line_sep = "\n" if multiline else " "
     optional_line_sep = "\n" if multiline else ""
 
+    rule = rule.rule.func  # type: ignore[attr-defined]
     type_hints = get_type_hints(rule)
     product = type_hints.pop("return").__name__
     params = f",{line_sep}".join(t.__name__ for t in type_hints.values())
@@ -315,22 +316,22 @@ class TestRuleArgumentAnnotation:
         def a_named_rule(a: int, b: str) -> bool:
             return False
 
-        assert a_named_rule.rule is not None
+        assert a_named_rule.rule is not None  # type: ignore[attr-defined]
         assert (
-            a_named_rule.rule.canonical_name
+            a_named_rule.rule.canonical_name  # type: ignore[attr-defined]
             == "pants.engine.rules_test.TestRuleArgumentAnnotation.test_annotations_kwargs.a_named_rule"
         )
-        assert a_named_rule.rule.desc is None
-        assert a_named_rule.rule.level == LogLevel.INFO
+        assert a_named_rule.rule.desc is None  # type: ignore[attr-defined]
+        assert a_named_rule.rule.level == LogLevel.INFO  # type: ignore[attr-defined]
 
         @rule(canonical_name="something_different", desc="Human readable desc")
         def another_named_rule(a: int, b: str) -> bool:
             return False
 
-        assert a_named_rule.rule is not None
-        assert another_named_rule.rule.canonical_name == "something_different"
-        assert another_named_rule.rule.desc == "Human readable desc"
-        assert another_named_rule.rule.level == LogLevel.TRACE
+        assert a_named_rule.rule is not None  # type: ignore[attr-defined]
+        assert another_named_rule.rule.canonical_name == "something_different"  # type: ignore[attr-defined]
+        assert another_named_rule.rule.desc == "Human readable desc"  # type: ignore[attr-defined]
+        assert another_named_rule.rule.level == LogLevel.TRACE  # type: ignore[attr-defined]
 
     def test_bogus_rules(self) -> None:
         with pytest.raises(UnrecognizedRuleArgument):
@@ -351,7 +352,7 @@ class TestRuleArgumentAnnotation:
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        name = some_goal_rule.rule.canonical_name
+        name = some_goal_rule.rule.canonical_name  # type: ignore[attr-defined]
         assert name == "some_other_name"
 
 
@@ -1058,7 +1059,7 @@ def test_param_type_overrides() -> None:
     async def dont_injure_humans(param1: str, param2, param3: list) -> A:
         return A()
 
-    assert dont_injure_humans.rule.input_selectors == (int, dict, list)
+    assert dont_injure_humans.rule.input_selectors == (int, dict, list)  # type: ignore[attr-defined]
 
     with pytest.raises(ValueError, match="paramX"):
 

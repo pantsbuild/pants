@@ -29,20 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 @enum.unique
-class PipVersion(enum.Enum):
-    V20_3_4 = "20.3.4-patched"
-    V22_2_2 = "22.2.2"
-    V22_3 = "22.3"
-    V22_3_1 = "22.3.1"
-    V23_0 = "23.0"
-    V23_0_1 = "23.0.1"
-    V23_1 = "23.1"
-    V23_1_1 = "23.1.1"
-    V23_1_2 = "23.1.2"
-    LATEST = "latest"
-
-
-@enum.unique
 class InvalidLockfileBehavior(enum.Enum):
     error = "error"
     ignore = "ignore"
@@ -64,7 +50,17 @@ class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
 
-    default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
+    default_interpreter_universe = [
+        "2.7",
+        "3.5",
+        "3.6",
+        "3.7",
+        "3.8",
+        "3.9",
+        "3.10",
+        "3.11",
+        "3.12",
+    ]
 
     _interpreter_constraints = StrListOption(
         default=None,
@@ -75,8 +71,8 @@ class PythonSetup(Subsystem):
             These constraints are used as the default value for the `interpreter_constraints`
             field of Python targets.
 
-            Specify with requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with
-            version >=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple
+            Specify with requirement syntax, e.g. `'CPython>=2.7,<3'` (A CPython interpreter with
+            version >=2.7 AND version <3) or `'PyPy'` (A pypy interpreter of any version). Multiple
             constraint strings will be ORed together.
             """
         ),
@@ -132,7 +128,7 @@ class PythonSetup(Subsystem):
             `[isort].interpreter_constraints` to tell Pants which interpreters your code
             actually uses. See {doc_url('python-interpreter-compatibility')}.
 
-            All elements must be the minor and major Python version, e.g. '2.7' or '3.10'. Do
+            All elements must be the minor and major Python version, e.g. `'2.7'` or `'3.10'`. Do
             not include the patch version.
             """
         ),
@@ -228,13 +224,16 @@ class PythonSetup(Subsystem):
             """
         ),
     )
-    pip_version = EnumOption(
-        default=PipVersion.V20_3_4,
+    pip_version = StrOption(
+        default="23.1.2",
         help=softwrap(
-            """
+            f"""
             Use this version of Pip for resolving requirements and generating lockfiles.
 
-            N.B.: The `latest` value selects the latest of the listed choices which is not
+            The value used here must be one of the Pip versions supported by the underlying PEX
+            version. See {doc_url("pex")} for details.
+
+            N.B.: The `latest` value selects the latest of the choices listed by PEX which is not
             necessarily the latest Pip version released on PyPI.
             """
         ),
@@ -257,8 +256,8 @@ class PythonSetup(Subsystem):
 
             Pants will validate that the interpreter constraints of your code using a
             resolve are compatible with that resolve's own constraints. For example, if your
-            code is set to use ['==3.9.*'] via the `interpreter_constraints` field, but it's
-            using a resolve whose interpreter constraints are set to ['==3.7.*'], then
+            code is set to use `['==3.9.*']` via the `interpreter_constraints` field, but it's
+            using a resolve whose interpreter constraints are set to `['==3.7.*']`, then
             Pants will error explaining the incompatibility.
 
             The keys must be defined as resolves in `[python].resolves`.
@@ -465,7 +464,7 @@ class PythonSetup(Subsystem):
             """
             Whether to allow resolution of manylinux wheels when resolving requirements for
             foreign linux platforms. The value should be a manylinux platform upper bound,
-            e.g.: 'manylinux2010', or else the string 'no' to disallow.
+            e.g. `'manylinux2010'`, or else the string `'no'` to disallow.
             """
         ),
         advanced=True,
@@ -539,9 +538,9 @@ class PythonSetup(Subsystem):
         default=False,
         help=softwrap(
             """
-            If set, and if running on MacOS Big Sur, use macosx_10_16 as the platform
-            when building wheels. Otherwise, the default of macosx_11_0 will be used.
-            This may be required for pip to be able to install the resulting distribution
+            If set, and if running on macOS Big Sur, use `macosx_10_16` as the platform
+            when building wheels. Otherwise, the default of `macosx_11_0` will be used.
+            This may be required for `pip` to be able to install the resulting distribution
             on Big Sur.
             """
         ),

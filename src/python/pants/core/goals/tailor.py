@@ -10,9 +10,10 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs import AncestorGlobSpec, RawSpecs, Specs
+from pants.base.specs import AncestorGlobSpec, DirLiteralSpec, RawSpecs, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -572,6 +573,48 @@ async def edit_build_files(
     return EditedBuildFiles(new_digest, tuple(sorted(created)), tuple(sorted(updated)))
 
 
+def spec_with_build_to_dir(spec: RawSpecs, build_file_patterns: tuple[str, ...]) -> RawSpecs:
+    """Convert a spec like `path/to/BUILD` into `path/to`, which is probably the intention."""
+
+    filespec_matcher = FilespecMatcher(build_file_patterns, ())
+
+    def is_build_file(s: str):
+        return bool(filespec_matcher.matches([s]))
+
+    new_file_literals = []
+    new_dir_literals = []
+
+    # handles existing BUILD files
+    for file_literal in spec.file_literals:
+        path = Path(file_literal.file)
+        if is_build_file(path.name):
+            # convert FileLiteralSpec into DirLiteralSpec
+            new_dir_literals.append(DirLiteralSpec(path.parent.as_posix()))
+        else:
+            new_file_literals.append(file_literal)
+
+    # If the BUILD file doesn't exist (possibly because it was deleted)
+    # it will appear as a dir_literal
+    for dir_literal in spec.dir_literals:
+        path = Path(dir_literal.directory)
+        if is_build_file(path.name):
+            new_dir_literals.append(DirLiteralSpec(path.parent.as_posix()))
+        else:
+            new_dir_literals.append(dir_literal)
+
+    return dataclasses.replace(
+        spec, dir_literals=tuple(new_dir_literals), file_literals=tuple(new_file_literals)
+    )
+
+
+def resolve_specs_with_build(specs: Specs, build_file_patterns: tuple[str, ...]) -> Specs:
+    """Convert Specs with specs like `path/to/BUILD` into `path/to`, which is probably the
+    intention."""
+    new_includes = spec_with_build_to_dir(specs.includes, build_file_patterns)
+    new_ignores = spec_with_build_to_dir(specs.ignores, build_file_patterns)
+    return dataclasses.replace(specs, includes=new_includes, ignores=new_ignores)
+
+
 @goal_rule
 async def tailor(
     tailor_subsystem: TailorSubsystem,
@@ -582,6 +625,9 @@ async def tailor(
     build_file_options: BuildFileOptions,
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
+
+    specs = resolve_specs_with_build(specs, build_file_options.patterns)
+
     if not specs:
         if not specs.includes.from_change_detection:
             logger.warning(
@@ -594,6 +640,7 @@ async def tailor(
                       * `{bin_name()} tailor ::` to run on everything
                       * `{bin_name()} tailor dir::` to run on `dir` and subdirs
                       * `{bin_name()} tailor dir` to run on `dir`
+                      * `{bin_name()} tailor dir/{tailor_subsystem.build_file_name}` to run on `dir`
                       * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
                     """
                 )

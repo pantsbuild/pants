@@ -9,7 +9,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, List, Mapping, Union
+from typing import Iterator, List, Mapping, Union, cast
 
 import pytest
 
@@ -25,6 +25,12 @@ from pants.util.strutil import ensure_binary
 
 # NB: If `shell=True`, it's a single `str`.
 Command = Union[str, List[str]]
+
+# Sometimes we mix strings and bytes as keys and/or values, but in most
+# cases we pass strict str->str, and we want both to typecheck.
+# TODO: The complexity of this type, and the casting and # type: ignoring we have to do below,
+#  is a code smell. We should use bytes everywhere, and convert lazily as needed.
+Env = Union[Mapping[str, str], Mapping[bytes, bytes], Mapping[Union[str, bytes], Union[str, bytes]]]
 
 
 @dataclass(frozen=True)
@@ -87,7 +93,7 @@ def run_pants_with_workdir_without_waiting(
     hermetic: bool = True,
     use_pantsd: bool = True,
     config: Mapping | None = None,
-    extra_env: Mapping[str, str] | None = None,
+    extra_env: Env | None = None,
     shell: bool = False,
     set_pants_ignore: bool = True,
 ) -> PantsJoinHandle:
@@ -137,6 +143,7 @@ def run_pants_with_workdir_without_waiting(
     # Only allow-listed entries will be included in the environment if hermetic=True. Note that
     # the env will already be fairly hermetic thanks to the v2 engine; this provides an
     # additional layer of hermiticity.
+    env: dict[Union[str, bytes], Union[str, bytes]]
     if hermetic:
         # With an empty environment, we would generally get the true underlying system default
         # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we
@@ -157,10 +164,11 @@ def run_pants_with_workdir_without_waiting(
                 if value is not None:
                     env[h] = value
     else:
-        env = os.environ.copy()
-    if extra_env:
-        env.update(extra_env)
+        env = cast(dict[Union[str, bytes], Union[str, bytes]], os.environ.copy())
+
     env.update(PYTHONPATH=os.pathsep.join(sys.path), NO_SCIE_WARNING="1")
+    if extra_env:
+        env.update(cast(dict[Union[str, bytes], Union[str, bytes]], extra_env))
 
     # Pants command that was called from the test shouldn't have a parent.
     if "PANTS_PARENT_BUILD_ID" in env:
@@ -170,7 +178,10 @@ def run_pants_with_workdir_without_waiting(
         command=pants_command,
         process=subprocess.Popen(
             pants_command,
-            env=env,
+            # The type stub for the env argument is unnecessarily restrictive: it requires
+            # all keys to be str or all to be bytes. But in practice Popen supports a mix,
+            # which is what we pass. So we silence the typechecking error.
+            env=env,  # type: ignore
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -187,7 +198,7 @@ def run_pants_with_workdir(
     hermetic: bool = True,
     use_pantsd: bool = True,
     config: Mapping | None = None,
-    extra_env: Mapping[str, str] | None = None,
+    extra_env: Env | None = None,
     stdin_data: bytes | str | None = None,
     shell: bool = False,
     set_pants_ignore: bool = True,
@@ -211,7 +222,7 @@ def run_pants(
     hermetic: bool = True,
     use_pantsd: bool = False,
     config: Mapping | None = None,
-    extra_env: Mapping[str, str] | None = None,
+    extra_env: Env | None = None,
     stdin_data: bytes | str | None = None,
 ) -> PantsResult:
     """Runs Pants in a subprocess.

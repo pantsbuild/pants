@@ -9,9 +9,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
+from pants.backend.python.target_types import (
+    PythonRequirementFindLinksField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
@@ -42,11 +45,13 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.pip_requirement import PipRequirement
 
 
 @dataclass(frozen=True)
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
+    find_links: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
 
     @property
@@ -114,7 +119,7 @@ async def generate_lockfile(
                 # want to let users change this, as `style=strict` is safer.
                 "--style=universal",
                 "--pip-version",
-                python_setup.pip_version.value,
+                python_setup.pip_version,
                 "--resolver-version",
                 "pip-2020-resolver",
                 # PEX files currently only run on Linux and Mac machines; so we hard code this
@@ -131,6 +136,7 @@ async def generate_lockfile(
                 "mac",
                 # This makes diffs more readable when lockfiles change.
                 "--indent=2",
+                *(f"--find-links={link}" for link in req.find_links),
                 *pip_args_setup.args,
                 *req.interpreter_constraints.generate_pex_arg_list(),
                 *req.requirements,
@@ -220,17 +226,20 @@ async def setup_user_lockfile_requests(
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
+    find_links: set[str] = set()
     for tgt in all_targets:
         if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
             continue
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
         resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
+        find_links.update(tgt[PythonRequirementFindLinksField].value or ())
 
     return UserGenerateLockfiles(
         GeneratePythonLockfile(
             requirements=PexRequirements.req_strings_from_requirement_fields(
                 resolve_to_requirements_fields[resolve]
             ),
+            find_links=FrozenOrderedSet(find_links),
             interpreter_constraints=InterpreterConstraints(
                 python_setup.resolves_to_interpreter_constraints.get(
                     resolve, python_setup.interpreter_constraints

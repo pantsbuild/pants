@@ -235,11 +235,12 @@ class KotlincPluginTarget(Target):
         plugin if that name cannot be inferred from the `name` of this target.
 
         The standard `kotlinc` plugins are available via the following artifact coordinates and IDs:
+
         * All-open: `org.jetbrains.kotlin:kotlin-allopen:VERSION` (ID: `all-open`)
         * No-arg: `org.jetbrains.kotlin:kotlin-noarg:VERSION` (ID: `no-arg`)
         * SAM with receiver: `org.jetbrains.kotlin:kotlin-sam-with-receiver:VERSION` (ID: `sam-with-receiver`)
         * kapt (annotation processor): `org.jetbrains.kotlin:org.jetbrains.kotlin:kotlin-annotation-processing-embeddable:VERSION` (ID: `kapt3`)
-        * Seralization: `org.jetbrains.kotlin:kotlin-serialization:VERSION` (ID: `serialization`)
+        * Serialization: `org.jetbrains.kotlin:kotlin-serialization:VERSION` (ID: `serialization`)
         """
     )
 

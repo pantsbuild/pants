@@ -15,7 +15,7 @@ from pants.backend.javascript.package_json import (
     OwningNodePackageRequest,
     PackageJsonSourceField,
 )
-from pants.backend.javascript.subsystems.nodejs import NodeJS
+from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
 from pants.build_graph.address import Address
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.selectors import Get
@@ -23,7 +23,6 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
-from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -76,10 +75,6 @@ class NodeJSProjectResolves(FrozenDict[str, NodeJSProject]):
     pass
 
 
-class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
-    pass
-
-
 @rule
 async def resolve_to_projects(
     all_projects: AllNodeJSProjects, user_chosen_resolves: UserChosenNodeJSResolveAliases
@@ -104,11 +99,6 @@ async def resolve_to_first_party_node_package(
     return FirstPartyNodePackageResolves(
         (resolve, by_dir[project.root_dir]) for resolve, project in resolves.items()
     )
-
-
-@rule(level=LogLevel.DEBUG)
-async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolveAliases:
-    return UserChosenNodeJSResolveAliases((value, key) for key, value in nodejs.resolves.items())
 
 
 def rules() -> Iterable[Rule | UnionRule]:

@@ -42,7 +42,7 @@ class GoStdLibPackage:
 
     # Embed configuration.
     #
-    # Note: `EmbedConfig` is not resolved here to avoid issues with trying to build the the embed analyzer.
+    # Note: `EmbedConfig` is not resolved here to avoid issues with trying to build the embed analyzer.
     # The `EmbedConfig` will be resolved in `build_pkg_target.py` rules.
     embed_patterns: tuple[str, ...]
     embed_files: tuple[str, ...]

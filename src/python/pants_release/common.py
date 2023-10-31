@@ -1,27 +1,16 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""Utils for scripts to interface with the outside world.
-
-NB: We intentionally only use the standard library here, rather than using
-Pants code and/or 3rd-party dependencies like `colors`, to ensure that all
-scripts that import this file may still be invoked directly, rather than having
-to run via `./pants run`.
-
-We want to allow direct invocation of scripts for these reasons:
-1) Consistency with how we invoke Bash scripts, which notably may _not_ be ran via `./pants run`.
-2) More ergonomic command line arguments, e.g. `./src/python/pants_release/generate_github_workflows.py [args]`,
-   rather than `./pants run src/python/pants_release:generate_github_workflows -- [args]`.
-3) Avoid undesired dependencies on Pants for certain scripts.
-
-Callers of this file, however, are free to dogfood Pants as they'd like, and any script
-may be called via `./pants run` instead of direct invocation if desired.
-"""
 from __future__ import annotations
 
 import subprocess
+import sys
 import time
+from pathlib import Path
 from typing import NoReturn
+
+VERSION_PATH = Path("src/python/pants/VERSION")
+CONTRIBUTORS_PATH = Path("CONTRIBUTORS.md")
 
 _SCRIPT_START_TIME = time.time()
 
@@ -36,12 +25,15 @@ def die(message: str) -> NoReturn:
 
 
 def green(message: str) -> None:
-    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}")
+    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}", file=sys.stderr)
 
 
 def banner(message: str) -> None:
     minutes, seconds = elapsed_time()
-    print(f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}")
+    print(
+        f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}",
+        file=sys.stderr,
+    )
 
 
 def elapsed_time() -> tuple[int, int]:
@@ -50,15 +42,15 @@ def elapsed_time() -> tuple[int, int]:
     return elapsed_seconds // 60, elapsed_seconds % 60
 
 
-def git_merge_base() -> str:
-    get_tracking_branch = [
-        "git",
-        "rev-parse",
-        "--symbolic-full-name",
-        "--abbrev-ref",
-        "HEAD@{upstream}",
-    ]
-    process = subprocess.run(
-        get_tracking_branch, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
+def sorted_contributors(git_range: str) -> list[str]:
+    contributors = set(
+        subprocess.run(
+            ["git", "log", "--use-mailmap", "--format=format:%aN", git_range],
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+        .stdout.decode()
+        .splitlines()
     )
-    return str(process.stdout.rstrip()) if process.stdout else "main"
+    contributors -= {"dependabot[bot]", "Worker Pants (Pantsbuild GitHub Automation Bot)"}
+    return sorted(contributors)

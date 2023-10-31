@@ -105,7 +105,7 @@ async def isort_fmt(
             keep_sandboxes=keep_sandboxes,
         )
 
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+    return await FmtResult.create(request, result)
 
 
 def rules():

@@ -14,8 +14,9 @@ class BUILDDeprecationsFixer(Subsystem):
         A tool/plugin for fixing BUILD file deprecations (where possible).
 
         This includes deprecations for:
-        - Renamed targets
-        - Renamed fields
+
+          - Renamed targets
+          - Renamed fields
         """
     )
 

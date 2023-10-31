@@ -187,10 +187,6 @@ async def get_pyenv_install_info(
                             shutil.rmtree(SPECIFIC_VERSION_PATH, ignore_errors=True)
 
                             subprocess.run(["{pyenv.exe}", "install", SPECIFIC_VERSION], check=True)
-                            # Removing write perms helps ensure users aren't accidentally modifying
-                            # Python or the site-packages
-                            subprocess.run(["chmod", "-R", "-w", str(SPECIFIC_VERSION_PATH)], check=True)
-                            subprocess.run(["chmod", "+w", str(SPECIFIC_VERSION_PATH)], check=True)
                             DONEFILE_PATH.touch()
 
                         if __name__ == "__main__":
@@ -212,8 +208,7 @@ async def get_pyenv_install_info(
             "TMPDIR": "{chroot}/tmpdir",
             **installation_env_vars,
         },
-        immutable_input_digests=bootstrap_python.immutable_input_digests,
-        append_only_caches=PYENV_APPEND_ONLY_CACHES,
+        append_only_caches={**PYENV_APPEND_ONLY_CACHES, **bootstrap_python.APPEND_ONLY_CACHES},
     )
 
 

@@ -60,7 +60,7 @@ class PyOxidizerEntryPointField(StringField):
         This represents the content of PyOxidizer's `python_config.run_module` and leaving this
         field empty will create a REPL binary.
 
-        It is specified with the full module declared: 'path.to.module'.
+        It is specified with the full module declared: `'path.to.module'`.
 
         This field is passed into the PyOxidizer config as-is, and does not undergo validation
         checking.
@@ -116,15 +116,15 @@ class PyOxidizerConfigSourceField(OptionalSingleSourceField):
 
         The path is relative to the BUILD file's directory, and it must end in `.blzt`.
 
-        All parameters must be prefixed by $ or surrounded with ${ }.
+        All parameters must be prefixed by `$` or surrounded with `${ }`.
 
         Available template parameters:
 
-          * RUN_MODULE - The re-formatted entry_point passed to this target (or None).
+          * RUN_MODULE - The re-formatted `entry_point` passed to this target (or None).
           * NAME - This target's name.
-          * WHEELS - All python distributions passed to this target (or []).
+          * WHEELS - All python distributions passed to this target (or `[]`).
           * UNCLASSIFIED_RESOURCE_INSTALLATION - This will populate a snippet of code to correctly\
-            inject the targets filesystem_resources.
+            inject the targets `filesystem_resources`.
         """
     )
 

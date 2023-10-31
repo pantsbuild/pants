@@ -154,6 +154,6 @@ The format can be `zip`, `tar`, `tar.xz`, `tar.gz`, or `tar.bz2`.
 
 The `packages` field is a list of targets that can be built using `pants package`, such as `pex_binary`, `python_aws_lambda_function`, and even other `archive` targets. Pants will build the packages as if you had run `pants package`. It will include the results in your archive using the same name they would normally have, but without the `dist/` prefix.
 
-The `files` field is a list of `file`, `files`, and `relocated_files` targets. See [resources](doc:resources) for more details.
+The `files` field is a list of `file`, `files`, and `relocated_files` targets.
 
 You can optionally set the field `output_path` to change the generated archive's name.

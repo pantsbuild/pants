@@ -6,12 +6,11 @@ from __future__ import annotations
 import itertools
 import logging
 from abc import ABC, ABCMeta
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, Sequence, Tuple, TypeVar, cast
 
-from pants.base.deprecated import deprecated
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -67,7 +66,7 @@ from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized, memoized_property
 from pants.util.meta import classproperty
-from pants.util.strutil import help_text, softwrap
+from pants.util.strutil import Simplifier, help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +85,7 @@ class TestResult(EngineAwareReturnType):
     # A None result_metadata indicates a backend that performs its own test discovery/selection
     # and either discovered no tests, or encounted an error, such as a compilation error, in
     # the attempt.
-    result_metadata: ProcessResultMetadata | None
+    result_metadata: ProcessResultMetadata | None  # TODO: Merge elapsed MS of all subproceses
     partition_description: str | None = None
 
     coverage_data: CoverageData | None = None
@@ -97,6 +96,10 @@ class TestResult(EngineAwareReturnType):
     extra_output: Snapshot | None = None
     # True if the core test rules should log that extra output was written.
     log_extra_output: bool = False
+    # All results including failed attempts
+    process_results: Tuple[FallibleProcessResult, ...] = field(default_factory=tuple)
+
+    output_simplifier: Simplifier = Simplifier()
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -134,7 +137,7 @@ class TestResult(EngineAwareReturnType):
 
     @staticmethod
     def from_fallible_process_result(
-        process_result: FallibleProcessResult,
+        process_results: Tuple[FallibleProcessResult, ...],
         address: Address,
         output_setting: ShowOutput,
         *,
@@ -142,7 +145,9 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
         log_extra_output: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
+        process_result = process_results[-1]
         return TestResult(
             exit_code=process_result.exit_code,
             stdout_bytes=process_result.stdout,
@@ -156,11 +161,13 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
             log_extra_output=log_extra_output,
+            process_results=process_results,
+            output_simplifier=output_simplifier,
         )
 
     @staticmethod
     def from_batched_fallible_process_result(
-        process_result: FallibleProcessResult,
+        process_results: Tuple[FallibleProcessResult, ...],
         batch: TestRequest.Batch[_TestFieldSetT, Any],
         output_setting: ShowOutput,
         *,
@@ -168,7 +175,9 @@ class TestResult(EngineAwareReturnType):
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
         log_extra_output: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> TestResult:
+        process_result = process_results[-1]
         return TestResult(
             exit_code=process_result.exit_code,
             stdout_bytes=process_result.stdout,
@@ -182,22 +191,10 @@ class TestResult(EngineAwareReturnType):
             xml_results=xml_results,
             extra_output=extra_output,
             log_extra_output=log_extra_output,
+            output_simplifier=output_simplifier,
             partition_description=batch.partition_metadata.description,
+            process_results=process_results,
         )
-
-    @memoized_property
-    @deprecated(
-        removal_version="2.19.0.dev0", hint="Use `TestResult.stdout_bytes` instead of `stdout`."
-    )
-    def stdout(self) -> str:
-        return self.stdout_bytes.decode(errors="replace")
-
-    @memoized_property
-    @deprecated(
-        removal_version="2.19.0.dev0", hint="Use `TestResult.stderr_bytes` instead of `stderr`."
-    )
-    def stderr(self) -> str:
-        return self.stderr_bytes.decode(errors="replace")
 
     @property
     def description(self) -> str:
@@ -239,6 +236,17 @@ class TestResult(EngineAwareReturnType):
             return LogLevel.DEBUG
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
+    def _simplified_output(self, v: bytes) -> str:
+        return self.output_simplifier.simplify(v.decode(errors="replace"))
+
+    @memoized_property
+    def stdout_simplified_str(self) -> str:
+        return self._simplified_output(self.stdout_bytes)
+
+    @memoized_property
+    def stderr_simplified_str(self) -> str:
+        return self._simplified_output(self.stderr_bytes)
+
     def message(self) -> str:
         if self.exit_code is None:
             return "no tests found."
@@ -252,9 +260,9 @@ class TestResult(EngineAwareReturnType):
             return message
         output = ""
         if self.stdout_bytes:
-            output += f"\n{self.stdout_bytes.decode(errors='replace')}"
+            output += f"\n{self.stdout_simplified_str}"
         if self.stderr_bytes:
-            output += f"\n{self.stderr_bytes.decode(errors='replace')}"
+            output += f"\n{self.stderr_simplified_str}"
         if output:
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
@@ -536,7 +544,7 @@ class TestSubsystem(GoalSubsystem):
             The interactive process used will be immediately blocked waiting for a client before
             continuing.
 
-            This option implies --debug.
+            This option implies `--debug`.
             """
         ),
     )
@@ -561,7 +569,7 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
-    report = BoolOption(default=False, advanced=True, help="Write test reports to --report-dir.")
+    report = BoolOption(default=False, advanced=True, help="Write test reports to `--report-dir`.")
     default_report_path = str(PurePath("{distdir}", "test", "reports"))
     _report_dir = StrOption(
         default=default_report_path,
@@ -580,7 +588,7 @@ class TestSubsystem(GoalSubsystem):
             discarded.
 
             Useful for splitting large numbers of test files across multiple machines in CI.
-            For example, you can run three shards with --shard=0/3, --shard=1/3, --shard=2/3.
+            For example, you can run three shards with `--shard=0/3`, `--shard=1/3`, `--shard=2/3`.
 
             Note that the shards are roughly equal in size as measured by number of files.
             No attempt is made to consider the size of different files, the time they have
@@ -614,6 +622,16 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a test target.",
     )
+    attempts_default = IntOption(
+        default=1,
+        help=softwrap(
+            """
+            The number of attempts to run tests, in case of a test failure.
+            Tests that were retried will include the number of attempts in the summary output.
+            """
+        ),
+    )
+
     batch_size = IntOption(
         "--batch-size",
         default=128,
@@ -628,13 +646,13 @@ class TestSubsystem(GoalSubsystem):
             and then this may be further divided into smaller batches, based on this option.
             This is done:
 
-                1. to avoid OS argument length limits (in processes which don't support argument files)
-                2. to support more stable cache keys than would be possible if all files were operated \
-                    on in a single batch
-                3. to allow for parallelism in test runners which don't have internal \
-                    parallelism, or -- if they do support internal parallelism -- to improve scheduling \
-                    behavior when multiple processes are competing for cores and so internal parallelism \
-                    cannot be used perfectly
+              1. to avoid OS argument length limits (in processes which don't support argument files)
+              2. to support more stable cache keys than would be possible if all files were operated \
+                 on in a single batch
+              3. to allow for parallelism in test runners which don't have internal \
+                 parallelism, or -- if they do support internal parallelism -- to improve scheduling \
+                 behavior when multiple processes are competing for cores and so internal parallelism \
+                 cannot be used perfectly
 
             In order to improve cache hit rates (see 2.), batches are created at stable boundaries,
             and so this value is only a "target" max batch size (rather than an exact value).
@@ -733,10 +751,10 @@ class TestsBatchCompatibilityTagField(StringField, metaclass=ABCMeta):
         `{target_name}`, then the two targets are explicitly compatible and _may_ run in the same
         test runner process. Compatible tests may not end up in the same test runner batch if:
 
-            * There are "too many" compatible tests in a partition, as determined by the \
-                `[test].batch_size` config parameter, or
-            * Compatible tests have some incompatibility in Pants metadata (i.e. different \
-                `resolve`s or `extra_env_vars`).
+          * There are "too many" compatible tests in a partition, as determined by the \
+            `[test].batch_size` config parameter, or
+          * Compatible tests have some incompatibility in Pants metadata (i.e. different \
+            `resolve`s or `extra_env_vars`).
 
         When tests with the same `batch_compatibility_tag` have incompatibilities in some other
         Pants metadata, they will be automatically split into separate batches. This way you can
@@ -886,9 +904,16 @@ async def run_tests(
             test_batches, environment_names, test_subsystem, debug_adapter
         )
 
+    to_test = list(zip(test_batches, environment_names))
     results = await MultiGet(
-        Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName})
-        for batch, environment_name in zip(test_batches, environment_names)
+        Get(
+            TestResult,
+            {
+                batch: TestRequest.Batch,
+                environment_name: EnvironmentName,
+            },
+        )
+        for batch, environment_name in to_test
     )
 
     # Print summary.
@@ -1000,12 +1025,23 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
     assert (
         result.result_metadata is not None
     ), "Skipped test results should not be outputted in the test summary"
-    if result.exit_code == 0:
-        sigil = console.sigil_succeeded()
+    succeeded = result.exit_code == 0
+    retried = len(result.process_results) > 1
+
+    if succeeded:
+        if not retried:
+            sigil = console.sigil_succeeded()
+        else:
+            sigil = console.sigil_succeeded_with_edits()
         status = "succeeded"
     else:
         sigil = console.sigil_failed()
         status = "failed"
+
+    if retried:
+        attempt_msg = f" after {len(result.process_results)} attempts"
+    else:
+        attempt_msg = ""
 
     environment = result.result_metadata.execution_environment.name
     environment_type = result.result_metadata.execution_environment.environment_type
@@ -1027,8 +1063,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    suffix = f" {elapsed_print}{source_desc}"
-    return f"{sigil} {result.description} {status}{suffix}."
+    return f"{sigil} {result.description} {status}{attempt_msg} {elapsed_print}{source_desc}."
 
 
 @dataclass(frozen=True)
@@ -1047,7 +1082,7 @@ async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAwar
 def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
     """Returns a rule that implements TestDebugRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls.Batch})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls.Batch})
     async def get_test_debug_request(request: TestRequest.Batch) -> TestDebugRequest:
         raise NotImplementedError("Testing this target with --debug is not yet supported.")
 
@@ -1058,7 +1093,7 @@ def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
 def _unsupported_debug_adapter_rules(cls: type[TestRequest]) -> Iterable:
     """Returns a rule that implements TestDebugAdapterRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls.Batch})
+    @rule(canonical_name_suffix=cls.__name__, _param_type_overrides={"request": cls.Batch})
     async def get_test_debug_adapter_request(request: TestRequest.Batch) -> TestDebugAdapterRequest:
         raise NotImplementedError(
             "Testing this target type with a debug adapter is not yet supported."

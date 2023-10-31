@@ -63,6 +63,8 @@ Created src/helm/example/BUILD:
   - Add helm_chart target example
 ```
 
+If your workspace contains any Helm unit tests (under a `tests` folder), Pants will also idenfity them and create `helm_unittest_tests` targets for them. Additionally, if your unit tests also have snapshots (under a `tests/__snapshot__` folder), `tailor` will identify those files as test snapshots and will create `resources` targets for them. See "Snapshot testing" below for more info.
+
 Basic operations
 ----------------
 
@@ -110,6 +112,44 @@ Built Helm chart artifact: testprojects.src.helm.example/example/example-0.2.0.t
 ```
 
 The final output folder can customised using the `output_path` field in the `helm_chart` target. Run `pants help helm_chart` for more information.
+
+### Helm chart version
+
+Helm charts are versioned artifacts with the value of the `version` field in `Chart.yaml` determining the actual version of the chart. Pants needs to know the version of a first party chart to be able to build packages and correctly establish the dependencies among them. By default, Pants will use the value in `Chart.yaml` as the given version of a chart but it also supports overriding that value via the `version` field in the `helm_chart` target.
+
+For example, a chart defined as such:
+
+```python src/helm/example/BUILD
+helm_chart()
+```
+```yaml src/helm/example/Chart.yaml
+apiVersion: v2
+description: Example Helm chart
+name: example
+version: 0.1.0
+```
+
+Will be understood to have version `0.1.0` (as read from the `Chart.yaml` file). However, if we specify a version in `helm_chart` as follows:
+
+```python src/helm/example/BUILD
+helm_chart(version="2.0.0")
+```
+```yaml src/helm/example/Chart.yaml
+apiVersion: v2
+description: Example Helm chart
+name: example
+version: 0.1.0
+```
+
+Now the value in `Chart.yaml` will be ignored and the chart will be understood to have version `2.0.0`.
+
+Because Pants has support for interpolating values in the target fields, we can also make this version value more dynamic as follows:
+
+```python src/helm/example/BUILD
+helm_chart(version=env('HELM_CHART_VERSION'))
+```
+
+Now the version value for this chart will be what has been set as the value of the environment variable `HELM_CHART_VERSION`.
 
 Helm Unit tests
 ===============
@@ -253,6 +293,20 @@ tests:
 > not affected by the source roots setting. When using `relocated_files`, the files will be relative
 > to the value set in the `dest` field.
 
+### Snapshot testing
+
+Unit test snapshots are supported by Pants by wrapping the snapshots in resources targets, as shown in the previous section. Snapshot resources will be automatically inferred as dependencies of the tests where they reside, so there is no need to add a explicit `dependencies` relationship in your `helm_unittest_tests` targets.
+
+Since managing snapshots by hand is quite tedious, Pants provides some utilities to manage them in a simpler way. To generate or update the snapshots, use Pants's `generate-snapshots` goal:
+
+```
+pants generate-snapshots ::
+```
+
+This will generate test snapshots for tests that require them, with out-of-date snapshots being overwritten by newer ones.
+
+If new `__snapshot__` folders are created after running the `generate-snapshots` target, we recommend running the `tailor` goal again so that Pants can detect these new folders and create `resources` targets as appropriate.
+
 ### Timeouts
 
 Pants can cancel tests that take too long, which is useful to prevent tests from hanging indefinitely.
@@ -368,7 +422,7 @@ Managing Chart Dependencies
 
 Helm charts can depend on other charts, whether first-party charts defined in the same repo, or third-party charts published in a registry. Pants uses this dependency information to know when work needs to be re-run. 
 
-> 📘 Chart.yaml version
+> 📘 Chart.yaml API version
 > 
 > To benefit from Pants dependency management and inference in your Helm charts, you will need to use `apiVersion: v2` in your `Chart.yaml` file.
 

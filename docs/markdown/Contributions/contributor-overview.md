@@ -87,7 +87,7 @@ See our [Style guide](doc:style-guide) for some Python conventions we follow.
 > 
 > You do not need to fully finish your change before asking for feedback. We'd be eager to help you while iterating.
 > 
-> If doing this, please open your pull request as a "Draft" and prefix your PR title with "WIP". Then, comment on the PR asking for feedback and/or post a link to the PR in [Slack](doc:community).
+> If doing this, please open your pull request as a "Draft" and prefix your PR title with "WIP". Then, comment on the PR asking for feedback and/or post a link to the PR in [Slack](doc:the-pants-community).
 
 Opening a pull request
 ----------------------

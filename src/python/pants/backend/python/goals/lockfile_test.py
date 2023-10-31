@@ -51,6 +51,7 @@ def _generate(
         [
             GeneratePythonLockfile(
                 requirements=FrozenOrderedSet([f"ansicolors{ansicolors_version}"]),
+                find_links=FrozenOrderedSet([]),
                 interpreter_constraints=InterpreterConstraints(),
                 resolve_name="test",
                 lockfile_dest="test.lock",
@@ -236,6 +237,7 @@ def test_multiple_resolves() -> None:
     assert set(result) == {
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["a"]),
+            find_links=FrozenOrderedSet([]),
             interpreter_constraints=InterpreterConstraints(["CPython>=3.7,<3.10"]),
             resolve_name="a",
             lockfile_dest="a.lock",
@@ -243,6 +245,7 @@ def test_multiple_resolves() -> None:
         ),
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["b"]),
+            find_links=FrozenOrderedSet([]),
             interpreter_constraints=InterpreterConstraints(["==3.7.*"]),
             resolve_name="b",
             lockfile_dest="b.lock",

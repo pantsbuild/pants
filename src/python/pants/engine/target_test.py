@@ -1510,6 +1510,6 @@ def test_generate_file_based_overrides_field_help_message() -> None:
         }
         """,
     )
-    assert "example:\n    overrides={\n" in message
+    assert "example:\n\n    overrides={\n" in message
     assert '\n        "bar.proto"' in message
     assert "\n    }\n\nFile" in message

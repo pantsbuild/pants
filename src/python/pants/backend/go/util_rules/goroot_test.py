@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from pants.backend.go.util_rules.go_bootstrap_test import (
+from pants.backend.go.util_rules.goroot import GoRoot
+from pants.backend.go.util_rules.goroot import rules as goroot_rules
+from pants.backend.go.util_rules.testutil import (
     EXPECTED_VERSION,
     EXPECTED_VERSION_NEXT_RELEASE,
     mock_go_binary,
 )
-from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.goroot import rules as goroot_rules
 from pants.core.util_rules.system_binaries import BinaryNotFoundError
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule

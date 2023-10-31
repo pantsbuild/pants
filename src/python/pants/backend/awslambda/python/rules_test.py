@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from io import BytesIO
 from textwrap import dedent
 from zipfile import ZipFile
@@ -21,8 +20,6 @@ from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonA
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.subsystems.lambdex import Lambdex
-from pants.backend.python.subsystems.lambdex import rules as awslambda_python_subsystem_rules
 from pants.backend.python.target_types import (
     PexBinary,
     PythonRequirementTarget,
@@ -42,7 +39,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import FieldSet
-from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
 
@@ -52,7 +48,6 @@ def rule_runner() -> PythonRuleRunner:
     rule_runner = PythonRuleRunner(
         rules=[
             *awslambda_python_rules(),
-            *awslambda_python_subsystem_rules(),
             *core_target_types_rules(),
             *package_pex_binary.rules(),
             *python_target_types_rules(),
@@ -129,95 +124,7 @@ def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     ).stdout
 
 
-@pytest.mark.platform_specific_behavior
-@pytest.mark.parametrize(
-    "major_minor_interpreter",
-    all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
-)
-def test_create_hello_world_lambda_with_lambdex(
-    rule_runner: PythonRuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
-) -> None:
-    rule_runner.write_files(
-        {
-            "src/python/foo/bar/hello_world.py": dedent(
-                """
-                import mureq
-
-                def handler(event, context):
-                    print('Hello, World!')
-                """
-            ),
-            "src/python/foo/bar/platform.json": complete_platform,
-            "src/python/foo/bar/BUILD": dedent(
-                """
-                python_requirement(name="mureq", requirements=["mureq==0.2"])
-                python_sources(name='lib')
-
-                file(name="platform", source="platform.json")
-                python_aws_lambda_function(
-                    name='lambda',
-                    dependencies=[':lib'],
-                    handler='foo.bar.hello_world:handler',
-                    runtime='python3.7',
-                    complete_platforms=[':platform'],
-                )
-                python_aws_lambda_function(
-                    name='slimlambda',
-                    include_requirements=False,
-                    dependencies=[':lib'],
-                    handler='foo.bar.hello_world:handler',
-                    runtime='python3.7',
-                )
-                """
-            ),
-        }
-    )
-    zip_file_relpath, content = create_python_awslambda(
-        rule_runner,
-        Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=(
-            "              Runtime: python3.7",
-            "    Complete platform: src/python/foo/bar/platform.json",
-            "              Handler: lambdex_handler.handler",
-        ),
-        extra_args=[
-            f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']",
-            "--lambdex-layout=lambdex",
-        ],
-    )
-    assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
-    zipfile = ZipFile(BytesIO(content))
-    names = set(zipfile.namelist())
-    assert "lambdex_handler.py" in names
-    assert (
-        ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" in names
-    ), "third-party dep `mureq` must be included"
-    if sys.platform == "darwin":
-        assert (
-            "`python_aws_lambda_function` targets built on macOS may fail to build." in caplog.text
-        )
-
-    zip_file_relpath, content = create_python_awslambda(
-        rule_runner,
-        Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=(
-            "    Runtime: python3.7",
-            "    Handler: lambdex_handler.handler",
-        ),
-        extra_args=[
-            f"--lambdex-interpreter-constraints=['=={major_minor_interpreter}.*']",
-            "--lambdex-layout=lambdex",
-        ],
-    )
-    assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
-    zipfile = ZipFile(BytesIO(content))
-    names = set(zipfile.namelist())
-    assert (
-        ".deps/mureq-0.2.0-py3-none-any.whl/mureq/__init__.py" not in names
-    ), "Using include_requirements=False should exclude third-party deps"
-
-
-def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) -> None:
+def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -266,9 +173,8 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
         Address("src/py/project", target_name="lambda"),
         expected_extra_log_lines=(
             "    Runtime: python3.7",
-            "    Handler: lambdex_handler.handler",
+            "    Handler: lambda_function.handler",
         ),
-        extra_args=["--lambdex-layout=lambdex"],
     )
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
@@ -281,7 +187,16 @@ def test_warn_files_targets_with_lambdex(rule_runner: PythonRuleRunner, caplog) 
     assert "assets:resources" not in caplog.text
 
 
-def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("ics", "runtime"),
+    [
+        pytest.param(["==3.7.*"], None, id="runtime inferred from ICs"),
+        pytest.param(None, "python3.7", id="runtime explicitly set"),
+    ],
+)
+def test_create_hello_world_lambda(
+    ics: list[str] | None, runtime: None | str, rule_runner: PythonRuleRunner
+) -> None:
     rule_runner.write_files(
         {
             "src/python/foo/bar/hello_world.py": dedent(
@@ -293,20 +208,20 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
                 """
             ),
             "src/python/foo/bar/BUILD": dedent(
-                """
+                f"""
                 python_requirement(name="mureq", requirements=["mureq==0.2"])
-                python_sources()
+                python_sources(interpreter_constraints={ics!r})
 
                 python_aws_lambda_function(
                     name='lambda',
                     handler='foo.bar.hello_world:handler',
-                    runtime="python3.7",
+                    runtime={runtime!r},
                 )
                 python_aws_lambda_function(
                     name='slimlambda',
                     include_requirements=False,
                     handler='foo.bar.hello_world:handler',
-                    runtime="python3.7",
+                    runtime={runtime!r},
                 )
                 """
             ),
@@ -316,7 +231,10 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=("    Handler: lambda_function.handler",),
+        expected_extra_log_lines=(
+            "    Runtime: python3.7",
+            "    Handler: lambda_function.handler",
+        ),
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
 
@@ -331,7 +249,10 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=("    Handler: lambda_function.handler",),
+        expected_extra_log_lines=(
+            "    Runtime: python3.7",
+            "    Handler: lambda_function.handler",
+        ),
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
 
@@ -379,7 +300,7 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=(),
+        expected_extra_log_lines=("    Runtime: python3.7",),
         layer=True,
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
@@ -394,7 +315,7 @@ def test_create_hello_world_layer(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=(),
+        expected_extra_log_lines=("    Runtime: python3.7",),
         layer=True,
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
@@ -418,6 +339,6 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
         create_python_awslambda(
             rule_runner,
             Address("", target_name="lambda"),
-            expected_extra_log_lines=(),
+            expected_extra_log_lines=("    Runtime: python3.7",),
             layer=True,
         )

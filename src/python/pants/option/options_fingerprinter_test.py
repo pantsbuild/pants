@@ -33,12 +33,6 @@ def test_fingerprint_dict() -> None:
     assert fp1 != fp3
 
 
-def test_fingerprint_dict_with_non_string_keys() -> None:
-    d = {("a", 2): (3, 4)}
-    fp = OptionsFingerprinter().fingerprint(DictValueComponent.create, d)
-    assert fp == "3852a094612ce1c22c08ee2ddcdc03d09e87ad97"
-
-
 def test_fingerprint_list() -> None:
     l1 = [1, 2, 3]
     l2 = [1, 3, 2]

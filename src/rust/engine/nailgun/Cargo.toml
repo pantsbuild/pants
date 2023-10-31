@@ -7,14 +7,14 @@ publish = false
 
 [dependencies]
 async_latch = { path = "../async_latch" }
-bytes = "1.2"
-futures = "0.3"
-log = "0.4"
-nails = "0.13"
-os_pipe = { version = "1.1", features = ["io_safety"] }
+bytes = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+nails = { workspace = true }
+os_pipe = { workspace = true, features = ["io_safety"] }
 task_executor = { path = "../task_executor" }
-tokio = { version = "1.28", features = ["fs", "io-std", "io-util", "net", "signal", "sync"] }
-tokio-stream = "0.1"
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "net", "signal", "sync"] }
+tokio-stream = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1.28", features = ["io-std", "macros", "net", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["io-std", "macros", "net", "rt-multi-thread"] }

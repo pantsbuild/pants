@@ -138,6 +138,11 @@ class Parser:
     def scope(self) -> str:
         return self._scope
 
+    @property
+    def known_scoped_args(self) -> frozenset[str]:
+        prefix = f"{self.scope}-" if self.scope != GLOBAL_SCOPE else ""
+        return frozenset(f"--{prefix}{arg.lstrip('--')}" for arg in self._known_args)
+
     def history(self, dest: str) -> OptionValueHistory | None:
         return self._history.get(dest)
 

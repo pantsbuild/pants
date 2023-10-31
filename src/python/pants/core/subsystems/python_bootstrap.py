@@ -37,7 +37,7 @@ class PythonBootstrapSubsystem(Subsystem):
     options_scope = "python-bootstrap"
     help = help_text(
         """
-        Options used to locate Python interpreters
+        Options used to locate Python interpreters.
 
         This subsystem controls where and how Pants will locate Python, but beyond that it does
         not control which Python interpreter versions are actually used for your code: see the
@@ -80,7 +80,7 @@ class PythonBootstrapSubsystem(Subsystem):
             interpreter constraints. Additionally, the downloaded file should be extractable by
             `tar` using `-xvf` (most likely a `.tar.gz` file).
 
-            The schema is <string platform key>: (<string url>, <string fingerprint>, <int bytelen>)
+            The schema is `<string platform key>: (<string url>, <string fingerprint>, <int bytelen>)`
             for each possible platform.
             """
         ),
@@ -89,7 +89,7 @@ class PythonBootstrapSubsystem(Subsystem):
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
         search_path = StrListOption(
-            default=["<PYENV>", "<PATH>"],
+            default=["<PYENV>", AsdfPathString.STANDARD.value, "<PATH>"],
             help=softwrap(
                 f"""
                 A list of paths to search for Python interpreters.
@@ -112,9 +112,9 @@ class PythonBootstrapSubsystem(Subsystem):
 
                 * `{AsdfPathString.STANDARD}`, {AsdfPathString.STANDARD.description("Python")}
                 * `{AsdfPathString.LOCAL}`, {AsdfPathString.LOCAL.description("interpreter")}
-                * `<PYENV>`, all Python versions under $(pyenv root)/versions
-                * `<PYENV_LOCAL>`, the Pyenv interpreter with the version in BUILD_ROOT/.python-version
-                * `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc
+                * `<PYENV>`, all Python versions under `$(pyenv root)/versions`
+                * `<PYENV_LOCAL>`, the Pyenv interpreter with the version in `BUILD_ROOT/.python-version`
+                * `<PEXRC>`, paths in the `PEX_PYTHON_PATH` variable in `/etc/pexrc` or `~/.pexrc`
                 """
             ),
             advanced=True,

@@ -58,7 +58,7 @@ class JvmToolBase(Subsystem):
         help=lambda cls: softwrap(
             f"""
             Artifact requirements for this tool using specified as either the address of a `jvm_artifact`
-            target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version).
+            target or, alternatively, as a colon-separated Maven coordinates (e.g., `group:name:version`).
             For Maven coordinates, the string `{{version}}` version will be substituted with the value of the
             `[{cls.options_scope}].version` option.
             """

@@ -28,7 +28,7 @@ backend_packages = [
 
 Once you have become familiar with the [core concepts of Targets and Fields](https://www.pantsbuild.org/docs/target-api-concepts), you are ready to [create an own custom target](https://www.pantsbuild.org/docs/target-api-new-targets) that will represent the `VERSION` file:
 
-```python pants-plugins/project_version/targets.py
+```python pants-plugins/project_version/target_types.py
 from pants.engine.target import COMMON_TARGET_FIELDS, SingleSourceField, Target
 
 
@@ -126,6 +126,7 @@ class ProjectVersionSubsystem(GoalSubsystem):
 
 class ProjectVersionGoal(Goal):
     subsystem_cls = ProjectVersionSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -345,6 +346,7 @@ class ProjectVersionSubsystem(GoalSubsystem):
 
 class ProjectVersionGoal(Goal):
     subsystem_cls = ProjectVersionSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -363,7 +365,7 @@ async def goal_show_project_version(
 def rules():
     return collect_rules()
 ```
-```python pants-plugins/project_version/targets.py
+```python pants-plugins/project_version/target_types.py
 from pants.engine.target import COMMON_TARGET_FIELDS, SingleSourceField, Target
 
 
@@ -391,7 +393,7 @@ def rules():
 Running our goal:
 
 ```
-$ /pants project-version myapp
+$ pants project-version myapp
 ProjectVersionFileView(path='myapp/VERSION', version='0.0.1')
 ```
 

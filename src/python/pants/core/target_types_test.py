@@ -44,11 +44,12 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.option.global_options import UnmatchedBuildFileGlobs
-from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule, mock_console
 
 
 def test_relocated_files() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *target_type_rules(),
             *archive.rules(),
@@ -165,7 +166,7 @@ def test_relocated_files() -> None:
 
 
 def test_relocated_relocated_files() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *target_type_rules(),
             *archive.rules(),
@@ -218,7 +219,7 @@ def test_archive() -> None:
     * An `archive` containing another `archive`.
     """
 
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *target_type_rules(),
             *pex_from_targets.rules(),
@@ -313,7 +314,7 @@ def test_archive() -> None:
 
 @pytest.mark.parametrize("use_per_platform", [True, False])
 def test_url_assets(use_per_platform: bool) -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             *target_type_rules(),
             *pex_from_targets.rules(),
