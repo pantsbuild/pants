@@ -4,7 +4,7 @@ from typing import Iterable
 
 from pants.backend.adhoc import run_system_binary
 from pants.backend.adhoc.target_types import SystemBinaryTarget
-from pants.backend.code_quality_tool.lib import (
+from pants.backend.experimental.code_quality_tool.lib import (
     CodeQualityToolRuleBuilder,
     CodeQualityToolTarget,
     base_rules,
