@@ -219,7 +219,7 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
         FallibleProcessResult,
         Process(
             argv=tuple(runner.args + batch.sources_snapshot.files),
-            description="Running byotool",
+            description="Running code quality tool",
             input_digest=input_digest,
             append_only_caches=runner.append_only_caches,
             immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
