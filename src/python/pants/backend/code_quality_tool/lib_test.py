@@ -47,12 +47,12 @@ def test_lint_built_rule():
                 name="flake8",
                 requirements=["flake8==5.0.4"]
             )
-            
+        
             file(
                 name="flake8_conf",
                 source=".flake8"
             )
-            
+        
             code_quality_tool(
                 name="flake8_tool",
                 runnable=":flake8",
@@ -63,6 +63,11 @@ def test_lint_built_rule():
             )
             """
         ),
+        ".flake8": dedent(
+            """
+            [flake8]
+            extend-ignore = F401
+            """),
         "good_fmt.py": "foo = 5\n",
         "unused_import_saved_by_conf.py": "import os\n",
         "messy_ignored_dir/messy_file.py": "ignoreme=10",
@@ -73,11 +78,6 @@ def test_lint_built_rule():
               return 2
             """
         ),
-        ".flake8": dedent(
-            """
-            [flake8]
-            extend-ignore = F401
-            """),
     })
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
