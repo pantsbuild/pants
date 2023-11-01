@@ -40,16 +40,6 @@ def test_lint_built_rule():
         preserve_tmpdirs=True,
     )
 
-    """
-                file(
-                    name="flake8_conf",
-                    source=".flake8"
-                )
-                
-                execution_dependencies=[":flake8_conf"],
-    """
-
-
     rule_runner.write_files({
         "build-support/BUILD": dedent(
             """
@@ -61,9 +51,15 @@ def test_lint_built_rule():
             code_quality_tool(
                 name="flake8_tool",
                 runnable=":flake8",
+                execution_dependencies=[":flake8_conf"],
                 file_glob_include=["**/*.py"],
                 file_glob_exclude=["messy_ignored_dir/**"],
-                args=["--indent-size=2"],
+                args=["--config=build-support/.flake8", "--indent-size=2"],
+            )
+            
+            file(
+                name="flake8_conf",
+                source=".flake8"
             )
             """
         ),
@@ -73,7 +69,7 @@ def test_lint_built_rule():
             extend-ignore = F401
             """),
         "good_fmt.py": "foo = 5\n",
-        # "unused_import_saved_by_conf.py": "import os\n",
+        "unused_import_saved_by_conf.py": "import os\n",
         "messy_ignored_dir/messy_file.py": "ignoreme=10",
         "not_a_dot_py_file.nopy": "notpy=100",
         "indent_2_ok_by_cmd_arg.py": dedent(

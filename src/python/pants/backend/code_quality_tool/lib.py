@@ -325,6 +325,7 @@ class CodeQualityToolRuleBuilder:
                     output_files=(),
                 ))
 
+
             return LintResult.create(request, process_result=proc_result)
 
         namespace = dict(locals())
