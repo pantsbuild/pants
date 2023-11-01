@@ -49,6 +49,13 @@ pub enum Metric {
     RemoteExecutionRPCWaitExecution,
     RemoteExecutionSuccess,
     RemoteExecutionTimeouts,
+    RemoteStoreReadAttempts,
+    RemoteStoreReadCached,
+    RemoteStoreReadUncached,
+    RemoteStoreReadErrors,
+    RemoteStoreWriteAttempts,
+    RemoteStoreWriteSuccesses,
+    RemoteStoreWriteErrors,
     RemoteStoreMissingDigest,
     RemoteStoreRequestTimeouts,
     /// Number of times that we backtracked due to missing digests.
