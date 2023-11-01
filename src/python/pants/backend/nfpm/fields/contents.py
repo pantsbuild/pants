@@ -209,8 +209,6 @@ class NfpmContentFileMtimeField(StringField):
 class NfpmContentFileSourceField(OptionalSingleSourceField):
     nfpm_alias = ""
     none_is_valid_value = True
-    # Maybe set this similar to DockerImageSourceField...
-    # default_glob_match_error_behavior =
     help = help_text(
         lambda: f"""
         A file that should be copied into an nFPM package (optional).
@@ -225,6 +223,24 @@ class NfpmContentFileSourceField(OptionalSingleSourceField):
         how the '{RelocatedFiles.alias}' target works).
         """
     )
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address)
+        # This field should either have a path to a file or it should be None.
+        # If it is a path to a file, we rely on standard glob_match_error_behavior
+        # to inform the user of any issues finding the file.
+        if value_or_default == "":
+            # avoid ambiguity so we can use "is None" checks with this field.
+            raise InvalidFieldException(
+                help_text(
+                    f"""\
+                    The '{cls.alias}' field in target {address} should not be an empty string.
+                    Did you mean to set it to None?
+                    """
+                )
+            )
+        return value_or_default
 
 
 class NfpmContentSrcField(StringField):

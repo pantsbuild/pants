@@ -77,7 +77,13 @@ from pants.backend.nfpm.fields.version import (
     NfpmVersionSchemaField,
 )
 from pants.core.goals.package import OutputPathField
-from pants.engine.target import COMMON_TARGET_FIELDS, Target, TargetGenerator
+from pants.core.target_types import FileTarget
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    InvalidTargetException,
+    Target,
+    TargetGenerator,
+)
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
 
@@ -288,10 +294,30 @@ class NfpmContentFile(Target):
         *CONTENT_FILE_INFO_FIELDS,
     )
     help = help_text(
-        """
+        lambda: f"""
         A file that should be copied into an nFPM package.
+
+        The file comes from either the '{NfpmContentFileSourceField.alias}' field
+        or from the first '{FileTarget.alias}' target listed in the
+        '{NfpmDependencies.alias}' field.
+        
+        The '{NfpmContentSrcField}' field determines where the file goes in the sandbox.
+        The '{NfpmContentDstField}' field tells nFPM where the file should be installed
+        by the nFPM-generated package.
         """
     )
+
+    def validate(self) -> None:
+        if self[NfpmContentFileSourceField].value is None and not self[NfpmDependencies].value:
+            raise InvalidTargetException(
+                help_text(
+                    f"""
+                    The '{self.alias}' target {self.address} must either
+                    define a source file in the '{NfpmContentFileSourceField.alias}' field
+                    or depend on a file target via the '{NfpmDependencies.alias}' field.
+                    """
+                )
+            )
 
 
 class NfpmContentFiles(TargetGenerator):
