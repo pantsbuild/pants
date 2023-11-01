@@ -296,14 +296,14 @@ class NfpmRpmCompressionField(StringField):
         computed_algorithm = super().compute_value(raw_algorithm, address)
         if computed_algorithm not in ("gzip", "zstd"):
             raise InvalidFieldException(
-                f"Values for the {repr(cls.alias)} field in target {address} "
+                f"Values for the '{cls.alias}' field in target {address} "
                 "may only specify a compression level for gzip or zstd compression, "
                 f"but {repr(computed_algorithm)} was provided as {repr(raw_value)}."
             )
 
         if unknown:
             raise InvalidFieldException(
-                f"Values for the {repr(cls.alias)} field in target {address} "
+                f"Values for the '{cls.alias}' field in target {address} "
                 f"must not have more than one ':', but got {len(unknown) + 1}."
                 "Only use ':' to specify an optional compression level after "
                 "the compression algorithm (ie '<algorithm>[:<level>]')."

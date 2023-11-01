@@ -157,7 +157,7 @@ class NfpmDebTriggersField(DictStringToStringSequenceField):
         if value_or_default and not cls.valid_keys.issuperset(value_or_default.keys()):
             invalid_keys = value_or_default.keys() - cls.valid_keys
             raise InvalidFieldException(
-                f"Each key for the {repr(cls.alias)} field in target {address} must be one of"
+                f"Each key for the '{cls.alias}' field in target {address} must be one of"
                 f"{repr(cls.valid_keys)}, but {repr(invalid_keys)} was provided.",
             )
         return value_or_default

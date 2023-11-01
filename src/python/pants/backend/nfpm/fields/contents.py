@@ -158,7 +158,7 @@ class NfpmContentFileModeField(IntField):
                     octal_value = _parse_filemode(raw_value)
                 except ValueError as e:
                     raise InvalidFieldException(
-                        f"The {repr(cls.alias)} field in target {address} must be "
+                        f"The '{cls.alias}' field in target {address} must be "
                         "an octal (like 0o755 or 0o600), "
                         "an octal as a string (like '755' or '600'), "
                         "or a symbolic file mode (like 'rwxr-xr-x' or 'rw-------'). "
@@ -243,7 +243,7 @@ class NfpmContentSrcField(StringField):
         The '{NfpmContentSrcField.alias}' defaults to the file referenced in the
         '{NfpmContentFileSourceField.alias}' field, if provided. Otherwise, this
         defaults to the path of the first '{FileTarget.alias}' target listed in the
-        '{NfpmDependencies.alias}'.
+        '{NfpmDependencies.alias}' field.
 
         If both '{NfpmContentSrcField.alias}' and '{NfpmContentFileSourceField.alias}'
         are populated, then the file in '{NfpmContentFileSourceField.alias}' will be
