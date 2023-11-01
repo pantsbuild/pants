@@ -56,6 +56,11 @@ pub enum Metric {
     RemoteStoreWriteAttempts,
     RemoteStoreWriteSuccesses,
     RemoteStoreWriteErrors,
+    /// Number of network requests to check existance of digests, not the total number of digests
+    /// that were checked (if bulk query)
+    RemoteStoreExistsAttempts,
+    RemoteStoreExistsSuccesses,
+    RemoteStoreExistsErrors,
     RemoteStoreMissingDigest,
     RemoteStoreRequestTimeouts,
     /// Number of times that we backtracked due to missing digests.
