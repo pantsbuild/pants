@@ -81,6 +81,7 @@ from pants.engine.target import COMMON_TARGET_FIELDS, Target, TargetGenerator
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
 
+
 class NfpmPackageTarget(Target):
     pass
 
