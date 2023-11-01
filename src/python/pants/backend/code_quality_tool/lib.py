@@ -1,7 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-from typing import ClassVar, Mapping
+from typing import ClassVar, Iterable, Mapping
 
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult
 from pants.core.goals.lint import LintFilesRequest, LintResult
@@ -12,6 +12,7 @@ from pants.core.util_rules.adhoc_process_support import (
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
 )
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Addresses
@@ -28,7 +29,7 @@ from pants.engine.internals.native_engine import (
 )
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     FieldSetsPerTarget,
@@ -285,7 +286,7 @@ class CodeQualityToolRuleBuilder:
     name: str
     scope: str
 
-    def _build_lint_rules(self):
+    def _build_lint_rules(self) -> Iterable[Rule]:
         class CodeQualityToolInstance(Subsystem):
             options_scope = self.scope
             name = self.name
@@ -339,7 +340,7 @@ class CodeQualityToolRuleBuilder:
             *CodeQualityProcessingRequest.rules(),
         ]
 
-    def _build_fmt_rules(self):
+    def _build_fmt_rules(self) -> Iterable[Rule]:
         class CodeQualityToolInstance(Subsystem):
             options_scope = self.scope
             name = self.name
@@ -401,18 +402,17 @@ class CodeQualityToolRuleBuilder:
             *CodeQualityProcessingRequest.rules(),
         ]
 
-    def build_rules(self):
-        rules = [
-            find_code_quality_tool,
-            process_files,
-            hydrate_code_quality_tool,
-        ]
-
+    def rules(self) -> Iterable[Rule]:
         if self.goal == "fmt":
-            rules.extend(self._build_fmt_rules())
+            return self._build_fmt_rules()
         elif self.goal == "lint":
-            rules.extend(self._build_lint_rules())
+            return self._build_lint_rules()
         else:
             raise ValueError(f"Unsupported goal for code quality tool: {self.goal}")
 
-        return rules
+
+def base_rules():
+    return [
+        *collect_rules(),
+        *adhoc_process_support_rules(),
+    ]

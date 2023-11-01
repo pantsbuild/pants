@@ -2,7 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from textwrap import dedent  # noqa: PNT20
 
-from pants.backend.code_quality_tool.lib import CodeQualityToolRuleBuilder, CodeQualityToolTarget
+from pants.backend.code_quality_tool.lib import (
+    CodeQualityToolRuleBuilder,
+    CodeQualityToolTarget,
+    base_rules,
+)
 from pants.backend.project_info.list_targets import rules as list_rules
 from pants.backend.python import register as register_python
 from pants.backend.python.target_types import PythonRequirementTarget
@@ -20,8 +24,6 @@ def test_lint_built_rule():
         goal="lint", target="build-support:flake8_tool", name="Flake8", scope="flake8_tool"
     )
 
-    code_quality_tool_rules = cfg.build_rules()
-
     rule_runner = RuleRunner(
         target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
         rules=[
@@ -31,7 +33,8 @@ def test_lint_built_rule():
             *list_rules(),
             *adhoc_process_support.rules(),
             *register_python.rules(),
-            *code_quality_tool_rules,
+            *base_rules(),
+            *cfg.rules(),
         ],
         preserve_tmpdirs=True,
     )
@@ -107,8 +110,6 @@ def test_fmt_built_rule():
         goal="fmt", target="//:black_tool", name="Black", scope="black_formatter"
     )
 
-    code_quality_tool_rules = cfg.build_rules()
-
     rule_runner = RuleRunner(
         target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
         rules=[
@@ -118,7 +119,8 @@ def test_fmt_built_rule():
             *list_rules(),
             *adhoc_process_support.rules(),
             *register_python.rules(),
-            *code_quality_tool_rules,
+            *base_rules(),
+            *cfg.rules(),
         ],
         preserve_tmpdirs=True,
     )
@@ -177,8 +179,9 @@ def test_several_formatters():
             *list_rules(),
             *adhoc_process_support.rules(),
             *register_python.rules(),
-            *black_cfg.build_rules(),
-            *isort_cfg.build_rules(),
+            *base_rules(),
+            *black_cfg.rules(),
+            *isort_cfg.rules(),
         ],
         preserve_tmpdirs=True,
     )
