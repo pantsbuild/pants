@@ -44,41 +44,41 @@ from pants.util.frozendict import FrozenDict
 from pants.util.strutil import Simplifier, help_text
 
 
-class FileGlobIncludeField(StringSequenceField):
+class CodeQualityToolFileGlobIncludeField(StringSequenceField):
     alias: ClassVar[str] = "file_glob_include"
     required = True
 
 
-class FileGlobExcludeField(StringSequenceField):
+class CodeQualityToolFileGlobExcludeField(StringSequenceField):
     alias: ClassVar[str] = "file_glob_exclude"
     required = False
     default = ()
 
-class RunnableField(StringField):
+class CodeQualityToolRunnableField(StringField):
     alias: ClassVar[str] = "runnable"
     required = True
     help = help_text(
         lambda: f"""
         Address to a target that can be invoked by the `run` goal (and does not set
         `run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments
-        specified by `{ArgumentsField.alias}`, in a sandbox with that target's transitive
+        specified by `{CodeQualityToolArgumentsField.alias}`, in a sandbox with that target's transitive
         dependencies, along with the transitive dependencies specified by
-        `{ExecutionDependenciesField.alias}`.
+        `{CodeQualityToolExecutionDependenciesField.alias}`.
         """
     )
 
-class ArgumentsField(StringSequenceField):
+class CodeQualityToolArgumentsField(StringSequenceField):
     alias: ClassVar[str] = "args"
     default = ()
     help = help_text(
         lambda: f"""
-        Extra arguments to pass into the `{RunnableField.alias}` field
+        Extra arguments to pass into the `{CodeQualityToolRunnableField.alias}` field
         before the list of source files
         """
     )
 
 
-class ExecutionDependenciesField(SpecialCasedDependencies):
+class CodeQualityToolExecutionDependenciesField(SpecialCasedDependencies):
     alias: ClassVar[str] = "execution_dependencies"
     required = False
     default = None
@@ -86,7 +86,7 @@ class ExecutionDependenciesField(SpecialCasedDependencies):
     help = help_text(
         lambda: f"""
         Additional dependencies that need to be available when running the tool.
-        Typically used to point to config files for the tool.
+        Typically used to point to config files.
         """
     )
 
@@ -95,15 +95,15 @@ class CodeQualityToolTarget(Target):
     alias: ClassVar[str] = "code_quality_tool"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        RunnableField,
-        ArgumentsField,
-        ExecutionDependenciesField,
-        FileGlobIncludeField,
-        FileGlobExcludeField,
+        CodeQualityToolRunnableField,
+        CodeQualityToolArgumentsField,
+        CodeQualityToolExecutionDependenciesField,
+        CodeQualityToolFileGlobIncludeField,
+        CodeQualityToolFileGlobExcludeField,
     )
 
 
-class ByoGoal:
+class SupportedGoal:
     goal: str
     request_superclass: Type[LintFilesRequest]
     skippable: list[str]
@@ -118,7 +118,7 @@ class ByoGoal:
         raise NotImplementedError
 
 
-class ByoLintGoal(ByoGoal):
+class LintGoal(SupportedGoal):
     goal = "lint"
     request_superclass = LintFilesRequest
     skippable = ["lint"]
@@ -133,7 +133,7 @@ class ByoLintGoal(ByoGoal):
         return None
 
 
-class ByoFmtGoal(ByoGoal):
+class FmtGoal(SupportedGoal):
     goal = "fmt"
     request_superclass = FmtFilesRequest
     skippable = ["lint", "fmt"]
@@ -155,194 +155,193 @@ class ByoFmtGoal(ByoGoal):
 
 
 @dataclass
-class CodeQualityToolConfig:
+class CodeQualityToolRuleBuilder:
     goal: str
     target: str
     name: str
     scope: str
 
     @property
-    def _goal(self) -> ByoGoal:
+    def _goal(self) -> SupportedGoal:
         if self.goal == "fmt":
-            return ByoFmtGoal
+            return FmtGoal
         elif self.goal == "lint":
-            return ByoLintGoal
+            return LintGoal
         else:
             raise ValueError(f"Unknown goal {self.goal}")
 
+    def build_rules(self):
+        goal = self._goal
 
-def build_rules(cfg: CodeQualityToolConfig):
-    goal = cfg._goal
+        class ByoTool(Subsystem):
+            options_scope = self.scope
+            name = self.name
+            help = f"{self.goal.capitalize()} with {self.name}. Tool defined in {self.target}"
 
-    class ByoTool(Subsystem):
-        options_scope = cfg.scope
-        name = cfg.name
-        help = f"{cfg.goal.capitalize()} with {cfg.name}. Tool defined in {cfg.target}"
+            skip = SkipOption(*goal.skippable)
+            linter = self.target
 
-        skip = SkipOption(*goal.skippable)
-        linter = cfg.target
+        request_superclass = goal.request_superclass
 
-    request_superclass = goal.request_superclass
+        class ByoToolRequest(request_superclass):
+            tool_subsystem = ByoTool
 
-    class ByoToolRequest(request_superclass):
-        tool_subsystem = ByoTool
+        @rule(canonical_name_suffix=self.scope)
+        async def partition_inputs(
+            request: ByoToolRequest.PartitionRequest, subsystem: ByoTool
+        ) -> Partitions[str, PartitionMetadata]:
+            if subsystem.skip:
+                return Partitions()
 
-    @rule(canonical_name_suffix=cfg.scope)
-    async def partition_inputs(
-        request: ByoToolRequest.PartitionRequest, subsystem: ByoTool
-    ) -> Partitions[str, PartitionMetadata]:
-        if subsystem.skip:
-            return Partitions()
-
-        linter_address_str = subsystem.linter
-        linter_address = await Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
-        )
-
-        addresses = Addresses((linter_address,))
-        addresses.expect_single()
-
-        linter_targets = await Get(Targets, Addresses, addresses)
-        linter = linter_targets[0]
-
-        matching_filepaths = FilespecMatcher(
-            includes=linter[FileGlobIncludeField].value,
-            excludes=linter[FileGlobExcludeField].value,
-        ).matches(request.files)
-
-        return Partitions.single_partition(sorted(matching_filepaths))
-
-    result_class = goal.result_class
-
-    @rule(canonical_name_suffix=cfg.scope)
-    async def run_byotool(request: ByoToolRequest.Batch, subsystem: ByoTool) -> result_class:
-
-        if goal is ByoLintGoal:
-            sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
-        else:
-            sources_snapshot = request.snapshot  # only available on Batches for Fmt or Fix
-
-        linter_address_str = subsystem.linter
-        linter_address = await Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
-        )
-
-        addresses = Addresses((linter_address,))
-        addresses.expect_single()
-
-        linter_targets = await Get(Targets, Addresses, addresses)
-
-        linter = linter_targets[0]
-
-        runnable_address_str = linter[RunnableField].value
-        runnable_address = await Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(
-                runnable_address_str,
-                # Need to add a relative_to=addresses
-                description_of_origin=f"ByoTool runnable target",
-            ),
-        )
-
-        addresses = Addresses((runnable_address,))
-        addresses.expect_single()
-
-        runnable_targets = await Get(Targets, Addresses, addresses)
-
-        target = runnable_targets[0]
-
-        environment_name = await Get(
-            EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
-        )
-
-        field_sets = await Get(
-            FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)
-        )
-
-        run_field_set: RunFieldSet = field_sets.field_sets[0]
-
-        run_request = await Get(
-            RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
-        )
-
-        execution_environment = await Get(
-            ResolvedExecutionDependencies,
-            ResolveExecutionDependenciesRequest(
-                target.address,
-                execution_dependencies=linter[ExecutionDependenciesField].value,
-                runnable_dependencies=None,
-            ),
-        )
-
-        dependencies_digest = execution_environment.digest
-        runnable_dependencies = execution_environment.runnable_dependencies
-
-        extra_env: dict[str, str] = dict(run_request.extra_env or {})
-        extra_path = extra_env.pop("PATH", None)
-
-        extra_sandbox_contents = []
-
-        extra_sandbox_contents.append(
-            ExtraSandboxContents(
-                EMPTY_DIGEST,
-                extra_path,
-                run_request.immutable_input_digests or FrozenDict(),
-                run_request.append_only_caches or FrozenDict(),
-                run_request.extra_env or FrozenDict(),
+            linter_address_str = subsystem.linter
+            linter_address = await Get(
+                Address,
+                AddressInput,
+                AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
             )
-        )
 
-        if runnable_dependencies:
+            addresses = Addresses((linter_address,))
+            addresses.expect_single()
+
+            linter_targets = await Get(Targets, Addresses, addresses)
+            linter = linter_targets[0]
+
+            matching_filepaths = FilespecMatcher(
+                includes=linter[CodeQualityToolFileGlobIncludeField].value,
+                excludes=linter[CodeQualityToolFileGlobExcludeField].value,
+            ).matches(request.files)
+
+            return Partitions.single_partition(sorted(matching_filepaths))
+
+        result_class = goal.result_class
+
+        @rule(canonical_name_suffix=self.scope)
+        async def run_byotool(request: ByoToolRequest.Batch, subsystem: ByoTool) -> result_class:
+
+            if goal is LintGoal:
+                sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
+            else:
+                sources_snapshot = request.snapshot  # only available on Batches for Fmt or Fix
+
+            linter_address_str = subsystem.linter
+            linter_address = await Get(
+                Address,
+                AddressInput,
+                AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
+            )
+
+            addresses = Addresses((linter_address,))
+            addresses.expect_single()
+
+            linter_targets = await Get(Targets, Addresses, addresses)
+
+            linter = linter_targets[0]
+
+            runnable_address_str = linter[CodeQualityToolRunnableField].value
+            runnable_address = await Get(
+                Address,
+                AddressInput,
+                AddressInput.parse(
+                    runnable_address_str,
+                    # Need to add a relative_to=addresses
+                    description_of_origin=f"ByoTool runnable target",
+                ),
+            )
+
+            addresses = Addresses((runnable_address,))
+            addresses.expect_single()
+
+            runnable_targets = await Get(Targets, Addresses, addresses)
+
+            target = runnable_targets[0]
+
+            environment_name = await Get(
+                EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
+            )
+
+            field_sets = await Get(
+                FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)
+            )
+
+            run_field_set: RunFieldSet = field_sets.field_sets[0]
+
+            run_request = await Get(
+                RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
+            )
+
+            execution_environment = await Get(
+                ResolvedExecutionDependencies,
+                ResolveExecutionDependenciesRequest(
+                    target.address,
+                    execution_dependencies=linter[CodeQualityToolExecutionDependenciesField].value,
+                    runnable_dependencies=None,
+                ),
+            )
+
+            dependencies_digest = execution_environment.digest
+            runnable_dependencies = execution_environment.runnable_dependencies
+
+            extra_env: dict[str, str] = dict(run_request.extra_env or {})
+            extra_path = extra_env.pop("PATH", None)
+
+            extra_sandbox_contents = []
+
             extra_sandbox_contents.append(
                 ExtraSandboxContents(
                     EMPTY_DIGEST,
-                    f"{{chroot}}/{runnable_dependencies.path_component}",
-                    runnable_dependencies.immutable_input_digests,
-                    runnable_dependencies.append_only_caches,
-                    runnable_dependencies.extra_env,
+                    extra_path,
+                    run_request.immutable_input_digests or FrozenDict(),
+                    run_request.append_only_caches or FrozenDict(),
+                    run_request.extra_env or FrozenDict(),
                 )
             )
 
-        merged_extras = await Get(
-            ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
-        )
-        extra_env = dict(merged_extras.extra_env)
-        if merged_extras.path:
-            extra_env["PATH"] = merged_extras.path
+            if runnable_dependencies:
+                extra_sandbox_contents.append(
+                    ExtraSandboxContents(
+                        EMPTY_DIGEST,
+                        f"{{chroot}}/{runnable_dependencies.path_component}",
+                        runnable_dependencies.immutable_input_digests,
+                        runnable_dependencies.append_only_caches,
+                        runnable_dependencies.extra_env,
+                    )
+                )
 
-        input_digest = await Get(
-            Digest, MergeDigests((dependencies_digest, run_request.digest, sources_snapshot.digest))
-        )
+            merged_extras = await Get(
+                ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
+            )
+            extra_env = dict(merged_extras.extra_env)
+            if merged_extras.path:
+                extra_env["PATH"] = merged_extras.path
 
-        cmd_args = linter[ArgumentsField].value or ()
+            input_digest = await Get(
+                Digest, MergeDigests((dependencies_digest, run_request.digest, sources_snapshot.digest))
+            )
 
-        append_only_caches = {
-            **merged_extras.append_only_caches,
-        }
+            cmd_args = linter[CodeQualityToolArgumentsField].value or ()
 
-        proc = Process(
-            argv=tuple(run_request.args + cmd_args + sources_snapshot.files),
-            description="Running byotool",
-            input_digest=input_digest,
-            append_only_caches=append_only_caches,
-            immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
-            env=FrozenDict(extra_env),
-            output_files=goal.output_files_to_read(request),
-        )
+            append_only_caches = {
+                **merged_extras.append_only_caches,
+            }
 
-        proc_result = await Get(FallibleProcessResult, Process, proc)
-        output = await Get(Snapshot, Digest, proc_result.output_digest)
+            proc = Process(
+                argv=tuple(run_request.args + cmd_args + sources_snapshot.files),
+                description="Running byotool",
+                input_digest=input_digest,
+                append_only_caches=append_only_caches,
+                immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
+                env=FrozenDict(extra_env),
+                output_files=goal.output_files_to_read(request),
+            )
 
-        return goal.create_result(request, process_result=proc_result, output=output)
+            proc_result = await Get(FallibleProcessResult, Process, proc)
+            output = await Get(Snapshot, Digest, proc_result.output_digest)
 
-    namespace = dict(locals())
+            return goal.create_result(request, process_result=proc_result, output=output)
 
-    return [
-        *collect_rules(namespace),
-        *ByoToolRequest.rules(),
-    ]
+        namespace = dict(locals())
+
+        return [
+            *collect_rules(namespace),
+            *ByoToolRequest.rules(),
+        ]

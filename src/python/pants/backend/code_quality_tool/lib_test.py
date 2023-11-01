@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from textwrap import dedent  # noqa: PNT20
 
-from pants.backend.code_quality_tool.lib import CodeQualityToolConfig, build_rules, CodeQualityToolTarget
+from pants.backend.code_quality_tool.lib import CodeQualityToolRuleBuilder, CodeQualityToolTarget
 from pants.backend.project_info.list_targets import List, rules as list_rules
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.goals.fmt import Fmt
@@ -17,14 +17,14 @@ from pants.backend.python import register as register_python
 
 
 def test_lint_built_rule():
-    cfg = CodeQualityToolConfig(
+    cfg = CodeQualityToolRuleBuilder(
         goal='lint',
         target='//:flake8_tool',
         name='Flake8',
         scope='flake8_tool'
     )
 
-    code_quality_tool_rules = build_rules(cfg)
+    code_quality_tool_rules = cfg.build_rules()
 
     rule_runner = RuleRunner(
         target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
@@ -99,14 +99,14 @@ def test_lint_built_rule():
 
 
 def test_fmt_built_rule():
-    cfg = CodeQualityToolConfig(
+    cfg = CodeQualityToolRuleBuilder(
         goal='fmt',
         target='//:black_tool',
         name='Black',
         scope='black_formatter'
     )
 
-    code_quality_tool_rules = build_rules(cfg)
+    code_quality_tool_rules = cfg.build_rules()
 
     rule_runner = RuleRunner(
         target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
@@ -133,7 +133,6 @@ def test_fmt_built_rule():
             code_quality_tool(
                 name="black_tool",
                 runnable=":black",
-                runnable_dependencies=[],
                 file_glob_include=["**/*.py"],
             )
             """
@@ -158,14 +157,14 @@ def test_fmt_built_rule():
 
 
 def test_several_formatters():
-    black_cfg = CodeQualityToolConfig(
+    black_cfg = CodeQualityToolRuleBuilder(
         goal='fmt',
         target='//:black_tool',
         name='Black',
         scope='black_formatter'
     )
 
-    isort_cfg = CodeQualityToolConfig(
+    isort_cfg = CodeQualityToolRuleBuilder(
         goal='fmt',
         target='//:isort_tool',
         name='isort',
@@ -182,8 +181,8 @@ def test_several_formatters():
             *list_rules(),
             *adhoc_process_support.rules(),
             *register_python.rules(),
-            *build_rules(black_cfg),
-            *build_rules(isort_cfg),
+            *black_cfg.build_rules(),
+            *isort_cfg.build_rules(),
         ],
         preserve_tmpdirs=True,
     )
@@ -204,14 +203,12 @@ def test_several_formatters():
             code_quality_tool(
                 name="black_tool",
                 runnable=":black",
-                runnable_dependencies=[],
                 file_glob_include=["**/*.py"],
             )
             
             code_quality_tool(
                 name="isort_tool",
                 runnable=":isort",
-                runnable_dependencies=[],
                 file_glob_include=["**/*.py"],
             )
             """
