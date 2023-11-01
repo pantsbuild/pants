@@ -35,6 +35,7 @@ from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     DeployJarDuplicatePolicyField,
+    DeployJarExcludeFilesField,
     DeployJarShadingRulesField,
     JvmDependenciesField,
     JvmJdkField,
@@ -60,6 +61,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     jdk_version: JvmJdkField
     duplicate_policy: DeployJarDuplicatePolicyField
     shading_rules: DeployJarShadingRulesField
+    exclude_files: DeployJarExcludeFilesField
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
@@ -136,6 +138,7 @@ async def package_deploy_jar(
                 (rule.pattern, rule.action)
                 for rule in field_set.duplicate_policy.value_or_default()
             ],
+            skip=field_set.exclude_files.value,
             compress=True,
         ),
     )

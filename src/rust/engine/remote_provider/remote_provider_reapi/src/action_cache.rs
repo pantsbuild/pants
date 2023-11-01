@@ -10,7 +10,7 @@ use hashing::Digest;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::ActionResult;
-use remote_provider_traits::{ActionCacheProvider, RemoteCacheProviderOptions};
+use remote_provider_traits::{ActionCacheProvider, RemoteStoreOptions};
 use workunit_store::Metric;
 
 use tonic::{Code, Request};
@@ -24,27 +24,27 @@ pub struct Provider {
 
 impl Provider {
     pub async fn new(
-        RemoteCacheProviderOptions {
+        RemoteStoreOptions {
             instance_name,
-            action_cache_address,
+            store_address,
             tls_config,
             headers,
             concurrency_limit,
-            rpc_timeout,
-        }: RemoteCacheProviderOptions,
+            timeout,
+            ..
+        }: RemoteStoreOptions,
     ) -> Result<Self, String> {
-        let needs_tls = action_cache_address.starts_with("https://");
+        let needs_tls = store_address.starts_with("https://");
 
         let tls_client_config = needs_tls.then(|| tls_config.try_into()).transpose()?;
 
-        let channel =
-            grpc_util::create_channel(&action_cache_address, tls_client_config.as_ref()).await?;
+        let channel = grpc_util::create_channel(&store_address, tls_client_config.as_ref()).await?;
         let http_headers = headers_to_http_header_map(&headers)?;
         let channel = layered_service(
             channel,
             concurrency_limit,
             http_headers,
-            Some((rpc_timeout, Metric::RemoteCacheRequestTimeouts)),
+            Some((timeout, Metric::RemoteCacheRequestTimeouts)),
         );
         let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 

@@ -48,7 +48,7 @@ use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use store::{
-    RemoteOptions, Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams,
+    RemoteStoreOptions, Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams,
     UploadSummary,
 };
 use workunit_store::WorkunitStore;
@@ -413,8 +413,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
 
                 (
                     local_only
-                        .into_with_remote(RemoteOptions {
-                            cas_address: cas_address.to_owned(),
+                        .into_with_remote(RemoteStoreOptions {
+                            store_address: cas_address.to_owned(),
                             instance_name: top_match
                                 .value_of("remote-instance-name")
                                 .map(str::to_owned),
@@ -426,14 +426,13 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                             //
                             // Make fs_util have a very long deadline (because it's not configurable,
                             // like it is inside pants).
-                            rpc_timeout: Duration::from_secs(30 * 60),
-                            rpc_retries: top_match
+                            timeout: Duration::from_secs(30 * 60),
+                            retries: top_match
                                 .value_of_t::<usize>("rpc-attempts")
                                 .expect("Bad rpc-attempts flag"),
-                            rpc_concurrency_limit: top_match
+                            concurrency_limit: top_match
                                 .value_of_t::<usize>("rpc-concurrency-limit")
                                 .expect("Bad rpc-concurrency-limit flag"),
-                            capabilities_cell_opt: None,
                             batch_api_size_limit: top_match
                                 .value_of_t::<usize>("batch-api-size-limit")
                                 .expect("Bad batch-api-size-limit flag"),

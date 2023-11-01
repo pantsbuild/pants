@@ -43,7 +43,7 @@ use tokio::fs::File;
 use workunit_store::ObservationMetric;
 
 use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteOptions,
+    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
 };
 
 #[cfg(test)]
@@ -68,7 +68,7 @@ impl Provider {
     pub fn new<B: Builder>(
         builder: B,
         scope: String,
-        options: RemoteOptions,
+        options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
         let operator = Operator::new(builder)
             .map_err(|e| {
@@ -77,16 +77,16 @@ impl Provider {
                     B::SCHEME
                 )
             })?
-            .layer(ConcurrentLimitLayer::new(options.rpc_concurrency_limit))
+            .layer(ConcurrentLimitLayer::new(options.concurrency_limit))
             .layer(
                 // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
                 TimeoutLayer::new()
-                    .with_timeout(options.rpc_timeout)
+                    .with_timeout(options.timeout)
                     // TimeoutLayer requires specifying a non-zero minimum transfer speed too.
                     .with_speed(1),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
-            .layer(RetryLayer::new().with_max_times(options.rpc_retries + 1))
+            .layer(RetryLayer::new().with_max_times(options.retries + 1))
             .finish();
 
         let base_path = match options.instance_name {
@@ -100,7 +100,7 @@ impl Provider {
         })
     }
 
-    pub fn fs(path: &str, scope: String, options: RemoteOptions) -> Result<Provider, String> {
+    pub fn fs(path: &str, scope: String, options: RemoteStoreOptions) -> Result<Provider, String> {
         let mut builder = opendal::services::Fs::default();
         builder.root(path).enable_path_check();
         Provider::new(builder, scope, options)
@@ -109,7 +109,7 @@ impl Provider {
     pub fn github_actions_cache(
         url: &str,
         scope: String,
-        options: RemoteOptions,
+        options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
         let mut builder = opendal::services::Ghac::default();
 
