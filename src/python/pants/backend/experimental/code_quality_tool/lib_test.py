@@ -7,16 +7,32 @@ from pants.backend.experimental.code_quality_tool.lib import (
     CodeQualityToolTarget,
     base_rules,
 )
-from pants.backend.project_info.list_targets import rules as list_rules
 from pants.backend.python import register as register_python
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.goals.fmt import Fmt
 from pants.core.goals.lint import Lint
 from pants.core.register import rules as core_rules
 from pants.core.target_types import FileTarget
-from pants.core.util_rules import adhoc_process_support, source_files
+from pants.core.util_rules import source_files
 from pants.engine import process
 from pants.testutil.rule_runner import RuleRunner
+
+
+def make_rule_runner(*cfgs: CodeQualityToolRuleBuilder):
+    rules = [
+        *source_files.rules(),
+        *core_rules(),
+        *process.rules(),
+        *register_python.rules(),
+        *base_rules(),
+    ]
+    for cfg in cfgs:
+        rules.extend(cfg.rules())
+
+    return RuleRunner(
+        target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
+        rules=rules,
+    )
 
 
 def test_lint_built_rule():
@@ -24,20 +40,7 @@ def test_lint_built_rule():
         goal="lint", target="build-support:flake8_tool", name="Flake8", scope="flake8_tool"
     )
 
-    rule_runner = RuleRunner(
-        target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
-        rules=[
-            *source_files.rules(),
-            *core_rules(),
-            *process.rules(),
-            *list_rules(),
-            *adhoc_process_support.rules(),
-            *register_python.rules(),
-            *base_rules(),
-            *cfg.rules(),
-        ],
-        preserve_tmpdirs=True,
-    )
+    rule_runner = make_rule_runner(cfg)
 
     rule_runner.write_files(
         {
@@ -110,20 +113,7 @@ def test_fmt_built_rule():
         goal="fmt", target="//:black_tool", name="Black", scope="black_formatter"
     )
 
-    rule_runner = RuleRunner(
-        target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
-        rules=[
-            *source_files.rules(),
-            *core_rules(),
-            *process.rules(),
-            *list_rules(),
-            *adhoc_process_support.rules(),
-            *register_python.rules(),
-            *base_rules(),
-            *cfg.rules(),
-        ],
-        preserve_tmpdirs=True,
-    )
+    rule_runner = make_rule_runner(cfg)
 
     rule_runner.write_files(
         {
@@ -170,21 +160,7 @@ def test_several_formatters():
         goal="fmt", target="//:isort_tool", name="isort", scope="isort_formatter"
     )
 
-    rule_runner = RuleRunner(
-        target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
-        rules=[
-            *source_files.rules(),
-            *core_rules(),
-            *process.rules(),
-            *list_rules(),
-            *adhoc_process_support.rules(),
-            *register_python.rules(),
-            *base_rules(),
-            *black_cfg.rules(),
-            *isort_cfg.rules(),
-        ],
-        preserve_tmpdirs=True,
-    )
+    rule_runner = make_rule_runner(black_cfg, isort_cfg)
 
     rule_runner.write_files(
         {
