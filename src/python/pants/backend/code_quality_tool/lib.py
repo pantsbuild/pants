@@ -119,14 +119,13 @@ class CodeQualityTool:
 
 @rule
 async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQualityTool:
-    linter_address_str = request.address
-    linter_address = await Get(
+    tool_address = await Get(
         Address,
         AddressInput,
-        AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
+        AddressInput.parse(request.address, description_of_origin=f"code quality tool target"),
     )
 
-    addresses = Addresses((linter_address,))
+    addresses = Addresses((tool_address,))
     addresses.expect_single()
 
     linter_targets = await Get(Targets, Addresses, addresses)
@@ -282,19 +281,19 @@ class CodeQualityToolRuleBuilder:
     scope: str
 
     def _build_lint_rules(self):
-        class ByoTool(Subsystem):
+        class CodeQualityToolInstance(Subsystem):
             options_scope = self.scope
             name = self.name
             help = f"{self.goal.capitalize()} with {self.name}. Tool defined in {self.target}"
 
             skip = SkipOption("lint")
 
-        class ByoToolRequest(LintFilesRequest):
-            tool_subsystem = ByoTool
+        class CodeQualityProcessingRequest(LintFilesRequest):
+            tool_subsystem = CodeQualityToolInstance
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
-            request: ByoToolRequest.PartitionRequest, subsystem: ByoTool
+            request: CodeQualityProcessingRequest.PartitionRequest, subsystem: CodeQualityToolInstance
         ) -> Partitions:
             if subsystem.skip:
                 return Partitions()
@@ -309,7 +308,7 @@ class CodeQualityToolRuleBuilder:
             return Partitions.single_partition(sorted(matching_filepaths))
 
         @rule(canonical_name_suffix=self.scope)
-        async def run_byotool(request: ByoToolRequest.Batch) -> LintResult:
+        async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> LintResult:
             sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
 
             code_quality_tool_runner = await Get(
@@ -330,23 +329,23 @@ class CodeQualityToolRuleBuilder:
 
         return [
             *collect_rules(namespace),
-            *ByoToolRequest.rules(),
+            *CodeQualityProcessingRequest.rules(),
         ]
 
     def _build_fmt_rules(self):
-        class ByoTool(Subsystem):
+        class CodeQualityToolInstance(Subsystem):
             options_scope = self.scope
             name = self.name
             help = f"{self.goal.capitalize()} with {self.name}. Tool defined in {self.target}"
 
             skip = SkipOption("lint", "fmt")
 
-        class ByoToolRequest(FmtFilesRequest):
-            tool_subsystem = ByoTool
+        class CodeQualityProcessingRequest(FmtFilesRequest):
+            tool_subsystem = CodeQualityToolInstance
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
-            request: ByoToolRequest.PartitionRequest, subsystem: ByoTool
+            request: CodeQualityProcessingRequest.PartitionRequest, subsystem: CodeQualityToolInstance
         ) -> Partitions:
             if subsystem.skip:
                 return Partitions()
@@ -361,7 +360,7 @@ class CodeQualityToolRuleBuilder:
             return Partitions.single_partition(sorted(matching_filepaths))
 
         @rule(canonical_name_suffix=self.scope)
-        async def run_byotool(request: ByoToolRequest.Batch) -> FmtResult:
+        async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> FmtResult:
             sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
@@ -390,7 +389,7 @@ class CodeQualityToolRuleBuilder:
 
         return [
             *collect_rules(namespace),
-            *ByoToolRequest.rules(),
+            *CodeQualityProcessingRequest.rules(),
         ]
 
     def build_rules(self):
