@@ -187,48 +187,37 @@ class CodeQualityToolRunnerRequest:
 
 @dataclass(frozen=True)
 class CodeQualityToolBatchRunner:
-    environment_name: EnvironmentName
-    run_field_set: RunFieldSet
-    runnable_target: Target
-    run_request: RunInSandboxRequest
-    merged_extras: ExtraSandboxContents
-    dependencies_digest: Digest
-    extra_env: Mapping[str, str]
     digest: Digest
-    cmd_args: tuple[str, ...]
+    args: tuple[str, ...]
+    extra_env: Mapping[str, str]
+    append_only_caches: Mapping[str, str]
+    immutable_input_digests: Mapping[str, Digest]
 
-    @property
-    def args(self) -> tuple[str, ...]:
-         return self.run_request.args + self.cmd_args
-
-    # @property
-    # def append_only_caches(self) -> Mapping[str, str] | None:
-    #     return self.merged_extras.append_only_caches
 
 
 @dataclass(frozen=True)
 class CodeQualityToolBatch:
-    tool: CodeQualityToolBatchRunner
+    runner: CodeQualityToolBatchRunner
     sources_snapshot: Snapshot
     output_files: tuple[str, ...]
 
 @rule
 async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
-    tool = batch.tool
+    runner = batch.runner
 
     input_digest = await Get(
-        Digest, MergeDigests((tool.digest, batch.sources_snapshot.digest))
+        Digest, MergeDigests((runner.digest, batch.sources_snapshot.digest))
     )
 
     result = await Get(
         FallibleProcessResult,
         Process(
-            argv=tuple(tool.args + batch.sources_snapshot.files),
+            argv=tuple(runner.args + batch.sources_snapshot.files),
             description="Running byotool",
             input_digest=input_digest,
-            append_only_caches=tool.merged_extras.append_only_caches,
-            immutable_input_digests=FrozenDict.frozen(tool.merged_extras.immutable_input_digests),
-            env=FrozenDict(tool.extra_env),
+            append_only_caches=runner.append_only_caches,
+            immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
+            env=FrozenDict(runner.extra_env),
             output_files=batch.output_files,
         ))
     return result
@@ -322,15 +311,11 @@ async def hydrate_code_quality_tool(request: CodeQualityToolAddressString) -> Co
     cmd_args = linter[CodeQualityToolArgumentsField].value or ()
 
     return CodeQualityToolBatchRunner(
-        run_field_set=run_field_set,
-        environment_name=environment_name,
-        runnable_target=target,
-        run_request=run_request,
-        merged_extras=merged_extras,
-        dependencies_digest=dependencies_digest,
-        extra_env=FrozenDict(extra_env),
         digest=digest,
-        cmd_args=tuple(cmd_args),
+        args=run_request.args + tuple(cmd_args),
+        extra_env=FrozenDict(extra_env),
+        append_only_caches=merged_extras.append_only_caches,
+        immutable_input_digests=merged_extras.immutable_input_digests,
     )
 
 
@@ -400,7 +385,7 @@ class CodeQualityToolRuleBuilder:
             proc_result = await Get(
                 FallibleProcessResult,
                 CodeQualityToolBatch(
-                    tool=code_quality_tool_runner,
+                    runner=code_quality_tool_runner,
                     sources_snapshot=sources_snapshot,
                     output_files=goal.output_files_to_read(request),
                 ))
