@@ -36,7 +36,7 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     StringSequenceField,
     Target,
-    Targets, StringField, SpecialCasedDependencies,
+    Targets, StringField, SpecialCasedDependencies, FieldSet,
 )
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
@@ -155,12 +155,38 @@ class FmtGoal(SupportedGoal):
 
 
 @dataclass(frozen=True)
-class HydratedCodeQualityToolRequest:
+class CodeQualityToolAddressString:
     address: str
 
 
 @dataclass(frozen=True)
-class HydratedCodeQualityTool:
+class CodeQualityTool:
+    target: Target
+
+
+@rule
+async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQualityTool:
+    linter_address_str = request.address
+    linter_address = await Get(
+        Address,
+        AddressInput,
+        AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
+    )
+
+    addresses = Addresses((linter_address,))
+    addresses.expect_single()
+
+    linter_targets = await Get(Targets, Addresses, addresses)
+    return CodeQualityTool(linter_targets[0])
+
+
+@dataclass(frozen=True)
+class CodeQualityToolRunnerRequest:
+    address: str
+
+
+@dataclass(frozen=True)
+class CodeQualityToolBatchRunner:
     environment_name: EnvironmentName
     run_field_set: RunFieldSet
     runnable_target: Target
@@ -171,10 +197,18 @@ class HydratedCodeQualityTool:
     digest: Digest
     cmd_args: tuple[str, ...]
 
+    @property
+    def args(self) -> tuple[str, ...]:
+         return self.run_request.args + self.cmd_args
+
+    # @property
+    # def append_only_caches(self) -> Mapping[str, str] | None:
+    #     return self.merged_extras.append_only_caches
+
 
 @dataclass(frozen=True)
 class CodeQualityToolBatch:
-    tool: HydratedCodeQualityTool
+    tool: CodeQualityToolBatchRunner
     sources_snapshot: Snapshot
     output_files: tuple[str, ...]
 
@@ -189,7 +223,7 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
     result = await Get(
         FallibleProcessResult,
         Process(
-            argv=tuple(tool.run_request.args + tool.cmd_args + batch.sources_snapshot.files),
+            argv=tuple(tool.args + batch.sources_snapshot.files),
             description="Running byotool",
             input_digest=input_digest,
             append_only_caches=tool.merged_extras.append_only_caches,
@@ -201,20 +235,9 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
 
 
 @rule
-async def hydrate_code_quality_tool(request: HydratedCodeQualityToolRequest) -> HydratedCodeQualityTool:
-    linter_address_str = request.address
-    linter_address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
-    )
-
-    addresses = Addresses((linter_address,))
-    addresses.expect_single()
-
-    linter_targets = await Get(Targets, Addresses, addresses)
-
-    linter = linter_targets[0]
+async def hydrate_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQualityToolBatchRunner:
+    tool = await Get(CodeQualityTool, CodeQualityToolAddressString, request)
+    linter = tool.target
 
     runnable_address_str = linter[CodeQualityToolRunnableField].value
     runnable_address = await Get(
@@ -298,7 +321,7 @@ async def hydrate_code_quality_tool(request: HydratedCodeQualityToolRequest) -> 
 
     cmd_args = linter[CodeQualityToolArgumentsField].value or ()
 
-    return HydratedCodeQualityTool(
+    return CodeQualityToolBatchRunner(
         run_field_set=run_field_set,
         environment_name=environment_name,
         runnable_target=target,
@@ -350,18 +373,8 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            linter_address_str = subsystem.linter
-            linter_address = await Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
-            )
-
-            addresses = Addresses((linter_address,))
-            addresses.expect_single()
-
-            linter_targets = await Get(Targets, Addresses, addresses)
-            linter = linter_targets[0]
+            tool = await Get(CodeQualityTool, CodeQualityToolAddressString(address=subsystem.linter))
+            linter = tool.target
 
             matching_filepaths = FilespecMatcher(
                 includes=linter[CodeQualityToolFileGlobIncludeField].value,
@@ -380,23 +393,14 @@ class CodeQualityToolRuleBuilder:
             else:
                 sources_snapshot = request.snapshot  # only available on Batches for Fmt or Fix
 
-            linter_address_str = subsystem.linter
-            linter_address = await Get(
-                Address,
-                AddressInput,
-                AddressInput.parse(linter_address_str, description_of_origin=f"ByoTool linter target"),
-            )
-
-            addresses = Addresses((linter_address,))
-            addresses.expect_single()
-
-            code_quality_tool = await Get(HydratedCodeQualityTool,
-                      HydratedCodeQualityToolRequest(address=subsystem.linter))
+            code_quality_tool_runner = await Get(
+                CodeQualityToolBatchRunner,
+                CodeQualityToolAddressString(address=subsystem.linter))
 
             proc_result = await Get(
                 FallibleProcessResult,
                 CodeQualityToolBatch(
-                    tool=code_quality_tool,
+                    tool=code_quality_tool_runner,
                     sources_snapshot=sources_snapshot,
                     output_files=goal.output_files_to_read(request),
                 ))
@@ -408,6 +412,7 @@ class CodeQualityToolRuleBuilder:
         namespace = dict(locals())
 
         return [
+            find_code_quality_tool,
             process_files,
             hydrate_code_quality_tool,
             *collect_rules(namespace),
