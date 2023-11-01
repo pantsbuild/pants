@@ -186,29 +186,13 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
         Digest, MergeDigests((tool.digest, batch.sources_snapshot.digest))
     )
 
-    cmd_args = tool.cmd_args
-
-    append_only_caches = {
-        **tool.merged_extras.append_only_caches,
-    }
-
-    Process(
-        argv=tuple(tool.run_request.args + cmd_args + batch.sources_snapshot.files),
-        description="Running byotool",
-        input_digest=input_digest,
-        append_only_caches=append_only_caches,
-        immutable_input_digests=FrozenDict.frozen(tool.merged_extras.immutable_input_digests),
-        env=FrozenDict(tool.extra_env),
-        output_files=batch.output_files,
-    )
-
     result = await Get(
         FallibleProcessResult,
         Process(
-            argv=tuple(tool.run_request.args + cmd_args + batch.sources_snapshot.files),
+            argv=tuple(tool.run_request.args + tool.cmd_args + batch.sources_snapshot.files),
             description="Running byotool",
             input_digest=input_digest,
-            append_only_caches=append_only_caches,
+            append_only_caches=tool.merged_extras.append_only_caches,
             immutable_input_digests=FrozenDict.frozen(tool.merged_extras.immutable_input_digests),
             env=FrozenDict(tool.extra_env),
             output_files=batch.output_files,
