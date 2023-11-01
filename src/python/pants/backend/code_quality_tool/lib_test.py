@@ -3,7 +3,6 @@
 from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.code_quality_tool.lib import CodeQualityToolRuleBuilder, CodeQualityToolTarget
-from pants.backend.project_info.list_targets import List
 from pants.backend.project_info.list_targets import rules as list_rules
 from pants.backend.python import register as register_python
 from pants.backend.python.target_types import PythonRequirementTarget
@@ -45,7 +44,7 @@ def test_lint_built_rule():
                 name="flake8",
                 requirements=["flake8==5.0.4"]
             )
-        
+
             code_quality_tool(
                 name="flake8_tool",
                 runnable=":flake8",
@@ -54,7 +53,7 @@ def test_lint_built_rule():
                 file_glob_exclude=["messy_ignored_dir/**"],
                 args=["--config=build-support/.flake8", "--indent-size=2"],
             )
-            
+
             file(
                 name="flake8_conf",
                 source=".flake8"
@@ -203,7 +202,7 @@ def test_several_formatters():
                 runnable=":black",
                 file_glob_include=["**/*.py"],
             )
-            
+
             code_quality_tool(
                 name="isort_tool",
                 runnable=":isort",
@@ -217,7 +216,7 @@ def test_several_formatters():
                 """
             import b
             import a
-            
+
             foo=a.a+b.b
             """
             ).lstrip(),
@@ -239,7 +238,7 @@ def test_several_formatters():
             """
         import a
         import b
-    
+
         foo = a.a + b.b
         """
         ).lstrip()
@@ -257,7 +256,7 @@ def test_several_formatters():
                 """
             import b
             import a
-    
+
             bar=a.a+b.b
             """
             ).lstrip(),

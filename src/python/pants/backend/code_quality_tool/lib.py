@@ -87,7 +87,7 @@ class CodeQualityToolExecutionDependenciesField(SpecialCasedDependencies):
     default = None
 
     help = help_text(
-        lambda: f"""
+        """
         Additional dependencies that need to be available when running the tool.
         Typically used to point to config files.
         """
@@ -126,7 +126,7 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
     tool_address = await Get(
         Address,
         AddressInput,
-        AddressInput.parse(request.address, description_of_origin=f"code quality tool target"),
+        AddressInput.parse(request.address, description_of_origin="code quality tool target"),
     )
 
     addresses = Addresses((tool_address,))
@@ -197,7 +197,7 @@ async def hydrate_code_quality_tool(
         AddressInput.parse(
             cqt.runnable_address_str,
             relative_to=cqt.target.address.spec_path,
-            description_of_origin=f"Code Quality Tool runnable target",
+            description_of_origin=f"Runnable target for code quality tool {cqt.target.address.spec_path}",
         ),
     )
 
