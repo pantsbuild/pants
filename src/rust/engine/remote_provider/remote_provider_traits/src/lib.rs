@@ -55,14 +55,21 @@ pub struct RemoteStoreOptions {
 #[async_trait]
 pub trait ByteStoreProvider: Sync + Send + 'static {
     /// Store the bytes readable from `file` into the remote store
+    ///
+    /// NB. this does not need to update any observations or counters.
     async fn store_file(&self, digest: Digest, file: File) -> Result<(), String>;
 
     /// Store the bytes in `bytes` into the remote store, as an optimisation of `store_file` when the
     /// bytes are already in memory
+    ///
+    /// NB. this does not need to update any observations or counters.
     async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<(), String>;
 
     /// Load the data stored (if any) in the remote store for `digest` into `destination`. Returns
     /// true when found, false when not.
+    ///
+    /// NB. this should update the
+    /// workunit_store::ObservationMetric::RemoteStoreTimeToFirstByteMicros observation.
     async fn load(
         &self,
         digest: Digest,
@@ -70,6 +77,9 @@ pub trait ByteStoreProvider: Sync + Send + 'static {
     ) -> Result<bool, String>;
 
     /// Return any digests from `digests` that are not (currently) available in the remote store.
+    ///
+    /// NB. this should update the workunit_store::Metric::RemoteStoreExists... counters, based on
+    /// the requests it runs.
     async fn list_missing_digests(
         &self,
         digests: &mut (dyn Iterator<Item = Digest> + Send),
