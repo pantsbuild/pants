@@ -161,7 +161,11 @@ class CodeQualityToolAddressString:
 
 @dataclass(frozen=True)
 class CodeQualityTool:
-    target: Target
+    runnable_address_str: str
+    args: tuple[str, ...]
+    execution_dependencies: tuple[str, ...]
+    file_glob_include: tuple[str, ...]
+    file_glob_exclude: tuple[str, ...]
 
 
 @rule
@@ -177,12 +181,14 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
     addresses.expect_single()
 
     linter_targets = await Get(Targets, Addresses, addresses)
-    return CodeQualityTool(linter_targets[0])
-
-
-@dataclass(frozen=True)
-class CodeQualityToolRunnerRequest:
-    address: str
+    target = linter_targets[0]
+    return CodeQualityTool(
+        runnable_address_str=target[CodeQualityToolRunnableField].value,
+        execution_dependencies=target[CodeQualityToolExecutionDependenciesField].value or (),
+        args=target[CodeQualityToolArgumentsField].value or (),
+        file_glob_include=target[CodeQualityToolFileGlobIncludeField].value,
+        file_glob_exclude=target[CodeQualityToolFileGlobExcludeField].value,
+    )
 
 
 @dataclass(frozen=True)
@@ -225,17 +231,15 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
 
 @rule
 async def hydrate_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQualityToolBatchRunner:
-    tool = await Get(CodeQualityTool, CodeQualityToolAddressString, request)
-    linter = tool.target
+    cqt = await Get(CodeQualityTool, CodeQualityToolAddressString, request)
 
-    runnable_address_str = linter[CodeQualityToolRunnableField].value
     runnable_address = await Get(
         Address,
         AddressInput,
         AddressInput.parse(
-            runnable_address_str,
+            cqt.runnable_address_str,
             # Need to add a relative_to=addresses
-            description_of_origin=f"ByoTool runnable target",
+            description_of_origin=f"Code Quality Tool runnable target",
         ),
     )
 
@@ -265,7 +269,7 @@ async def hydrate_code_quality_tool(request: CodeQualityToolAddressString) -> Co
         ResolvedExecutionDependencies,
         ResolveExecutionDependenciesRequest(
             target.address,
-            execution_dependencies=linter[CodeQualityToolExecutionDependenciesField].value,
+            execution_dependencies=cqt.execution_dependencies,
             runnable_dependencies=None,
         ),
     )
@@ -308,11 +312,9 @@ async def hydrate_code_quality_tool(request: CodeQualityToolAddressString) -> Co
 
     digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
 
-    cmd_args = linter[CodeQualityToolArgumentsField].value or ()
-
     return CodeQualityToolBatchRunner(
         digest=digest,
-        args=run_request.args + tuple(cmd_args),
+        args=run_request.args + tuple(cqt.args),
         extra_env=FrozenDict(extra_env),
         append_only_caches=merged_extras.append_only_caches,
         immutable_input_digests=merged_extras.immutable_input_digests,
@@ -358,12 +360,11 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            tool = await Get(CodeQualityTool, CodeQualityToolAddressString(address=subsystem.linter))
-            linter = tool.target
+            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=subsystem.linter))
 
             matching_filepaths = FilespecMatcher(
-                includes=linter[CodeQualityToolFileGlobIncludeField].value,
-                excludes=linter[CodeQualityToolFileGlobExcludeField].value,
+                includes=cqt.file_glob_include,
+                excludes=cqt.file_glob_exclude,
             ).matches(request.files)
 
             return Partitions.single_partition(sorted(matching_filepaths))
