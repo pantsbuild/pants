@@ -3,12 +3,6 @@
 from dataclasses import dataclass
 from typing import ClassVar, Type
 
-from pants.backend.adhoc.target_types import (
-    AdhocToolArgumentsField,
-    AdhocToolExecutionDependenciesField,
-    AdhocToolRunnableDependenciesField,
-    AdhocToolRunnableField,
-)
 from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtFilesRequest
 from pants.core.goals.lint import LintFilesRequest, LintResult
@@ -42,35 +36,70 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     StringSequenceField,
     Target,
-    Targets,
+    Targets, StringField, SpecialCasedDependencies,
 )
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import Simplifier
+from pants.util.strutil import Simplifier, help_text
 
 
-class ByoFileGlobIncludeField(StringSequenceField):
+class FileGlobIncludeField(StringSequenceField):
     alias: ClassVar[str] = "file_glob_include"
     required = True
 
 
-class ByoFileGlobExcludeField(StringSequenceField):
+class FileGlobExcludeField(StringSequenceField):
     alias: ClassVar[str] = "file_glob_exclude"
     required = False
     default = ()
+
+class RunnableField(StringField):
+    alias: ClassVar[str] = "runnable"
+    required = True
+    help = help_text(
+        lambda: f"""
+        Address to a target that can be invoked by the `run` goal (and does not set
+        `run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments
+        specified by `{ArgumentsField.alias}`, in a sandbox with that target's transitive
+        dependencies, along with the transitive dependencies specified by
+        `{ExecutionDependenciesField.alias}`.
+        """
+    )
+
+class ArgumentsField(StringSequenceField):
+    alias: ClassVar[str] = "args"
+    default = ()
+    help = help_text(
+        lambda: f"""
+        Extra arguments to pass into the `{RunnableField.alias}` field
+        before the list of source files
+        """
+    )
+
+
+class ExecutionDependenciesField(SpecialCasedDependencies):
+    alias: ClassVar[str] = "execution_dependencies"
+    required = False
+    default = None
+
+    help = help_text(
+        lambda: f"""
+        Additional dependencies that need to be available when running the tool.
+        Typically used to point to config files for the tool.
+        """
+    )
 
 
 class CodeQualityToolTarget(Target):
     alias: ClassVar[str] = "code_quality_tool"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        AdhocToolRunnableField,
-        AdhocToolArgumentsField,
-        AdhocToolExecutionDependenciesField,
-        AdhocToolRunnableDependenciesField,
-        ByoFileGlobIncludeField,
-        ByoFileGlobExcludeField,
+        RunnableField,
+        ArgumentsField,
+        ExecutionDependenciesField,
+        FileGlobIncludeField,
+        FileGlobExcludeField,
     )
 
 
@@ -179,8 +208,8 @@ def build_rules(cfg: CodeQualityToolConfig):
         linter = linter_targets[0]
 
         matching_filepaths = FilespecMatcher(
-            includes=linter[ByoFileGlobIncludeField].value,
-            excludes=linter[ByoFileGlobExcludeField].value,
+            includes=linter[FileGlobIncludeField].value,
+            excludes=linter[FileGlobExcludeField].value,
         ).matches(request.files)
 
         return Partitions.single_partition(sorted(matching_filepaths))
@@ -209,7 +238,7 @@ def build_rules(cfg: CodeQualityToolConfig):
 
         linter = linter_targets[0]
 
-        runnable_address_str = linter[AdhocToolRunnableField].value
+        runnable_address_str = linter[RunnableField].value
         runnable_address = await Get(
             Address,
             AddressInput,
@@ -245,8 +274,8 @@ def build_rules(cfg: CodeQualityToolConfig):
             ResolvedExecutionDependencies,
             ResolveExecutionDependenciesRequest(
                 target.address,
-                execution_dependencies=linter[AdhocToolExecutionDependenciesField].value,
-                runnable_dependencies=linter[AdhocToolRunnableDependenciesField].value,
+                execution_dependencies=linter[ExecutionDependenciesField].value,
+                runnable_dependencies=None,
             ),
         )
 
@@ -290,7 +319,7 @@ def build_rules(cfg: CodeQualityToolConfig):
             Digest, MergeDigests((dependencies_digest, run_request.digest, sources_snapshot.digest))
         )
 
-        cmd_args = linter[AdhocToolArgumentsField].value or ()
+        cmd_args = linter[ArgumentsField].value or ()
 
         append_only_caches = {
             **merged_extras.append_only_caches,
