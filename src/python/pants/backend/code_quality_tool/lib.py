@@ -2,10 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 
-from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
-from typing import ClassVar, Type, Mapping, Iterable
+from typing import ClassVar, Mapping
 
-from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -16,7 +14,7 @@ from pants.core.util_rules.adhoc_process_support import (
     ResolveExecutionDependenciesRequest,
 )
 from pants.core.util_rules.environments import EnvironmentNameRequest
-from pants.core.util_rules.partitions import PartitionMetadata, Partitions
+from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs
@@ -38,7 +36,7 @@ from pants.engine.target import (
     FieldSetsPerTargetRequest,
     StringSequenceField,
     Target,
-    Targets, StringField, SpecialCasedDependencies, FieldSet,
+    Targets, StringField, SpecialCasedDependencies,
 )
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
@@ -103,57 +101,6 @@ class CodeQualityToolTarget(Target):
         CodeQualityToolFileGlobIncludeField,
         CodeQualityToolFileGlobExcludeField,
     )
-
-
-# class GoalSupport:
-#     goal: str
-#     request_superclass: Type[LintFilesRequest]
-#     skippable: list[str]
-#     result_class: type
-#
-#     @classmethod
-#     def create_result(cls, request, process_result, output):
-#         raise NotImplementedError
-#
-#     @classmethod
-#     def output_files_to_read(cls, request: LintFilesRequest.Batch):
-#         raise NotImplementedError
-#
-#
-# class LintGoalSupport(GoalSupport):
-#     goal = "lint"
-#     request_superclass = LintFilesRequest
-#     skippable = ["lint"]
-#     result_class = LintResult
-#
-#     @classmethod
-#     def create_result(cls, request, process_result, output):
-#         return LintResult.create(request, process_result)
-#
-#     @classmethod
-#     def output_files_to_read(cls, request: LintFilesRequest.Batch):
-#         return None
-#
-#
-# class FmtGoalSupport(GoalSupport):
-#     goal = "fmt"
-#     request_superclass = FmtFilesRequest
-#     skippable = ["lint", "fmt"]
-#     result_class = FixResult
-#
-#     @classmethod
-#     def create_result(cls, request, process_result, output):
-#         return FixResult(
-#             input=request.snapshot,
-#             output=output,
-#             stdout=Simplifier().simplify(process_result.stdout),
-#             stderr=Simplifier().simplify(process_result.stderr),
-#             tool_name=request.tool_name,
-#         )
-#
-#     @classmethod
-#     def output_files_to_read(cls, request: FmtFilesRequest.Batch):
-#         return request.files
 
 
 @dataclass(frozen=True)
@@ -334,14 +281,6 @@ class CodeQualityToolRuleBuilder:
     name: str
     scope: str
 
-    # def supported_goal(self) -> Type[GoalSupport]:
-    #     if self.goal == "fmt":
-    #         return FmtGoalSupport
-    #     elif self.goal == "lint":
-    #         return LintGoalSupport
-    #     else:
-    #         raise ValueError(f"Unknown goal {self.goal}")
-
     def _build_lint_rules(self):
         class ByoTool(Subsystem):
             options_scope = self.scope
@@ -423,7 +362,7 @@ class CodeQualityToolRuleBuilder:
 
         @rule(canonical_name_suffix=self.scope)
         async def run_byotool(request: ByoToolRequest.Batch) -> FmtResult:
-            sources_snapshot = request.snapshot  # only available on Batches for Fmt or Fix
+            sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
                 CodeQualityToolBatchRunner,
@@ -470,67 +409,3 @@ class CodeQualityToolRuleBuilder:
 
         return rules
 
-    # def build_rules_old(self):
-    #     goal = self.supported_goal()
-    #
-    #     class ByoTool(Subsystem):
-    #         options_scope = self.scope
-    #         name = self.name
-    #         help = f"{self.goal.capitalize()} with {self.name}. Tool defined in {self.target}"
-    #
-    #         skip = SkipOption(*goal.skippable)
-    #
-    #     class ByoToolRequest(goal.request_superclass):
-    #         tool_subsystem = ByoTool
-    #
-    #     @rule(canonical_name_suffix=self.scope)
-    #     async def partition_inputs(
-    #         request: ByoToolRequest.PartitionRequest, subsystem: ByoTool
-    #     ) -> Partitions[str, PartitionMetadata]:
-    #         if subsystem.skip:
-    #             return Partitions()
-    #
-    #         cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
-    #
-    #         matching_filepaths = FilespecMatcher(
-    #             includes=cqt.file_glob_include,
-    #             excludes=cqt.file_glob_exclude,
-    #         ).matches(request.files)
-    #
-    #         return Partitions.single_partition(sorted(matching_filepaths))
-    #
-    #     result_class = goal.result_class
-    #
-    #     @rule(canonical_name_suffix=self.scope)
-    #     async def run_byotool(request: ByoToolRequest.Batch) -> result_class:
-    #
-    #         if goal is LintGoalSupport:
-    #             sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
-    #         else:
-    #             sources_snapshot = request.snapshot  # only available on Batches for Fmt or Fix
-    #
-    #         code_quality_tool_runner = await Get(
-    #             CodeQualityToolBatchRunner,
-    #             CodeQualityToolAddressString(address=self.target))
-    #
-    #         proc_result = await Get(
-    #             FallibleProcessResult,
-    #             CodeQualityToolBatch(
-    #                 runner=code_quality_tool_runner,
-    #                 sources_snapshot=sources_snapshot,
-    #                 output_files=goal.output_files_to_read(request),
-    #             ))
-    #
-    #         output = await Get(Snapshot, Digest, proc_result.output_digest)
-    #
-    #         return goal.create_result(request, process_result=proc_result, output=output)
-    #
-    #     namespace = dict(locals())
-    #
-    #     return [
-    #         find_code_quality_tool,
-    #         process_files,
-    #         hydrate_code_quality_tool,
-    #         *collect_rules(namespace),
-    #         *ByoToolRequest.rules(),
-    #     ]
