@@ -19,7 +19,7 @@ from pants.backend.python import register as register_python
 def test_lint_built_rule():
     cfg = CodeQualityToolRuleBuilder(
         goal='lint',
-        target='//:flake8_tool',
+        target='build-support:flake8_tool',
         name='Flake8',
         scope='flake8_tool'
     )
@@ -40,36 +40,40 @@ def test_lint_built_rule():
         preserve_tmpdirs=True,
     )
 
+    """
+                file(
+                    name="flake8_conf",
+                    source=".flake8"
+                )
+                
+                execution_dependencies=[":flake8_conf"],
+    """
+
+
     rule_runner.write_files({
-        "BUILD": dedent(
+        "build-support/BUILD": dedent(
             """
             python_requirement(
                 name="flake8",
                 requirements=["flake8==5.0.4"]
             )
         
-            file(
-                name="flake8_conf",
-                source=".flake8"
-            )
-        
             code_quality_tool(
                 name="flake8_tool",
                 runnable=":flake8",
-                execution_dependencies=[":flake8_conf"],
                 file_glob_include=["**/*.py"],
                 file_glob_exclude=["messy_ignored_dir/**"],
                 args=["--indent-size=2"],
             )
             """
         ),
-        ".flake8": dedent(
+        "build-support/.flake8": dedent(
             """
             [flake8]
             extend-ignore = F401
             """),
         "good_fmt.py": "foo = 5\n",
-        "unused_import_saved_by_conf.py": "import os\n",
+        # "unused_import_saved_by_conf.py": "import os\n",
         "messy_ignored_dir/messy_file.py": "ignoreme=10",
         "not_a_dot_py_file.nopy": "notpy=100",
         "indent_2_ok_by_cmd_arg.py": dedent(

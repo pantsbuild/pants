@@ -115,6 +115,7 @@ class CodeQualityTool:
     execution_dependencies: tuple[str, ...]
     file_glob_include: tuple[str, ...]
     file_glob_exclude: tuple[str, ...]
+    target: Target
 
 
 @rule
@@ -140,6 +141,7 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
         args=target[CodeQualityToolArgumentsField].value or (),
         file_glob_include=target[CodeQualityToolFileGlobIncludeField].value or (),
         file_glob_exclude=target[CodeQualityToolFileGlobExcludeField].value or (),
+        target=target,
     )
 
 
@@ -190,7 +192,7 @@ async def hydrate_code_quality_tool(request: CodeQualityToolAddressString) -> Co
         AddressInput,
         AddressInput.parse(
             cqt.runnable_address_str,
-            # Need to add a relative_to=addresses
+            relative_to=cqt.target.address.spec_path,
             description_of_origin=f"Code Quality Tool runnable target",
         ),
     )
