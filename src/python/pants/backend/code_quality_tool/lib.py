@@ -103,7 +103,7 @@ class CodeQualityToolTarget(Target):
     )
 
 
-class SupportedGoal:
+class GoalSupport:
     goal: str
     request_superclass: Type[LintFilesRequest]
     skippable: list[str]
@@ -118,7 +118,7 @@ class SupportedGoal:
         raise NotImplementedError
 
 
-class LintGoal(SupportedGoal):
+class LintGoalSupport(GoalSupport):
     goal = "lint"
     request_superclass = LintFilesRequest
     skippable = ["lint"]
@@ -133,7 +133,7 @@ class LintGoal(SupportedGoal):
         return None
 
 
-class FmtGoal(SupportedGoal):
+class FmtGoalSupport(GoalSupport):
     goal = "fmt"
     request_superclass = FmtFilesRequest
     skippable = ["lint", "fmt"]
@@ -328,17 +328,16 @@ class CodeQualityToolRuleBuilder:
     name: str
     scope: str
 
-    @property
-    def _goal(self) -> SupportedGoal:
+    def supported_goal(self) -> GoalSupport:
         if self.goal == "fmt":
-            return FmtGoal
+            return FmtGoalSupport
         elif self.goal == "lint":
-            return LintGoal
+            return LintGoalSupport
         else:
             raise ValueError(f"Unknown goal {self.goal}")
 
     def build_rules(self):
-        goal = self._goal
+        goal = self.supported_goal()
 
         class ByoTool(Subsystem):
             options_scope = self.scope
@@ -346,11 +345,8 @@ class CodeQualityToolRuleBuilder:
             help = f"{self.goal.capitalize()} with {self.name}. Tool defined in {self.target}"
 
             skip = SkipOption(*goal.skippable)
-            linter = self.target
 
-        request_superclass = goal.request_superclass
-
-        class ByoToolRequest(request_superclass):
+        class ByoToolRequest(goal.request_superclass):
             tool_subsystem = ByoTool
 
         @rule(canonical_name_suffix=self.scope)
@@ -360,7 +356,7 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=subsystem.linter))
+            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
 
             matching_filepaths = FilespecMatcher(
                 includes=cqt.file_glob_include,
@@ -372,16 +368,16 @@ class CodeQualityToolRuleBuilder:
         result_class = goal.result_class
 
         @rule(canonical_name_suffix=self.scope)
-        async def run_byotool(request: ByoToolRequest.Batch, subsystem: ByoTool) -> result_class:
+        async def run_byotool(request: ByoToolRequest.Batch) -> result_class:
 
-            if goal is LintGoal:
+            if goal is LintGoalSupport:
                 sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
             else:
                 sources_snapshot = request.snapshot  # only available on Batches for Fmt or Fix
 
             code_quality_tool_runner = await Get(
                 CodeQualityToolBatchRunner,
-                CodeQualityToolAddressString(address=subsystem.linter))
+                CodeQualityToolAddressString(address=self.target))
 
             proc_result = await Get(
                 FallibleProcessResult,
