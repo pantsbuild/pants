@@ -3,25 +3,22 @@
 from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.code_quality_tool.lib import CodeQualityToolRuleBuilder, CodeQualityToolTarget
-from pants.backend.project_info.list_targets import List, rules as list_rules
+from pants.backend.project_info.list_targets import List
+from pants.backend.project_info.list_targets import rules as list_rules
+from pants.backend.python import register as register_python
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.goals.fmt import Fmt
 from pants.core.goals.lint import Lint
-from pants.core.target_types import FileTarget
-from pants.testutil.rule_runner import RuleRunner
-
 from pants.core.register import rules as core_rules
-from pants.core.util_rules import source_files, adhoc_process_support
+from pants.core.target_types import FileTarget
+from pants.core.util_rules import adhoc_process_support, source_files
 from pants.engine import process
-from pants.backend.python import register as register_python
+from pants.testutil.rule_runner import RuleRunner
 
 
 def test_lint_built_rule():
     cfg = CodeQualityToolRuleBuilder(
-        goal='lint',
-        target='build-support:flake8_tool',
-        name='Flake8',
-        scope='flake8_tool'
+        goal="lint", target="build-support:flake8_tool", name="Flake8", scope="flake8_tool"
     )
 
     code_quality_tool_rules = cfg.build_rules()
@@ -40,9 +37,10 @@ def test_lint_built_rule():
         preserve_tmpdirs=True,
     )
 
-    rule_runner.write_files({
-        "build-support/BUILD": dedent(
-            """
+    rule_runner.write_files(
+        {
+            "build-support/BUILD": dedent(
+                """
             python_requirement(
                 name="flake8",
                 requirements=["flake8==5.0.4"]
@@ -62,23 +60,25 @@ def test_lint_built_rule():
                 source=".flake8"
             )
             """
-        ),
-        "build-support/.flake8": dedent(
-            """
+            ),
+            "build-support/.flake8": dedent(
+                """
             [flake8]
             extend-ignore = F401
-            """),
-        "good_fmt.py": "foo = 5\n",
-        "unused_import_saved_by_conf.py": "import os\n",
-        "messy_ignored_dir/messy_file.py": "ignoreme=10",
-        "not_a_dot_py_file.nopy": "notpy=100",
-        "indent_2_ok_by_cmd_arg.py": dedent(
             """
+            ),
+            "good_fmt.py": "foo = 5\n",
+            "unused_import_saved_by_conf.py": "import os\n",
+            "messy_ignored_dir/messy_file.py": "ignoreme=10",
+            "not_a_dot_py_file.nopy": "notpy=100",
+            "indent_2_ok_by_cmd_arg.py": dedent(
+                """
             def foo():
               return 2
             """
-        ),
-    })
+            ),
+        }
+    )
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 0
@@ -88,9 +88,7 @@ def test_lint_built_rule():
     assert res.exit_code == 0
     assert "flake8_tool succeeded" in res.stderr
 
-    rule_runner.write_files({
-        "bad_fmt.py": "baz=5\n"
-    })
+    rule_runner.write_files({"bad_fmt.py": "baz=5\n"})
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 1
@@ -107,10 +105,7 @@ def test_lint_built_rule():
 
 def test_fmt_built_rule():
     cfg = CodeQualityToolRuleBuilder(
-        goal='fmt',
-        target='//:black_tool',
-        name='Black',
-        scope='black_formatter'
+        goal="fmt", target="//:black_tool", name="Black", scope="black_formatter"
     )
 
     code_quality_tool_rules = cfg.build_rules()
@@ -129,9 +124,10 @@ def test_fmt_built_rule():
         preserve_tmpdirs=True,
     )
 
-    rule_runner.write_files({
-        "BUILD": dedent(
-            """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
             python_requirement(
                 name="black",
                 requirements=["black==22.6.0"]
@@ -143,10 +139,11 @@ def test_fmt_built_rule():
                 file_glob_include=["**/*.py"],
             )
             """
-        ),
-        "good_fmt.py": "foo = 5\n",
-        "needs_repair.py": "bar=10\n",
-    })
+            ),
+            "good_fmt.py": "foo = 5\n",
+            "needs_repair.py": "bar=10\n",
+        }
+    )
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 1
@@ -165,19 +162,12 @@ def test_fmt_built_rule():
 
 def test_several_formatters():
     black_cfg = CodeQualityToolRuleBuilder(
-        goal='fmt',
-        target='//:black_tool',
-        name='Black',
-        scope='black_formatter'
+        goal="fmt", target="//:black_tool", name="Black", scope="black_formatter"
     )
 
     isort_cfg = CodeQualityToolRuleBuilder(
-        goal='fmt',
-        target='//:isort_tool',
-        name='isort',
-        scope='isort_formatter'
+        goal="fmt", target="//:isort_tool", name="isort", scope="isort_formatter"
     )
-
 
     rule_runner = RuleRunner(
         target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
@@ -194,9 +184,10 @@ def test_several_formatters():
         preserve_tmpdirs=True,
     )
 
-    rule_runner.write_files({
-        "BUILD": dedent(
-            """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
             python_requirement(
                 name="black",
                 requirements=["black==22.6.0"]
@@ -219,18 +210,19 @@ def test_several_formatters():
                 file_glob_include=["**/*.py"],
             )
             """
-        ),
-        # the import order will be fixed by isort
-        # the spacing on the foo line will be fixed by black
-        "needs_repair.py": dedent(
-            """
+            ),
+            # the import order will be fixed by isort
+            # the spacing on the foo line will be fixed by black
+            "needs_repair.py": dedent(
+                """
             import b
             import a
             
             foo=a.a+b.b
             """
-        ).lstrip(),
-    })
+            ).lstrip(),
+        }
+    )
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 1
@@ -242,64 +234,77 @@ def test_several_formatters():
     assert "isort_formatter made changes" in res.stderr
     assert "black_formatter made changes" in res.stderr
 
-    assert dedent(
-        """
+    assert (
+        dedent(
+            """
         import a
         import b
     
         foo = a.a + b.b
         """
-    ).lstrip() == rule_runner.read_file("needs_repair.py")
+        ).lstrip()
+        == rule_runner.read_file("needs_repair.py")
+    )
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 0
     assert "isort_formatter succeeded" in res.stderr
     assert "black_formatter succeeded" in res.stderr
 
-    rule_runner.write_files({
-        "only_fix_imports.py": dedent(
-            """
+    rule_runner.write_files(
+        {
+            "only_fix_imports.py": dedent(
+                """
             import b
             import a
     
             bar=a.a+b.b
             """
-        ).lstrip(),
-    })
+            ).lstrip(),
+        }
+    )
     res = rule_runner.run_goal_rule(Fmt, args=["--only=isort_formatter", "only_fix_imports.py"])
     assert res.exit_code == 0
     assert "isort_formatter made changes" in res.stderr
     assert "black" not in res.stderr
-    assert dedent(
-        """
+    assert (
+        dedent(
+            """
         import a
         import b
 
         bar=a.a+b.b
         """
-    ).lstrip() == rule_runner.read_file("only_fix_imports.py")
+        ).lstrip()
+        == rule_runner.read_file("only_fix_imports.py")
+    )
 
-    rule_runner.write_files({
-        "skip_isort.py": dedent(
-            """
+    rule_runner.write_files(
+        {
+            "skip_isort.py": dedent(
+                """
             import b
             import a
 
             zap=a.a+b.b
             """
-        ).lstrip(),
-    })
-    res = rule_runner.run_goal_rule(Fmt,
-                                    global_args=["--isort_formatter-skip"],
-                                    args=["skip_isort.py"])
+            ).lstrip(),
+        }
+    )
+    res = rule_runner.run_goal_rule(
+        Fmt, global_args=["--isort_formatter-skip"], args=["skip_isort.py"]
+    )
     assert res.exit_code == 0
     assert "black_formatter made changes" in res.stderr
     assert "isort" not in res.stderr
-    assert dedent(
-        """
+    assert (
+        dedent(
+            """
         import b
         import a
 
         zap = a.a + b.b
         """
-    ).lstrip() == rule_runner.read_file("skip_isort.py")
+        ).lstrip()
+        == rule_runner.read_file("skip_isort.py")
+    )

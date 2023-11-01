@@ -1,7 +1,6 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-
 from typing import ClassVar, Mapping
 
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult
@@ -34,9 +33,11 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    SpecialCasedDependencies,
+    StringField,
     StringSequenceField,
     Target,
-    Targets, StringField, SpecialCasedDependencies,
+    Targets,
 )
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
@@ -54,6 +55,7 @@ class CodeQualityToolFileGlobExcludeField(StringSequenceField):
     required = False
     default = ()
 
+
 class CodeQualityToolRunnableField(StringField):
     alias: ClassVar[str] = "runnable"
     required = True
@@ -66,6 +68,7 @@ class CodeQualityToolRunnableField(StringField):
         `{CodeQualityToolExecutionDependenciesField.alias}`.
         """
     )
+
 
 class CodeQualityToolArgumentsField(StringSequenceField):
     alias: ClassVar[str] = "args"
@@ -154,20 +157,18 @@ class CodeQualityToolBatchRunner:
     immutable_input_digests: Mapping[str, Digest]
 
 
-
 @dataclass(frozen=True)
 class CodeQualityToolBatch:
     runner: CodeQualityToolBatchRunner
     sources_snapshot: Snapshot
     output_files: tuple[str, ...]
 
+
 @rule
 async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
     runner = batch.runner
 
-    input_digest = await Get(
-        Digest, MergeDigests((runner.digest, batch.sources_snapshot.digest))
-    )
+    input_digest = await Get(Digest, MergeDigests((runner.digest, batch.sources_snapshot.digest)))
 
     result = await Get(
         FallibleProcessResult,
@@ -179,12 +180,15 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
             immutable_input_digests=FrozenDict.frozen(runner.immutable_input_digests),
             env=FrozenDict(runner.extra_env),
             output_files=batch.output_files,
-        ))
+        ),
+    )
     return result
 
 
 @rule
-async def hydrate_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQualityToolBatchRunner:
+async def hydrate_code_quality_tool(
+    request: CodeQualityToolAddressString,
+) -> CodeQualityToolBatchRunner:
     cqt = await Get(CodeQualityTool, CodeQualityToolAddressString, request)
 
     runnable_address = await Get(
@@ -203,7 +207,6 @@ async def hydrate_code_quality_tool(request: CodeQualityToolAddressString) -> Co
     runnable_targets = await Get(Targets, Addresses, addresses)
 
     target = runnable_targets[0]
-
 
     field_sets = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)
@@ -295,7 +298,8 @@ class CodeQualityToolRuleBuilder:
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
-            request: CodeQualityProcessingRequest.PartitionRequest, subsystem: CodeQualityToolInstance
+            request: CodeQualityProcessingRequest.PartitionRequest,
+            subsystem: CodeQualityToolInstance,
         ) -> Partitions:
             if subsystem.skip:
                 return Partitions()
@@ -314,8 +318,8 @@ class CodeQualityToolRuleBuilder:
             sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
 
             code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner,
-                CodeQualityToolAddressString(address=self.target))
+                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+            )
 
             proc_result = await Get(
                 FallibleProcessResult,
@@ -323,8 +327,8 @@ class CodeQualityToolRuleBuilder:
                     runner=code_quality_tool_runner,
                     sources_snapshot=sources_snapshot,
                     output_files=(),
-                ))
-
+                ),
+            )
 
             return LintResult.create(request, process_result=proc_result)
 
@@ -348,7 +352,8 @@ class CodeQualityToolRuleBuilder:
 
         @rule(canonical_name_suffix=self.scope)
         async def partition_inputs(
-            request: CodeQualityProcessingRequest.PartitionRequest, subsystem: CodeQualityToolInstance
+            request: CodeQualityProcessingRequest.PartitionRequest,
+            subsystem: CodeQualityToolInstance,
         ) -> Partitions:
             if subsystem.skip:
                 return Partitions()
@@ -367,8 +372,8 @@ class CodeQualityToolRuleBuilder:
             sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner,
-                CodeQualityToolAddressString(address=self.target))
+                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+            )
 
             proc_result = await Get(
                 FallibleProcessResult,
@@ -376,7 +381,8 @@ class CodeQualityToolRuleBuilder:
                     runner=code_quality_tool_runner,
                     sources_snapshot=sources_snapshot,
                     output_files=request.files,
-                ))
+                ),
+            )
 
             output = await Get(Snapshot, Digest, proc_result.output_digest)
 
@@ -402,12 +408,11 @@ class CodeQualityToolRuleBuilder:
             hydrate_code_quality_tool,
         ]
 
-        if self.goal == 'fmt':
+        if self.goal == "fmt":
             rules.extend(self._build_fmt_rules())
-        elif self.goal == 'lint':
+        elif self.goal == "lint":
             rules.extend(self._build_lint_rules())
         else:
-            raise ValueError(f'Unsupported goal for code quality tool: {self.goal}')
+            raise ValueError(f"Unsupported goal for code quality tool: {self.goal}")
 
         return rules
-
