@@ -385,7 +385,7 @@ python_test(
 )
 ```
 
-To parametrize multiple fields together in groups, put each parametrization group as an unnamed (positional) argument to the target with the field values to use for that group as parametrization arguments. This is useful to avoid a full cartesian product if not every combination of field values makes sense. i.e. The previous example uses the same resolve (lockfile) for both interpreter constraints, however if you want to use a different resolve per interpreter, then grouping the resolve value with the interpreter constraint may be the way to go.
+To parametrize multiple fields together as one parametrization, splat a named parametrize object to the target with the field values to use for that group as the parametrization keyword arguments. (See example below.)  This is useful to avoid a full cartesian product if not every combination of field values makes sense. i.e. The previous example uses the same resolve (lockfile) for both interpreter constraints, however if you want to use a different resolve per interpreter, then grouping the resolve value with the interpreter constraint may be the way to go.
 
 ```python example/BUILD
 # Creates two targets:
@@ -394,10 +394,10 @@ To parametrize multiple fields together in groups, put each parametrization grou
 #    example:tests@parametrize=py3
 
 python_test(
-    parametrize("py2", interpreter_constraints=["==2.7.*"], resolve="lock-a"),
-    parametrize("py3", interpreter_constraints=[">=3.6,<3.7"], resolve="lock-b"),
     name="tests",
     source="tests.py",
+    **parametrize("py2", interpreter_constraints=["==2.7.*"], resolve="lock-a"),
+    **parametrize("py3", interpreter_constraints=[">=3.6,<3.7"], resolve="lock-b"),
 )
 ```
 

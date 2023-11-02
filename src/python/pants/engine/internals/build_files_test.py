@@ -549,9 +549,9 @@ def test_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
             "hello/BUILD": dedent(
                 """\
                 mock_tgt(
-                  parametrize("a", tags=["opt-a"], resolve="lock-a"),
-                  parametrize("b", tags=["opt-b"], resolve="lock-b"),
                   description="desc for a and b",
+                  **parametrize("a", tags=["opt-a"], resolve="lock-a"),
+                  **parametrize("b", tags=["opt-b"], resolve="lock-b"),
                 )
                 """
             ),
@@ -563,9 +563,9 @@ def test_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
         [TargetAdaptorRequest(Address("hello"), description_of_origin="tests")],
     )
     assert target_adaptor.kwargs == dict(
-        __0__=Parametrize("a", tags=["opt-a"], resolve="lock-a").as_group(),
-        __1__=Parametrize("b", tags=["opt-b"], resolve="lock-b").as_group(),
         description="desc for a and b",
+        **Parametrize("a", tags=["opt-a"], resolve="lock-a"),  # type: ignore[arg-type]
+        **Parametrize("b", tags=["opt-b"], resolve="lock-b"),
     )
 
 

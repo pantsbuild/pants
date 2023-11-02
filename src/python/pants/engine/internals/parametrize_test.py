@@ -61,7 +61,7 @@ def test_to_parameters_failure(exception_str: str, args: list[Any], kwargs: dict
 )
 def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, Any]) -> None:
     with pytest.raises(Exception) as exc:
-        Parametrize(*args, **kwargs).as_group().group_name
+        Parametrize(*args, **kwargs).to_group().group_name
     assert exception_str in str(exc.value)
 
 
@@ -92,10 +92,9 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
                 ("a@parametrize=B", {"f0": "c", "f1": 3, "f2": 4}),
             ],
             {
-                # The "field name" for the parametrization group is not used, it only has to be unique.
-                "__0__": Parametrize("A", f1=1, f2=2).as_group(),
-                "__1__": Parametrize("B", f1=3, f2=4).as_group(),
                 "f0": "c",
+                **Parametrize("A", f1=1, f2=2),
+                **Parametrize("B", f1=3, f2=4),
             },
         ),
         (
@@ -105,11 +104,11 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
                 ("a@parametrize=C", {"f": "x", "g": ()}),
             ],
             {
-                "__0__": Parametrize("A", f=1).as_group(),
-                "__1__": Parametrize("B", f=2).as_group(),
-                "__2__": Parametrize("C", g=[]).as_group(),
                 # Field overridden by some parametrize groups.
                 "f": "x",
+                **Parametrize("A", f=1),
+                **Parametrize("B", f=2),
+                **Parametrize("C", g=[]),
             },
         ),
     ],
@@ -125,13 +124,13 @@ def test_expand(
 
 def test_expand_fails_when_overriding_parametrized_field() -> None:
     fields = {
-        "__0__": Parametrize("A", f=1).as_group(),
-        "__1__": Parametrize("B", g=2, x=3).as_group(),
         "f": Parametrize("x", "y"),
         "g": Parametrize("x", "y"),
         "h": Parametrize("x", "y"),
         "x": 5,
         "z": 6,
+        **Parametrize("A", f=1),
+        **Parametrize("B", g=2, x=3),
     }
     with pytest.raises(Exception) as exc:
         _ = list(Parametrize.expand(Address("a"), fields))

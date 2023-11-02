@@ -47,7 +47,16 @@ class Parametrize:
         object.__setattr__(self, "args", args)
         object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
 
-    def as_group(self) -> Parametrize:
+    def keys(self) -> tuple[str]:
+        return (f"parametrize_{hash(self)}",)
+
+    def __getitem__(self, key) -> Any:
+        if isinstance(key, str) and key.startswith("parametrize_"):
+            return self.to_group()
+        else:
+            raise KeyError(key)
+
+    def to_group(self) -> Parametrize:
         object.__setattr__(self, "is_group", True)
         return self
 
@@ -102,8 +111,8 @@ class Parametrize:
                     Example:
 
                         target(
-                            parametrize("group-a", field_a=1, field_b=True),
-                            ...
+                            ...,
+                            **parametrize("group-a", field_a=1, field_b=True),
                         )
 
                     Got: `{self!r}`
