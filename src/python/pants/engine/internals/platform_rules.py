@@ -57,6 +57,8 @@ async def complete_environment_vars(
     # do not strip the environment from either runtime. It is reasonable to not strip because
     # every user will have the same consistent Docker image or Remote Execution environment, unlike
     # local environments.
+    local_environment_vars = session_values[CompleteEnvironmentVars]
+
     if env_tgt.val:
         if env_tgt.val.has_field(DockerImageField):
             description_of_env_source = f"the Docker image {env_tgt.val[DockerImageField].value}"
@@ -64,12 +66,12 @@ async def complete_environment_vars(
             description_of_env_source = "the remote execution environment"
         else:
             # Else, it's a local environment.
-            return session_values[CompleteEnvironmentVars]
+            return local_environment_vars
     else:
         if environments_subsystem.remote_execution_used_globally(global_options):
             description_of_env_source = "the remote execution environment"
         else:
-            return session_values[CompleteEnvironmentVars]
+            return local_environment_vars
 
     env_process_result = await Get(
         ProcessResult,
@@ -80,7 +82,7 @@ async def complete_environment_vars(
             cache_scope=env_tgt.executable_search_path_cache_scope(),
         ),
     )
-    result = {}
+    result = dict(local_environment_vars)
     for line in env_process_result.stdout.decode("utf-8").rstrip().split("\0"):
         if not line:
             continue

@@ -9,8 +9,6 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import PurePath
-
-from pants.util.frozendict import FrozenDict
 from typing import Any, ClassVar, Iterable, Optional, Sequence, Tuple, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
@@ -1074,23 +1072,11 @@ class TestExtraEnv:
 
 
 @rule
-async def get_filtered_environment(
-    test_env_aware: TestSubsystem.EnvironmentAware,
-    local_environment_name: ChosenLocalEnvironmentName,
-) -> TestExtraEnv:
+async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAware) -> TestExtraEnv:
+    return TestExtraEnv(
+        await Get(EnvironmentVars, EnvironmentVarsRequest(test_env_aware.extra_env_vars))
+    )
 
-    # Read the local environment for requested environment variables
-    # even if we are going to be running in a different environment.
-    # This allows transmitting env variables from the shell running `pants`
-    # into the test run
-    local_env = await Get(EnvironmentVars,
-              {
-                  EnvironmentVarsRequest(test_env_aware.extra_env_vars): EnvironmentVarsRequest,
-                  local_environment_name.val: EnvironmentName,
-              })
-
-    environment_env = await Get(EnvironmentVars, EnvironmentVarsRequest(test_env_aware.extra_env_vars))
-    return TestExtraEnv(EnvironmentVars({**local_env, **environment_env}))
 
 @memoized
 def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
