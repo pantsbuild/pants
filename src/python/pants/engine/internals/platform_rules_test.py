@@ -103,7 +103,7 @@ def test_complete_env_vars() -> None:
         envs_enabled: bool = True,
         env_tgt: LocalEnvironmentTarget | RemoteEnvironmentTarget | DockerEnvironmentTarget | None,
         remote_execution: bool,
-        expected_env: str,
+        expected_env: dict,
     ) -> None:
         global_options = create_subsystem(GlobalOptions, remote_execution=remote_execution)
         name = "name"
@@ -131,31 +131,31 @@ def test_complete_env_vars() -> None:
                 MockGet(output_type=ProcessResult, input_types=(Process,), mock=mock_env_process)
             ],
         )
-        assert dict(result) == {expected_env: "true"}
+        assert dict(result) == expected_env
 
-    assert_env_vars(env_tgt=None, remote_execution=False, expected_env="LOCAL")
-    assert_env_vars(env_tgt=None, envs_enabled=False, remote_execution=True, expected_env="REMOTE")
-    assert_env_vars(env_tgt=None, envs_enabled=True, remote_execution=True, expected_env="LOCAL")
+    assert_env_vars(env_tgt=None, remote_execution=False, expected_env={"LOCAL": "true"})
+    assert_env_vars(env_tgt=None, envs_enabled=False, remote_execution=True, expected_env={"REMOTE": "true"})
+    assert_env_vars(env_tgt=None, envs_enabled=True, remote_execution=True, expected_env={"LOCAL": "true"})
 
     for re in (False, True):
         assert_env_vars(
             env_tgt=LocalEnvironmentTarget({}, Address("dir")),
             remote_execution=re,
-            expected_env="LOCAL",
+            expected_env={"LOCAL": "true"},
         )
 
     for re in (False, True):
         assert_env_vars(
             env_tgt=DockerEnvironmentTarget({DockerImageField.alias: "my_img"}, Address("dir")),
             remote_execution=re,
-            expected_env="DOCKER",
+            expected_env={"DOCKER": "true"},
         )
 
     for re in (False, True):
         assert_env_vars(
             env_tgt=RemoteEnvironmentTarget({}, Address("dir")),
             remote_execution=re,
-            expected_env="REMOTE",
+            expected_env={"REMOTE": "true"},
         )
 
 
