@@ -114,15 +114,22 @@ def test_complete_env_vars() -> None:
 
         def mock_env_process(process: Process) -> ProcessResult:
             return Mock(
-                stdout=b"DOCKER=true" if "Docker" in process.description else b"REMOTE=true"
+                stdout=(
+                    b"CONTAINER_VAR=container_val\0COMMON_VAR=docker"
+                    if "Docker" in process.description
+                    else b"REMOTE_VAR=remote_val\0COMMON_VAR=remote"
+                )
             )
+
+        local_env = {
+            "USER_SHELL_VAR": "user_val",
+            "COMMON_VAR": "local",
+        }
 
         result = run_rule_with_mocks(
             complete_environment_vars,
             rule_args=[
-                SessionValues(
-                    {CompleteEnvironmentVars: CompleteEnvironmentVars({"LOCAL": "true"})}
-                ),
+                SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars(local_env)}),
                 EnvironmentTarget(name, env_tgt),
                 global_options,
                 env_subsystem,
@@ -133,29 +140,52 @@ def test_complete_env_vars() -> None:
         )
         assert dict(result) == expected_env
 
-    assert_env_vars(env_tgt=None, remote_execution=False, expected_env={"LOCAL": "true"})
-    assert_env_vars(env_tgt=None, envs_enabled=False, remote_execution=True, expected_env={"REMOTE": "true"})
-    assert_env_vars(env_tgt=None, envs_enabled=True, remote_execution=True, expected_env={"LOCAL": "true"})
+    assert_env_vars(
+        env_tgt=None,
+        remote_execution=False,
+        expected_env={"USER_SHELL_VAR": "user_val", "COMMON_VAR": "local"},
+    )
+    assert_env_vars(
+        env_tgt=None,
+        envs_enabled=False,
+        remote_execution=True,
+        expected_env={"REMOTE_VAR": "remote_val", "COMMON_VAR": "remote"},
+    )
+    assert_env_vars(
+        env_tgt=None,
+        envs_enabled=True,
+        remote_execution=True,
+        expected_env={
+            "USER_SHELL_VAR": "user_val",
+            "COMMON_VAR": "local",
+        },
+    )
 
     for re in (False, True):
         assert_env_vars(
             env_tgt=LocalEnvironmentTarget({}, Address("dir")),
             remote_execution=re,
-            expected_env={"LOCAL": "true"},
+            expected_env={
+                "USER_SHELL_VAR": "user_val",
+                "COMMON_VAR": "local",
+            },
         )
 
     for re in (False, True):
         assert_env_vars(
             env_tgt=DockerEnvironmentTarget({DockerImageField.alias: "my_img"}, Address("dir")),
             remote_execution=re,
-            expected_env={"DOCKER": "true"},
+            expected_env={
+                "CONTAINER_VAR": "container_val",
+                "COMMON_VAR": "docker",
+            },
         )
 
     for re in (False, True):
         assert_env_vars(
             env_tgt=RemoteEnvironmentTarget({}, Address("dir")),
             remote_execution=re,
-            expected_env={"REMOTE": "true"},
+            expected_env={"REMOTE_VAR": "remote_val", "COMMON_VAR": "remote"},
         )
 
 
