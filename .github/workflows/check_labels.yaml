@@ -1,18 +1,14 @@
-name: PR Validation
-on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - labeled
-      - unlabeled
+# GENERATED, DO NOT EDIT!
+# To change, edit `src/python/pants_release/generate_github_workflows.py` and run:
+#   ./pants run src/python/pants_release/generate_github_workflows.py
+
 
 jobs:
   check_labels:
     if: github.repository_owner == 'pantsbuild'
     name: Ensure PR has a category label
-    runs-on:
-    - ubuntu-20.04
+    runs_on:
+    - ubuntu-latest
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -20,6 +16,14 @@ jobs:
       uses: mheap/github-action-required-labels@v4.0.0
       with:
         count: 1
-        labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
-          category:documentation, category:internal
+        labels: category:new feature, category:user api change, category:plugin api
+          change, category:performance, category:bugfix, category:documentation, category:internal
         mode: exactly
+name: PR Validation
+'on':
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - labeled
+    - unlabeled

@@ -17,6 +17,8 @@ import toml
 import yaml
 from pants_release.common import die
 
+from pants.util.strutil import softwrap
+
 HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
@@ -1524,6 +1526,41 @@ def public_repos() -> PublicReposOutput:
     return PublicReposOutput(jobs=jobs, inputs=inputs, run_name=run_name)
 
 
+@dataclass
+class CheckLabelsOutput:
+    jobs: Jobs
+
+
+def check_labels() -> CheckLabelsOutput:
+    steps = [
+        {
+            "name": "Ensure category label",
+            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
+            "uses": "mheap/github-action-required-labels@v4.0.0",
+            "with": {
+                "count": 1,
+                "labels": softwrap(
+                    """
+                            category:new feature, category:user api change,
+                            category:plugin api change, category:performance, category:bugfix,
+                            category:documentation, category:internal
+                            """
+                ),
+                "mode": "exactly",
+            },
+        }
+    ]
+
+    job = {
+        "name": "Ensure PR has a category label",
+        "if": IS_PANTS_OWNER,
+        "runs_on": ["ubuntu-latest"],
+        "steps": steps,
+    }
+
+    return CheckLabelsOutput({"check_labels": job})
+
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -1694,12 +1731,32 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
+    check_labels_output = check_labels()
+    check_labels_yaml = yaml.dump(
+        {
+            "name": "PR Validation",
+            "on": {
+                "pull_request": {
+                    "types": [
+                        "opened",
+                        "reopened",
+                        "labeled",
+                        "unlabeled",
+                    ]
+                }
+            },
+            "jobs": check_labels_output.jobs,
+        },
+        Dumper=NoAliasDumper,
+    )
+
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",
         Path(".github/workflows/public_repos.yaml"): f"{HEADER}\n\n{public_repos_yaml}",
+        Path(".github/workflows/check_labels.yaml"): f"{HEADER}\n\n{check_labels_yaml}",
     }
 
 
