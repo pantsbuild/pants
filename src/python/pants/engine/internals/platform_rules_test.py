@@ -149,7 +149,11 @@ def test_complete_env_vars() -> None:
         env_tgt=None,
         envs_enabled=False,
         remote_execution=True,
-        expected_env={"REMOTE_VAR": "remote_val", "COMMON_VAR": "remote"},
+        expected_env={
+            "REMOTE_VAR": "remote_val",
+            "COMMON_VAR": "remote",
+            "USER_SHELL_VAR": "user_val",
+        },
     )
     assert_env_vars(
         env_tgt=None,
@@ -176,6 +180,7 @@ def test_complete_env_vars() -> None:
             env_tgt=DockerEnvironmentTarget({DockerImageField.alias: "my_img"}, Address("dir")),
             remote_execution=re,
             expected_env={
+                "USER_SHELL_VAR": "user_val",
                 "CONTAINER_VAR": "container_val",
                 "COMMON_VAR": "docker",
             },
@@ -185,7 +190,11 @@ def test_complete_env_vars() -> None:
         assert_env_vars(
             env_tgt=RemoteEnvironmentTarget({}, Address("dir")),
             remote_execution=re,
-            expected_env={"REMOTE_VAR": "remote_val", "COMMON_VAR": "remote"},
+            expected_env={
+                "USER_SHELL_VAR": "user_val",
+                "REMOTE_VAR": "remote_val",
+                "COMMON_VAR": "remote",
+            },
         )
 
 

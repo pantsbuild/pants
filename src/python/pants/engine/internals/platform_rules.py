@@ -82,8 +82,7 @@ async def complete_environment_vars(
             cache_scope=env_tgt.executable_search_path_cache_scope(),
         ),
     )
-    # result = dict(local_environment_vars)
-    result = dict()
+    result = dict(local_environment_vars)
     for line in env_process_result.stdout.decode("utf-8").rstrip().split("\0"):
         if not line:
             continue
