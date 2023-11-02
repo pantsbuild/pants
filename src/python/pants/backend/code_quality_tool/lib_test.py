@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from textwrap import dedent  # noqa: PNT20
 
-from pants.backend.experimental.code_quality_tool.lib import (
+from pants.backend.code_quality_tool.lib import (
     CodeQualityToolRuleBuilder,
     CodeQualityToolTarget,
     base_rules,
