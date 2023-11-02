@@ -721,7 +721,7 @@ impl WorkunitStore {
             .latest_workunits(max_verbosity)
     }
 
-    pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
+    pub fn increment_counter(&self, counter_name: Metric, change: u64) {
         self.metrics_data
             .counters
             .lock()
@@ -843,7 +843,7 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
 
 /// If this thread has a workunit set, increment `counter_name` by `change`.
 pub fn increment_counter_if_in_workunit(counter_name: Metric, change: u64) {
-    if let Some(mut handle) = get_workunit_store_handle() {
+    if let Some(handle) = get_workunit_store_handle() {
         handle.store.increment_counter(counter_name, change)
     }
 }
@@ -913,11 +913,11 @@ impl RunningWorkunit {
         }
     }
 
-    pub fn record_observation(&mut self, metric: ObservationMetric, value: u64) {
+    pub fn record_observation(&self, metric: ObservationMetric, value: u64) {
         self.store.record_observation(metric, value);
     }
 
-    pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
+    pub fn increment_counter(&self, counter_name: Metric, change: u64) {
         self.store.increment_counter(counter_name, change);
     }
 
