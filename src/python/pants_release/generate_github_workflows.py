@@ -1554,7 +1554,7 @@ def check_labels() -> CheckLabelsOutput:
     job = {
         "name": "Ensure PR has a category label",
         "if": IS_PANTS_OWNER,
-        "runs_on": ["ubuntu-latest"],
+        "runs-on": ["ubuntu-latest"],
         "steps": steps,
     }
 
