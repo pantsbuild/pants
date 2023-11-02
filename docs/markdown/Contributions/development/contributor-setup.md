@@ -113,6 +113,9 @@ Add this to your `settings.json` file inside the build root's `.vscode` folder:
   "python.linting.flake8Args": [
     "--config=build-support/flake8/.flake8"
   ],
+  "rust-analyzer.linkedProjects": [
+    "src/rust/engine/Cargo.toml"
+  ]
 }
 ```
 

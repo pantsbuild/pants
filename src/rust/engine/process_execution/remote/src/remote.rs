@@ -171,7 +171,6 @@ impl CommandRunner {
         overall_deadline: Duration,
         retry_interval_duration: Duration,
         execution_concurrency_limit: usize,
-        capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     ) -> Result<Self, String> {
         let needs_tls = execution_address.starts_with("https://");
 
@@ -201,7 +200,7 @@ impl CommandRunner {
             executor,
             overall_deadline,
             retry_interval_duration,
-            capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
+            capabilities_cell: Arc::new(OnceCell::new()),
             capabilities_client,
         };
 

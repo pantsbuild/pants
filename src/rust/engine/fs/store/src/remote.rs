@@ -10,7 +10,7 @@ use futures::Future;
 use hashing::Digest;
 use log::Level;
 use remote_provider::{
-    choose_byte_store_provider, ByteStoreProvider, LoadDestination, RemoteOptions,
+    choose_byte_store_provider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
 };
 use tokio::fs::File;
 use workunit_store::{in_workunit, ObservationMetric};
@@ -38,7 +38,7 @@ impl ByteStore {
         }
     }
 
-    pub async fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
+    pub async fn from_options(options: RemoteStoreOptions) -> Result<ByteStore, String> {
         let instance_name = options.instance_name.clone();
         let provider = choose_byte_store_provider(options).await?;
         Ok(ByteStore::new(instance_name, provider))

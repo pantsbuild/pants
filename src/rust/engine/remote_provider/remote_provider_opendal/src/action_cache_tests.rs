@@ -11,7 +11,7 @@ use hashing::Digest;
 use opendal::services::Memory;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remote_provider_traits::{ActionCacheProvider, RemoteOptions};
+use remote_provider_traits::{ActionCacheProvider, RemoteStoreOptions};
 
 use super::Provider;
 
@@ -28,17 +28,16 @@ fn test_path(digest: Digest) -> String {
     )
 }
 
-fn remote_options() -> RemoteOptions {
-    RemoteOptions {
-        cas_address: "".to_owned(),
+fn remote_options() -> RemoteStoreOptions {
+    RemoteStoreOptions {
+        store_address: "".to_owned(),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes: 10000,
-        rpc_timeout: Duration::from_secs(5),
-        rpc_retries: 1,
-        rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
+        timeout: Duration::from_secs(5),
+        retries: 1,
+        concurrency_limit: 256,
         batch_api_size_limit: 10000,
     }
 }

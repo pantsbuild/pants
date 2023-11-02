@@ -209,17 +209,24 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
         """
         return f"./{self.generate_url(plat).rsplit('/', 1)[-1]}"
 
+    def known_version(self, plat: Platform) -> ExternalToolVersion | None:
+        for known_version in self.known_versions:
+            tool_version = self.decode_known_version(known_version)
+            if plat.value == tool_version.platform and tool_version.version == self.version:
+                return tool_version
+        return None
+
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
-        for known_version in self.known_versions:
-            version = self.decode_known_version(known_version)
-            if plat.value == version.platform and version.version == self.version:
-                return self.get_request_for(
-                    version.platform,
-                    version.sha256,
-                    version.filesize,
-                    url_override=version.url_override,
-                )
+
+        tool_version = self.known_version(plat)
+        if tool_version:
+            return self.get_request_for(
+                tool_version.platform,
+                tool_version.sha256,
+                tool_version.filesize,
+                url_override=tool_version.url_override,
+            )
         raise UnknownVersion(
             softwrap(
                 f"""

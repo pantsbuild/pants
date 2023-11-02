@@ -620,14 +620,14 @@ def bootstrap_jobs(
         human_readable_job_name += ", test and lint Rust"
         human_readable_step_name = "Test and lint Rust"
         # We pass --tests to skip doc tests because our generated protos contain
-        # invalid doc tests in their comments.
+        # invalid doc tests in their comments, and --benches to ensure that the
+        # benchmarks can at least execute once correctly
         step_cmd = "\n".join(
             [
                 "./build-support/bin/check_rust_pre_commit.sh",
                 helper.maybe_append_cargo_test_parallelism(
-                    "./cargo test --locked --all --tests -- --nocapture"
+                    "./cargo test --locked --all --tests --benches -- --nocapture"
                 ),
-                "./cargo check --benches",
                 "./cargo doc",
             ]
         )

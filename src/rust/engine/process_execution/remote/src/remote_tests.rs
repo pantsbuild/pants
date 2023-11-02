@@ -14,7 +14,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::Operation;
 use remexec::{execution_stage::Value as ExecutionStageValue, ExecutedActionMetadata};
-use store::{RemoteOptions, SnapshotOps, Store, StoreError};
+use store::{RemoteStoreOptions, SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
@@ -1268,17 +1268,16 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
     assert!(result.stdout().contains("user timeout"));
 }
 
-fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteOptions {
-    RemoteOptions {
-        cas_address: cas.address(),
+fn remote_options_for_cas(cas: &mock::StubCAS) -> RemoteStoreOptions {
+    RemoteStoreOptions {
+        store_address: cas.address(),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes: 10 * 1024 * 1024,
-        rpc_timeout: Duration::from_secs(1),
-        rpc_retries: 1,
-        rpc_concurrency_limit: STORE_CONCURRENCY_LIMIT,
-        capabilities_cell_opt: None,
+        timeout: Duration::from_secs(1),
+        retries: 1,
+        concurrency_limit: STORE_CONCURRENCY_LIMIT,
         batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
     }
 }
@@ -1338,7 +1337,6 @@ async fn sends_headers() {
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .unwrap();
@@ -1498,7 +1496,6 @@ async fn ensure_inline_stdio_is_stored() {
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .unwrap();
@@ -1875,7 +1872,6 @@ async fn execute_missing_file_uploads_if_known() {
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .unwrap();
@@ -1927,7 +1923,6 @@ async fn execute_missing_file_errors_if_unknown() {
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .unwrap();
@@ -2639,7 +2634,6 @@ async fn create_command_runner(
         OVERALL_DEADLINE_SECS,
         RETRY_INTERVAL,
         EXEC_CONCURRENCY_LIMIT,
-        None,
     )
     .await
     .expect("Failed to make command runner");

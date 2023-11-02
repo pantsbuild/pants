@@ -17,7 +17,6 @@ use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
-use async_oncecell::OnceCell;
 use cache::PersistentCache;
 use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
@@ -32,14 +31,11 @@ use process_execution::{
     self, bounded, local, CacheContentBehavior, CommandRunner, NamedCaches,
     ProcessExecutionStrategy,
 };
-use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
-use remote::remote_cache::{
-    RemoteCacheProviderOptions, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
-};
+use remote::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, RemoteOptions, Store};
+use store::{self, ImmutableInputs, RemoteStoreOptions, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
@@ -111,6 +107,31 @@ pub struct RemotingOptions {
     pub append_only_caches_base_path: Option<String>,
 }
 
+impl RemotingOptions {
+    fn to_remote_store_options(
+        &self,
+        tls_config: grpc_util::tls::Config,
+    ) -> Result<RemoteStoreOptions, String> {
+        let store_address = self
+            .store_address
+            .as_ref()
+            .ok_or("Remote store required, but none configured")?
+            .clone();
+
+        Ok(RemoteStoreOptions {
+            store_address,
+            instance_name: self.instance_name.clone(),
+            tls_config,
+            headers: self.store_headers.clone(),
+            chunk_size_bytes: self.store_chunk_bytes,
+            timeout: self.store_rpc_timeout,
+            retries: self.store_rpc_retries,
+            concurrency_limit: self.store_rpc_concurrency,
+            batch_api_size_limit: self.store_batch_api_size_limit,
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ExecutionStrategyOptions {
     pub local_parallelism: usize,
@@ -153,9 +174,7 @@ impl Core {
         local_execution_root_dir: &Path,
         enable_remote: bool,
         remoting_opts: &RemotingOptions,
-        remote_store_address: &Option<String>,
         tls_config: grpc_util::tls::Config,
-        capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     ) -> Result<Store, String> {
         let local_only = Store::local_only_with_options(
             executor.clone(),
@@ -164,24 +183,8 @@ impl Core {
             local_store_options.into(),
         )?;
         if enable_remote {
-            let cas_address = remote_store_address
-                .as_ref()
-                .ok_or("Remote store required, but none configured")?
-                .clone();
-
             local_only
-                .into_with_remote(RemoteOptions {
-                    cas_address,
-                    instance_name: remoting_opts.instance_name.clone(),
-                    tls_config,
-                    headers: remoting_opts.store_headers.clone(),
-                    chunk_size_bytes: remoting_opts.store_chunk_bytes,
-                    rpc_timeout: remoting_opts.store_rpc_timeout,
-                    rpc_retries: remoting_opts.store_rpc_retries,
-                    rpc_concurrency_limit: remoting_opts.store_rpc_concurrency,
-                    capabilities_cell_opt,
-                    batch_api_size_limit: remoting_opts.store_batch_api_size_limit,
-                })
+                .into_with_remote(remoting_opts.to_remote_store_options(tls_config)?)
                 .await
         } else {
             Ok(local_only)
@@ -204,7 +207,6 @@ impl Core {
         tls_config: grpc_util::tls::Config,
         exec_strategy_opts: &ExecutionStrategyOptions,
         remoting_opts: &RemotingOptions,
-        capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     ) -> Result<Arc<dyn CommandRunner>, String> {
         let local_command_runner = local::CommandRunner::new(
             local_runner_store.clone(),
@@ -289,7 +291,6 @@ impl Core {
                     remoting_opts.execution_overall_deadline,
                     Duration::from_millis(100),
                     remoting_opts.execution_rpc_concurrency,
-                    capabilities_cell_opt,
                 )
                 .await?,
             );
@@ -350,14 +351,7 @@ impl Core {
                             .append_only_caches_base_path
                             .clone(),
                     },
-                    RemoteCacheProviderOptions {
-                        instance_name,
-                        action_cache_address: remoting_opts.store_address.clone().unwrap(),
-                        tls_config,
-                        headers: remoting_opts.store_headers.clone(),
-                        concurrency_limit: remoting_opts.cache_rpc_concurrency,
-                        rpc_timeout: remoting_opts.cache_rpc_timeout,
-                    },
+                    remoting_opts.to_remote_store_options(tls_config)?,
                 )
                 .await?,
             );
@@ -393,7 +387,6 @@ impl Core {
         tls_config: grpc_util::tls::Config,
         exec_strategy_opts: &ExecutionStrategyOptions,
         remoting_opts: &RemotingOptions,
-        capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     ) -> Result<Vec<Arc<dyn CommandRunner>>, String> {
         let leaf_runner = Self::make_leaf_runner(
             full_store,
@@ -407,7 +400,6 @@ impl Core {
             tls_config.clone(),
             exec_strategy_opts,
             remoting_opts,
-            capabilities_cell_opt,
         )
         .await?;
 
@@ -556,17 +548,6 @@ impl Core {
             || exec_strategy_opts.remote_cache_read
             || exec_strategy_opts.remote_cache_write;
 
-        // If the remote store and remote execution server are the same (address and headers),
-        // then share the capabilities cache between them to avoid duplicate GetCapabilities calls.
-        let capabilities_cell_opt = if need_remote_store
-            && remoting_opts.execution_address == remoting_opts.store_address
-            && remoting_opts.execution_headers == remoting_opts.store_headers
-        {
-            Some(Arc::new(OnceCell::new()))
-        } else {
-            None
-        };
-
         std::fs::create_dir_all(&local_store_options.store_dir).map_err(|e| {
             format!(
                 "Error making directory {:?}: {:?}",
@@ -580,9 +561,7 @@ impl Core {
             &local_execution_root_dir,
             need_remote_store,
             &remoting_opts,
-            &remoting_opts.store_address,
             tls_config.clone(),
-            capabilities_cell_opt.clone(),
         )
         .await
         .map_err(|e| format!("Could not initialize Store: {e:?}"))?;
@@ -628,7 +607,6 @@ impl Core {
             tls_config.clone(),
             &exec_strategy_opts,
             &remoting_opts,
-            capabilities_cell_opt,
         )
         .await?;
         log::debug!("Using {command_runners:?} for process execution.");
