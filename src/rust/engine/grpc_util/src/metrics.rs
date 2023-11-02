@@ -14,7 +14,7 @@ use http::{Request, Response};
 use pin_project::pin_project;
 use tower_layer::Layer;
 use tower_service::Service;
-use workunit_store::{get_workunit_store_handle, ObservationMetric};
+use workunit_store::{record_observation_if_in_workunit, ObservationMetric};
 
 #[derive(Clone, Debug)]
 pub struct NetworkMetricsLayer {
@@ -81,12 +81,7 @@ where
         let this = self.project();
         let result = ready!(this.inner.poll(cx));
         if let Some((metric, start)) = metric_data {
-            let workunit_store_handle = get_workunit_store_handle();
-            if let Some(workunit_store_handle) = workunit_store_handle {
-                workunit_store_handle
-                    .store
-                    .record_observation(metric, start.elapsed().as_micros() as u64)
-            }
+            record_observation_if_in_workunit(metric, start.elapsed().as_micros() as u64)
         }
         Poll::Ready(result)
     }

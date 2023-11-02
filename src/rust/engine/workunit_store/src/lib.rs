@@ -841,6 +841,19 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
     get_workunit_store_handle().expect("A WorkunitStore has not been set for this thread.")
 }
 
+/// If this thread has a workunit set, increment `counter_name` by `change`.
+pub fn increment_counter_if_in_workunit(counter_name: Metric, change: u64) {
+    if let Some(mut handle) = get_workunit_store_handle() {
+        handle.store.increment_counter(counter_name, change)
+    }
+}
+/// If this thread has a workunit set, record `value` as an observation of `metric`.
+pub fn record_observation_if_in_workunit(metric: ObservationMetric, value: u64) {
+    if let Some(handle) = get_workunit_store_handle() {
+        handle.store.record_observation(metric, value)
+    }
+}
+
 /// Run the given async block. If the level given by the WorkunitMetadata is above a configured
 /// threshold, the block will run inside of a workunit recorded in the workunit store.
 ///
