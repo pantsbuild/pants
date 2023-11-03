@@ -95,6 +95,25 @@ class CodeQualityToolExecutionDependenciesField(SpecialCasedDependencies):
     )
 
 
+class CodeQualityToolRunnableDependenciesField(SpecialCasedDependencies):
+    alias: ClassVar[str] = "runnable_dependencies"
+    required = False
+    default = None
+
+    help = help_text(
+        lambda: f"""
+        The runnable dependencies for this command.
+
+        Dependencies specified here are those required to exist on the `PATH` to make the command
+        complete successfully (interpreters specified in a `#!` command, etc). Note that these
+        dependencies will be made available on the `PATH` with the name of the target.
+
+        See also `{CodeQualityToolExecutionDependenciesField.alias}`.
+        """
+    )
+
+
+
 class CodeQualityToolTarget(Target):
     alias: ClassVar[str] = "code_quality_tool"
     core_fields = (
@@ -102,6 +121,7 @@ class CodeQualityToolTarget(Target):
         CodeQualityToolRunnableField,
         CodeQualityToolArgumentsField,
         CodeQualityToolExecutionDependenciesField,
+        CodeQualityToolRunnableDependenciesField,
         CodeQualityToolFileGlobIncludeField,
         CodeQualityToolFileGlobExcludeField,
     )
@@ -117,6 +137,7 @@ class CodeQualityTool:
     runnable_address_str: str
     args: tuple[str, ...]
     execution_dependencies: tuple[str, ...]
+    runnable_dependencies: tuple[str, ...]
     file_glob_include: tuple[str, ...]
     file_glob_exclude: tuple[str, ...]
     target: Target
@@ -142,6 +163,7 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
     return CodeQualityTool(
         runnable_address_str=runnable_address_str,
         execution_dependencies=target[CodeQualityToolExecutionDependenciesField].value or (),
+        runnable_dependencies=target[CodeQualityToolRunnableDependenciesField].value or (),
         args=target[CodeQualityToolArgumentsField].value or (),
         file_glob_include=target[CodeQualityToolFileGlobIncludeField].value or (),
         file_glob_exclude=target[CodeQualityToolFileGlobExcludeField].value or (),
@@ -228,7 +250,7 @@ async def hydrate_code_quality_tool(
         ResolveExecutionDependenciesRequest(
             target.address,
             execution_dependencies=cqt.execution_dependencies,
-            runnable_dependencies=None,
+            runnable_dependencies=cqt.runnable_dependencies,
         ),
     )
 
