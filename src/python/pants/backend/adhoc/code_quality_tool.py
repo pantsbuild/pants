@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Mapping
 
-from pants.core.goals.fmt import FmtFilesRequest, FmtResult
-from pants.core.goals.lint import LintFilesRequest, LintResult
+from pants.core.goals.fmt import Fmt, FmtFilesRequest, FmtResult
+from pants.core.goals.lint import Lint, LintFilesRequest, LintResult
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
 from pants.core.util_rules.adhoc_process_support import (
     ExtraSandboxContents,
@@ -18,6 +18,7 @@ from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs
+from pants.engine.goal import Goal
 from pants.engine.internals.native_engine import (
     EMPTY_DIGEST,
     Address,
@@ -300,12 +301,37 @@ async def hydrate_code_quality_tool(
     )
 
 
+_name_to_supported_goal = {g.name: g for g in (Lint, Fmt)}
+
+
+class CodeQualityToolUnsupportedGoalError(Exception):
+    """Raised when a rule builder is instantiated for an unrecognized or unsupported goal."""
+
+
 @dataclass
 class CodeQualityToolRuleBuilder:
     goal: str
     target: str
     name: str
     scope: str
+
+    @property
+    def goal_type(self) -> type[Goal]:
+        return _name_to_supported_goal[self.goal]
+
+    def __post_init__(self):
+        if self.goal not in _name_to_supported_goal:
+            raise CodeQualityToolUnsupportedGoalError(
+                f"""goal must be one of {sorted(_name_to_supported_goal)}"""
+            )
+
+    def rules(self) -> Iterable[Rule]:
+        if self.goal_type is Fmt:
+            return self._build_fmt_rules()
+        elif self.goal_type is Lint:
+            return self._build_lint_rules()
+        else:
+            raise ValueError(f"Unsupported goal for code quality tool: {self.goal}")
 
     def _build_lint_rules(self) -> Iterable[Rule]:
         class CodeQualityToolInstance(Subsystem):
@@ -422,14 +448,6 @@ class CodeQualityToolRuleBuilder:
             *collect_rules(namespace),
             *CodeQualityProcessingRequest.rules(),
         ]
-
-    def rules(self) -> Iterable[Rule]:
-        if self.goal == "fmt":
-            return self._build_fmt_rules()
-        elif self.goal == "lint":
-            return self._build_lint_rules()
-        else:
-            raise ValueError(f"Unsupported goal for code quality tool: {self.goal}")
 
 
 def base_rules():
