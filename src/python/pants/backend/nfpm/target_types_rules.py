@@ -6,8 +6,16 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentFileSourceField,
     NfpmContentFilesField,
     NfpmContentSrcField,
+    NfpmContentSymlinkDstField,
+    NfpmContentSymlinkSrcField,
+    NfpmContentSymlinksField,
 )
-from pants.backend.nfpm.target_types import NfpmContentFile, NfpmContentFiles
+from pants.backend.nfpm.target_types import (
+    NfpmContentFile,
+    NfpmContentFiles,
+    NfpmContentSymlink,
+    NfpmContentSymlinks,
+)
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import GenerateTargetsRequest, GeneratedTargets, InvalidFieldException
 from pants.engine.unions import UnionMembership, UnionRule
@@ -65,8 +73,58 @@ async def generate_targets_from_nfpm_content_files(
     return GeneratedTargets(generator, generated_targets)
 
 
+class GenerateTargetsFromNfpmContentSymlinksRequest(GenerateTargetsRequest):
+    generate_from = NfpmContentSymlinks
+
+
+@rule(
+    desc="Generate `nfmp_content_symlink` targets from `nfpm_content_symlinks` target",
+    level=LogLevel.DEBUG,
+)
+async def generate_targets_from_nfpm_content_symlinks(
+    request: GenerateTargetsFromNfpmContentSymlinksRequest,
+    union_membership: UnionMembership,
+) -> GeneratedTargets:
+    generator: NfpmContentSymlinks = request.generator
+    # This is not a dict because the same src can be linked to more than one dst.
+    # Also, the field guarantees that there are no dst duplicates in this field.
+    src_dst_map: tuple[tuple[str, str]] = generator[NfpmContentSymlinksField].value
+
+    overrides = request.require_unparametrized_overrides()
+
+    def generate_tgt(src: str, dst: str) -> NfpmContentSymlink:
+        tgt_overrides = overrides.pop(dst, {})
+        return NfpmContentSymlink(
+            {
+                **request.template,
+                NfpmContentSymlinkSrcField.alias: src,
+                NfpmContentSymlinkDstField.alias: dst,
+                **tgt_overrides,
+            },
+            # We use 'dst' as 'src' is not always unique.
+            # This results in an address like: path/to:nfpm_content#/dst/install/path
+            request.template_address.create_generated(dst),
+            union_membership,
+        )
+
+    generated_targets = [generate_tgt(src, dst) for src, dst in src_dst_map]
+
+    if overrides:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+                """
+            )
+        )
+
+    return GeneratedTargets(generator, generated_targets)
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromNfpmContentFilesRequest),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromNfpmContentSymlinksRequest),
     )

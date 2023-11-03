@@ -40,6 +40,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentSymlinkDstField,
     NfpmContentSymlinksField,
     NfpmContentSymlinkSrcField,
+    NfpmContentSymlinksOverridesField,
     NfpmContentTypeField,
 )
 from pants.backend.nfpm.fields.deb import (
@@ -373,12 +374,20 @@ class NfpmContentSymlinks(TargetGenerator):
         *COMMON_TARGET_FIELDS,
         # Modeled w/o dependencies for now (feel free to add later).
         NfpmContentSymlinksField,
+        NfpmContentSymlinksOverridesField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = CONTENT_FILE_INFO_FIELDS
     help = help_text(
-        """
+        f"""
         Multiple symlinks in an nFPM package (created on package install).
+
+        Pass the list of ('{NfpmContentSymlinkSrcField.alias}', '{NfpmContentSymlinkDstField.alias}')
+        symlink tuples in the '{NfpmContentSymlinksField.alias}' field.
+        
+        Note that '{NfpmContentSymlinkSrcField.alias}' is commonly known as the
+        symlink "target" and '{NfpmContentSymlinkDstField.alias}' is the path
+        to the symlink itself, also known as the symlink "name".
         """
     )
 

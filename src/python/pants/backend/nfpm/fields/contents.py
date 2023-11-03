@@ -450,7 +450,7 @@ class NfpmContentSymlinkSrcField(NfpmContentSrcField):
         The symlink target path (on package install).
 
         When the package gets installed, a symlink will be installed at the
-        '{NfpmContentDstField.alias}' path. The symlink will point to the
+        '{NfpmContentSymlinkDstField.alias}' path. The symlink will point to the
         '{NfpmContentSymlinkSrcField.alias}' path (the symlink target).
 
         This path is a path on the file system where the package will be installed.
@@ -468,7 +468,7 @@ class NfpmContentSymlinkDstField(NfpmContentDstField):
         The symlink path (on package install).
 
         When the package gets installed, a symlink will be installed at the
-        '{NfpmContentDstField.alias}' path. The symlink will point to the
+        '{NfpmContentSymlinkDstField.alias}' path. The symlink will point to the
         '{NfpmContentSymlinkSrcField.alias}' path (the symlink target).
 
         This path is an absolute path on the file system where the package
@@ -477,13 +477,31 @@ class NfpmContentSymlinkDstField(NfpmContentDstField):
     )
 
 
-class NfpmContentSymlinksField(SequenceField[tuple[str, str]]):
-    nfpm_alias = ""
+class NfpmContentSymlinksField(_SrcDstSequenceField):
     alias: ClassVar[str] = "symlinks"
+    required = True
     help = help_text(
         lambda: f"""
         A list of 2-tuples ('{NfpmContentSymlinkSrcField.alias}', '{NfpmContentSymlinkDstField.alias}').
+
+        The second part, `{NfpmContentSymlinkDstField.alias}', must be unique across all entries.
         """
+    )
+    _dst_alias = NfpmContentSymlinkDstField.alias
+
+
+class NfpmContentSymlinksOverridesField(_NfpmContentOverridesField):
+    help = help_text(
+        f"""
+        Override the field values for generated `nfmp_content_symlink` targets.
+
+        This expects a dictionary of '{NfpmContentSymlinkDstField.alias}' files
+        to a dictionary for the overrides.
+        """
+    )
+    _disallow_overrides_for_field_aliases = (
+        NfpmContentSymlinkSrcField.alias,
+        NfpmContentSymlinkDstField.alias,
     )
 
 
