@@ -16,7 +16,12 @@ from pants.backend.nfpm.fields.contents import (
 )
 from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES, NfpmPackageFieldSet
 from pants.backend.nfpm.target_types import NfpmContentFile, NfpmPackageTarget
-from pants.core.goals.package import PackageFieldSet, BuiltPackage, EnvironmentAwarePackageRequest
+from pants.core.goals.package import (
+    PackageFieldSet,
+    BuiltPackage,
+    EnvironmentAwarePackageRequest,
+    TraverseIfNotPackageTarget,
+)
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
@@ -31,6 +36,7 @@ from pants.engine.target import (
     TransitiveTargets,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership
 
@@ -113,21 +119,31 @@ class _NfpmSortedDeps:
 
 
 @dataclass(frozen=True)
-class NfpmPackagingSandboxRequest:
+class NfpmContentSandboxRequest:
     field_set: NfpmPackageFieldSet
-    transitive_targets: TransitiveTargets
 
 
 @dataclass(frozen=True)
-class NfpmPackagingSandbox:
+class NfpmContentSandbox:
     digest: Digest
 
 
 @rule
-async def populate_nfpm_packaging_sandbox(
-    request: NfpmPackagingSandboxRequest, union_membership: UnionMembership
-) -> NfpmPackagingSandbox:
-    deps = _NfpmSortedDeps.sort(request.field_set, request.transitive_targets, union_membership)
+async def populate_nfpm_content_sandbox(
+    request: NfpmContentSandboxRequest, union_membership: UnionMembership
+) -> NfpmContentSandbox:
+    transitive_targets = await Get(
+        TransitiveTargets,
+        TransitiveTargetsRequest(
+            [request.field_set.address],
+            should_traverse_deps_predicate=TraverseIfNotPackageTarget(
+                roots=[request.field_set.address],
+                union_membership=union_membership,
+            ),
+        ),
+    )
+
+    deps = _NfpmSortedDeps.sort(request.field_set, transitive_targets, union_membership)
 
     # 1. Build packages for deps that are (non-nfpm) Packages
 
@@ -233,7 +249,7 @@ async def populate_nfpm_packaging_sandbox(
         ),
     )
 
-    return NfpmPackagingSandbox(sandbox_digest)
+    return NfpmContentSandbox(sandbox_digest)
 
 
 def rules():
