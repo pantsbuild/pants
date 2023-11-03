@@ -48,7 +48,7 @@ class Parametrize:
         object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
 
     def keys(self) -> tuple[str]:
-        return (f"parametrize_{hash(self)}",)
+        return (f"parametrize_{hash(self.args)}",)
 
     def __getitem__(self, key) -> Any:
         if isinstance(key, str) and key.startswith("parametrize_"):

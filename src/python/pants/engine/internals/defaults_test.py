@@ -268,18 +268,7 @@ Scenario = namedtuple(
                 kwargs=dict(ignore_unknown_fields=True),
                 expected_defaults={
                     "test_type_1": {
-                        # This horrible thing is to work-around the fact that the splat key changes
-                        # when we remove the unknown field..
-                        Parametrize(
-                            "splat",
-                            description="splat-desc",
-                            whats_this="now",
-                        )
-                        .keys()[0]: ParametrizeDefault(
-                            "splat",
-                            description="splat-desc",
-                        )
-                        .to_group(),
+                        **ParametrizeDefault("splat", description="splat-desc")  # type: ignore[list-item]
                     }
                 },
             ),

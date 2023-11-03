@@ -111,6 +111,16 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
                 **Parametrize("C", g=[]),
             },
         ),
+        (
+            [
+                ("a@parametrize=A", {"f": "x", "a": 2, "c": 4}),
+            ],
+            {
+                "f": "x",
+                **Parametrize("A", a=1, b=3),
+                **Parametrize("A", a=2, c=4),
+            },
+        ),
     ],
 )
 def test_expand(
