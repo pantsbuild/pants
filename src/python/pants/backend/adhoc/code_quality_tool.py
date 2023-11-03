@@ -113,7 +113,6 @@ class CodeQualityToolRunnableDependenciesField(SpecialCasedDependencies):
     )
 
 
-
 class CodeQualityToolTarget(Target):
     alias: ClassVar[str] = "code_quality_tool"
     core_fields = (
