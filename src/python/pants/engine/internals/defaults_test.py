@@ -235,14 +235,55 @@ Scenario = namedtuple(
         ),
         pytest.param(
             Scenario(
-                args=({Test1Target.alias: {"tags": Parametrize(["foo"], ["bar"], baz=["baz"])}},),
+                args=(
+                    {
+                        Test1Target.alias: {
+                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),
+                            **Parametrize(
+                                "splat", description="splat-desc", dependencies=["splat:dep"]
+                            ),
+                        }
+                    },
+                ),
                 expected_defaults={
                     "test_type_1": {
                         "tags": ParametrizeDefault(("foo",), ("bar",), baz=("baz",)),  # type: ignore[arg-type]
+                        **ParametrizeDefault(
+                            "splat", description="splat-desc", dependencies=["splat:dep"]
+                        ),
                     }
                 },
             ),
             id="parametrize default field value",
+        ),
+        pytest.param(
+            Scenario(
+                args=(
+                    {
+                        Test1Target.alias: {
+                            **Parametrize("splat", description="splat-desc", whats_this="now"),
+                        }
+                    },
+                ),
+                kwargs=dict(ignore_unknown_fields=True),
+                expected_defaults={
+                    "test_type_1": {
+                        # This horrible thing is to work-around the fact that the splat key changes
+                        # when we remove the unknown field..
+                        Parametrize(
+                            "splat",
+                            description="splat-desc",
+                            whats_this="now",
+                        )
+                        .keys()[0]: ParametrizeDefault(
+                            "splat",
+                            description="splat-desc",
+                        )
+                        .to_group(),
+                    }
+                },
+            ),
+            id="parametrize ignore unknown fields",
         ),
         pytest.param(
             Scenario(
