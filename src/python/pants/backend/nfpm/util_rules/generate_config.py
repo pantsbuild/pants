@@ -12,6 +12,7 @@ from pants.backend.nfpm.field_sets import NfpmPackageFieldSet
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDstField,
+    NfpmContentFileSourceField,
     NfpmContentSrcField,
     NfpmContentSymlinkDstField,
     NfpmContentSymlinkSrcField,
@@ -60,6 +61,8 @@ async def generate_nfpm_yaml(
 
     # NB: TransitiveTargets is AFTER target generation/expansion (so there are no target generators)
     for tgt in transitive_targets.dependencies:
+        # We ignore targets with invalid 'src' or 'dst' to satisfy linters.
+        # 'src' and 'dst' shouldn't be None here thanks to 'required' and 'default'.
         if tgt.has_field(NfpmContentDirDstField):  # an NfpmContentDir
             dst = tgt[NfpmContentDirDstField].value
             if dst is None:
@@ -85,14 +88,17 @@ async def generate_nfpm_yaml(
                 )
             )
         elif tgt.has_field(NfpmContentDstField):  # an NfpmContentFile
-            src = tgt[NfpmContentSrcField].value
+            source = tgt.get(NfpmContentFileSourceField, None).value
+            src = tgt.get(NfpmContentSrcField, None).value
             dst = tgt[NfpmContentDstField].value
-            # TODO: handle the 'source' field that can implicitly provide 'src'
+            if source is not None and not src:
+                # If defined, 'source' provides the default value for 'src'.
+                src = source
             if src is None or dst is None:
                 continue
             contents.append(
                 NfpmContent(
-                    type=tgt[NfpmContentTypeField].value or NfpmContentTypeField.default,
+                    type=tgt[NfpmContentTypeField].value,
                     src=src,
                     dst=dst,
                     file_info=file_info(tgt),
