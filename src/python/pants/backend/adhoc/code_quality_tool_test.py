@@ -2,9 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from textwrap import dedent  # noqa: PNT20
 
+import pytest
+
 from pants.backend.adhoc.code_quality_tool import (
     CodeQualityToolRuleBuilder,
     CodeQualityToolTarget,
+    CodeQualityToolUnsupportedGoalError,
     base_rules,
 )
 from pants.backend.python import register as register_python
@@ -16,6 +19,13 @@ from pants.core.target_types import FileTarget
 from pants.core.util_rules import source_files
 from pants.engine import process
 from pants.testutil.rule_runner import RuleRunner
+
+
+def test_error_on_unrecognized_goal():
+    with pytest.raises(CodeQualityToolUnsupportedGoalError):
+        CodeQualityToolRuleBuilder(
+            goal="package", target="build-support:flake8_tool", name="Flake8", scope="flake8_tool"
+        )
 
 
 def make_rule_runner(*cfgs: CodeQualityToolRuleBuilder):
