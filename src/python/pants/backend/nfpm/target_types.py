@@ -28,6 +28,7 @@ from pants.backend.nfpm.fields.archlinux import (
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDirsField,
+    NfpmContentDirsOverridesField,
     NfpmContentDstField,
     NfpmContentFileGroupField,
     NfpmContentFileModeField,
@@ -418,6 +419,7 @@ class NfpmContentDirs(TargetGenerator):
         *COMMON_TARGET_FIELDS,
         # Modeled w/o dependencies for now (feel free to add later).
         NfpmContentDirsField,
+        NfpmContentDirsOverridesField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = CONTENT_FILE_INFO_FIELDS

@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.nfpm.fields.contents import (
+    NfpmContentDirDstField,
+    NfpmContentDirsField,
     NfpmContentDstField,
     NfpmContentFileSourceField,
     NfpmContentFilesField,
@@ -11,6 +13,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentSymlinksField,
 )
 from pants.backend.nfpm.target_types import (
+    NfpmContentDirs,
     NfpmContentFile,
     NfpmContentFiles,
     NfpmContentSymlink,
@@ -122,9 +125,58 @@ async def generate_targets_from_nfpm_content_symlinks(
     return GeneratedTargets(generator, generated_targets)
 
 
+class GenerateTargetsFromNfpmContentDirsRequest(GenerateTargetsRequest):
+    generate_from = NfpmContentDirs
+
+
+@rule(
+    desc="Generate `nfmp_content_dir` targets from `nfpm_content_dirs` target",
+    level=LogLevel.DEBUG,
+)
+async def generate_targets_from_nfpm_content_dirs(
+    request: GenerateTargetsFromNfpmContentDirsRequest,
+    union_membership: UnionMembership,
+) -> GeneratedTargets:
+    generator: NfpmContentDirs = request.generator
+    # This is not a dict because the same src can be linked to more than one dst.
+    # Also, the field guarantees that there are no dst duplicates in this field.
+    dirs: tuple[str, ...] = generator[NfpmContentDirsField].value
+
+    overrides = request.require_unparametrized_overrides()
+
+    def generate_tgt(dst: str) -> NfpmContentSymlink:
+        tgt_overrides = overrides.pop(dst, {})
+        return NfpmContentSymlink(
+            {
+                **request.template,
+                NfpmContentDirDstField.alias: dst,
+                **tgt_overrides,
+            },
+            # We use 'dst' as 'src' is not always unique.
+            # This results in an address like: path/to:nfpm_content#/dst/install/path
+            request.template_address.create_generated(dst),
+            union_membership,
+        )
+
+    generated_targets = [generate_tgt(dst) for dst in dirs]
+
+    if overrides:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+                """
+            )
+        )
+
+    return GeneratedTargets(generator, generated_targets)
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromNfpmContentFilesRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromNfpmContentSymlinksRequest),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromNfpmContentDirsRequest),
     )

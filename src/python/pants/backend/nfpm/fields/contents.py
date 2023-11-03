@@ -528,8 +528,52 @@ class NfpmContentDirDstField(NfpmContentDstField):
 class NfpmContentDirsField(StringSequenceField):
     nfpm_alias = ""
     alias: ClassVar[str] = "dirs"
+    required = True
     help = help_text(
         lambda: f"""
-        A list of directories '{NfpmContentDirDstField.alias}'.
+        A list of install path for '{NfpmContentDirDstField.alias}' directories.
+
+        When the package gets installed, each directory will be created.
+
+        Each path is an absolute path on the file system where the package
+        will be installed.
         """
     )
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[tuple[str, ...]]:
+        dst_dirs = super().compute_value(raw_value, address)
+        # TODO: does dst need to be validated as non-empty valid paths?
+
+        dst_seen = set()
+        dst_dupes = set()
+        for dst in dst_dirs:
+            if dst in dst_seen:
+                dst_dupes.add(dst)
+            else:
+                dst_seen.add(dst)
+        if dst_dupes:
+            raise InvalidFieldException(
+                help_text(
+                    lambda: f"""
+                    '{NfpmContentDirDstField.alias}' must be unique in '{cls.alias}', but
+                    found duplicate entries for: {repr(dst_dupes)}
+                    """
+                )
+            )
+
+        return dst_dirs
+
+
+class NfpmContentDirsOverridesField(_NfpmContentOverridesField):
+    help = help_text(
+        f"""
+        Override the field values for generated `nfmp_content_dir` targets.
+
+        This expects a dictionary of '{NfpmContentDirDstField.alias}' files
+        to a dictionary for the overrides.
+        """
+    )
+    _disallow_overrides_for_field_aliases = (NfpmContentDirDstField.alias,)
