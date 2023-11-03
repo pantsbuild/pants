@@ -205,6 +205,69 @@ class NfpmContentFileMtimeField(StringField):
 
 
 # -----------------------------------------------------------------------------------------------
+# Internal generic parent class fields
+# -----------------------------------------------------------------------------------------------
+
+
+class _SrcDstSequenceField(SequenceField[tuple[str, str]]):
+    nfpm_alias = ""
+
+    # Subclasses must define these
+    _dst_alias: ClassVar[str]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[Any]], address: Address
+    ) -> Optional[tuple[str, str]]:
+        src_dst_map = super().compute_value(raw_value, address)
+        # TODO: does src and dst need to be validated as non-empty valid paths?
+
+        dst_seen = set()
+        dst_dupes = set()
+        for src, dst in src_dst_map:
+            if dst in dst_seen:
+                dst_dupes.add(dst)
+            else:
+                dst_seen.add(dst)
+        if dst_dupes:
+            raise InvalidFieldException(
+                help_text(
+                    lambda: f"""
+                    '{cls._dst_alias}' must be unique in '{cls.alias}', but
+                    found duplicate entries for: {repr(dst_dupes)}
+                    """
+                )
+            )
+
+        return src_dst_map
+
+
+class _NfpmContentOverridesField(OverridesField):
+    nfpm_alias = ""
+    _disallow_overrides_for_field_aliases: tuple[str, ...] = ()
+
+    @classmethod
+    def compute_value(
+        cls,
+        raw_value: Optional[dict[str | tuple[str, ...], dict[str, Any]]],
+        address: Address,
+    ) -> Optional[FrozenDict[tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
+        value = super().compute_value(raw_value, address)
+        for dst, overrides in value.items():
+            for field_alias in cls._disallow_overrides_for_field_aliases:
+                if field_alias in overrides:
+                    raise InvalidFieldException(
+                        help_text(
+                            f"""
+                            '{cls.alias}' does not support overriding '{field_alias}'.
+                            Please remove the '{field_alias}' override for: {dst}
+                            """
+                        )
+                    )
+        return value
+
+
+# -----------------------------------------------------------------------------------------------
 # File-specific fields
 # -----------------------------------------------------------------------------------------------
 
@@ -347,78 +410,32 @@ class NfpmContentTypeField(StringField):
     )
 
 
-class NfpmContentFilesField(SequenceField[tuple[str, str]]):
-    nfpm_alias = ""
+class NfpmContentFilesField(_SrcDstSequenceField):
     alias: ClassVar[str] = "files"
     required = True
     help = help_text(
         lambda: f"""
         A list of 2-tuples ('{NfpmContentSrcField.alias}', '{NfpmContentDstField.alias}').
-        
+
         The second part, `{NfpmContentDstField.alias}', must be unique across all entries.
         """
     )
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[Any]], address: Address
-    ) -> Optional[tuple[str, str]]:
-        src_dst_map = super().compute_value(raw_value, address)
-        # TODO: does src and dst need to be validated as non-empty valid paths?
-
-        dst_seen = set()
-        dst_dupes = set()
-        for src, dst in src_dst_map:
-            if dst in dst_seen:
-                dst_dupes.add(dst)
-            else:
-                dst_seen.add(dst)
-        if dst_dupes:
-            raise InvalidFieldException(
-                help_text(
-                    lambda: f"""
-                    '{NfpmContentDstField.alias}' must be unique in '{cls.alias}', but
-                    found duplicate entries for: {repr(dst_dupes)}
-                    """
-                )
-            )
-
-        return src_dst_map
+    dst_alias = NfpmContentDstField.alias
 
 
-class NfpmContentFilesOverridesField(OverridesField):
-    nfpm_alias = ""
+class NfpmContentFilesOverridesField(_NfpmContentOverridesField):
     help = help_text(
         f"""
         Override the field values for generated `nfmp_content_file` targets.
-        
+
         This expects a dictionary of '{NfpmContentDstField.alias}' files to a dictionary for the overrides.
         """
     )
-
-    @classmethod
-    def compute_value(
-        cls,
-        raw_value: Optional[dict[str | tuple[str, ...], dict[str, Any]]],
-        address: Address,
-    ) -> Optional[FrozenDict[tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
-        value = super().compute_value(raw_value, address)
-        for dst, overrides in value.items():
-            for field_alias in (
-                NfpmContentFileSourceField.alias,
-                NfpmContentSrcField.alias,
-                NfpmContentDstField.alias,
-            ):
-                if field_alias in overrides:
-                    raise InvalidFieldException(
-                        help_text(
-                            f"""
-                            '{NfpmContentFilesOverridesField.alias}' does not support overriding '{field_alias}'.
-                            Please remove the '{field_alias}' override for: {dst}
-                            """
-                        )
-                    )
-        return value
+    _disallow_overrides_for_field_aliases = (
+        NfpmContentFileSourceField.alias,
+        NfpmContentSrcField.alias,
+        NfpmContentDstField.alias,
+    )
 
 
 # -----------------------------------------------------------------------------------------------

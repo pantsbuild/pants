@@ -23,7 +23,7 @@ class GenerateTargetsFromNfpmContentFilesRequest(GenerateTargetsRequest):
     desc="Generate `nfmp_content_file` targets from `nfpm_content_files` target",
     level=LogLevel.DEBUG,
 )
-async def generate_targets_from_go_mod(
+async def generate_targets_from_nfpm_content_files(
     request: GenerateTargetsFromNfpmContentFilesRequest,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
