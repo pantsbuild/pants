@@ -9,6 +9,7 @@ from pants.backend.nfpm.target_types import (
     NfpmDebPackage,
     NfpmRpmPackage,
 )
+from pants.backend.nfpm.target_types_rules import rules as target_type_rules
 
 
 def target_types():
@@ -22,6 +23,7 @@ def target_types():
 
 def rules():
     return [
+        *target_type_rules(),
         *field_sets.rules(),
         *nfpm_rules.rules(),
     ]

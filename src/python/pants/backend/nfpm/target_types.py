@@ -35,6 +35,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentFileOwnerField,
     NfpmContentFilesField,
     NfpmContentFileSourceField,
+    NfpmContentFilesOverridesField,
     NfpmContentSrcField,
     NfpmContentSymlinkDstField,
     NfpmContentSymlinksField,
@@ -325,11 +326,12 @@ class NfpmContentFiles(TargetGenerator):
     generated_target_cls = NfpmContentFile
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        NfpmDependencies,
         NfpmContentFilesField,  # TODO: if given a "sources" field, what does this look like?
+        NfpmContentFilesOverridesField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        NfpmDependencies,
         NfpmContentTypeField,
         *CONTENT_FILE_INFO_FIELDS,
     )

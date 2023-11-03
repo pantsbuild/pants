@@ -5,20 +5,23 @@ from __future__ import annotations
 
 import stat
 from enum import Enum
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Iterable, Optional
 
 from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.core.target_types import FileTarget, RelocatedFiles
 from pants.engine.addresses import Address
 from pants.engine.target import (
+    ImmutableValue,
     IntField,
     InvalidFieldException,
     OptionalSingleSourceField,
+    OverridesField,
     SequenceField,
     StringField,
     StringSequenceField,
     ValidNumbers,
 )
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text
 
 # -----------------------------------------------------------------------------------------------
@@ -347,11 +350,75 @@ class NfpmContentTypeField(StringField):
 class NfpmContentFilesField(SequenceField[tuple[str, str]]):
     nfpm_alias = ""
     alias: ClassVar[str] = "files"
+    required = True
     help = help_text(
         lambda: f"""
         A list of 2-tuples ('{NfpmContentSrcField.alias}', '{NfpmContentDstField.alias}').
+        
+        The second part, `{NfpmContentDstField.alias}', must be unique across all entries.
         """
     )
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[Any]], address: Address
+    ) -> Optional[tuple[str, str]]:
+        src_dst_map = super().compute_value(raw_value, address)
+        # TODO: does src and dst need to be validated as non-empty valid paths?
+
+        dst_seen = set()
+        dst_dupes = set()
+        for src, dst in src_dst_map:
+            if dst in dst_seen:
+                dst_dupes.add(dst)
+            else:
+                dst_seen.add(dst)
+        if dst_dupes:
+            raise InvalidFieldException(
+                help_text(
+                    lambda: f"""
+                    '{NfpmContentDstField.alias}' must be unique in '{cls.alias}', but
+                    found duplicate entries for: {repr(dst_dupes)}
+                    """
+                )
+            )
+
+        return src_dst_map
+
+
+class NfpmContentFilesOverridesField(OverridesField):
+    nfpm_alias = ""
+    help = help_text(
+        f"""
+        Override the field values for generated `nfmp_content_file` targets.
+        
+        This expects a dictionary of '{NfpmContentDstField.alias}' files to a dictionary for the overrides.
+        """
+    )
+
+    @classmethod
+    def compute_value(
+        cls,
+        raw_value: Optional[dict[str | tuple[str, ...], dict[str, Any]]],
+        address: Address,
+    ) -> Optional[FrozenDict[tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
+        value = super().compute_value(raw_value, address)
+        for dst, overrides in value.items():
+            for field_alias in (
+                NfpmContentFileSourceField.alias,
+                NfpmContentSrcField.alias,
+                NfpmContentDstField.alias,
+            ):
+                if field_alias in overrides:
+                    raise InvalidFieldException(
+                        help_text(
+                            f"""
+                            '{NfpmContentFilesOverridesField.alias}' does not support overriding '{field_alias}'.
+                            Please remove the '{field_alias}' override for: {dst}
+                            """
+                        )
+                    )
+        return value
 
 
 # -----------------------------------------------------------------------------------------------
