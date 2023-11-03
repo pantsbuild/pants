@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Mapping
 
+from pants.core.goals.fix import Fix, FixFilesRequest, FixResult
 from pants.core.goals.fmt import Fmt, FmtFilesRequest, FmtResult
 from pants.core.goals.lint import Lint, LintFilesRequest, LintResult
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -328,7 +329,7 @@ async def hydrate_code_quality_tool(
     )
 
 
-_name_to_supported_goal = {g.name: g for g in (Lint, Fmt)}
+_name_to_supported_goal = {g.name: g for g in (Lint, Fmt, Fix)}
 
 
 class CodeQualityToolUnsupportedGoalError(Exception):
@@ -355,6 +356,8 @@ class CodeQualityToolRuleBuilder:
     def rules(self) -> Iterable[Rule]:
         if self.goal_type is Fmt:
             return self._build_fmt_rules()
+        elif self.goal_type is Fix:
+            return self._build_fix_rules()
         elif self.goal_type is Lint:
             return self._build_lint_rules()
         else:
@@ -462,6 +465,68 @@ class CodeQualityToolRuleBuilder:
             output = await Get(Snapshot, Digest, proc_result.output_digest)
 
             return FmtResult(
+                input=request.snapshot,
+                output=output,
+                stdout=Simplifier().simplify(proc_result.stdout),
+                stderr=Simplifier().simplify(proc_result.stderr),
+                tool_name=request.tool_name,
+            )
+
+        namespace = dict(locals())
+
+        return [
+            *collect_rules(namespace),
+            *CodeQualityProcessingRequest.rules(),
+        ]
+
+    def _build_fix_rules(self) -> Iterable[Rule]:
+        class CodeQualityToolInstance(Subsystem):
+            options_scope = self.scope
+            name = self.name
+            help = f"{self.goal.capitalize()} with {self.name}. Tool defined in {self.target}"
+
+            skip = SkipOption("lint", "fmt", "fix")
+
+        class CodeQualityProcessingRequest(FixFilesRequest):
+            tool_subsystem = CodeQualityToolInstance
+
+        @rule(canonical_name_suffix=self.scope)
+        async def partition_inputs(
+            request: CodeQualityProcessingRequest.PartitionRequest,
+            subsystem: CodeQualityToolInstance,
+        ) -> Partitions:
+            if subsystem.skip:
+                return Partitions()
+
+            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
+
+            matching_filepaths = FilespecMatcher(
+                includes=cqt.file_glob_include,
+                excludes=cqt.file_glob_exclude,
+            ).matches(request.files)
+
+            return Partitions.single_partition(sorted(matching_filepaths))
+
+        @rule(canonical_name_suffix=self.scope)
+        async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> FixResult:
+            sources_snapshot = request.snapshot
+
+            code_quality_tool_runner = await Get(
+                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+            )
+
+            proc_result = await Get(
+                FallibleProcessResult,
+                CodeQualityToolBatch(
+                    runner=code_quality_tool_runner,
+                    sources_snapshot=sources_snapshot,
+                    output_files=request.files,
+                ),
+            )
+
+            output = await Get(Snapshot, Digest, proc_result.output_digest)
+
+            return FixResult(
                 input=request.snapshot,
                 output=output,
                 stdout=Simplifier().simplify(proc_result.stdout),

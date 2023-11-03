@@ -12,6 +12,7 @@ from pants.backend.adhoc.code_quality_tool import (
 )
 from pants.backend.python import register as register_python
 from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.goals.fix import Fix
 from pants.core.goals.fmt import Fmt
 from pants.core.goals.lint import Lint
 from pants.core.register import rules as core_rules
@@ -118,9 +119,9 @@ def test_lint_built_rule():
     assert "flake8_tool succeeded" in res.stderr
 
 
-def test_fmt_built_rule():
+def test_fix_built_rule():
     cfg = CodeQualityToolRuleBuilder(
-        goal="fmt", target="//:black_tool", name="Black", scope="black_formatter"
+        goal="fix", target="//:black_tool", name="Black", scope="black_fixer"
     )
 
     rule_runner = make_rule_runner(cfg)
@@ -148,17 +149,17 @@ def test_fmt_built_rule():
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 1
-    assert "black_formatter failed" in res.stderr
+    assert "black_fixer failed" in res.stderr
 
-    res = rule_runner.run_goal_rule(Fmt, args=["::"])
+    res = rule_runner.run_goal_rule(Fix, args=["::"])
     assert res.exit_code == 0
-    assert "black_formatter made changes" in res.stderr
+    assert "black_fixer made changes" in res.stderr
 
     assert "bar = 10\n" == rule_runner.read_file("needs_repair.py")
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 0
-    assert "black_formatter succeeded" in res.stderr
+    assert "black_fixer succeeded" in res.stderr
 
 
 def test_several_formatters():
