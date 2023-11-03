@@ -50,12 +50,25 @@ from pants.util.strutil import Simplifier, help_text
 class CodeQualityToolFileGlobIncludeField(StringSequenceField):
     alias: ClassVar[str] = "file_glob_include"
     required = True
+    help = help_text(
+        """
+        Globs that identify files that can be processed by this tool
+
+        A file matching any of the supplied globs is eligible for processing.
+        Example: ["**/*.py"]
+        """
+    )
 
 
 class CodeQualityToolFileGlobExcludeField(StringSequenceField):
     alias: ClassVar[str] = "file_glob_exclude"
     required = False
     default = ()
+    help = help_text(
+        """
+        Globs matching files that should not be processed by this tool
+        """
+    )
 
 
 class CodeQualityToolRunnableField(StringField):
@@ -124,6 +137,20 @@ class CodeQualityToolTarget(Target):
         CodeQualityToolRunnableDependenciesField,
         CodeQualityToolFileGlobIncludeField,
         CodeQualityToolFileGlobExcludeField,
+    )
+
+    help = help_text(
+        lambda: f"""
+        Configure a runnable to use as a linter, fixer or formatter
+
+        Example BUILD file:
+
+            {CodeQualityToolTarget.alias}(
+                {CodeQualityToolRunnableField.alias}=":flake8_req",
+                {CodeQualityToolExecutionDependenciesField.alias}=[":config_file"],
+                {CodeQualityToolFileGlobIncludeField.alias}=["**/*.py"],
+            )
+        """
     )
 
 
