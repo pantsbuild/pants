@@ -259,10 +259,10 @@ class NfpmContentSrcField(StringField):
         This path should be relative to the sandbox. The path should point to a
         generated file or a real file sourced from the workspace.
 
-        The '{NfpmContentSrcField.alias}' defaults to the file referenced in the
-        '{NfpmContentFileSourceField.alias}' field, if provided. Otherwise, this
-        defaults to the path of the first '{FileTarget.alias}' target listed in the
-        '{NfpmDependencies.alias}' field.
+        Either '{NfpmContentSrcField.alias}' or '{NfpmContentFileSourceField.alias}'
+        is required. If the '{NfpmContentFileSourceField.alias}' field is provided,
+        then the '{NfpmContentSrcField.alias}' defaults to the file referenced in the
+        '{NfpmContentFileSourceField.alias}' field.
 
         If both '{NfpmContentSrcField.alias}' and '{NfpmContentFileSourceField.alias}'
         are populated, then the file in '{NfpmContentFileSourceField.alias}' will be

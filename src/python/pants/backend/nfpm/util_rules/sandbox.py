@@ -7,7 +7,6 @@ import dataclasses
 from dataclasses import dataclass
 from typing import cast
 
-from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDstField,
@@ -18,23 +17,20 @@ from pants.backend.nfpm.fields.contents import (
 from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES, NfpmPackageFieldSet
 from pants.backend.nfpm.target_types import NfpmContentFile, NfpmPackageTarget
 from pants.core.goals.package import PackageFieldSet, BuiltPackage, EnvironmentAwarePackageRequest
-from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
-    DependenciesRequest,
+    GenerateSourcesRequest,
     HydrateSourcesRequest,
     HydratedSources,
     SourcesField,
     Target,
-    Targets,
     TransitiveTargets,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
-    targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
 
@@ -133,7 +129,8 @@ async def populate_nfpm_packaging_sandbox(
 ) -> NfpmPackagingSandbox:
     deps = _NfpmSortedDeps.sort(request.field_set, request.transitive_targets, union_membership)
 
-    # Build packages for deps that are (non-nfpm) Packages
+    # 1. Build packages for deps that are (non-nfpm) Packages
+
     package_field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, deps.package_targets)
     )
@@ -142,81 +139,96 @@ async def populate_nfpm_packaging_sandbox(
         for field_set in package_field_sets_per_target.field_sets
     )
 
-    # collect source fields to hydrate files.
-    source_fields_to_relocate: list[tuple[SourcesField, NfpmContentSrcField]] = []
-    source_fields: list[SourcesField] = []
+    # 2. Hydrate 'source' fields for nfpm_content_file targets.
+
+    nfpm_content_source_fields_to_relocate: list[tuple[SourcesField, NfpmContentSrcField]] = []
+    nfpm_content_source_fields: list[SourcesField] = []
 
     for nfpm_content_tgt in deps.nfpm_content_from_source_targets:
-        source = nfpm_content_tgt.get(SourcesField)
+        source = nfpm_content_tgt[NfpmContentFileSourceField]
         src = nfpm_content_tgt[NfpmContentSrcField]
         # If 'src' is empty, it defaults to the content target's 'source'.
         if src.value and source.value != src.value:
-            source_fields_to_relocate.append((source, src))
+            nfpm_content_source_fields_to_relocate.append((source, src))
         else:
-            source_fields.append(source)
+            nfpm_content_source_fields.append(source)
 
-    source_from_dependency_targets = await MultiGet(
-        Get(Targets, DependenciesRequest(tgt[NfpmDependencies]))
-        for tgt in deps.nfpm_content_from_dependency_targets
-    )
-    file_tgts = (
-        targets_with_sources_types([FileSourceField], tgts, union_membership)
-        for tgts in source_from_dependency_targets
-    )
-    if any(not files for files in file_tgts):
-        raise ValueError("One of the targets does not have a file target dependency")
-
-    for files, nfpm_content_tgt in zip(file_tgts, deps.nfpm_content_from_dependency_targets):
-        # we just grab the first one (as documented on the source and src fields)
-        dep_tgt: Target = files[0]
-        source = dep_tgt.get(SourcesField)
-        src = nfpm_content_tgt[NfpmContentSrcField]
-        # If 'src' is empty, it defaults to the dependency target's 'source'.
-        if src.value and source.value != src.value:
-            source_fields_to_relocate.append((source, src))
-        else:
-            source_fields.append(source)
-
-    # Relocate sources
-    # TODO: enable_codegen=True but for all possible codegen types?
     hydrated_sources_to_relocate = await MultiGet(
-        Get(
-            HydratedSources,
-            HydrateSourcesRequest(field, for_sources_types=[FileSourceField], enable_codegen=True),
-        )
-        for field, _ in source_fields_to_relocate
+        Get(HydratedSources, HydrateSourcesRequest(field))
+        for field, _ in nfpm_content_source_fields_to_relocate
     )
     relocated_source_entries = await MultiGet(
         Get(DigestEntries, Snapshot, hydrated.snapshot) for hydrated in hydrated_sources_to_relocate
     )
     moved_entries = []
     digest_entries: DigestEntries
-    for digest_entries, (source, src) in zip(relocated_source_entries, source_fields_to_relocate):
+    for digest_entries, (source, src) in zip(
+        relocated_source_entries, nfpm_content_source_fields_to_relocate
+    ):
         for entry in digest_entries:
             if isinstance(entry, FileEntry) and entry.path == source.value:
                 moved_entries.append(dataclasses.replace(entry, path=src.alue))
             else:
                 moved_entries.append(entry)
 
-    # Hydrate sources
-    relocated_sources_digest, sources = await MultiGet(
+    nfpm_content_relocated_sources_digest, nfpm_content_sources = await MultiGet(
         Get(Digest, CreateDigest(moved_entries)),
-        # TODO: enable_codegen=True but for all possible codegen types?
-        Get(
-            SourceFiles,
-            SourceFilesRequest(
-                source_fields, for_sources_types=[FileSourceField], enable_codegen=True
-            ),
-        ),
+        # nfpm_content_file sources are simply files -- no codegen required.
+        # anything more involved (like downloading http_source()) should use 'dependencies' instead
+        # (for example, depend on a 'file(source=http_source(...))' target to download something).
+        Get(SourceFiles, SourceFilesRequest(nfpm_content_source_fields)),
     )
 
+    # 3. Hydrate sources from 'dependencies' fields for nfpm_content_file targets,
+    # which should all be accounted for in the transitive targets in deps.remaining_targets.
+
+    # This involves doing as much codegen as possible (based on export_codegen goal).
+    codegen_inputs_to_outputs = [
+        (req.input, req.output) for req in union_membership.get(GenerateSourcesRequest)
+    ]
+    codegen_sources_fields_with_output = []
+    for tgt in deps.remaining_targets:
+        if not tgt.has_field(SourcesField):
+            continue
+        sources_field = tgt[SourcesField]
+        found = False
+        for input_type, output_type in codegen_inputs_to_outputs:
+            if isinstance(sources_field, input_type):
+                codegen_sources_fields_with_output.append((sources_field, output_type))
+                found = True
+        # make sure to include anything where codegen doesn't apply
+        if not found:
+            codegen_sources_fields_with_output.append((sources_field, type(sources_field)))
+    hydrated_dep_sources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                sources,
+                for_sources_types=(output_type,),
+                enable_codegen=True,
+            ),
+        )
+        for sources, output_type in codegen_sources_fields_with_output
+    )
+
+    # I would love to cleanly support relocations to 'src' from 'dependencies' files.
+    # But, I don't see any clean approaches to identify which package, generated file,
+    # or workspace file needs to be relocated to 'src'.
+    # TODO: handle relocations from 'dependencies' to 'src'
+    #       deps.nfpm_content_from_dependency_targets
+
+    # This should include at least all files in 'src' fields of nfpm_content_file targets.
+    # Other dependency files aren't required since nFPM will ignore anything not configured.
     sandbox_digest = await Get(
         Digest,
         MergeDigests(
             [
                 *(package.digest for package in packages),
-                relocated_sources_digest,
-                sources.snapshot.digest,
+                # nfpm_content_file 'src' from 'source' field
+                nfpm_content_relocated_sources_digest,
+                nfpm_content_sources.snapshot.digest,
+                # nfpm_content_file 'src' from 'dependencies' field
+                *(hydrated.snapshot.digest for hydrated in hydrated_dep_sources),
             ]
         ),
     )
