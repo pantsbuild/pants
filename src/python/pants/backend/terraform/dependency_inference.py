@@ -159,13 +159,14 @@ async def infer_terraform_deployment_dependencies(
     root_module_address_input = request.field_set.root_module.to_address_input()
     root_module = await Get(Address, AddressInput, root_module_address_input)
 
-    # # TODO: This leads to a dependency on self. Can we do something about it?
+    # TODO: add depenendency on the vars files
+    #  The use of this target_name here leads to a dependency on self.
+    #  Is there a way to avoid the reference? Would generating targets for the vars files help?
     # var_files_names = request.field_set.var_files.value
-    # print(request.field_set.address.spec_path)
     # var_files_addresses = [
     #     Address(
     #         spec_path=request.field_set.address.spec_path,
-    #         target_name="a",
+    #         target_name=request.field_set.address.target_name,
     #         relative_file_path=v,
     #     ) for v in var_files_names
     # ]
