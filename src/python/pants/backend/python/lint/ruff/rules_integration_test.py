@@ -128,7 +128,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert fix_result.did_change
     assert fix_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
     assert not fmt_result.did_change
-    assert fmt_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.py": BAD_FILE})
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
