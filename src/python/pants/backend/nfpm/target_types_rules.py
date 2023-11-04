@@ -31,7 +31,7 @@ class GenerateTargetsFromNfpmContentFilesRequest(GenerateTargetsRequest):
 
 
 @rule(
-    desc="Generate `nfmp_content_file` targets from `nfpm_content_files` target",
+    desc="Generate `nfpm_content_file` targets from `nfpm_content_files` target",
     level=LogLevel.DEBUG,
 )
 async def generate_targets_from_nfpm_content_files(
@@ -81,7 +81,7 @@ class GenerateTargetsFromNfpmContentSymlinksRequest(GenerateTargetsRequest):
 
 
 @rule(
-    desc="Generate `nfmp_content_symlink` targets from `nfpm_content_symlinks` target",
+    desc="Generate `nfpm_content_symlink` targets from `nfpm_content_symlinks` target",
     level=LogLevel.DEBUG,
 )
 async def generate_targets_from_nfpm_content_symlinks(
@@ -130,7 +130,7 @@ class GenerateTargetsFromNfpmContentDirsRequest(GenerateTargetsRequest):
 
 
 @rule(
-    desc="Generate `nfmp_content_dir` targets from `nfpm_content_dirs` target",
+    desc="Generate `nfpm_content_dir` targets from `nfpm_content_dirs` target",
     level=LogLevel.DEBUG,
 )
 async def generate_targets_from_nfpm_content_dirs(

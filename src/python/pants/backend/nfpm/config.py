@@ -34,7 +34,7 @@ yaml.add_representer(OctalInt, OctalInt.represent_octal)
 
 class NfpmFileInfo(TypedDict, total=False):
     # nFPM allows these to be None or missing.
-    # Each of the fields have a default, so in practice, these won't be None.
+    # Each of the fields has a default, so in practice, these won't be None.
     owner: str | None
     group: str | None
     mode: OctalInt | None

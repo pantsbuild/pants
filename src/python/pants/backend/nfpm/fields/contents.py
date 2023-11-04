@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any, ClassVar, Iterable, Optional
 
 from pants.backend.nfpm.fields.all import NfpmDependencies
-from pants.core.target_types import FileTarget, RelocatedFiles
+from pants.core.target_types import RelocatedFiles
 from pants.engine.addresses import Address
 from pants.engine.target import (
     ImmutableValue,
@@ -426,7 +426,7 @@ class NfpmContentFilesField(_SrcDstSequenceField):
 class NfpmContentFilesOverridesField(_NfpmContentOverridesField):
     help = help_text(
         f"""
-        Override the field values for generated `nfmp_content_file` targets.
+        Override the field values for generated `nfpm_content_file` targets.
 
         This expects a dictionary of '{NfpmContentDstField.alias}' files to a dictionary for the overrides.
         """
@@ -493,7 +493,7 @@ class NfpmContentSymlinksField(_SrcDstSequenceField):
 class NfpmContentSymlinksOverridesField(_NfpmContentOverridesField):
     help = help_text(
         f"""
-        Override the field values for generated `nfmp_content_symlink` targets.
+        Override the field values for generated `nfpm_content_symlink` targets.
 
         This expects a dictionary of '{NfpmContentSymlinkDstField.alias}' files
         to a dictionary for the overrides.
@@ -570,7 +570,7 @@ class NfpmContentDirsField(StringSequenceField):
 class NfpmContentDirsOverridesField(_NfpmContentOverridesField):
     help = help_text(
         f"""
-        Override the field values for generated `nfmp_content_dir` targets.
+        Override the field values for generated `nfpm_content_dir` targets.
 
         This expects a dictionary of '{NfpmContentDirDstField.alias}' files
         to a dictionary for the overrides.

@@ -21,7 +21,7 @@ class NfpmPackageNameField(StringField):
 
 
 class NfpmDependencies(Dependencies):
-    nfpm_alias = ""  # does not map directly to a nfpm.yaml field
+    nfpm_alias = ""  # doesn't map directly to a nfpm.yaml field
 
 
 class GoArch(Enum):

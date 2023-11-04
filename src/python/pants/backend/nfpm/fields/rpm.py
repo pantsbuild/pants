@@ -18,7 +18,7 @@ from pants.util.strutil import help_text
 
 
 # Internally, nFPM just uses this to populate the default for 'packager'.
-# So, there's no point exposing both in our UX.
+# So, there is no point exposing both in our UX.
 # class NfpmRpmMaintainerField(StringField):
 #     alias = "maintainer"
 

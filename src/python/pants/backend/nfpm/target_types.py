@@ -80,7 +80,6 @@ from pants.backend.nfpm.fields.version import (
     NfpmVersionSchemaField,
 )
 from pants.core.goals.package import OutputPathField
-from pants.core.target_types import FileTarget
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     InvalidTargetException,
