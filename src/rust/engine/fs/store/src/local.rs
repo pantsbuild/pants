@@ -973,16 +973,14 @@ impl ByteStore {
             dbs.load_bytes_with(digest.hash, len_checked_f).await?
         };
 
-        if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-            workunit_store_handle.store.record_observation(
-                ObservationMetric::LocalStoreReadBlobSize,
-                digest.size_bytes as u64,
-            );
-            workunit_store_handle.store.record_observation(
-                ObservationMetric::LocalStoreReadBlobTimeMicros,
-                start.elapsed().as_micros() as u64,
-            );
-        }
+        workunit_store::record_observation_if_in_workunit(
+            ObservationMetric::LocalStoreReadBlobSize,
+            digest.size_bytes as u64,
+        );
+        workunit_store::record_observation_if_in_workunit(
+            ObservationMetric::LocalStoreReadBlobTimeMicros,
+            start.elapsed().as_micros() as u64,
+        );
 
         Ok(result)
     }
