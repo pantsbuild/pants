@@ -400,11 +400,7 @@ impl ByteStoreProvider for Provider {
 
         let client = self.cas_client.as_ref().clone();
 
-        if let Some(mut workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-            workunit_store_handle
-                .store
-                .increment_counter(Metric::RemoteStoreExistsAttempts, 1);
-        }
+        workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
         let result = retry_call(
             client,
             move |mut client, _| {
@@ -416,13 +412,11 @@ impl ByteStoreProvider for Provider {
         .await
         .map_err(status_to_str);
 
-        if let Some(mut workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-            let metric = match result {
-                Ok(_) => Metric::RemoteStoreExistsSuccesses,
-                Err(_) => Metric::RemoteStoreExistsErrors,
-            };
-            workunit_store_handle.store.increment_counter(metric, 1);
-        }
+        let metric = match result {
+            Ok(_) => Metric::RemoteStoreExistsSuccesses,
+            Err(_) => Metric::RemoteStoreExistsErrors,
+        };
+        workunit_store::increment_counter_if_in_workunit(metric, 1);
 
         let response = result?;
 

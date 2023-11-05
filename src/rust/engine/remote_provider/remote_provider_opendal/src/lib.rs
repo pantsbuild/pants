@@ -297,21 +297,15 @@ impl ByteStoreProvider for Provider {
 
             let path = self.path(digest.hash);
 
-            if let Some(mut workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-                workunit_store_handle
-                    .store
-                    .increment_counter(Metric::RemoteStoreExistsAttempts, 1);
-            }
+            workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
 
             let result = self.operator.is_exist(&path).await;
 
-            if let Some(mut workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-                let metric = match result {
-                    Ok(_) => Metric::RemoteStoreExistsSuccesses,
-                    Err(_) => Metric::RemoteStoreExistsErrors,
-                };
-                workunit_store_handle.store.increment_counter(metric, 1);
-            }
+            let metric = match result {
+                Ok(_) => Metric::RemoteStoreExistsSuccesses,
+                Err(_) => Metric::RemoteStoreExistsErrors,
+            };
+            workunit_store::increment_counter_if_in_workunit(metric, 1);
 
             match result {
                 Ok(true) => Ok(None),
