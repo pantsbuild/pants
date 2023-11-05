@@ -173,16 +173,14 @@ impl Provider {
             Err(e) => return Err(format!("failed to read {}: {}", path, e)),
         };
 
-        if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-            // TODO: this pretends that the time-to-first-byte can be approximated by "time to create
-            // reader", which is often not really true.
-            let timing: Result<u64, _> =
-                Instant::now().duration_since(start).as_micros().try_into();
-            if let Ok(obs) = timing {
-                workunit_store_handle
-                    .store
-                    .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
-            }
+        // TODO: this pretends that the time-to-first-byte can be approximated by "time to create
+        // reader", which is often not really true.
+        let timing: Result<u64, _> = Instant::now().duration_since(start).as_micros().try_into();
+        if let Ok(obs) = timing {
+            workunit_store::record_observation_if_in_workunit(
+                ObservationMetric::RemoteStoreTimeToFirstByteMicros,
+                obs,
+            );
         }
 
         match mode {

@@ -341,17 +341,14 @@ impl ByteStoreProvider for Provider {
                     let mut stream = response.into_inner().inspect(|_| {
                         // Record the observed time to receive the first response for this read.
                         if let Some(start) = start_opt.take() {
-                            if let Some(workunit_store_handle) =
-                                workunit_store::get_workunit_store_handle()
-                            {
-                                let timing: Result<u64, _> =
-                                    Instant::now().duration_since(start).as_micros().try_into();
-                                if let Ok(obs) = timing {
-                                    workunit_store_handle.store.record_observation(
-                                        ObservationMetric::RemoteStoreTimeToFirstByteMicros,
-                                        obs,
-                                    );
-                                }
+                            let timing: Result<u64, _> =
+                                Instant::now().duration_since(start).as_micros().try_into();
+
+                            if let Ok(obs) = timing {
+                                workunit_store::record_observation_if_in_workunit(
+                                    ObservationMetric::RemoteStoreTimeToFirstByteMicros,
+                                    obs,
+                                );
                             }
                         }
                     });
