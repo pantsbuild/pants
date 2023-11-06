@@ -318,7 +318,7 @@ webpki = "0.22"
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/engine/dep_inference/Cargo.toml`.
 tree-sitter = "0.20.10"
-tree-sitter-javascript = "0.20.0"
+tree-sitter-javascript = "0.20.1"
 tree-sitter-python = "0.20.4"
 
 [patch.crates-io]
