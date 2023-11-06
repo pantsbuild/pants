@@ -236,6 +236,29 @@ class NfpmDebDependsField(NfpmPackageRelationshipsField):
     )
 
 
+class NfpmDebPreDependsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "deb.predepends"
+    alias: ClassVar[str] = "predepends"
+    help = help_text(
+        lambda: f"""
+        List of package unpack-time dependencies (for package installers).
+
+        In most cases, you should use the '{NfpmDebDependsField.alias}' field
+        instead of this one to declare install-time package dependencies.
+        The '{NfpmDebPreDependsField.alias}' field has install-time dependencies
+        that need to be available (including unpacking, pre-install, and
+        post-install scripts) before unpacking or installing this package.
+        
+        Make sure to include packages required by the `preinst` script.
+
+        WARNING: This is NOT the same as the 'dependencies' field!
+        It does not accept pants-style dependencies like target addresses.
+
+        See: https://www.debian.org/doc/debian-policy/ch-relationships.html
+        """
+    )
+
+
 class NfpmDebRecommendsField(NfpmPackageRelationshipsField):
     nfpm_alias = "recommends"
     alias: ClassVar[str] = nfpm_alias
