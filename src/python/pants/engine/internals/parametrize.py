@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterator, cast
+from typing import Any, Iterator, Mapping, cast
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
@@ -48,7 +49,7 @@ class Parametrize:
         object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
 
     def keys(self) -> tuple[str]:
-        return (f"parametrize_{hash(self.args)}",)
+        return (f"parametrize_{hash(self.args)}:{id(self)}",)
 
     def __getitem__(self, key) -> Any:
         if isinstance(key, str) and key.startswith("parametrize_"):
@@ -131,19 +132,19 @@ class Parametrize:
         separate calls.
         """
         try:
-            cls._check_parametrizations(fields)
+            parametrizations = cls._collect_parametrizations(fields)
+            cls._check_parametrizations(parametrizations)
             parametrized: list[list[tuple[str, str, Any]]] = [
                 [
                     (field_name, alias, field_value)
                     for alias, field_value in v.to_parameters().items()
                 ]
-                for field_name, v in fields.items()
-                if isinstance(v, Parametrize) and not v.is_group
+                for field_name, v in parametrizations.get(None, ())
             ]
             parametrized_groups: list[tuple[str, str, Parametrize]] = [
-                ("parametrize", v.group_name, v)
-                for v in fields.values()
-                if isinstance(v, Parametrize) and v.is_group
+                ("parametrize", group_name, vs[0][1])
+                for group_name, vs in parametrizations.items()
+                if group_name is not None
             ]
         except Exception as e:
             raise Exception(f"Failed to parametrize `{address}`:\n{e}") from e
@@ -187,19 +188,34 @@ class Parametrize:
             yield expanded_address, expanded_fields
 
     @staticmethod
-    def _check_parametrizations(fields: dict[str, Any | Parametrize]) -> None:
-        parametrize_field_names = {
+    def _collect_parametrizations(
+        fields: dict[str, Any | Parametrize]
+    ) -> Mapping[str | None, list[tuple[str, Parametrize]]]:
+        parametrizations = defaultdict(list)
+        for field_name, v in fields.items():
+            if not isinstance(v, Parametrize):
+                continue
+            group_name = None if not v.is_group else v.group_name
+            parametrizations[group_name].append((field_name, v))
+        return parametrizations
+
+    @staticmethod
+    def _check_parametrizations(
+        parametrizations: Mapping[str | None, list[tuple[str, Parametrize]]]
+    ) -> None:
+        for group_name, groups in parametrizations.items():
+            if group_name is None:
+                continue
+            if len(groups) > 1:
+                raise ValueError(f"Parametrize group name is not unique: {group_name!r}")
+        parametrize_field_names = {field_name for field_name, v in parametrizations.get(None, ())}
+        parametrize_field_names_from_groups = {
             field_name
-            for field_name, v in fields.items()
-            if isinstance(v, Parametrize) and not v.is_group
+            for group_name, groups in parametrizations.items()
+            if group_name is not None
+            for field_name in groups[0][1].kwargs.keys()
         }
-        parametrize_group_field_names = {
-            field_name
-            for v in fields.values()
-            if isinstance(v, Parametrize) and v.is_group
-            for field_name in v.kwargs.keys()
-        }
-        conflicting = parametrize_field_names.intersection(parametrize_group_field_names)
+        conflicting = parametrize_field_names.intersection(parametrize_field_names_from_groups)
         if conflicting:
             raise ValueError(
                 softwrap(

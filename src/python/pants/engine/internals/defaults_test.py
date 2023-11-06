@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections import namedtuple
+from typing import Any, Mapping
 
 import pytest
 
@@ -85,6 +86,14 @@ def test_assumptions(
             "target": FrozenDict({"tags": ("foo", "bar")}),
         }
     )
+
+
+def _determenistic_parametrize_group_keys(value: Mapping[str, Any]) -> dict[str, Any]:
+    # The `parametrize` object uses a unique generated field name when splatted onto a target (in
+    # order to provide a helpful error message in case of non-unique group names), but the part up
+    # until `:` is determenistic on the group name, which we need to exploit in the tests using
+    # parametrize groups.
+    return {key.rsplit(":", 1)[0]: val for key, val in value.items()}
 
 
 Scenario = namedtuple(
@@ -246,12 +255,14 @@ Scenario = namedtuple(
                     },
                 ),
                 expected_defaults={
-                    "test_type_1": {
-                        "tags": ParametrizeDefault(("foo",), ("bar",), baz=("baz",)),  # type: ignore[arg-type]
-                        **ParametrizeDefault(
-                            "splat", description="splat-desc", dependencies=["splat:dep"]
-                        ),
-                    }
+                    "test_type_1": _determenistic_parametrize_group_keys(
+                        {
+                            "tags": ParametrizeDefault(("foo",), ("bar",), baz=("baz",)),  # type: ignore[arg-type]
+                            **ParametrizeDefault(
+                                "splat", description="splat-desc", dependencies=["splat:dep"]
+                            ),
+                        }
+                    )
                 },
             ),
             id="parametrize default field value",
@@ -267,9 +278,11 @@ Scenario = namedtuple(
                 ),
                 kwargs=dict(ignore_unknown_fields=True),
                 expected_defaults={
-                    "test_type_1": {
-                        **ParametrizeDefault("splat", description="splat-desc")  # type: ignore[list-item]
-                    }
+                    "test_type_1": _determenistic_parametrize_group_keys(
+                        {
+                            **ParametrizeDefault("splat", description="splat-desc")  # type: ignore[list-item]
+                        }
+                    )
                 },
             ),
             id="parametrize ignore unknown fields",
@@ -311,6 +324,7 @@ def test_set_defaults(
         )
         defaults.set_defaults(*scenario.args, **scenario.kwargs)
         actual_defaults = {
-            tgt: dict(field_values) for tgt, field_values in defaults.get_frozen_defaults().items()
+            tgt: _determenistic_parametrize_group_keys(field_values)
+            for tgt, field_values in defaults.get_frozen_defaults().items()
         }
         assert scenario.expected_defaults == actual_defaults

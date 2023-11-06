@@ -103,23 +103,15 @@ def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, A
                 ("a@parametrize=B", {"f": 2}),
                 ("a@parametrize=C", {"f": "x", "g": ()}),
             ],
-            {
+            # Using a dict constructor rather than a dict literal to get the same semantics as when
+            # we declare a target in a BUILD file.
+            dict(
                 # Field overridden by some parametrize groups.
-                "f": "x",
-                **Parametrize("A", f=1),
+                f="x",
+                **Parametrize("A", f=1),  # type: ignore[arg-type]
                 **Parametrize("B", f=2),
                 **Parametrize("C", g=[]),
-            },
-        ),
-        (
-            [
-                ("a@parametrize=A", {"f": "x", "a": 2, "c": 4}),
-            ],
-            {
-                "f": "x",
-                **Parametrize("A", a=1, b=3),
-                **Parametrize("A", a=2, c=4),
-            },
+            ),
         ),
     ],
 )
@@ -127,25 +119,42 @@ def test_expand(
     expected: list[tuple[str, dict[str, Any]]], fields: dict[str, Any | Parametrize]
 ) -> None:
     assert sorted(expected) == sorted(
-        (address.spec, result_fields)
-        for address, result_fields in Parametrize.expand(Address("a"), fields)
+        (
+            (address.spec, result_fields)
+            for address, result_fields in Parametrize.expand(Address("a"), fields)
+        ),
+        key=lambda value: value[0],
     )
 
 
-def test_expand_fails_when_overriding_parametrized_field() -> None:
-    fields = {
-        "f": Parametrize("x", "y"),
-        "g": Parametrize("x", "y"),
-        "h": Parametrize("x", "y"),
-        "x": 5,
-        "z": 6,
-        **Parametrize("A", f=1),
-        **Parametrize("B", g=2, x=3),
-    }
-    with pytest.raises(Exception) as exc:
+@pytest.mark.parametrize(
+    "fields, expected_error",
+    [
+        (
+            dict(
+                f=Parametrize("x", "y"),
+                g=Parametrize("x", "y"),
+                h=Parametrize("x", "y"),
+                x=5,
+                z=6,
+                **Parametrize("A", f=1),  # type: ignore[arg-type]
+                **Parametrize("B", g=2, x=3),
+            ),
+            "Failed to parametrize `a:a`:\nConflicting parametrizations for fields: f, g",
+        ),
+        (
+            dict(
+                f="x",
+                **Parametrize("A", a=1, b=3),  # type: ignore[arg-type]
+                **Parametrize("A", a=2, c=4),
+            ),
+            "Failed to parametrize `a:a`:\nParametrize group name is not unique: 'A'",
+        ),
+    ],
+)
+def test_expand_error_cases(fields: dict[str, Any], expected_error: str) -> None:
+    with pytest.raises(Exception, match=expected_error):
         _ = list(Parametrize.expand(Address("a"), fields))
-    err_msg = "Failed to parametrize `a:a`:\nConflicting parametrizations for fields: f, g"
-    assert err_msg in str(exc.value)
 
 
 def test_get_superset_targets() -> None:
