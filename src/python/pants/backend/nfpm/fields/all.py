@@ -26,13 +26,19 @@ class NfpmDependencies(Dependencies):
     nfpm_alias = ""  # doesn't map directly to a nfpm.yaml field
 
 
-class GoArch(Enum):
+class NfpmArch(Enum):
+    # nFPM uses arch = GOARCH + GOARM. See: https://nfpm.goreleaser.com/goarch-to-pkg/
     # GOARCH possible values come from `okgoarch` var at:
     # https://github.com/golang/go/blob/go1.20.3/src/cmd/dist/build.go#L62-L79
+    # GOARM possible values come from `goarm()` func at:
+    # https://github.com/golang/go/blob/go1.20.3/src/internal/buildcfg/cfg.go#L77-L84
     _386 = "386"
+    all = "all"  # not in `okgoarch`, but a conventionally accepted GOARCH value.
     amd64 = "amd64"
-    arm = "arm"
-    arm64 = "arm64"
+    arm5 = "arm5"  # GOARCH=arm GOARM=5
+    arm6 = "arm6"  # GOARCH=arm GOARM=6
+    arm7 = "arm7"  # GOARCH=arm GOARM=7
+    arm64 = "arm64"  # GOARCH=arm64
     loong64 = "loong64"
     mips = "mips"
     mipsle = "mipsle"
@@ -41,6 +47,7 @@ class GoArch(Enum):
     ppc64 = "ppc64"
     ppc64le = "ppc64le"
     riscv64 = "riscv64"
+    s390 = "s390"  # not in `okgoarch`; nFPM translates it to "s390x".
     s390x = "s390x"
     sparc64 = "sparc64"
     wasm = "wasm"
@@ -49,13 +56,12 @@ class GoArch(Enum):
 class GoOS(Enum):
     # GOOS possible values come from `okgoos` var at:
     # https://github.com/golang/go/blob/go1.20.3/src/cmd/dist/build.go#L81-L98
-    # TODO: maybe filter this down to only what nFPM can handle
     darwin = "darwin"
     dragonfly = "dragonfly"
     illumos = "illumos"
     ios = "ios"
     js = "js"
-    linux = "linux"
+    linux = "linux"  # apk, archlinux - no other value accepted
     android = "android"
     solaris = "solaris"
     freebsd = "freebsd"
@@ -70,31 +76,35 @@ class GoOS(Enum):
 class NfpmArchField(StringField):
     nfpm_alias = "arch"
     alias: ClassVar[str] = nfpm_alias
-    default = GoArch.amd64.value  # based on nFPM default
+    # valid_choices = NfpmArch  # no valid_choices to support pass-through values.
+    default = NfpmArch.amd64.value  # based on nFPM default
     help = help_text(
         """
         The package architecture.
 
-        This should be a valid GOARCH value that nFPM can translate
-        into the package-specific equivalent. Otherwise, pants tells
+        This should be a valid GOARCH value (or GOARCH+GOARM) that nFPM can
+        translate into the package-specific equivalent. Otherwise, pants tells
         nFPM to use this value as-is.
         """
     )
-    # We can't use just the enum because we need to special case using this.
-    # valid_choices = GoArch
 
 
 class NfpmPlatformField(StringField):
     nfpm_alias = "platform"
     alias: ClassVar[str] = nfpm_alias
-    valid_choices = GoOS
+    # valid_choices = GoOS  # no valid_choices to support pass-through values.
     default = GoOS.linux.value  # based on nFPM default
     help = help_text(
-        """
-        The package platform.
+        f"""
+        The package platform or OS.
 
-        This should be a valid GOOS value that nFPM can translate
-        into the package-specific equivalent.
+        You probably do not need to change the package's OS. nFPM is designed
+        with the assumption that this is a GOOS value (since nFPM is part of the
+        "goreleaser" project). But, nFPM does not do much with it.
+
+        For archlinux and apk, the only valid value is '{GoOS.linux.value}'.
+        For deb, this can be used as part of the 'Architecture' entry.
+        For rpm, this populates the "OS" tag.
         """
     )
 
