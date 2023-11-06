@@ -182,8 +182,8 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
     addresses = Addresses((tool_address,))
     addresses.expect_single()
 
-    linter_targets = await Get(Targets, Addresses, addresses)
-    target = linter_targets[0]
+    tool_targets = await Get(Targets, Addresses, addresses)
+    target = tool_targets[0]
     runnable_address_str = target[CodeQualityToolRunnableField].value
     if not runnable_address_str:
         raise Exception(f"Must supply a value for `runnable` for {request.address}.")
