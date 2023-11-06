@@ -66,6 +66,7 @@ from pants.backend.nfpm.fields.rpm import (
     NfpmRpmGhostContents,
     NfpmRpmGroupField,
     NfpmRpmPackagerField,
+    NfpmRpmPrefixesField,
     NfpmRpmProvidesField,
     NfpmRpmRecommendsField,
     NfpmRpmReplacesField,
@@ -248,6 +249,7 @@ RPM_FIELDS = (
     NfpmRpmVendorField,
     NfpmRpmGroupField,
     NfpmRpmSummaryField,
+    NfpmRpmPrefixesField,
     # package relationships
     NfpmRpmReplacesField,
     NfpmRpmProvidesField,

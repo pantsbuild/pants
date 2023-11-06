@@ -97,6 +97,33 @@ class NfpmRpmSummaryField(StringField):
     )
 
 
+class NfpmRpmPrefixesField(StringSequenceField):
+    nfpm_alias = "rpm.prefixes"
+    alias: ClassVar[str] = "prefixes"
+    help = help_text(
+        lambda: f"""
+        A list of relocatable prefixes (to support relocatable rpms).
+
+        Defining '{NfpmRpmPrefixesField.alias}' allows rpm to install your package
+        at an alternative prefix if the user requests that using the `--prefix` flag.
+        This list is the default list of prefixes used by this package.
+        If rpm relocates an installation of this package, it will strip off each of
+        these prefixes, replacing them with the `--prefix` requested by the user.
+
+        Before using this, ensure that any packaged software can actually run
+        from alternate prefixes, and watch out for any absolute symlinks targets which
+        might not be relocated correctly.
+
+        RPM specs use the `Prefix:` tag to list each prefix in this list.
+
+        See:
+        https://rpm-software-management.github.io/rpm/manual/tags.html#packages-with-files
+        https://ftp.osuosl.org/pub/rpm/max-rpm/ch-rpm-reloc.html
+        https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-tags.html#S3-RPM-INSIDE-PREFIX-TAG
+        """
+    )
+
+
 class NfpmRpmReplacesField(NfpmPackageRelationshipsField):
     nfpm_alias = "replaces"
     alias: ClassVar[str] = nfpm_alias
