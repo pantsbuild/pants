@@ -25,7 +25,7 @@ For Python, to generate the `.env` file containing all the source roots, you can
 
 ```shell
 $ ROOTS=$(pants roots)
-$ python3 -c "print('PYTHONPATH=\"./' + ':./'.join('''${ROOTS}'''.split('\n')) + ':\$PYTHONPATH\"')" > .env
+$ python3 -c "print('PYTHONPATH=./' + ':./'.join('''${ROOTS}'''.replace(' ', '\\ ').split('\n')) + ':\$PYTHONPATH')" > .env
 ```
 
 See [Use of the PYTHONPATH variable](https://code.visualstudio.com/docs/python/environments#_use-of-the-pythonpath-variable) to learn more about using the `PYTHONPATH` variable in VSCode.

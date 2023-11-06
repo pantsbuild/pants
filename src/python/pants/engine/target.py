@@ -437,7 +437,6 @@ class Target:
             other.field_values,
         )
 
-    @final
     @classmethod
     @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
@@ -1037,6 +1036,10 @@ class TargetGenerator(Target):
     # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    @distinct_union_type_per_subclass
+    class MovedPluginField:
+        """A plugin field that should be moved into the generated targets."""
+
     def validate(self) -> None:
         super().validate()
 
@@ -1051,6 +1054,45 @@ class TargetGenerator(Target):
                 "`TargetGenerator.copied_field`. `Dependencies` fields should be "
                 "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
             )
+
+    @classmethod
+    def register_plugin_field(cls, field: Type[Field], *, as_moved_field=False) -> UnionRule:
+        if as_moved_field:
+            return UnionRule(cls.MovedPluginField, field)
+        else:
+            return super().register_plugin_field(field)
+
+    @classmethod
+    @memoized_method
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+        return (
+            *cls._find_copied_plugin_fields(union_membership),
+            *cls._find_moved_plugin_fields(union_membership),
+        )
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_moved_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
+        result: set[type[Field]] = set()
+        classes = [cls]
+        while classes:
+            cls = classes.pop()
+            classes.extend(cls.__bases__)
+            if issubclass(cls, TargetGenerator):
+                result.update(cast("set[type[Field]]", union_membership.get(cls.MovedPluginField)))
+
+        return tuple(result)
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_copied_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
+        return super()._find_plugin_fields(union_membership)
 
 
 class TargetFilesGenerator(TargetGenerator):
