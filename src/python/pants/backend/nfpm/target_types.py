@@ -89,6 +89,15 @@ from pants.engine.target import (
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
 
+# Fields required to satisfy NfpmPackageFieldSet on all NfpmPackageTarget subclasses.
+COMMON_NFPM_PACKAGE_FIELDS = (
+    *COMMON_TARGET_FIELDS,  # tags, description
+    OutputPathField,
+    NfpmDependencies,
+    # NfpmPackageNameField is in the packager-specific lists of fields so that it ends up
+    # in field_set.required_fields even though it is also required by NfpmPackageFieldSet.
+)
+
 
 class NfpmPackageTarget(Target):
     pass
@@ -116,9 +125,7 @@ APK_FIELDS = (
 class NfpmApkPackage(NfpmPackageTarget):
     alias = "nfpm_apk_package"
     core_fields = (
-        *COMMON_TARGET_FIELDS,  # tags, description
-        OutputPathField,
-        NfpmDependencies,
+        *COMMON_NFPM_PACKAGE_FIELDS,
         *APK_FIELDS,
     )
     help = help_text(
@@ -158,9 +165,7 @@ ARCHLINUX_FIELDS = (
 class NfpmArchlinuxPackage(NfpmPackageTarget):
     alias = "nfpm_archlinux_package"
     core_fields = (
-        *COMMON_TARGET_FIELDS,
-        OutputPathField,
-        NfpmDependencies,
+        *COMMON_NFPM_PACKAGE_FIELDS,
         *ARCHLINUX_FIELDS,
     )
     help = help_text(
@@ -208,9 +213,7 @@ DEB_FIELDS = (
 class NfpmDebPackage(NfpmPackageTarget):
     alias = "nfpm_deb_package"
     core_fields = (
-        *COMMON_TARGET_FIELDS,
-        OutputPathField,
-        NfpmDependencies,
+        *COMMON_NFPM_PACKAGE_FIELDS,
         *DEB_FIELDS,
     )
     help = help_text(
@@ -258,9 +261,7 @@ RPM_FIELDS = (
 class NfpmRpmPackage(NfpmPackageTarget):
     alias = "nfpm_rpm_package"
     core_fields = (
-        *COMMON_TARGET_FIELDS,
-        OutputPathField,
-        NfpmDependencies,
+        *COMMON_NFPM_PACKAGE_FIELDS,
         *RPM_FIELDS,
         NfpmRpmGhostContents,
     )
