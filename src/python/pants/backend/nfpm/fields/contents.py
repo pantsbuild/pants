@@ -188,6 +188,7 @@ class NfpmContentFileMtimeField(StringField):
     # TODO: override default with SOURCE_DATE_EPOCH env var if defined
     # TODO: there are many things in nFPM that use time.Now(), so upstream nFPM work
     #       is required so pants can use SOURCE_DATE_EPOCH to overwrite that.
+    #       https://github.com/goreleaser/nfpm/issues/734
     help = help_text(
         """
         The file modification time as an RFC 3339 formatted string.
