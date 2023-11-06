@@ -105,6 +105,7 @@ class NfpmContentFileModeField(IntField):
     alias: ClassVar[str] = "file_mode"
     # TODO: use the digest's execute bit to default to either 0o644 or 0o755
     #       and bypass any nFPM auto detection confusion.
+    #       This would require building the sandbox before building the config.
     help = help_text(
         """
         A file mode as a numeric octal, an string octal, or a symbolic representation.
@@ -170,7 +171,11 @@ class NfpmContentFileModeField(IntField):
             value = super().compute_value(octal_value, address)
         else:
             value = super().compute_value(raw_value, address)
-        # TODO: maybe warn if the octal value is higher than expected (value > 0o7777).
+        if value > 0o7777:
+            raise InvalidFieldException(
+                f"The '{cls.alias} field in target {address} must be less than or equal to "
+                f"0o7777, but was set to {repr(raw_value)} (ie: `{value:#o}`)."
+            )
         return value
 
 
