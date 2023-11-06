@@ -5,7 +5,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import ClassVar
 
+from pants.core.goals.package import OutputPathField
 from pants.engine.target import Dependencies, StringField
+from pants.util.docutil import bin_name
 from pants.util.strutil import help_text
 
 
@@ -136,5 +138,29 @@ class NfpmLicenseField(StringField):
         about specifying a license for deb packaging:
         https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#license-specification
         https://wiki.debian.org/Proposals/CopyrightFormat#Differences_between_DEP5_and_SPDX
+        """
+    )
+
+
+class NfpmOutputPathField(OutputPathField):
+    nfpm_alias = ""
+    help = help_text(
+        f"""
+        Where the built directory tree should be located.
+
+        If undefined, this will use the path to the BUILD file, followed by the target name.
+        For example, `src/project/packaging:rpm` would be `src.project.packaging/rpm/`.
+
+        Regardless of whether you use the default or set this field, the package's file name
+        will have the packaging system's conventional filename (as understood by nFPM).
+        So, an rpm using the default for this field, the target `src/project/packaging:rpm`
+        might have a final path like `src.project.packaging/rpm/projectname-1.2.3-1.x86_64.rpm`.
+        Similarly, for deb, the target `src/project/packaging:deb` might have a final path like
+        `src.project.packaging/deb/projectname_1.2.3+git-1_x86_64.deb`. The other packagers
+        have their own formats as well.
+
+        When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
+
+        Warning: setting this value risks naming collisions with other package targets you may have.
         """
     )

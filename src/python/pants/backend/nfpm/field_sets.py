@@ -7,10 +7,10 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from pants.backend.nfpm.fields.all import NfpmPackageNameField
+from pants.backend.nfpm.fields.all import NfpmOutputPathField, NfpmPackageNameField
 from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
-from pants.core.goals.package import OutputPathField, PackageFieldSet
+from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, Target
 from pants.engine.unions import UnionRule
@@ -20,7 +20,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 @dataclass(frozen=True)
 class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     default_file_extension: ClassVar[str]
-    output_path: OutputPathField
+    output_path: NfpmOutputPathField
     package_name: NfpmPackageNameField
     description: DescriptionField
 

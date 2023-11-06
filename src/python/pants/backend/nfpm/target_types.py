@@ -8,6 +8,7 @@ from pants.backend.nfpm.fields.all import (
     NfpmDependencies,
     NfpmHomepageField,
     NfpmLicenseField,
+    NfpmOutputPathField,
     NfpmPackageNameField,
     NfpmPlatformField,
 )
@@ -79,7 +80,6 @@ from pants.backend.nfpm.fields.version import (
     NfpmVersionReleaseField,
     NfpmVersionSchemaField,
 )
-from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     InvalidTargetException,
@@ -92,7 +92,7 @@ from pants.util.strutil import help_text
 # Fields required to satisfy NfpmPackageFieldSet on all NfpmPackageTarget subclasses.
 COMMON_NFPM_PACKAGE_FIELDS = (
     *COMMON_TARGET_FIELDS,  # tags, description
-    OutputPathField,
+    NfpmOutputPathField,
     NfpmDependencies,
     # NfpmPackageNameField is in the packager-specific lists of fields so that it ends up
     # in field_set.required_fields even though it is also required by NfpmPackageFieldSet.
