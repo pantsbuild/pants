@@ -33,10 +33,15 @@ def rules():
     return [
         ProtobufSourceTarget.register_plugin_field(ProtobufPythonInterpreterConstraintsField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(
-            ProtobufPythonInterpreterConstraintsField
+            ProtobufPythonInterpreterConstraintsField,
+            as_moved_field=True,
         ),
         ProtobufSourceTarget.register_plugin_field(ProtobufPythonResolveField),
-        ProtobufSourcesGeneratorTarget.register_plugin_field(ProtobufPythonResolveField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(
+            ProtobufPythonResolveField, as_moved_field=True
+        ),
         ProtobufSourceTarget.register_plugin_field(PythonSourceRootField),
-        ProtobufSourcesGeneratorTarget.register_plugin_field(PythonSourceRootField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(
+            PythonSourceRootField, as_moved_field=True
+        ),
     ]
