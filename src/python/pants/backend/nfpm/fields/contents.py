@@ -103,9 +103,6 @@ def _parse_filemode(filemode: str) -> int:
 class NfpmContentFileModeField(IntField):
     nfpm_alias = "contents.[].file_info.mode"
     alias: ClassVar[str] = "file_mode"
-    # TODO: use the digest's execute bit to default to either 0o644 or 0o755
-    #       and bypass any nFPM auto detection confusion.
-    #       This would require building the sandbox before building the config.
     help = help_text(
         """
         A file mode as a numeric octal, an string octal, or a symbolic representation.

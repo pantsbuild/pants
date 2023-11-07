@@ -19,7 +19,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentTypeField,
 )
 from pants.core.goals.package import TraverseIfNotPackageTarget
-from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.fs import CreateDigest, DigestEntries, FileContent, FileEntry
 from pants.engine.internals.native_engine import Digest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
@@ -30,6 +30,7 @@ from pants.util.logging import LogLevel
 @dataclass(frozen=True)
 class NfpmPackageConfigRequest:
     field_set: NfpmPackageFieldSet
+    content_sandbox_digest: Digest  # NfpmContentSandbox.digest
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,14 @@ async def generate_nfpm_yaml(
 
     # Second, gather package contents from hydrated deps.
     contents: list[NfpmContent] = config["contents"]
+
+    content_sandbox_entries = await Get(DigestEntries, Digest, request.content_sandbox_digest)
+    content_sandbox_files = {
+        entry.path: entry for entry in content_sandbox_entries if isinstance(entry, FileEntry)
+    }
+
+    invalid_content_file_targets = []
+    src_missing_from_sandbox = []
 
     # NB: TransitiveTargets is AFTER target generation/expansion (so there are no target generators)
     for tgt in transitive_targets.dependencies:
@@ -95,15 +104,24 @@ async def generate_nfpm_yaml(
                 # If defined, 'source' provides the default value for 'src'.
                 src = source
             if src is None or dst is None:
+                invalid_content_file_targets.append(tgt)
+                continue
+            sandbox_file: FileEntry | None = content_sandbox_files.get(src)
+            if sandbox_file is None:
+                src_missing_from_sandbox.append(src)
                 continue
             contents.append(
                 NfpmContent(
                     type=tgt[NfpmContentTypeField].value,
                     src=src,
                     dst=dst,
-                    file_info=file_info(tgt),
+                    file_info=file_info(tgt, sandbox_file.is_executable),
                 )
             )
+
+    # TODO: raise errors
+    # if invalid_content_file_targets:
+    # if src_missing_from_sandbox:
 
     contents.sort(key=lambda d: d["dst"])
 
