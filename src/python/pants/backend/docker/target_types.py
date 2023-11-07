@@ -377,11 +377,11 @@ class DockerImageBuildImageOutputField(
         f"""
         Sets the export action for the build result.
 
-        When using `pants publish` to publish Docker images to a registry, the output type 
-        must be 'docker', as `publish` expects that the built images exist in the local 
+        When using `pants publish` to publish Docker images to a registry, the output type
+        must be 'docker', as `publish` expects that the built images exist in the local
         image store.
 
-        Currently, multi-platform images cannot be exported with the 'docker' export type, 
+        Currently, multi-platform images cannot be exported with the 'docker' export type,
         although experimental support is available with the [containerd image store](https://docs.docker.com/desktop/containerd/)
 
         {_interpolation_help.format(kind="Values")}
