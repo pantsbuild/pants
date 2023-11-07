@@ -341,17 +341,14 @@ impl ByteStoreProvider for Provider {
                     let mut stream = response.into_inner().inspect(|_| {
                         // Record the observed time to receive the first response for this read.
                         if let Some(start) = start_opt.take() {
-                            if let Some(workunit_store_handle) =
-                                workunit_store::get_workunit_store_handle()
-                            {
-                                let timing: Result<u64, _> =
-                                    Instant::now().duration_since(start).as_micros().try_into();
-                                if let Ok(obs) = timing {
-                                    workunit_store_handle.store.record_observation(
-                                        ObservationMetric::RemoteStoreTimeToFirstByteMicros,
-                                        obs,
-                                    );
-                                }
+                            let timing: Result<u64, _> =
+                                Instant::now().duration_since(start).as_micros().try_into();
+
+                            if let Ok(obs) = timing {
+                                workunit_store::record_observation_if_in_workunit(
+                                    ObservationMetric::RemoteStoreTimeToFirstByteMicros,
+                                    obs,
+                                );
                             }
                         }
                     });
@@ -402,7 +399,9 @@ impl ByteStoreProvider for Provider {
         };
 
         let client = self.cas_client.as_ref().clone();
-        let response = retry_call(
+
+        workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
+        let result = retry_call(
             client,
             move |mut client, _| {
                 let request = request.clone();
@@ -411,7 +410,15 @@ impl ByteStoreProvider for Provider {
             status_is_retryable,
         )
         .await
-        .map_err(status_to_str)?;
+        .map_err(status_to_str);
+
+        let metric = match result {
+            Ok(_) => Metric::RemoteStoreExistsSuccesses,
+            Err(_) => Metric::RemoteStoreExistsErrors,
+        };
+        workunit_store::increment_counter_if_in_workunit(metric, 1);
+
+        let response = result?;
 
         response
             .into_inner()

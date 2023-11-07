@@ -40,7 +40,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ActionResult;
 use tokio::fs::File;
-use workunit_store::ObservationMetric;
+use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{
     ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
@@ -173,16 +173,14 @@ impl Provider {
             Err(e) => return Err(format!("failed to read {}: {}", path, e)),
         };
 
-        if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-            // TODO: this pretends that the time-to-first-byte can be approximated by "time to create
-            // reader", which is often not really true.
-            let timing: Result<u64, _> =
-                Instant::now().duration_since(start).as_micros().try_into();
-            if let Ok(obs) = timing {
-                workunit_store_handle
-                    .store
-                    .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
-            }
+        // TODO: this pretends that the time-to-first-byte can be approximated by "time to create
+        // reader", which is often not really true.
+        let timing: Result<u64, _> = Instant::now().duration_since(start).as_micros().try_into();
+        if let Ok(obs) = timing {
+            workunit_store::record_observation_if_in_workunit(
+                ObservationMetric::RemoteStoreTimeToFirstByteMicros,
+                obs,
+            );
         }
 
         match mode {
@@ -298,7 +296,18 @@ impl ByteStoreProvider for Provider {
             }
 
             let path = self.path(digest.hash);
-            match self.operator.is_exist(&path).await {
+
+            workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
+
+            let result = self.operator.is_exist(&path).await;
+
+            let metric = match result {
+                Ok(_) => Metric::RemoteStoreExistsSuccesses,
+                Err(_) => Metric::RemoteStoreExistsErrors,
+            };
+            workunit_store::increment_counter_if_in_workunit(metric, 1);
+
+            match result {
                 Ok(true) => Ok(None),
                 Ok(false) => Ok(Some(digest)),
                 Err(e) => Err(format!("failed to query {}: {}", path, e)),
