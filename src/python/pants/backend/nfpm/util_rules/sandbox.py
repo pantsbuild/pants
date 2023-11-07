@@ -7,6 +7,7 @@ import dataclasses
 from dataclasses import dataclass
 from typing import cast
 
+from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES, NfpmPackageFieldSet
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDstField,
@@ -14,12 +15,11 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentSrcField,
     NfpmContentSymlinkDstField,
 )
-from pants.backend.nfpm.field_sets import NFPM_PACKAGE_FIELD_SET_TYPES, NfpmPackageFieldSet
 from pants.backend.nfpm.target_types import NfpmContentFile, NfpmPackageTarget
 from pants.core.goals.package import (
-    PackageFieldSet,
     BuiltPackage,
     EnvironmentAwarePackageRequest,
+    PackageFieldSet,
     TraverseIfNotPackageTarget,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -28,14 +28,14 @@ from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
     GenerateSourcesRequest,
-    HydrateSourcesRequest,
     HydratedSources,
+    HydrateSourcesRequest,
     SourcesField,
     Target,
     TransitiveTargets,
-    FieldSetsPerTarget,
-    FieldSetsPerTargetRequest,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership

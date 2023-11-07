@@ -41,8 +41,8 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentSrcField,
     NfpmContentSymlinkDstField,
     NfpmContentSymlinksField,
-    NfpmContentSymlinkSrcField,
     NfpmContentSymlinksOverridesField,
+    NfpmContentSymlinkSrcField,
     NfpmContentTypeField,
 )
 from pants.backend.nfpm.fields.deb import (

@@ -5,12 +5,12 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
     NfpmContentDirsField,
     NfpmContentDstField,
-    NfpmContentFileSourceField,
     NfpmContentFilesField,
+    NfpmContentFileSourceField,
     NfpmContentSrcField,
     NfpmContentSymlinkDstField,
-    NfpmContentSymlinkSrcField,
     NfpmContentSymlinksField,
+    NfpmContentSymlinkSrcField,
 )
 from pants.backend.nfpm.target_types import (
     NfpmContentDirs,
@@ -20,7 +20,7 @@ from pants.backend.nfpm.target_types import (
     NfpmContentSymlinks,
 )
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import GenerateTargetsRequest, GeneratedTargets, InvalidFieldException
+from pants.engine.target import GeneratedTargets, GenerateTargetsRequest, InvalidFieldException
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap

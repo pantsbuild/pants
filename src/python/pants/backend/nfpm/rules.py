@@ -7,16 +7,13 @@ from dataclasses import dataclass
 
 from pants.backend.nfpm.field_sets import NfpmPackageFieldSet
 from pants.backend.nfpm.subsystem import NfpmSubsystem
-from pants.backend.nfpm.util_rules.generate_config import rules as generate_config_rules
 from pants.backend.nfpm.util_rules.generate_config import (
     NfpmPackageConfig,
     NfpmPackageConfigRequest,
 )
-from pants.backend.nfpm.util_rules.sandbox import (
-    NfpmContentSandbox,
-    NfpmContentSandboxRequest,
-    rules as sandbox_rules,
-)
+from pants.backend.nfpm.util_rules.generate_config import rules as generate_config_rules
+from pants.backend.nfpm.util_rules.sandbox import NfpmContentSandbox, NfpmContentSandboxRequest
+from pants.backend.nfpm.util_rules.sandbox import rules as sandbox_rules
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.fs import CreateDigest, Directory, MergeDigests
