@@ -355,7 +355,6 @@ def get_build_options(
                 yield from target[field_type].options(format)
             elif target[field_type].value != target[field_type].default:
                 raise DockerImageOptionValueError(
-                    # TODO: improve
                     f"The {target[field_type].alias} field on the = `{target.alias}` target in `{target.address}` was set to `{target[field_type].value}`"
                     f" and buildx is not enabled. Buildx must be enabled via the Docker subsystem options in order to use this field."
                 )

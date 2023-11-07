@@ -1116,6 +1116,7 @@ def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "buildx",
+            "build",
             "--cache-to=type=local,dest=/tmp/docker/pants-test-cache",
             "--output=type=docker",
             "--pull=False",
@@ -1152,6 +1153,7 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "buildx",
+            "build",
             "--cache-from=type=local,dest=/tmp/docker/pants-test-cache",
             "--output=type=docker",
             "--pull=False",
@@ -1192,6 +1194,7 @@ def test_docker_output_option(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "buildx",
+            "build",
             "--output=type=image",
             "--pull=False",
             "--tag",

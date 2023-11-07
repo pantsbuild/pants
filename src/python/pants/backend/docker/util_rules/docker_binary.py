@@ -66,11 +66,11 @@ class DockerBinary(BinaryPath):
         extra_args: tuple[str, ...] = (),
     ) -> Process:
         if use_buildx:
-            build_command = "buildx"
+            build_commands = ["buildx", "build"]
         else:
-            build_command = "build"
+            build_commands = ["build"]
 
-        args = [self.path, build_command, *extra_args]
+        args = [self.path, *build_commands, *extra_args]
 
         for tag in tags:
             args.extend(["--tag", tag])
