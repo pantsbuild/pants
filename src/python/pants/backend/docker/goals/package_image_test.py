@@ -14,6 +14,7 @@ import pytest
 
 from pants.backend.docker.goals.package_image import (
     DockerBuildTargetStageError,
+    DockerImageOptionValueError,
     DockerImageTagValueError,
     DockerInfoV1,
     DockerPackageFieldSet,
@@ -171,6 +172,7 @@ def assert_build(
         opts.setdefault("build_hosts", None)
         opts.setdefault("build_verbose", False)
         opts.setdefault("build_no_cache", False)
+        opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
 
         docker_options = create_subsystem(
@@ -1113,8 +1115,9 @@ def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
     def check_docker_proc(process: Process):
         assert process.argv == (
             "/dummy/docker",
-            "build",
+            "buildx",
             "--cache-to=type=local,dest=/tmp/docker/pants-test-cache",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1127,6 +1130,7 @@ def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="img1"),
         process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
     )
 
 
@@ -1147,8 +1151,9 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
     def check_docker_proc(process: Process):
         assert process.argv == (
             "/dummy/docker",
-            "build",
+            "buildx",
             "--cache-from=type=local,dest=/tmp/docker/pants-test-cache",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1161,7 +1166,71 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="img1"),
         process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
     )
+
+
+def test_docker_output_option(rule_runner: RuleRunner) -> None:
+    """Testing non-default output type 'image'.
+
+    Default output type 'docker' tested implicitly in other scenarios
+    """
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output={"type": "image"}
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "--output=type=image",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
+    )
+
+
+def test_docker_output_option_raises_when_no_buildkit(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output={"type": "image"}
+                )
+                """
+            ),
+        }
+    )
+
+    with pytest.raises(
+        DockerImageOptionValueError,
+        match=r"Buildx must be enabled via the Docker subsystem options in order to use this field.",
+    ):
+        assert_build(
+            rule_runner,
+            Address("docker/test", target_name="img1"),
+        )
 
 
 def test_docker_build_network_option(rule_runner: RuleRunner) -> None:

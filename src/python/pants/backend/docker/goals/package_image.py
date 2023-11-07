@@ -25,6 +25,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFlagFieldMixin,
     DockerImageBuildImageCacheFromField,
     DockerImageBuildImageCacheToField,
+    DockerImageBuildImageOutputField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -316,6 +317,7 @@ def get_build_options(
     global_target_stage_option: str | None,
     global_build_hosts_options: dict | None,
     global_build_no_cache_option: bool | None,
+    use_buildx_option: bool,
     target: Target,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
@@ -336,18 +338,27 @@ def get_build_options(
             yield from target[field_type].options()
         elif issubclass(field_type, DockerBuildOptionFlagFieldMixin):
             yield from target[field_type].options()
-        elif issubclass(field_type, DockerImageBuildImageCacheToField) or issubclass(
-            field_type, DockerImageBuildImageCacheFromField
+        elif (
+            issubclass(field_type, DockerImageBuildImageCacheToField)
+            or issubclass(field_type, DockerImageBuildImageCacheFromField)
+            or issubclass(field_type, DockerImageBuildImageOutputField)
         ):
-            source = InterpolationContext.TextSource(
-                address=target.address, target_alias=target.alias, field_alias=field_type.alias
-            )
-            format = partial(
-                context.interpolation_context.format,
-                source=source,
-                error_cls=DockerImageOptionValueError,
-            )
-            yield from target[field_type].options(format)
+            if use_buildx_option is True:
+                source = InterpolationContext.TextSource(
+                    address=target.address, target_alias=target.alias, field_alias=field_type.alias
+                )
+                format = partial(
+                    context.interpolation_context.format,
+                    source=source,
+                    error_cls=DockerImageOptionValueError,
+                )
+                yield from target[field_type].options(format)
+            elif target[field_type].value != target[field_type].default:
+                raise DockerImageOptionValueError(
+                    # TODO: improve
+                    f"The {target[field_type].alias} field on the = `{target.alias}` target in `{target.address}` was set to `{target[field_type].value}`"
+                    f" and buildx is not enabled. Buildx must be enabled via the Docker subsystem options in order to use this field."
+                )
 
     # Target stage
     target_stage = None
@@ -440,6 +451,7 @@ async def build_docker_image(
         context_root=context_root,
         env=env,
         tags=tags,
+        use_buildx=options.use_buildx,
         extra_args=tuple(
             get_build_options(
                 context=context,
@@ -447,6 +459,7 @@ async def build_docker_image(
                 global_target_stage_option=options.build_target_stage,
                 global_build_hosts_options=options.build_hosts,
                 global_build_no_cache_option=options.build_no_cache,
+                use_buildx_option=options.use_buildx,
                 target=wrapped_target.target,
             )
         ),

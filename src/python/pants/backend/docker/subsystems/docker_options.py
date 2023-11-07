@@ -143,6 +143,14 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    use_buildx = BoolOption(
+        default=False,
+        help=softwrap(
+            f"""
+            Use [buildx](https://github.com/docker/buildx#buildx) (and BuildKit) for builds.
+            """
+        ),
+    )
     _build_args = ShellStrListOption(
         help=softwrap(
             f"""

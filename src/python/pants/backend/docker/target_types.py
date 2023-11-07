@@ -37,6 +37,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text, softwrap
 
 # Common help text to be applied to each field that supports value interpolation.
@@ -367,6 +368,28 @@ class DockerImageBuildImageCacheFromField(
     docker_build_option = "--cache-from"
 
 
+class DockerImageBuildImageOutputField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField
+):
+    alias = "output"
+    default = FrozenDict({"type": "docker"})
+    help = help_text(
+        f"""
+        Sets the export action for the build result.
+
+        When using `pants publish` to publish Docker images to a registry, the output type 
+        must be 'docker', as `publish` expects that the built images exist in the local 
+        image store.
+
+        Currently, multi-platform images cannot be exported with the 'docker' export type, 
+        although experimental support is available with the [containerd image store](https://docs.docker.com/desktop/containerd/)
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--output"
+
+
 class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
@@ -547,6 +570,7 @@ class DockerImageTarget(Target):
         DockerImageBuildPlatformOptionField,
         DockerImageBuildImageCacheToField,
         DockerImageBuildImageCacheFromField,
+        DockerImageBuildImageOutputField,
         OutputPathField,
         RestartableField,
     )
