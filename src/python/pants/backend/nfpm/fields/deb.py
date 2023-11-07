@@ -34,12 +34,12 @@ class NfpmDebMaintainerField(StringField):
         packaged the software, as opposed to the author of the software.
 
         The name is first, then the email address inside angle brackets `<>`
-        (in RFC822 format). For example: "Foo Bar <maintainer@example.com>"
+        (in RFC5322 format). For example: "Foo Bar <maintainer@example.com>"
 
         See: https://www.debian.org/doc/debian-policy/ch-controlfields.html#maintainer
         """
     )
-    # TODO: Add validation for the "Name <email@domain>" format
+    # nFPM embeds this string as-is in the deb package.
 
 
 class NfpmDebSectionField(StringField):

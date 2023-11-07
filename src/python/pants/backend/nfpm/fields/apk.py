@@ -27,12 +27,14 @@ class NfpmApkMaintainerField(StringField):
         packaged the software, as opposed to the author of the software.
 
         The name is first, then the email address inside angle brackets `<>`
-        (in RFC822 format). For example: "Foo Bar <maintainer@example.com>"
+        (in RFC5322 format). For example: "Foo Bar <maintainer@example.com>"
 
         See: https://wiki.alpinelinux.org/wiki/Apk_spec#PKGINFO_Format
         """
     )
-    # TODO: Add validation for the "Name <email@domain>" format
+    # During signing nFPM parses with mail.ParseAddress() which uses RFC5322
+    # (RFC 5322 supersedes RFC 2822 which supersedes RFC 822).
+    # Otherwise, nFPM embeds this string as-is in the apk package.
 
 
 class NfpmApkReplacesField(NfpmPackageRelationshipsField):

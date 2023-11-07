@@ -28,7 +28,8 @@ class NfpmArchlinuxPackagerField(StringField):
         maintainer of an archlinux PKGBUILD.
 
         The name is first, then the email address inside angle brackets `<>`
-        (in RFC822 format). For example: "Foo Bar <maintainer@example.com>"
+        (in RFC5322 format). For example: "Foo Bar <maintainer@example.com>"
+        This format is the conventional format; it not a hard requirement.
 
         If not set, nFPM uses "Unknown Packager" by default (as does `makepkg`).
 
@@ -37,7 +38,7 @@ class NfpmArchlinuxPackagerField(StringField):
         https://wiki.archlinux.org/title/Makepkg#Packager_information
         """
     )
-    # TODO: Add validation for the "Name <email@domain>" format
+    # nFPM embeds this string as-is in the archlinux package.
 
 
 class NfpmArchlinuxPkgbaseField(StringField):

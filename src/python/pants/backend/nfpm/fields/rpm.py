@@ -24,9 +24,8 @@ from pants.util.strutil import help_text
 
 
 class NfpmRpmPackagerField(StringField):
-    nfpm_alias = "rpm.packager"
+    nfpm_alias = "rpm.packager"  # nFPM uses value of 'maintainer' as default.
     alias: ClassVar[str] = "packager"
-    # nFPM uses value of 'maintainer' as default.
     help = help_text(
         # based in part on the docs at:
         # https://nfpm.goreleaser.com/configuration/#reference
@@ -37,7 +36,8 @@ class NfpmRpmPackagerField(StringField):
         packaged the software, as opposed to the author of the software.
 
         The name is first, then the email address inside angle brackets `<>`
-        (in RFC822 format). For example: "Foo Bar <maintainer@example.com>"
+        (in RFC5322 format). For example: "Foo Bar <maintainer@example.com>"
+        This format is the conventional format; it not a hard requirement.
 
         See: https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-tags.html#S3-RPM-INSIDE-PACKAGER-TAG
 
@@ -45,7 +45,7 @@ class NfpmRpmPackagerField(StringField):
         https://docs.fedoraproject.org/en-US/packaging-guidelines/#_tags_and_sections
         """
     )
-    # TODO: Add validation for the "Name <email@domain>" format
+    # nFPM embeds this string as-is in the rpm package.
 
 
 class NfpmRpmVendorField(StringField):
