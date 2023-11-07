@@ -140,7 +140,7 @@ def test_expand(
                 **Parametrize("A", f=1),  # type: ignore[arg-type]
                 **Parametrize("B", g=2, x=3),
             ),
-            "Failed to parametrize `a:a`:\nConflicting parametrizations for fields: f, g",
+            "Failed to parametrize `a:a`:\n  Conflicting parametrizations for fields: f, g",
         ),
         (
             dict(
@@ -148,7 +148,7 @@ def test_expand(
                 **Parametrize("A", a=1, b=3),  # type: ignore[arg-type]
                 **Parametrize("A", a=2, c=4),
             ),
-            "Failed to parametrize `a:a`:\nParametrize group name is not unique: 'A'",
+            "Failed to parametrize `a:a`:\n  Parametrization group name is not unique: 'A'",
         ),
     ],
 )

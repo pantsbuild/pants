@@ -147,7 +147,7 @@ class Parametrize:
                 if group_name is not None
             ]
         except Exception as e:
-            raise Exception(f"Failed to parametrize `{address}`:\n{e}") from e
+            raise Exception(f"Failed to parametrize `{address}`:\n  {e}") from e
 
         if parametrized_groups:
             # Add the groups as one vector for the cross-product.
@@ -207,7 +207,7 @@ class Parametrize:
             if group_name is None:
                 continue
             if len(groups) > 1:
-                raise ValueError(f"Parametrize group name is not unique: {group_name!r}")
+                raise ValueError(f"Parametrization group name is not unique: {group_name!r}")
         parametrize_field_names = {field_name for field_name, v in parametrizations.get(None, ())}
         parametrize_field_names_from_groups = {
             field_name
