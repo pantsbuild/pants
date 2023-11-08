@@ -267,19 +267,19 @@ async def hydrate_code_quality_tool(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
     )
 
+    execution_environment = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(
+            address=runnable_address,
+            execution_dependencies=cqt.execution_dependencies,
+            runnable_dependencies=cqt.runnable_dependencies,
+        ),
+    )
+
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
     run_request = await Get(
         RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
-    )
-
-    execution_environment = await Get(
-        ResolvedExecutionDependencies,
-        ResolveExecutionDependenciesRequest(
-            target.address,
-            execution_dependencies=cqt.execution_dependencies,
-            runnable_dependencies=cqt.runnable_dependencies,
-        ),
     )
 
     dependencies_digest = execution_environment.digest
