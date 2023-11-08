@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
+from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.target import StringField
 from pants.util.frozendict import FrozenDict
@@ -178,7 +179,30 @@ class NfpmApkScriptsField(NfpmPackageScriptsField):
         }
     )
     help = help_text(
-        """
-        TODO
+        f"""
+        Map of install scripts source files for the APK package.
+
+        This maps the script type (key) to the script source file (value).
+        Each of the script source file(s) must be provided via '{NfpmDependencies.alias}'.
+        The script types are the terms used by nFPM. For reference, Alpine Linux
+        uses the following terms in the APKBUILD file instead:
+
+            | nFPM term   | APKBUILD term  |
+            +-------------+----------------+
+            | preinstall  | pre-install    |
+            | postinstall | post-install   |
+            | preupgrade  | pre-upgrade    |
+            | postupgrade | post-upgrade   |
+            | preremove   | pre-deinstall  |
+            | postremove  | post-deinstall |
+
+        Please consult the Alpine Linux docs to understand when `apk` will run
+        each of these scripts, how it handles a failure, and what failure means
+        for the lifecycle of the package `apk` is working on.
+
+        See:
+        https://wiki.alpinelinux.org/wiki/APKBUILD_Reference#install
+        https://wiki.alpinelinux.org/wiki/Creating_an_Alpine_package#install
+        https://wiki.alpinelinux.org/wiki/Apk_spec#Binary_Format
         """
     )

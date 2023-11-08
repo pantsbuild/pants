@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
+from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.target import StringField
 from pants.util.frozendict import FrozenDict
@@ -182,7 +183,45 @@ class NfpmArchlinuxScriptsField(NfpmPackageScriptsField):
         }
     )
     help = help_text(
-        """
-        TODO
+        f"""
+        Map of install scripts source files for the Archlinux package.
+
+        This maps the script type (key) to the script source file (value).
+        Each of the script source file(s) must be provided via '{NfpmDependencies.alias}'.
+        nFPM will package all of these scripts in a single `.INSTALL` scriptlet file
+        by adding a shell function for each of your script files where your script becomes
+        the body of that function. These functions are:
+
+            | nFPM script | `.INSTALL` function |
+            +-------------+---------------------+
+            | preinstall  | pre_install         |
+            | postinstall | post_install        |
+            | preupgrade  | pre_upgrade         |
+            | postupgrade | post_upgrade        |
+            | preremove   | pre_remove          |
+            | postremove  | post_remove         |
+
+        So, if you provide a `preinstall` script, the `.INSTALL` scriptlet would contain:
+
+            ```
+            function pre_install() {{
+            # Your preinstall script's contents get embedded here.
+            }}
+            ```
+
+        Here are several things to keep in mind when writing your scripts:
+
+        * Your scripts are actually functions, so use `return` instead of `exit`.
+        * `pacman` uses `/bin/sh` to source `.INSTALL` and run the function(s).
+        * `pacman` runs these in a chroot.
+        * The current directory is the root of the chroot.
+
+        Please consult the Archlinux docs to understand when `pacman` will run
+        each of these functions and what arguments the functions will receive.
+
+        See:
+        https://wiki.archlinux.org/title/pacman#What_happens_during_package_install/upgrade/removal
+        https://man.archlinux.org/man/core/pacman/PKGBUILD.5.en#INSTALL/UPGRADE/REMOVE_SCRIPTING
+        https://wiki.archlinux.org/title/PKGBUILD#install
         """
     )

@@ -8,6 +8,7 @@ from typing import ClassVar, Optional
 
 from pants.backend.nfpm.config import NfpmContent
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
+from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException, StringField, StringSequenceField
@@ -352,8 +353,30 @@ class NfpmRpmScriptsField(NfpmPackageScriptsField):
         }
     )
     help = help_text(
-        """
-        TODO
+        f"""
+        Map of install scripts source files for the deb package.
+
+        This maps the script type (key) to the script source file (value).
+        Each of the script source file(s) must be provided via '{NfpmDependencies.alias}'.
+        The script types are the names used by nFPM. For reference, RPM
+        uses the following scriptlet tag names instead and runs them before/after
+        the indicated phase:
+
+            | nFPM term   | RPM scriptlet | RPM phase   |
+            +-------------+---------------+-------------+
+            | preinstall  | %pre          | install     |
+            | postinstall | %post         | install     |
+            | preremove   | %preun        | uninstall   |
+            | postremove  | %postun       | uninstall   |
+            | pretrans    | %pretrnas     | transaction |
+            | posttrans   | %posttrnas    | transaction |
+
+        Please consult the RPM docs to understand what is required of these scripts.
+
+        See:
+        https://docs.fedoraproject.org/en-US/packaging-guidelines/Scriptlets/
+        https://rpm-software-management.github.io/rpm/manual/tags.html#scriptlets
+        https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-scripts.html#S2-RPM-INSIDE-ERASE-TIME-SCRIPTS
         """
     )
 

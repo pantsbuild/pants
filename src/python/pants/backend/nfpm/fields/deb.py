@@ -7,6 +7,7 @@ from enum import Enum
 from typing import ClassVar, Dict, Iterable, Optional, Tuple
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
+from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.addresses import Address
 from pants.engine.target import (
@@ -376,7 +377,44 @@ class NfpmDebScriptsField(NfpmPackageScriptsField):
         }
     )
     help = help_text(
-        """
-        TODO
+        f"""
+        Map of maintainer scripts source files for the deb package.
+
+        This maps the script type (key) to the script source file (value).
+        Each of the script source file(s) must be provided via '{NfpmDependencies.alias}'.
+        The script types are the names used by nFPM. For reference, Debian
+        uses the following file names instead:
+
+            | nFPM script | Debian file |
+            +-------------+-------------+
+            | preinstall  | preinst     |
+            | postinstall | postinst    |
+            | preremove   | prerm       |
+            | postremove  | postrm      |
+            | config      | config      |
+            | templates   | templates   |
+            | rules       | rules       |
+
+        The `pre*` and `post*` scripts are used by `dpkg` at various stages of
+        installing, upgrading, and removing the deb package.
+
+        The `config` script and `templates` file are part of the Debian Configuration
+        Management Specification. `config` can run at any time, including before
+        `preinst` to prompt the user for package configuration using `debconf`.
+        `templates` is used by `debconf` to create those prompts.
+
+        The `rules` script is only needed for source packages. This script is an
+        executable makefile that can build a binary from the packaged sources.
+
+        Please consult the Debian docs to understand when `dpkg` or `debconf` will
+        run each of these scripts, what assumptions you can safely make when they run,
+        and how `dpkg` handles a failure.
+
+        See:
+        https://www.debian.org/doc/debian-policy/ch-binary.html#maintainer-scripts
+        https://www.debian.org/doc/debian-policy/ch-maintainerscripts.html
+        https://www.debian.org/doc/debian-policy/ap-flowcharts.html
+        http://www.fifi.org/doc/debconf-doc/tutorial.html
+        https://www.debian.org/doc/debian-policy/ch-source.html#s-debianrules
         """
     )
