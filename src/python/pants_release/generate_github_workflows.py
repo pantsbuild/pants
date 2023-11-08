@@ -1541,10 +1541,9 @@ def check_labels() -> CheckLabelsOutput:
                 "count": 1,
                 "labels": softwrap(
                     """
-                            category:new feature, category:user api change,
-                            category:plugin api change, category:performance, category:bugfix,
-                            category:documentation, category:internal
-                            """
+                    category:new feature, category:user api change, category:plugin api change,
+                    category:performance, category:bugfix, category:documentation, category:internal
+                    """
                 ),
                 "mode": "exactly",
             },
