@@ -136,9 +136,9 @@ def test_lint_tool():
     assert "nobadcode succeeded" in res.stderr
 
 
-def test_fix_built_rule():
+def test_fix_tool():
     cfg = CodeQualityToolRuleBuilder(
-        goal="fix", target="//:black_tool", name="Black", scope="black_fixer"
+        goal="fix", target="//:bad_to_good_tool", name="Bad to Good", scope="badtogood"
     )
 
     rule_runner = make_rule_runner(cfg)
@@ -147,36 +147,52 @@ def test_fix_built_rule():
         {
             "BUILD": dedent(
                 """
-            python_requirement(
-                name="black",
-                requirements=["black==22.6.0"]
+            python_source(
+                name="bad_to_good",
+                source="bad_to_good.py",
             )
 
             code_quality_tool(
-                name="black_tool",
-                runnable=":black",
+                name="bad_to_good_tool",
+                runnable=":bad_to_good",
                 file_glob_include=["**/*.py"],
+                file_glob_exclude=["bad_to_good.py"],
             )
             """
             ),
-            "good_fmt.py": "foo = 5\n",
-            "needs_repair.py": "bar=10\n",
+            "bad_to_good.py": dedent(
+                """
+            import sys
+
+            if __name__ == '__main__':
+                source_files = sys.argv[1:]
+                failed = False
+                for fpath in source_files:
+                    with open(fpath) as f:
+                        contents = f.read()
+                    if 'badcode' in contents:
+                        with open(fpath, 'w') as f:
+                            f.write(contents.replace('badcode', 'goodcode'))
+                """
+            ),
+            "good_fmt.py": "thisisfine = 5\n",
+            "needs_repair.py": "badcode = 10\n",
         }
     )
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 1
-    assert "black_fixer failed" in res.stderr
+    assert "badtogood failed" in res.stderr
 
     res = rule_runner.run_goal_rule(Fix, args=["::"])
     assert res.exit_code == 0
-    assert "black_fixer made changes" in res.stderr
+    assert "badtogood made changes" in res.stderr
 
-    assert "bar = 10\n" == rule_runner.read_file("needs_repair.py")
+    assert "goodcode = 10\n" == rule_runner.read_file("needs_repair.py")
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 0
-    assert "black_fixer succeeded" in res.stderr
+    assert "badtogood succeeded" in res.stderr
 
 
 def test_several_formatters():
