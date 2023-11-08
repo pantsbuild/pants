@@ -354,7 +354,7 @@ class NfpmRpmScriptsField(NfpmPackageScriptsField):
     )
     help = help_text(
         f"""
-        Map of install scripts source files for the deb package.
+        Map of install scriptlet source files for the deb package.
 
         This maps the script type (key) to the script source file (value).
         Each of the script source file(s) must be provided via '{NfpmDependencies.alias}'.
@@ -368,8 +368,8 @@ class NfpmRpmScriptsField(NfpmPackageScriptsField):
             | postinstall | %post         | install     |
             | preremove   | %preun        | uninstall   |
             | postremove  | %postun       | uninstall   |
-            | pretrans    | %pretrnas     | transaction |
-            | posttrans   | %posttrnas    | transaction |
+            | pretrans    | %pretrans     | transaction |
+            | posttrans   | %posttrans    | transaction |
 
         Please consult the RPM docs to understand what is required of these scripts.
 

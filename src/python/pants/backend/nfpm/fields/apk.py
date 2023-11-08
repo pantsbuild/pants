@@ -180,7 +180,7 @@ class NfpmApkScriptsField(NfpmPackageScriptsField):
     )
     help = help_text(
         f"""
-        Map of install scripts source files for the APK package.
+        Map of install script source files for the APK package.
 
         This maps the script type (key) to the script source file (value).
         Each of the script source file(s) must be provided via '{NfpmDependencies.alias}'.

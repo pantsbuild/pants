@@ -378,7 +378,7 @@ class NfpmDebScriptsField(NfpmPackageScriptsField):
     )
     help = help_text(
         f"""
-        Map of maintainer scripts source files for the deb package.
+        Map of maintainer script source files for the deb package.
 
         This maps the script type (key) to the script source file (value).
         Each of the script source file(s) must be provided via '{NfpmDependencies.alias}'.
