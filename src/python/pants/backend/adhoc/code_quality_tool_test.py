@@ -11,7 +11,7 @@ from pants.backend.adhoc.code_quality_tool import (
     base_rules,
 )
 from pants.backend.python import register as register_python
-from pants.backend.python.target_types import PythonRequirementTarget, PythonSourceTarget
+from pants.backend.python.target_types import PythonSourceTarget
 from pants.core.goals.fix import Fix
 from pants.core.goals.fmt import Fmt
 from pants.core.goals.lint import Lint
@@ -43,7 +43,6 @@ def make_rule_runner(*cfgs: CodeQualityToolRuleBuilder):
     return RuleRunner(
         target_types=[
             CodeQualityToolTarget,
-            PythonRequirementTarget,
             FileTarget,
             PythonSourceTarget,
         ],
@@ -58,16 +57,14 @@ def test_lint_tool():
 
     rule_runner = make_rule_runner(cfg)
 
-    # Implements a linter with a python script that detects the presence
-    # of a configurable list of problem strings in the files to be linted.
+    # linter is a python script that detects the presence
+    # of a configurable list of problem strings
     rule_runner.write_files(
         {
             "build-support/BUILD": dedent(
                 """
-            python_source(
-                name="no_badcode",
-                source="no_badcode.py",
-            )
+            python_source(name="no_badcode", source="no_badcode.py")
+            file(name="badcode_conf", source="badcode.conf")
 
             code_quality_tool(
                 name="no_badcode_tool",
@@ -77,33 +74,26 @@ def test_lint_tool():
                 file_glob_exclude=["messy_ignored_dir/**", "build-support/**"],
                 args=["build-support/badcode.conf"],
             )
-
-            file(
-                name="badcode_conf",
-                source="badcode.conf"
-            )
             """
             ),
             "build-support/no_badcode.py": dedent(
                 """
             import sys
 
-            if __name__ == '__main__':
-                config_file = sys.argv[1]
-                with open(config_file) as cfgfile:
-                    badcode_strings = cfgfile.read().strip().split(",")
+            config_file = sys.argv[1]
+            with open(config_file) as cfgfile:
+                badcode_strings = cfgfile.read().strip().split(",")
 
-                source_files = sys.argv[2:]
-                failed = False
-                for fpath in source_files:
-                    with open(fpath) as f:
-                        for i, line in enumerate(f):
-                            for badcode_string in badcode_strings:
-                                if badcode_string in line:
-                                    print(f"{fpath}:{i + 1} found {badcode_string}")
-                                    failed = True
-                if failed:
-                    sys.exit(1)
+            failed = False
+            for fpath in sys.argv[2:]:
+                with open(fpath) as f:
+                    for i, line in enumerate(f):
+                        for badcode_string in badcode_strings:
+                            if badcode_string in line:
+                                print(f"{fpath}:{i + 1} found {badcode_string}")
+                                failed = True
+            if failed:
+                sys.exit(1)
             """
             ),
             "build-support/badcode.conf": "badcode,brokencode,sillycode",
@@ -143,14 +133,12 @@ def test_fix_tool():
 
     rule_runner = make_rule_runner(cfg)
 
+    # Fixer replaces the string 'badcode' with 'goodcode'
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """
-            python_source(
-                name="bad_to_good",
-                source="bad_to_good.py",
-            )
+            python_source(name="bad_to_good", source="bad_to_good.py")
 
             code_quality_tool(
                 name="bad_to_good_tool",
@@ -164,15 +152,12 @@ def test_fix_tool():
                 """
             import sys
 
-            if __name__ == '__main__':
-                source_files = sys.argv[1:]
-                failed = False
-                for fpath in source_files:
-                    with open(fpath) as f:
-                        contents = f.read()
-                    if 'badcode' in contents:
-                        with open(fpath, 'w') as f:
-                            f.write(contents.replace('badcode', 'goodcode'))
+            for fpath in sys.argv[1:]:
+                with open(fpath) as f:
+                    contents = f.read()
+                if 'badcode' in contents:
+                    with open(fpath, 'w') as f:
+                        f.write(contents.replace('badcode', 'goodcode'))
                 """
             ),
             "good_fmt.py": "thisisfine = 5\n",
@@ -206,25 +191,20 @@ def test_several_formatters():
 
     rule_runner = make_rule_runner(bad_to_good_cfg, underscoreit_cfg)
 
+    # One formatter replaces the string 'badcode' with 'goodcode'
+    # The other adds an underscore to 'goodcode' -> 'good_code'
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """
-            python_source(
-                name="bad_to_good",
-                source="bad_to_good.py",
-            )
+            python_source(name="bad_to_good", source="bad_to_good.py")
+            python_source(name="underscore_it", source="underscore_it.py")
 
             code_quality_tool(
                 name="bad_to_good_tool",
                 runnable=":bad_to_good",
                 file_glob_include=["**/*.py"],
                 file_glob_exclude=["underscore_it.py", "bad_to_good.py"],
-            )
-
-            python_source(
-                name="underscore_it",
-                source="underscore_it.py",
             )
 
             code_quality_tool(
@@ -239,30 +219,24 @@ def test_several_formatters():
                 """
             import sys
 
-            if __name__ == '__main__':
-                source_files = sys.argv[1:]
-                failed = False
-                for fpath in source_files:
-                    with open(fpath) as f:
-                        contents = f.read()
-                    if 'badcode' in contents:
-                        with open(fpath, 'w') as f:
-                            f.write(contents.replace('badcode', 'goodcode'))
+            for fpath in sys.argv[1:]:
+                with open(fpath) as f:
+                    contents = f.read()
+                if 'badcode' in contents:
+                    with open(fpath, 'w') as f:
+                        f.write(contents.replace('badcode', 'goodcode'))
                 """
             ),
             "underscore_it.py": dedent(
                 """
             import sys
 
-            if __name__ == '__main__':
-                source_files = sys.argv[1:]
-                failed = False
-                for fpath in source_files:
-                    with open(fpath) as f:
-                        contents = f.read()
-                    if 'goodcode' in contents:
-                        with open(fpath, 'w') as f:
-                            f.write(contents.replace('goodcode', 'good_code'))
+            for fpath in sys.argv[1:]:
+                with open(fpath) as f:
+                    contents = f.read()
+                if 'goodcode' in contents:
+                    with open(fpath, 'w') as f:
+                        f.write(contents.replace('goodcode', 'good_code'))
                 """
             ),
             "needs_repair.py": "badcode = 10\n",
@@ -293,12 +267,12 @@ def test_several_formatters():
     assert "badtogood" not in res.stderr
     assert "good_code = 5\nbadcode = 10\n" == rule_runner.read_file("only_fix_underscores.py")
 
-    rule_runner.write_files({"do_not_fix_underscores.py": "goodcode = 50\nbadcode = 100\n"})
+    rule_runner.write_files({"do_not_underscore.py": "goodcode = 50\nbadcode = 100\n"})
 
     res = rule_runner.run_goal_rule(
-        Fmt, global_args=["--underscoreit-skip"], args=["do_not_fix_underscores.py"]
+        Fmt, global_args=["--underscoreit-skip"], args=["do_not_underscore.py"]
     )
     assert res.exit_code == 0
     assert "badtogood made changes" in res.stderr
     assert "underscoreit" not in res.stderr
-    assert "goodcode = 50\ngoodcode = 100\n" == rule_runner.read_file("do_not_fix_underscores.py")
+    assert "goodcode = 50\ngoodcode = 100\n" == rule_runner.read_file("do_not_underscore.py")
