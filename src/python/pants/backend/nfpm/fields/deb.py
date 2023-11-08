@@ -248,7 +248,7 @@ class NfpmDebPreDependsField(NfpmPackageRelationshipsField):
         The '{NfpmDebPreDependsField.alias}' field has install-time dependencies
         that need to be available (including unpacking, pre-install, and
         post-install scripts) before unpacking or installing this package.
-        
+
         Make sure to include packages required by the `preinst` script.
 
         WARNING: This is NOT the same as the 'dependencies' field!

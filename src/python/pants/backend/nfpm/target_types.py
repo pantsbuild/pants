@@ -389,7 +389,7 @@ class NfpmContentSymlinks(TargetGenerator):
 
         Pass the list of ('{NfpmContentSymlinkSrcField.alias}', '{NfpmContentSymlinkDstField.alias}')
         symlink tuples in the '{NfpmContentSymlinksField.alias}' field.
-        
+
         Note that '{NfpmContentSymlinkSrcField.alias}' is commonly known as the
         symlink "target" and '{NfpmContentSymlinkDstField.alias}' is the path
         to the symlink itself, also known as the symlink "name".
