@@ -21,6 +21,10 @@ from pants.backend.scala.bsp.spec import (
 )
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+)
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier
@@ -148,22 +152,15 @@ async def collect_thirdparty_modules(
 
 
 async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
+
     tool_classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(
             artifact_requirements=ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-compiler",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-library",
-                        version=scala_version,
-                    ),
-                ]
+                scala_artifacts.all_coordinates
             ),
         ),
     )
