@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import textwrap
 from pants.core.goals.fmt import FmtResult
 
 import pytest
@@ -27,6 +28,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GOOD_FILE = 'a = "string without any placeholders"'
 BAD_FILE = 'a = f"string without any placeholders"'
+UNFORMATTED_FILE = 'a ="string without any placeholders"'
 
 
 @pytest.fixture
@@ -136,19 +138,24 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         {
             "good.py": GOOD_FILE,
             "bad.py": BAD_FILE,
+            "unformatted.py": UNFORMATTED_FILE,
             "BUILD": "python_sources(name='t')",
         }
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.py")),
     ]
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
     assert lint_result.exit_code == 1
     assert fix_result.output == rule_runner.make_snapshot(
-        {"good.py": GOOD_FILE, "bad.py": GOOD_FILE}
+        {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
     )
     assert fix_result.did_change is True
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
+    )
 
 
 @pytest.mark.parametrize(
