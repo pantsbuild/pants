@@ -40,7 +40,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ActionResult;
 use tokio::fs::File;
-use workunit_store::ObservationMetric;
+use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{
     ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
@@ -296,7 +296,18 @@ impl ByteStoreProvider for Provider {
             }
 
             let path = self.path(digest.hash);
-            match self.operator.is_exist(&path).await {
+
+            workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
+
+            let result = self.operator.is_exist(&path).await;
+
+            let metric = match result {
+                Ok(_) => Metric::RemoteStoreExistsSuccesses,
+                Err(_) => Metric::RemoteStoreExistsErrors,
+            };
+            workunit_store::increment_counter_if_in_workunit(metric, 1);
+
+            match result {
                 Ok(true) => Ok(None),
                 Ok(false) => Ok(Some(digest)),
                 Err(e) => Err(format!("failed to query {}: {}", path, e)),
