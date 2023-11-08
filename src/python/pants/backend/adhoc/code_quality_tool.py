@@ -389,10 +389,9 @@ class CodeQualityToolRuleBuilder:
 
         @rule(canonical_name_suffix=self.scope)
         async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> LintResult:
-            sources_snapshot = await Get(Snapshot, PathGlobs(request.elements))
-
-            code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+            sources_snapshot, code_quality_tool_runner = await MultiGet(
+                Get(Snapshot, PathGlobs(request.elements)),
+                Get(CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)),
             )
 
             proc_result = await Get(
