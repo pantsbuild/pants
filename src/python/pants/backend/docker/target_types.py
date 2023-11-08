@@ -312,13 +312,25 @@ class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
             )
 
 
+class DockerBuildKitOptionField:
+    """Mixin to indicate a BuildKit-specific option."""
+
+    @abstractmethod
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+        ...
+
+    required_help = "This option requires BuildKit to be enabled via the Docker subsystem options."
+
+
 class DockerImageBuildImageCacheToField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
 ):
     alias = "cache_to"
     help = help_text(
         f"""
         Export image build cache to an external cache destination.
+
+        {DockerBuildKitOptionField.required_help}
 
         Example:
 
@@ -341,12 +353,14 @@ class DockerImageBuildImageCacheToField(
 
 
 class DockerImageBuildImageCacheFromField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
 ):
     alias = "cache_from"
     help = help_text(
         f"""
         Use an external cache source when building the image.
+
+        {DockerBuildKitOptionField.required_help}
 
         Example:
 
@@ -369,13 +383,15 @@ class DockerImageBuildImageCacheFromField(
 
 
 class DockerImageBuildImageOutputField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
 ):
     alias = "output"
     default = FrozenDict({"type": "docker"})
     help = help_text(
         f"""
         Sets the export action for the build result.
+
+        {DockerBuildKitOptionField.required_help}
 
         When using `pants publish` to publish Docker images to a registry, the output type
         must be 'docker', as `publish` expects that the built images exist in the local

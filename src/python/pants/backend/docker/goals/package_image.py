@@ -19,13 +19,11 @@ from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerIm
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
+    DockerBuildKitOptionField,
     DockerBuildOptionFieldMixin,
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
-    DockerImageBuildImageCacheFromField,
-    DockerImageBuildImageCacheToField,
-    DockerImageBuildImageOutputField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
@@ -338,11 +336,7 @@ def get_build_options(
             yield from target[field_type].options()
         elif issubclass(field_type, DockerBuildOptionFlagFieldMixin):
             yield from target[field_type].options()
-        elif (
-            issubclass(field_type, DockerImageBuildImageCacheToField)
-            or issubclass(field_type, DockerImageBuildImageCacheFromField)
-            or issubclass(field_type, DockerImageBuildImageOutputField)
-        ):
+        elif issubclass(field_type, DockerBuildKitOptionField):
             if use_buildx_option is True:
                 source = InterpolationContext.TextSource(
                     address=target.address, target_alias=target.alias, field_alias=field_type.alias
