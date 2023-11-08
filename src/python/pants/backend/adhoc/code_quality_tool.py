@@ -29,7 +29,7 @@ from pants.engine.internals.native_engine import (
     MergeDigests,
     Snapshot,
 )
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
@@ -259,24 +259,20 @@ async def hydrate_code_quality_tool(
 
     target = runnable_targets[0]
 
-    field_sets = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)
-    )
-
-    environment_name = await Get(
-        EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
-    )
-
-    execution_environment = await Get(
-        ResolvedExecutionDependencies,
-        ResolveExecutionDependenciesRequest(
-            address=runnable_address,
-            execution_dependencies=cqt.execution_dependencies,
-            runnable_dependencies=cqt.runnable_dependencies,
+    run_field_sets, environment_name, execution_environment = await MultiGet(
+        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)),
+        Get(EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)),
+        Get(
+            ResolvedExecutionDependencies,
+            ResolveExecutionDependenciesRequest(
+                address=runnable_address,
+                execution_dependencies=cqt.execution_dependencies,
+                runnable_dependencies=cqt.runnable_dependencies,
+            ),
         ),
     )
 
-    run_field_set: RunFieldSet = field_sets.field_sets[0]
+    run_field_set: RunFieldSet = run_field_sets.field_sets[0]
 
     run_request = await Get(
         RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
