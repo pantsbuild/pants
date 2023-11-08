@@ -307,17 +307,17 @@ async def hydrate_code_quality_tool(
             )
         )
 
-    merged_extras = await Get(
-        ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
+    merged_extras, main_digest = await MultiGet(
+        Get(ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))),
+        Get(Digest, MergeDigests((dependencies_digest, run_request.digest))),
     )
+
     extra_env = dict(merged_extras.extra_env)
     if merged_extras.path:
         extra_env["PATH"] = merged_extras.path
 
-    digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
-
     return CodeQualityToolBatchRunner(
-        digest=digest,
+        digest=main_digest,
         args=run_request.args + tuple(cqt.args),
         extra_env=FrozenDict(extra_env),
         append_only_caches=merged_extras.append_only_caches,
