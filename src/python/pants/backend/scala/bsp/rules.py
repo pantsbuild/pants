@@ -276,11 +276,17 @@ async def bsp_resolve_scala_metadata(
         java_version=f"1.{jdk.jre_major_version}",
     )
 
+    scala_version_parts = scala_version.split(".")
+    scala_binary_version = (
+        ".".join(scala_version_parts[0:2])
+        if int(scala_version_parts[0]) < 3
+        else scala_version_parts[0]
+    )
     return BSPBuildTargetsMetadataResult(
         metadata=ScalaBuildTarget(
             scala_organization="org.scala-lang",
             scala_version=scala_version,
-            scala_binary_version=".".join(scala_version.split(".")[0:2]),
+            scala_binary_version=scala_binary_version,
             platform=ScalaPlatform.JVM,
             jars=scala_jar_uris,
             jvm_build_target=jvm_build_target,
