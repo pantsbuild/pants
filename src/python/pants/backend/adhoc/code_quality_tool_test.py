@@ -196,137 +196,109 @@ def test_fix_tool():
 
 
 def test_several_formatters():
-    black_cfg = CodeQualityToolRuleBuilder(
-        goal="fmt", target="//:black_tool", name="Black", scope="black_formatter"
+    bad_to_good_cfg = CodeQualityToolRuleBuilder(
+        goal="fmt", target="//:bad_to_good_tool", name="Bad to Good", scope="badtogood"
     )
 
-    isort_cfg = CodeQualityToolRuleBuilder(
-        goal="fmt", target="//:isort_tool", name="isort", scope="isort_formatter"
+    underscoreit_cfg = CodeQualityToolRuleBuilder(
+        goal="fmt", target="//:underscore_it_tool", name="Underscore It", scope="underscoreit"
     )
 
-    rule_runner = make_rule_runner(black_cfg, isort_cfg)
+    rule_runner = make_rule_runner(bad_to_good_cfg, underscoreit_cfg)
 
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """
-            python_requirement(
-                name="black",
-                requirements=["black==22.6.0"]
-            )
-
-            python_requirement(
-                name="isort",
-                requirements=["isort==5.9.3"]
+            python_source(
+                name="bad_to_good",
+                source="bad_to_good.py",
             )
 
             code_quality_tool(
-                name="black_tool",
-                runnable=":black",
+                name="bad_to_good_tool",
+                runnable=":bad_to_good",
                 file_glob_include=["**/*.py"],
+                file_glob_exclude=["underscore_it.py", "bad_to_good.py"],
+            )
+
+            python_source(
+                name="underscore_it",
+                source="underscore_it.py",
             )
 
             code_quality_tool(
-                name="isort_tool",
-                runnable=":isort",
+                name="underscore_it_tool",
+                runnable=":underscore_it",
                 file_glob_include=["**/*.py"],
+                file_glob_exclude=["underscore_it.py", "bad_to_good.py"],
             )
             """
             ),
-            # the import order will be fixed by isort
-            # the spacing on the foo line will be fixed by black
-            "needs_repair.py": dedent(
+            "bad_to_good.py": dedent(
                 """
-            import b
-            import a
+            import sys
 
-            foo=a.a+b.b
-            """
-            ).lstrip(),
+            if __name__ == '__main__':
+                source_files = sys.argv[1:]
+                failed = False
+                for fpath in source_files:
+                    with open(fpath) as f:
+                        contents = f.read()
+                    if 'badcode' in contents:
+                        with open(fpath, 'w') as f:
+                            f.write(contents.replace('badcode', 'goodcode'))
+                """
+            ),
+            "underscore_it.py": dedent(
+                """
+            import sys
+
+            if __name__ == '__main__':
+                source_files = sys.argv[1:]
+                failed = False
+                for fpath in source_files:
+                    with open(fpath) as f:
+                        contents = f.read()
+                    if 'goodcode' in contents:
+                        with open(fpath, 'w') as f:
+                            f.write(contents.replace('goodcode', 'good_code'))
+                """
+            ),
+            "needs_repair.py": "badcode = 10\n",
         }
     )
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 1
-    assert "isort_formatter failed" in res.stderr
-    assert "black_formatter failed" in res.stderr
+    assert "badtogood failed" in res.stderr
+    assert "underscoreit succeeded" in res.stderr
 
     res = rule_runner.run_goal_rule(Fmt, args=["::"])
     assert res.exit_code == 0
-    assert "isort_formatter made changes" in res.stderr
-    assert "black_formatter made changes" in res.stderr
+    assert "badtogood made changes" in res.stderr
+    assert "underscoreit made changes" in res.stderr
 
-    assert (
-        dedent(
-            """
-        import a
-        import b
-
-        foo = a.a + b.b
-        """
-        ).lstrip()
-        == rule_runner.read_file("needs_repair.py")
-    )
+    assert "good_code = 10\n" == rule_runner.read_file("needs_repair.py")
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 0
-    assert "isort_formatter succeeded" in res.stderr
-    assert "black_formatter succeeded" in res.stderr
+    assert "badtogood succeeded" in res.stderr
+    assert "underscoreit succeeded" in res.stderr
 
-    rule_runner.write_files(
-        {
-            "only_fix_imports.py": dedent(
-                """
-            import b
-            import a
-
-            bar=a.a+b.b
-            """
-            ).lstrip(),
-        }
-    )
-    res = rule_runner.run_goal_rule(Fmt, args=["--only=isort_formatter", "only_fix_imports.py"])
+    rule_runner.write_files({"only_fix_underscores.py": "goodcode = 5\nbadcode = 10\n"})
+    res = rule_runner.run_goal_rule(Fmt, args=["--only=underscoreit", "only_fix_underscores.py"])
     assert res.exit_code == 0
-    assert "isort_formatter made changes" in res.stderr
-    assert "black" not in res.stderr
-    assert (
-        dedent(
-            """
-        import a
-        import b
+    assert "underscoreit made changes" in res.stderr
+    assert "badtogood" not in res.stderr
+    assert "good_code = 5\nbadcode = 10\n" == rule_runner.read_file("only_fix_underscores.py")
 
-        bar=a.a+b.b
-        """
-        ).lstrip()
-        == rule_runner.read_file("only_fix_imports.py")
-    )
+    rule_runner.write_files({"do_not_fix_underscores.py": "goodcode = 50\nbadcode = 100\n"})
 
-    rule_runner.write_files(
-        {
-            "skip_isort.py": dedent(
-                """
-            import b
-            import a
-
-            zap=a.a+b.b
-            """
-            ).lstrip(),
-        }
-    )
     res = rule_runner.run_goal_rule(
-        Fmt, global_args=["--isort_formatter-skip"], args=["skip_isort.py"]
+        Fmt, global_args=["--underscoreit-skip"], args=["do_not_fix_underscores.py"]
     )
     assert res.exit_code == 0
-    assert "black_formatter made changes" in res.stderr
-    assert "isort" not in res.stderr
-    assert (
-        dedent(
-            """
-        import b
-        import a
-
-        zap = a.a + b.b
-        """
-        ).lstrip()
-        == rule_runner.read_file("skip_isort.py")
-    )
+    assert "badtogood made changes" in res.stderr
+    assert "underscoreit" not in res.stderr
+    assert "goodcode = 50\ngoodcode = 100\n" == rule_runner.read_file("do_not_fix_underscores.py")
