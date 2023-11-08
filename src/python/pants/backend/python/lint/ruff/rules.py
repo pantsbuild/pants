@@ -93,7 +93,9 @@ async def run_ruff(
         extra_initial_args = ()
 
     # `--force-exclude` applies file excludes from config to files provided explicitly
-    initial_args = ("--force-exclude",) + extra_initial_args
+    # The format argument must be passed before force-exclude if Ruff is used for formatting.
+    # For other cases, the flags should work the same regardless of the order.
+    initial_args = extra_initial_args + ("--force-exclude",)
 
     result = await Get(
         FallibleProcessResult,
