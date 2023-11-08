@@ -9,6 +9,7 @@ from typing import Any, ClassVar
 
 from pants.backend.nfpm.fields.all import NfpmOutputPathField, NfpmPackageNameField
 from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
+from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import collect_rules
@@ -23,6 +24,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     output_path: NfpmOutputPathField
     package_name: NfpmPackageNameField
     description: DescriptionField
+    scripts: NfpmPackageScriptsField
 
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
         config: dict[str, Any] = {
@@ -30,27 +32,10 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
             "disable_globbing": True,
             "contents": [],
         }
-        for field in self.required_fields:
-            # NB: This assumes that nfpm fields have a str 'nfpm_alias' attribute.
-            if not hasattr(field, "nfpm_alias"):
-                # Ignore field that is not defined in the nfpm backend.
-                continue
-            # nfpm_alias is a "." concatenated series of nfpm.yaml dict keys.
-            nfpm_alias: str = getattr(field, "nfpm_alias", "")
-            if not nfpm_alias:
-                # field opted out of being included in this config (like dependencies)
-                continue
 
-            value = tgt[field].value
-            # NB: This assumes that nfpm fields have 'none_is_valid_value=False'.
-            if not field.required and value is None:
-                # Omit any undefined optional values unless default applied.
-                # A default ensures value will not be None. So, the pants interface
-                # will be stable even if nFPM changes any defaults.
-                continue
-
+        def fill_nested(_nfpm_alias: str, value: Any) -> None:
             # handle nested fields (eg: deb.triggers, rpm.compression, maintainer)
-            keys = nfpm_alias.split(".")
+            keys = _nfpm_alias.split(".")
 
             cfg = config
             for key in keys[:-1]:
@@ -62,6 +47,32 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
                 cfg.setdefault(key, {})
                 cfg = cfg[key]
             cfg[keys[-1]] = value
+
+        for field in self.required_fields:
+            # NB: This assumes that nfpm fields have a str 'nfpm_alias' attribute.
+            if not hasattr(field, "nfpm_alias"):
+                # Ignore field that is not defined in the nfpm backend.
+                continue
+            # nfpm_alias is a "." concatenated series of nfpm.yaml dict keys.
+            nfpm_alias: str = getattr(field, "nfpm_alias", "")
+            if not nfpm_alias:
+                # field opted out of being included in this config (like dependencies)
+                continue
+
+            field_value = tgt[field].value
+            # NB: This assumes that nfpm fields have 'none_is_valid_value=False'.
+            if not field.required and field_value is None:
+                # Omit any undefined optional values unless default applied.
+                # A default ensures field_value will not be None. So, the pants interface
+                # will be stable even if nFPM changes any defaults.
+                continue
+
+            fill_nested(nfpm_alias, field_value)
+
+        scripts = self.scripts.value or {}
+        for script_type, script_src in scripts.items():
+            nfpm_alias = self.scripts.nfpm_aliases[script_type]
+            fill_nested(nfpm_alias, script_src)
 
         description = self.description.value
         if description:

@@ -8,8 +8,10 @@ from typing import ClassVar, Optional
 
 from pants.backend.nfpm.config import NfpmContent
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
+from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException, StringField, StringSequenceField
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text
 
 # These fields are used by the `nfpm_rpm_package` target
@@ -339,6 +341,21 @@ class NfpmRpmCompressionField(StringField):
         # Pass level as-is w/o sanitization or type checking because
         # there are too many possible levels to check it sanely here.
         return f"{computed_algorithm}:{level}"
+
+
+class NfpmRpmScriptsField(NfpmPackageScriptsField):
+    nfpm_aliases: ClassVar[FrozenDict[str, str]] = FrozenDict(
+        {
+            **NfpmPackageScriptsField.nfpm_aliases,
+            "pretrans": "rpm.scripts.pretrans",
+            "posttrans": "rpm.scripts.posttrans",
+        }
+    )
+    help = help_text(
+        """
+        TODO
+        """
+    )
 
 
 class NfpmRpmGhostContents(StringSequenceField):

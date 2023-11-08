@@ -6,7 +6,9 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
+from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.target import StringField
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text
 
 # These fields are used by the `nfpm_archlinux_package` target
@@ -167,5 +169,20 @@ class NfpmArchlinuxConflictsField(NfpmPackageRelationshipsField):
         See:
         https://wiki.archlinux.org/title/PKGBUILD#conflicts
         https://man.archlinux.org/man/core/pacman/PKGBUILD.5.en
+        """
+    )
+
+
+class NfpmArchlinuxScriptsField(NfpmPackageScriptsField):
+    nfpm_aliases: ClassVar[FrozenDict[str, str]] = FrozenDict(
+        {
+            **NfpmPackageScriptsField.nfpm_aliases,
+            "preupgrade": "archlinux.scripts.preupgrade",
+            "postupgrade": "archlinux.scripts.postupgrade",
+        }
+    )
+    help = help_text(
+        """
+        TODO
         """
     )

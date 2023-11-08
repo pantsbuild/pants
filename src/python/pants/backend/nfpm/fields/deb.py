@@ -7,6 +7,7 @@ from enum import Enum
 from typing import ClassVar, Dict, Iterable, Optional, Tuple
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
+from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     DictStringToStringField,
@@ -361,5 +362,21 @@ class NfpmDebCompressionField(StringField):
     help = help_text(
         """
         The compression algorithm to use on the deb package.
+        """
+    )
+
+
+class NfpmDebScriptsField(NfpmPackageScriptsField):
+    nfpm_aliases: ClassVar[FrozenDict[str, str]] = FrozenDict(
+        {
+            **NfpmPackageScriptsField.nfpm_aliases,
+            "rules": "deb.scripts.rules",
+            "templates": "deb.scripts.templates",
+            "config": "deb.scripts.config",
+        }
+    )
+    help = help_text(
+        """
+        TODO
         """
     )

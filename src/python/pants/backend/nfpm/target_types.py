@@ -17,6 +17,7 @@ from pants.backend.nfpm.fields.apk import (
     NfpmApkMaintainerField,
     NfpmApkProvidesField,
     NfpmApkReplacesField,
+    NfpmApkScriptsField,
 )
 from pants.backend.nfpm.fields.archlinux import (
     NfpmArchlinuxConflictsField,
@@ -25,6 +26,7 @@ from pants.backend.nfpm.fields.archlinux import (
     NfpmArchlinuxPkgbaseField,
     NfpmArchlinuxProvidesField,
     NfpmArchlinuxReplacesField,
+    NfpmArchlinuxScriptsField,
 )
 from pants.backend.nfpm.fields.contents import (
     NfpmContentDirDstField,
@@ -56,6 +58,7 @@ from pants.backend.nfpm.fields.deb import (
     NfpmDebProvidesField,
     NfpmDebRecommendsField,
     NfpmDebReplacesField,
+    NfpmDebScriptsField,
     NfpmDebSectionField,
     NfpmDebSuggestsField,
 )
@@ -70,6 +73,7 @@ from pants.backend.nfpm.fields.rpm import (
     NfpmRpmProvidesField,
     NfpmRpmRecommendsField,
     NfpmRpmReplacesField,
+    NfpmRpmScriptsField,
     NfpmRpmSuggestsField,
     NfpmRpmSummaryField,
     NfpmRpmVendorField,
@@ -129,6 +133,7 @@ class NfpmApkPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *APK_FIELDS,
+        NfpmApkScriptsField,
     )
     help = help_text(
         f"""
@@ -169,6 +174,7 @@ class NfpmArchlinuxPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *ARCHLINUX_FIELDS,
+        NfpmArchlinuxScriptsField,
     )
     help = help_text(
         f"""
@@ -218,6 +224,7 @@ class NfpmDebPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *DEB_FIELDS,
+        NfpmDebScriptsField,
     )
     help = help_text(
         f"""
@@ -267,6 +274,7 @@ class NfpmRpmPackage(NfpmPackageTarget):
     core_fields = (
         *COMMON_NFPM_PACKAGE_FIELDS,
         *RPM_FIELDS,
+        NfpmRpmScriptsField,
         NfpmRpmGhostContents,
     )
     help = help_text(

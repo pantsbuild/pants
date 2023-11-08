@@ -6,7 +6,9 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
+from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.engine.target import StringField
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text
 
 # These fields are used by the `nfpm_apk_package` target
@@ -164,4 +166,19 @@ class NfpmApkDependsField(NfpmPackageRelationshipsField):
         # https://git.alpinelinux.org/abuild/tree/abuild.in
         # nFPM does not do that.
         # TODO: maybe analyze the pants-built artifacts to generate this like abuild does
+    )
+
+
+class NfpmApkScriptsField(NfpmPackageScriptsField):
+    nfpm_aliases: ClassVar[FrozenDict[str, str]] = FrozenDict(
+        {
+            **NfpmPackageScriptsField.nfpm_aliases,
+            "preupgrade": "apk.scripts.preupgrade",
+            "postupgrade": "apk.scripts.postupgrade",
+        }
+    )
+    help = help_text(
+        """
+        TODO
+        """
     )
