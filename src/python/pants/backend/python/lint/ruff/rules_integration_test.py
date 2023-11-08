@@ -4,9 +4,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import textwrap
-from pants.core.goals.fmt import FmtResult
-from pants.engine.fs import SnapshotDiff
 
 import pytest
 
@@ -18,6 +15,7 @@ from pants.backend.python.lint.ruff.subsystem import RuffFieldSet
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
+from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files
 from pants.core.util_rules.partitions import _EmptyMetadata
@@ -93,7 +91,7 @@ def run_ruff(
                 partition_metadata=None,
                 snapshot=input_sources.snapshot,
             )
-        ]
+        ],
     )
 
     return fix_result, lint_result, fmt_result
