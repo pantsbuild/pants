@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 import textwrap
 from pants.core.goals.fmt import FmtResult
+from pants.engine.fs import SnapshotDiff
 
 import pytest
 
@@ -26,9 +27,9 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
-GOOD_FILE = 'a = "string without any placeholders"'
-BAD_FILE = 'a = f"string without any placeholders"'
-UNFORMATTED_FILE = 'a ="string without any placeholders"'
+GOOD_FILE = 'a = "string without any placeholders"\n'
+BAD_FILE = 'a = f"string without any placeholders"\n'
+UNFORMATTED_FILE = 'a ="string without any placeholders"\n'
 
 
 @pytest.fixture
@@ -156,6 +157,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert fmt_result.output == rule_runner.make_snapshot(
         {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
     )
+    assert fmt_result.did_change is True
 
 
 @pytest.mark.parametrize(
