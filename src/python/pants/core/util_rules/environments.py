@@ -108,6 +108,18 @@ class EnvironmentField(StringField):
     )
 
 
+class PassThroughEnvVars(StringSequenceField):
+    alias = "pass_through_env_vars"
+    default = ()
+    value: tuple[str, ...]
+    help = help_text(
+        """
+        Environment variables to take from the shell invoking pants
+        and make available for processes running in the non-local environment.
+        """
+    )
+
+
 class FallbackEnvironmentField(StringField):
     alias = "fallback_environment"
     default = None
@@ -257,6 +269,7 @@ class DockerEnvironmentTarget(Target):
         DockerImageField,
         DockerPlatformField,
         DockerFallbackEnvironmentField,
+        PassThroughEnvVars,
     )
     help = help_text(
         """
@@ -350,6 +363,7 @@ class RemoteEnvironmentTarget(Target):
         RemoteExtraPlatformPropertiesField,
         RemoteFallbackEnvironmentField,
         RemoteEnvironmentCacheBinaryDiscovery,
+        PassThroughEnvVars,
     )
     help = help_text(
         """

@@ -17,9 +17,6 @@ shorthand_re = re.compile(r"([A-Za-z_]\w*)")
 class CompleteEnvironmentVars(FrozenDict):
     """CompleteEnvironmentVars contains all environment variables from the current Pants process.
 
-    For non-local environments like docker or remote execution we also include the local environment
-    from the shell running pants.
-
     NB: Consumers should almost always prefer to consume the `EnvironmentVars` type, which is
     filtered to a relevant subset of the environment.
     """

@@ -16,6 +16,7 @@ from pants.core.util_rules.environments import (
     EnvironmentsSubsystem,
     EnvironmentTarget,
     LocalEnvironmentTarget,
+    PassThroughEnvVars,
     RemoteEnvironmentTarget,
     RemotePlatformField,
 )
@@ -152,7 +153,6 @@ def test_complete_env_vars() -> None:
         expected_env={
             "REMOTE_VAR": "remote_val",
             "COMMON_VAR": "remote",
-            "USER_SHELL_VAR": "user_val",
         },
     )
     assert_env_vars(
@@ -177,23 +177,34 @@ def test_complete_env_vars() -> None:
 
     for re in (False, True):
         assert_env_vars(
-            env_tgt=DockerEnvironmentTarget({DockerImageField.alias: "my_img"}, Address("dir")),
+            env_tgt=DockerEnvironmentTarget(
+                {
+                    DockerImageField.alias: "my_img",
+                    PassThroughEnvVars.alias: ["COMMON_VAR", "USER_SHELL_VAR"],
+                },
+                Address("dir"),
+            ),
             remote_execution=re,
             expected_env={
                 "USER_SHELL_VAR": "user_val",
                 "CONTAINER_VAR": "container_val",
-                "COMMON_VAR": "docker",
+                "COMMON_VAR": "local",
             },
         )
 
     for re in (False, True):
         assert_env_vars(
-            env_tgt=RemoteEnvironmentTarget({}, Address("dir")),
+            env_tgt=RemoteEnvironmentTarget(
+                {
+                    PassThroughEnvVars.alias: ["COMMON_VAR", "USER_SHELL_VAR"],
+                },
+                Address("dir"),
+            ),
             remote_execution=re,
             expected_env={
                 "USER_SHELL_VAR": "user_val",
                 "REMOTE_VAR": "remote_val",
-                "COMMON_VAR": "remote",
+                "COMMON_VAR": "local",
             },
         )
 

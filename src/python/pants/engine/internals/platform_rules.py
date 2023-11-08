@@ -10,6 +10,7 @@ from pants.core.util_rules.environments import (
     DockerPlatformField,
     EnvironmentsSubsystem,
     EnvironmentTarget,
+    PassThroughEnvVars,
     RemotePlatformField,
 )
 from pants.engine.env_vars import (
@@ -82,12 +83,20 @@ async def complete_environment_vars(
             cache_scope=env_tgt.executable_search_path_cache_scope(),
         ),
     )
-    result = dict(local_environment_vars)
+
+    result = {}
     for line in env_process_result.stdout.decode("utf-8").rstrip().split("\0"):
         if not line:
             continue
         k, v = line.split("=", maxsplit=1)
         result[k] = v
+
+    if env_tgt.val and env_tgt.val.has_field(PassThroughEnvVars):
+        pass_through_env_keys = set(env_tgt.val[PassThroughEnvVars].value)
+        result.update(
+            {k: v for k, v in local_environment_vars.items() if k in pass_through_env_keys}
+        )
+
     return CompleteEnvironmentVars(result)
 
 
