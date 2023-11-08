@@ -11,7 +11,7 @@ from pants.backend.adhoc.code_quality_tool import (
     base_rules,
 )
 from pants.backend.python import register as register_python
-from pants.backend.python.target_types import PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourceTarget
 from pants.core.goals.fix import Fix
 from pants.core.goals.fmt import Fmt
 from pants.core.goals.lint import Lint
@@ -41,82 +41,99 @@ def make_rule_runner(*cfgs: CodeQualityToolRuleBuilder):
         rules.extend(cfg.rules())
 
     return RuleRunner(
-        target_types=[CodeQualityToolTarget, PythonRequirementTarget, FileTarget],
+        target_types=[
+            CodeQualityToolTarget,
+            PythonRequirementTarget,
+            FileTarget,
+            PythonSourceTarget,
+        ],
         rules=rules,
     )
 
 
-def test_lint_built_rule():
+def test_lint_tool():
     cfg = CodeQualityToolRuleBuilder(
-        goal="lint", target="build-support:flake8_tool", name="Flake8", scope="flake8_tool"
+        goal="lint", target="build-support:no_badcode_tool", name="No Bad Code", scope="nobadcode"
     )
 
     rule_runner = make_rule_runner(cfg)
 
+    # Implements a linter with a python script that detects the presence
+    # of a configurable list of problem strings in the files to be linted.
     rule_runner.write_files(
         {
             "build-support/BUILD": dedent(
                 """
-            python_requirement(
-                name="flake8",
-                requirements=["flake8==5.0.4"]
+            python_source(
+                name="no_badcode",
+                source="no_badcode.py",
             )
 
             code_quality_tool(
-                name="flake8_tool",
-                runnable=":flake8",
-                execution_dependencies=[":flake8_conf"],
+                name="no_badcode_tool",
+                runnable=":no_badcode",
+                execution_dependencies=[":badcode_conf"],
                 file_glob_include=["**/*.py"],
-                file_glob_exclude=["messy_ignored_dir/**"],
-                args=["--config=build-support/.flake8", "--indent-size=2"],
+                file_glob_exclude=["messy_ignored_dir/**", "build-support/**"],
+                args=["build-support/badcode.conf"],
             )
 
             file(
-                name="flake8_conf",
-                source=".flake8"
+                name="badcode_conf",
+                source="badcode.conf"
             )
             """
             ),
-            "build-support/.flake8": dedent(
+            "build-support/no_badcode.py": dedent(
                 """
-            [flake8]
-            extend-ignore = F401
+            import sys
+
+            if __name__ == '__main__':
+                config_file = sys.argv[1]
+                with open(config_file) as cfgfile:
+                    badcode_strings = cfgfile.read().strip().split(",")
+
+                source_files = sys.argv[2:]
+                failed = False
+                for fpath in source_files:
+                    with open(fpath) as f:
+                        for i, line in enumerate(f):
+                            for badcode_string in badcode_strings:
+                                if badcode_string in line:
+                                    print(f"{fpath}:{i + 1} found {badcode_string}")
+                                    failed = True
+                if failed:
+                    sys.exit(1)
             """
             ),
-            "good_fmt.py": "foo = 5\n",
-            "unused_import_saved_by_conf.py": "import os\n",
-            "messy_ignored_dir/messy_file.py": "ignoreme=10",
-            "not_a_dot_py_file.nopy": "notpy=100",
-            "indent_2_ok_by_cmd_arg.py": dedent(
-                """
-            def foo():
-              return 2
-            """
-            ),
+            "build-support/badcode.conf": "badcode,brokencode,sillycode",
+            "good_file.py": "okcode = 5",
+            "messy_ignored_dir/messy_file.py": "brokencode = 10",
+            "not_a_dot_py_file.md": "This is sillycode",
         }
     )
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 0
-    assert "flake8_tool succeeded" in res.stderr
+    assert "nobadcode succeeded" in res.stderr
 
-    res = rule_runner.run_goal_rule(Lint, args=["good_fmt.py"])
+    res = rule_runner.run_goal_rule(Lint, args=["good_file.py"])
     assert res.exit_code == 0
-    assert "flake8_tool succeeded" in res.stderr
+    assert "nobadcode succeeded" in res.stderr
 
-    rule_runner.write_files({"bad_fmt.py": "baz=5\n"})
+    rule_runner.write_files({"bad_file.py": "brokencode = 5\n"})
 
     res = rule_runner.run_goal_rule(Lint, args=["::"])
     assert res.exit_code == 1
-    assert "flake8_tool failed" in res.stderr
+    assert "nobadcode failed" in res.stderr
 
-    res = rule_runner.run_goal_rule(Lint, args=["bad_fmt.py"])
+    res = rule_runner.run_goal_rule(Lint, args=["bad_file.py"])
     assert res.exit_code == 1
-    assert "flake8_tool failed" in res.stderr
+    assert "nobadcode failed" in res.stderr
 
-    res = rule_runner.run_goal_rule(Lint, args=["good_fmt.py"])
+    res = rule_runner.run_goal_rule(Lint, args=["good_file.py"])
     assert res.exit_code == 0
-    assert "flake8_tool succeeded" in res.stderr
+    assert "nobadcode succeeded" in res.stderr
 
 
 def test_fix_built_rule():
