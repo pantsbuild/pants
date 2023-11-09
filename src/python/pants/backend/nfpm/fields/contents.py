@@ -214,6 +214,7 @@ class NfpmContentFileMtimeField(StringField):
 
 class _SrcDstSequenceField(SequenceField[tuple[str, str]]):
     nfpm_alias = ""
+    value: tuple[tuple[str, str], ...]
 
     # Subclasses must define these
     _dst_alias: ClassVar[str]
@@ -342,6 +343,7 @@ class NfpmContentDstField(StringField):
     nfpm_alias = "contents.[].dst"
     alias: ClassVar[str] = "dst"
     required = True
+    value: str
     help = help_text(
         lambda: f"""
         The absolute install path for a packaged file.
@@ -380,6 +382,7 @@ class NfpmContentTypeField(StringField):
     alias: ClassVar[str] = "content_type"
     valid_choices = NfpmContentFileType
     default = NfpmContentFileType.file.value
+    value: str  # will not be None due to enum + default
     help = help_text(
         lambda: f"""
         The nFPM content type for the packaged file.
@@ -448,6 +451,7 @@ class NfpmContentFilesOverridesField(_NfpmContentOverridesField):
 
 class NfpmContentSymlinkSrcField(NfpmContentSrcField):
     required = True
+    value: str
     help = help_text(
         lambda: f"""
         The symlink target path (on package install).
@@ -466,6 +470,7 @@ class NfpmContentSymlinkSrcField(NfpmContentSrcField):
 
 class NfpmContentSymlinkDstField(NfpmContentDstField):
     required = True
+    value: str
     help = help_text(
         lambda: f"""
         The symlink path (on package install).
@@ -515,6 +520,7 @@ class NfpmContentSymlinksOverridesField(_NfpmContentOverridesField):
 
 class NfpmContentDirDstField(NfpmContentDstField):
     required = True
+    value: str
     help = help_text(
         lambda: f"""
         The absolute install path for a directory.
@@ -532,6 +538,7 @@ class NfpmContentDirsField(StringSequenceField):
     nfpm_alias = ""
     alias: ClassVar[str] = "dirs"
     required = True
+    value: tuple[str, ...]
     help = help_text(
         lambda: f"""
         A list of install path for '{NfpmContentDirDstField.alias}' directories.

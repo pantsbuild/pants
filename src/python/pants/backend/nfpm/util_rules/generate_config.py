@@ -81,38 +81,27 @@ async def generate_nfpm_yaml(
 
     # NB: TransitiveTargets is AFTER target generation/expansion (so there are no target generators)
     for tgt in transitive_targets.dependencies:
-        # We ignore targets with invalid 'src' or 'dst' to satisfy linters.
-        # 'src' and 'dst' shouldn't be None here thanks to 'required' and 'default'.
         if tgt.has_field(NfpmContentDirDstField):  # an NfpmContentDir
-            dst = tgt[NfpmContentDirDstField].value
-            if dst is None:  # dst is required
-                continue
             contents.append(
                 NfpmContent(
                     type="dir",
-                    dst=dst,
+                    dst=tgt[NfpmContentDirDstField].value,
                     file_info=file_info(tgt),
                 )
             )
         elif tgt.has_field(NfpmContentSymlinkDstField):  # an NfpmContentSymlink
-            src = tgt[NfpmContentSymlinkSrcField].value
-            dst = tgt[NfpmContentSymlinkDstField].value
-            if src is None or dst is None:  # src, dst are required
-                continue
             contents.append(
                 NfpmContent(
                     type="symlink",
-                    src=src,
-                    dst=dst,
+                    src=tgt[NfpmContentSymlinkSrcField].value,
+                    dst=tgt[NfpmContentSymlinkDstField].value,
                     file_info=file_info(tgt),
                 )
             )
         elif tgt.has_field(NfpmContentDstField):  # an NfpmContentFile
-            source = tgt.get(NfpmContentFileSourceField, None).value
-            src = tgt.get(NfpmContentSrcField, None).value
-            dst = tgt[NfpmContentDstField].value
-            if dst is None:  # dst is required
-                continue
+            source: str | None = tgt[NfpmContentFileSourceField].value
+            src: str | None = tgt[NfpmContentSrcField].value
+            dst: str = tgt[NfpmContentDstField].value
             if source is not None and not src:
                 # If defined, 'source' provides the default value for 'src'.
                 src = source

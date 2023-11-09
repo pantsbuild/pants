@@ -28,6 +28,7 @@ class NfpmDebMaintainerField(StringField):
     nfpm_alias = "maintainer"
     alias: ClassVar[str] = nfpm_alias
     required = True  # Not setting this is deprecated in nFPM, so we require it.
+    value: str
     help = help_text(
         lambda: f"""
         The name and email address of the package maintainer.
@@ -76,6 +77,7 @@ class NfpmDebPriorityField(StringField):
     alias: ClassVar[str] = nfpm_alias
     valid_choices = DebPriority
     default = DebPriority.optional.value
+    value: str  # will not be None due to enum + default
     help = help_text(
         """
         Indicates how important the package is for OS functions.
@@ -360,6 +362,7 @@ class NfpmDebCompressionField(StringField):
     alias: ClassVar[str] = "compression"
     valid_choices = NfpmDebCompressionAlgorithm
     default = NfpmDebCompressionAlgorithm.gzip.value  # same default as nFPM
+    value: str  # will not be None due to enum + default
     help = help_text(
         """
         The compression algorithm to use on the deb package.

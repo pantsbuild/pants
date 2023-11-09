@@ -15,6 +15,7 @@ class NfpmPackageNameField(StringField):
     nfpm_alias = "name"
     alias: ClassVar[str] = "package_name"
     required = True
+    value: str
     help = help_text(
         """
         The package name.
