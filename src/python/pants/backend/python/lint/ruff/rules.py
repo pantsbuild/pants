@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Tuple
 
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet
 from pants.backend.python.util_rules import pex
@@ -79,6 +79,7 @@ async def run_ruff(
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
 
+    extra_initial_args: Tuple[str, ...] = ()
     if request.mode == RuffMode.FORMAT:
         extra_initial_args = ("format",)
     elif request.mode == RuffMode.FIX:
@@ -87,10 +88,6 @@ async def run_ruff(
         # for ruff < 0.1 is dropped.
         # See https://docs.astral.sh/ruff/linter/ for more details.
         extra_initial_args = ("--fix",)
-    else:
-        # Same as above - this should be ("check") in Ruff >= 0.1, but we retain
-        # the old behavior for backwards compatibility.
-        extra_initial_args = ()
 
     # `--force-exclude` applies file excludes from config to files provided explicitly
     # The format argument must be passed before force-exclude if Ruff is used for formatting.
