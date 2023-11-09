@@ -168,7 +168,7 @@ class NfpmContentFileModeField(IntField):
             value = super().compute_value(octal_value, address)
         else:
             value = super().compute_value(raw_value, address)
-        if value > 0o7777:
+        if value is not None and value > 0o7777:
             raise InvalidFieldException(
                 f"The '{cls.alias} field in target {address} must be less than or equal to "
                 f"0o7777, but was set to {repr(raw_value)} (ie: `{value:#o}`)."
@@ -221,9 +221,11 @@ class _SrcDstSequenceField(SequenceField[tuple[str, str]]):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[Any]], address: Address
-    ) -> Optional[tuple[str, str]]:
+        cls, raw_value: Optional[Iterable[Iterable[str]]], address: Address
+    ) -> tuple[tuple[str, str], ...]:
         src_dst_map = super().compute_value(raw_value, address)
+        if not src_dst_map:
+            return ()
         # TODO: does src and dst need to be validated as non-empty valid paths?
 
         dst_seen = set()
@@ -257,6 +259,8 @@ class _NfpmContentOverridesField(OverridesField):
         address: Address,
     ) -> Optional[FrozenDict[tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
         value = super().compute_value(raw_value, address)
+        if not value:
+            return None
         for dst, overrides in value.items():
             for field_alias in cls._disallow_overrides_for_field_aliases:
                 if field_alias in overrides:
@@ -551,10 +555,9 @@ class NfpmContentDirsField(StringSequenceField):
     )
 
     @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Optional[tuple[str, ...]]:
+    def compute_value(cls, raw_value: Optional[Iterable[str]], address: Address) -> tuple[str, ...]:
         dst_dirs = super().compute_value(raw_value, address)
+        assert dst_dirs is not None  # it is required
         # TODO: does dst need to be validated as non-empty valid paths?
 
         dst_seen = set()

@@ -41,7 +41,7 @@ async def generate_targets_from_nfpm_content_files(
     generator: NfpmContentFiles = request.generator
     # This is not a dict because the same src can be copied to more than one dst.
     # Also, the field guarantees that there are no dst duplicates in this field.
-    src_dst_map: tuple[tuple[str, str]] = generator[NfpmContentFilesField].value
+    src_dst_map: tuple[tuple[str, str], ...] = generator[NfpmContentFilesField].value or ()
 
     overrides = request.require_unparametrized_overrides()
 
@@ -91,7 +91,7 @@ async def generate_targets_from_nfpm_content_symlinks(
     generator: NfpmContentSymlinks = request.generator
     # This is not a dict because the same src can be linked to more than one dst.
     # Also, the field guarantees that there are no dst duplicates in this field.
-    src_dst_map: tuple[tuple[str, str]] = generator[NfpmContentSymlinksField].value
+    src_dst_map: tuple[tuple[str, str], ...] = generator[NfpmContentSymlinksField].value or ()
 
     overrides = request.require_unparametrized_overrides()
 
@@ -140,7 +140,7 @@ async def generate_targets_from_nfpm_content_dirs(
     generator: NfpmContentDirs = request.generator
     # This is not a dict because the same src can be linked to more than one dst.
     # Also, the field guarantees that there are no dst duplicates in this field.
-    dirs: tuple[str, ...] = generator[NfpmContentDirsField].value
+    dirs: tuple[str, ...] = generator[NfpmContentDirsField].value or ()
 
     overrides = request.require_unparametrized_overrides()
 

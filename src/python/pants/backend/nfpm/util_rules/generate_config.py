@@ -132,7 +132,7 @@ async def generate_nfpm_yaml(
                 defaults to the file referenced in the '{NfpmContentFileSourceField.alias}' field.
                 Please fix the {'targets at these addresses' if plural else 'target at this address'}:
                 """
-                + ",\n".join(tgt.address for tgt in invalid_content_file_targets)
+                + ",\n".join(str(tgt.address) for tgt in invalid_content_file_targets)
             )
         )
     if src_missing_from_sandbox:
@@ -146,16 +146,15 @@ async def generate_nfpm_yaml(
                 '{NfpmContentFileSourceField.alias}' field. Please fix the '{NfpmContentFile.alias}'
                 {'targets at these addresses' if plural else 'target at this address'}.:
                 """
-                + ",\n".join(tgt.address for tgt in src_missing_from_sandbox)
+                + ",\n".join(str(tgt.address) for tgt in src_missing_from_sandbox)
             )
         )
 
     contents.sort(key=lambda d: d["dst"])
 
-    scripts = request.field_set.scripts.value or {}
     script_src_missing_from_sandbox = {
         script_type: script_src
-        for script_type, script_src in scripts.items()
+        for script_type, script_src in (request.field_set.scripts.value or {}).items()
         if content_sandbox_files.get(script_src) is None
     }
     if script_src_missing_from_sandbox:

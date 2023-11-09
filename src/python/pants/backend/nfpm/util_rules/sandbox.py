@@ -23,7 +23,7 @@ from pants.core.goals.package import (
     TraverseIfNotPackageTarget,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
+from pants.engine.fs import CreateDigest, DigestEntries, Directory, FileEntry, SymlinkEntry
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
@@ -79,10 +79,10 @@ class _NfpmSortedDeps:
                 # If 'source' is None, the file comes from dependencies.
                 if tgt[NfpmContentFileSourceField].value is None:
                     # The file must be hydrated from one of the dependencies.
-                    nfpm_content_from_dependency_targets.append(cast(tgt, NfpmContentFile))
+                    nfpm_content_from_dependency_targets.append(cast(NfpmContentFile, tgt))
                     continue
                 # The file must be hydrated from the 'source' field
-                nfpm_content_from_source_targets.append(cast(tgt, NfpmContentFile))
+                nfpm_content_from_source_targets.append(cast(NfpmContentFile, tgt))
                 continue
 
             # This bool serves as a "continue" for the outer "for tgt" loop.
@@ -94,7 +94,7 @@ class _NfpmSortedDeps:
                     # we only respect nfpm package deps for the same packager
                     # (For example, deb targets will ignore any deps on rpm targets)
                     if isinstance(field_set, field_set_type):
-                        nfpm_package_targets.append(cast(tgt, NfpmPackageTarget))
+                        nfpm_package_targets.append(cast(NfpmPackageTarget, tgt))
                     break
             if identified_target:
                 continue
@@ -157,7 +157,9 @@ async def populate_nfpm_content_sandbox(
 
     # 2. Hydrate 'source' fields for nfpm_content_file targets.
 
-    nfpm_content_source_fields_to_relocate: list[tuple[SourcesField, NfpmContentSrcField]] = []
+    nfpm_content_source_fields_to_relocate: list[
+        tuple[NfpmContentFileSourceField, NfpmContentSrcField]
+    ] = []
     nfpm_content_source_fields: list[SourcesField] = []
 
     for nfpm_content_tgt in deps.nfpm_content_from_source_targets:
@@ -176,14 +178,14 @@ async def populate_nfpm_content_sandbox(
     relocated_source_entries = await MultiGet(
         Get(DigestEntries, Snapshot, hydrated.snapshot) for hydrated in hydrated_sources_to_relocate
     )
-    moved_entries = []
+    moved_entries: list[FileEntry | SymlinkEntry | Directory] = []
     digest_entries: DigestEntries
     for digest_entries, (source, src) in zip(
         relocated_source_entries, nfpm_content_source_fields_to_relocate
     ):
         for entry in digest_entries:
             if isinstance(entry, FileEntry) and entry.path == source.value:
-                moved_entries.append(dataclasses.replace(entry, path=src.alue))
+                moved_entries.append(dataclasses.replace(entry, path=src.value))
             else:
                 moved_entries.append(entry)
 

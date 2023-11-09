@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Iterable, Optional
+from typing import ClassVar, Optional
 
 from pants.engine.internals.native_engine import Address
 from pants.engine.target import DictStringToStringField, InvalidFieldException
@@ -27,8 +27,8 @@ class NfpmPackageScriptsField(DictStringToStringField):
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[dict[str, Iterable[str]]], address: Address
-    ) -> Optional[FrozenDict[str, tuple[str, ...]]]:
+        cls, raw_value: Optional[dict[str, str]], address: Address
+    ) -> Optional[FrozenDict[str, str]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default:
             invalid_keys = value_or_default.keys() - cls.nfpm_aliases.keys()

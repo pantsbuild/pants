@@ -69,8 +69,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
 
             fill_nested(nfpm_alias, field_value)
 
-        scripts = self.scripts.value or {}
-        for script_type, script_src in scripts.items():
+        for script_type, script_src in (self.scripts.value or {}).items():
             nfpm_alias = self.scripts.nfpm_aliases[script_type]
             fill_nested(nfpm_alias, script_src)
 
@@ -115,7 +114,7 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
         return config
 
 
-NFPM_PACKAGE_FIELD_SET_TYPES = FrozenOrderedSet(
+NFPM_PACKAGE_FIELD_SET_TYPES: FrozenOrderedSet[type[PackageFieldSet]] = FrozenOrderedSet(
     (
         NfpmApkPackageFieldSet,
         NfpmArchlinuxPackageFieldSet,
