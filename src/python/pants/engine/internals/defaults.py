@@ -51,7 +51,7 @@ class ParametrizeDefault(Parametrize):
         return cls(
             *map(freeze, parametrize.args),
             **{kw: freeze(arg) for kw, arg in parametrize.kwargs.items()},
-        )
+        ).to_weak()
 
 
 @dataclass
@@ -112,7 +112,9 @@ class BuildFileDefaultsParserState:
                                     if field_alias
                                     in (field_type.alias, field_type.deprecated_alias)
                                 },
-                            ).to_group()
+                            )
+                            .to_weak()
+                            .to_group()
                             for key, parametrize in fields.items()
                             if isinstance(parametrize, Parametrize) and parametrize.is_group
                         },
@@ -221,6 +223,7 @@ class BuildFileDefaultsParserState:
 
                 for field_alias, field_value in default.items():
                     if isinstance(field_value, Parametrize) and field_value.is_group:
+                        field_value.to_weak()
                         for parametrize_field_alias in field_value.kwargs.keys():
                             _check_field_alias(parametrize_field_alias)
                     else:

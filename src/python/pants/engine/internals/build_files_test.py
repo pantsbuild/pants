@@ -580,6 +580,33 @@ def test_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
     )
 
 
+def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "hello/BUILD": dedent(
+                """\
+                __defaults__({mock_tgt: dict(**parametrize("a", tags=["from default"]))})
+                mock_tgt(
+                  tags=["from target"],
+                  **parametrize("a"),
+                  **parametrize("b", tags=["from b"]),
+                )
+                """
+            ),
+        }
+    )
+    address = Address("hello")
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(address, description_of_origin="tests")],
+    )
+    targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    assert targets == (
+        (address.parametrize(dict(parametrize="a")), dict(tags=["from target"])),
+        (address.parametrize(dict(parametrize="b")), dict(tags=("from b",))),
+    )
+
+
 def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {

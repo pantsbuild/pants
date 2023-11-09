@@ -5,9 +5,14 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import operator
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
+from functools import reduce
 from typing import Any, Iterator, Mapping, cast
+
+from typing_extensions import Self
 
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
@@ -39,14 +44,22 @@ class Parametrize:
     means that individual Field instances need not be aware of it.
     """
 
+    class _MergeBehaviour(Enum):
+        # Do not merge this parametrization.
+        never = "never"
+        # Discard this parametrization with `other`.
+        replace = "replace"
+
     args: tuple[str, ...]
     kwargs: FrozenDict[str, ImmutableValue]
     is_group: bool
+    merge_behaviour: _MergeBehaviour = dataclasses.field(compare=False)
 
     def __init__(self, *args: str, **kwargs: Any) -> None:
-        object.__setattr__(self, "is_group", False)
         object.__setattr__(self, "args", args)
         object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
+        object.__setattr__(self, "is_group", False)
+        object.__setattr__(self, "merge_behaviour", Parametrize._MergeBehaviour.never)
 
     def keys(self) -> tuple[str]:
         return (f"parametrize_{hash(self.args)}:{id(self)}",)
@@ -57,8 +70,12 @@ class Parametrize:
         else:
             raise KeyError(key)
 
-    def to_group(self) -> Parametrize:
+    def to_group(self) -> Self:
         object.__setattr__(self, "is_group", True)
+        return self
+
+    def to_weak(self) -> Self:
+        object.__setattr__(self, "merge_behaviour", Parametrize._MergeBehaviour.replace)
         return self
 
     def to_parameters(self) -> dict[str, Any]:
@@ -204,10 +221,11 @@ class Parametrize:
         parametrizations: Mapping[str | None, list[tuple[str, Parametrize]]]
     ) -> None:
         for group_name, groups in parametrizations.items():
-            if group_name is None:
-                continue
-            if len(groups) > 1:
-                raise ValueError(f"Parametrization group name is not unique: {group_name!r}")
+            if group_name is not None and len(groups) > 1:
+                group = Parametrize._combine(*(group for _, group in groups))
+                groups.clear()
+                groups.append(("combined", group))
+
         parametrize_field_names = {field_name for field_name, v in parametrizations.get(None, ())}
         parametrize_field_names_from_groups = {
             field_name
@@ -225,6 +243,21 @@ class Parametrize:
                     """
                 )
             )
+
+    @staticmethod
+    def _combine(head: Parametrize, *tail: Parametrize) -> Parametrize:
+        return reduce(operator.add, tail, head)
+
+    def __add__(self, other: Parametrize) -> Parametrize:
+        if not isinstance(other, Parametrize):
+            raise TypeError(f"Can not combine {self} with {other!r}")
+        if self.merge_behaviour is Parametrize._MergeBehaviour.replace:
+            return other
+        if other.merge_behaviour is Parametrize._MergeBehaviour.replace:
+            return self
+        if self.is_group and other.is_group:
+            raise ValueError(f"Parametrization group name is not unique: {self.group_name!r}")
+        raise ValueError(f"Can not combine parametrizations: {self} | {other}")
 
     def __repr__(self) -> str:
         strs = [repr(s) for s in self.args]
