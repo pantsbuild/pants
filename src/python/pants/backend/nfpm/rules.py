@@ -46,13 +46,12 @@ async def package_nfpm_package(
 ) -> BuiltPackage:
     output_dir = "__out"
 
-    nfpm_content_sandbox, downloaded_tool, output_dir_digest = await MultiGet(
-        Get(NfpmContentSandbox, NfpmContentSandboxRequest(field_set)),
+    nfpm_content_sandbox = await Get(NfpmContentSandbox, NfpmContentSandboxRequest(field_set))
+
+    nfpm_config, downloaded_tool, output_dir_digest = await MultiGet(
+        Get(NfpmPackageConfig, NfpmPackageConfigRequest(field_set, nfpm_content_sandbox.digest)),
         Get(DownloadedExternalTool, ExternalToolRequest, nfpm_subsystem.get_request(platform)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
-    )
-    nfpm_config = await Get(
-        NfpmPackageConfig, NfpmPackageConfigRequest(field_set, nfpm_content_sandbox.digest)
     )
 
     sandbox_digest = await Get(
