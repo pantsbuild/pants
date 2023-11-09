@@ -13,6 +13,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentSymlinkSrcField,
 )
 from pants.backend.nfpm.target_types import (
+    NfpmContentDir,
     NfpmContentDirs,
     NfpmContentFile,
     NfpmContentFiles,
@@ -61,7 +62,7 @@ async def generate_targets_from_nfpm_content_files(
             union_membership,
         )
 
-    generated_targets = [generate_tgt(src, dst) for src, dst in src_dst_map]
+    generated_targets: list[NfpmContentFile] = [generate_tgt(src, dst) for src, dst in src_dst_map]
 
     if overrides:
         raise InvalidFieldException(
@@ -110,7 +111,9 @@ async def generate_targets_from_nfpm_content_symlinks(
             union_membership,
         )
 
-    generated_targets = [generate_tgt(src, dst) for src, dst in src_dst_map]
+    generated_targets: list[NfpmContentSymlink] = [
+        generate_tgt(src, dst) for src, dst in src_dst_map
+    ]
 
     if overrides:
         raise InvalidFieldException(
@@ -144,9 +147,9 @@ async def generate_targets_from_nfpm_content_dirs(
 
     overrides = request.require_unparametrized_overrides()
 
-    def generate_tgt(dst: str) -> NfpmContentSymlink:
+    def generate_tgt(dst: str) -> NfpmContentDir:
         tgt_overrides = overrides.pop(dst, {})
-        return NfpmContentSymlink(
+        return NfpmContentDir(
             {
                 **request.template,
                 NfpmContentDirDstField.alias: dst,
@@ -158,7 +161,7 @@ async def generate_targets_from_nfpm_content_dirs(
             union_membership,
         )
 
-    generated_targets = [generate_tgt(dst) for dst in dirs]
+    generated_targets: list[NfpmContentDir] = [generate_tgt(dst) for dst in dirs]
 
     if overrides:
         raise InvalidFieldException(
