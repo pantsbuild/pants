@@ -7,13 +7,17 @@ from pants.backend.terraform.goals import check, deploy
 from pants.backend.terraform.goals import lockfiles as terraform_lockfile
 from pants.backend.terraform.goals import tailor
 from pants.backend.terraform.lint.tffmt.tffmt import rules as tffmt_rules
-from pants.backend.terraform.target_types import TerraformDeploymentTarget, TerraformModuleTarget
+from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
+    TerraformDeploymentTarget,
+    TerraformModuleTarget,
+)
 from pants.backend.terraform.target_types import rules as target_types_rules
 from pants.engine.rules import collect_rules
 
 
 def target_types():
-    return [TerraformModuleTarget, TerraformDeploymentTarget]
+    return [TerraformModuleTarget, TerraformBackendTarget, TerraformDeploymentTarget]
 
 
 def rules():

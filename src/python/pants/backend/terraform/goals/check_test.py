@@ -11,6 +11,7 @@ from pants.backend.terraform import dependencies, dependency_inference, tool
 from pants.backend.terraform.goals import check
 from pants.backend.terraform.goals.check import TerraformCheckRequest
 from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
     TerraformModuleTarget,
@@ -27,7 +28,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[TerraformModuleTarget, TerraformDeploymentTarget],
+        target_types=[TerraformModuleTarget, TerraformBackendTarget, TerraformDeploymentTarget],
         rules=[
             *external_tool.rules(),
             *check.rules(),

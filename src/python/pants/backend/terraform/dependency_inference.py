@@ -12,6 +12,7 @@ from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform.target_types import (
     TerraformDeploymentFieldSet,
     TerraformModuleSourcesField,
+    to_address_input,
 )
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
@@ -156,8 +157,10 @@ class InferTerraformDeploymentDependenciesRequest(InferDependenciesRequest):
 async def infer_terraform_deployment_dependencies(
     request: InferTerraformDeploymentDependenciesRequest,
 ) -> InferredDependencies:
-    root_module_address_input = request.field_set.root_module.to_address_input()
+    root_module_address_input = to_address_input(request.field_set.root_module)
     root_module = await Get(Address, AddressInput, root_module_address_input)
+
+    deps = [root_module]
 
     # TODO: add depenendency on the vars files
     #  The use of this target_name here leads to a dependency on self.
@@ -170,13 +173,13 @@ async def infer_terraform_deployment_dependencies(
     #         relative_file_path=v,
     #     ) for v in var_files_names
     # ]
+    # backend_target_name = request.field_set.backend_config.value
+    # if backend_target_name:
+    #     deps += [
+    #         await Get(Address, AddressInput, backend_target_name)
+    #     ]
 
-    return InferredDependencies(
-        [
-            root_module,
-            # *var_files_addresses,
-        ]
-    )
+    return InferredDependencies(deps)
 
 
 def rules():

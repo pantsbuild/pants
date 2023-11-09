@@ -6,19 +6,34 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pants.backend.terraform.target_types import (
-    TerraformBackendConfigField,
+    TerraformBackendTargetField,
     TerraformDependenciesField,
     TerraformRootModuleField,
+    to_address_input,
 )
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import (
+    EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
+    Address,
+    AddressInput,
+    Digest,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import SourcesField, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import (
+    SourcesField,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 
 
 @dataclass(frozen=True)
@@ -93,7 +108,7 @@ async def get_terraform_providers(
 @dataclass(frozen=True)
 class TerraformInitRequest:
     root_module: TerraformRootModuleField
-    backend_config: TerraformBackendConfigField
+    backend_config: TerraformBackendTargetField
     dependencies: TerraformDependenciesField
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
@@ -115,8 +130,19 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
     )
 
-    backend_config, lockfile, dependencies_files = await MultiGet(
-        Get(SourceFiles, SourceFilesRequest([request.backend_config])),
+    if request.backend_config.value:
+        backend_address = await Get(Address, AddressInput, to_address_input(request.backend_config))
+        backend_target = await Get(
+            WrappedTarget,
+            WrappedTargetRequest(backend_address, description_of_origin="Terraform initialisation"),
+        )
+        backend_sources = await Get(
+            SourceFiles, SourceFilesRequest([backend_target.target.get(SourcesField)])
+        )
+    else:
+        backend_sources = SourceFiles(EMPTY_SNAPSHOT, ())
+
+    lockfile, dependencies_files = await MultiGet(
         Get(
             Snapshot,
             PathGlobs(
@@ -132,7 +158,7 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         TerraformDependenciesResponse,
         TerraformDependenciesRequest(
             request.root_module.address.spec_path,
-            backend_config,
+            backend_sources,
             lockfile,
             dependencies_files,
             initialise_backend=request.initialise_backend,

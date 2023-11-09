@@ -6,7 +6,7 @@ from typing import Iterable, Union
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import (
-    TerraformBackendConfigField,
+    TerraformBackendTargetField,
     TerraformDependenciesField,
     TerraformDeploymentTarget,
     TerraformRootModuleField,
@@ -94,7 +94,7 @@ async def generate_lockfile_from_sources(
         TerraformInitResponse,
         TerraformInitRequest(
             lockfile_request.target[TerraformRootModuleField],
-            lockfile_request.target[TerraformBackendConfigField],
+            lockfile_request.target[TerraformBackendTargetField],
             lockfile_request.target[TerraformDependenciesField],
             initialise_backend=False,
             upgrade=True,

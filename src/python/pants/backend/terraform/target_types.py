@@ -15,7 +15,7 @@ from pants.engine.target import (
     DescriptionField,
     FieldSet,
     MultipleSourcesField,
-    OptionalSingleSourceField,
+    SingleSourceField,
     StringField,
     Target,
     Targets,
@@ -59,6 +59,22 @@ class TerraformModuleTarget(Target):
     )
 
 
+def to_address_input(addr) -> AddressInput:
+    if not addr.value:
+        raise ValueError(
+            softwrap(
+                f"""
+        A Terraform deployment must have a nonempty {addr.alias} field,
+         but {addr.address} was empty"""
+            )
+        )
+    return AddressInput.parse(
+        addr.value,
+        relative_to=addr.address.spec_path,
+        description_of_origin=f"the `{addr.alias} field in the `{TerraformDeploymentTarget.alias}` target {addr.address}",
+    )
+
+
 class TerraformRootModuleField(StringField, AsyncFieldMixin):
     """The module to use as the root module for a Terraform deployment."""
 
@@ -88,9 +104,19 @@ class TerraformRootModuleField(StringField, AsyncFieldMixin):
         )
 
 
-class TerraformBackendConfigField(OptionalSingleSourceField):
+class TerraformBackendConfigField(SingleSourceField):
+    help = "Configuration to be merged with what is in the configuration file's 'backend' block"
+
+
+class TerraformBackendTarget(Target):
+    alias = "terraform_backend"
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformBackendConfigField)
+
+
+class TerraformBackendTargetField(StringField, AsyncFieldMixin):
     alias = "backend_config"
     help = "Configuration to be merged with what is in the configuration file's 'backend' block"
+    default = None
 
 
 class TerraformVarFileSourcesField(MultipleSourcesField):
@@ -107,7 +133,7 @@ class TerraformDeploymentTarget(Target):
         *COMMON_TARGET_FIELDS,
         TerraformDependenciesField,
         TerraformRootModuleField,
-        TerraformBackendConfigField,
+        TerraformBackendTargetField,
         TerraformVarFileSourcesField,
     )
     help = "A deployment of Terraform"
@@ -123,7 +149,7 @@ class TerraformDeploymentFieldSet(FieldSet):
     root_module: TerraformRootModuleField
     dependencies: TerraformDependenciesField
 
-    backend_config: TerraformBackendConfigField
+    backend_config: TerraformBackendTargetField
     var_files: TerraformVarFileSourcesField
 
 

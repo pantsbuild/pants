@@ -7,6 +7,7 @@ from pants.backend.terraform.lint.tffmt.tffmt import PartitionMetadata
 from pants.backend.terraform.lint.tfsec.rules import rules as tfsec_rules
 from pants.backend.terraform.lint.tfsec.tfsec import TfSecRequest
 from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
     TerraformDeploymentTarget,
     TerraformFieldSet,
     TerraformModuleTarget,
@@ -20,7 +21,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 def test_run_tfsec():
     rule_runner = RuleRunner(
-        target_types=[TerraformModuleTarget, TerraformDeploymentTarget],
+        target_types=[TerraformModuleTarget, TerraformBackendTarget, TerraformDeploymentTarget],
         rules=[
             *tfsec_rules(),
             *tool.rules(),
