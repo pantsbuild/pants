@@ -6,7 +6,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use grpc_util::tls;
 use opendal::services::Memory;
-use remote_provider_traits::{ByteStoreProvider, RemoteOptions};
+use remote_provider_traits::{ByteStoreProvider, RemoteStoreOptions};
 use testutil::data::TestData;
 use testutil::file::mk_tempfile;
 
@@ -24,17 +24,16 @@ fn test_path(data: &TestData) -> String {
         fingerprint
     )
 }
-fn remote_options() -> RemoteOptions {
-    RemoteOptions {
-        cas_address: "".to_owned(),
+fn remote_options() -> RemoteStoreOptions {
+    RemoteStoreOptions {
+        store_address: "".to_owned(),
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes: 10000,
-        rpc_timeout: Duration::from_secs(5),
-        rpc_retries: 1,
-        rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
+        timeout: Duration::from_secs(5),
+        retries: 1,
+        concurrency_limit: 256,
         batch_api_size_limit: 10000,
     }
 }

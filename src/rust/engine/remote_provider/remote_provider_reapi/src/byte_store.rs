@@ -29,7 +29,7 @@ use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{Metric, ObservationMetric};
 
-use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteOptions};
+use remote_provider_traits::{ByteStoreProvider, LoadDestination, RemoteStoreOptions};
 
 pub struct Provider {
     instance_name: Option<String>,
@@ -75,21 +75,21 @@ impl std::error::Error for ByteStoreError {}
 impl Provider {
     // TODO: Consider extracting these options to a struct with `impl Default`, similar to
     // `super::LocalOptions`.
-    pub async fn new(options: RemoteOptions) -> Result<Provider, String> {
+    pub async fn new(options: RemoteStoreOptions) -> Result<Provider, String> {
         let tls_client_config = options
-            .cas_address
+            .store_address
             .starts_with("https://")
             .then(|| options.tls_config.try_into())
             .transpose()?;
 
         let channel =
-            grpc_util::create_channel(&options.cas_address, tls_client_config.as_ref()).await?;
+            grpc_util::create_channel(&options.store_address, tls_client_config.as_ref()).await?;
         let http_headers = headers_to_http_header_map(&options.headers)?;
         let channel = layered_service(
             channel,
-            options.rpc_concurrency_limit,
+            options.concurrency_limit,
             http_headers,
-            Some((options.rpc_timeout, Metric::RemoteStoreRequestTimeouts)),
+            Some((options.timeout, Metric::RemoteStoreRequestTimeouts)),
         );
 
         let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
@@ -101,12 +101,10 @@ impl Provider {
         Ok(Provider {
             instance_name: options.instance_name,
             chunk_size_bytes: options.chunk_size_bytes,
-            _rpc_attempts: options.rpc_retries + 1,
+            _rpc_attempts: options.retries + 1,
             byte_stream_client,
             cas_client,
-            capabilities_cell: options
-                .capabilities_cell_opt
-                .unwrap_or_else(|| Arc::new(OnceCell::new())),
+            capabilities_cell: Arc::new(OnceCell::new()),
             capabilities_client,
             batch_api_size_limit: options.batch_api_size_limit,
         })
@@ -343,17 +341,14 @@ impl ByteStoreProvider for Provider {
                     let mut stream = response.into_inner().inspect(|_| {
                         // Record the observed time to receive the first response for this read.
                         if let Some(start) = start_opt.take() {
-                            if let Some(workunit_store_handle) =
-                                workunit_store::get_workunit_store_handle()
-                            {
-                                let timing: Result<u64, _> =
-                                    Instant::now().duration_since(start).as_micros().try_into();
-                                if let Ok(obs) = timing {
-                                    workunit_store_handle.store.record_observation(
-                                        ObservationMetric::RemoteStoreTimeToFirstByteMicros,
-                                        obs,
-                                    );
-                                }
+                            let timing: Result<u64, _> =
+                                Instant::now().duration_since(start).as_micros().try_into();
+
+                            if let Ok(obs) = timing {
+                                workunit_store::record_observation_if_in_workunit(
+                                    ObservationMetric::RemoteStoreTimeToFirstByteMicros,
+                                    obs,
+                                );
                             }
                         }
                     });
@@ -404,7 +399,9 @@ impl ByteStoreProvider for Provider {
         };
 
         let client = self.cas_client.as_ref().clone();
-        let response = retry_call(
+
+        workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
+        let result = retry_call(
             client,
             move |mut client, _| {
                 let request = request.clone();
@@ -413,7 +410,15 @@ impl ByteStoreProvider for Provider {
             status_is_retryable,
         )
         .await
-        .map_err(status_to_str)?;
+        .map_err(status_to_str);
+
+        let metric = match result {
+            Ok(_) => Metric::RemoteStoreExistsSuccesses,
+            Err(_) => Metric::RemoteStoreExistsErrors,
+        };
+        workunit_store::increment_counter_if_in_workunit(metric, 1);
+
+        let response = result?;
 
         response
             .into_inner()

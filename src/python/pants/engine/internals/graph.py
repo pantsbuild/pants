@@ -415,13 +415,17 @@ def _parametrized_target_generators_with_templates(
     template_fields = {}
     copied_fields = (
         *target_type.copied_fields,
-        *target_type._find_plugin_fields(union_membership),
+        *target_type._find_copied_plugin_fields(union_membership),
+    )
+    moved_fields = (
+        *target_type.moved_fields,
+        *target_type._find_moved_plugin_fields(union_membership),
     )
     for field_type in copied_fields:
         field_value = generator_fields.get(field_type.alias, None)
         if field_value is not None:
             template_fields[field_type.alias] = field_value
-    for field_type in target_type.moved_fields:
+    for field_type in moved_fields:
         field_value = generator_fields.pop(field_type.alias, None)
         if field_value is not None:
             template_fields[field_type.alias] = field_value

@@ -29,7 +29,7 @@ use process_execution::{make_execute_request, EntireExecuteRequest};
 
 // Consumers of this crate shouldn't need to worry about the exact crate structure that comes
 // together to make a remote cache command runner.
-pub use remote_provider::RemoteCacheProviderOptions;
+pub use remote_provider::RemoteStoreOptions;
 
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
@@ -112,7 +112,7 @@ impl CommandRunner {
 
     pub async fn from_provider_options(
         runner_options: RemoteCacheRunnerOptions,
-        provider_options: RemoteCacheProviderOptions,
+        provider_options: RemoteStoreOptions,
     ) -> Result<Self, String> {
         let provider = choose_action_cache_provider(provider_options).await?;
         Ok(Self::new(runner_options, provider))

@@ -201,7 +201,7 @@ default-members = [
 #  inheriting-a-dependency-from-a-workspace
 [workspace.dependencies]
 arc-swap = "1.6"
-async-lock = "2.5"
+async-lock = "2.8"
 async-oncecell = "0.2"
 async-stream = "0.3"
 async-trait = "0.1"
@@ -281,7 +281,7 @@ pyo3 = "0.19"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"
-rustls = "0.21.1"
+rustls = "0.21.8"
 rustls-native-certs = "0.6"
 rustls-pemfile = "1.0"
 serde = "1.0.160"
@@ -311,14 +311,14 @@ tower-layer = "0.3"
 tower-service = "0.3"
 uname = "0.1.1"
 url = "2.4"
-uuid = "1.4.1"
+uuid = "1.5.0"
 walkdir = "2"
 webpki = "0.22"
 
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/engine/dep_inference/Cargo.toml`.
 tree-sitter = "0.20.10"
-tree-sitter-javascript = "0.20.0"
+tree-sitter-javascript = "0.20.1"
 tree-sitter-python = "0.20.4"
 
 [patch.crates-io]
