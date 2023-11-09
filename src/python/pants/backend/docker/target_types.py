@@ -305,7 +305,7 @@ class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
         if self.value:
             yield f"{self.docker_build_option}=" + ",".join(
                 f"{key}={value_formatter(value)}" for key, value in self.value.items()
@@ -480,7 +480,7 @@ class DockerBuildOptionFieldValueMixin(Field):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self) -> Iterator[str]:
+    def options(self, *args, **kwargs) -> Iterator[str]:
         if self.value is not None:
             yield f"{self.docker_build_option}={self.value}"
 
@@ -492,7 +492,7 @@ class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self) -> Iterator[str]:
+    def options(self, *args, **kwargs) -> Iterator[str]:
         if self.value:
             yield f"{self.docker_build_option}={','.join(list(self.value))}"
 
@@ -518,7 +518,7 @@ class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self) -> Iterator[str]:
+    def options(self, *args, **kwargs) -> Iterator[str]:
         if self.value:
             yield f"{self.docker_build_option}"
 

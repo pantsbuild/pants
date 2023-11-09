@@ -21,6 +21,7 @@ from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildKitOptionField,
     DockerBuildOptionFieldMixin,
+    DockerBuildOptionFieldMultiValueDictMixin,
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
@@ -320,7 +321,27 @@ def get_build_options(
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
-        if issubclass(field_type, DockerBuildOptionFieldMixin):
+        if issubclass(field_type, DockerBuildKitOptionField):
+            if use_buildx_option is not True:
+                if target[field_type].value != target[field_type].default:
+                    raise DockerImageOptionValueError(
+                        f"The {target[field_type].alias} field on the = `{target.alias}` target in `{target.address}` was set to `{target[field_type].value}`"
+                        f" and buildx is not enabled. Buildx must be enabled via the Docker subsystem options in order to use this field."
+                    )
+                else:
+                    # Case where BuildKit option has a default value - still should not be generated
+                    continue
+
+        if issubclass(
+            field_type,
+            (
+                DockerBuildOptionFieldMixin,
+                DockerBuildOptionFieldMultiValueDictMixin,
+                DockerBuildOptionFieldValueMixin,
+                DockerBuildOptionFieldMultiValueMixin,
+                DockerBuildOptionFlagFieldMixin,
+            ),
+        ):
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
             )
@@ -329,29 +350,7 @@ def get_build_options(
                 source=source,
                 error_cls=DockerImageOptionValueError,
             )
-            yield from target[field_type].options(format, global_build_hosts_options)
-        elif issubclass(field_type, DockerBuildOptionFieldValueMixin):
-            yield from target[field_type].options()
-        elif issubclass(field_type, DockerBuildOptionFieldMultiValueMixin):
-            yield from target[field_type].options()
-        elif issubclass(field_type, DockerBuildOptionFlagFieldMixin):
-            yield from target[field_type].options()
-        elif issubclass(field_type, DockerBuildKitOptionField):
-            if use_buildx_option is True:
-                source = InterpolationContext.TextSource(
-                    address=target.address, target_alias=target.alias, field_alias=field_type.alias
-                )
-                format = partial(
-                    context.interpolation_context.format,
-                    source=source,
-                    error_cls=DockerImageOptionValueError,
-                )
-                yield from target[field_type].options(format)
-            elif target[field_type].value != target[field_type].default:
-                raise DockerImageOptionValueError(
-                    f"The {target[field_type].alias} field on the = `{target.alias}` target in `{target.address}` was set to `{target[field_type].value}`"
-                    f" and buildx is not enabled. Buildx must be enabled via the Docker subsystem options in order to use this field."
-                )
+            yield from target[field_type].options(format, global_build_hosts_options=global_build_hosts_options)  # type: ignore[attr-defined]
 
     # Target stage
     target_stage = None
