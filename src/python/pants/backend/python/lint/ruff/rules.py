@@ -4,10 +4,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Tuple
 
-from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet
+from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet, RuffMode
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fix import FixResult, FixTargetsRequest
@@ -45,12 +44,6 @@ class RuffFormatRequest(FmtTargetsRequest):
     field_set_type = RuffFieldSet
     tool_subsystem = Ruff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
-
-
-class RuffMode(str, Enum):
-    FIX = "fix"
-    FORMAT = "format"
-    LINT = "lint"
 
 
 @dataclass(frozen=True)
