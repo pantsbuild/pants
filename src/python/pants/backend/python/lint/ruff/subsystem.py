@@ -20,13 +20,7 @@ from pants.backend.python.util_rules import python_sources
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
-from pants.option.option_types import (
-    ArgsListOption,
-    BoolOption,
-    EnumListOption,
-    FileOption,
-    SkipOption,
-)
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
 
@@ -67,10 +61,6 @@ class Ruff(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.ruff", "ruff.lock")
 
     skip = SkipOption("fmt", "fix", "lint")
-    ruff_modes = EnumListOption(
-        default=[RuffMode.LINT, RuffMode.FIX],
-        help="List of modes that Ruff should execute in. Valid values are 'fix', 'fmt', and 'lint'.",
-    )
     args = ArgsListOption(example="--exclude=foo --ignore=E501")
     config = FileOption(
         default=None,
