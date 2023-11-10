@@ -45,7 +45,7 @@ class RuffFieldSet(FieldSet):
 
 class RuffMode(str, Enum):
     FIX = "fix"
-    FORMAT = "format"
+    FORMAT = "fmt"
     LINT = "lint"
 
 
@@ -69,7 +69,7 @@ class Ruff(PythonToolBase):
     skip = SkipOption("fmt", "fix", "lint")
     ruff_modes = EnumListOption(
         default=[RuffMode.LINT, RuffMode.FIX],
-        help="List of modes that Ruff should execute in. Available options are 'fix', 'format', and 'lint'.",
+        help="List of modes that Ruff should execute in. Valid values are 'fix', 'fmt', and 'lint'.",
     )
     args = ArgsListOption(example="--exclude=foo --ignore=E501")
     config = FileOption(
