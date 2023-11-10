@@ -372,12 +372,13 @@ class TailorSubsystem(GoalSubsystem):
             raise ValueError(
                 softwrap(
                     f"""
-                The option `[{self.options_scope}].build_file_name` is set to
-                `{self.build_file_name}`, which is not compatible with
-                `[GLOBAL].build_patterns`: {sorted(build_file_patterns)}. This means that
-                generated BUILD files would be ignored.\n\n
-                To fix, please update the options so that they are compatible.
-                """
+                    The option `[{self.options_scope}].build_file_name` is set to
+                    `{self.build_file_name}`, which is not compatible with
+                    `[GLOBAL].build_patterns`: {sorted(build_file_patterns)}. This means that
+                    generated BUILD files would be ignored.
+
+                    To fix, please update the options so that they are compatible.
+                    """
                 )
             )
 

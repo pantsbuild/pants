@@ -11,7 +11,7 @@ You can download and run an installer script that will install the Pants binary 
 curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash
 ```
 
-This script will install `pants` into `~/bin`, which must be on your PATH. The installer script will warn you if it is not.
+This script will install `pants` into `~/.local/bin`, which must be on your PATH. The installer script will warn you if it is not.
 
 For security reasons, we don't recommend frequently curling this script directly to `bash`, e.g., on every CI run. If the script were compromised during some time window, you'd be more likely to download it during that window and be impacted. Instead, for regular use, we recommend checking this script into the root of your repo and pointing users and CI machines to that checked-in version. The script is very simple and need not be updated very often.
 
