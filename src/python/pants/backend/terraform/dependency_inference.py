@@ -18,7 +18,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import Address, AddressInput
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -164,22 +164,22 @@ async def infer_terraform_deployment_dependencies(
 
     deps = [root_module]
 
-    # TODO: add depenendency on the vars files
-    #  The use of this target_name here leads to a dependency on self.
-    #  Is there a way to avoid the reference? Would generating targets for the vars files help?
-    # var_files_names = request.field_set.var_files.value
-    # var_files_addresses = [
-    #     Address(
-    #         spec_path=request.field_set.address.spec_path,
-    #         target_name=request.field_set.address.target_name,
-    #         relative_file_path=v,
-    #     ) for v in var_files_names
-    # ]
-    # backend_target_name = request.field_set.backend_config.value
-    # if backend_target_name:
-    #     deps += [
-    #         await Get(Address, AddressInput, backend_target_name)
-    #     ]
+    if request.field_set.backend_config.value:
+        backend_address = await Get(
+            Address,
+            AddressInput,
+            to_address_input(
+                request.field_set.backend_config.value, request.field_set.backend_config
+            ),
+        )
+        deps.append(backend_address)
+
+    if request.field_set.var_files.value:
+        vars_addresses = await MultiGet(
+            Get(Address, AddressInput, to_address_input(x, request.field_set.var_files))
+            for x in request.field_set.var_files.value
+        )
+        deps.extend(vars_addresses)
 
     return InferredDependencies(deps)
 
