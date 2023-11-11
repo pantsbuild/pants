@@ -131,7 +131,11 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
     )
 
     if request.backend_config.value:
-        backend_address = await Get(Address, AddressInput, to_address_input(request.backend_config))
+        backend_address = await Get(
+            Address,
+            AddressInput,
+            to_address_input(request.backend_config.value, request.backend_config),
+        )
         backend_target = await Get(
             WrappedTarget,
             WrappedTargetRequest(backend_address, description_of_origin="Terraform initialisation"),

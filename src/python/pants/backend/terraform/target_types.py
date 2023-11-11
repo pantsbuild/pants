@@ -17,6 +17,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     SingleSourceField,
     StringField,
+    StringSequenceField,
     Target,
     Targets,
     generate_multiple_sources_field_help_message,
@@ -59,19 +60,19 @@ class TerraformModuleTarget(Target):
     )
 
 
-def to_address_input(addr) -> AddressInput:
-    if not addr.value:
+def to_address_input(addr, tgt) -> AddressInput:
+    if not addr:
         raise ValueError(
             softwrap(
                 f"""
-        A Terraform deployment must have a nonempty {addr.alias} field,
-         but {addr.address} was empty"""
+        A Terraform deployment must have a nonempty {tgt.alias} field,
+         but {tgt.address} was empty"""
             )
         )
     return AddressInput.parse(
-        addr.value,
-        relative_to=addr.address.spec_path,
-        description_of_origin=f"the `{addr.alias} field in the `{TerraformDeploymentTarget.alias}` target {addr.address}",
+        addr,
+        relative_to=tgt.address.spec_path,
+        description_of_origin=f"the `{tgt.alias} field in the `{TerraformDeploymentTarget.alias}` target {tgt.address}",
     )
 
 
@@ -119,12 +120,21 @@ class TerraformBackendTargetField(StringField, AsyncFieldMixin):
     default = None
 
 
-class TerraformVarFileSourcesField(MultipleSourcesField):
-    alias = "var_files"
+class TerraformVarFileSourceField(MultipleSourcesField):
     expected_file_extensions = (".tfvars",)
     help = generate_multiple_sources_field_help_message(
         "Example: `var_files=['common.tfvars', 'prod.tfvars']`"
     )
+
+
+class TerraformVarFileTarget(Target):
+    alias = "terraform_var_files"
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformVarFileSourceField)
+
+
+class TerraformVarFileTargetsField(StringSequenceField, AsyncFieldMixin):
+    alias = "var_files"
+    default = None
 
 
 class TerraformDeploymentTarget(Target):
@@ -134,7 +144,7 @@ class TerraformDeploymentTarget(Target):
         TerraformDependenciesField,
         TerraformRootModuleField,
         TerraformBackendTargetField,
-        TerraformVarFileSourcesField,
+        TerraformVarFileTargetsField,
     )
     help = "A deployment of Terraform"
 
@@ -150,7 +160,7 @@ class TerraformDeploymentFieldSet(FieldSet):
     dependencies: TerraformDependenciesField
 
     backend_config: TerraformBackendTargetField
-    var_files: TerraformVarFileSourcesField
+    var_files: TerraformVarFileTargetsField
 
 
 class AllTerraformDeploymentTargets(Targets):

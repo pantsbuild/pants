@@ -15,6 +15,7 @@ from pants.backend.terraform.target_types import (
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
     TerraformModuleTarget,
+    TerraformVarFileTarget,
 )
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.core.util_rules import external_tool, source_files
@@ -28,7 +29,12 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[TerraformModuleTarget, TerraformBackendTarget, TerraformDeploymentTarget],
+        target_types=[
+            TerraformModuleTarget,
+            TerraformBackendTarget,
+            TerraformVarFileTarget,
+            TerraformDeploymentTarget,
+        ],
         rules=[
             *external_tool.rules(),
             *check.rules(),

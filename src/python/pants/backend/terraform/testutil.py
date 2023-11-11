@@ -15,6 +15,7 @@ from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDeploymentTarget,
     TerraformModuleTarget,
+    TerraformVarFileTarget,
 )
 from pants.core.goals import deploy
 from pants.core.goals.deploy import DeployProcess
@@ -29,7 +30,12 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner_with_auto_approve() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[TerraformModuleTarget, TerraformBackendTarget, TerraformDeploymentTarget],
+        target_types=[
+            TerraformModuleTarget,
+            TerraformBackendTarget,
+            TerraformVarFileTarget,
+            TerraformDeploymentTarget,
+        ],
         rules=[
             *dependency_inference.rules(),
             *dependencies.rules(),
@@ -66,11 +72,12 @@ def standard_deployment(tmpdir) -> StandardDeployment:
                 """
                 terraform_deployment(
                     name="stg",
-                    var_files=["stg.tfvars"],
+                    var_files=[":stg_vars"],
                     backend_config=":stg_tfbackend",
                     root_module=":mod",
                 )
                 terraform_backend(name="stg_tfbackend", source="stg.tfbackend")
+                terraform_var_files(name="stg_vars", sources=["stg.tfvars"])
                 terraform_module(name="mod")
             """
             ),

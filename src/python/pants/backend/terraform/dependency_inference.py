@@ -157,7 +157,9 @@ class InferTerraformDeploymentDependenciesRequest(InferDependenciesRequest):
 async def infer_terraform_deployment_dependencies(
     request: InferTerraformDeploymentDependenciesRequest,
 ) -> InferredDependencies:
-    root_module_address_input = to_address_input(request.field_set.root_module)
+    root_module_address_input = to_address_input(
+        request.field_set.root_module.value, request.field_set.root_module
+    )
     root_module = await Get(Address, AddressInput, root_module_address_input)
 
     deps = [root_module]

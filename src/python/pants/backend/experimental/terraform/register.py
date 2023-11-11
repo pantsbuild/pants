@@ -11,13 +11,19 @@ from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDeploymentTarget,
     TerraformModuleTarget,
+    TerraformVarFileTarget,
 )
 from pants.backend.terraform.target_types import rules as target_types_rules
 from pants.engine.rules import collect_rules
 
 
 def target_types():
-    return [TerraformModuleTarget, TerraformBackendTarget, TerraformDeploymentTarget]
+    return [
+        TerraformModuleTarget,
+        TerraformBackendTarget,
+        TerraformVarFileTarget,
+        TerraformDeploymentTarget,
+    ]
 
 
 def rules():

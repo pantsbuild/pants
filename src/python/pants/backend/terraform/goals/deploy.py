@@ -6,16 +6,28 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
-from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
+from pants.backend.terraform.target_types import (
+    TerraformDeploymentFieldSet,
+    TerraformVarFileSourceField,
+    to_address_input,
+)
 from pants.backend.terraform.tool import TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.native_engine import Digest, MergeDigests
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.native_engine import (
+    EMPTY_SNAPSHOT,
+    Address,
+    AddressInput,
+    Digest,
+    MergeDigests,
+)
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -48,7 +60,18 @@ async def prepare_terraform_deployment(
 
     args = ["apply"]
 
-    var_files = await Get(SourceFiles, SourceFilesRequest([request.field_set.var_files]))
+    if request.field_set.var_files.value:
+        vars_addresses = await MultiGet(
+            Get(Address, AddressInput, to_address_input(x, request.field_set.var_files))
+            for x in request.field_set.var_files.value
+        )
+        vars_targets = await Get(Targets, Addresses(vars_addresses))
+        var_files = await Get(
+            SourceFiles,
+            SourceFilesRequest([x.get(TerraformVarFileSourceField) for x in vars_targets]),
+        )
+    else:
+        var_files = SourceFiles(EMPTY_SNAPSHOT, ())
     for var_file in var_files.files:
         args.append(
             terraform_arg("-var-file", terraform_relpath(initialised_terraform.chdir, var_file))

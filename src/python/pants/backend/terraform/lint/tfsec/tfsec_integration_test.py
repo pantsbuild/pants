@@ -11,6 +11,7 @@ from pants.backend.terraform.target_types import (
     TerraformDeploymentTarget,
     TerraformFieldSet,
     TerraformModuleTarget,
+    TerraformVarFileTarget,
 )
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import source_files
@@ -21,7 +22,12 @@ from pants.testutil.rule_runner import RuleRunner
 
 def test_run_tfsec():
     rule_runner = RuleRunner(
-        target_types=[TerraformModuleTarget, TerraformBackendTarget, TerraformDeploymentTarget],
+        target_types=[
+            TerraformModuleTarget,
+            TerraformBackendTarget,
+            TerraformVarFileTarget,
+            TerraformDeploymentTarget,
+        ],
         rules=[
             *tfsec_rules(),
             *tool.rules(),
