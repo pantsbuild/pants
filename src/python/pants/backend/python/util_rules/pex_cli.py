@@ -35,7 +35,7 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.148"
+    default_version = "v2.1.152"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
     version_constraints = ">=2.1.135,<3.0"
 
@@ -46,8 +46,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7",
-                    "4197604",
+                    "64640336f60ec06c52ffa174f1b59b39ae1e3894d475ea0ae0abc62c0dda9fac",
+                    "4205187",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
