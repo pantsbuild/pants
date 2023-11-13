@@ -76,7 +76,10 @@ async def run_ruff(
     if request.mode == RuffMode.FORMAT:
         extra_initial_args = ("format",)
     elif request.mode == RuffMode.FIX:
-        extra_initial_args = ("check", "--fix",)
+        extra_initial_args = (
+            "check",
+            "--fix",
+        )
 
     # `--force-exclude` applies file excludes from config to files provided explicitly
     # The format argument must be passed before force-exclude if Ruff is used for formatting.
