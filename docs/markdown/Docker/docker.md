@@ -184,12 +184,6 @@ very-secret-value
 
 BuildKit supports exporting build cache to an external location, making it possible to import in future builds. Cache backends can be configured using the [`cache_to`](doc:reference-docker_image#codecache_tocode) and [`cache_from`](doc:reference-docker_image#codecache_fromcode) fields.
 
-Enable BuildKit if necessary (it is the default in later versions of Docker):
-
-```
-❯ export DOCKER_BUILDKIT=1
-```
-
 Create a builder using a [build driver](https://docs.docker.com/build/drivers/) that is compatible with the cache backend:
 
 ```
@@ -205,17 +199,17 @@ Use the builder:
 Optionally, validate a build with the Docker CLI directly:
 
 ```
-❯ docker build -t pants-cache-test:latest \
+❯ docker buildx build -t pants-cache-test:latest \
   --cache-to type=local,dest=/tmp/docker/pants-test-cache \
   --cache-from type=local,src=/tmp/docker/pants-test-cache .
 ```
 
-Configure Pants:
+Configure Pants to use buildx and pass the BUILDX_BUILDER environment variable:
 
 ```toml pants.toml
 [docker]
+use_buildx = true
 env_vars = [
-  "DOCKER_BUILDKIT",
   "BUILDX_BUILDER"
 ]
 ```
