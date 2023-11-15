@@ -77,6 +77,59 @@ fn ignore_imports() {
     assert_imports("require('f') // pants: no-infer-dep", &[]);
     assert_imports("import('e'); // pants: no-infer-dep", &[]);
     assert_imports("require('f'); // pants: no-infer-dep", &[]);
+
+    // multi-line
+    assert_imports(
+        "import {
+            a
+        } from 'ignored'; // pants: no-infer-dep",
+        &[],
+    );
+    // NB. the inference (and thus ignoring) is driven off the 'from'.
+    assert_imports(
+        "
+        import { // pants: no-infer-dep
+            a
+        } from 'b';
+        import {
+            c  // pants: no-infer-dep
+        } from 'd';",
+        &["b", "d"],
+    );
+
+    assert_imports(
+        "require(
+            'ignored'
+        ) // pants: no-infer-dep",
+        &[],
+    );
+    // as above, driven off the end of the require()
+    assert_imports(
+        "require( // pants: no-infer-dep
+            'a'
+        );
+        require(
+            'b' // pants: no-infer-dep
+        )",
+        &["a", "b"],
+    );
+
+    assert_imports(
+        "import(
+            'ignored'
+        ) // pants: no-infer-dep",
+        &[],
+    );
+    // as above, driven off the end of the import()
+    assert_imports(
+        "import( // pants: no-infer-dep
+            'a'
+        );
+        import(
+            'b' // pants: no-infer-dep
+        )",
+        &["a", "b"],
+    );
 }
 
 #[test]
@@ -102,6 +155,24 @@ fn simple_exports() {
     );
     // just confirm a relative path is preserved
     assert_imports("export * from './b/c'", &["./b/c"]);
+
+    // multi-line
+    assert_imports(
+        "export {
+            a
+        } from 'ignored'; // pants: no-infer-dep",
+        &[],
+    );
+    // NB. the inference is driven off the 'from'.
+    assert_imports(
+        "export { // pants: no-infer-dep
+            a
+        } from 'b';
+        export {
+            c // pants: no-infer-dep
+        } from 'd';",
+        &["b", "d"],
+    );
 }
 
 #[test]
