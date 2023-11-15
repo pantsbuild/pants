@@ -47,6 +47,11 @@ docker_environment(
 )
 ```
 
+> 🚧 Environment targets and macros
+> 
+> Environment targets are loaded before regular targets in a bootstrap phase, during which macros are unavailable. As such any required field values must be fully defined in the BUILD file without referencing any macros. For optional fields, the use of macros are still discouraged as it may or may not work and Pants makes no guarantees that it will not break in a future version if it were to currently work.
+
+
 ### Environment-aware options
 
 Environment targets have fields ([target](doc:targets) arguments) which correspond to [options](doc:options) which are marked "environment-aware". When an option is environment-aware, the value of the option that will be used in an environment can be overridden by setting the corresponding field value on the associated environment target. If an environment target does not set a value, it defaults to the value which is set globally via options values.
