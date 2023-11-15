@@ -10,10 +10,10 @@ use futures::Future;
 use hashing::Digest;
 use log::Level;
 use remote_provider::{
-    choose_byte_store_provider, ByteStoreProvider, LoadDestination, RemoteOptions,
+    choose_byte_store_provider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
 };
 use tokio::fs::File;
-use workunit_store::{in_workunit, ObservationMetric};
+use workunit_store::{in_workunit, Metric, ObservationMetric};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -38,7 +38,7 @@ impl ByteStore {
         }
     }
 
-    pub async fn from_options(options: RemoteOptions) -> Result<ByteStore, String> {
+    pub async fn from_options(options: RemoteStoreOptions) -> Result<ByteStore, String> {
         let instance_name = options.instance_name.clone();
         let provider = choose_byte_store_provider(options).await?;
         Ok(ByteStore::new(instance_name, provider))
@@ -75,14 +75,20 @@ impl ByteStore {
             Level::Trace,
             desc = Some(format!("Storing {digest:?}")),
             |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreWriteAttempts, 1);
                 let result = do_store().await;
 
-                if result.is_ok() {
-                    workunit.record_observation(
-                        ObservationMetric::RemoteStoreBlobBytesUploaded,
-                        digest.size_bytes as u64,
-                    );
-                }
+                let result_metric = match result {
+                    Ok(()) => {
+                        workunit.record_observation(
+                            ObservationMetric::RemoteStoreBlobBytesUploaded,
+                            digest.size_bytes as u64,
+                        );
+                        Metric::RemoteStoreWriteSuccesses
+                    }
+                    Err(_) => Metric::RemoteStoreWriteErrors,
+                };
+                workunit.increment_counter(result_metric, 1);
 
                 result
             }
@@ -108,17 +114,25 @@ impl ByteStore {
             Level::Trace,
             desc = Some(workunit_desc),
             |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreReadAttempts, 1);
                 let result = self.provider.load(digest, destination).await;
                 workunit.record_observation(
                     ObservationMetric::RemoteStoreReadBlobTimeMicros,
                     start.elapsed().as_micros() as u64,
                 );
-                if result.is_ok() {
-                    workunit.record_observation(
-                        ObservationMetric::RemoteStoreBlobBytesDownloaded,
-                        digest.size_bytes as u64,
-                    );
-                }
+                let result_metric = match result {
+                    Ok(true) => {
+                        workunit.record_observation(
+                            ObservationMetric::RemoteStoreBlobBytesDownloaded,
+                            digest.size_bytes as u64,
+                        );
+                        Metric::RemoteStoreReadCached
+                    }
+                    Ok(false) => Metric::RemoteStoreReadUncached,
+                    Err(_) => Metric::RemoteStoreReadErrors,
+                };
+                workunit.increment_counter(result_metric, 1);
+
                 result
             },
         )

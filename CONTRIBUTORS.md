@@ -12,6 +12,7 @@ Created as part of the release process.
 + Alexander Johnson
 + Alexander Kuhn-Regnier
 + Alexey Tereshenkov
++ Alisha Parveen
 + Andreas Stenius
 + Andrew Hamilton
 + Andrii Porokhnavets
@@ -109,6 +110,7 @@ Created as part of the release process.
 + Gordon Cassie
 + Greg Niemann
 + Greg Shuflin
++ Gregory Borodin
 + Grzegorz Kossakowski
 + Guy Marom
 + Harley Cooper
@@ -332,6 +334,7 @@ Created as part of the release process.
 + azban
 + bianca rosa
 + billybecker
++ csqzhang
 + eugene yokota
 + gyudoza
 + hephex

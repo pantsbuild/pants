@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from textwrap import dedent
-from typing import cast
+from typing import Any, Mapping, cast
 
 import pytest
 
@@ -541,6 +541,70 @@ def test_parametrize_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
         [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
     )
     assert target_adaptor.kwargs["tags"] == ParametrizeDefault(a=("a", "root"), b=("non-root", "b"))
+
+
+def test_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
+    def _determenistic_parametrize_group_keys(value: Mapping[str, Any]) -> dict[str, Any]:
+        # The `parametrize` object uses a unique generated field name when splatted onto a target
+        # (in order to provide a helpful error message in case of non-unique group names), but the
+        # part up until `:` is determenistic on the group name, which we need to exploit in the
+        # tests using parametrize groups.
+        return {key.rsplit(":", 1)[0]: val for key, val in value.items()}
+
+    target_adaptor_rule_runner.write_files(
+        {
+            "hello/BUILD": dedent(
+                """\
+                mock_tgt(
+                  description="desc for a and b",
+                  **parametrize("a", tags=["opt-a"], resolve="lock-a"),
+                  **parametrize("b", tags=["opt-b"], resolve="lock-b"),
+                )
+                """
+            ),
+        }
+    )
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("hello"), description_of_origin="tests")],
+    )
+    assert _determenistic_parametrize_group_keys(
+        target_adaptor.kwargs
+    ) == _determenistic_parametrize_group_keys(
+        dict(
+            description="desc for a and b",
+            **Parametrize("a", tags=["opt-a"], resolve="lock-a"),  # type: ignore[arg-type]
+            **Parametrize("b", tags=["opt-b"], resolve="lock-b"),
+        )
+    )
+
+
+def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "hello/BUILD": dedent(
+                """\
+                __defaults__({mock_tgt: dict(**parametrize("a", tags=["from default"]))})
+                mock_tgt(
+                  tags=["from target"],
+                  **parametrize("a"),
+                  **parametrize("b", tags=["from b"]),
+                )
+                """
+            ),
+        }
+    )
+    address = Address("hello")
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(address, description_of_origin="tests")],
+    )
+    targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    assert targets == (
+        (address.parametrize(dict(parametrize="a")), dict(tags=["from target"])),
+        (address.parametrize(dict(parametrize="b")), dict(tags=("from b",))),
+    )
 
 
 def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:

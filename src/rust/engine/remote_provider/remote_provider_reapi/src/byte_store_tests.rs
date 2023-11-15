@@ -12,7 +12,7 @@ use testutil::file::mk_tempfile;
 use tokio::fs::File;
 use workunit_store::WorkunitStore;
 
-use remote_provider_traits::{ByteStoreProvider, RemoteOptions};
+use remote_provider_traits::{ByteStoreProvider, RemoteStoreOptions};
 
 use crate::byte_store::Provider;
 
@@ -20,20 +20,19 @@ const MEGABYTES: usize = 1024 * 1024;
 const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * MEGABYTES;
 
 fn remote_options(
-    cas_address: String,
+    store_address: String,
     chunk_size_bytes: usize,
     batch_api_size_limit: usize,
-) -> RemoteOptions {
-    RemoteOptions {
-        cas_address,
+) -> RemoteStoreOptions {
+    RemoteStoreOptions {
+        store_address,
         instance_name: None,
         tls_config: tls::Config::default(),
         headers: BTreeMap::new(),
         chunk_size_bytes,
-        rpc_timeout: Duration::from_secs(5),
-        rpc_retries: 1,
-        rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
+        timeout: Duration::from_secs(5),
+        retries: 1,
+        concurrency_limit: 256,
         batch_api_size_limit,
     }
 }

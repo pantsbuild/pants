@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
+from enum import Enum
 from typing import Iterable
 
 from pants.backend.python.lint.ruff.skip_field import SkipRuffField
@@ -36,6 +37,12 @@ class RuffFieldSet(FieldSet):
         return tgt.get(SkipRuffField).value
 
 
+class RuffMode(str, Enum):
+    FIX = "fix"
+    FORMAT = "fmt"
+    LINT = "lint"
+
+
 # --------------------------------------------------------------------------------------
 # Subsystem
 # --------------------------------------------------------------------------------------
@@ -44,16 +51,16 @@ class RuffFieldSet(FieldSet):
 class Ruff(PythonToolBase):
     options_scope = "ruff"
     name = "Ruff"
-    help = "The Ruff Python formatter (https://github.com/charliermarsh/ruff)."
+    help = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
 
     default_main = ConsoleScript("ruff")
-    default_requirements = ["ruff>=0.0.213,<1"]
+    default_requirements = ["ruff>=0.1.2,<1"]
 
     register_interpreter_constraints = True
 
     default_lockfile_resource = ("pants.backend.python.lint.ruff", "ruff.lock")
 
-    skip = SkipOption("fmt", "lint")
+    skip = SkipOption("fmt", "fix", "lint")
     args = ArgsListOption(example="--exclude=foo --ignore=E501")
     config = FileOption(
         default=None,
@@ -61,7 +68,7 @@ class Ruff(PythonToolBase):
         help=softwrap(
             f"""
             Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-            (https://github.com/charliermarsh/ruff#configuration).
+            (https://github.com/astral-sh/ruff#configuration).
 
             Setting this option will disable `[{options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
@@ -83,7 +90,7 @@ class Ruff(PythonToolBase):
     )
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
-        # See https://github.com/charliermarsh/ruff#configuration for how ruff discovers
+        # See https://github.com/astral-sh/ruff#configuration for how ruff discovers
         # config files.
         return ConfigFilesRequest(
             specified=self.config,

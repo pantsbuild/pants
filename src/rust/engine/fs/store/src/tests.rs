@@ -22,7 +22,7 @@ use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;
 use crate::{
-    EntryType, FileContent, RemoteOptions, Snapshot, Store, StoreError, StoreFileByDigest,
+    EntryType, FileContent, RemoteStoreOptions, Snapshot, Store, StoreError, StoreFileByDigest,
     UploadSummary, MEGABYTES,
 };
 
@@ -59,20 +59,19 @@ fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
 }
 
 fn remote_options(
-    cas_address: String,
+    store_address: String,
     instance_name: Option<String>,
     headers: BTreeMap<String, String>,
-) -> RemoteOptions {
-    RemoteOptions {
-        cas_address,
+) -> RemoteStoreOptions {
+    RemoteStoreOptions {
+        store_address,
         instance_name,
         tls_config: tls::Config::default(),
         headers,
         chunk_size_bytes: 10 * MEGABYTES,
-        rpc_timeout: Duration::from_secs(1),
-        rpc_retries: 1,
-        rpc_concurrency_limit: 256,
-        capabilities_cell_opt: None,
+        timeout: Duration::from_secs(1),
+        retries: 1,
+        concurrency_limit: 256,
         batch_api_size_limit: STORE_BATCH_API_SIZE_LIMIT,
     }
 }

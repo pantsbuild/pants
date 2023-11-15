@@ -53,6 +53,19 @@ def test_to_parameters_failure(exception_str: str, args: list[Any], kwargs: dict
 
 
 @pytest.mark.parametrize(
+    "exception_str,args,kwargs",
+    [
+        ("A parametrize group must begin with the group name", [], {}),
+        ("group name `bladder:dust` contained separator characters (`:`).", ["bladder:dust"], {}),
+    ],
+)
+def test_bad_group_name(exception_str: str, args: list[Any], kwargs: dict[str, Any]) -> None:
+    with pytest.raises(Exception) as exc:
+        Parametrize(*args, **kwargs).to_group().group_name
+    assert exception_str in str(exc.value)
+
+
+@pytest.mark.parametrize(
     "expected,fields",
     [
         ([("a:a", {"f": "b"})], {"f": "b"}),
@@ -73,15 +86,75 @@ def test_to_parameters_failure(exception_str: str, args: list[Any], kwargs: dict
             ],
             {"f": Parametrize("b", "c"), "x": Parametrize("d", "e")},
         ),
+        (
+            [
+                ("a@parametrize=A", {"f0": "c", "f1": 1, "f2": 2}),
+                ("a@parametrize=B", {"f0": "c", "f1": 3, "f2": 4}),
+            ],
+            {
+                "f0": "c",
+                **Parametrize("A", f1=1, f2=2),
+                **Parametrize("B", f1=3, f2=4),
+            },
+        ),
+        (
+            [
+                ("a@parametrize=A", {"f": 1}),
+                ("a@parametrize=B", {"f": 2}),
+                ("a@parametrize=C", {"f": "x", "g": ()}),
+            ],
+            # Using a dict constructor rather than a dict literal to get the same semantics as when
+            # we declare a target in a BUILD file.
+            dict(
+                # Field overridden by some parametrize groups.
+                f="x",
+                **Parametrize("A", f=1),  # type: ignore[arg-type]
+                **Parametrize("B", f=2),
+                **Parametrize("C", g=[]),
+            ),
+        ),
     ],
 )
 def test_expand(
     expected: list[tuple[str, dict[str, Any]]], fields: dict[str, Any | Parametrize]
 ) -> None:
     assert sorted(expected) == sorted(
-        (address.spec, result_fields)
-        for address, result_fields in Parametrize.expand(Address("a"), fields)
+        (
+            (address.spec, result_fields)
+            for address, result_fields in Parametrize.expand(Address("a"), fields)
+        ),
+        key=lambda value: value[0],
     )
+
+
+@pytest.mark.parametrize(
+    "fields, expected_error",
+    [
+        (
+            dict(
+                f=Parametrize("x", "y"),
+                g=Parametrize("x", "y"),
+                h=Parametrize("x", "y"),
+                x=5,
+                z=6,
+                **Parametrize("A", f=1),  # type: ignore[arg-type]
+                **Parametrize("B", g=2, x=3),
+            ),
+            "Failed to parametrize `a:a`:\n  Conflicting parametrizations for fields: f, g",
+        ),
+        (
+            dict(
+                f="x",
+                **Parametrize("A", a=1, b=3),  # type: ignore[arg-type]
+                **Parametrize("A", a=2, c=4),
+            ),
+            "Failed to parametrize `a:a`:\n  Parametrization group name is not unique: 'A'",
+        ),
+    ],
+)
+def test_expand_error_cases(fields: dict[str, Any], expected_error: str) -> None:
+    with pytest.raises(Exception, match=expected_error):
+        _ = list(Parametrize.expand(Address("a"), fields))
 
 
 def test_get_superset_targets() -> None:
