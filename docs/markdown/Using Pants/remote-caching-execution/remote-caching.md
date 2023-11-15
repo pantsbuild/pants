@@ -40,64 +40,6 @@ remote_instance_name = "main"
 
 If the endpoint is using TLS, then the `remote_store_address` option would be specified with the  `grpcs://` scheme, i.e. `"grpcs://cache.corp.example.com:8980"`.
 
-GitHub Actions Cache
-====================
-
-GitHub Actions provides a built-in caching service which Pants supports using for sharing caches across GitHub Actions runs (not with machines outside of GitHub Actions). It is typically used via the `actions/cache` action to cache whole directories and files, but Pants can use the same functionality for fine-grained caching.
-
-> 🚧 GitHub Actions Cache support is still experimental
->
-> Support for this cache provider is still under development, with more refinement required. Please [let us know](doc:getting-help) if you use it and encounter errors or warnings.
-
-Workflow
---------
-
-The values of the `ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` environment variables need to be provided to Pants via the `[GLOBAL].remote_store_address` and `[GLOBAL].remote_store_headers` options respectively. They are only provided to action calls (not shell steps that use `run: ...`). Include a step like the following in your jobs, which sets those options via environment variables, before executing any Pants commands:
-
-```yaml
-- name: Configure Pants caching to GitHub Actions Cache
-  uses: actions/github-script@v6
-  with:
-    script: |
-      core.exportVariable('PANTS_REMOTE_STORE_ADDRESS', 'experimental:github-actions-cache+' + (process.env.ACTIONS_CACHE_URL || ''));
-      core.exportVariable('PANTS_REMOTE_STORE_HEADERS', `+{'authorization':'Bearer ${process.env.ACTIONS_RUNTIME_TOKEN || ''}'}`);
-```
-
-Pants Configuration
--------------------
-
-Once the GitHub values are configured, Pants will read the environment variables. You will also need to configure pants to read and write to the cache only while in CI, such as [via a `pants.ci.toml` configuration file](doc:using-pants-in-ci#configuring-pants-for-ci-pantscitoml-optional):
-
-```toml
-[GLOBAL]
-# GitHub Actions cache URL and token are set via environment variables
-remote_cache_read = true
-remote_cache_write = true
-```
-
-If desired, you can also set `remote_instance_name` to a string that's included as a prefix on each cache key, which will be then be displayed in the 'Actions' > 'Caches' UI.
-
-Local file system
-=================
-
-Pants can cache "remotely" to a local file system path, which can be used for a networked mount cache, without having to pay the cost of storing Pants' local cache on the network mount too. This can also be used for testing/validation.
-
-> 🚧 Local file system caching support is still experimental
->
-> Support for this cache provider is still under development, with more refinement required. Please [let us know](doc:getting-help) if you use it and encounter errors or warnings.
-
-Pants Configuration
--------------------
-
-To read and write the cache to `/path/to/cache`, you will need to configure `pants.toml` as follows:
-
-```toml
-[GLOBAL]
-remote_store_address = "experimental:file:///path/to/cache"
-remote_cache_read = true
-remote_cache_write = true
-```
-
 Reference
 =========
 

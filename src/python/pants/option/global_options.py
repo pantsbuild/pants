@@ -1670,10 +1670,13 @@ class BootstrapOptions:
     remote_store_address = StrOption(
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_store_address),
-        help=_RemoteAddressScheme.address_help(
-            "remote file store",
-            extra="",
-            requires_execution=False,
+        help=softwrap(
+            """
+            The URI of a server used for the remote file store.
+
+            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
+            with TLS enabled. If `grpc` is used, TLS will be disabled.
+            """
         ),
     )
     remote_store_headers = DictOption(
@@ -1742,10 +1745,15 @@ class BootstrapOptions:
     remote_execution_address = StrOption(
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_execution_address),
-        help=_RemoteAddressScheme.address_help(
-            "remote execution scheduler",
-            extra="You must also set `[GLOBAL].remote_store_address`, which will often be the same value.",
-            requires_execution=True,
+        help=softwrap(
+            """
+            The URI of a server used as a remote execution scheduler.
+
+            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
+            with TLS enabled. If `grpc` is used, TLS will be disabled.
+
+            You must also set `[GLOBAL].remote_store_address`, which will often be the same value.
+            """
         ),
     )
     remote_execution_headers = DictOption(
