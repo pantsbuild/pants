@@ -80,8 +80,41 @@ fn ignore_imports() {
 }
 
 #[test]
+fn simple_exports() {
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/export
+    assert_imports(r#"export * from "module-name";"#, &["module-name"]);
+    assert_imports(r#"export * as name1 from "module-name";"#, &["module-name"]);
+    assert_imports(
+        r#"export { name1, /* …, */ nameN } from "module-name";"#,
+        &["module-name"],
+    );
+    assert_imports(
+        r#"export { import1 as name1, import2 as name2, /* …, */ nameN } from "module-name";"#,
+        &["module-name"],
+    );
+    assert_imports(
+        r#"export { default, /* …, */ } from "module-name";"#,
+        &["module-name"],
+    );
+    assert_imports(
+        r#"export { default as name1 } from "module-name";"#,
+        &["module-name"],
+    );
+    // just confirm a relative path is preserved
+    assert_imports("export * from './b/c'", &["./b/c"]);
+}
+
+#[test]
+fn ignore_exports() {
+    assert_imports("export * from 'a'; // pants: no-infer-dep", &[]);
+    assert_imports("export * as x from './b' // pants: no-infer-dep", &[]);
+    assert_imports("export { y } from \"../c\"  // pants: no-infer-dep", &[]);
+}
+
+#[test]
 fn still_parses_from_syntax_error() {
     assert_imports("import a from '.'; x=", &["."]);
+    assert_imports("export {some nonsense} from '.'", &["."]);
 }
 
 #[test]
