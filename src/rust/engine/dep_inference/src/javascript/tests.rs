@@ -176,6 +176,39 @@ fn simple_exports() {
 }
 
 #[test]
+fn export_without_from() {
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/export
+    assert_imports(
+        "
+// Exporting declarations
+export let name1, name2/*, … */; // also var
+export const name1 = 1, name2 = 2/*, … */; // also var, let
+export function functionName() { /* … */ }
+export class ClassName { /* … */ }
+export function* generatorFunctionName() { /* … */ }
+export const { name1, name2: bar } = o;
+export const [ name1, name2 ] = array;
+
+// Export list
+export { name1, /* …, */ nameN };
+export { variable1 as name1, variable2 as name2, /* …, */ nameN };
+export { variable1 as \"string name\" };
+export { name1 as default /*, … */ };
+
+// Default exports
+export default expression;
+export default function functionName() { /* … */ }
+export default class ClassName { /* … */ }
+export default function* generatorFunctionName() { /* … */ }
+export default function () { /* … */ }
+export default class { /* … */ }
+export default function* () { /* … */ }
+",
+        &[],
+    );
+}
+
+#[test]
 fn ignore_exports() {
     assert_imports("export * from 'a'; // pants: no-infer-dep", &[]);
     assert_imports("export * as x from './b' // pants: no-infer-dep", &[]);
