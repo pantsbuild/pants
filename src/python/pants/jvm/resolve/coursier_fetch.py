@@ -230,18 +230,17 @@ class CoursierResolvedLockfile:
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
-        dependency_entries = []
-        for d in entry.dependencies:
-            dependency = (d.group, d.artifact)
-            if dependency not in entries:
-                if d.packaging == "pom":
-                    # https://github.com/pantsbuild/pants/issues/20162#issuecomment-1813374036
-                    continue
-                else:
-                    raise RuntimeError(f"missing entry: {dependency}")
-            dependency_entries.append(entries[dependency])
-
-        return (entry, tuple(dependency_entries))
+        return (
+            entry,
+            tuple(
+                entries[dependency]
+                for d in entry.dependencies
+                # If the dependency is missing from the entries, we want to skip the dependency.
+                # More details in the issue:
+                # https://github.com/pantsbuild/pants/issues/20162
+                if (dependency := (d.group, d.artifact)) not in entries
+            ),
+        )
 
     @classmethod
     def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
