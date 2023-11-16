@@ -14,6 +14,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
     ProcessExecutionEnvironment as ProcessExecutionEnvironment,
 )
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
@@ -403,6 +404,67 @@ class InteractiveProcess(SideEffecting):
             restartable=restartable,
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceProcessResult:
+    exit_code: int
+    output_snapshot: Snapshot
+    stdout_bytes: bytes
+    stderr_bytes: bytes
+
+    # TODO: For the actual implementation, return a full FallibleProcessResult.
+    # result: FallibleProcessResult
+
+
+@dataclass(frozen=True)
+class WorkspaceProcess:
+    process: Process
+    keep_sandboxes: KeepSandboxes
+
+    def __init__(
+        self,
+        argv: Iterable[str],
+        *,
+        env: Mapping[str, str] | None = None,
+        input_digest: Digest = EMPTY_DIGEST,
+        append_only_caches: Mapping[str, str] | None = None,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+    ) -> None:
+        """Request to run a subprocess in the workspace, similar to subprocess.run()."""
+        object.__setattr__(
+            self,
+            "process",
+            Process(
+                argv,
+                description="Workspace process",
+                env=env,
+                input_digest=input_digest,
+                append_only_caches=append_only_caches,
+                immutable_input_digests=immutable_input_digests,
+                output_files=output_files,
+                output_directories=output_directories,
+            ),
+        )
+        object.__setattr__(self, "keep_sandboxes", keep_sandboxes)
+
+    @classmethod
+    def from_process(
+        cls,
+        process: Process,
+    ) -> WorkspaceProcess:
+        return WorkspaceProcess(
+            argv=process.argv,
+            env=process.env,
+            input_digest=process.input_digest,
+            append_only_caches=process.append_only_caches,
+            immutable_input_digests=process.immutable_input_digests,
+            output_files=process.output_files,
+            output_directories=process.output_directories,
         )
 
 

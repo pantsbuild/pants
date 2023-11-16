@@ -80,7 +80,7 @@ impl CommandRunner {
         }
     }
 
-    async fn construct_output_snapshot(
+    pub async fn construct_output_snapshot(
         store: Store,
         posix_fs: Arc<fs::PosixFS>,
         output_file_paths: BTreeSet<RelativePath>,

@@ -61,6 +61,8 @@ from pants.engine.process import (
     InteractiveProcessResult,
     Process,
     ProcessResultMetadata,
+    WorkspaceProcess,
+    WorkspaceProcessResult,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union, union_in_scope_types
@@ -176,6 +178,8 @@ class Scheduler:
             docker_resolve_image_result=DockerResolveImageResult,
             parsed_python_deps_result=NativeParsedPythonDependencies,
             parsed_javascript_deps_result=NativeParsedJavascriptDependencies,
+            workspace_process=WorkspaceProcess,
+            workspace_process_result=WorkspaceProcessResult,
         )
         remoting_options = PyRemotingOptions(
             provider=execution_options.remote_provider.value,

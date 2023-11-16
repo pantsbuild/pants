@@ -18,6 +18,7 @@ mod docker;
 mod interactive_process;
 mod process;
 mod values;
+mod workspace_process;
 
 type IntrinsicFn =
     Box<dyn Fn(Context, Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> + Send + Sync>;
@@ -147,6 +148,18 @@ impl Intrinsics {
             },
             Box::new(self::interactive_process::interactive_process),
         );
+        intrinsics.insert(
+            Intrinsic {
+                id: RuleId::new("workspace_process"),
+                product: types.workspace_process_result,
+                inputs: vec![
+                    DependencyKey::new(types.workspace_process),
+                    DependencyKey::new(types.process_config_from_environment),
+                ],
+            },
+            Box::new(self::workspace_process::workspace_process),
+        );
+
         intrinsics.insert(
             Intrinsic {
                 id: RuleId::new("docker_resolve_image"),

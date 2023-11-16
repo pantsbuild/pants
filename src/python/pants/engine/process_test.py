@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import textwrap
+from pathlib import Path
+
 import pytest
 
 from pants.engine.fs import (
@@ -22,9 +25,13 @@ from pants.engine.process import (
     InteractiveProcessResult,
     Process,
     ProcessCacheScope,
+    ProcessExecutionFailure,
     ProcessResult,
+    WorkspaceProcess,
+    WorkspaceProcessResult,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
+from pants.option.global_options import KeepSandboxes
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, mock_console
 from pants.util.contextutil import environment_as
 
 
@@ -35,6 +42,8 @@ def new_rule_runner() -> RuleRunner:
             QueryRule(FallibleProcessResult, [Process]),
             QueryRule(InteractiveProcessResult, [InteractiveProcess]),
             QueryRule(DigestEntries, [Digest]),
+            QueryRule(DigestContents, [Digest]),
+            QueryRule(WorkspaceProcessResult, [WorkspaceProcess]),
         ],
     )
 
@@ -299,3 +308,87 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
             "prefix1",
             "prefix2",
         }
+
+
+def test_workspace_process_basic(rule_runner: RuleRunner) -> None:
+    def assert_success(result: WorkspaceProcessResult):
+        if result.exit_code != 0:
+            raise ProcessExecutionFailure(
+                result.exit_code,
+                result.stdout_bytes,
+                result.stderr_bytes,
+                "WorkspaceProcessResult",
+                keep_sandboxes=KeepSandboxes.never,
+            )
+
+    # Check that a custom exit code is returned as expected.
+    with mock_console(rule_runner.options_bootstrapper) as (_, _stdio_reader):
+        process = WorkspaceProcess(
+            argv=["/bin/bash", "-c", "exit 143"],
+        )
+        result = rule_runner.request(WorkspaceProcessResult, [process])
+        assert result.exit_code == 143
+
+    # Test whether there is a distinction between the workspace and chroot
+    # when a WorkspaceProcess executes. Do this by puttng a file in the build
+    # root and a depenency via a digest.
+    rule_runner.write_files(
+        {
+            "unmanaged.txt": "workspace\n",
+        }
+    )
+    input_snapshot = rule_runner.make_snapshot(
+        {
+            "dependency.txt": "digest\n",
+        }
+    )
+    with mock_console(rule_runner.options_bootstrapper) as (_, _stdio_reader):
+        script = textwrap.dedent(
+            """
+            echo '{chroot}'
+            cat '{chroot}/dependency.txt'
+            pwd
+            cat unmanaged.txt
+            """
+        )
+        process = WorkspaceProcess(
+            argv=["/bin/bash", "-c", script],
+            input_digest=input_snapshot.digest,
+        )
+        result = rule_runner.request(WorkspaceProcessResult, [process])
+        assert_success(result)
+        output_lines = result.stdout_bytes.decode().splitlines()
+        assert output_lines[1] == "digest"
+        assert output_lines[2] == rule_runner.build_root
+        assert output_lines[3] == "workspace"
+
+    # Test capture of outputs from the chroot.
+    with mock_console(rule_runner.options_bootstrapper) as (_, _stdio_reader):
+        script = textwrap.dedent(
+            """
+            echo 'generated' > '{chroot}/output.txt'
+            mkdir -p '{chroot}/subdir'
+            echo 'subdir' > '{chroot}/subdir/file.txt'
+            echo 'buildroot' > new-file.txt
+            """
+        )
+        process = WorkspaceProcess(
+            argv=["/bin/bash", "-c", script],
+            output_files=["output.txt"],
+            output_directories=["subdir"],
+        )
+        result = rule_runner.request(WorkspaceProcessResult, [process])
+        assert_success(result)
+
+        digest_contents = rule_runner.request(DigestContents, [result.output_snapshot.digest])
+        assert len(digest_contents) == 2
+
+        digest_contents = sorted(digest_contents, key=lambda x: x.path)
+        assert digest_contents[0].path == "output.txt"
+        assert digest_contents[0].content == b"generated\n"
+        assert digest_contents[1].path == "subdir/file.txt"
+        assert digest_contents[1].content == b"subdir\n"
+
+        new_file = Path(rule_runner.build_root, "new-file.txt")
+        assert new_file.exists()
+        assert new_file.read_text().strip() == "buildroot"
