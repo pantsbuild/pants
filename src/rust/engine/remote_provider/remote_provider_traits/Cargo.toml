@@ -13,3 +13,6 @@ grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
 protos = { path = "../../protos" }
 tokio = { workspace = true, features = ["fs"] }
+
+[lints]
+workspace = true

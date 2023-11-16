@@ -36,3 +36,6 @@ tempfile = { workspace = true }
 testutil = { path = "../../testutil" }
 tokio = { workspace = true, features = ["macros"] }
 process_execution = { path = ".." }
+
+[lints]
+workspace = true

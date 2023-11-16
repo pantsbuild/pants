@@ -20,3 +20,6 @@ protos = { path = "../../protos" }
 testutil = { path = ".." }
 tokio = { workspace = true, features = ["time"] }
 tonic = { workspace = true }
+
+[lints]
+workspace = true

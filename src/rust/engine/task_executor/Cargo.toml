@@ -13,3 +13,6 @@ parking_lot = { workspace = true }
 stdio = { path = "../stdio" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 workunit_store = { path = "../workunit_store" }
+
+[lints]
+workspace = true

@@ -56,3 +56,6 @@ walkdir = { workspace = true }
 name = "store"
 # Using criterion: see https://bheisler.github.io/criterion.rs/book/getting_started.html
 harness = false
+
+[lints]
+workspace = true

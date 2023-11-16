@@ -22,3 +22,6 @@ workunit_store = { path = "../workunit_store" }
 rand = { workspace = true }
 env_logger = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true
