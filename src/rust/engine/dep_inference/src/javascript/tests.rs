@@ -155,24 +155,6 @@ fn simple_exports() {
     );
     // just confirm a relative path is preserved
     assert_imports("export * from './b/c'", &["./b/c"]);
-
-    // multi-line
-    assert_imports(
-        "export {
-            a
-        } from 'ignored'; // pants: no-infer-dep",
-        &[],
-    );
-    // NB. the inference is driven off the 'from'.
-    assert_imports(
-        "export { // pants: no-infer-dep
-            a
-        } from 'b';
-        export {
-            c // pants: no-infer-dep
-        } from 'd';",
-        &["b", "d"],
-    );
 }
 
 #[test]
@@ -213,6 +195,24 @@ fn ignore_exports() {
     assert_imports("export * from 'a'; // pants: no-infer-dep", &[]);
     assert_imports("export * as x from './b' // pants: no-infer-dep", &[]);
     assert_imports("export { y } from \"../c\"  // pants: no-infer-dep", &[]);
+
+    // multi-line
+    assert_imports(
+        "export {
+            a
+        } from 'ignored'; // pants: no-infer-dep",
+        &[],
+    );
+    // NB. the inference is driven off the 'from'.
+    assert_imports(
+        "export { // pants: no-infer-dep
+            a
+        } from 'b';
+        export {
+            c // pants: no-infer-dep
+        } from 'd';",
+        &["b", "d"],
+    );
 }
 
 #[test]
