@@ -51,7 +51,7 @@ impl TestData {
     }
 
     pub fn bytes(&self) -> bytes::Bytes {
-        bytes::Bytes::copy_from_slice(self.string.as_str().as_bytes())
+        bytes::Bytes::copy_from_slice(self.string.as_bytes())
     }
 
     pub fn fingerprint(&self) -> hashing::Fingerprint {
