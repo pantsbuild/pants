@@ -238,7 +238,7 @@ class CoursierResolvedLockfile:
                 # If the dependency is missing from the entries, we want to skip the dependency.
                 # More details in the issue:
                 # https://github.com/pantsbuild/pants/issues/20162
-                if (dependency := (d.group, d.artifact)) not in entries
+                if (dependency := (d.group, d.artifact)) in entries
             ),
         )
 
