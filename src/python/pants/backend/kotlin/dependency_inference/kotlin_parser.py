@@ -144,7 +144,7 @@ async def analyze_kotlin_source_dependencies(
     source_files: SourceFiles,
 ) -> FallibleKotlinSourceDependencyAnalysisResult:
     # Use JDK 8 due to https://youtrack.jetbrains.com/issue/KTIJ-17192 and https://youtrack.jetbrains.com/issue/KT-37446.
-    request = JdkRequest("adopt:8")
+    request = JdkRequest("zulu:8.0.392")
     env = await Get(JdkEnvironment, JdkRequest, request)
     jdk = InternalJdk.from_jdk_environment(env)
 
