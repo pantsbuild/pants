@@ -4,5 +4,13 @@
 python_sources(dependencies=[":kotlin_resources"])
 resources(name="kotlin_resources", sources=["*.kt", "*.lock"])
 
-# Dep inference installs its own JDK, we must make sure that works on all platforms.
-python_tests(name="tests", timeout=240, tags=["platform_specific_behavior"])
+python_tests(
+    name="tests",
+    timeout=240,
+    overrides={
+        "kotlin_parser_test.py": {
+            # Dep inference installs its own JDK, we must make sure that works on all platforms.
+            "tags": ["platform_specific_behavior"],
+        },
+    },
+)
