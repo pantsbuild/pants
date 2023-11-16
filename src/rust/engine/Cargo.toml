@@ -102,6 +102,9 @@ env_logger = { workspace = true }
 [build-dependencies]
 pyo3-build-config = "0.18"
 
+[lints]
+workspace = true
+
 [workspace]
 resolver = "2"
 # These are the packages which are built/tested when the --all flag is passed to cargo.
@@ -323,3 +326,35 @@ tree-sitter-python = "0.20.4"
 
 [patch.crates-io]
 console = { version = "0.15.7", git = "https://github.com/tgolsson/console.git", rev = "5483880905f384679d322e83c37180f122951995" }
+
+
+# Default lints adopted by most crates in this workspace.
+
+[workspace.lints.rust]
+warnings = { level = "deny", priority = 0 }
+
+# Enable all clippy lints except for many of the pedantic ones.
+[workspace.lints.clippy]
+all = { level = "deny", priority = 0 }
+
+default_trait_access = { level = "deny", priority = 1 }
+expl_impl_clone_on_copy = { level = "deny", priority = 1 }
+if_not_else = { level = "deny", priority = 1 }
+needless_continue = { level = "deny", priority = 1 }
+unseparated_literal_suffix = { level = "deny", priority = 1 }
+used_underscore_binding = { level = "deny", priority = 1 }
+
+# It is often more clear to show that nothing is being moved.
+match_ref_pats = { level = "allow", priority = 1 }
+
+# Subjective style.
+len_without_is_empty = { level = "allow", priority = 1 }
+redundant_field_names = { level = "allow", priority = 1 }
+too_many_arguments = { level = "allow", priority = 1 }
+
+# Default isn't as big a deal as people seem to think it is.
+new_without_default = { level = "allow", priority = 1 }
+new_ret_no_self = { level = "allow", priority = 1 }
+
+# Arc<Mutex> can be more clear than needing to grok Orderings:
+mutex_atomic = { level = "allow", priority = 1 }
