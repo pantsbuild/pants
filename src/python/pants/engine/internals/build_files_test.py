@@ -775,6 +775,42 @@ def test_default_plugin_field_bootstrap() -> None:
     assert dict(tags=("ok",)) == dict(address_family.defaults["mock_tgt"])
 
 
+def test_environment_target_macro_field_value() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+        is_bootstrap=True,
+    )
+    rule_runner.set_options(
+        args=("--build-file-prelude-globs=prelude.py",),
+    )
+    rule_runner.write_files(
+        {
+            "prelude.py": dedent(
+                """
+                def tags():
+                    return ["foo", "bar"]
+                """
+            ),
+            "BUILD": dedent(
+                """
+                mock_tgt(name="tgt", tags=tags())
+                """
+            ),
+        }
+    )
+
+    # Parse the root BUILD file.
+    address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
+    tgt = address_family.name_to_target_adaptors["tgt"][1]
+    # We're pretending that field values returned from a called macro function doesn't exist during
+    # bootstrap. This is to allow the semi-dubios use of macro calls for environment target field
+    # values that are not required, and depending on how they are used, it may work to only have
+    # those field values set during normal lookup.
+    assert not tgt.kwargs
+    assert tgt == TargetAdaptor("mock_tgt", "tgt", "BUILD:2")
+
+
 def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
