@@ -150,7 +150,6 @@ async def infer_dependencies(
             ),
         )
 
-        print(addresses_for_grpc, locality)
         result.append(
             find_python_runtime_library_or_raise_error(
                 addresses_for_grpc,
