@@ -69,6 +69,7 @@ def _analyze(rule_runner: RuleRunner, source: str) -> KotlinSourceDependencyAnal
 
 
 @logging
+@pytest.mark.platform_specific_behavior
 def test_parser_simple(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
         rule_runner,
