@@ -233,12 +233,12 @@ class CoursierResolvedLockfile:
         return (
             entry,
             tuple(
-                entries[dependency]
+                dependency_entry
                 for d in entry.dependencies
                 # If the dependency is missing from the entries, we want to skip the dependency.
                 # More details in the issue:
                 # https://github.com/pantsbuild/pants/issues/20162
-                if (dependency := (d.group, d.artifact)) in entries
+                if (dependency_entry := entries.get((d.group, d.artifact))) is not None
             ),
         )
 
