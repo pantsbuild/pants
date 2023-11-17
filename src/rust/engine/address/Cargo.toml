@@ -7,3 +7,6 @@ publish = false
 
 [dependencies]
 peg = { workspace = true }
+
+[lints]
+workspace = true

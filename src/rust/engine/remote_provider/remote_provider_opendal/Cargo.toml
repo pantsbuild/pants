@@ -24,3 +24,6 @@ workunit_store = { path = "../../workunit_store" }
 mock = { path = "../../testutil/mock" }
 tempfile = { workspace = true }
 testutil = { path = "../../testutil" }
+
+[lints]
+workspace = true
