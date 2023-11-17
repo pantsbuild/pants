@@ -670,7 +670,9 @@ def test_transitive_excludes(rule_runner: RuleRunner) -> None:
     assert not any(i for i in entries if i.coord.artifact == "jackson-core")
 
 
-@pytest.mark.xfail(reason="bug in coursier: https://github.com/coursier/coursier/issues/2884")
+@pytest.mark.xfail(
+    reason="coursier bug: https://github.com/coursier/coursier/issues/2884", strict=True
+)
 @maybe_skip_jdk_test
 def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> None:
     resolve = rule_runner.request(
@@ -706,3 +708,20 @@ def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> Non
     # for ("junit", "junit") and ("org.apache.curator", "apache-curator").
     # TODO Remove the workaround once the bug is fixed.
     assert missing == []
+
+
+@pytest.mark.xfail(reason="coursier bug?", strict=True)
+@maybe_skip_jdk_test
+def test_failed_to_fetch_jar_given_packaging_pom(rule_runner: RuleRunner) -> None:
+    reqs = ArtifactRequirements(
+        [
+            Coordinate(
+                group="org.apache.curator",
+                artifact="apache-curator",
+                version="5.5.0",
+            ).as_requirement()
+        ]
+    )
+
+    # Exception: No jar found for org.apache.curator:apache-curator:5.5.0.
+    rule_runner.request(CoursierResolvedLockfile, [reqs])
