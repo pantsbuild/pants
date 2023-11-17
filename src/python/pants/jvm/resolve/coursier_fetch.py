@@ -235,9 +235,10 @@ class CoursierResolvedLockfile:
             tuple(
                 dependency_entry
                 for d in entry.dependencies
-                # If the dependency is missing from the entries, we want to skip the dependency.
-                # More details in the issue:
-                # https://github.com/pantsbuild/pants/issues/20162
+                # The dependency might not be present in the entries due to coursier bug:
+                # https://github.com/coursier/coursier/issues/2884
+                # As a workaround, if this happens, we want to skip the dependency.
+                # TODO Drop the check once the bug is fixed.
                 if (dependency_entry := entries.get((d.group, d.artifact))) is not None
             ),
         )
