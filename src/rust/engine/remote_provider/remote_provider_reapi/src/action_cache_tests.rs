@@ -5,18 +5,21 @@ use std::{collections::BTreeMap, time::Duration};
 use hashing::Digest;
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remote_provider_traits::{ActionCacheProvider, RemoteCacheProviderOptions};
+use remote_provider_traits::{ActionCacheProvider, RemoteStoreOptions};
 
 use super::action_cache::Provider;
 
 async fn new_provider(cas: &StubCAS) -> Provider {
-    Provider::new(RemoteCacheProviderOptions {
+    Provider::new(RemoteStoreOptions {
         instance_name: None,
-        action_cache_address: cas.address(),
+        store_address: cas.address(),
         tls_config: Default::default(),
         headers: BTreeMap::new(),
         concurrency_limit: 256,
-        rpc_timeout: Duration::from_secs(2),
+        timeout: Duration::from_secs(2),
+        retries: 0,
+        batch_api_size_limit: 0,
+        chunk_size_bytes: 0,
     })
     .await
     .unwrap()

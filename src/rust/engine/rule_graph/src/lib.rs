@@ -470,8 +470,8 @@ impl<R: Rule> RuleGraph<R> {
                     dep_entries.sort();
                     let deps_with_attrs = dep_entries
                         .iter()
-                        .cloned()
                         .filter(|d| d.attrs_str.is_some())
+                        .cloned()
                         .map(|d| format!("\"{}\" {}", d.entry_str, d.attrs_str.unwrap()))
                         .collect::<Vec<String>>()
                         .join("\n");
@@ -508,8 +508,8 @@ impl<R: Rule> RuleGraph<R> {
                     dep_entries.sort();
                     let deps_with_attrs = dep_entries
                         .iter()
-                        .cloned()
                         .filter(|d| d.attrs_str.is_some())
+                        .cloned()
                         .map(|d| format!("\"{}\" {}", d.entry_str, d.attrs_str.unwrap()))
                         .collect::<Vec<String>>()
                         .join("\n");

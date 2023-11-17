@@ -45,7 +45,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::timeout::{Timeout, TimeoutLayer};
 use tower::ServiceBuilder;
 use tower_service::Service;
-use workunit_store::{get_workunit_store_handle, Metric, ObservationMetric};
+use workunit_store::{increment_counter_if_in_workunit, Metric, ObservationMetric};
 
 use crate::channel::Channel;
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
@@ -164,9 +164,7 @@ where
         result
             .inspect_err(move |_| {
                 if let Some(metric) = metric {
-                    if let Some(mut workunit_store_handle) = get_workunit_store_handle() {
-                        workunit_store_handle.store.increment_counter(metric, 1)
-                    }
+                    increment_counter_if_in_workunit(metric, 1);
                 }
             })
             .boxed()

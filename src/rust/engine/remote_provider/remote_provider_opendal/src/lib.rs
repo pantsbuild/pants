@@ -40,10 +40,10 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ActionResult;
 use tokio::fs::File;
-use workunit_store::ObservationMetric;
+use workunit_store::{Metric, ObservationMetric};
 
 use remote_provider_traits::{
-    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteOptions,
+    ActionCacheProvider, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
 };
 
 #[cfg(test)]
@@ -68,7 +68,7 @@ impl Provider {
     pub fn new<B: Builder>(
         builder: B,
         scope: String,
-        options: RemoteOptions,
+        options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
         let operator = Operator::new(builder)
             .map_err(|e| {
@@ -77,16 +77,16 @@ impl Provider {
                     B::SCHEME
                 )
             })?
-            .layer(ConcurrentLimitLayer::new(options.rpc_concurrency_limit))
+            .layer(ConcurrentLimitLayer::new(options.concurrency_limit))
             .layer(
                 // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
                 TimeoutLayer::new()
-                    .with_timeout(options.rpc_timeout)
+                    .with_timeout(options.timeout)
                     // TimeoutLayer requires specifying a non-zero minimum transfer speed too.
                     .with_speed(1),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
-            .layer(RetryLayer::new().with_max_times(options.rpc_retries + 1))
+            .layer(RetryLayer::new().with_max_times(options.retries + 1))
             .finish();
 
         let base_path = match options.instance_name {
@@ -100,7 +100,7 @@ impl Provider {
         })
     }
 
-    pub fn fs(path: &str, scope: String, options: RemoteOptions) -> Result<Provider, String> {
+    pub fn fs(path: &str, scope: String, options: RemoteStoreOptions) -> Result<Provider, String> {
         let mut builder = opendal::services::Fs::default();
         builder.root(path).enable_path_check();
         Provider::new(builder, scope, options)
@@ -109,7 +109,7 @@ impl Provider {
     pub fn github_actions_cache(
         url: &str,
         scope: String,
-        options: RemoteOptions,
+        options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
         let mut builder = opendal::services::Ghac::default();
 
@@ -173,16 +173,14 @@ impl Provider {
             Err(e) => return Err(format!("failed to read {}: {}", path, e)),
         };
 
-        if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-            // TODO: this pretends that the time-to-first-byte can be approximated by "time to create
-            // reader", which is often not really true.
-            let timing: Result<u64, _> =
-                Instant::now().duration_since(start).as_micros().try_into();
-            if let Ok(obs) = timing {
-                workunit_store_handle
-                    .store
-                    .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
-            }
+        // TODO: this pretends that the time-to-first-byte can be approximated by "time to create
+        // reader", which is often not really true.
+        let timing: Result<u64, _> = Instant::now().duration_since(start).as_micros().try_into();
+        if let Ok(obs) = timing {
+            workunit_store::record_observation_if_in_workunit(
+                ObservationMetric::RemoteStoreTimeToFirstByteMicros,
+                obs,
+            );
         }
 
         match mode {
@@ -298,7 +296,18 @@ impl ByteStoreProvider for Provider {
             }
 
             let path = self.path(digest.hash);
-            match self.operator.is_exist(&path).await {
+
+            workunit_store::increment_counter_if_in_workunit(Metric::RemoteStoreExistsAttempts, 1);
+
+            let result = self.operator.is_exist(&path).await;
+
+            let metric = match result {
+                Ok(_) => Metric::RemoteStoreExistsSuccesses,
+                Err(_) => Metric::RemoteStoreExistsErrors,
+            };
+            workunit_store::increment_counter_if_in_workunit(metric, 1);
+
+            match result {
                 Ok(true) => Ok(None),
                 Ok(false) => Ok(Some(digest)),
                 Err(e) => Err(format!("failed to query {}: {}", path, e)),

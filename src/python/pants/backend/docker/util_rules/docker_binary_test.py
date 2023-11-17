@@ -36,6 +36,7 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         build_args=DockerBuildArgs.from_strings("arg1=2"),
         context_root="build/context",
         env=env,
+        use_buildx=False,
         extra_args=("--pull", "--squash"),
     )
 

@@ -16,8 +16,7 @@ use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remote_provider::RemoteCacheProviderOptions;
-use store::{RemoteOptions, Store};
+use store::{RemoteStoreOptions, Store};
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
@@ -106,16 +105,15 @@ impl StoreSetup {
         let store_dir = store_temp_dir.path().join("store_dir");
         let store = Store::local_only(executor.clone(), store_dir)
             .unwrap()
-            .into_with_remote(RemoteOptions {
-                cas_address: cas.address(),
+            .into_with_remote(RemoteStoreOptions {
+                store_address: cas.address(),
                 instance_name: None,
                 tls_config: tls::Config::default(),
                 headers: BTreeMap::new(),
                 chunk_size_bytes: 10 * 1024 * 1024,
-                rpc_timeout: Duration::from_secs(1),
-                rpc_retries: 1,
-                rpc_concurrency_limit: 256,
-                capabilities_cell_opt: None,
+                timeout: Duration::from_secs(1),
+                retries: 1,
+                concurrency_limit: 256,
                 batch_api_size_limit: 4 * 1024 * 1024,
             })
             .await
@@ -161,13 +159,16 @@ async fn create_cached_runner(
                 cache_content_behavior,
                 append_only_caches_base_path: None,
             },
-            RemoteCacheProviderOptions {
+            RemoteStoreOptions {
                 instance_name: None,
-                action_cache_address: store_setup.cas.address(),
+                store_address: store_setup.cas.address(),
                 tls_config: tls::Config::default(),
                 headers: BTreeMap::default(),
                 concurrency_limit: 256,
-                rpc_timeout: CACHE_READ_TIMEOUT,
+                timeout: CACHE_READ_TIMEOUT,
+                retries: 0,
+                batch_api_size_limit: 0,
+                chunk_size_bytes: 0,
             },
         )
         .await
@@ -761,13 +762,16 @@ async fn make_action_result_basic() {
             cache_content_behavior: CacheContentBehavior::Defer,
             append_only_caches_base_path: None,
         },
-        RemoteCacheProviderOptions {
+        RemoteStoreOptions {
             instance_name: None,
-            action_cache_address: cas.address(),
+            store_address: cas.address(),
             tls_config: tls::Config::default(),
             headers: BTreeMap::default(),
             concurrency_limit: 256,
-            rpc_timeout: CACHE_READ_TIMEOUT,
+            timeout: CACHE_READ_TIMEOUT,
+            retries: 0,
+            batch_api_size_limit: 0,
+            chunk_size_bytes: 0,
         },
     )
     .await
