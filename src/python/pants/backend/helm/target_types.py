@@ -168,6 +168,11 @@ class HelmChartLintStrictField(TriBoolField):
     help = "If set to true, enables strict linting of this Helm chart."
 
 
+class HelmChartLintQuietField(TriBoolField):
+    alias = "lint_quiet"
+    help = "If set to true, only print only warnings and errors."
+
+
 class HelmChartRepositoryField(StringField):
     alias = "repository"
     help = help_text(
@@ -201,6 +206,7 @@ class HelmChartTarget(Target):
         HelmChartDependenciesField,
         HelmChartOutputPathField,
         HelmChartLintStrictField,
+        HelmChartLintQuietField,
         HelmChartRepositoryField,
         HelmChartVersionField,
         HelmRegistriesField,
