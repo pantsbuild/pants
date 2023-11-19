@@ -27,6 +27,7 @@ backend_packages.add = [
   "pants.backend.experimental.java.debug_goals",
   "pants.backend.experimental.javascript",
   "pants.backend.experimental.javascript.lint.prettier",
+  "pants.backend.experimental.typescript",
   "pants.backend.experimental.python",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
