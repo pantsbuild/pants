@@ -4,6 +4,7 @@
 from typing import Iterable, Union
 
 from pants.backend.typescript.dependency_inference import rules as dependency_inference_rules
+from pants.backend.typescript.goals import tailor
 from pants.backend.typescript.target_types import (
     TSSourcesGeneratorTarget,
     TSSourceTarget,
@@ -25,4 +26,7 @@ def target_types() -> Iterable[type[Target]]:
 
 
 def rules() -> Iterable[Union[Rule, UnionRule]]:
-    return (*dependency_inference_rules.rules(),)
+    return (
+        *dependency_inference_rules.rules(),
+        *tailor.rules(),
+    )
