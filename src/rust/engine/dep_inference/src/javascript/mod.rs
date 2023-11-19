@@ -146,6 +146,15 @@ impl Visitor for ImportCollector<'_> {
         }
         ChildBehavior::Ignore
     }
+
+    fn visit_export_statement(&mut self, node: Node) -> ChildBehavior {
+        if !self.is_pragma_ignored(node) {
+            self.insert_import(node.child_by_field_name("source"));
+        }
+
+        ChildBehavior::Ignore
+    }
+
     fn visit_expression_statement(&mut self, node: Node) -> ChildBehavior {
         if node.children(&mut node.walk()).any(|child| {
             let id = child.kind_id();
