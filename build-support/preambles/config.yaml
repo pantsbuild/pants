@@ -1,6 +1,9 @@
 "**/*.py:!**/__init__.py:**/BUILD:**/BUILD.*": |+
   # Copyright $year Pants project contributors (see CONTRIBUTORS.md).
   # Licensed under the Apache License, Version 2.0 (see LICENSE).
+"**/lib.rs:**/build.rs::**/main.rs": |+
+  // Copyright $year Pants project contributors (see CONTRIBUTORS.md).
+  // Licensed under the Apache License, Version 2.0 (see LICENSE).
 "**/*.rs:**/*.cjs:**/*.mjs:**/*.js": |+
   // Copyright $year Pants project contributors (see CONTRIBUTORS.md).
   // Licensed under the Apache License, Version 2.0 (see LICENSE).
