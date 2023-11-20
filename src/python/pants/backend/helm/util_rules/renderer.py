@@ -326,7 +326,7 @@ async def setup_render_helm_deployment_process(
         request.field_set.release_name.value
         or request.field_set.address.target_name.replace("_", "-")
     )
-    inline_values = request.field_set.values.format_with(
+    inline_values = request.field_set.values._format_with(
         interpolation_context, ignore_missing=is_render_cmd
     )
 

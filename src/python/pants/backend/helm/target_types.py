@@ -499,6 +499,11 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
     def format_with(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
     ) -> dict[str, str]:
+        return self._format_with(interpolation_context, ignore_missing=ignore_missing)
+
+    def _format_with(
+        self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
+    ) -> dict[str, str]:
         source = InterpolationContext.TextSource(
             self.address,
             target_alias=HelmDeploymentTarget.alias,
@@ -625,7 +630,7 @@ class HelmDeploymentFieldSet(FieldSet):
     def format_values(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False
     ) -> dict[str, str]:
-        return self.values.format_with(interpolation_context, ignore_missing=ignore_missing)
+        return self.values._format_with(interpolation_context, ignore_missing=ignore_missing)
 
 
 class AllHelmDeploymentTargets(Targets):
