@@ -230,7 +230,18 @@ class CoursierResolvedLockfile:
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
-        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
+        return (
+            entry,
+            tuple(
+                dependency_entry
+                for d in entry.dependencies
+                # The dependency might not be present in the entries due to coursier bug:
+                # https://github.com/coursier/coursier/issues/2884
+                # As a workaround, if this happens, we want to skip the dependency.
+                # TODO Drop the check once the bug is fixed.
+                if (dependency_entry := entries.get((d.group, d.artifact))) is not None
+            ),
+        )
 
     @classmethod
     def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
