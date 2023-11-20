@@ -68,7 +68,6 @@ from pants.option.global_options import (
     LOCAL_STORE_LEASE_TIME_SECS,
     ExecutionOptions,
     LocalStoreOptions,
-    normalize_remote_address,
 )
 from pants.util.contextutil import temporary_file_path
 from pants.util.logging import LogLevel
@@ -193,8 +192,8 @@ class Scheduler:
             execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
-            store_address=normalize_remote_address(execution_options.remote_store_address),
-            execution_address=normalize_remote_address(execution_options.remote_execution_address),
+            store_address=execution_options.remote_store_address,
+            execution_address=execution_options.remote_execution_address,
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,

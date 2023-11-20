@@ -59,7 +59,7 @@ The values of the `ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` environment va
   uses: actions/github-script@v6
   with:
     script: |
-      core.exportVariable('PANTS_REMOTE_STORE_ADDRESS', 'experimental:github-actions-cache+' + (process.env.ACTIONS_CACHE_URL || ''));
+      core.exportVariable('PANTS_REMOTE_STORE_ADDRESS', process.env.ACTIONS_CACHE_URL);
       core.exportVariable('PANTS_REMOTE_OAUTH_BEARER_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN);
 ```
 
@@ -71,6 +71,7 @@ Once the GitHub values are configured, Pants will read the environment variables
 ```toml
 [GLOBAL]
 # GitHub Actions cache URL and token are set via environment variables
+remote_provider = "experimental-github-actions-cache"
 remote_cache_read = true
 remote_cache_write = true
 ```
@@ -93,7 +94,8 @@ To read and write the cache to `/path/to/cache`, you will need to configure `pan
 
 ```toml
 [GLOBAL]
-remote_store_address = "experimental:file:///path/to/cache"
+remote_store_provider = "experimental-file"
+remote_store_address = "file:///path/to/cache"
 remote_cache_read = true
 remote_cache_write = true
 ```
