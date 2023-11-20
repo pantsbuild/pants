@@ -670,9 +670,6 @@ def test_transitive_excludes(rule_runner: RuleRunner) -> None:
     assert not any(i for i in entries if i.coord.artifact == "jackson-core")
 
 
-@pytest.mark.xfail(
-    reason="coursier bug: https://github.com/coursier/coursier/issues/2884", strict=True
-)
 @maybe_skip_jdk_test
 def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> None:
     resolve = rule_runner.request(
@@ -696,21 +693,18 @@ def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> Non
         ],
     )
 
-    lookup = {(entry.coord.group, entry.coord.artifact): entry for entry in resolve.entries}
-    missing = []
-    for entry in resolve.entries:
-        for d in entry.dependencies:
-            coord = (d.group, d.artifact)
-            if coord not in lookup:
-                missing.append(coord)
+    coords_of_entries = {(entry.coord.group, entry.coord.artifact) for entry in resolve.entries}
+    coords_of_dependencies = {
+        (d.group, d.artifact) for entry in resolve.entries for d in entry.dependencies
+    }
+    missing = coords_of_dependencies - coords_of_entries
 
     # We expect all the dependencies to have an entry, but right now it's not true
     # for ("junit", "junit") and ("org.apache.curator", "apache-curator").
     # TODO Remove the workaround once the bug is fixed.
-    assert missing == []
+    assert missing == {("junit", "junit"), ("org.apache.curator", "apache-curator")}
 
 
-@pytest.mark.xfail(reason="coursier bug?", strict=True)
 @maybe_skip_jdk_test
 def test_failed_to_fetch_jar_given_packaging_pom(rule_runner: RuleRunner) -> None:
     reqs = ArtifactRequirements(
@@ -723,5 +717,9 @@ def test_failed_to_fetch_jar_given_packaging_pom(rule_runner: RuleRunner) -> Non
         ]
     )
 
-    # Exception: No jar found for org.apache.curator:apache-curator:5.5.0.
-    rule_runner.request(CoursierResolvedLockfile, [reqs])
+    # TODO Remove the workaround once the bug is fixed.
+    with pytest.raises(
+        Exception,
+        match=r"Exception: No jar found for org.apache.curator:apache-curator:5.5.0. .*",
+    ):
+        rule_runner.request(CoursierResolvedLockfile, [reqs])
