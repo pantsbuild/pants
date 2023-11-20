@@ -11,7 +11,7 @@ import pytest
 from pants.base.exceptions import RuleTypeError
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import Get, GetParseError, MultiGet
-from pants.engine.rules import implicitly, rule, rule_helper
+from pants.engine.rules import implicitly, rule
 from pants.util.strutil import softwrap
 
 # The visitor inspects the module for definitions.
@@ -20,24 +20,20 @@ INT = int
 BOOL = bool
 
 
-@rule_helper
 async def _top_helper(arg1):
     a = await Get(STR, INT, arg1)
     return await _helper_helper(a)
 
 
-@rule_helper
 async def _helper_helper(arg1):
     return await Get(INT, STR, arg1)
 
 
 class HelperContainer:
-    @rule_helper
     async def _method_helper(self):
         return await Get(STR, INT, 42)
 
     @staticmethod
-    @rule_helper
     async def _static_helper():
         a = await Get(STR, INT, 42)
         return await _helper_helper(a)
