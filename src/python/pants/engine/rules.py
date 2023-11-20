@@ -28,7 +28,6 @@ from typing import (
 
 from typing_extensions import ParamSpec, Protocol
 
-from pants.base.deprecated import deprecated
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
 from pants.engine.internals.rule_visitor import collect_awaitables
@@ -201,9 +200,6 @@ IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"rule_type", "cacheable"}
 def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
     if not inspect.isfunction(func):
         raise ValueError("The @rule decorator expects to be placed on a function.")
-
-    if hasattr(func, "rule_helper"):
-        raise ValueError("Cannot use both @rule and @rule_helper")
 
     if (
         len(
@@ -404,88 +400,6 @@ def goal_rule(*args, **kwargs):
 # until we figure out the implications, and have a handle on the semantics and use-cases.
 def _uncacheable_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
-
-
-def _rule_helper_decorator(func: Callable[P, R], _public: bool = False) -> Callable[P, R]:
-    if not _public and not func.__name__.startswith("_"):
-        raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
-
-    if hasattr(func, "rule"):
-        raise ValueError("Cannot use both @rule and @rule_helper.")
-
-    if not inspect.iscoroutinefunction(func):
-        raise ValueError("@rule_helpers must be async.")
-
-    setattr(func, "rule_helper", func)
-    return func  # type: ignore[return-value]
-
-
-@overload
-def rule_helper(func: Callable[P, R]) -> Callable[P, R]:
-    ...
-
-
-@overload
-def rule_helper(func: None = None, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    ...
-
-
-@deprecated(
-    removal_version="2.20.0.dev0",
-    hint=softwrap(
-        """
-        The `@rule_helper` decorator is no longer needed. `@rule` methods may call any other
-        methods, and if they are `async` may also use `Get` and `MultiGet`.
-        """
-    ),
-)
-def rule_helper(
-    func: Callable[P, R] | None = None, **kwargs: Any
-) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
-    """Decorator which marks a function as a "rule helper".
-
-    This docstring is now deprecated. Any async method may now use `await Get/MultiGet`.
-
-    Functions marked as rule helpers are allowed to be called by rules and other rule helpers
-    and can `await Get/MultiGet`. The rule parser adds these functions' awaitables to the rule's
-    awaitables.
-
-    There are a few restrictions:
-        1. Rule helpers must be "private". I.e. start with an underscore.
-        2. Rule hlpers must be `async`
-        3. Rule helpers can't be rules
-        4. Rule helpers must be accessed by attributes chained from a module variable (see below)
-
-    To explain restriction 4, consider the following:
-    ```
-        from some_mod import helper_function, attribute
-
-        ...
-
-        some_instance = AClass()
-
-        @rule
-        async def my_rule(arg: RequestType) -> ReturnType
-            await helper_function()  # OK
-            await attribute.helper()  # OK (assuming `helper` is a @rule_helper)
-            await attribute.otherattr.helper()  # OK (assuming `helper` is a @rule_helper)
-            await some_instance.helper()  # OK (assuming `helper` is a @rule_helper)
-
-            await AClass().helper()  # Not OK, won't collect awaitables from `helper`
-
-            func_var = AClass()
-            await func_var.helper()  # Not OK, won't collect awaitables from `helper`
-            await arg.helper()  # Not OK, won't collect awaitables from `helper`
-    ```
-    """
-    if func is None:
-
-        def wrapper(func: Callable[P, R]) -> Callable[P, R]:
-            return _rule_helper_decorator(func, **kwargs)
-
-        return wrapper
-
-    return _rule_helper_decorator(func, **kwargs)
 
 
 class Rule(Protocol):
