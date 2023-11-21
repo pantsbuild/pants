@@ -524,12 +524,15 @@ class HelmDeploymentValuesField(DictStringToStringField, AsyncFieldMixin):
         result = {}
         default_curr_value: dict[str, str] = {}
         current_value: Mapping[str, str] = self.value or default_curr_value
+        any_change = False
         for key, value in current_value.items():
             formatted_value = format_value(value)
             if formatted_value is not None:
                 result[key] = formatted_value
 
-        if result != current_value:
+            any_change |= formatted_value != value
+
+        if any_change:
             warn_or_error(
                 "2.19.0.dev0",
                 "Using the {env.VAR_NAME} interpolation syntax",
