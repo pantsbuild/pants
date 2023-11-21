@@ -200,6 +200,14 @@ Sept 3, 2020
 
 ## Talks
 
+### [Hamburg Python Pizza 2023](https://hamburg.python.pizza/)
+
+#### Sailing smoothly: navigating a migration from multi-repo to monorepo
+November 17, 2023  
+<https://www.youtube.com/live/0Fp_lQ1oimE?t=22920>
+
+> Short presentation by Julio Batista Silva on migrating many Python code repositories to a monorepo. He talks about benefits and challenges of monorepos and how Pants helps with this task. Video starts at 06:22:00.
+
 ### PyCon AU 2023
 
 #### Packaging for serverless: effortless? Doubtless!
