@@ -86,18 +86,19 @@ class FrozenDict(Mapping[K, V]):
         return reversed(tuple(self._data))
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, FrozenDict):
-            return NotImplemented
-        return tuple(self.items()) == tuple(other.items())
+        return self._data == other
 
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, FrozenDict):
             return NotImplemented
-        return tuple(self._data.items()) < tuple(other._data.items())
+        return sorted(self._data.items()) < sorted(other._data.items())
 
     def _calculate_hash(self) -> int:
         try:
-            return hash(tuple(self._data.items()))
+            h = 0
+            for pair in self._data.items():
+                h ^= hash(pair)
+            return h
         except TypeError as e:
             raise TypeError(
                 softwrap(
