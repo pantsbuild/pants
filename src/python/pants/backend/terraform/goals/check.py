@@ -39,7 +39,7 @@ class SkipTerraformValidateField(BoolField):
 
 
 @dataclass(frozen=True)
-class TerraformValidateFieldSet(TerraformDeploymentFieldSet):
+class TerraformValidateFieldSet(TerraformFieldSet):
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipTerraformValidateField).value
