@@ -1,12 +1,19 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from dataclasses import dataclass
+
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
-from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
+from pants.backend.terraform.target_types import (
+    TerraformDeploymentFieldSet,
+    TerraformDeploymentTarget,
+    TerraformModuleTarget,
+)
 from pants.backend.terraform.tool import TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
@@ -21,8 +28,21 @@ class TerraformValidateSubsystem(Subsystem):
     skip = SkipOption("check")
 
 
+class SkipTerraformValidateField(BoolField):
+    alias = "skip_terraform_validate"
+    default = False
+    help = "If true, don't run `terraform validate` on this target's code. If this target is a module, `terraform validate might still be run on a `terraform_deployment that references this module."
+
+
+@dataclass(frozen=True)
+class TerraformValidateFieldSet(TerraformDeploymentFieldSet):
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipTerraformValidateField).value
+
+
 class TerraformCheckRequest(CheckRequest):
-    field_set_type = TerraformDeploymentFieldSet
+    field_set_type = TerraformValidateFieldSet
     tool_name = TerraformValidateSubsystem.options_scope
 
 
@@ -71,5 +91,7 @@ async def terraform_check(
 def rules():
     return (
         *collect_rules(),
+        TerraformDeploymentTarget.register_plugin_field(SkipTerraformValidateField),
+        TerraformModuleTarget.register_plugin_field(SkipTerraformValidateField),
         UnionRule(CheckRequest, TerraformCheckRequest),
     )
