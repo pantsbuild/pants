@@ -19,6 +19,7 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BoolField,
     Dependencies,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
@@ -250,6 +251,16 @@ class JvmArtifactPackagesField(StringSequenceField):
     )
 
 
+class JvmArtifactForceVersionField(BoolField):
+    alias = "force_version"
+    default = False
+    help = help_text(
+        f"""
+        Force artifact version during resolution.
+        """
+    )
+
+
 class JvmProvidesTypesField(StringSequenceField):
     alias = "experimental_provides_types"
     help = help_text(
@@ -370,12 +381,14 @@ class JvmArtifactFieldSet(JvmRunnableSourceFieldSet):
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
     url: JvmArtifactUrlField
+    force_version: JvmArtifactForceVersionField
 
     required_fields = (
         JvmArtifactGroupField,
         JvmArtifactArtifactField,
         JvmArtifactVersionField,
         JvmArtifactPackagesField,
+        JvmArtifactForceVersionField,
     )
 
 

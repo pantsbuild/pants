@@ -15,6 +15,7 @@ from pants.jvm.target_types import (
     JvmArtifactArtifactField,
     JvmArtifactExclusionsField,
     JvmArtifactFieldSet,
+    JvmArtifactForceVersionField,
     JvmArtifactGroupField,
     JvmArtifactJarSourceField,
     JvmArtifactUrlField,
@@ -152,6 +153,7 @@ class ArtifactRequirement:
     url: str | None = None
     jar: JvmArtifactJarSourceField | None = None
     excludes: frozenset[str] | None = None
+    force_version: bool = False
 
     @classmethod
     def from_jvm_artifact_target(cls, target: Target) -> ArtifactRequirement:
@@ -175,6 +177,7 @@ class ArtifactRequirement:
                 else None
             ),
             excludes=frozenset([*(exclusion.to_coord_str() for exclusion in exclusions)]) or None,
+            force_version=target[JvmArtifactForceVersionField].value,
         )
 
     def with_extra_excludes(self, *excludes: str) -> ArtifactRequirement:
