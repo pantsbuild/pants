@@ -197,9 +197,7 @@ class DockerImageField(StringField):
         - `bash`
         - `tar`
 
-        While most images will have these preinstalled, users of base images such as Distroless
-        or scratch will need to bake these tools into the image themselves. All of these
-        except `bash` are available via busybox.
+        While most images will have these preinstalled, users of base images such as Distroless or scratch will need to bake these tools into the image themselves. All of these except `bash` are available via busybox.
         """
     )
 
