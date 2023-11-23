@@ -31,6 +31,7 @@ class PexVenvRequest:
     platforms: PexPlatforms = PexPlatforms()
     complete_platforms: CompletePlatforms = CompletePlatforms()
     prefix: None | str = None
+    collisions_ok: bool = False
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ async def pex_venv(request: PexVenvRequest) -> PexVenv:
                 f"--pex-repository={request.pex.name}",
                 f"--layout={request.layout.value}",
                 *((f"--prefix={request.prefix}",) if request.prefix is not None else ()),
+                *(("--collisions-ok",) if request.collisions_ok else ()),
                 # NB. Specifying more than one of these args doesn't make sense for `venv
                 # create`. Incorrect usage will be surfaced as a subprocess failure.
                 *request.platforms.generate_pex_arg_list(),

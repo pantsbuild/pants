@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import fnmatch
 import io
 import zipfile
@@ -214,5 +215,49 @@ def test_prefix_should_add_path(
         check_globs_exist=(
             "out/dir/some/prefix/psycopg2/__init__.py",
             "out/dir/some/prefix/first/party.py",
+        ),
+    )
+
+
+def test_collisions_ok_should_allow_distributions_that_have_colliding_files(
+    rule_runner: RuleRunner,
+) -> None:
+    # Setup - we need a PEX that has distributions that collide
+    result = create_pex_and_get_all_data(
+        rule_runner,
+        # Per https://github.com/pantsbuild/pants/issues/20224, these both package their `tests/`
+        # folder at the top level with non-equal __init__.py and test_defaults.py within it.
+        requirements=PexRequirements(["django-hosts==5.1", "draftjs-exporter==2.1.7"]),
+        internal_only=False,
+    )
+    assert isinstance(result.pex, Pex)
+    pex = result.pex
+
+    request = PexVenvRequest(
+        pex=pex,
+        layout=PexVenvLayout.FLAT,
+        output_path=Path("out"),
+        description="testing",
+        collisions_ok=False,
+    )
+
+    # Verify - these distributions have the collisions we expect
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(PexVenv, [request])
+
+    assert "Encountered collisions" in str(exc.value)
+    assert "out/tests/__init__.py was provided by" in str(exc.value)
+    assert "out/tests/test_defaults.py was provided by" in str(exc.value)
+
+    # Exercise/Verify - if we allow collisions, we get something useful
+    run_and_validate(
+        rule_runner,
+        dataclasses.replace(request, collisions_ok=True),
+        check_globs_exist=(
+            "out/django_hosts/__init__.py",
+            "out/draftjs_exporter/__init__.py",
+            # the colliding files themselves; one of them will be chosen arbitrarily;
+            "out/tests/__init__.py",
+            "out/tests/test_defaults.py",
         ),
     )
