@@ -12,7 +12,11 @@ from pants.backend.google_cloud_function.python.target_types import (
     PythonGoogleCloudFunctionRuntime,
     PythonGoogleCloudFunctionType,
 )
-from pants.backend.python.util_rules.faas import BuildPythonFaaSRequest, PythonFaaSCompletePlatforms
+from pants.backend.python.util_rules.faas import (
+    BuildPythonFaaSRequest,
+    PythonFaaSCollisionsOkField,
+    PythonFaaSCompletePlatforms,
+)
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.core.util_rules.environments import EnvironmentField
@@ -30,6 +34,7 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     handler: PythonGoogleCloudFunctionHandlerField
     runtime: PythonGoogleCloudFunctionRuntime
     complete_platforms: PythonFaaSCompletePlatforms
+    collisions_ok: PythonFaaSCollisionsOkField
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
     environment: EnvironmentField
@@ -47,6 +52,7 @@ async def package_python_google_cloud_function(
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
             handler=field_set.handler,
+            collisions_ok=field_set.collisions_ok,
             output_path=field_set.output_path,
             include_requirements=True,
             include_sources=True,

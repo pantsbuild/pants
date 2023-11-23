@@ -36,6 +36,7 @@ from pants.core.target_types import (
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
+from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
 
@@ -233,3 +234,57 @@ def test_create_hello_world_gcf(
     assert "mureq/__init__.py" in names
     assert "foo/bar/hello_world.py" in names
     assert zipfile.read("main.py") == b"from foo.bar.hello_world import handler as handler"
+
+
+def test_collisions_ok(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": dedent(
+                """
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/BUILD": dedent(
+                """
+                # Per https://github.com/pantsbuild/pants/issues/20224, these both package their `tests/`
+                # folder at the top level with non-equal __init__.py and test_defaults.py within it.
+                python_requirement(name="django-hosts", requirements=["django-hosts==5.1"])
+                python_requirement(name="draftjs-exporter", requirements=["draftjs-exporter==2.1.7"])
+                python_sources()
+
+                python_google_cloud_function(
+                    name='gcf-ok',
+                    handler='foo.bar.hello_world:handler',
+                    dependencies=[":django-hosts", ":draftjs-exporter"],
+                    runtime='python39',
+                    collisions_ok=True,
+                    type='event',
+                )
+
+                python_google_cloud_function(
+                    name='gcf-error',
+                    handler='foo.bar.hello_world:handler',
+                    dependencies=[":django-hosts", ":draftjs-exporter"],
+                    runtime='python39',
+                    type='event',
+                )
+                """
+            ),
+        }
+    )
+
+    # Verify - without the flag, we get an error
+    target = rule_runner.get_target(Address("src/python/foo/bar", target_name="gcf-error"))
+    with pytest.raises(ExecutionError, match="Encountered collisions"):
+        rule_runner.request(BuiltPackage, [PythonGoogleCloudFunctionFieldSet.create(target)])
+
+    # Exercise/Verify - passing collisions_ok resolves the issue
+    create_python_google_cloud_function(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="gcf-ok"),
+        expected_extra_log_lines=(
+            "    Runtime: python39",
+            "    Handler: handler",
+        ),
+    )

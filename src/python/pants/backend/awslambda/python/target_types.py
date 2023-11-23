@@ -9,6 +9,7 @@ from typing import ClassVar, Match, Optional, Tuple, cast
 
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.backend.python.util_rules.faas import (
+    PythonFaaSCollisionsOkField,
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
@@ -150,6 +151,7 @@ class _AWSLambdaBaseTarget(Target):
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
         PythonFaaSCompletePlatforms,
+        PythonFaaSCollisionsOkField,
         PythonResolveField,
         EnvironmentField,
     )

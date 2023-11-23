@@ -342,3 +342,75 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
             expected_extra_log_lines=("    Runtime: python3.7",),
             layer=True,
         )
+
+
+def test_collisions_ok(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": dedent(
+                """
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/BUILD": dedent(
+                """
+                # Per https://github.com/pantsbuild/pants/issues/20224, these both package their `tests/`
+                # folder at the top level with non-equal __init__.py and test_defaults.py within it.
+                python_requirement(name="django-hosts", requirements=["django-hosts==5.1"])
+                python_requirement(name="draftjs-exporter", requirements=["draftjs-exporter==2.1.7"])
+                python_sources()
+
+                python_aws_lambda_function(
+                    name='lambda-ok',
+                    handler='foo.bar.hello_world:handler',
+                    dependencies=[":django-hosts", ":draftjs-exporter"],
+                    runtime='python3.9',
+                    collisions_ok=True,
+                )
+                python_aws_lambda_layer(
+                    name='layer-ok',
+                    dependencies=[":django-hosts", ":draftjs-exporter"],
+                    runtime="python3.9",
+                    collisions_ok=True,
+                )
+
+                python_aws_lambda_function(
+                    name='lambda-error',
+                    handler='foo.bar.hello_world:handler',
+                    dependencies=[":django-hosts", ":draftjs-exporter"],
+                    runtime='python3.9',
+                )
+                python_aws_lambda_layer(
+                    name='layer-error',
+                    dependencies=[":django-hosts", ":draftjs-exporter"],
+                    runtime="python3.9",
+                )
+                """
+            ),
+        }
+    )
+
+    # Verify - without the flag, we get an error
+    target = rule_runner.get_target(Address("src/python/foo/bar", target_name="lambda-error"))
+    with pytest.raises(ExecutionError, match="Encountered collisions"):
+        rule_runner.request(BuiltPackage, [PythonAwsLambdaFieldSet.create(target)])
+    target = rule_runner.get_target(Address("src/python/foo/bar", target_name="layer-error"))
+    with pytest.raises(ExecutionError, match="Encountered collisions"):
+        rule_runner.request(BuiltPackage, [PythonAwsLambdaLayerFieldSet.create(target)])
+
+    # Exercise/Verify - passing collisions_ok resolves the issue
+    create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="lambda-ok"),
+        expected_extra_log_lines=(
+            "    Runtime: python3.9",
+            "    Handler: lambda_function.handler",
+        ),
+    )
+    create_python_awslambda(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="layer-ok"),
+        expected_extra_log_lines=("    Runtime: python3.9",),
+        layer=True,
+    )
