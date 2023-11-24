@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import textwrap
 
 import pytest
@@ -739,7 +740,6 @@ def test_force_version(rule_runner):
                 group="org.slf4j",
                 artifact="slf4j-api",
                 version="1.7.19",
-                strict=False,
             ).as_requirement(),
         ]
     )
@@ -758,12 +758,14 @@ def test_force_version(rule_runner):
                 artifact="parquet-common",
                 version="1.13.1",
             ).as_requirement(),
-            Coordinate(
-                group="org.slf4j",
-                artifact="slf4j-api",
-                version="1.7.19",
-                strict=True,
-            ).as_requirement(),
+            dataclasses.replace(
+                Coordinate(
+                    group="org.slf4j",
+                    artifact="slf4j-api",
+                    version="1.7.19",
+                ).as_requirement(),
+                force_version=True,
+            ),
         ]
     )
     entries = rule_runner.request(CoursierResolvedLockfile, [reqs]).entries
@@ -771,4 +773,5 @@ def test_force_version(rule_runner):
         group="org.slf4j",
         artifact="slf4j-api",
         version="1.7.19",
+        strict=True,
     ) in [e.coord for e in entries]
