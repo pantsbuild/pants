@@ -286,9 +286,9 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
   "render-line",
   "render-line-termion",
 ] }
-prost = "0.11"
-prost-build = "0.11"
-prost-types = "0.11"
+prost = "0.12"
+prost-build = "0.12"
+prost-types = "0.12"
 pyo3 = "0.19"
 rand = "0.8"
 regex = "1"
@@ -316,8 +316,8 @@ tokio-rustls = "0.24"
 tokio-stream = "0.1"
 tokio-util = "0.7"
 toml = "0.5"
-tonic = "0.9"
-tonic-build = "0.9"
+tonic = "0.10"
+tonic-build = "0.10"
 tower = "0.4"
 tower-layer = "0.3"
 tower-service = "0.3"

@@ -560,7 +560,7 @@ impl CommandRunner {
                 None
             })?;
 
-        ExecutionStageValue::from_i32(eom.stage)
+        ExecutionStageValue::try_from(eom.stage).ok()
     }
 
     // pub(crate) for testing
