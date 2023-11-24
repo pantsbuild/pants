@@ -400,7 +400,7 @@ async def prepare_coursier_resolve_info(
     for req in to_resolve:
         coord_arg_str = req.to_coord_arg_str()
         coord_arg_strings.add(coord_arg_str)
-        if req.force_version:
+        if req.coordinate.strict:
             force_version_coord_arg_strings.add(coord_arg_str)
 
     return CoursierResolveInfo(
