@@ -255,8 +255,10 @@ class JvmArtifactForceVersionField(BoolField):
     alias = "force_version"
     default = False
     help = help_text(
-        f"""
+        """
         Force artifact version during resolution.
+
+        If set, pants will pass `--force-version` argument to `coursier fetch` for this artifact.
         """
     )
 
