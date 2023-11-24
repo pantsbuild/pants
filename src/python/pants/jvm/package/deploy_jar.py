@@ -142,6 +142,7 @@ async def package_deploy_jar(
             compress=True,
         ),
     )
+    jar_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
 
     #
     # 3. Strip the JAR from  all non-reproducible metadata if requested so
@@ -170,9 +171,8 @@ async def package_deploy_jar(
         )
         jar_digest = shaded_jar.digest
 
-    prefixed_output_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
-    return BuiltPackage(digest=prefixed_output_digest, artifacts=(artifact,))
+    return BuiltPackage(digest=jar_digest, artifacts=(artifact,))
 
 
 def rules():
