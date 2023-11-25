@@ -85,7 +85,7 @@ class FrozenDict(Mapping[K, V]):
     def __reversed__(self) -> Iterator[K]:
         return reversed(tuple(self._data))
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: Any) -> Any:
         # defer to dict's __eq__
         return self._data == other
 
