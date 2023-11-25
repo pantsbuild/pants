@@ -142,7 +142,6 @@ async def package_deploy_jar(
             compress=True,
         ),
     )
-    jar_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
 
     #
     # 3. Strip the JAR from  all non-reproducible metadata if requested so
@@ -155,6 +154,8 @@ async def package_deploy_jar(
                 filenames=(output_filename.name,),
             ),
         )
+
+    jar_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
 
     #
     # 4. Apply shading rules
