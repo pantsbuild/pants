@@ -90,11 +90,6 @@ class FrozenDict(Mapping[K, V]):
             return NotImplemented
         return tuple(self.items()) == tuple(other.items())
 
-    def __lt__(self, other: Any) -> bool:
-        if not isinstance(other, FrozenDict):
-            return NotImplemented
-        return tuple(self._data.items()) < tuple(other._data.items())
-
     def _calculate_hash(self) -> int:
         try:
             return hash(tuple(self._data.items()))
