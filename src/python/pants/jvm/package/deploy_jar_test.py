@@ -429,7 +429,7 @@ def test_deploy_jar_shaded_in_subdir(rule_runner: RuleRunner) -> None:
                     deploy_jar(
                         name="example_app_deploy_jar",
                         main="org.pantsbuild.example.Example",
-                        output_path="dave.jar",
+                        output_path="subdir/dave.jar",
                         dependencies=[
                             ":example",
                         ],
