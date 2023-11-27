@@ -540,7 +540,7 @@ def _deploy_jar_test(
         [
             JvmProcess(
                 jdk=jdk,
-                argv=("-jar", "dave.jar"),
+                argv=("-jar", os.path.join(path, "dave.jar")),
                 classpath_entries=[],
                 description="Run that test jar",
                 input_digest=fat_jar.digest,
