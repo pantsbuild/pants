@@ -15,6 +15,7 @@ from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
+from pants.engine.fs import Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
@@ -535,12 +536,14 @@ def _deploy_jar_test(
         [DeployJarFieldSet.create(tgt)],
     )
 
+    digest_files = rule_runner.request(Snapshot, [fat_jar.digest]).files
+    assert len(digest_files) == 1
     process_result = rule_runner.request(
         ProcessResult,
         [
             JvmProcess(
                 jdk=jdk,
-                argv=("-jar", os.path.join(path, "dave.jar")),
+                argv=("-jar", digest_files[0]),
                 classpath_entries=[],
                 description="Run that test jar",
                 input_digest=fat_jar.digest,
