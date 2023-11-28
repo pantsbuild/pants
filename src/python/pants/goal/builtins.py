@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from pants.bsp.goal import BSPGoal
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal import help
 from pants.goal.builtin_goal import BuiltinGoal
@@ -13,12 +12,12 @@ from pants.goal.migrate_call_by_name import MigrateCallByNameBuiltinGoal
 
 
 def register_builtin_goals(build_configuration: BuildConfiguration.Builder) -> None:
-    build_configuration.register_subsystems("pants.goal", builtin_goals())
+    # build_configuration.register_subsystems("pants.goal", builtin_goals())
+    build_configuration.register_builtin_goals("builtin", builtin_goals())
 
 
 def builtin_goals() -> tuple[type[BuiltinGoal], ...]:
     return (
-        BSPGoal,
         CompletionBuiltinGoal,
         ExplorerBuiltinGoal,
         MigrateCallByNameBuiltinGoal,

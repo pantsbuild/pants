@@ -269,6 +269,24 @@ class BuildConfiguration:
         def register_remote_auth_plugin(self, remote_auth_plugin: Callable) -> None:
             self._remote_auth_plugin = remote_auth_plugin
 
+        def register_builtin_goals(self, plugin_or_backend: str, builtin_goals: Iterable[type]):
+            """Registers the given builtin goals."""
+            if not isinstance(builtin_goals, Iterable):
+                raise TypeError(
+                    f"The entrypoint `builtin_goals` must return an iterable. "
+                    f"Given {repr(builtin_goals)}"
+                )
+            # Import `BuiltinGoal` here to avoid import cycle.
+            from pants.goal.builtin_goal import BuiltinGoal
+
+            bad_elements = [goal for goal in builtin_goals if not issubclass(goal, BuiltinGoal)]
+            if bad_elements:
+                raise TypeError(
+                    "Every element of the entrypoint `builtin_goals` must be a subclass of "
+                    f"{BuiltinGoal.__name__}. Bad elements: {bad_elements}."
+                )
+            self.register_subsystems(plugin_or_backend, builtin_goals)
+
         def allow_unknown_options(self, allow: bool = True) -> None:
             """Allows overriding whether Options parsing will fail for unrecognized Options.
 
