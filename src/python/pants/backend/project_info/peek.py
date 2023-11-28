@@ -192,17 +192,16 @@ def describe_ruleset(ruleset: DependencyRuleSet | None) -> tuple[str, ...] | Non
         return None
     return ruleset.peek()
 
-async def _create_target_alias_to_goals_map(include_goals: bool) -> Mapping[str, tuple[str, ...]]:
+async def _create_target_alias_to_goals_map() -> Mapping[str, tuple[str, ...]]:
     """
     Returns a mapping from a target alias to the goals that can operate on that target.
 
     For instance, `pex_binary` would map to `("run", "package")`.
-    """
-    if not include_goals:
-        return {}
 
+    :return: A mapping from a target alias to the goals that can operate on that target.
+    """
     # TODO: This is manually curated for now - do we want to show all possible goals?
-    peekable_field_sets: Iterable[Type[FieldSet]] = [DeployFieldSet, PackageFieldSet, PublishFieldSet, RunFieldSet, TestFieldSet]
+    peekable_field_sets: Iterable[Type[FieldSet]] = [PackageFieldSet, RunFieldSet, TestFieldSet]
     # TODO: How do we get the goal subsystem from field set? This shouldn't need to be manually maintained
     field_set_to_goal_map = {
         DeployFieldSet: "experimental-deploy",
@@ -316,7 +315,7 @@ async def get_target_data(
             for application in all_applicable_dep_rules
         }
 
-    target_alias_to_goals_map = await _create_target_alias_to_goals_map(subsys.include_goals)
+    target_alias_to_goals_map = {}# await _create_target_alias_to_goals_map() if subsys.include_goals else {}
 
     return TargetDatas(
         TargetData(
