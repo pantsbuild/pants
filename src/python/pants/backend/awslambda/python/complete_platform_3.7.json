@@ -290,6 +290,7 @@
     "py30-none-manylinux_2_5_x86_64",
     "py30-none-manylinux1_x86_64",
     "py30-none-linux_x86_64",
+    "cp37-none-any",
     "py37-none-any",
     "py3-none-any",
     "py36-none-any",

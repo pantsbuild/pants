@@ -220,7 +220,7 @@ class VersionField(Field):
 
 > 👍 Asking for help
 > 
-> Have a tricky field you're trying to write? We would love to help! See [Getting Help](doc:community).
+> Have a tricky field you're trying to write? We would love to help! See [Getting Help](doc:the-pants-community).
 
 Examples
 --------

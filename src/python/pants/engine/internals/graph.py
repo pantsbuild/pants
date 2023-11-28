@@ -11,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, NewType, Sequence, Type, cast
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -68,7 +68,6 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     RegisteredTargetTypes,
-    SecondaryOwnerMixin,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -80,6 +79,8 @@ from pants.engine.target import (
     TargetGenerator,
     Targets,
     TargetTypesToGenerateTargetsRequests,
+    TransitivelyExcludeDependencies,
+    TransitivelyExcludeDependenciesRequest,
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
@@ -367,8 +368,9 @@ def _target_parametrizations(
     target_type: type[Target],
     union_membership: UnionMembership,
 ) -> _TargetParametrization:
-    first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
-    if rest:
+    expanded_parametrizations = tuple(Parametrize.expand(address, target_adaptor.kwargs))
+    first_address, first_kwargs = expanded_parametrizations[0]
+    if first_address is not address:
         # The target was parametrized, and so the original Target does not exist.
         generated = FrozenDict(
             (
@@ -381,7 +383,7 @@ def _target_parametrizations(
                     description_of_origin=target_adaptor.description_of_origin,
                 ),
             )
-            for parameterized_address, parameterized_fields in (first, *rest)
+            for parameterized_address, parameterized_fields in expanded_parametrizations
         )
         return _TargetParametrization(None, generated)
     else:
@@ -413,13 +415,17 @@ def _parametrized_target_generators_with_templates(
     template_fields = {}
     copied_fields = (
         *target_type.copied_fields,
-        *target_type._find_plugin_fields(union_membership),
+        *target_type._find_copied_plugin_fields(union_membership),
+    )
+    moved_fields = (
+        *target_type.moved_fields,
+        *target_type._find_moved_plugin_fields(union_membership),
     )
     for field_type in copied_fields:
         field_value = generator_fields.get(field_type.alias, None)
         if field_value is not None:
             template_fields[field_type.alias] = field_value
-    for field_type in target_type.moved_fields:
+    for field_type in moved_fields:
         field_value = generator_fields.pop(field_type.alias, None)
         if field_value is not None:
             template_fields[field_type.alias] = field_value
@@ -743,27 +749,65 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
 
 @rule(desc="Resolve transitive targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def transitive_targets(
-    request: TransitiveTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
+    request: TransitiveTargetsRequest,
+    local_environment_name: ChosenLocalEnvironmentName,
+    union_membership: UnionMembership,
 ) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots."""
+    environment_name = local_environment_name.val
 
     dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
+    targets = (*dependency_mapping.roots_as_targets, *dependency_mapping.visited)
 
     # Apply any transitive excludes (`!!` ignores).
-    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     unevaluated_transitive_excludes = []
-    for t in (*dependency_mapping.roots_as_targets, *dependency_mapping.visited):
+    for t in targets:
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
         if unparsed.values:
             unevaluated_transitive_excludes.append(unparsed)
+
+    transitive_exclude_addresses = []
     if unevaluated_transitive_excludes:
-        nested_transitive_excludes = await MultiGet(
-            Get(Targets, UnparsedAddressInputs, unparsed)
+        all_transitive_exclude_addresses = await MultiGet(
+            Get(Addresses, UnparsedAddressInputs, unparsed)
             for unparsed in unevaluated_transitive_excludes
         )
-        transitive_excludes = FrozenOrderedSet(
-            itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
+        transitive_exclude_addresses = [
+            *itertools.chain.from_iterable(all_transitive_exclude_addresses)
+        ]
+
+    # Apply plugin-provided transitive excludes
+    if request_types := cast(
+        "Sequence[Type[TransitivelyExcludeDependenciesRequest]]",
+        union_membership.get(TransitivelyExcludeDependenciesRequest),
+    ):
+        tgts_to_request_types = {
+            tgt: [
+                inference_request_type
+                for inference_request_type in request_types
+                if inference_request_type.infer_from.is_applicable(tgt)
+            ]
+            for tgt in targets
+        }
+
+        results = await MultiGet(
+            Get(
+                TransitivelyExcludeDependencies,
+                {
+                    request_type(
+                        request_type.infer_from.create(tgt)
+                    ): TransitivelyExcludeDependenciesRequest,
+                    environment_name: EnvironmentName,
+                },
+            )
+            for tgt, request_types in tgts_to_request_types.items()
+            for request_type in request_types
         )
+        transitive_exclude_addresses.extend(
+            itertools.chain.from_iterable(addresses for addresses in results)
+        )
+
+    transitive_excludes = await Get(Targets, Addresses(transitive_exclude_addresses))
 
     return TransitiveTargets(
         tuple(dependency_mapping.roots_as_targets),
@@ -899,15 +943,7 @@ class OwnersRequest:
     match_if_owning_build_file_included_in_sources: bool = False
 
 
-# NB: This was changed from:
-# class Owners(Collection[Address]):
-#     pass
-# In https://github.com/pantsbuild/pants/pull/19191 to facilitate surgical warning of deprecation
-# of SecondaryOwnerMixin. After the Deprecation ends, it can be changed back.
-IsPrimary = NewType("IsPrimary", bool)
-
-
-class Owners(FrozenDict[Address, IsPrimary]):
+class Owners(FrozenOrderedSet[Address]):
     pass
 
 
@@ -962,7 +998,7 @@ async def find_owners(
     )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
-    result = {}
+    result = set()
     unmatched_sources = set(owners_request.sources)
     for live in (True, False):
         candidate_tgts: Sequence[Target]
@@ -987,20 +1023,6 @@ async def find_owners(
             matching_files = set(
                 candidate_tgt.get(SourcesField).filespec_matcher.matches(list(sources_set))
             )
-            is_primary = bool(matching_files)
-
-            # Also consider secondary ownership, meaning it's not a `SourcesField` field with
-            # primary ownership, but the target still should match the file. We can't use
-            # `tgt.get()` because this is a mixin, and there technically may be >1 field.
-            secondary_owner_fields = tuple(
-                field  # type: ignore[misc]
-                for field in candidate_tgt.field_values.values()
-                if isinstance(field, SecondaryOwnerMixin)
-            )
-            for secondary_owner_field in secondary_owner_fields:
-                matching_files.update(
-                    secondary_owner_field.filespec_matcher.matches(list(sources_set))
-                )
 
             if not matching_files and not (
                 owners_request.match_if_owning_build_file_included_in_sources
@@ -1009,7 +1031,7 @@ async def find_owners(
                 continue
 
             unmatched_sources -= matching_files
-            result[candidate_tgt.address] = IsPrimary(is_primary)
+            result.add(candidate_tgt.address)
 
     if (
         unmatched_sources

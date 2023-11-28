@@ -143,6 +143,14 @@ class DockerOptions(Subsystem):
             """
         ),
     )
+    use_buildx = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Use [buildx](https://github.com/docker/buildx#buildx) (and BuildKit) for builds.
+            """
+        ),
+    )
     _build_args = ShellStrListOption(
         help=softwrap(
             f"""
@@ -174,6 +182,26 @@ class DockerOptions(Subsystem):
             build for at execution time.
             """
         ),
+    )
+    build_hosts = DictOption[str](
+        default={},
+        help=softwrap(
+            f"""
+            Hosts entries to be added to the `/etc/hosts` file in all built images.
+
+            Example:
+
+                [{options_scope}]
+                build_hosts = {{"docker": "10.180.0.1", "docker2": "10.180.0.2"}}
+
+            Use the `extra_build_hosts` field on a `docker_image` target for additional
+            image specific host entries.
+            """
+        ),
+    )
+    build_no_cache = BoolOption(
+        default=False,
+        help="Do not use the Docker cache when building images.",
     )
     build_verbose = BoolOption(
         default=False,

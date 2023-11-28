@@ -9,7 +9,7 @@ createdAt: "2020-05-16T22:53:24.499Z"
 >
 > Change the `pants_version` option in the `[GLOBAL]` scope in your pants.toml to upgrade.
 >
-> You can see all releases at <https://pypi.org/project/pantsbuild.pants/#history>.
+> You can see all releases at <https://github.com/pantsbuild/pants/releases>.
 
 Upgrade one minor release at a time
 -----------------------------------
@@ -47,7 +47,7 @@ It is also helpful to spot-check that your main commands like `lint`, `package`,
 >
 > As described in our [Release strategy](doc:release-strategy), we make weekly dev releases with all the latest features and bug fixes we've been working on. While dev releases are less stable, they mean you get access to improvements sooner.
 >
-> If you encounter any blocking issues, you can easily roll back to a prior version by changing the `pants_version` option. (Please let us know the issue by opening a [GitHub issue](https://github.com/pantsbuild/pants/issues) or messaging us on [Slack](doc:community)).
+> If you encounter any blocking issues, you can easily roll back to a prior version by changing the `pants_version` option. (Please let us know the issue by opening a [GitHub issue](https://github.com/pantsbuild/pants/issues) or messaging us on [Slack](doc:the-pants-community)).
 
 Ignore deprecation messages with `ignore_warnings`
 --------------------------------------------------
@@ -76,4 +76,4 @@ Run `curl -L -o pants https://pantsbuild.github.io/setup/pants` to check if ther
 Find any bugs or issues?
 ------------------------
 
-Please either open a [GitHub issue](https://github.com/pantsbuild/pants/issues) or head over to [Slack](doc:community). We'd be happy to help and would appreciate knowing about the issue!
+Please either open a [GitHub issue](https://github.com/pantsbuild/pants/issues) or head over to [Slack](doc:the-pants-community). We'd be happy to help and would appreciate knowing about the issue!

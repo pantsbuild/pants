@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import os
 import re
 from dataclasses import dataclass, field
@@ -264,7 +265,7 @@ def global_env() -> Env:
 
 
 def rust_channel() -> str:
-    with open("rust-toolchain") as fp:
+    with open("src/rust/engine/rust-toolchain") as fp:
         rust_toolchain = toml.load(fp)
     return cast(str, rust_toolchain["toolchain"]["channel"])
 
@@ -316,20 +317,16 @@ def install_go() -> Step:
     }
 
 
-def deploy_to_s3(
-    name: str,
-    *,
-    scope: str | None = None,
-) -> Step:
-    run = "./pants run src/python/pants_release/deploy_to_s3.py"
-    if scope:
-        run = f"{run} -- --scope {scope}"
+# NOTE: Any updates to the version of arduino/setup-protoc will require an audit of the updated  source code to verify
+# nothing "bad" has been added to the action. (We pass the user's GitHub secret to the action in order to avoid the
+# default GitHub rate limits when downloading protoc._
+def install_protoc() -> Step:
     return {
-        "name": name,
-        "run": run,
-        "env": {
-            "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
-            "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
+        "name": "Install Protoc",
+        "uses": "arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9",
+        "with": {
+            "version": "23.x",
+            "repo-token": "${{ secrets.GITHUB_TOKEN }}",
         },
     }
 
@@ -391,6 +388,14 @@ class Helper:
             ret["ARCHFLAGS"] = "-arch arm64"
         if self.platform == Platform.LINUX_ARM64:
             ret["PANTS_CONFIG_FILES"] = "+['pants.ci.toml','pants.ci.aarch64.toml']"
+        if self.platform == Platform.LINUX_X86_64:
+            # Currently we run Linux x86_64 CI on GitHub Actions-hosted hardware, and
+            # these are weak dual-core machines. Default parallelism on those machines
+            # leads to many test timeouts. This parallelism reduction appears to lead
+            # to test shard runs that are 50% slower on average, but more likely to
+            # complete without timeouts.
+            # TODO: If we add a "redo timed out tests" feature, we can kill this.
+            ret["PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM"] = "1"
         return ret
 
     def maybe_append_cargo_test_parallelism(self, cmd: str) -> str:
@@ -436,12 +441,17 @@ class Helper:
 
     def rust_caches(self) -> Sequence[Step]:
         return [
+            install_protoc(),  # for `prost` crate
+            {
+                "name": "Set rustup profile",
+                "run": "rustup set profile default",
+            },
             {
                 "name": "Cache Rust toolchain",
                 "uses": "actions/cache@v3",
                 "with": {
                     "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                    "key": f"{self.platform_name()}-rustup-{hash_files('rust-toolchain')}-v2",
+                    "key": f"{self.platform_name()}-rustup-{hash_files('src/rust/engine/rust-toolchain')}-v2",
                 },
             },
             {
@@ -542,7 +552,7 @@ class Helper:
             "continue-on-error": True,
             "with": {
                 "name": f"logs-{name.replace('/', '_')}-{self.platform_name()}",
-                "path": ".pants.d/*.log",
+                "path": ".pants.d/workdir/*.log",
             },
         }
 
@@ -602,20 +612,22 @@ def bootstrap_jobs(
         # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
         # pass on GHA MacOS containers.
         step_cmd = helper.wrap_cmd(
-            helper.maybe_append_cargo_test_parallelism("./cargo test --tests -- --nocapture")
+            helper.maybe_append_cargo_test_parallelism(
+                "./cargo test --locked --tests -- --nocapture"
+            )
         )
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
         human_readable_step_name = "Test and lint Rust"
         # We pass --tests to skip doc tests because our generated protos contain
-        # invalid doc tests in their comments.
+        # invalid doc tests in their comments, and --benches to ensure that the
+        # benchmarks can at least execute once correctly
         step_cmd = "\n".join(
             [
                 "./build-support/bin/check_rust_pre_commit.sh",
                 helper.maybe_append_cargo_test_parallelism(
-                    "./cargo test --all --tests -- --nocapture"
+                    "./cargo test --locked --all --tests --benches -- --nocapture"
                 ),
-                "./cargo check --benches",
                 "./cargo doc",
             ]
         )
@@ -846,6 +858,7 @@ def build_wheels_job(
             },
             "steps": [
                 *initial_steps,
+                install_protoc(),  # for prost crate
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 {
                     "name": "Build wheels",
@@ -858,24 +871,63 @@ def build_wheels_job(
                     "env": helper.platform_env(),
                 },
                 helper.upload_log_artifacts(name="wheels-and-pex"),
-                *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
                 *(
                     [
                         {
-                            "name": "Upload Pants PEX",
+                            "name": "Upload Wheel and Pex",
                             "if": "needs.release_info.outputs.is-release == 'true'",
-                            "env": {
-                                "GH_TOKEN": "${{ github.token }}",
-                                "GH_REPO": "${{ github.repository }}",
-                            },
+                            # NB: We can't use `gh` or even `./pants run 3rdparty/tools/gh` reliably
+                            #   in this job. Certain variations run on docker images without `gh`,
+                            #   and we could be building on a tag that doesn't have the `pants run <gh>`
+                            #   support. `curl` is a good lowest-common-denominator way to upload the assets.
                             "run": dedent(
                                 """\
-                                LOCAL_TAG=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;major, minor = sys.version_info[:2];import os;uname = os.uname();print(f'cp{major}{minor}-{uname.sysname.lower()}_{uname.machine.lower()}')")
-                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/pants.$LOCAL_TAG.pex
-                                gh release upload --no-clobber ${{ needs.release_info.outputs.build-ref }} dist/src.python.pants/pants.$LOCAL_TAG.pex
+                                PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+                                PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+                                PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+
+                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \\
+                                    --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+                                WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants-*.whl")
+                                curl -L --fail \\
+                                    -X POST \\
+                                    -H "Authorization: Bearer ${{ github.token }}" \\
+                                    -H "Content-Type: application/octet-stream" \\
+                                    "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \\
+                                    --data-binary "@$WHL";
                                 """
                             ),
-                        }
+                        },
+                        *(
+                            [
+                                {
+                                    "name": "Upload testutil Wheel",
+                                    "if": "needs.release_info.outputs.is-release == 'true'",
+                                    # NB: See above about curl
+                                    "run": dedent(
+                                        """\
+                                        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild.pants.testutil*.whl")
+                                        curl -L --fail \\
+                                            -X POST \\
+                                            -H "Authorization: Bearer ${{ github.token }}" \\
+                                            -H "Content-Type: application/octet-stream" \\
+                                            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \\
+                                            --data-binary "@$WHL";
+                                """
+                                    ),
+                                },
+                            ]
+                            if platform == Platform.LINUX_X86_64
+                            else []
+                        ),
                     ]
                     if for_deploy_ref
                     else []
@@ -1032,10 +1084,8 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
 
 
 def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
-    """Builds and releases a git ref to S3, and (if the ref is a release tag) to PyPI."""
     inputs, env = workflow_dispatch_inputs([WorkflowInput("REF", "string")])
 
-    pypi_release_dir = "dest/pypi_release"
     helper = Helper(Platform.LINUX_X86_64)
     wheels_jobs = build_wheels_jobs(
         needs=["release_info"], for_deploy_ref=gha_expr("needs.release_info.outputs.build-ref")
@@ -1067,6 +1117,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 {
                     "name": "Make GitHub Release",
+                    "id": "make_draft_release",
                     "if": f"{IS_PANTS_OWNER} && steps.get_info.outputs.is-release == 'true'",
                     "env": {
                         "GH_TOKEN": "${{ github.token }}",
@@ -1078,32 +1129,36 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         RELEASE_VERSION="${RELEASE_TAG#release_}"
 
                         # NB: This could be a re-run of a release, in the event a job/step failed.
-                        if gh release view $RELEASE_TAG ; then
-                            exit 0
-                        fi
-
-                        GH_RELEASE_ARGS=("--notes" "")
-                        GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
-                        if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
-                            GH_RELEASE_ARGS+=("--prerelease")
-                            GH_RELEASE_ARGS+=("--latest=false")
-                        else
-                            STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
-                            LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\\n' | sort --version-sort | tail -n 1)
-                            if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
-                                GH_RELEASE_ARGS+=("--latest=true")
-                            else
+                        if ! gh release view $RELEASE_TAG ; then
+                            GH_RELEASE_ARGS=("--notes" "")
+                            GH_RELEASE_ARGS+=("--title" "$RELEASE_TAG")
+                            if [[ $RELEASE_VERSION =~ [[:alpha:]] ]]; then
+                                GH_RELEASE_ARGS+=("--prerelease")
                                 GH_RELEASE_ARGS+=("--latest=false")
+                            else
+                                STABLE_RELEASE_TAGS=$(gh api -X GET -F per_page=100 /repos/{owner}/{repo}/releases --jq '.[].tag_name | sub("^release_"; "") | select(test("^[0-9.]+$"))')
+                                LATEST_TAG=$(echo "$STABLE_RELEASE_TAGS $RELEASE_TAG" | tr ' ' '\\n' | sort --version-sort | tail -n 1)
+                                if [[ $RELEASE_TAG == $LATEST_TAG ]]; then
+                                    GH_RELEASE_ARGS+=("--latest=true")
+                                else
+                                    GH_RELEASE_ARGS+=("--latest=false")
+                                fi
                             fi
+
+                            gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}" --draft
                         fi
 
-                        gh release create "$RELEASE_TAG" "${GH_RELEASE_ARGS[@]}" --draft
+                        ASSET_UPLOAD_URL=$(gh release view "$RELEASE_TAG" --json uploadUrl --jq '.uploadUrl | sub("\\\\{\\\\?.*$"; "")')
+                        echo "release-asset-upload-url=$ASSET_UPLOAD_URL" >> $GITHUB_OUTPUT
                         """
                     ),
                 },
             ],
             "outputs": {
                 "build-ref": gha_expr("steps.get_info.outputs.build-ref"),
+                "release-asset-upload-url": gha_expr(
+                    "steps.make_draft_release.outputs.release-asset-upload-url"
+                ),
                 "is-release": gha_expr("steps.get_info.outputs.is-release"),
             },
         },
@@ -1112,6 +1167,10 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "runs-on": "ubuntu-latest",
             "needs": [*wheels_job_names, "release_info"],
             "if": f"{IS_PANTS_OWNER} && needs.release_info.outputs.is-release == 'true'",
+            "env": {
+                # This job does not actually build anything: only download wheels from S3.
+                "MODE": "debug",
+            },
             "steps": [
                 {
                     "name": "Checkout Pants at Release Tag",
@@ -1121,51 +1180,18 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         # clone the repo, we're not so big as to need to optimize this.
                         "fetch-depth": "0",
                         "ref": f"{gha_expr('needs.release_info.outputs.build-ref')}",
+                        "fetch-tags": True,
                     },
                 },
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
-                {
-                    "name": "Fetch and stabilize wheels",
-                    "run": f"./pants run src/python/pants_release/release.py -- fetch-and-stabilize --dest={pypi_release_dir}",
-                    "env": {
-                        # This step does not actually build anything: only download wheels from S3.
-                        "MODE": "debug",
-                    },
-                },
-                {
-                    "name": "Create Release -> Commit Mapping",
-                    # The `git rev-parse` subshell below is used to obtain the tagged commit sha.
-                    # The syntax it uses is tricky, but correct. The literal suffix `^{commit}` gets
-                    # the sha of the commit object that is the tag's target (as opposed to the sha
-                    # of the tag object itself). Due to Python f-strings, the nearness of shell
-                    # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
-                    "run": dedent(
-                        f"""\
-                        tag="{gha_expr("needs.release_info.outputs.build-ref")}"
-                        commit="$(git rev-parse ${{tag}}^{{commit}})"
-
-                        echo "Recording tag ${{tag}} is of commit ${{commit}}"
-                        mkdir -p dist/deploy/tags/pantsbuild.pants
-                        echo "${{commit}}" > "dist/deploy/tags/pantsbuild.pants/${{tag}}"
-                        """
-                    ),
-                },
-                {
-                    "name": "Publish to PyPI",
-                    "uses": "pypa/gh-action-pypi-publish@release/v1",
-                    "with": {
-                        "password": gha_expr("secrets.PANTSBUILD_PYPI_API_TOKEN"),
-                        "packages-dir": pypi_release_dir,
-                        "skip-existing": True,
-                    },
-                },
+                *helper.bootstrap_caches(),
                 {
                     "name": "Generate announcement",
                     "run": dedent(
                         """\
                         ./pants run src/python/pants_release/generate_release_announcement.py \
-                        -- --channel=slack >> ${{ runner.temp }}/slack_announcement.json
+                        -- --output-dir=${{ runner.temp }}
                         """
                     ),
                 },
@@ -1178,10 +1204,38 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "env": {"SLACK_BOT_TOKEN": f"{gha_expr('secrets.SLACK_BOT_TOKEN')}"},
                 },
-                deploy_to_s3(
-                    "Deploy commit mapping to S3",
-                    scope="tags/pantsbuild.pants",
-                ),
+                {
+                    "name": "Announce to pants-devel",
+                    "uses": "dawidd6/action-send-mail@v3.8.0",
+                    "with": {
+                        # Note: Email is sent from the dedicated account pants.announce@gmail.com.
+                        # The EMAIL_CONNECTION_URL should be of the form:
+                        # smtp+starttls://pants.announce@gmail.com:password@smtp.gmail.com:465
+                        # (i.e., should use gmail's raw SMTP server), and the password
+                        # should be a Google account "app password" set up for this purpose
+                        # (not the Google account's regular password).
+                        # And, of course, that account must have permission to post to pants-devel.
+                        "connection_url": f"{gha_expr('secrets.EMAIL_CONNECTION_URL')}",
+                        "secure": True,
+                        "subject": "file://${{ runner.temp }}/email_announcement_subject.txt",
+                        "to": "pants-devel@googlegroups.com",
+                        "from": "Pants Announce",
+                        "body": "file://${{ runner.temp }}/email_announcement_body.md",
+                        "convert_markdown": True,
+                    },
+                },
+                {
+                    "name": "Get release notes",
+                    "run": dedent(
+                        """\
+                        ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
+                        """
+                    ),
+                    "env": {
+                        "GH_TOKEN": "${{ github.token }}",
+                        "GH_REPO": "${{ github.repository }}",
+                    },
+                },
                 {
                     "name": "Publish GitHub Release",
                     "env": {
@@ -1190,8 +1244,18 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     },
                     "run": dedent(
                         f"""\
-                        gh release upload {gha_expr("needs.release_info.outputs.build-ref") } {pypi_release_dir}
-                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false
+                        gh release edit {gha_expr("needs.release_info.outputs.build-ref") } --draft=false --notes-file notes.txt
+                        """
+                    ),
+                },
+                {
+                    "name": "Trigger cheeseshop build",
+                    "env": {
+                        "GH_TOKEN": "${{ secrets.WORKER_PANTS_CHEESESHOP_TRIGGER_PAT }}",
+                    },
+                    "run": dedent(
+                        """\
+                        gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F event_type=github-pages
                         """
                     ),
                 },
@@ -1300,7 +1364,10 @@ PUBLIC_REPOS = [
         # skip check
         goals=[DefaultGoals.tailor_update_build_files, "lint ::", DefaultGoals.test],
     ),
+    # other pants' managed repos
+    Repo(name="pantsbuild/scie-pants", python_version="3.9"),
     # public repos
+    Repo(name="AlexTereshenkov/cheeseshop-query", python_version="3.9"),
     Repo(name="Ars-Linguistica/mlconjug3", goals=[DefaultGoals.package]),
     Repo(
         name="fucina/treb",
@@ -1321,12 +1388,12 @@ PUBLIC_REPOS = [
     Repo(name="komprenilo/liga", python_version="3.9", goals=[DefaultGoals.package]),
     Repo(
         name="lablup/backend.ai",
-        python_version="3.11.3",
+        python_version="3.11.4",
         setup_commands="mkdir .tmp",
         goals=[
             DefaultGoals.tailor_update_build_files,
             DefaultGoals.lint_check,
-            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::",
+            "test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::",
             DefaultGoals.package,
         ],
     ),
@@ -1672,14 +1739,24 @@ def main() -> None:
     args = create_parser().parse_args()
     generated_yaml = generate()
     if args.check:
-        for path, content in generated_yaml.items():
-            if path.read_text() != content:
+        for path, expected in generated_yaml.items():
+            actual = path.read_text()
+            if actual != expected:
+                diff = difflib.unified_diff(
+                    actual.splitlines(),
+                    expected.splitlines(),
+                    fromfile="actual",
+                    tofile="expected",
+                    lineterm="",
+                )
                 die(
                     os.linesep.join(
                         (
                             f"Error: Generated path mismatched: {path}",
-                            "To re-generate, run: `./pants run src/python/pants_release/"
-                            "generate_github_workflows.py`",
+                            "To re-generate, run: `./pants run src/python/pants_release/generate_github_workflows.py`",
+                            "Also note that you might need to merge the latest changes to `main` to this branch.",
+                            "Diff:",
+                            *diff,
                         )
                     )
                 )

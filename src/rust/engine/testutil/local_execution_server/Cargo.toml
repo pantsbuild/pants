@@ -8,4 +8,7 @@ publish = false
 [dependencies]
 protos = { path = "../../protos" }
 mock = { path = "../mock" }
-clap = { version = "3", features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

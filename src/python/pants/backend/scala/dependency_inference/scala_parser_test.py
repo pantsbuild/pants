@@ -16,6 +16,7 @@ from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.engine import process
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *jdk_rules.rules(),
             *target_types.rules(),
             *jvm_util_rules.rules(),
+            *process.rules(),
             QueryRule(AnalyzeScalaSourceRequest, (SourceFilesRequest,)),
             QueryRule(ScalaSourceDependencyAnalysis, (AnalyzeScalaSourceRequest,)),
         ],
@@ -593,6 +595,60 @@ def test_package_object_extends_trait(rule_runner: RuleRunner) -> None:
     )
 
     assert sorted(analysis.fully_qualified_consumed_symbols()) == ["foo.Trait", "foo.bar.Trait"]
+
+
+def test_enum(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.3.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+            enum Spam {
+                case Ham
+                case Eggs
+            }
+            """
+        ),
+    )
+
+    expected_symbols = [
+        ScalaProvidedSymbol("foo.Spam", False),
+        ScalaProvidedSymbol("foo.Spam.Eggs", False),
+        ScalaProvidedSymbol("foo.Spam.Ham", False),
+    ]
+
+    assert sorted(analysis.provided_symbols, key=lambda x: x.name) == expected_symbols
+
+
+def test_enum_use(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.3.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+            enum Spam {
+                case Ham(x: Eggs)
+            }
+            """
+        ),
+    )
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == ["foo.Eggs"]
 
 
 def test_types_at_toplevel_package(rule_runner: RuleRunner) -> None:

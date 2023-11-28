@@ -51,7 +51,7 @@ class ParametrizeDefault(Parametrize):
         return cls(
             *map(freeze, parametrize.args),
             **{kw: freeze(arg) for kw, arg in parametrize.kwargs.items()},
-        )
+        ).to_weak()
 
 
 @dataclass
@@ -94,10 +94,30 @@ class BuildFileDefaultsParserState:
             {
                 target_alias: FrozenDict(
                     {
-                        field_type.alias: self._freeze_field_value(field_type, default)
-                        for field_alias, default in fields.items()
-                        for field_type in self._target_type_field_types(types[target_alias])
-                        if field_alias in (field_type.alias, field_type.deprecated_alias)
+                        **{
+                            field_type.alias: self._freeze_field_value(field_type, default)
+                            for field_alias, default in fields.items()
+                            for field_type in self._target_type_field_types(types[target_alias])
+                            if field_alias in (field_type.alias, field_type.deprecated_alias)
+                        },
+                        **{
+                            key: ParametrizeDefault(
+                                parametrize.group_name,
+                                **{
+                                    field_type.alias: self._freeze_field_value(field_type, default)
+                                    for field_alias, default in parametrize.kwargs.items()
+                                    for field_type in self._target_type_field_types(
+                                        types[target_alias]
+                                    )
+                                    if field_alias
+                                    in (field_type.alias, field_type.deprecated_alias)
+                                },
+                            )
+                            .to_weak()
+                            .to_group()
+                            for key, parametrize in fields.items()
+                            if isinstance(parametrize, Parametrize) and parametrize.is_group
+                        },
                     }
                 )
                 for target_alias, fields in self.defaults.items()
@@ -114,7 +134,7 @@ class BuildFileDefaultsParserState:
         all: SetDefaultsValueT | None = None,
         extend: bool = False,
         ignore_unknown_fields: bool = False,
-        **kwargs,
+        ignore_unknown_targets: bool = False,
     ) -> None:
         defaults: dict[str, dict[str, Any]] = (
             {} if not extend else {k: dict(v) for k, v in self.defaults.items()}
@@ -125,10 +145,16 @@ class BuildFileDefaultsParserState:
                 defaults,
                 {tuple(self.registered_target_types.aliases): all},
                 ignore_unknown_fields=True,
+                ignore_unknown_targets=ignore_unknown_targets,
             )
 
         for arg in args:
-            self._process_defaults(defaults, arg, ignore_unknown_fields=ignore_unknown_fields)
+            self._process_defaults(
+                defaults,
+                arg,
+                ignore_unknown_fields=ignore_unknown_fields,
+                ignore_unknown_targets=ignore_unknown_targets,
+            )
 
         # Update with new defaults, dropping targets without any default values.
         for tgt, default in defaults.items():
@@ -148,6 +174,7 @@ class BuildFileDefaultsParserState:
         defaults: dict[str, dict[str, Any]],
         targets_defaults: SetDefaultsT,
         ignore_unknown_fields: bool = False,
+        ignore_unknown_targets: bool = False,
     ):
         if not isinstance(targets_defaults, dict):
             raise ValueError(
@@ -168,6 +195,8 @@ class BuildFileDefaultsParserState:
             for target_alias in map(str, targets):
                 if target_alias in types:
                     target_type = types[target_alias]
+                elif ignore_unknown_targets:
+                    continue
                 else:
                     raise ValueError(f"Unrecognized target type {target_alias} in {self.address}.")
 
@@ -181,15 +210,24 @@ class BuildFileDefaultsParserState:
                     ).keys()
                 )
 
-                for field_alias in default.keys():
-                    if field_alias not in valid_field_aliases:
-                        if ignore_unknown_fields:
-                            del raw_values[field_alias]
-                        else:
-                            raise InvalidFieldException(
-                                f"Unrecognized field `{field_alias}` for target {target_type.alias}. "
-                                f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
-                            )
+                def _check_field_alias(field_alias: str) -> None:
+                    if field_alias in valid_field_aliases:
+                        return
+                    if not ignore_unknown_fields:
+                        raise InvalidFieldException(
+                            f"Unrecognized field `{field_alias}` for target {target_type.alias}. "
+                            f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
+                        )
+                    elif field_alias in raw_values:
+                        del raw_values[field_alias]
+
+                for field_alias, field_value in default.items():
+                    if isinstance(field_value, Parametrize) and field_value.is_group:
+                        field_value.to_weak()
+                        for parametrize_field_alias in field_value.kwargs.keys():
+                            _check_field_alias(parametrize_field_alias)
+                    else:
+                        _check_field_alias(field_alias)
 
                 # Merge all provided defaults for this call.
                 defaults.setdefault(target_type.alias, {}).update(raw_values)

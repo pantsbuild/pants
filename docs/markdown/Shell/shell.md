@@ -61,7 +61,7 @@ shell_source(name="script_without_a_extension", source="script_without_an_extens
 
 > 📘 Shell dependency inference
 > 
-> Pants will [infer dependencies](doc:dependencies-and-dependency-inference) by looking for imports like `source script.sh` and `. script.sh`. You can check that the correct dependencies are inferred by running `pants dependencies path/to/script.sh` and `pants dependencies --transitive path/to/script.sh`.
+> Pants will infer dependencies by looking for imports like `source script.sh` and `. script.sh`. You can check that the correct dependencies are inferred by running `pants dependencies path/to/script.sh` and `pants dependencies --transitive path/to/script.sh`.
 > 
 > Normally, Pants will not understand dynamic sources, e.g. using variable expansion. However, Pants uses Shellcheck for parsing, so you can use Shellcheck's syntax to give a hint to Pants:
 > 
@@ -353,7 +353,7 @@ You can include the result of `pants package` in your test through the `runtime_
 
 This allows you to test your packaging pipeline by simply running `pants test ::`, without needing custom integration test scripts.
 
-To depend on a built package, use the `runtime_package_dependencies` field on the `shunit2_test` / `shunit2_tests` targets, which is a list of addresses to targets that can be built with `pants package`, such as [`pex_binary`](doc:python-package-goal), [`python_aws_lambda_function`](doc:awslambda-python), and [`archive`](doc:resources) targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix.
+To depend on a built package, use the `runtime_package_dependencies` field on the `shunit2_test` / `shunit2_tests` targets, which is a list of addresses to targets that can be built with `pants package`, such as [`pex_binary`](doc:python-package-goal), [`python_aws_lambda_function`](doc:awslambda-python), and [`archive`](doc:assets) targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix.
 
 For example:
 

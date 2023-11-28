@@ -437,7 +437,6 @@ class Target:
             other.field_values,
         )
 
-    @final
     @classmethod
     @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
@@ -1037,6 +1036,10 @@ class TargetGenerator(Target):
     # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    @distinct_union_type_per_subclass
+    class MovedPluginField:
+        """A plugin field that should be moved into the generated targets."""
+
     def validate(self) -> None:
         super().validate()
 
@@ -1051,6 +1054,45 @@ class TargetGenerator(Target):
                 "`TargetGenerator.copied_field`. `Dependencies` fields should be "
                 "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
             )
+
+    @classmethod
+    def register_plugin_field(cls, field: Type[Field], *, as_moved_field=False) -> UnionRule:
+        if as_moved_field:
+            return UnionRule(cls.MovedPluginField, field)
+        else:
+            return super().register_plugin_field(field)
+
+    @classmethod
+    @memoized_method
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
+        return (
+            *cls._find_copied_plugin_fields(union_membership),
+            *cls._find_moved_plugin_fields(union_membership),
+        )
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_moved_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
+        result: set[type[Field]] = set()
+        classes = [cls]
+        while classes:
+            cls = classes.pop()
+            classes.extend(cls.__bases__)
+            if issubclass(cls, TargetGenerator):
+                result.update(cast("set[type[Field]]", union_membership.get(cls.MovedPluginField)))
+
+        return tuple(result)
+
+    @final
+    @classmethod
+    @memoized_method
+    def _find_copied_plugin_fields(
+        cls, union_membership: UnionMembership
+    ) -> tuple[type[Field], ...]:
+        return super()._find_plugin_fields(union_membership)
 
 
 class TargetFilesGenerator(TargetGenerator):
@@ -2433,44 +2475,6 @@ class SourcesPathsRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
-class SecondaryOwnerMixin(ABC):
-    """Add to a Field for the target to work with file arguments and `--changed-since`, without it
-    needing a `SourcesField`.
-
-    Why use this? In a dependency inference world, multiple targets including the same file in the
-    `sources` field causes issues due to ambiguity over which target to use. So, only one target
-    should have "primary ownership" of the file. However, you may still want other targets to be
-    used when that file is included in file arguments. For example, a `python_source` target
-    being the primary owner of the `.py` file, but a `pex_binary` still working with file
-    arguments for that file. Secondary ownership means that the target won't be used for things like
-    dependency inference and hydrating sources, but file arguments will still work.
-
-    There should be a primary owner of the file(s), e.g. the `python_source` in the above example.
-    Typically, you will want to add a dependency inference rule to infer a dep on that primary
-    owner.
-
-    All associated files must live in the BUILD target's directory or a subdirectory to work
-    properly, like the `sources` field.
-    """
-
-    @property
-    @abstractmethod
-    def filespec(self) -> Filespec:
-        """A dictionary in the form {'globs': ['full/path/to/f.ext']} representing the field's
-        associated files.
-
-        Typically, users should use a file name/glob relative to the BUILD file, like the `sources`
-        field. Then, you can use `os.path.join(self.address.spec_path, self.value)` to relative to
-        the build root.
-        """
-
-    @memoized_property
-    def filespec_matcher(self) -> FilespecMatcher:
-        # Note: memoized because parsing the globs is expensive:
-        # https://github.com/pantsbuild/pants/issues/16122
-        return FilespecMatcher(self.filespec["includes"], self.filespec.get("excludes", []))
-
-
 def targets_with_sources_types(
     sources_types: Iterable[type[SourcesField]],
     targets: Iterable[Target],
@@ -2728,6 +2732,26 @@ class InferredDependencies:
         """The result of inferring dependencies."""
         object.__setattr__(self, "include", FrozenOrderedSet(sorted(include)))
         object.__setattr__(self, "exclude", FrozenOrderedSet(sorted(exclude)))
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class TransitivelyExcludeDependenciesRequest(Generic[FS], EngineAwareParameter):
+    """A request to transitvely exclude dependencies of a "root" node.
+
+    This is similar to `InferDependenciesRequest`, except the request is only made for "root" nodes
+    in the dependency graph.
+
+    This mirrors the public facing "transitive exclude" dependency feature (i.e. `!!<address>`).
+    """
+
+    infer_from: ClassVar[Type[FS]]  # type: ignore[misc]
+
+    field_set: FS
+
+
+class TransitivelyExcludeDependencies(FrozenOrderedSet[Address]):
+    pass
 
 
 @union(in_scope_types=[EnvironmentName])

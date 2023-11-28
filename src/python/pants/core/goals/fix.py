@@ -36,7 +36,8 @@ from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap, strip_v2_chroot_path
+from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import Simplifier, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -54,16 +55,13 @@ class FixResult(EngineAwareReturnType):
         request: AbstractFixRequest.Batch,
         process_result: ProcessResult | FallibleProcessResult,
         *,
-        strip_chroot_path: bool = False,
+        output_simplifier: Simplifier = Simplifier(),
     ) -> FixResult:
-        def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-
         return FixResult(
             input=request.snapshot,
             output=await Get(Snapshot, Digest, process_result.output_digest),
-            stdout=prep_output(process_result.stdout),
-            stderr=prep_output(process_result.stderr),
+            stdout=output_simplifier.simplify(process_result.stdout),
+            stderr=output_simplifier.simplify(process_result.stderr),
             tool_name=request.tool_name,
         )
 
@@ -126,7 +124,7 @@ class AbstractFixRequest(AbstractLintRequest):
 
         @property
         def files(self) -> tuple[str, ...]:
-            return self.elements
+            return tuple(FrozenOrderedSet(self.elements))
 
     @classmethod
     def _get_rules(cls) -> Iterable[UnionRule]:
@@ -294,7 +292,7 @@ async def _do_fix(
             yield tuple(batch)
 
     def _make_disjoint_batch_requests() -> Iterable[_FixBatchRequest]:
-        partition_infos: Sequence[Tuple[Type[AbstractFixRequest], Any]]
+        partition_infos: Iterable[Tuple[Type[AbstractFixRequest], Any]]
         files: Sequence[str]
 
         partition_infos_by_files = defaultdict(list)
@@ -306,7 +304,8 @@ async def _do_fix(
 
         files_by_partition_info = defaultdict(list)
         for file, partition_infos in partition_infos_by_files.items():
-            files_by_partition_info[tuple(partition_infos)].append(file)
+            deduped_partition_infos = FrozenOrderedSet(partition_infos)
+            files_by_partition_info[deduped_partition_infos].append(file)
 
         for partition_infos, files in files_by_partition_info.items():
             for batch in batch_by_size(files):

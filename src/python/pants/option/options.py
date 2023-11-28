@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
@@ -365,8 +365,9 @@ class Options:
         self,
         scope: str,
         daemon_only: bool = False,
-    ):
-        """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
+    ) -> list[tuple[str, type, Any]]:
+        """Returns a list of fingerprintable (option name, option type, option value) pairs for the
+        given scope.
 
         Options are fingerprintable by default, but may be registered with "fingerprint=False".
 
@@ -385,13 +386,14 @@ class Options:
                 continue
             if daemon_only and not kwargs.get("daemon", False):
                 continue
-            val = self.for_scope(scope)[kwargs["dest"]]
+            dest = kwargs["dest"]
+            val = self.for_scope(scope)[dest]
             # If we have a list then we delegate to the fingerprinting implementation of the members.
             if is_list_option(kwargs):
                 val_type = kwargs.get("member_type", str)
             else:
                 val_type = kwargs.get("type", str)
-            pairs.append((val_type, val))
+            pairs.append((dest, val_type, val))
         return pairs
 
     def __getitem__(self, scope: str) -> OptionValueContainer:

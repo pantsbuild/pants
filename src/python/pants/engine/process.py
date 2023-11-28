@@ -7,13 +7,14 @@ import dataclasses
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, Mapping
+from typing import Iterable, List, Mapping, Tuple
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
     ProcessExecutionEnvironment as ProcessExecutionEnvironment,
 )
+from pants.engine.internals.selectors import Get
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
@@ -64,6 +65,7 @@ class Process:
     concurrency_available: int
     cache_scope: ProcessCacheScope
     remote_cache_speculation_delay_millis: int
+    attempt: int
 
     def __init__(
         self,
@@ -85,6 +87,7 @@ class Process:
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         remote_cache_speculation_delay_millis: int = 0,
+        attempt: int = 0,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -141,6 +144,13 @@ class Process:
         object.__setattr__(
             self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
         )
+        object.__setattr__(self, "attempt", attempt)
+
+
+@dataclass(frozen=True)
+class ProcessWithRetries:
+    proc: Process
+    attempts: int
 
 
 @dataclass(frozen=True)
@@ -181,6 +191,15 @@ class FallibleProcessResult:
     @property
     def platform(self) -> Platform:
         return self.metadata.platform
+
+
+@dataclass(frozen=True)
+class ProcessResultWithRetries:
+    results: Tuple[FallibleProcessResult, ...]
+
+    @property
+    def last(self):
+        return self.results[-1]
 
 
 @dataclass(frozen=True)
@@ -294,6 +313,22 @@ def fallible_to_exec_result_or_raise(
         description.value,
         keep_sandboxes=keep_sandboxes,
     )
+
+
+@rule
+async def run_proc_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
+    results: List[FallibleProcessResult] = []
+    for attempt in range(0, req.attempts):
+        proc = dataclasses.replace(req.proc, attempt=attempt)
+        result = (
+            await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
+                FallibleProcessResult, Process, proc
+            )
+        )
+        results.append(result)
+        if result.exit_code == 0:
+            break
+    return ProcessResultWithRetries(tuple(results))
 
 
 @dataclass(frozen=True)

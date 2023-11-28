@@ -19,7 +19,10 @@ from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerIm
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
+    DockerBuildKitOptionField,
     DockerBuildOptionFieldMixin,
+    DockerBuildOptionFieldMultiValueDictMixin,
+    DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
     DockerImageContextRootField,
@@ -42,10 +45,10 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import InvalidFieldException, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 logger = logging.getLogger(__name__)
@@ -311,11 +314,34 @@ def get_build_options(
     context: DockerBuildContext,
     field_set: DockerPackageFieldSet,
     global_target_stage_option: str | None,
+    global_build_hosts_options: dict | None,
+    global_build_no_cache_option: bool | None,
+    use_buildx_option: bool,
     target: Target,
 ) -> Iterator[str]:
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
-        if issubclass(field_type, DockerBuildOptionFieldMixin):
+        if issubclass(field_type, DockerBuildKitOptionField):
+            if use_buildx_option is not True:
+                if target[field_type].value != target[field_type].default:
+                    raise DockerImageOptionValueError(
+                        f"The {target[field_type].alias} field on the = `{target.alias}` target in `{target.address}` was set to `{target[field_type].value}`"
+                        f" and buildx is not enabled. Buildx must be enabled via the Docker subsystem options in order to use this field."
+                    )
+                else:
+                    # Case where BuildKit option has a default value - still should not be generated
+                    continue
+
+        if issubclass(
+            field_type,
+            (
+                DockerBuildOptionFieldMixin,
+                DockerBuildOptionFieldMultiValueDictMixin,
+                DockerBuildOptionFieldValueMixin,
+                DockerBuildOptionFieldMultiValueMixin,
+                DockerBuildOptionFlagFieldMixin,
+            ),
+        ):
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
             )
@@ -324,11 +350,7 @@ def get_build_options(
                 source=source,
                 error_cls=DockerImageOptionValueError,
             )
-            yield from target[field_type].options(format)
-        elif issubclass(field_type, DockerBuildOptionFieldValueMixin):
-            yield from target[field_type].options()
-        elif issubclass(field_type, DockerBuildOptionFlagFieldMixin):
-            yield from target[field_type].options()
+            yield from target[field_type].options(format, global_build_hosts_options=global_build_hosts_options)  # type: ignore[attr-defined]
 
     # Target stage
     target_stage = None
@@ -350,6 +372,9 @@ def get_build_options(
 
     if target_stage:
         yield from ("--target", target_stage)
+
+    if global_build_no_cache_option:
+        yield "--no-cache"
 
 
 @rule
@@ -392,6 +417,16 @@ async def build_docker_image(
         )
     )
     tags = tuple(tag.full_name for registry in image_refs for tag in registry.tags)
+    if not tags:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                The `{DockerImageTagsField.alias}` field in target {field_set.address} must not be
+                empty, unless there is a custom plugin providing additional tags using the
+                `DockerImageTagsRequest` union type.
+                """
+            )
+        )
 
     # Mix the upstream image ids into the env to ensure that Pants invalidates this
     # image-building process correctly when an upstream image changes, even though the
@@ -408,11 +443,15 @@ async def build_docker_image(
         context_root=context_root,
         env=env,
         tags=tags,
+        use_buildx=options.use_buildx,
         extra_args=tuple(
             get_build_options(
                 context=context,
                 field_set=field_set,
                 global_target_stage_option=options.build_target_stage,
+                global_build_hosts_options=options.build_hosts,
+                global_build_no_cache_option=options.build_no_cache,
+                use_buildx_option=options.use_buildx,
                 target=wrapped_target.target,
             )
         ),

@@ -5,11 +5,11 @@ use pyo3::prelude::*;
 use workunit_store::Metric;
 
 pub fn register(m: &PyModule) -> PyResult<()> {
-  m.add_function(wrap_pyfunction!(all_counter_names, m)?)?;
-  Ok(())
+    m.add_function(wrap_pyfunction!(all_counter_names, m)?)?;
+    Ok(())
 }
 
 #[pyfunction]
 fn all_counter_names() -> Vec<String> {
-  Metric::all_metrics()
+    Metric::all_metrics()
 }

@@ -6,13 +6,13 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-bytes = "1.0"
+bytes = { workspace = true }
 hashing = { path = "../hashing" }
-prost = "0.9"
-prost-build = "0.9"
-prost-types = "0.9"
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots"] }
+prost = { workspace = true }
+prost-build = { workspace = true }
+prost-types = { workspace = true }
+tonic = { workspace = true, features = ["transport", "codegen", "tls", "tls-roots"] }
 
 [build-dependencies]
-prost-build = "0.9"
-tonic-build = { version = "0.6", features = ["prost"] }
+prost-build = { workspace = true }
+tonic-build = { workspace = true, features = ["prost"] }

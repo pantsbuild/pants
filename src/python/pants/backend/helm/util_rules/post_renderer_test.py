@@ -30,7 +30,7 @@ from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRequest,
     RenderedHelmFiles,
 )
-from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
+from pants.backend.helm.util_rules.testutil import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.backend.shell.target_types import ShellCommandRunTarget, ShellSourcesGeneratorTarget
 from pants.backend.shell.util_rules import shell_command
@@ -146,7 +146,7 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
                 {{- end }}
                 """
             ),
-            "src/deployment/BUILD": "helm_deployment(name='test', dependencies=['//src/mychart'])",
+            "src/deployment/BUILD": "helm_deployment(name='test', chart='//src/mychart')",
             "src/deployment/values.yaml": dedent(
                 """\
                 pods:
@@ -287,7 +287,7 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
                 """\
               helm_deployment(
                 name="test",
-                dependencies=["//src/mychart"],
+                chart="//src/mychart",
                 post_renderers=["//src/shell:custom_post_renderer"]
               )
               """

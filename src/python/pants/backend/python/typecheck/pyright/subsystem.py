@@ -20,7 +20,7 @@ class Pyright(NodeJSToolBase):
         """
     )
 
-    default_version = "pyright@1.1.274"
+    default_version = "pyright@1.1.316"
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--version")

@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Tuple
 
-from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet
+from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet, RuffMode
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fix import FixResult, FixTargetsRequest
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
@@ -39,10 +40,16 @@ class RuffLintRequest(LintTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
+class RuffFormatRequest(FmtTargetsRequest):
+    field_set_type = RuffFieldSet
+    tool_subsystem = Ruff
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+
+
 @dataclass(frozen=True)
 class _RunRuffRequest:
     snapshot: Snapshot
-    is_fix: bool
+    mode: RuffMode
 
 
 @rule(level=LogLevel.DEBUG)
@@ -64,7 +71,20 @@ async def run_ruff(
     )
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
-    initial_args = ("--fix",) if request.is_fix else ()
+
+    extra_initial_args: Tuple[str, ...] = ("check",)
+    if request.mode == RuffMode.FORMAT:
+        extra_initial_args = ("format",)
+    elif request.mode == RuffMode.FIX:
+        extra_initial_args = (
+            "check",
+            "--fix",
+        )
+
+    # `--force-exclude` applies file excludes from config to files provided explicitly
+    # The format argument must be passed before force-exclude if Ruff is used for formatting.
+    # For other cases, the flags should work the same regardless of the order.
+    initial_args = extra_initial_args + ("--force-exclude",)
 
     result = await Get(
         FallibleProcessResult,
@@ -83,9 +103,9 @@ async def run_ruff(
 @rule(desc="Fix with ruff", level=LogLevel.DEBUG)
 async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
     result = await Get(
-        FallibleProcessResult, _RunRuffRequest(snapshot=request.snapshot, is_fix=True)
+        FallibleProcessResult, _RunRuffRequest(snapshot=request.snapshot, mode=RuffMode.FIX)
     )
-    return await FixResult.create(request, result, strip_chroot_path=True)
+    return await FixResult.create(request, result)
 
 
 @rule(desc="Lint with ruff", level=LogLevel.DEBUG)
@@ -94,9 +114,17 @@ async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintRe
         SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
     result = await Get(
-        FallibleProcessResult, _RunRuffRequest(snapshot=source_files.snapshot, is_fix=False)
+        FallibleProcessResult, _RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.LINT)
     )
-    return LintResult.create(request, result, strip_chroot_path=True)
+    return LintResult.create(request, result)
+
+
+@rule(desc="Format with ruff", level=LogLevel.DEBUG)
+async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
+    result = await Get(
+        FallibleProcessResult, _RunRuffRequest(snapshot=request.snapshot, mode=RuffMode.FORMAT)
+    )
+    return await FmtResult.create(request, result)
 
 
 def rules():
@@ -104,5 +132,6 @@ def rules():
         *collect_rules(),
         *RuffFixRequest.rules(),
         *RuffLintRequest.rules(),
+        *RuffFormatRequest.rules(),
         *pex.rules(),
     ]

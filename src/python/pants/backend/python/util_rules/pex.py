@@ -24,7 +24,10 @@ from pants.backend.python.target_types import (
     PexLayout,
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import PythonRequirementsField
+from pants.backend.python.target_types import (
+    PythonRequirementFindLinksField,
+    PythonRequirementsField,
+)
 from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
@@ -463,15 +466,17 @@ class _BuildPexRequirementsSetup:
 
 
 @dataclass(frozen=True)
-class ReqStrings:
+class PexRequirementsInfo:
     req_strings: tuple[str, ...]
+    find_links: tuple[str, ...]
 
 
 @rule
-async def get_req_strings(pex_reqs: PexRequirements) -> ReqStrings:
+async def get_req_strings(pex_reqs: PexRequirements) -> PexRequirementsInfo:
     addrs: list[Address] = []
     specs: list[str] = []
     req_strings: list[str] = []
+    find_links: set[str] = set()
     for req_str_or_addr in pex_reqs.req_strings_or_addrs:
         if isinstance(req_str_or_addr, Address):
             addrs.append(req_str_or_addr)
@@ -502,7 +507,13 @@ async def get_req_strings(pex_reqs: PexRequirements) -> ReqStrings:
                 if tgt.has_field(PythonRequirementsField)
             )
         )
-    return ReqStrings(tuple(sorted(req_strings)))
+        find_links.update(
+            find_links
+            for tgt in transitive_targets.closure
+            if tgt.has_field(PythonRequirementFindLinksField)
+            for find_links in tgt[PythonRequirementFindLinksField].value or ()
+        )
+    return PexRequirementsInfo(tuple(sorted(req_strings)), tuple(sorted(find_links)))
 
 
 async def _setup_pex_requirements(
@@ -562,18 +573,18 @@ async def _setup_pex_requirements(
         )
 
     assert isinstance(request.requirements, PexRequirements)
-    req_strings = (await Get(ReqStrings, PexRequirements, request.requirements)).req_strings
+    reqs_info = await Get(PexRequirementsInfo, PexRequirements, request.requirements)
 
     # TODO: This is not the best heuristic for available concurrency, since the
     # requirements almost certainly have transitive deps which also need building, but it
     # is better than using something hardcoded.
-    concurrency_available = len(req_strings)
+    concurrency_available = len(reqs_info.req_strings)
 
     if isinstance(request.requirements.from_superset, Pex):
         repository_pex = request.requirements.from_superset
         return _BuildPexRequirementsSetup(
             [repository_pex.digest],
-            [*req_strings, "--pex-repository", repository_pex.name],
+            [*reqs_info.req_strings, "--pex-repository", repository_pex.name],
             concurrency_available,
         )
 
@@ -583,7 +594,7 @@ async def _setup_pex_requirements(
 
         # NB: This is also validated in the constructor.
         assert loaded_lockfile.is_pex_native
-        if not req_strings:
+        if not reqs_info.req_strings:
             return _BuildPexRequirementsSetup([], [], concurrency_available)
 
         if loaded_lockfile.metadata:
@@ -591,7 +602,7 @@ async def _setup_pex_requirements(
                 loaded_lockfile.metadata,
                 request.interpreter_constraints,
                 loaded_lockfile.original_lockfile,
-                consumed_req_strings=req_strings,
+                consumed_req_strings=reqs_info.req_strings,
                 # Don't validate user requirements when subsetting a resolve, as Pex's
                 # validation during the subsetting is far more precise than our naive string
                 # comparison. For example, if a lockfile was generated with `foo==1.2.3`
@@ -605,7 +616,7 @@ async def _setup_pex_requirements(
         return _BuildPexRequirementsSetup(
             [loaded_lockfile.lockfile_digest],
             [
-                *req_strings,
+                *reqs_info.req_strings,
                 "--lock",
                 loaded_lockfile.lockfile_path,
                 *pex_lock_resolver_args,
@@ -615,7 +626,11 @@ async def _setup_pex_requirements(
 
     # We use pip to perform a normal resolve.
     digests = []
-    argv = [*req_strings, *pip_resolver_args]
+    argv = [
+        *reqs_info.req_strings,
+        *pip_resolver_args,
+        *(f"--find-links={find_links}" for find_links in reqs_info.find_links),
+    ]
     if request.requirements.constraints_strings:
         constraints_file = "__constraints.txt"
         constraints_content = "\n".join(request.requirements.constraints_strings)
@@ -713,7 +728,7 @@ async def build_pex(
         output_directories = [request.output_filename]
 
     req_strings = (
-        (await Get(ReqStrings, PexRequirements, request.requirements)).req_strings
+        (await Get(PexRequirementsInfo, PexRequirements, request.requirements)).req_strings
         if isinstance(request.requirements, PexRequirements)
         else []
     )
@@ -1030,6 +1045,7 @@ async def create_venv_pex(
         additional_args=pex_request.additional_args
         + (
             "--venv",
+            "prepend",
             "--seed",
             "verbose",
             pex_environment.venv_site_packages_copies_option(
@@ -1160,7 +1176,6 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
             **complete_pex_env.append_only_caches,
             **append_only_caches,
         },
-        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,
@@ -1254,7 +1269,6 @@ async def setup_venv_pex_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=append_only_caches,
-        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,

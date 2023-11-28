@@ -21,6 +21,10 @@ from pants.backend.scala.bsp.spec import (
 )
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+)
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier
@@ -148,22 +152,15 @@ async def collect_thirdparty_modules(
 
 
 async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
+
     tool_classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(
             artifact_requirements=ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-compiler",
-                        version=scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-library",
-                        version=scala_version,
-                    ),
-                ]
+                scala_artifacts.all_coordinates
             ),
         ),
     )
@@ -269,7 +266,8 @@ async def bsp_resolve_scala_metadata(
         coursier_java_home = jdk_home
 
     scala_jar_uris = tuple(
-        build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
+        # TODO: Why is this hardcoded and not under pants_workdir?
+        build_root.pathlib_path.joinpath(".pants.d", "bsp", p).as_uri()
         for p in scala_runtime.files
     )
 
@@ -278,11 +276,17 @@ async def bsp_resolve_scala_metadata(
         java_version=f"1.{jdk.jre_major_version}",
     )
 
+    scala_version_parts = scala_version.split(".")
+    scala_binary_version = (
+        ".".join(scala_version_parts[0:2])
+        if int(scala_version_parts[0]) < 3
+        else scala_version_parts[0]
+    )
     return BSPBuildTargetsMetadataResult(
         metadata=ScalaBuildTarget(
             scala_organization="org.scala-lang",
             scala_version=scala_version,
-            scala_binary_version=".".join(scala_version.split(".")[0:2]),
+            scala_binary_version=scala_binary_version,
             platform=ScalaPlatform.JVM,
             jars=scala_jar_uris,
             jvm_build_target=jvm_build_target,

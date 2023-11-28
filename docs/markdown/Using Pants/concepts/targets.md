@@ -38,7 +38,7 @@ pex_binary(
 )
 ```
 
-Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults. See [Field default values](doc:targets#field-default-values) for how you may override a fields default value.
+Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults. See [Field default values](doc:targets#field-default-values) for how you may override a field's default value.
 
 All target types have a `name` field, which is used to identify the target. Target names must be unique within a directory.
 
@@ -168,7 +168,7 @@ You only need to declare direct dependencies. Pants will pull in _transitive dep
 >
 > You can use the prefix `!!` to transitively exclude a dependency, meaning that even if a target's dependencies include the bad dependency, the final result will not include the value.
 >
-> Transitive excludes can only be used in target types that conventionally are not dependend upon by other targets, such as `pex_binary` and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
+> Transitive excludes can only be used in target types that conventionally are not depended upon by other targets, such as `pex_binary`, `python_distribution`, and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
 
 Field default values
 ====================
@@ -186,6 +186,10 @@ The `extend=True` keyword argument allows to add to any existing default field v
 Default fields and values are validated against their target types, except when provided using the `all` keyword, in which case only values for fields applicable to each target are validated. Use `ignore_unknown_fields=True` to ignore invalid fields.
 
 This means, that it is legal to provide a default value for `all` targets, even if it is only a subset of targets that actually supports that particular field.
+
+> 📘 `__defaults__` does not apply to environment targets.
+>
+> The environment targets (such as `local_environment` and `docker_environment` etc) are special and used during a bootstrap phase before any targets are defined and as such can not be targeted by the `__defaults__` construct.
 
 Examples:
 
@@ -376,8 +380,24 @@ If multiple fields are parametrized, a target will be created for each value in 
 python_test(
     name="tests",
     source="tests.py",
-    interpreter_constraints=parametrize(py2=["==2.7.*"], py3=[">=3.6"]),
+    interpreter_constraints=parametrize(py2=["==2.7.*"], py3=[">=3.6,<3.7"]),
     resolve=parametrize("lock-a", "lock-b"),
+)
+```
+
+To parametrize multiple fields together as one parametrization, unpack a parametrize object with the field values to use for that group as the parametrization keyword arguments. The parametrization must be named by providing one positional string argument as the name. (See example below.)  This is useful to avoid a full cartesian product if not every combination of field values makes sense. i.e. The previous example uses the same resolve (lockfile) for both interpreter constraints, however if you want to use a different resolve per interpreter, then grouping the resolve value with the interpreter constraint may be the way to go.
+
+```python example/BUILD
+# Creates two targets:
+#
+#    example:tests@parametrize=py2
+#    example:tests@parametrize=py3
+
+python_test(
+    name="tests",
+    source="tests.py",
+    **parametrize("py2", interpreter_constraints=["==2.7.*"], resolve="lock-a"),
+    **parametrize("py3", interpreter_constraints=[">=3.6,<3.7"], resolve="lock-b"),
 )
 ```
 
@@ -413,7 +433,7 @@ shunit2_tests(
 )
 ```
 
-You can combine `parametrize` with the ` overrides` field to set more granular metadata for generated targets:
+You can combine `parametrize` with the `overrides` field to set more granular metadata for generated targets:
 
 ```python example/BUILD
 # Generates three `shunit2_test` targets:

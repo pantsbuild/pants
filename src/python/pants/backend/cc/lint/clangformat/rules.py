@@ -80,7 +80,7 @@ async def clangformat_fmt(request: ClangFormatRequest.Batch, clangformat: ClangF
             level=LogLevel.DEBUG,
         ),
     )
-    return await FmtResult.create(request, result, strip_chroot_path=True)
+    return await FmtResult.create(request, result)
 
 
 def rules() -> Iterable[Rule | UnionRule]:

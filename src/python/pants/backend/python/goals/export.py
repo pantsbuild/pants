@@ -37,7 +37,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import BoolOption, EnumOption, StrListOption
+from pants.option.option_types import EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
@@ -74,15 +74,6 @@ class ExportPluginOptions:
                 to export than a standalone, mutable virtualenv.
             """
         ),
-    )
-
-    symlink_python_virtualenv = BoolOption(
-        default=False,
-        help="Export a symlink into a cached Python virtualenv.  This virtualenv will have no pip binary, "
-        "and will be immutable. Any attempt to modify it will corrupt the cache!  It may, however, "
-        "take significantly less time to export than a standalone, mutable virtualenv will.",
-        removal_version="2.20.0.dev0",
-        removal_hint="Set the `[export].py_resolve_format` option to 'symlinked_immutable_virtualenv'",
     )
 
     py_editable_in_resolve = StrListOption(
@@ -159,10 +150,7 @@ async def do_export(
 
     complete_pex_env = pex_env.in_workspace()
 
-    if export_subsys.options.symlink_python_virtualenv:
-        export_format = PythonResolveExportFormat.symlinked_immutable_virtualenv
-    else:
-        export_format = export_subsys.options.py_resolve_format
+    export_format = export_subsys.options.py_resolve_format
 
     if export_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
         # NB: The symlink performance hack leaks an internal named cache location as output (via
@@ -323,7 +311,9 @@ async def export_virtualenv_for_resolve(
     resolve = request.resolve
     lockfile_path = python_setup.resolves.get(resolve)
     if not lockfile_path:
-        raise ExportError(f"No resolve named {resolve} found in [python_setup].resolves.")
+        raise ExportError(
+            f"No resolve named {resolve} found in [{python_setup.options_scope}].resolves."
+        )
     lockfile = Lockfile(
         url=lockfile_path,
         url_description_of_origin=f"the resolve `{resolve}`",

@@ -70,7 +70,7 @@ When you run `docker build` directly, the context is usually a directory within 
 
 Pants, however, takes care of assembling the context for you. It does so using the dependencies of the [`docker_image`](doc:reference-docker_image) target, which can include:
 
-- Loose files specified using  [`file` / `files` targets](doc:resources#files).
+- Loose files specified using  [`file` / `files` targets](doc:assets#files).
 - Artifacts packaged from a variety of targets, such as [`pex_binary`](doc:reference-pex_binary) , [`python_distribution`](doc:reference-python_distribution), [`archive`](doc:reference-archive), and any other target that can be built via the [package](doc:reference-package) goal, including other docker images.
 
 The context is assembled as follows:
@@ -180,6 +180,53 @@ very-secret-value
 > 
 > See the example for the [`secrets`](doc:reference-docker_image#codesecretscode) field.
 
+### External cache storage backends
+
+BuildKit supports exporting build cache to an external location, making it possible to import in future builds. Cache backends can be configured using the [`cache_to`](doc:reference-docker_image#codecache_tocode) and [`cache_from`](doc:reference-docker_image#codecache_fromcode) fields.
+
+Create a builder using a [build driver](https://docs.docker.com/build/drivers/) that is compatible with the cache backend:
+
+```
+❯ docker buildx create --name container --driver=docker-container container
+```
+
+Use the builder:
+
+```
+❯ export BUILDX_BUILDER=container
+```
+
+Optionally, validate a build with the Docker CLI directly:
+
+```
+❯ docker buildx build -t pants-cache-test:latest \
+  --cache-to type=local,dest=/tmp/docker/pants-test-cache \
+  --cache-from type=local,src=/tmp/docker/pants-test-cache .
+```
+
+Configure Pants to use buildx and pass the BUILDX_BUILDER environment variable:
+
+```toml pants.toml
+[docker]
+use_buildx = true
+env_vars = [
+  "BUILDX_BUILDER"
+]
+```
+```python example/BUILD
+docker_image(
+    name="with-local-cache-backend",
+    cache_to={
+        "type": "local",
+        "dest": "/tmp/docker-cache/pants-example"
+    },
+    cache_from={
+        "type": "local",
+        "src": "/tmp/docker-cache/pants-example"
+    }
+)
+```
+
 ### Build Docker image example
 
 This example copies both a `file` and `pex_binary`. The file is specified as an explicit dependency in the `BUILD` file, whereas the `pex_binary` dependency is inferred from the path in the `Dockerfile`.
@@ -206,7 +253,7 @@ python_sources(name="lib")
 
 pex_binary(name="bin", entry_point="main.py")
 ```
-```python src/py/hw/main.py
+```python src/python/hw/main.py
 import os
 
 msg = "Hello"
@@ -311,7 +358,7 @@ Most authentication mechanisms will also require tools exposed on the `$PATH` to
 [docker]
 env_vars = ["DOCKER_CONFIG=%(homedir)s/.docker"]
 tools = [
-  "docker-credential-gcr",
+  "docker-credential-gcr", # or docker-credential-gcloud when using artifact registry
   "dirname",
   "readlink",
   "python3",

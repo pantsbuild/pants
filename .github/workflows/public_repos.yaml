@@ -4,6 +4,91 @@
 
 
 jobs:
+  AlexTereshenkov_cheeseshop-query:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: AlexTereshenkov/cheeseshop-query
+    permissions: {}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: AlexTereshenkov/cheeseshop-query
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `version` with repo-default version (baseline)
+      run: ' pants version'
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
+      run: ' pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `lint check ::` with repo-default version (baseline)
+      run: ' pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `test ::` with repo-default version (baseline)
+      run: ' pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `package ::` with repo-default version (baseline)
+      run: ' pants package ::'
+    - if: success() || failure()
+      name: Kill pantsd
+      run: pkill -f pantsd
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: ${{ github.event.inputs.extra_env }} pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
+        --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants package ::'
   Ars-Linguistica_mlconjug3:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -438,10 +523,10 @@ jobs:
       with:
         fetch-depth: 10
         repository: lablup/backend.ai
-    - name: Set up Python 3.11.3
+    - name: Set up Python 3.11.4
       uses: actions/setup-python@v4
       with:
-        python-version: 3.11.3
+        python-version: 3.11.4
     - name: Pants on
       run: '
 
@@ -475,9 +560,9 @@ jobs:
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
-      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::`
+      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::`
         with repo-default version (baseline)'
-      run: ' pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::'
+      run: ' pants test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::'
     - env:
         PANTS_VERSION: ''
       if: success() || failure()
@@ -506,10 +591,10 @@ jobs:
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
-      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis::`
+      name: 'Run `test :: -tests/agent/docker:: -tests/client/integration:: -tests/common/redis_helper::`
         with ${{ github.event.inputs.pants_version }}'
       run: '${{ github.event.inputs.extra_env }} pants test :: -tests/agent/docker::
-        -tests/client/integration:: -tests/common/redis::'
+        -tests/client/integration:: -tests/common/redis_helper::'
     - env:
         PANTS_VERSION: ${{ github.event.inputs.pants_version }}
       if: success() || failure()
@@ -1437,6 +1522,91 @@ jobs:
       if: success() || failure()
       name: Run `test ::` with ${{ github.event.inputs.pants_version }}
       run: '${{ github.event.inputs.extra_env }} pants test ::'
+  pantsbuild_scie-pants:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    name: pantsbuild/scie-pants
+    permissions: {}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+        repository: pantsbuild/scie-pants
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Pants on
+      run: '
+
+        curl --proto ''=https'' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+        | bash -
+
+        echo "$HOME/bin" | tee -a $GITHUB_PATH
+
+        '
+    - name: Check for pants.ci.toml
+      run: "\nif [[ -f pants.ci.toml ]]; then\n    echo \"PANTS_CONFIG_FILES=pants.ci.toml\"\
+        \ | tee -a $GITHUB_ENV\nfi\n"
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `version` with repo-default version (baseline)
+      run: ' pants version'
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `tailor --check update-build-files --check ::` with repo-default version
+        (baseline)
+      run: ' pants tailor --check update-build-files --check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `lint check ::` with repo-default version (baseline)
+      run: ' pants lint check ::'
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `test ::` with repo-default version (baseline)
+      run: ' pants test ::'
+    - env:
+        PANTS_VERSION: ''
+      if: success() || failure()
+      name: Run `package ::` with repo-default version (baseline)
+      run: ' pants package ::'
+    - if: success() || failure()
+      name: Kill pantsd
+      run: pkill -f pantsd
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `version` with ${{ github.event.inputs.pants_version }}
+      run: ${{ github.event.inputs.extra_env }} pants version
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `tailor --check update-build-files --check ::` with ${{ github.event.inputs.pants_version
+        }}
+      run: '${{ github.event.inputs.extra_env }} pants tailor --check update-build-files
+        --check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `lint check ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants lint check ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `test ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants test ::'
+    - env:
+        PANTS_VERSION: ${{ github.event.inputs.pants_version }}
+      if: success() || failure()
+      name: Run `package ::` with ${{ github.event.inputs.pants_version }}
+      run: '${{ github.event.inputs.extra_env }} pants package ::'
 name: Public repos tests
 'on':
   workflow_dispatch:

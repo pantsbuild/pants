@@ -7,9 +7,9 @@ createdAt: "2021-10-08T18:16:00.142Z"
 ---
 > 🚧 Go support is beta stage
 >
-> We are done implementing the initial core functionality for Pants's initial Go support ([tracked here](https://github.com/pantsbuild/pants/projects/21)). However, there may be some edge cases we aren't yet handling. There are also some features that are not yet supported like vendoring, which we'd love your input on how to prioritize!
+> We are done implementing the initial core functionality for Pants's initial Go support ([tracked here](https://github.com/pantsbuild/pants/issues/17447)). However, there may be some edge cases we aren't yet handling. There are also some features that are not yet supported like vendoring, which we'd love your input on how to prioritize!
 >
-> Please share feedback for what you need to use Pants with your Go project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:community)!
+> Please share feedback for what you need to use Pants with your Go project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:the-pants-community)!
 
 > 👍 Why use Pants with Go?
 >
@@ -83,7 +83,7 @@ pkg/runner:runner
 
 ### The `embed` directive and `resource` targets
 
-To use the [`embed` directive](https://pkg.go.dev/embed), you must first teach Pants about the [files](doc:resources) with the `resource` / `resources` targets:
+To use the [`embed` directive](https://pkg.go.dev/embed), you must first teach Pants about the [files](doc:assets) with the `resource` / `resources` targets:
 
 1. Add a `resource` or `resources` target with the embedded files in the `source` / `sources` field, respectively.
 2. Add that target to the `dependencies` field of the relevant `go_package` target.
@@ -117,7 +117,7 @@ To run a binary, use `pants run path/to/main_pkg:` (note the colon). You can pas
 
 ```
 ❯ pants run cmd/deploy: -- --help
-Usage of /Users/pantsbuild/example/.pants.d/tmpzfh33ggu/cmd.deploy/bin:
+Usage of /Users/pantsbuild/example/.pants.d/workdir/tmpzfh33ggu/cmd.deploy/bin:
       --allow-insecure-auth        allow credentials to be passed unencrypted (i.e., no TLS)
   -A, --auth-token-env string      name of environment variable with auth bearer token
 ...
@@ -176,7 +176,7 @@ You can pass through arguments with `--`, e.g. `pants test pkg/deploy: -- -v -ru
 
 ### Loose files in tests (`testdata`)
 
-To open files in your tests, use [`file` / `files` targets](doc:resources) targets and add them as `dependencies` to your `go_package`.
+To open files in your tests, use [`file` / `files` targets](doc:assets) targets and add them as `dependencies` to your `go_package`.
 
 ```python pkg/runner/BUILD
 go_package(dependencies=[":testdata"])

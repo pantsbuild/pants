@@ -11,7 +11,7 @@ You can download and run an installer script that will install the Pants binary 
 curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash
 ```
 
-This script will install `pants` into `~/bin`, which must be on your PATH. The installer script will warn you if it is not.
+This script will install `pants` into `~/.local/bin`, which must be on your PATH. The installer script will warn you if it is not.
 
 For security reasons, we don't recommend frequently curling this script directly to `bash`, e.g., on every CI run. If the script were compromised during some time window, you'd be more likely to download it during that window and be impacted. Instead, for regular use, we recommend checking this script into the root of your repo and pointing users and CI machines to that checked-in version. The script is very simple and need not be updated very often.
 
@@ -43,17 +43,6 @@ If you have difficulty installing Pants, see our [getting help](doc:getting-help
 > ```
 > SCIE_BOOT=update pants
 > ```
-
-Running Pants from unreleased builds
-------------------------------------
-
-To use an unreleased build of Pants from the [pantsbuild/pants](https://github.com/pantsbuild/pants) main branch, locate the main branch SHA, set `PANTS_SHA=<SHA>` in the environment, and run `pants` as usual:
-
-```
-PANTS_SHA=8553e8cbc5a1d9da3f84dcfc5e7bf3139847fb5f pants --version
-```
-
-If a particular SHA does not have built wheels, you can either wait for [the next release from the relevant branch](doc:release-strategy), ping a maintainer [in Slack](doc:getting-help), or file a Github issue mentioning the SHA that you would like to test.
 
 Running Pants from sources
 --------------------------

@@ -202,7 +202,7 @@ def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) ->
     )
     assert result.xml_results is not None
     assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py ." in result.stdout
+    assert f"{PACKAGE}/tests.py ." in result.stdout_simplified_str
 
 
 def test_failing(rule_runner: PythonRuleRunner) -> None:
@@ -220,7 +220,7 @@ def test_failing(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(rule_runner, [tgt])
     assert result.exit_code == 1
-    assert f"{PACKAGE}/tests.py F" in result.stdout
+    assert f"{PACKAGE}/tests.py F" in result.stdout_simplified_str
 
 
 def test_dependencies(rule_runner: PythonRuleRunner) -> None:
@@ -278,7 +278,7 @@ def test_dependencies(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(rule_runner, [tgt])
     assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py ." in result.stdout
+    assert f"{PACKAGE}/tests.py ." in result.stdout_simplified_str
 
 
 @skip_unless_python37_and_python39_present
@@ -305,14 +305,14 @@ def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     )
     result = run_pytest(rule_runner, [py37_tgt], test_debug_adapter=False)
     assert result.exit_code == 2
-    assert "SyntaxError: invalid syntax" in result.stdout
+    assert b"SyntaxError: invalid syntax" in result.stdout_bytes
 
     py39_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py39", relative_file_path="tests.py")
     )
     result = run_pytest(rule_runner, [py39_tgt], test_debug_adapter=False)
     assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py ." in result.stdout
+    assert f"{PACKAGE}/tests.py ." in result.stdout_simplified_str
 
 
 def test_passthrough_args(rule_runner: PythonRuleRunner) -> None:
@@ -333,8 +333,8 @@ def test_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(rule_runner, [tgt], extra_args=["--pytest-args='-k test_run_me'"])
     assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py ." in result.stdout
-    assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
+    assert f"{PACKAGE}/tests.py ." in result.stdout_simplified_str
+    assert b"collected 2 items / 1 deselected / 1 selected" in result.stdout_bytes
 
 
 def test_xdist_enabled_noninteractive(rule_runner: PythonRuleRunner) -> None:
@@ -430,7 +430,7 @@ def test_config_file(
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(rule_runner, [tgt], extra_args=extra_args)
     assert result.exit_code == 0
-    assert "All good!" in result.stdout and "Captured" not in result.stdout
+    assert b"All good!" in result.stdout_bytes and b"Captured" not in result.stdout_bytes
 
 
 def test_force(rule_runner: PythonRuleRunner) -> None:
@@ -474,7 +474,7 @@ def test_extra_output(rule_runner: PythonRuleRunner) -> None:
         ],
     )
     assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py ." in result.stdout
+    assert f"{PACKAGE}/tests.py ." in result.stdout_simplified_str
     assert result.extra_output is not None
     digest_contents = rule_runner.request(DigestContents, [result.extra_output.digest])
     paths = {dc.path for dc in digest_contents}
@@ -494,7 +494,7 @@ def test_coverage(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(rule_runner, [tgt], extra_args=["--test-use-coverage"])
     assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py ." in result.stdout
+    assert f"{PACKAGE}/tests.py ." in result.stdout_simplified_str
     assert result.coverage_data is not None
 
 
@@ -516,7 +516,7 @@ def test_conftest_dependency_injection(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(rule_runner, [tgt], extra_args=["--pytest-args='-s'"])
     assert result.exit_code == 0
-    assert f"{PACKAGE}/tests.py In conftest!\n." in result.stdout
+    assert f"{PACKAGE}/tests.py In conftest!\n." in result.stdout_simplified_str
 
 
 def test_execution_slot_variable(rule_runner: PythonRuleRunner) -> None:
@@ -539,7 +539,7 @@ def test_execution_slot_variable(rule_runner: PythonRuleRunner) -> None:
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_concurrency_slot.py"))
     result = run_pytest(rule_runner, [tgt], extra_args=["--pytest-execution-slot-var=SLOT"])
     assert result.exit_code == 1
-    assert re.search(r"Value of slot is \d+", result.stdout)
+    assert re.search(r"Value of slot is \d+", result.stdout_simplified_str)
 
 
 def test_extra_env_vars(rule_runner: PythonRuleRunner) -> None:
@@ -824,7 +824,7 @@ def test_debug_adaptor_request_argv(rule_runner: PythonRuleRunner) -> None:
         "127.0.0.1:5678",
         "-c",
         unittest.mock.ANY,
-        "--color=no",
+        "--color=yes",
         "tests/python/pants_test/test_foo.py",
     )
 
@@ -948,8 +948,9 @@ def test_batched_passing(rule_runner: PythonRuleRunner, major_minor_interpreter:
     )
     assert result.xml_results is not None
     assert result.exit_code == 0
-    assert f"{PACKAGE}/test_1.py ." in result.stdout
-    assert f"{PACKAGE}/test_2.py ." in result.stdout
+    stdout_text = result.stdout_simplified_str
+    assert f"{PACKAGE}/test_1.py ." in stdout_text
+    assert f"{PACKAGE}/test_2.py ." in stdout_text
 
 
 def test_batched_failing(rule_runner: PythonRuleRunner) -> None:
@@ -971,5 +972,6 @@ def test_batched_failing(rule_runner: PythonRuleRunner) -> None:
     )
     result = run_pytest(rule_runner, targets)
     assert result.exit_code == 1
-    assert f"{PACKAGE}/test_1.py ." in result.stdout
-    assert f"{PACKAGE}/test_2.py F" in result.stdout
+    stdout_text = result.stdout_simplified_str
+    assert f"{PACKAGE}/test_1.py ." in stdout_text
+    assert f"{PACKAGE}/test_2.py F" in stdout_text

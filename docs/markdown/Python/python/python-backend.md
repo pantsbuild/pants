@@ -19,10 +19,6 @@ Enable the Python [backend](doc:enabling-backends) like this:
 backend_packages = [
   "pants.backend.python"
 ]
-
-[python]
-# This will become the default in Pants 2.15.
-tailor_pex_binary_targets = false
 ```
 
 Pants use [`python_source`](doc:reference-python_source) and [`python_test`](doc:reference-python_test) targets to know which Python files to run on and to set any metadata.

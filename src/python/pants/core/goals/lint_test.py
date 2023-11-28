@@ -26,7 +26,7 @@ from pants.core.goals.lint import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import EnvironmentNameRequest
-from pants.core.util_rules.partitions import PartitionerType
+from pants.core.util_rules.partitions import PartitionerType, _EmptyMetadata
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
@@ -401,6 +401,15 @@ def run_lint_rule(
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
+
+
+def test_duplicate_files_in_fixer(rule_runner: RuleRunner) -> None:
+    assert MockFixRequest.Batch(
+        "tool_name",
+        ("a", "a"),
+        _EmptyMetadata(),
+        rule_runner.make_snapshot({"a": ""}),
+    ).files == ("a",)
 
 
 def test_invalid_target_noops(rule_runner: RuleRunner) -> None:

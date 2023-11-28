@@ -6,8 +6,11 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-parking_lot = "0.12"
-tokio = { version = "1.28", features = ["sync"] }
+parking_lot = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
-tokio = { version = "1.28", features = ["rt", "macros", "time"] }
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
+
+[lints]
+workspace = true

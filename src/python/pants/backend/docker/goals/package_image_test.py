@@ -14,6 +14,7 @@ import pytest
 
 from pants.backend.docker.goals.package_image import (
     DockerBuildTargetStageError,
+    DockerImageOptionValueError,
     DockerImageTagValueError,
     DockerInfoV1,
     DockerPackageFieldSet,
@@ -168,7 +169,10 @@ def assert_build(
         opts.setdefault("default_context_root", "")
         opts.setdefault("build_args", [])
         opts.setdefault("build_target_stage", None)
+        opts.setdefault("build_hosts", None)
         opts.setdefault("build_verbose", False)
+        opts.setdefault("build_no_cache", False)
+        opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
 
         docker_options = create_subsystem(
@@ -1010,6 +1014,228 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_docker_build_no_cache_option(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_NO_CACHE": "true",
+        },
+    )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=False",
+            "--no-cache",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_HOSTS": '{"global": "9.9.9.9"}',
+        },
+    )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  extra_build_hosts={"docker": "10.180.0.1", "docker2": "10.180.0.2"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--add-host",
+            "global:9.9.9.9",
+            "--add-host",
+            "docker:10.180.0.1",
+            "--add-host",
+            "docker2:10.180.0.2",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  cache_to={"type": "local", "dest": "/tmp/docker/pants-test-cache"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            "--cache-to=type=local,dest=/tmp/docker/pants-test-cache",
+            "--output=type=docker",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
+    )
+
+
+def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  cache_from={"type": "local", "dest": "/tmp/docker/pants-test-cache"},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            "--cache-from=type=local,dest=/tmp/docker/pants-test-cache",
+            "--output=type=docker",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
+    )
+
+
+def test_docker_output_option(rule_runner: RuleRunner) -> None:
+    """Testing non-default output type 'image'.
+
+    Default output type 'docker' tested implicitly in other scenarios
+    """
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output={"type": "image"}
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            "--output=type=image",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+        options=dict(use_buildx=True),
+    )
+
+
+def test_docker_output_option_raises_when_no_buildkit(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output={"type": "image"}
+                )
+                """
+            ),
+        }
+    )
+
+    with pytest.raises(
+        DockerImageOptionValueError,
+        match=r"Buildx must be enabled via the Docker subsystem options in order to use this field.",
+    ):
+        assert_build(
+            rule_runner,
+            Address("docker/test", target_name="img1"),
+        )
+
+
 def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -1029,6 +1255,40 @@ def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--network=host",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        process_assertions=check_docker_proc,
+    )
+
+
+def test_docker_build_platform_option(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  build_platform=["linux/amd64", "linux/arm64", "linux/arm/v7"],
+                )
+                """
+            ),
+        }
+    )
+
+    def check_docker_proc(process: Process):
+        assert process.argv == (
+            "/dummy/docker",
+            "build",
+            "--platform=linux/amd64,linux/arm64,linux/arm/v7",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1658,18 +1918,40 @@ def test_image_ref_formatting(test: ImageRefTest) -> None:
         assert tuple(image_refs) == test.expect_refs
 
 
-def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="plugin")'})
+@pytest.mark.parametrize(
+    "BUILD, plugin_tags, tag_flags",
+    [
+        (
+            'docker_image(name="plugin")',
+            ("1.2.3",),
+            (
+                "--tag",
+                "plugin:latest",
+                "--tag",
+                "plugin:1.2.3",
+            ),
+        ),
+        (
+            'docker_image(name="plugin", image_tags=[])',
+            ("1.2.3",),
+            (
+                "--tag",
+                "plugin:1.2.3",
+            ),
+        ),
+    ],
+)
+def test_docker_image_tags_from_plugin_hook(
+    rule_runner: RuleRunner, BUILD: str, plugin_tags: tuple[str, ...], tag_flags: tuple[str, ...]
+) -> None:
+    rule_runner.write_files({"docker/test/BUILD": BUILD})
 
     def check_docker_proc(process: Process):
         assert process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
-            "--tag",
-            "plugin:latest",
-            "--tag",
-            "plugin:1.2.3",
+            *tag_flags,
             "--file",
             "docker/test/Dockerfile",
             ".",
@@ -1679,8 +1961,19 @@ def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="plugin"),
         process_assertions=check_docker_proc,
-        plugin_tags=("1.2.3",),
+        plugin_tags=plugin_tags,
     )
+
+
+def test_docker_image_tags_defined(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="no-tags", image_tags=[])'})
+
+    err = "The `image_tags` field in target docker/test:no-tags must not be empty, unless"
+    with pytest.raises(InvalidFieldException, match=err):
+        assert_build(
+            rule_runner,
+            Address("docker/test", target_name="no-tags"),
+        )
 
 
 def test_docker_info_serialize() -> None:

@@ -103,46 +103,6 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
     assert result.xml_results.files == (f"{target.address.path_safe_spec}.xml",)
 
 
-def test_simple_success_with_legacy_tool(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": "helm_chart(name='mychart')",
-            "Chart.yaml": HELM_CHART_FILE,
-            "values.yaml": HELM_VALUES_FILE,
-            "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
-            "tests/BUILD": "helm_unittest_test(name='test', source='service_test.yaml')",
-            "tests/service_test.yaml": dedent(
-                """\
-                suite: test service
-                templates:
-                  - service.yaml
-                values:
-                  - ../values.yaml
-                tests:
-                  - it: should work
-                    asserts:
-                      - isKind:
-                          of: Service
-                      - equal:
-                          path: spec.type
-                          value: ClusterIP
-                """
-            ),
-        }
-    )
-
-    rule_runner.set_options(["--helm-unittest-version=0.2.8"])
-    target = rule_runner.get_target(Address("tests", target_name="test"))
-    field_set = HelmUnitTestFieldSet.create(target)
-
-    result = rule_runner.request(TestResult, [HelmUnitTestRequest.Batch("", (field_set,), None)])
-
-    assert result.exit_code == 0
-    assert result.xml_results and result.xml_results.files
-    assert result.xml_results.files == (f"{target.address.path_safe_spec}.xml",)
-
-
 def test_simple_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

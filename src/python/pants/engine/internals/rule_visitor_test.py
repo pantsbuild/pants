@@ -11,7 +11,7 @@ import pytest
 from pants.base.exceptions import RuleTypeError
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import Get, GetParseError, MultiGet
-from pants.engine.rules import rule_helper
+from pants.engine.rules import implicitly, rule
 from pants.util.strutil import softwrap
 
 # The visitor inspects the module for definitions.
@@ -20,24 +20,20 @@ INT = int
 BOOL = bool
 
 
-@rule_helper
 async def _top_helper(arg1):
     a = await Get(STR, INT, arg1)
     return await _helper_helper(a)
 
 
-@rule_helper
 async def _helper_helper(arg1):
     return await Get(INT, STR, arg1)
 
 
 class HelperContainer:
-    @rule_helper
     async def _method_helper(self):
         return await Get(STR, INT, 42)
 
     @staticmethod
-    @rule_helper
     async def _static_helper():
         a = await Get(STR, INT, 42)
         return await _helper_helper(a)
@@ -126,6 +122,23 @@ def test_get_no_index_call_no_subject_call_allowed() -> None:
         get_type: type = Get  # noqa: F841
 
     assert_awaitables(rule, [])
+
+
+def test_byname() -> None:
+    @rule
+    def rule1(arg: int) -> int:
+        return arg
+
+    @rule
+    async def rule2() -> int:
+        return 2
+
+    async def rule3() -> int:
+        one = await rule1(**implicitly(int(1)))
+        two = await rule2()
+        return one + two
+
+    assert_awaitables(rule3, [(int, int), (int, [])])
 
 
 def test_rule_helpers_free_functions() -> None:

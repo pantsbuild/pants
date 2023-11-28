@@ -199,10 +199,17 @@ class ParseState(threading.local):
         """
     )
     def set_defaults(
-        self, *args: SetDefaultsT, ignore_unknown_fields: bool = False, **kwargs
+        self,
+        *args: SetDefaultsT,
+        ignore_unknown_fields: bool = False,
+        ignore_unknown_targets: bool = False,
+        **kwargs,
     ) -> None:
         self.defaults.set_defaults(
-            *args, ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields, **kwargs
+            *args,
+            ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields,
+            ignore_unknown_targets=self.is_bootstrap or ignore_unknown_targets,
+            **kwargs,
         )
 
     def set_dependents_rules(self, *args, **kwargs) -> None:
@@ -263,6 +270,12 @@ class Registrar:
         return self._type_alias
 
     def __call__(self, **kwargs: Any) -> TargetAdaptor:
+        if self._parse_state.is_bootstrap and any(
+            isinstance(v, _UnrecognizedSymbol) for v in kwargs.values()
+        ):
+            # Remove any field values that are not recognized during the bootstrap phase.
+            kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, _UnrecognizedSymbol)}
+
         # Target names default to the name of the directory their BUILD file is in
         # (as long as it's not the root directory).
         if "name" not in kwargs:
@@ -497,6 +510,9 @@ class _UnrecognizedSymbol:
         self.name = name
         self.args: tuple[Any, ...] = ()
         self.kwargs: dict[str, Any] = {}
+
+    def __hash__(self) -> int:
+        return hash(self.name)
 
     def __call__(self, *args, **kwargs) -> _UnrecognizedSymbol:
         self.args = args

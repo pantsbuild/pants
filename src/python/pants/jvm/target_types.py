@@ -732,6 +732,15 @@ class DeployJarShadingRulesField(JvmShadingRulesField):
     help = _shading_rules_field_help("Shading rules to be applied to the final JAR artifact.")
 
 
+class DeployJarExcludeFilesField(StringSequenceField):
+    alias = "exclude_files"
+    help = help_text(
+        """
+        A list of patterns to exclude from the final jar.
+        """
+    )
+
+
 class DeployJarTarget(Target):
     alias = "deploy_jar"
     core_fields = (
@@ -744,6 +753,7 @@ class DeployJarTarget(Target):
         JvmResolveField,
         DeployJarDuplicatePolicyField,
         DeployJarShadingRulesField,
+        DeployJarExcludeFilesField,
     )
     help = help_text(
         """
@@ -826,7 +836,11 @@ def jvm_resolve_field_default_factory(
 def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
     from pants.jvm.run import rules as run_rules
 
-    @rule(_param_type_overrides={"request": cls}, level=LogLevel.DEBUG)
+    @rule(
+        canonical_name_suffix=cls.__name__,
+        _param_type_overrides={"request": cls},
+        level=LogLevel.DEBUG,
+    )
     async def jvm_source_run_request(request: JvmRunnableSourceFieldSet) -> RunRequest:
         return await Get(RunRequest, GenericJvmRunRequest(request))
 

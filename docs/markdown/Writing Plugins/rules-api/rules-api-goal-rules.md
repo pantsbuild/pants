@@ -19,12 +19,12 @@ There are four steps to creating a new [goal](doc:goals) with Pants:
 1. Define a subclass of `GoalSubsystem`. This is the API to your goal.
    1. Set the class property `name` to the name of your goal.
    2. Set the class property `help`, which is used by `pants help`.
-   3. You may register options through attributes of `pants.option.option_types` types. See [Options and subsystems](doc:subsystems).
+   3. You may register options through attributes of `pants.option.option_types` types. See [Options and subsystems](doc:rules-api-subsystems).
 2. Define a subclass of `Goal`. When a user runs `pants my-goal`, the engine will request your subclass, which is what causes the `@goal_rule` to run.
    1. Set the class property `subsystem_cls` to the `GoalSubsystem` from the previous step.
    2. A `Goal` takes a single argument in its constructor, `exit_code: int`. Pants will use this to determine what its own exit code should be.
 3. Define an `@goal_rule`, which must return the `Goal` from the previous step and set its `exit_code`.
-   1. For most goals, simply return `MyGoal(exit_code=0)`. Some goals like `lint` and `test` will instead propagate the error code from the tools they run. 
+   1. For most goals, simply return `MyGoal(exit_code=0)`. Some goals like `lint` and `test` will instead propagate the error code from the tools they run.
 4. Register the `@goal_rule` in a `register.py` file.
 
 ```python pants-plugins/example/hello_world.py
@@ -39,12 +39,13 @@ class HelloWorldSubsystem(GoalSubsystem):
 
 class HelloWorld(Goal):
     subsystem_cls = HelloWorldSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
 async def hello_world() -> HelloWorld:
     return HelloWorld(exit_code=1)
- 
+
 
 def rules():
     return collect_rules()
@@ -115,7 +116,7 @@ from pants.engine.rules import goal_rule
 
 class HelloWorldSubsystem(LineOriented, GoalSubsystem):
     name = "hello-world"
-    help = "An example goal."""
+    help = "An example goal."
 
 ...
 
@@ -156,24 +157,24 @@ helloworld/util:tests
 See [Rules and the Target API](doc:rules-api-and-target-api)  for detailed information on how to use these targets in your rules, including accessing the metadata specified in BUILD files.
 
 > 🚧 Common mistake: requesting the type of target you want in the `@goal_rule` signature
-> 
+>
 > For example, if you are writing a `publish` goal, and you expect to operate on `python_distribution` targets, you might think to request `PythonDistribution` in your `@goal_rule` signature:
-> 
+>
 > ```python
 > @goal_rule
 > def publish(distribution: PythonDistributionTarget, console: Console) -> Publish:
 >    ...
 > ```
-> 
+>
 > This will not work because the engine has no path in the rule graph to resolve a `PythonDistribution` type given the initial input types to the rule graph (the "roots").
-> 
+>
 > Instead, request `Targets`, which will give you all the targets that the user specified on the command line. The engine knows how to resolve this type because it can go from `Specs` -> `Addresses` -> `Targets`.
-> 
+>
 > From here, filter out the relevant targets you want using the Target API (see [Rules and the Target API](doc:rules-api-and-target-api)).
-> 
+>
 > ```python
 > from pants.engine.target import Targets
-> 
+>
 > @goal_rule
 > def publish(targets: Targets, console: Console) -> Publish:
 >    relevant_targets = [
@@ -203,4 +204,4 @@ To convert `SpecsPaths` into a [`Digest`](doc:rules-api-file-system), use `await
 
 > 📘 Name clashing
 >
-> It is very unlikely, but is still possible that adding a custom goal with an unfortunate name may cause issues when certain existing Pants options are passed in the command line. For instance, executing a goal named `local` with a particular option (in this case, the global `local_cache` option), e.g. `pants --no-local-cache local ...` would fail since there's no `--no-cache` flag defined for the `local` goal. 
+> It is very unlikely, but is still possible that adding a custom goal with an unfortunate name may cause issues when certain existing Pants options are passed in the command line. For instance, executing a goal named `local` with a particular option (in this case, the global `local_cache` option), e.g. `pants --no-local-cache local ...` would fail since there's no `--no-cache` flag defined for the `local` goal.

@@ -37,6 +37,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text, softwrap
 
 # Common help text to be applied to each field that supports value interpolation.
@@ -242,13 +243,19 @@ class DockerBuildOptionFieldMixin(ABC):
     docker_build_option: ClassVar[str]
 
     @abstractmethod
-    def option_values(self, *, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def option_values(
+        self, *, value_formatter: OptionValueFormatter, global_build_hosts_options: dict
+    ) -> Iterator[str]:
         """Subclasses must implement this, to turn their `self.value` into none, one or more option
         values."""
 
     @final
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
-        for value in self.option_values(value_formatter=value_formatter):
+    def options(
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options
+    ) -> Iterator[str]:
+        for value in self.option_values(
+            value_formatter=value_formatter, global_build_hosts_options=global_build_hosts_options
+        ):
             yield from (self.docker_build_option, value)
 
 
@@ -266,9 +273,137 @@ class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictSt
     )
     docker_build_option = "--label"
 
-    def option_values(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+    def option_values(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
         for label, value in (self.value or {}).items():
             yield f"{label}={value_formatter(value)}"
+
+
+class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStringToStringField):
+    alias = "extra_build_hosts"
+    help = help_text(
+        """
+        Extra hosts entries to be added to a container's `/etc/hosts` file.
+
+        Use `[docker].build_hosts` to set default host entries for all images.
+        """
+    )
+    docker_build_option = "--add-host"
+
+    def option_values(
+        self, value_formatter: OptionValueFormatter, global_build_hosts_options: dict = {}
+    ) -> Iterator[str]:
+        if self.value:
+            merged_values = {**global_build_hosts_options, **self.value}
+            for label, value in merged_values.items():
+                yield f"{label}:{value_formatter(value)}"
+
+
+class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
+    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2`
+    to `docker build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}=" + ",".join(
+                f"{key}={value_formatter(value)}" for key, value in self.value.items()
+            )
+
+
+class DockerBuildKitOptionField:
+    """Mixin to indicate a BuildKit-specific option."""
+
+    @abstractmethod
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
+        ...
+
+    required_help = "This option requires BuildKit to be enabled via the Docker subsystem options."
+
+
+class DockerImageBuildImageCacheToField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+):
+    alias = "cache_to"
+    help = help_text(
+        f"""
+        Export image build cache to an external cache destination.
+
+        {DockerBuildKitOptionField.required_help}
+
+        Example:
+
+            docker_image(
+                name="example-local-cache-backend",
+                cache_to={{
+                    "type": "local",
+                    "dest": "/tmp/docker-cache/example"
+                }},
+                cache_from={{
+                    "type": "local",
+                    "src": "/tmp/docker-cache/example"
+                }}
+            )
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--cache-to"
+
+
+class DockerImageBuildImageCacheFromField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+):
+    alias = "cache_from"
+    help = help_text(
+        f"""
+        Use an external cache source when building the image.
+
+        {DockerBuildKitOptionField.required_help}
+
+        Example:
+
+            docker_image(
+                name="example-local-cache-backend",
+                cache_to={{
+                    "type": "local",
+                    "dest": "/tmp/docker-cache/example"
+                }},
+                cache_from={{
+                    "type": "local",
+                    "src": "/tmp/docker-cache/example"
+                }}
+            )
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--cache-from"
+
+
+class DockerImageBuildImageOutputField(
+    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+):
+    alias = "output"
+    default = FrozenDict({"type": "docker"})
+    help = help_text(
+        f"""
+        Sets the export action for the build result.
+
+        {DockerBuildKitOptionField.required_help}
+
+        When using `pants publish` to publish Docker images to a registry, the output type
+        must be 'docker', as `publish` expects that the built images exist in the local
+        image store.
+
+        Currently, multi-platform images cannot be exported with the 'docker' export type,
+        although experimental support is available with the [containerd image store](https://docs.docker.com/desktop/containerd/)
+
+        {_interpolation_help.format(kind="Values")}
+        """
+    )
+    docker_build_option = "--output"
 
 
 class DockerImageBuildSecretsOptionField(
@@ -345,9 +480,21 @@ class DockerBuildOptionFieldValueMixin(Field):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self) -> Iterator[str]:
+    def options(self, *args, **kwargs) -> Iterator[str]:
         if self.value is not None:
             yield f"{self.docker_build_option}={self.value}"
+
+
+class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
+    """Inherit this mixin class to provide options in the form of `--flag=value1,value2` to `docker
+    build`."""
+
+    docker_build_option: ClassVar[str]
+
+    @final
+    def options(self, *args, **kwargs) -> Iterator[str]:
+        if self.value:
+            yield f"{self.docker_build_option}={','.join(list(self.value))}"
 
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
@@ -371,7 +518,7 @@ class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
     docker_build_option: ClassVar[str]
 
     @final
-    def options(self) -> Iterator[str]:
+    def options(self, *args, **kwargs) -> Iterator[str]:
         if self.value:
             yield f"{self.docker_build_option}"
 
@@ -402,6 +549,19 @@ class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, Strin
     docker_build_option = "--network"
 
 
+class DockerImageBuildPlatformOptionField(
+    DockerBuildOptionFieldMultiValueMixin, StringSequenceField
+):
+    alias = "build_platform"
+    default = None
+    help = help_text(
+        """
+        Set the target platform(s) for the build.
+        """
+    )
+    docker_build_option = "--platform"
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -415,6 +575,7 @@ class DockerImageTarget(Target):
         DockerImageRegistriesField,
         DockerImageRepositoryField,
         DockerImageBuildImageLabelsOptionField,
+        DockerImageBuildImageExtraHostsField,
         DockerImageBuildSecretsOptionField,
         DockerImageBuildSSHOptionField,
         DockerImageSkipPushField,
@@ -422,6 +583,10 @@ class DockerImageTarget(Target):
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
         DockerImageBuildNetworkOptionField,
+        DockerImageBuildPlatformOptionField,
+        DockerImageBuildImageCacheToField,
+        DockerImageBuildImageCacheFromField,
+        DockerImageBuildImageOutputField,
         OutputPathField,
         RestartableField,
     )

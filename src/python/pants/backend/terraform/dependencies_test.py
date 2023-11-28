@@ -7,16 +7,16 @@ from typing import Optional
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
-from pants.backend.terraform.goals.deploy_test import (
+from pants.backend.terraform.testutil import (
     StandardDeployment,
-    rule_runner,
+    rule_runner_with_auto_approve,
     standard_deployment,
 )
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.native_engine import Address
 from pants.testutil.rule_runner import RuleRunner
 
-rule_runner = rule_runner
+rule_runner = rule_runner_with_auto_approve
 standard_deployment = standard_deployment
 
 
@@ -78,7 +78,7 @@ def test_init_terraform_without_backends(
     # Not initialising the backend means that ./.terraform/.terraform.tfstate will not be present
     assert not find_file(
         initialised_files, "**/*.tfstate"
-    ), "Terraform state file should not be present if the the request was to not initialise the backend"
+    ), "Terraform state file should not be present if the request was to not initialise the backend"
 
     # The dependencies should still be present
     assert find_file(

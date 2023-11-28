@@ -82,6 +82,7 @@ def test_root_package_json_is_supported(rule_runner: RuleRunner) -> None:
     )
     projects = rule_runner.request(AllNodeJSProjects, [])
     assert {project.root_dir for project in projects} == {"", "src/js/bar"}
+    assert {project.default_resolve_name for project in projects} == {"nodejs-default", "js.bar"}
 
 
 def test_parses_project_with_workspaces(rule_runner: RuleRunner) -> None:

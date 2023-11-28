@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import platform
 import sqlite3
+from collections.abc import Sequence
 from pathlib import Path
 from textwrap import dedent
 
@@ -244,6 +245,57 @@ def test_coverage_global(batched: bool) -> None:
         )
         in result.stderr
     ), result.stderr
+
+
+@pytest.mark.parametrize(
+    ("setting", "expected"),
+    [
+        (
+            "",
+            [
+                "/tests/python/namespace/bar_test.py       2      0   100%",
+                "TOTAL                                                2      0   100%",
+            ],
+        ),
+        (
+            "include_namespace_packages = false",
+            [
+                "/tests/python/namespace/bar_test.py       2      0   100%",
+                "TOTAL                                                2      0   100%",
+            ],
+        ),
+        (
+            "include_namespace_packages = true",
+            [
+                "/src/python/namespace/foo.py              1      1     0%",
+                "/tests/python/namespace/bar_test.py       2      0   100%",
+                "TOTAL                                                3      1    67%",
+            ],
+        ),
+    ],
+)
+def test_coverage_global_with_namespaced_package(setting: str, expected: Sequence[str]) -> None:
+    files = {
+        "pyproject.toml": f"[tool.coverage.report]\n{setting}",
+        "src/python/namespace/BUILD": "python_sources()",
+        "src/python/namespace/foo.py": "BAR = True",
+        "tests/python/namespace/BUILD": "python_tests()",
+        "tests/python/namespace/bar_test.py": "def test_true():\n    assert True is True",
+    }
+    with setup_tmpdir(files) as tmpdir:
+        command = [
+            "--backend-packages=pants.backend.python",
+            "test",
+            "--use-coverage",
+            f"{tmpdir}/tests/python/namespace/bar_test.py",
+            f"--source-root-patterns=['/{tmpdir}/src', '/{tmpdir}/tests']",
+            "--coverage-py-global-report",
+            f"--coverage-py-config={tmpdir}/pyproject.toml",
+        ]
+        result = run_pants(command)
+
+    for line in expected:
+        assert line in result.stderr, result.stderr
 
 
 @pytest.mark.parametrize("batched", (True, False))

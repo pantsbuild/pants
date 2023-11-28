@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Mapping
 
 from pants.backend.adhoc.target_types import (
     SystemBinaryExtraSearchPathsField,
@@ -22,10 +22,11 @@ from pants.core.util_rules.adhoc_process_support import (
     ResolveExecutionDependenciesRequest,
 )
 from pants.core.util_rules.system_binaries import (
-    SEARCH_PATHS,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
+    SearchPath,
+    SystemBinariesSubsystem,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get, MultiGet
@@ -58,18 +59,16 @@ class SystemBinaryFieldSet(RunFieldSet):
 async def _find_binary(
     address: Address,
     binary_name: str,
-    extra_search_paths: Iterable[str],
+    search_path: SearchPath,
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
 ) -> BinaryPath:
-    search_paths = tuple(extra_search_paths) + SEARCH_PATHS
-
     binaries = await Get(
         BinaryPaths,
         BinaryPathRequest(
             binary_name=binary_name,
-            search_path=search_paths,
+            search_path=search_path,
         ),
     )
 
@@ -123,19 +122,24 @@ async def _find_binary(
             if not fingerprint_pattern
             else f" with output matching `{fingerprint_pattern}` when run with arguments `{' '.join(fingerprint_args or ())}`"
         )
-        + f". The following paths were searched: {', '.join(search_paths)}."
+        + f". The following paths were searched: {', '.join(search_path)}."
     )
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_system_binary_run_request(field_set: SystemBinaryFieldSet) -> RunRequest:
+async def create_system_binary_run_request(
+    field_set: SystemBinaryFieldSet,
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> RunRequest:
     assert field_set.name.value is not None
     extra_search_paths = field_set.extra_search_paths.value or ()
+
+    search_path = SearchPath((*extra_search_paths, *system_binaries.system_binary_paths))
 
     path = await _find_binary(
         field_set.address,
         field_set.name.value,
-        extra_search_paths,
+        search_path,
         field_set.fingerprint_pattern.value,
         field_set.fingerprint_argv.value,
         field_set.fingerprint_dependencies.value,

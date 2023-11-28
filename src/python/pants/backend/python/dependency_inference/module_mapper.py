@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import enum
+import functools
 import itertools
 import logging
 import os
@@ -17,6 +18,7 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
+    DEFAULT_MODULE_PATTERN_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -39,6 +41,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
 
 ResolveName = str
 
@@ -308,6 +311,38 @@ class ThirdPartyPythonModuleMapping:
         )
 
 
+@functools.cache
+def generate_mappings_from_pattern(proj_name: str) -> Iterable[str]:
+    """Generate an iterable of possible module mappings from a project name using a regex pattern.
+
+    e.g. google-cloud-foo -> [google.cloud.foo, google.cloud.foo_v1, google.cloud.foo_v2]
+    Should eliminate the need to "manually" add a mapping for every service
+    proj_name: The project name to generate mappings for e.g google-cloud-datastream
+    """
+    pattern_values = []
+    for match_pattern, replace_patterns in DEFAULT_MODULE_PATTERN_MAPPING.items():
+        if match_pattern.match(proj_name) is not None:
+            pattern_values = [
+                match_pattern.sub(replace_pattern, proj_name)
+                for replace_pattern in replace_patterns
+            ]
+            break  # stop after the first match in the rare chance that there are multiple matches
+    return pattern_values
+
+
+@functools.cache
+def generate_mappings(proj_name: str, fallback_value: str) -> Iterable[str]:
+    """Will try the default mapping first and if no mapping is found, try the pattern match.
+
+    If those fail, use the fallback_value
+    """
+    return (
+        DEFAULT_MODULE_MAPPING.get(proj_name)
+        or generate_mappings_from_pattern(proj_name)
+        or (fallback_value,)
+    )
+
+
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
 async def map_third_party_modules_to_addresses(
     all_python_targets: AllPythonTargets,
@@ -361,7 +396,7 @@ async def map_third_party_modules_to_addresses(
                     )
                 add_modules(stub_modules, type_stub=True)
             else:
-                add_modules(DEFAULT_MODULE_MAPPING.get(proj_name, (fallback_value,)))
+                add_modules(generate_mappings(proj_name, fallback_value))
 
     return ThirdPartyPythonModuleMapping(
         FrozenDict(

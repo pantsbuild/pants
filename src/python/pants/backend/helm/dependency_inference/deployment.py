@@ -21,10 +21,11 @@ from pants.backend.helm.util_rules.renderer import (
     RenderedHelmFiles,
 )
 from pants.backend.helm.utils.yaml import FrozenYamlIndex, MutableYamlIndex
+from pants.build_graph.address import MaybeAddress
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import Digest, DigestEntries, FileEntry
-from pants.engine.internals.native_engine import AddressInput
+from pants.engine.internals.native_engine import AddressInput, AddressParseException
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -88,12 +89,12 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
     # Build YAML index of Docker image refs for future processing during depedendecy inference or post-rendering.
     image_refs_index: MutableYamlIndex[str] = MutableYamlIndex()
     for manifest in parsed_manifests:
-        for idx, path, image_ref in manifest.found_image_refs:
+        for entry in manifest.found_image_refs:
             image_refs_index.insert(
                 file_path=PurePath(manifest.filename),
-                document_index=idx,
-                yaml_path=path,
-                item=image_ref,
+                document_index=entry.document_index,
+                yaml_path=entry.path,
+                item=entry.unparsed_image_ref,
             )
 
     return HelmDeploymentReport(
@@ -129,18 +130,47 @@ async def first_party_helm_deployment_mapping(
     deployment_report = await Get(
         HelmDeploymentReport, AnalyseHelmDeploymentRequest(request.field_set)
     )
-    docker_target_addresses = {tgt.address.spec: tgt.address for tgt in docker_targets}
 
-    def lookup_docker_addreses(image_ref: str) -> tuple[str, Address] | None:
-        addr = docker_target_addresses.get(image_ref, None)
-        if addr:
-            return image_ref, addr
-        return None
+    def image_ref_to_address_input(image_ref: str) -> tuple[str, AddressInput] | None:
+        try:
+            return image_ref, AddressInput.parse(
+                image_ref,
+                description_of_origin=f"the helm_deployment at {request.field_set.address}",
+                relative_to=request.field_set.address.spec_path,
+            )
+        except AddressParseException:
+            return None
+
+    indexed_address_inputs = deployment_report.image_refs.transform_values(
+        image_ref_to_address_input
+    )
+    maybe_addresses = await MultiGet(
+        Get(MaybeAddress, AddressInput, ai) for _, ai in indexed_address_inputs.values()
+    )
+
+    docker_target_addresses = {tgt.address for tgt in docker_targets}
+    maybe_addresses_by_ref = {
+        ref: maybe_addr
+        for ((ref, _), maybe_addr) in zip(indexed_address_inputs.values(), maybe_addresses)
+    }
+
+    def image_ref_to_actual_address(
+        image_ref_ai: tuple[str, AddressInput]
+    ) -> tuple[str, Address] | None:
+        image_ref, _ = image_ref_ai
+        maybe_addr = maybe_addresses_by_ref.get(image_ref)
+        if not maybe_addr:
+            return None
+        if not isinstance(maybe_addr.val, Address):
+            return None
+        if maybe_addr.val not in docker_target_addresses:
+            return None
+        return image_ref, maybe_addr.val
 
     return FirstPartyHelmDeploymentMapping(
         address=request.field_set.address,
-        indexed_docker_addresses=deployment_report.image_refs.transform_values(
-            lookup_docker_addreses
+        indexed_docker_addresses=indexed_address_inputs.transform_values(
+            image_ref_to_actual_address
         ),
     )
 
@@ -153,12 +183,8 @@ class InferHelmDeploymentDependenciesRequest(InferDependenciesRequest):
 async def inject_deployment_dependencies(
     request: InferHelmDeploymentDependenciesRequest,
 ) -> InferredDependencies:
-    chart_address = None
-    chart_address_input = request.field_set.chart.to_address_input()
-    if chart_address_input:
-        chart_address = await Get(Address, AddressInput, chart_address_input)
-
-    explicitly_provided_deps, mapping = await MultiGet(
+    chart_address, explicitly_provided_deps, mapping = await MultiGet(
+        Get(Address, AddressInput, request.field_set.chart.to_address_input()),
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
         Get(
             FirstPartyHelmDeploymentMapping,
@@ -167,8 +193,8 @@ async def inject_deployment_dependencies(
     )
 
     dependencies: OrderedSet[Address] = OrderedSet()
-    if chart_address:
-        dependencies.add(chart_address)
+    dependencies.add(chart_address)
+
     for imager_ref, candidate_address in mapping.indexed_docker_addresses.values():
         matches = frozenset([candidate_address]).difference(explicitly_provided_deps.includes)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
