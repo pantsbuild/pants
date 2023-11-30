@@ -105,6 +105,16 @@ def test_eq_different_orders() -> None:
     assert fd1 == fd2
 
 
+def test_lt() -> None:
+    d = {"a": 0, "b": 1}
+    assert FrozenDict(d) < FrozenDict({"a": 1, "b": 2})
+    # Order matters.
+    assert FrozenDict(d) < FrozenDict({"b": 1, "a": 0})
+    # Must be an instance of FrozenDict.
+    with pytest.raises(TypeError):
+        FrozenDict(d) < d
+
+
 def test_hash() -> None:
     d1 = {"a": 0, "b": 1}
     assert hash(FrozenDict(d1)) == hash(FrozenDict(d1))
