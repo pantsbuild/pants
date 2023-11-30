@@ -728,7 +728,7 @@ def test_failed_to_fetch_jar_given_packaging_pom(rule_runner: RuleRunner) -> Non
 
 @maybe_skip_jdk_test
 def test_force_version(rule_runner):
-    # first check that strict=False leads to a different version
+    # first check that force_version=False leads to a different version
     reqs = ArtifactRequirements(
         [
             Coordinate(
@@ -750,7 +750,7 @@ def test_force_version(rule_runner):
         version="1.7.22",
     ) in [e.coord for e in entries]
 
-    # then check strict=True pins the version
+    # then check force_version=True pins the version
     reqs = ArtifactRequirements(
         [
             Coordinate(
