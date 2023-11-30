@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -27,12 +28,30 @@ from pants.util.resources import read_resource
 
 
 @dataclass(frozen=True)
-class DjangoApps:
-    label_to_name: FrozenDict[str, str]
+class DjangoApp:
+    name: str
+    config_file: str
 
-    def add_from_json(self, json_bytes: bytes) -> "DjangoApps":
-        apps = dict(self.label_to_name, **json.loads(json_bytes.decode()))
-        return DjangoApps(FrozenDict(sorted(apps.items())))
+
+# @dataclass(frozen=True)
+class DjangoApps(FrozenDict[str, DjangoApp]):
+    @property
+    def label_to_name(self) -> FrozenDict[str, str]:
+        return FrozenDict((label, app.name) for label, app in self.items())
+
+    @property
+    def label_to_file(self) -> FrozenDict[str, str]:
+        return FrozenDict((label, app.config_file) for label, app in self.items())
+
+    def add_from_json(self, json_bytes: bytes, strip_prefix="") -> "DjangoApps":
+        json_dict = dict(self, **json.loads(json_bytes.decode()))
+        apps = {
+            label: DjangoApp(
+                val["app_name"], val["config_file"].partition(f"{strip_prefix}{os.sep}")[2]
+            )
+            for label, val in json_dict.items()
+        }
+        return DjangoApps(sorted(apps.items()))
 
 
 _script_resource = "scripts/app_detector.py"
@@ -119,7 +138,10 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
                 description="Detect Django apps",
             ),
         )
-        django_apps = django_apps.add_from_json(process_result.stdout or b"{}")
+        django_apps = django_apps.add_from_json(
+            process_result.stdout or b"{}", strip_prefix=apps_sandbox_prefix
+        )
+
     return django_apps
 
 
