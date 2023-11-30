@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, cast, overload
 
+from pants.base.deprecated import deprecated
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
 from pants.util.typing import SupportsRichComparison
@@ -91,6 +92,18 @@ class FrozenDict(Mapping[K, V]):
             return NotImplemented
         return tuple(self.items()) == tuple(other.items())
 
+    @deprecated(
+        "2.24.0.dev0",
+        hint=softwrap(
+            """
+            If you are comparing `FrozenDict`s in a plugin, use `OrderedFrozenDict` instead.
+
+            If you are not using a plugin that compares `FrozenDict`s, please file an issue
+            https://github.com/pantsbuild/pants/issues/new/choose with information about what you
+            are doing to see this warning.
+            """
+        ),
+    )
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, FrozenDict):
             return NotImplemented
