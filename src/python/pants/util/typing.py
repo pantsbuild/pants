@@ -32,3 +32,16 @@ class ForwardRefPatched(typing.ForwardRef, _root=True):  # type: ignore[call-arg
         if globalns and "Union" not in globalns:
             globalns["Union"] = typing.Union
         return super()._evaluate(globalns, *args, **kwargs)
+
+
+class SupportsDunderLT(typing.Protocol):
+    def __lt__(self, __other: typing.Any) -> bool:
+        ...
+
+
+class SupportsDunderGT(typing.Protocol):
+    def __gt__(self, __other: typing.Any) -> bool:
+        ...
+
+
+SupportsRichComparison = typing.Union[SupportsDunderLT, SupportsDunderGT]

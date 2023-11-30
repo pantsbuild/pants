@@ -7,7 +7,7 @@ from typing import DefaultDict
 
 import pytest
 
-from pants.util.frozendict import FrozenDict, LazyFrozenDict
+from pants.util.frozendict import FrozenDict, LazyFrozenDict, OrderedFrozenDict
 
 
 def test_flexible_constructor() -> None:
@@ -175,3 +175,31 @@ def test_frozendict_dot_frozen() -> None:
 
     assert frozen_a == FrozenDict(a)
     assert frozen_b is b
+
+
+def test_orderedfrozendict_lt() -> None:
+    d = {"a": 0, "b": 1}
+
+    ordered = [
+        {"a": 0},
+        d,
+        {"a": 0, "b": 2},
+        {"a": 1},
+        {"a": 1, "b": 0},
+        {"b": -1},
+        {"c": -2},
+    ]
+    # Do all comparisions: the list is in order, so the comparisons of the dicts should match the
+    # comparison of indices.
+    for i, di in enumerate(ordered):
+        for j, dj in enumerate(ordered):
+            assert (OrderedFrozenDict(di) < OrderedFrozenDict(dj)) == (i < j)
+
+    # Order doesn't matter.
+    assert OrderedFrozenDict(d) < OrderedFrozenDict({"b": 2, "a": 0})
+
+    # Must be an instance of OrderedFrozenDict.
+    with pytest.raises(TypeError):
+        OrderedFrozenDict(d) < d
+    with pytest.raises(TypeError):
+        OrderedFrozenDict(d) < FrozenDict(d)
