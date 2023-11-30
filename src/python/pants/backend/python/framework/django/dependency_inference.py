@@ -23,6 +23,7 @@ from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.base.specs import FileGlobSpec, RawSpecs
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import CreateDigest, FileContent
@@ -30,7 +31,7 @@ from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import InferDependenciesRequest, InferredDependencies
+from pants.engine.target import InferDependenciesRequest, InferredDependencies, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -41,6 +42,10 @@ class InferDjangoDependencies(InferDependenciesRequest):
 
 
 _visitor_resource = "scripts/dependency_visitor.py"
+_implicit_dependency_packages = (
+    "management.commands",
+    "migrations",
+)
 
 
 async def _django_migration_dependencies(
@@ -111,16 +116,73 @@ async def _django_migration_dependencies(
     )
 
 
+async def _django_app_implicit_dependencies(
+    request: InferDjangoDependencies,
+    python_setup: PythonSetup,
+    django_apps: DjangoApps,
+) -> InferredDependencies:
+    file_path = request.field_set.source.file_path
+    apps = [
+        django_app for django_app in django_apps.values() if django_app.config_file == file_path
+    ]
+    if not apps:
+        return InferredDependencies([])
+
+    app_package = apps[0].name
+
+    implicit_dependency_packages = [
+        f"{app_package}.{subpackage}" for subpackage in _implicit_dependency_packages
+    ]
+
+    resolve = request.field_set.resolve.normalized_value(python_setup)
+
+    resolved_dependencies = await Get(
+        ResolvedParsedPythonDependencies,
+        ResolvedParsedPythonDependenciesRequest(
+            request.field_set,
+            ParsedPythonDependencies(
+                ParsedPythonImports(
+                    (package, ParsedPythonImportInfo(0, False))
+                    for package in implicit_dependency_packages
+                ),
+                ParsedPythonAssetPaths(),
+            ),
+            resolve,
+        ),
+    )
+
+    spec_paths = [
+        address.spec_path
+        for result in resolved_dependencies.resolve_results.values()
+        if result.status in (ImportOwnerStatus.unambiguous, ImportOwnerStatus.disambiguated)
+        for address in result.address
+    ]
+
+    targets = await Get(
+        Targets,
+        RawSpecs,
+        RawSpecs.create(
+            specs=[FileGlobSpec(f"{spec_path}/*.py") for spec_path in spec_paths],
+            description_of_origin="Django implicit dependency detection",
+        ),
+    )
+
+    return InferredDependencies(sorted(target.address for target in targets))
+
+
 @rule
-async def django_parser_script(
+async def infer_django_dependencies(
     request: InferDjangoDependencies,
     python_setup: PythonSetup,
     django_apps: DjangoApps,
 ) -> InferredDependencies:
     source_field = request.field_set.source
     # NB: This doesn't consider https://docs.djangoproject.com/en/4.2/ref/settings/#std-setting-MIGRATION_MODULES
-    if PurePath(source_field.file_path).match("migrations/*.py"):
+    path = PurePath(source_field.file_path)
+    if path.match("migrations/*.py"):
         return await _django_migration_dependencies(request, python_setup, django_apps)
+    elif path.match("apps.py"):
+        return await _django_app_implicit_dependencies(request, python_setup, django_apps)
     else:
         return InferredDependencies([])
 

@@ -33,7 +33,6 @@ class DjangoApp:
     config_file: str
 
 
-# @dataclass(frozen=True)
 class DjangoApps(FrozenDict[str, DjangoApp]):
     @property
     def label_to_name(self) -> FrozenDict[str, str]:
