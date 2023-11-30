@@ -3,7 +3,7 @@
 
 """Linter & formatter for Python.
 
-See https://www.pantsbuild.org/docs/python-linters-and-formatters and https://github.com/charliermarsh/ruff
+See https://www.pantsbuild.org/docs/python-linters-and-formatters and https://docs.astral.sh/ruff/
 """
 
 from pants.backend.python.lint.ruff import rules as ruff_rules
