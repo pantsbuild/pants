@@ -43,14 +43,15 @@ class DjangoApps(FrozenDict[str, DjangoApp]):
         return FrozenDict((label, app.config_file) for label, app in self.items())
 
     def add_from_json(self, json_bytes: bytes, strip_prefix="") -> "DjangoApps":
-        json_dict = dict(self, **json.loads(json_bytes.decode()))
+        json_dict: dict[str, dict[str, str]] = json.loads(json_bytes.decode())
         apps = {
             label: DjangoApp(
                 val["app_name"], val["config_file"].partition(f"{strip_prefix}{os.sep}")[2]
             )
             for label, val in json_dict.items()
         }
-        return DjangoApps(sorted(apps.items()))
+        combined = dict(self, **apps)
+        return DjangoApps(sorted(combined.items()))
 
 
 _script_resource = "scripts/app_detector.py"
