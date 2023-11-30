@@ -43,17 +43,11 @@ class InferDjangoDependencies(InferDependenciesRequest):
 _visitor_resource = "scripts/dependency_visitor.py"
 
 
-@rule
-async def django_parser_script(
+async def _django_migration_dependencies(
     request: InferDjangoDependencies,
     python_setup: PythonSetup,
     django_apps: DjangoApps,
 ) -> InferredDependencies:
-    source_field = request.field_set.source
-    # NB: This doesn't consider https://docs.djangoproject.com/en/4.2/ref/settings/#std-setting-MIGRATION_MODULES
-    if not PurePath(source_field.file_path).match("migrations/*.py"):
-        return InferredDependencies([])
-
     stripped_sources = await Get(
         StrippedSourceFiles, SourceFilesRequest([request.field_set.source])
     )
@@ -115,6 +109,20 @@ async def django_parser_script(
             for address in result.address
         )
     )
+
+
+@rule
+async def django_parser_script(
+    request: InferDjangoDependencies,
+    python_setup: PythonSetup,
+    django_apps: DjangoApps,
+) -> InferredDependencies:
+    source_field = request.field_set.source
+    # NB: This doesn't consider https://docs.djangoproject.com/en/4.2/ref/settings/#std-setting-MIGRATION_MODULES
+    if PurePath(source_field.file_path).match("migrations/*.py"):
+        return await _django_migration_dependencies(request, python_setup, django_apps)
+    else:
+        return InferredDependencies([])
 
 
 def rules():
