@@ -404,6 +404,8 @@ async def create_tool_runner(
 
     run_field_sets, environment_name, execution_environment = await MultiGet(
         Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)),
+        # Must be run in target environment so that the binaries/envvars match the execution
+        # environment when we actually run the process.
         Get(EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)),
         Get(
             ResolvedExecutionDependencies,
