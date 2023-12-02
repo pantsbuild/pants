@@ -164,6 +164,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         [Path("f.py"), Path("pyproject.toml"), [], False],
         [Path("f.py"), Path("ruff.toml"), [], False],
         [Path("custom/f.py"), Path("custom/ruff.toml"), [], False],
+        [Path("custom/f.py"), Path("custom/pyproject.toml"), [], False],
         [Path("f.py"), Path("custom/ruff.toml"), ["--ruff-config=custom/ruff.toml"], False],
         [Path("f.py"), Path("custom/ruff.toml"), [], True],
     ),
