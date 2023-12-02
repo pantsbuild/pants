@@ -200,7 +200,16 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
 
 
 @dataclass(frozen=True)
-class CodeQualityToolBatchRunner:
+class ToolRunnerRequest:
+    runnable_address_str: str
+    args: tuple[str, ...]
+    execution_dependencies: tuple[str, ...]
+    runnable_dependencies: tuple[str, ...]
+    target: Target
+
+
+@dataclass(frozen=True)
+class ToolRunner:
     digest: Digest
     args: tuple[str, ...]
     extra_env: Mapping[str, str]
@@ -210,7 +219,7 @@ class CodeQualityToolBatchRunner:
 
 @dataclass(frozen=True)
 class CodeQualityToolBatch:
-    runner: CodeQualityToolBatchRunner
+    runner: ToolRunner
     sources_snapshot: Snapshot
     output_files: tuple[str, ...]
 
@@ -237,18 +246,29 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
 
 
 @rule
-async def hydrate_code_quality_tool(
-    request: CodeQualityToolAddressString,
-) -> CodeQualityToolBatchRunner:
-    cqt = await Get(CodeQualityTool, CodeQualityToolAddressString, request)
+async def runner_request_for_code_quality_tool(
+    cqt: CodeQualityTool,
+) -> ToolRunnerRequest:
+    return ToolRunnerRequest(
+        runnable_address_str=cqt.runnable_address_str,
+        args=cqt.args,
+        execution_dependencies=cqt.execution_dependencies,
+        runnable_dependencies=cqt.runnable_dependencies,
+        target=cqt.target,
+    )
 
+
+@rule
+async def create_tool_runner(
+    request: ToolRunnerRequest,
+) -> ToolRunner:
     runnable_address = await Get(
         Address,
         AddressInput,
         AddressInput.parse(
-            cqt.runnable_address_str,
-            relative_to=cqt.target.address.spec_path,
-            description_of_origin=f"Runnable target for code quality tool {cqt.target.address.spec_path}",
+            request.runnable_address_str,
+            relative_to=request.target.address.spec_path,
+            description_of_origin=f"Runnable target for {request.target.address.spec_path}",
         ),
     )
 
@@ -266,8 +286,8 @@ async def hydrate_code_quality_tool(
             ResolvedExecutionDependencies,
             ResolveExecutionDependenciesRequest(
                 address=runnable_address,
-                execution_dependencies=cqt.execution_dependencies,
-                runnable_dependencies=cqt.runnable_dependencies,
+                execution_dependencies=request.execution_dependencies,
+                runnable_dependencies=request.runnable_dependencies,
             ),
         ),
     )
@@ -316,9 +336,9 @@ async def hydrate_code_quality_tool(
     if merged_extras.path:
         extra_env["PATH"] = merged_extras.path
 
-    return CodeQualityToolBatchRunner(
+    return ToolRunner(
         digest=main_digest,
-        args=run_request.args + tuple(cqt.args),
+        args=run_request.args + tuple(request.args),
         extra_env=FrozenDict(extra_env),
         append_only_caches=merged_extras.append_only_caches,
         immutable_input_digests=merged_extras.immutable_input_digests,
@@ -391,7 +411,7 @@ class CodeQualityToolRuleBuilder:
         async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> LintResult:
             sources_snapshot, code_quality_tool_runner = await MultiGet(
                 Get(Snapshot, PathGlobs(request.elements)),
-                Get(CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)),
+                Get(ToolRunner, CodeQualityToolAddressString(address=self.target)),
             )
 
             proc_result = await Get(
@@ -445,7 +465,7 @@ class CodeQualityToolRuleBuilder:
             sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+                ToolRunner, CodeQualityToolAddressString(address=self.target)
             )
 
             proc_result = await Get(
@@ -507,7 +527,7 @@ class CodeQualityToolRuleBuilder:
             sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+                ToolRunner, CodeQualityToolAddressString(address=self.target)
             )
 
             proc_result = await Get(
