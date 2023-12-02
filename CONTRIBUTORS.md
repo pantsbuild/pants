@@ -166,6 +166,7 @@ Created as part of the release process.
 + Joshua Cohen
 + Joshua Humphries
 + Jovial Joe Jayarson
++ Julio Batista Silva
 + Justin Trobec
 + KadenAgrey
 + Karin Lundberg
