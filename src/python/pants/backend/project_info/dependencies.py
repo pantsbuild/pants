@@ -71,16 +71,24 @@ async def dependencies(
     # generated targets.
 
     if dependencies_subsystem.format == DependenciesOutputFormat.json:
-        mapping = {}
-        for tgt in target_roots:
-            targets = await Get(
+        dependencies_per_target_root = await MultiGet(
+            Get(
                 Targets,
                 DependenciesRequest(
                     tgt.get(DependenciesField),
                     should_traverse_deps_predicate=AlwaysTraverseDeps(),
                 ),
             )
-            mapping[str(tgt.address)] = [str(t.address) for t in targets]
+            for tgt in target_roots
+        )
+        iterated_targets = []
+        for targets in dependencies_per_target_root:
+            iterated_targets.append([str(tgt.address) for tgt in targets])
+
+        mapping = dict(zip(
+            [str(tgt.address) for tgt in target_roots],
+            iterated_targets
+        ))
         output = json.dumps(mapping, indent=4)
         console.print_stdout(output)
 
