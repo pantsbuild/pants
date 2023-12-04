@@ -15,6 +15,7 @@ from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
+from pants.engine.fs import Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.jvm import jdk_rules
 from pants.jvm.classpath import rules as classpath_rules
@@ -421,6 +422,52 @@ def test_deploy_jar_shaded(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_deploy_jar_shaded_in_subdir(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "subdir/BUILD": dedent(
+                """\
+                    deploy_jar(
+                        name="example_app_deploy_jar",
+                        main="org.pantsbuild.example.Example",
+                        output_path="subdir/dave.jar",
+                        dependencies=[
+                            ":example",
+                        ],
+                        shading_rules=[
+                            shading_rename(
+                                pattern="com.fasterxml.jackson.core.**",
+                                replacement="jackson.core.@1",
+                            )
+                        ]
+                    )
+
+                    java_sources(
+                        name="example",
+                        sources=["**/*.java", ],
+                        dependencies=[
+                            ":com.fasterxml.jackson.core_jackson-databind",
+                        ],
+                    )
+
+                    jvm_artifact(
+                        name = "com.fasterxml.jackson.core_jackson-databind",
+                        group = "com.fasterxml.jackson.core",
+                        artifact = "jackson-databind",
+                        version = "2.12.5",
+                    )
+                """
+            ),
+            "3rdparty/jvm/default.lock": COURSIER_LOCKFILE_SOURCE,
+            "subdir/Example.java": JAVA_MAIN_SOURCE,
+            "subdir/lib/ExampleLib.java": JAVA_JSON_MANGLING_LIB_SOURCE,
+        }
+    )
+
+    _deploy_jar_test(rule_runner, "example_app_deploy_jar", path="subdir")
+
+
+@maybe_skip_jdk_test
 def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(args=["--jvm-reproducible-jars"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     rule_runner.write_files(
@@ -475,23 +522,28 @@ def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
 
 
 def _deploy_jar_test(
-    rule_runner: RuleRunner, target_name: str, args: Iterable[str] | None = None
+    rule_runner: RuleRunner,
+    target_name: str,
+    args: Iterable[str] | None = None,
+    path: str = "",
 ) -> None:
     rule_runner.set_options(args=(args or ()), env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(Address("", target_name=target_name))
+    tgt = rule_runner.get_target(Address(path, target_name=target_name))
     jdk = rule_runner.request(InternalJdk, [])
     fat_jar = rule_runner.request(
         BuiltPackage,
         [DeployJarFieldSet.create(tgt)],
     )
 
+    digest_files = rule_runner.request(Snapshot, [fat_jar.digest]).files
+    assert len(digest_files) == 1
     process_result = rule_runner.request(
         ProcessResult,
         [
             JvmProcess(
                 jdk=jdk,
-                argv=("-jar", "dave.jar"),
+                argv=("-jar", digest_files[0]),
                 classpath_entries=[],
                 description="Run that test jar",
                 input_digest=fat_jar.digest,
