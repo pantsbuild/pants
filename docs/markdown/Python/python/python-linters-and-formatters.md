@@ -282,3 +282,29 @@ default_section = "THIRDPARTY"
 ```
 
 You may also want to try downgrading to iSort 4.x by setting `version = "isort>=4.6,<5"` in the `[isort]` options scope.
+
+### Black and isort: excluding files
+
+In order to exclude files from being formatted by Black and isort, it may be necessary to explicitly tell those tools to respect skip configuration options. Otherwise, the tools may unconditionally format all files passed to them by the Pants runner.
+
+They report that this config works for them:
+
+```toml
+# pyproject.toml
+[tool.isort]
+# tell isort to respect skip_glob
+filter_files = true  
+# in particular, extend_skip_glob doesn't seem to work under Pants isort
+skip_glob = [
+    "**/*_skip_me.py",
+    "**/*_skip_me.pyi",
+]
+
+[tool.black]
+# in particular, extend-exclude and exclude will not work
+force-exclude='''
+^(
+    .*_skip_me\.py(i)?
+)$
+'''
+```
