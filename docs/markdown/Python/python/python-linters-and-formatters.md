@@ -285,9 +285,9 @@ You may also want to try downgrading to iSort 4.x by setting `version = "isort>=
 
 ### Black and isort: excluding files
 
-In order to exclude files from being formatted by Black and isort, it may be necessary to explicitly tell those tools to respect skip configuration options. Otherwise, the tools may unconditionally format all files passed to them by the Pants runner.
+In order to exclude files from being formatted by Black and isort, it may be necessary to tell those tools to respect skip configuration options. Otherwise, they may unconditionally format all files passed to them by the Pants runner.
 
-They report that this config works for them:
+Pants users report that this config works for them:
 
 ```toml
 # pyproject.toml
