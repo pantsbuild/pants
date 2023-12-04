@@ -14,13 +14,19 @@ from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
+
+
+# If a user wants linter reports to show up in dist/ they must ensure that the reports
+# are written under this directory. E.g.,
+# pants --raff-args="--output-file=reports/report.txt" lint <target>
+REPORT_DIR = "reports"
 
 
 class RuffFixRequest(FixTargetsRequest):
@@ -56,11 +62,18 @@ async def run_ruff(
         ConfigFiles, ConfigFilesRequest, ruff.config_request(request.snapshot.dirs)
     )
 
-    ruff_pex, config_files = await MultiGet(ruff_pex_get, config_files_get)
+    # Ensure that the empty report dir exists.
+    report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
+
+    ruff_pex, config_files, report_directory = await MultiGet(
+        ruff_pex_get,
+        config_files_get,
+        report_directory_digest_get,
+    )
 
     input_digest = await Get(
         Digest,
-        MergeDigests((request.snapshot.digest, config_files.snapshot.digest)),
+        MergeDigests((request.snapshot.digest, config_files.snapshot.digest, report_directory)),
     )
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
@@ -73,6 +86,7 @@ async def run_ruff(
             argv=(*initial_args, *conf_args, *ruff.args, *request.snapshot.files),
             input_digest=input_digest,
             output_files=request.snapshot.files,
+            output_directories=(REPORT_DIR,),
             description=f"Run ruff {' '.join(initial_args)} on {pluralize(len(request.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -96,7 +110,8 @@ async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintRe
     result = await Get(
         FallibleProcessResult, _RunRuffRequest(snapshot=source_files.snapshot, is_fix=False)
     )
-    return LintResult.create(request, result, strip_chroot_path=True)
+    report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
+    return LintResult.create(request, result, report=report, strip_chroot_path=True)
 
 
 def rules():
