@@ -101,15 +101,16 @@ class ToolRunnerRequest:
     execution_dependencies: tuple[str, ...]
     runnable_dependencies: tuple[str, ...]
     target: Target
+    named_caches: FrozenDict[str, str] | None = None
 
 
 @dataclass(frozen=True)
 class ToolRunner:
     digest: Digest
     args: tuple[str, ...]
-    extra_env: Mapping[str, str]
-    append_only_caches: Mapping[str, str]
-    immutable_input_digests: Mapping[str, Digest]
+    extra_env: FrozenDict[str, str]
+    append_only_caches: FrozenDict[str, str]
+    immutable_input_digests: FrozenDict[str, Digest]
 
 
 #
@@ -400,13 +401,13 @@ async def create_tool_runner(
 
     runnable_targets = await Get(Targets, Addresses, addresses)
 
-    target = runnable_targets[0]
-
     run_field_sets, environment_name, execution_environment = await MultiGet(
         Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)),
-        # Must be run in target environment so that the binaries/envvars match the execution
-        # environment when we actually run the process.
-        Get(EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)),
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_target(request.target),
+        ),
         Get(
             ResolvedExecutionDependencies,
             ResolveExecutionDependenciesRequest(
@@ -419,6 +420,8 @@ async def create_tool_runner(
 
     run_field_set: RunFieldSet = run_field_sets.field_sets[0]
 
+    # Must be run in target environment so that the binaries/envvars match the execution
+    # environment when we actually run the process.
     run_request = await Get(
         RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
     )
@@ -461,12 +464,17 @@ async def create_tool_runner(
     if merged_extras.path:
         extra_env["PATH"] = merged_extras.path
 
+    append_only_caches = {
+        **merged_extras.append_only_caches,
+        **(request.named_caches or {}),
+    }
+
     return ToolRunner(
         digest=main_digest,
         args=run_request.args + tuple(request.args),
         extra_env=FrozenDict(extra_env),
-        append_only_caches=merged_extras.append_only_caches,
-        immutable_input_digests=merged_extras.immutable_input_digests,
+        append_only_caches=FrozenDict(append_only_caches),
+        immutable_input_digests=FrozenDict(merged_extras.immutable_input_digests),
     )
 
 
