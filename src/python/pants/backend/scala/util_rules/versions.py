@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 
@@ -38,19 +39,27 @@ class ScalaCrossVersionMode(Enum):
         return cls(value)
 
 
+_SCALA_VERSION_PATTERN = re.compile(r"^([0-9]+)\.([0-9]+)\.([0-9]+)(\-(.+))?$")
+
+
 @dataclass(frozen=True)
 class ScalaVersion:
     major: int
     minor: int
     patch: int
+    suffix: str | None = None
 
     @classmethod
     def parse(cls, scala_version: str) -> ScalaVersion:
-        version_parts = scala_version.split(".")
-        if len(version_parts) != 3:
+        matched = _SCALA_VERSION_PATTERN.match(scala_version)
+        if not matched:
             raise InvalidScalaVersion(scala_version)
+
         return cls(
-            major=int(version_parts[0]), minor=int(version_parts[1]), patch=int(version_parts[2])
+            major=int(matched.groups()[0]),
+            minor=int(matched.groups()[1]),
+            patch=int(matched.groups()[2]),
+            suffix=matched.groups()[4] if len(matched.groups()) == 5 else None,
         )
 
     def crossversion(self, mode: ScalaCrossVersionMode) -> str:
@@ -65,7 +74,10 @@ class ScalaVersion:
         return self.crossversion(ScalaCrossVersionMode.BINARY)
 
     def __str__(self) -> str:
-        return f"{self.major}.{self.minor}.{self.patch}"
+        version_str = f"{self.major}.{self.minor}.{self.patch}"
+        if self.suffix:
+            version_str += f"-{self.suffix}"
+        return version_str
 
 
 @dataclass(frozen=True)
