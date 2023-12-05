@@ -75,7 +75,7 @@ async def find_putative_ts_targets(
         PutativeTarget.for_target_type(
             tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
         )
-        for tgt_type, paths, name in map(dataclasses.astuple, classified_unowned_ts_files)
+        for tgt_type, paths, name in (dataclasses.astuple(f) for f in classified_unowned_ts_files)
         for dirname, filenames in group_by_dir(paths).items()
     )
 
