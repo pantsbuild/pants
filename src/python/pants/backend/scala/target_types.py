@@ -4,14 +4,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.util_rules.versions import ScalaCrossVersionMode
+from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import AddressInput
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -425,6 +427,18 @@ class ScalaArtifactCrossversionField(StringField):
     )
     valid_choices = ScalaCrossVersionMode
 
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        computed_value = super().compute_value(raw_value, address)
+        if computed_value == ScalaCrossVersionMode.PARTIAL.value:
+            warn_or_error(
+                "2.21.0",
+                f"Scala cross version value '{computed_value}' in target: {address}",
+                "Use value `binary` instead",
+                start_version="2.20.0",
+            )
+        return computed_value
+
 
 @dataclass(frozen=True)
 class ScalaArtifactExclusion(JvmArtifactExclusion):
@@ -438,26 +452,34 @@ class ScalaArtifactExclusion(JvmArtifactExclusion):
 
     crossversion: str = ScalaCrossVersionMode.BINARY.value
 
-    def validate(self) -> set[str]:
-        errors = super().validate()
+    def validate(self, address: Address) -> set[str]:
+        errors = super().validate(address)
         valid_crossversions = [x.value for x in ScalaCrossVersionMode]
         if self.crossversion not in valid_crossversions:
             errors.add(
                 softwrap(
                     f"""
-                    Invalid `crossversion` value: {self.crossversion}. Valid values are:
+                    Invalid `crossversion` value '{self.crossversion}' in in list of
+                    exclusions at target: {address}. Valid values are:
                     {', '.join(valid_crossversions)}
                     """
                 )
+            )
+        if self.crossversion == ScalaCrossVersionMode.PARTIAL.value:
+            warn_or_error(
+                "2.21.0",
+                f"Scala cross version value '{self.crossversion}' in list of exclusions at target: {address}",
+                "Use value `binary` instead",
+                start_version="2.20.0",
             )
         return errors
 
 
 class ScalaArtifactExclusionsField(JvmArtifactExclusionsField):
     help = _jvm_artifact_exclusions_field_help(
-        lambda: ScalaArtifactExclusionsField.supported_rule_types
+        lambda: ScalaArtifactExclusionsField.supported_exclusion_types
     )
-    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (
+    supported_exclusion_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (
         JvmArtifactExclusion,
         ScalaArtifactExclusion,
     )
@@ -544,7 +566,7 @@ async def generate_jvm_artifact_targets(
             else:
                 excluded_artifact_name = None
                 if exclusion.artifact:
-                    cross_mode = ScalaCrossVersionMode.from_str(exclusion.crossversion)
+                    cross_mode = ScalaCrossVersionMode(exclusion.crossversion)
                     excluded_artifact_name = (
                         f"{exclusion.artifact}_{scala_version.crossversion(cross_mode)}"
                     )
@@ -553,7 +575,7 @@ async def generate_jvm_artifact_targets(
                 )
         exclusions_field[JvmArtifactExclusionsField.alias] = exclusions
 
-    cross_mode = ScalaCrossVersionMode.from_str(
+    cross_mode = ScalaCrossVersionMode(
         field_set.crossversion.value or ScalaArtifactCrossversionField.default
     )
     artifact_name = f"{field_set.artifact.value}_{scala_version.crossversion(cross_mode)}"

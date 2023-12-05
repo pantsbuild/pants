@@ -279,7 +279,7 @@ class JvmArtifactExclusion:
     group: str
     artifact: str | None = None
 
-    def validate(self) -> set[str]:
+    def validate(self, _: Address) -> set[str]:
         return set()
 
     def to_coord_str(self) -> str:
@@ -310,10 +310,12 @@ def _jvm_artifact_exclusions_field_help(
 class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
     alias = "exclusions"
     help = _jvm_artifact_exclusions_field_help(
-        lambda: JvmArtifactExclusionsField.supported_rule_types
+        lambda: JvmArtifactExclusionsField.supported_exclusion_types
     )
 
-    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (JvmArtifactExclusion,)
+    supported_exclusion_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (
+        JvmArtifactExclusion,
+    )
     expected_element_type = JvmArtifactExclusion
     expected_type_description = "an iterable of JvmArtifactExclusionRule"
 
@@ -326,7 +328,7 @@ class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
         if computed_value:
             errors: list[str] = []
             for exclusion_rule in computed_value:
-                err = exclusion_rule.validate()
+                err = exclusion_rule.validate(address)
                 if err:
                     errors.extend(err)
 
@@ -334,8 +336,8 @@ class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
                 raise InvalidFieldException(
                     softwrap(
                         f"""
-                        Invalid value for `{JvmArtifactExclusionsField.alias}` field.
-                        Found following errors:
+                        Invalid value for `{JvmArtifactExclusionsField.alias}` field at target
+                        {address}. Found following errors:
 
                         {bullet_list(errors)}
                         """
@@ -713,8 +715,8 @@ class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
                 raise InvalidFieldException(
                     softwrap(
                         f"""
-                        Invalid value for `{DeployJarDuplicatePolicyField.alias}` field.
-                        Found following errors:
+                        Invalid value for `{DeployJarDuplicatePolicyField.alias}` field at target:
+                        {address}. Found following errors:
 
                         {bullet_list(errors)}
                         """

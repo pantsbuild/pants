@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
-from pants.base.deprecated import warn_or_error
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.resolve.common import Coordinate
 from pants.util.strutil import softwrap
@@ -26,17 +25,6 @@ class ScalaCrossVersionMode(Enum):
     PARTIAL = "partial"
     BINARY = "binary"
     FULL = "full"
-
-    @classmethod
-    def from_str(cls, value: str) -> ScalaCrossVersionMode:
-        if value == ScalaCrossVersionMode.PARTIAL.value:
-            warn_or_error(
-                "2.21.0",
-                f"Scala cross version: {value}",
-                "Use value `binary` instead",
-                start_version="2.20.0",
-            )
-        return cls(value)
 
 
 _SCALA_VERSION_PATTERN = re.compile(r"^([0-9]+)\.([0-9]+)\.([0-9]+)(\-(.+))?$")
