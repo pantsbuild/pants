@@ -161,6 +161,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
     #  * Protobuf files can import other protobuf files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
+    #  * Dependency inference between Scala and Protobuf sources.
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(
