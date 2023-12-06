@@ -23,16 +23,16 @@ from pants.util.ordered_set import OrderedSet
 _ResolveName = str
 
 
-class FirstPartyProtobufScalaTargetsMappingRequest(FirstPartyMappingRequest):
+class FirstPartyProtobufJavaTargetsMappingRequest(FirstPartyMappingRequest):
     pass
 
 
 # Determine generated Java/Scala package name
-# * https://scalapb.github.io/docs/generated-code
-def _determing_package_name(file: FileContent) -> str:
+# * https://grpc.io/docs/languages/java/generated-code
+def _determing_class_name(file: FileContent) -> str:
     base_name, _, _ = os.path.basename(file.path).partition(".")
     package_definition = _parse_package_definition(file.content)
-    return f"{package_definition}.{base_name}" if package_definition else base_name
+    return f"{package_definition}.{base_name.upper()}" if package_definition else base_name.upper()
 
 
 _QUOTE_CHAR = r"(?:'|\")"
@@ -56,7 +56,7 @@ def _parse_package_definition(content_raw: bytes) -> str | None:
 
 @rule
 async def map_first_party_protobuf_scala_targets_to_symbols(
-    _: FirstPartyProtobufScalaTargetsMappingRequest,
+    _: FirstPartyProtobufJavaTargetsMappingRequest,
     all_protobuf_targets: AllProtobufTargets,
     jvm: JvmSubsystem,
 ) -> SymbolMap:
@@ -76,7 +76,7 @@ async def map_first_party_protobuf_scala_targets_to_symbols(
         Get(DigestContents, Digest, source.snapshot.digest) for source in sources
     )
 
-    package_symbols: DefaultDict[tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
+    class_symbols: DefaultDict[tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
         OrderedSet
     )
     for tgt, contents in zip(all_protobuf_targets, all_contents):
@@ -88,12 +88,12 @@ async def map_first_party_protobuf_scala_targets_to_symbols(
             )
 
         resolve = tgt[JvmResolveField].normalized_value(jvm)
-        package_name = _determing_package_name(contents[0])
-        package_symbols[(resolve, package_name)].add(tgt.address)
+        class_name = _determing_class_name(contents[0])
+        class_symbols[(resolve, class_name)].add(tgt.address)
 
     mapping: Mapping[str, MutableTrieNode] = defaultdict(MutableTrieNode)
-    for (resolve, package_name), addresses in package_symbols.items():
-        mapping[resolve].insert(package_name, addresses, first_party=True, recursive=True)
+    for (resolve, class_name), addresses in class_symbols.items():
+        mapping[resolve].insert(class_name, addresses, first_party=True, recursive=True)
 
     return SymbolMap((resolve, node.frozen()) for resolve, node in mapping.items())
 
@@ -102,5 +102,5 @@ def rules():
     return [
         *collect_rules(),
         *symbol_mapper.rules(),
-        UnionRule(FirstPartyMappingRequest, FirstPartyProtobufScalaTargetsMappingRequest),
+        UnionRule(FirstPartyMappingRequest, FirstPartyProtobufJavaTargetsMappingRequest),
     ]
