@@ -936,6 +936,7 @@ class BootstrapOptions:
     )
     templated_backends = DictOption(
         advanced=True,
+        default={},
         help="TODO",
     )
     plugins = StrListOption(

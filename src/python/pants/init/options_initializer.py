@@ -22,7 +22,7 @@ from pants.init.bootstrap_scheduler import BootstrapScheduler
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.extension_loader import (
     load_backends_and_plugins,
-    load_build_configuration_from_source,
+    load_build_configuration_from_source, TemplatedBackendConfig,
 )
 from pants.init.plugin_resolver import PluginResolver
 from pants.init.plugin_resolver import rules as plugin_resolver_rules
@@ -57,12 +57,17 @@ def _initialize_build_configuration(
             sys.path.append(path)
             pkg_resources.fixup_namespace_packages(path)
 
+    templated_backends = {
+        backend_alias: TemplatedBackendConfig.from_dict(templating_config)
+        for backend_alias, templating_config in bootstrap_options.templated_backends.items()
+    }
+
     # Load plugins and backends.
     return load_backends_and_plugins(
         bootstrap_options.plugins,
         working_set,
         bootstrap_options.backend_packages,
-        templated_backends=bootstrap_options.templated_backends,
+        templated_backends=templated_backends,
     )
 
 

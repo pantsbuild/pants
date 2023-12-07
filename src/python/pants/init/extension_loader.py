@@ -1,10 +1,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from dataclasses import dataclass
 
 import importlib
 import logging
 import traceback
-from typing import Dict, List, Optional, Mapping, Any
+
+from pants.util.frozendict import FrozenDict
+from typing import Dict, List, Optional, Mapping, Any, cast
 
 from pkg_resources import Requirement, WorkingSet
 
@@ -28,9 +31,23 @@ class PluginLoadOrderError(PluginLoadingError):
     pass
 
 
+@dataclass(frozen=True)
+class TemplatedBackendConfig:
+    template: str
+    kwargs: FrozenDict[str, Any]
+
+    @classmethod
+    def from_dict(cls, d: Any):
+        d = dict(d)
+        template = d.pop('template', None)
+        if not template:
+            raise ValueError(f'"template" is a required key for a backend template')
+        return cls(template=cast(str, template), kwargs=FrozenDict(d))
+
+
 def load_backends_and_plugins(plugins: List[str], working_set: WorkingSet, backends: List[str],
                               bc_builder: Optional[BuildConfiguration.Builder] = None,
-                              templated_backends: Optional[Mapping[str, Any]] = None) -> BuildConfiguration:
+                              templated_backends: Optional[Mapping[str, TemplatedBackendConfig]] = None) -> BuildConfiguration:
     """Load named plugins and source backends.
 
     :param plugins: v2 plugins to load.
@@ -109,7 +126,7 @@ def load_plugins(
 
 
 def load_build_configuration_from_source(build_configuration: BuildConfiguration.Builder, backends: List[str],
-                                         templated_backends=None) -> None:
+                                         templated_backends: Optional[Mapping[str, TemplatedBackendConfig]] = None) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
     :param build_configuration: The BuildConfiguration (for adding aliases).
@@ -123,11 +140,11 @@ def load_build_configuration_from_source(build_configuration: BuildConfiguration
 
     for backend_package in backend_packages:
         load_backend(build_configuration, backend_package,
-                     templating_args=templated_backends.get(backend_package))
+                     templating_config=templated_backends.get(backend_package))
 
 
 def load_backend(build_configuration: BuildConfiguration.Builder, backend_package: str,
-                 templating_args: Optional[Mapping[str, Any]] = None) -> None:
+                 templating_config: Optional[TemplatedBackendConfig]) -> None:
     """Installs the given backend package into the build configuration.
 
     :param build_configuration: the BuildConfiguration to install the backend plugin into.
@@ -137,10 +154,10 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
       the build configuration.
     """
 
-    if templating_args:
+    if templating_config:
         kwargs = {'backend_package_alias': backend_package}
-        kwargs.update(templating_args)
-        backend_module = kwargs.pop('template') + ".register"
+        kwargs.update(templating_config.kwargs)
+        backend_module = templating_config.template + ".register"
     else:
         kwargs = {}
         backend_module = backend_package + ".register"
