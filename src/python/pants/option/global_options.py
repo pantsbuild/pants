@@ -934,7 +934,7 @@ class BootstrapOptions:
             """
         ),
     )
-    generated_backends = DictOption(
+    templated_backends = DictOption(
         advanced=True,
         help="TODO",
     )

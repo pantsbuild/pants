@@ -30,7 +30,7 @@ class PluginLoadOrderError(PluginLoadingError):
 
 def load_backends_and_plugins(plugins: List[str], working_set: WorkingSet, backends: List[str],
                               bc_builder: Optional[BuildConfiguration.Builder] = None,
-                              generated_backends: Optional[Mapping[str, Any]] = None) -> BuildConfiguration:
+                              templated_backends: Optional[Mapping[str, Any]] = None) -> BuildConfiguration:
     """Load named plugins and source backends.
 
     :param plugins: v2 plugins to load.
@@ -39,7 +39,7 @@ def load_backends_and_plugins(plugins: List[str], working_set: WorkingSet, backe
     :param bc_builder: The BuildConfiguration (for adding aliases).
     """
     bc_builder = bc_builder or BuildConfiguration.Builder()
-    load_build_configuration_from_source(bc_builder, backends, generated_backends=generated_backends)
+    load_build_configuration_from_source(bc_builder, backends, templated_backends=templated_backends)
     load_plugins(bc_builder, plugins, working_set)
     register_builtin_goals(bc_builder)
     return bc_builder.create()
@@ -109,7 +109,7 @@ def load_plugins(
 
 
 def load_build_configuration_from_source(build_configuration: BuildConfiguration.Builder, backends: List[str],
-                                         generated_backends=None) -> None:
+                                         templated_backends=None) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
     :param build_configuration: The BuildConfiguration (for adding aliases).
@@ -119,15 +119,15 @@ def load_build_configuration_from_source(build_configuration: BuildConfiguration
     """
     # NB: Backends added here must be explicit dependencies of this module.
     backend_packages = FrozenOrderedSet(["pants.core", "pants.backend.project_info", *backends])
-    generated_backends = generated_backends or {}
+    templated_backends = templated_backends or {}
 
     for backend_package in backend_packages:
         load_backend(build_configuration, backend_package,
-                     backend_generation_args=generated_backends.get(backend_package))
+                     templating_args=templated_backends.get(backend_package))
 
 
 def load_backend(build_configuration: BuildConfiguration.Builder, backend_package: str,
-                 backend_generation_args: Optional[Mapping[str, Any]] = None) -> None:
+                 templating_args: Optional[Mapping[str, Any]] = None) -> None:
     """Installs the given backend package into the build configuration.
 
     :param build_configuration: the BuildConfiguration to install the backend plugin into.
@@ -137,10 +137,10 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
       the build configuration.
     """
 
-    if backend_generation_args:
-        kwargs = dict(backend_generation_args)
-        backend_template = kwargs.pop('backend_template')
-        backend_module = backend_template + ".register"
+    if templating_args:
+        kwargs = {'backend_package': backend_package}
+        kwargs.update(templating_args)
+        backend_module = kwargs.pop('template') + ".register"
     else:
         kwargs = {}
         backend_module = backend_package + ".register"
@@ -160,9 +160,14 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
             return entrypoint(**kwargs)
         except TypeError as e:
             traceback.print_exc()
-            raise BackendConfigurationError(
-                f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
-            )
+            if not kwargs:
+                err_msg = f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
+            else:
+                err_msg = (
+                    f"Entrypoint {name} in {backend_module} backend template "
+                    f"must accept {list(kwargs)} as keyword arguments: {e!r}"
+                )
+            raise BackendConfigurationError(err_msg)
 
     target_types = invoke_entrypoint("target_types")
     if target_types:
