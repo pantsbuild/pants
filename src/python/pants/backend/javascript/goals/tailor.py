@@ -85,7 +85,7 @@ async def find_putative_js_targets(
         PutativeTarget.for_target_type(
             tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
         )
-        for tgt_type, paths, name in map(dataclasses.astuple, classified_unowned_js_files)
+        for tgt_type, paths, name in (dataclasses.astuple(f) for f in classified_unowned_js_files)
         for dirname, filenames in group_by_dir(paths).items()
     )
 

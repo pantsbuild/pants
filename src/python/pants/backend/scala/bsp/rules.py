@@ -19,7 +19,14 @@ from pants.backend.scala.bsp.spec import (
     ScalaTestClassesParams,
     ScalaTestClassesResult,
 )
+from pants.backend.scala.compile.scalac_plugins import (
+    ScalaPlugins,
+    ScalaPluginsForTargetRequest,
+    ScalaPluginsRequest,
+    ScalaPluginTargetsForTarget,
+)
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
@@ -329,9 +336,7 @@ class HandleScalacOptionsResult:
 
 @_uncacheable_rule
 async def handle_bsp_scalac_options_request(
-    request: HandleScalacOptionsRequest,
-    build_root: BuildRoot,
-    workspace: Workspace,
+    request: HandleScalacOptionsRequest, build_root: BuildRoot, workspace: Workspace, scalac: Scalac
 ) -> HandleScalacOptionsResult:
     targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
     thirdparty_modules = await Get(
@@ -339,15 +344,30 @@ async def handle_bsp_scalac_options_request(
     )
     resolve = thirdparty_modules.resolve
 
-    resolve_digest = await Get(
-        Digest, AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib")
+    scalac_plugin_targets = await MultiGet(
+        Get(ScalaPluginTargetsForTarget, ScalaPluginsForTargetRequest(tgt, resolve.name))
+        for tgt in targets
     )
 
+    local_plugins_prefix = f"jvm/resolves/{resolve.name}/plugins"
+    local_plugins = await Get(
+        ScalaPlugins, ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
+    )
+
+    thirdparty_modules_prefix = f"jvm/resolves/{resolve.name}/lib"
+    thirdparty_modules_digest, local_plugins_digest = await MultiGet(
+        Get(Digest, AddPrefix(thirdparty_modules.merged_digest, thirdparty_modules_prefix)),
+        Get(Digest, AddPrefix(local_plugins.classpath.digest, local_plugins_prefix)),
+    )
+
+    resolve_digest = await Get(
+        Digest, MergeDigests([thirdparty_modules_digest, local_plugins_digest])
+    )
     workspace.write_digest(resolve_digest, path_prefix=".pants.d/bsp")
 
     classpath = tuple(
         build_root.pathlib_path.joinpath(
-            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{filename}"
+            f".pants.d/bsp/{thirdparty_modules_prefix}/{filename}"
         ).as_uri()
         for cp_entry in thirdparty_modules.entries.values()
         for filename in cp_entry.filenames
@@ -356,7 +376,7 @@ async def handle_bsp_scalac_options_request(
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
-            options=(),
+            options=(*local_plugins.args(local_plugins_prefix), *scalac.args),
             classpath=classpath,
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"
