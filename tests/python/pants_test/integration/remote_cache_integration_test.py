@@ -103,6 +103,17 @@ def test_warns_on_remote_cache_errors() -> None:
     for err in [third_read_err, third_write_err]:
         assert err not in backoff_result
 
+    always_result = run(RemoteCacheWarningsBehavior.always)
+    for err in [
+        first_read_err,
+        first_write_err,
+        third_read_err,
+        third_write_err,
+        fourth_read_err,
+        fourth_write_err,
+    ]:
+        assert err in always_result, f"Not found in:\n{always_result}"
+
 
 class ProcessOutputEntries(DigestEntries):
     pass
