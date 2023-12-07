@@ -62,6 +62,7 @@ def _initialize_build_configuration(
         bootstrap_options.plugins,
         working_set,
         bootstrap_options.backend_packages,
+        generated_backends=bootstrap_options.generated_backends,
     )
 
 

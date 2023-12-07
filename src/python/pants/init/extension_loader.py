@@ -4,7 +4,7 @@
 import importlib
 import logging
 import traceback
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Mapping, Any
 
 from pkg_resources import Requirement, WorkingSet
 
@@ -28,12 +28,9 @@ class PluginLoadOrderError(PluginLoadingError):
     pass
 
 
-def load_backends_and_plugins(
-    plugins: List[str],
-    working_set: WorkingSet,
-    backends: List[str],
-    bc_builder: Optional[BuildConfiguration.Builder] = None,
-) -> BuildConfiguration:
+def load_backends_and_plugins(plugins: List[str], working_set: WorkingSet, backends: List[str],
+                              bc_builder: Optional[BuildConfiguration.Builder] = None,
+                              generated_backends: Optional[Mapping[str, Any]] = None) -> BuildConfiguration:
     """Load named plugins and source backends.
 
     :param plugins: v2 plugins to load.
@@ -42,7 +39,7 @@ def load_backends_and_plugins(
     :param bc_builder: The BuildConfiguration (for adding aliases).
     """
     bc_builder = bc_builder or BuildConfiguration.Builder()
-    load_build_configuration_from_source(bc_builder, backends)
+    load_build_configuration_from_source(bc_builder, backends, generated_backends=generated_backends)
     load_plugins(bc_builder, plugins, working_set)
     register_builtin_goals(bc_builder)
     return bc_builder.create()
@@ -111,9 +108,8 @@ def load_plugins(
         loaded[dist.as_requirement().key] = dist
 
 
-def load_build_configuration_from_source(
-    build_configuration: BuildConfiguration.Builder, backends: List[str]
-) -> None:
+def load_build_configuration_from_source(build_configuration: BuildConfiguration.Builder, backends: List[str],
+                                         generated_backends=None) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
     :param build_configuration: The BuildConfiguration (for adding aliases).
@@ -123,11 +119,15 @@ def load_build_configuration_from_source(
     """
     # NB: Backends added here must be explicit dependencies of this module.
     backend_packages = FrozenOrderedSet(["pants.core", "pants.backend.project_info", *backends])
+    generated_backends = generated_backends or {}
+
     for backend_package in backend_packages:
-        load_backend(build_configuration, backend_package)
+        load_backend(build_configuration, backend_package,
+                     backend_generation_args=generated_backends.get(backend_package))
 
 
-def load_backend(build_configuration: BuildConfiguration.Builder, backend_package: str) -> None:
+def load_backend(build_configuration: BuildConfiguration.Builder, backend_package: str,
+                 backend_generation_args: Optional[Mapping[str, Any]] = None) -> None:
     """Installs the given backend package into the build configuration.
 
     :param build_configuration: the BuildConfiguration to install the backend plugin into.
@@ -136,17 +136,28 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
-    backend_module = backend_package + ".register"
+
+    if backend_generation_args:
+        kwargs = dict(backend_generation_args)
+        backend_template = kwargs.pop('backend_template')
+        backend_module = backend_template + ".register"
+    else:
+        kwargs = {}
+        backend_module = backend_package + ".register"
+
     try:
         module = importlib.import_module(backend_module)
     except ImportError as ex:
         traceback.print_exc()
         raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
 
+    def return_none(**kwargs):
+        return None
+
     def invoke_entrypoint(name: str):
-        entrypoint = getattr(module, name, lambda: None)
+        entrypoint = getattr(module, name, return_none)
         try:
-            return entrypoint()
+            return entrypoint(**kwargs)
         except TypeError as e:
             traceback.print_exc()
             raise BackendConfigurationError(

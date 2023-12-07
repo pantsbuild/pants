@@ -325,9 +325,8 @@ class LoaderTest(unittest.TestCase):
         aliases = BuildFileAliases(objects={"override-alias": DummyObject1})
         with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
             backends = [backend_module]
-            build_configuration = load_backends_and_plugins(
-                plugins, self.working_set, backends, bc_builder=self.bc_builder
-            )
+            build_configuration = load_backends_and_plugins(plugins, self.working_set, backends,
+                                                            bc_builder=self.bc_builder)
         # The backend should load first, then the plugins, therefore the alias registered in
         # the plugin will override the alias registered by the backend
         registered_aliases = build_configuration.registered_aliases

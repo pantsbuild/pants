@@ -934,6 +934,10 @@ class BootstrapOptions:
             """
         ),
     )
+    generated_backends = DictOption(
+        advanced=True,
+        help="TODO",
+    )
     plugins = StrListOption(
         advanced=True,
         help=softwrap(
