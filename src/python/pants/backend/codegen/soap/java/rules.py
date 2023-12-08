@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.codegen.soap.java import extra_fields
+from pants.backend.codegen.soap.java import dependency_inference, extra_fields
 from pants.backend.codegen.soap.java.extra_fields import JavaModuleField, JavaPackageField
 from pants.backend.codegen.soap.java.jaxws import JaxWsTools
 from pants.backend.codegen.soap.target_types import (
@@ -185,6 +185,7 @@ def rules():
     return [
         *collect_rules(),
         *extra_fields.rules(),
+        *dependency_inference.rules(),
         *jvm_tool.rules(),
         *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromWsdlRequest),
