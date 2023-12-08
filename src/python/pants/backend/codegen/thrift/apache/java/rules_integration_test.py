@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from pants.engine.addresses import Addresses
 
 import pytest
 
@@ -27,7 +28,7 @@ from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.rules import QueryRule
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.engine.target import Dependencies, DependenciesRequest, GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm import classpath, jdk_rules, testutil, util_rules
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.resolve import coursier_fetch, coursier_setup
@@ -82,6 +83,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromThriftRequest]),
             QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
+            QueryRule(Addresses, (DependenciesRequest,)),
         ],
         target_types=[
             ThriftSourcesGeneratorTarget,
@@ -120,6 +122,7 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
     #  * Thrift files can import other thrift files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
+    #  * Dependency inference between Java and Thrift sources.
     rule_runner.write_files(
         {
             "src/thrift/dir1/f.thrift": dedent(
@@ -164,10 +167,11 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
             "tests/thrift/test_thrifts/BUILD": "thrift_sources(dependencies=['src/thrift/dir2'])",
             "3rdparty/jvm/default.lock": libthrift_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": libthrift_lockfile.requirements_as_jvm_artifact_targets(),
-            "src/jvm/BUILD": "java_sources(dependencies=['src/thrift/dir1'])",
+            "src/jvm/BUILD": "java_sources()",
             "src/jvm/TestScroogeThriftJava.java": dedent(
                 """\
                 package org.pantsbuild.example;
+
                 public class TestScroogeThriftJava {
                     Person person;
                 }
@@ -210,6 +214,10 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
             "tests/thrift/Executive.java",
         ],
     )
+
+    tgt = rule_runner.get_target(Address("src/jvm", relative_file_path="TestScroogeThriftJava.java"))
+    dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
+    assert Address("src/thrift/dir1", relative_file_path="f.thrift") in dependencies
 
     request = CompileJavaSourceRequest(
         component=expect_single_expanded_coarsened_target(
