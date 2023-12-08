@@ -20,11 +20,7 @@ from pants.engine.unions import UnionRule
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [
-        *dependency_inference.rules(),
-        *tailor.rules(),
-        *target_types_rules()
-    ]
+    return [*dependency_inference.rules(), *tailor.rules(), *target_types_rules()]
 
 
 def target_types() -> Iterable[type[Target]]:

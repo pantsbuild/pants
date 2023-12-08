@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from pants.engine.addresses import Addresses
 
 import pytest
 
@@ -27,8 +26,15 @@ from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.engine.addresses import Addresses
 from pants.engine.rules import QueryRule
-from pants.engine.target import Dependencies, DependenciesRequest, GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    GeneratedSources,
+    HydratedSources,
+    HydrateSourcesRequest,
+)
 from pants.jvm import classpath, jdk_rules, testutil, util_rules
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.resolve import coursier_fetch, coursier_setup
@@ -215,7 +221,9 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
         ],
     )
 
-    tgt = rule_runner.get_target(Address("src/jvm", relative_file_path="TestScroogeThriftJava.java"))
+    tgt = rule_runner.get_target(
+        Address("src/jvm", relative_file_path="TestScroogeThriftJava.java")
+    )
     dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
     assert Address("src/thrift/dir1", relative_file_path="f.thrift") in dependencies
 
