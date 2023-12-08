@@ -22,7 +22,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.option.option_types import StrListOption
+from pants.option.option_types import StrListOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -149,8 +149,22 @@ class CoursierSubsystem(TemplatedExternalTool):
             Maven style repositories to resolve artifacts from.
 
             Coursier will resolve these repositories in the order in which they are
-            specifed, and re-ordering repositories will cause artifacts to be
+            specified, and re-ordering repositories will cause artifacts to be
             re-downloaded. This can result in artifacts in lockfiles becoming invalid.
+            """
+        ),
+    )
+
+    jvm_index = StrOption(
+        default="cs",
+        help=softwrap(
+            """
+            The JVM index to be used by Coursier.
+            
+            Possible values are:
+              - cs: The default JVM index used and maintained by Coursier.
+              - cs-maven: Fetches a JVM index from the io.get-coursier:jvm-index Maven repository.
+              - <URL>: An arbitrary URL for a JVM index. Ex. https://url/of/your/index.json
             """
         ),
     )
@@ -170,6 +184,7 @@ class Coursier:
     coursier: DownloadedExternalTool
     _digest: Digest
     repos: FrozenOrderedSet[str]
+    jvm_index: str
     _append_only_caches: FrozenDict[str, str]
 
     bin_dir: ClassVar[str] = "__coursier"
@@ -314,6 +329,7 @@ async def setup_coursier(
             ),
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
+        jvm_index=coursier_subsystem.jvm_index,
         _append_only_caches=python.APPEND_ONLY_CACHES,
     )
 
