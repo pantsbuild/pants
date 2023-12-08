@@ -3,15 +3,19 @@
 
 from __future__ import annotations
 
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     Dependencies,
     MultipleSourcesField,
     SingleSourceField,
     Target,
     TargetFilesGenerator,
+    Targets,
     generate_multiple_sources_field_help_message,
 )
+from pants.util.logging import LogLevel
 
 OPENAPI_FILE_EXTENSIONS = (".json", ".yaml", ".yml")
 
@@ -64,6 +68,17 @@ class OpenApiDocumentGeneratorTarget(TargetFilesGenerator):
     help = "Generate an `openapi_document` target for each file in the `sources` field."
 
 
+class AllOpenApiDocumentTargets(Targets):
+    pass
+
+
+@rule(desc="Find all OpenAPI Document targets in project", level=LogLevel.DEBUG)
+def find_all_openapi_document_targets(all_targets: AllTargets) -> AllOpenApiDocumentTargets:
+    return AllOpenApiDocumentTargets(
+        tgt for tgt in all_targets if tgt.has_field(OpenApiDocumentField)
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `openapi_source` and `openapi_sources` targets
 # -----------------------------------------------------------------------------------------------
@@ -102,3 +117,16 @@ class OpenApiSourceGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (OpenApiSourceDependenciesField,)
     help = "Generate an `openapi_source` target for each file in the `sources` field."
+
+
+class AllOpenApiSourceTargets(Targets):
+    pass
+
+
+@rule(desc="Find all OpenAPI source targets in project", level=LogLevel.DEBUG)
+def find_all_openapi_source_targets(all_targets: AllTargets) -> AllOpenApiSourceTargets:
+    return AllOpenApiSourceTargets(tgt for tgt in all_targets if tgt.has_field(OpenApiSourceField))
+
+
+def rules():
+    return collect_rules()

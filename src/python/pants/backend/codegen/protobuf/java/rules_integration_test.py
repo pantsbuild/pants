@@ -35,6 +35,7 @@ from pants.jvm.testutil import (
     RenderedClasspath,
     expect_single_expanded_coarsened_target,
     make_resolve,
+    maybe_skip_jdk_test,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -119,6 +120,7 @@ def assert_files_generated(
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
+@maybe_skip_jdk_test
 def test_generates_java(
     rule_runner: RuleRunner, protobuf_java_lockfile: JVMLockfileFixture
 ) -> None:
@@ -249,6 +251,7 @@ def protobuf_java_grpc_lockfile(
     return protobuf_java_grpc_lockfile_def.load(request)
 
 
+@maybe_skip_jdk_test
 def test_generates_grpc_java(
     rule_runner: RuleRunner, protobuf_java_grpc_lockfile: JVMLockfileFixture
 ) -> None:

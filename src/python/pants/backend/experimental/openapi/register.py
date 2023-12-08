@@ -13,6 +13,7 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceGeneratorTarget,
     OpenApiSourceTarget,
 )
+from pants.backend.openapi.target_types import rules as target_types_rules
 from pants.engine.rules import Rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -22,6 +23,7 @@ def rules() -> Iterable[Rule | UnionRule]:
     return [
         *dependency_inference.rules(),
         *tailor.rules(),
+        *target_types_rules()
     ]
 
 

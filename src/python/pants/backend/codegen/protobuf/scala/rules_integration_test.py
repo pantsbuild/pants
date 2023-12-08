@@ -47,6 +47,7 @@ from pants.jvm.testutil import (
     RenderedClasspath,
     expect_single_expanded_coarsened_target,
     make_resolve,
+    maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
@@ -155,6 +156,7 @@ def assert_files_generated(
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
+@maybe_skip_jdk_test
 def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileFixture) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
@@ -269,6 +271,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
     )
 
 
+@maybe_skip_jdk_test
 def test_top_level_proto_root(
     rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileFixture
 ) -> None:
