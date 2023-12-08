@@ -31,6 +31,7 @@ from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
     ScalaArtifactsForVersionResult,
+    ScalaVersion,
 )
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
@@ -158,7 +159,7 @@ async def collect_thirdparty_modules(
     )
 
 
-async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
+async def _materialize_scala_runtime_jars(scala_version: ScalaVersion) -> Snapshot:
     scala_artifacts = await Get(
         ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
     )
@@ -283,17 +284,11 @@ async def bsp_resolve_scala_metadata(
         java_version=f"1.{jdk.jre_major_version}",
     )
 
-    scala_version_parts = scala_version.split(".")
-    scala_binary_version = (
-        ".".join(scala_version_parts[0:2])
-        if int(scala_version_parts[0]) < 3
-        else scala_version_parts[0]
-    )
     return BSPBuildTargetsMetadataResult(
         metadata=ScalaBuildTarget(
             scala_organization="org.scala-lang",
-            scala_version=scala_version,
-            scala_binary_version=scala_binary_version,
+            scala_version=str(scala_version),
+            scala_binary_version=scala_version.binary,
             platform=ScalaPlatform.JVM,
             jars=scala_jar_uris,
             jvm_build_target=jvm_build_target,

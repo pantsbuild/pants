@@ -103,7 +103,7 @@ async def resolve_scrooge_thrift_java_runtime_for_resolve(
     scala_subsystem: ScalaSubsystem,
 ) -> ScroogeThriftJavaRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    scala_binary_version, _, _ = scala_version.rpartition(".")
+    scala_binary_version = scala_version.binary
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
             UnversionedCoordinate(

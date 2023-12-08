@@ -2,15 +2,75 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.resolve.common import Coordinate
+from pants.util.strutil import softwrap
+
+
+class InvalidScalaVersion(ValueError):
+    def __init__(self, scala_version: str) -> None:
+        super().__init__(
+            softwrap(
+                f"""Value '{scala_version}' is not a valid Scala version.
+            It should be formed of [major].[minor].[patch]"""
+            )
+        )
+
+
+class ScalaCrossVersionMode(Enum):
+    PARTIAL = "partial"
+    BINARY = "binary"
+    FULL = "full"
+
+
+_SCALA_VERSION_PATTERN = re.compile(r"^([0-9]+)\.([0-9]+)\.([0-9]+)(\-(.+))?$")
+
+
+@dataclass(frozen=True)
+class ScalaVersion:
+    major: int
+    minor: int
+    patch: int
+    suffix: str | None = None
+
+    @classmethod
+    def parse(cls, scala_version: str) -> ScalaVersion:
+        matched = _SCALA_VERSION_PATTERN.match(scala_version)
+        if not matched:
+            raise InvalidScalaVersion(scala_version)
+
+        return cls(
+            major=int(matched.groups()[0]),
+            minor=int(matched.groups()[1]),
+            patch=int(matched.groups()[2]),
+            suffix=matched.groups()[4] if len(matched.groups()) == 5 else None,
+        )
+
+    def crossversion(self, mode: ScalaCrossVersionMode) -> str:
+        if mode == ScalaCrossVersionMode.FULL:
+            return str(self)
+        if self.major >= 3:
+            return str(self.major)
+        return f"{self.major}.{self.minor}"
+
+    @property
+    def binary(self) -> str:
+        return self.crossversion(ScalaCrossVersionMode.BINARY)
+
+    def __str__(self) -> str:
+        version_str = f"{self.major}.{self.minor}.{self.patch}"
+        if self.suffix:
+            version_str += f"-{self.suffix}"
+        return version_str
 
 
 @dataclass(frozen=True)
 class ScalaArtifactsForVersionRequest:
-    scala_version: str
+    scala_version: ScalaVersion
 
 
 @dataclass(frozen=True)
@@ -33,18 +93,17 @@ class ScalaArtifactsForVersionResult:
 async def resolve_scala_artifacts_for_version(
     request: ScalaArtifactsForVersionRequest,
 ) -> ScalaArtifactsForVersionResult:
-    version_parts = request.scala_version.split(".")
-    if version_parts[0] == "3":
+    if request.scala_version.major == 3:
         return ScalaArtifactsForVersionResult(
             compiler_coordinate=Coordinate(
                 group="org.scala-lang",
                 artifact="scala3-compiler_3",
-                version=request.scala_version,
+                version=str(request.scala_version),
             ),
             library_coordinate=Coordinate(
                 group="org.scala-lang",
                 artifact="scala3-library_3",
-                version=request.scala_version,
+                version=str(request.scala_version),
             ),
             reflect_coordinate=None,
             compiler_main="dotty.tools.dotc.Main",
@@ -55,17 +114,17 @@ async def resolve_scala_artifacts_for_version(
         compiler_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-compiler",
-            version=request.scala_version,
+            version=str(request.scala_version),
         ),
         library_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-library",
-            version=request.scala_version,
+            version=str(request.scala_version),
         ),
         reflect_coordinate=Coordinate(
             group="org.scala-lang",
             artifact="scala-reflect",
-            version=request.scala_version,
+            version=str(request.scala_version),
         ),
         compiler_main="scala.tools.nsc.Main",
         repl_main="scala.tools.nsc.MainGenericRunner",

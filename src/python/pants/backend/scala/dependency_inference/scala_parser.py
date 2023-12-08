@@ -10,6 +10,11 @@ from typing import Any, Iterator, Mapping
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+    ScalaVersion,
+)
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -30,7 +35,7 @@ from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.subsystems import JvmSubsystem
@@ -43,8 +48,8 @@ from pants.util.resources import read_resource
 logger = logging.getLogger(__name__)
 
 
-_PARSER_SCALA_VERSION = "2.13.8"
-_PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.rpartition(".")[0]
+_PARSER_SCALA_VERSION = ScalaVersion.parse("2.13.8")
+_PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.binary
 
 
 class ScalaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -194,7 +199,7 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
 @dataclass(frozen=True)
 class AnalyzeScalaSourceRequest:
     source_files: SourceFiles
-    scala_version: str
+    scala_version: ScalaVersion
     source3: bool
 
 
@@ -274,7 +279,7 @@ async def analyze_scala_source_dependencies(
                 "org.pantsbuild.backend.scala.dependency_inference.ScalaParser",
                 analysis_output_path,
                 source_path,
-                request.scala_version,
+                str(request.scala_version),
                 str(request.source3),
             ],
             input_digest=prefixed_source_files_digest,
@@ -319,8 +324,9 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
 
     parser_source = FileContent("ScalaParser.scala", parser_source_content)
 
-    parser_lockfile_request = await Get(
-        GenerateJvmLockfileFromTool, ScalaParserToolLockfileSentinel()
+    parser_lockfile_request, scala_artifacts = await MultiGet(
+        Get(GenerateJvmLockfileFromTool, ScalaParserToolLockfileSentinel()),
+        Get(ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(_PARSER_SCALA_VERSION)),
     )
 
     tool_classpath, parser_classpath, source_digest = await MultiGet(
@@ -329,23 +335,7 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
             ToolClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=ArtifactRequirements.from_coordinates(
-                    [
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-compiler",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-library",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                        Coordinate(
-                            group="org.scala-lang",
-                            artifact="scala-reflect",
-                            version=_PARSER_SCALA_VERSION,
-                        ),
-                    ]
+                    scala_artifacts.all_coordinates
                 ),
             ),
         ),
@@ -397,15 +387,18 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
 
 
 @rule
-def generate_scala_parser_lockfile_request(
+async def generate_scala_parser_lockfile_request(
     _: ScalaParserToolLockfileSentinel,
 ) -> GenerateJvmLockfileFromTool:
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(_PARSER_SCALA_VERSION)
+    )
     return GenerateJvmLockfileFromTool(
         artifact_inputs=FrozenOrderedSet(
             {
                 f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.8.7",
                 f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
-                f"org.scala-lang:scala-library:{_PARSER_SCALA_VERSION}",
+                scala_artifacts.library_coordinate.to_coord_str(),
             }
         ),
         artifact_option_name="n/a",
