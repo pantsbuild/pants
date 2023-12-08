@@ -39,6 +39,7 @@ _VALID_PASSTHROUGH_OPTS = [
     "--kube-as-user",
     "--kube-ca-file",
     "--kube-token",
+    "--timeout",
 ]
 
 
