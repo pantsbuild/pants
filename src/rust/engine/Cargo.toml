@@ -334,7 +334,10 @@ tree-sitter-javascript = "0.20.1"
 tree-sitter-python = "0.20.4"
 
 [patch.crates-io]
+# https://github.com/console-rs/console/pull/186
 console = { version = "0.15.7", git = "https://github.com/tgolsson/console.git", rev = "5483880905f384679d322e83c37180f122951995" }
+# https://github.com/console-rs/indicatif/pull/608
+indicatif = { version = "0.17.7", git = "https://github.com/tgolsson/indicatif.git", rev = "31890f0ac55f9727d152ad314a78757ccc0142b6" }
 
 
 # Default lints adopted by most crates in this workspace.
