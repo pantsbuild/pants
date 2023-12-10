@@ -231,6 +231,7 @@ Created as part of the release process.
 + Moses Nakamura
 + Nadav Samet
 + Nathan Levesque
++ Navneeth Jayendran
 + Neeraj Kashyap
 + Neil Sanchala
 + Nicholas Santos
