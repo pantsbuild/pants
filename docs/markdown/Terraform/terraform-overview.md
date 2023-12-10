@@ -24,7 +24,7 @@ backend_packages = [
 ]
 ```
 
-The Terraform backend also needs Python to run Pant's analysers. The setting `[python].interpreter_constraints` will need to be set.
+The Terraform backend also needs Python to run Pants's analysers. The setting `[python].interpreter_constraints` will need to be set.
 
 Adding Terraform targets
 ------------------------
