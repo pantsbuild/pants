@@ -1750,8 +1750,7 @@ dependencies = [
 [[package]]
 name = "indicatif"
 version = "0.17.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb28741c9db9a713d93deb3bb9515c20788cef5815265bee4980e87bde7e0f25"
+source = "git+https://github.com/tgolsson/indicatif.git?rev=31890f0ac55f9727d152ad314a78757ccc0142b6#31890f0ac55f9727d152ad314a78757ccc0142b6"
 dependencies = [
  "console",
  "instant",
