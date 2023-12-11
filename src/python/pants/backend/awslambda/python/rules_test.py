@@ -26,7 +26,7 @@ from pants.backend.awslambda.python.target_types import PythonAWSLambda, PythonA
 from pants.backend.awslambda.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.subsystems.lambdex import Lambdex
+from pants.backend.python.subsystems.lambdex import Lambdex, LambdexLayout
 from pants.backend.python.subsystems.lambdex import rules as awslambda_python_subsystem_rules
 from pants.backend.python.target_types import (
     PexBinary,
@@ -35,6 +35,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
+    BuildLambdexRequest,
     BuildPythonFaaSRequest,
     PythonFaaSPex3VenvCreateExtraArgsField,
 )
@@ -51,6 +52,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import FieldSet
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import MockGet, QueryRule, run_rule_with_mocks
@@ -448,21 +450,29 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
 
 
 @pytest.mark.parametrize(
-    ("rule", "field_set_ty", "extra_field_set_args"),
+    ("rule", "field_set_ty", "extra_field_set_args", "requires_lambdex_mock"),
     [
         pytest.param(
-            package_python_aws_lambda_function, PythonAwsLambdaFieldSet, ["handler"], id="function"
+            package_python_aws_lambda_function,
+            PythonAwsLambdaFieldSet,
+            ["handler"],
+            True,
+            id="function",
         ),
         pytest.param(
             package_python_aws_lambda_layer,
             PythonAwsLambdaLayerFieldSet,
             ["dependencies", "include_sources"],
+            False,
             id="layer",
         ),
     ],
 )
 def test_pex3_venv_create_extra_args_are_passed_through(
-    rule: Any, field_set_ty: type[_BaseFieldSet], extra_field_set_args: list[str]
+    rule: Any,
+    field_set_ty: type[_BaseFieldSet],
+    extra_field_set_args: list[str],
+    requires_lambdex_mock: bool,
 ) -> None:
     # Setup
     addr = Address("addr")
@@ -482,6 +492,16 @@ def test_pex3_venv_create_extra_args_are_passed_through(
         pex3_venv_create_extra_args=extra_args_field,
     )
 
+    lambdex = create_subsystem(Lambdex, layout=LambdexLayout.ZIP)
+    if requires_lambdex_mock:
+        lambdex_mock = [
+            MockGet(
+                output_type=BuiltPackage, input_types=(BuildLambdexRequest,), mock=lambda _: Mock()
+            )
+        ]
+    else:
+        lambdex_mock = []
+
     observed_calls = []
 
     def mocked_build(request: BuildPythonFaaSRequest) -> BuiltPackage:
@@ -491,11 +511,12 @@ def test_pex3_venv_create_extra_args_are_passed_through(
     # Exercise
     run_rule_with_mocks(
         rule,
-        rule_args=[field_set],
+        rule_args=[field_set, lambdex],
         mock_gets=[
             MockGet(
                 output_type=BuiltPackage, input_types=(BuildPythonFaaSRequest,), mock=mocked_build
-            )
+            ),
+            *lambdex_mock,
         ],
     )
 

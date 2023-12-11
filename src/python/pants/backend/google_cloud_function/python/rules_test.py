@@ -24,7 +24,7 @@ from pants.backend.google_cloud_function.python.target_types import PythonGoogle
 from pants.backend.google_cloud_function.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.subsystems.lambdex import Lambdex
+from pants.backend.python.subsystems.lambdex import Lambdex, LambdexLayout
 from pants.backend.python.subsystems.lambdex import (
     rules as python_google_cloud_function_subsystem_rules,
 )
@@ -35,6 +35,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.faas import (
+    BuildLambdexRequest,
     BuildPythonFaaSRequest,
     PythonFaaSPex3VenvCreateExtraArgsField,
 )
@@ -49,6 +50,7 @@ from pants.core.target_types import (
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import MockGet, QueryRule, run_rule_with_mocks
@@ -329,6 +331,8 @@ def test_pex3_venv_create_extra_args_are_passed_through() -> None:
         pex3_venv_create_extra_args=extra_args_field,
     )
 
+    lambdex = create_subsystem(Lambdex, layout=LambdexLayout.ZIP)
+
     observed_calls = []
 
     def mocked_build(request: BuildPythonFaaSRequest) -> BuiltPackage:
@@ -338,11 +342,14 @@ def test_pex3_venv_create_extra_args_are_passed_through() -> None:
     # Exercise
     run_rule_with_mocks(
         package_python_google_cloud_function,
-        rule_args=[field_set],
+        rule_args=[field_set, lambdex],
         mock_gets=[
             MockGet(
                 output_type=BuiltPackage, input_types=(BuildPythonFaaSRequest,), mock=mocked_build
-            )
+            ),
+            MockGet(
+                output_type=BuiltPackage, input_types=(BuildLambdexRequest,), mock=lambda _: Mock()
+            ),
         ],
     )
 
