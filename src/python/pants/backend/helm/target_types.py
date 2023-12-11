@@ -170,7 +170,7 @@ class HelmChartLintStrictField(TriBoolField):
 
 class HelmChartLintQuietField(TriBoolField):
     alias = "lint_quiet"
-    help = "If set to true, only print only warnings and errors."
+    help = "If set to true, print only warnings and errors."
 
 
 class HelmChartRepositoryField(StringField):
