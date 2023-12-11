@@ -51,7 +51,6 @@ from pants.engine.fs import (
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AsyncFieldMixin,
-    BoolField,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -61,6 +60,7 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidTargetException,
     StringField,
+    StringSequenceField,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -69,22 +69,17 @@ from pants.util.strutil import help_text, softwrap
 logger = logging.getLogger(__name__)
 
 
-class PythonFaaSCollisionsOkField(BoolField):
-    alias = "collisions_ok"
-    default = False
+class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
+    alias = "pex3_venv_create_extra_args"
+    default = ()
     help = help_text(
         """
-        If set to true, don't error if population of the artifact encounters distributions with
-        colliding files.
+        Any extra arguments to pass to the `pex3 venv create` invocation that is used to create the
+        final zip file.
 
-        This flag can cause confusing and/or broken runtime behaviour, such as if the collision is
-        in code or data files.
-
-        However, this most often occurs with distributions that incorrectly package metadata or test
-        files at the top level, for instance, two packages `example1` and `example2` that both
-        include their own README file at `./README`, instead of `./example1/README` and
-        `./example2/README` respectively (or similar). In cases like this, ignoring collisions is
-        unlikely to change runtime behaviour.
+        For example, `pex3_venv_create_extra_args=["--collisions-ok"]`, if using packages that have
+        colliding files that aren't required at runtime (errors like "Encountered collisions
+        populating ...").
         """
     )
 
@@ -426,7 +421,7 @@ class BuildPythonFaaSRequest:
     handler: None | PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
-    collisions_ok: PythonFaaSCollisionsOkField
+    pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
 
     include_requirements: bool
     include_sources: bool
@@ -517,7 +512,7 @@ async def build_python_faas(
             layout=PexVenvLayout.FLAT_ZIPPED,
             platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
-            collisions_ok=request.collisions_ok.value,
+            extra_args=request.pex3_venv_create_extra_args.value or (),
             prefix=request.prefix_in_artifact,
             output_path=Path(output_filename),
             description=f"Build {request.target_name} artifact for {request.address}",

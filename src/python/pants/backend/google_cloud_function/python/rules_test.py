@@ -7,11 +7,15 @@ import os
 import subprocess
 from io import BytesIO
 from textwrap import dedent
+from unittest.mock import Mock
 from zipfile import ZipFile
 
 import pytest
 
-from pants.backend.google_cloud_function.python.rules import PythonGoogleCloudFunctionFieldSet
+from pants.backend.google_cloud_function.python.rules import (
+    PythonGoogleCloudFunctionFieldSet,
+    package_python_google_cloud_function,
+)
 from pants.backend.google_cloud_function.python.rules import (
     rules as python_google_cloud_function_rules,
 )
@@ -25,6 +29,10 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.backend.python.util_rules.faas import (
+    BuildPythonFaaSRequest,
+    PythonFaaSPex3VenvCreateExtraArgsField,
+)
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
@@ -36,9 +44,8 @@ from pants.core.target_types import (
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
-from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import QueryRule
+from pants.testutil.rule_runner import MockGet, QueryRule, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -236,55 +243,42 @@ def test_create_hello_world_gcf(
     assert zipfile.read("main.py") == b"from foo.bar.hello_world import handler as handler"
 
 
-def test_collisions_ok(rule_runner: PythonRuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/python/foo/bar/hello_world.py": dedent(
-                """
-                def handler(event, context):
-                    print('Hello, World!')
-                """
-            ),
-            "src/python/foo/bar/BUILD": dedent(
-                """
-                # Per https://github.com/pantsbuild/pants/issues/20224, these both package their `tests/`
-                # folder at the top level with non-equal __init__.py and test_defaults.py within it.
-                python_requirement(name="django-hosts", requirements=["django-hosts==5.1"])
-                python_requirement(name="draftjs-exporter", requirements=["draftjs-exporter==2.1.7"])
-                python_sources()
-
-                python_google_cloud_function(
-                    name='gcf-ok',
-                    handler='foo.bar.hello_world:handler',
-                    dependencies=[":django-hosts", ":draftjs-exporter"],
-                    runtime='python39',
-                    collisions_ok=True,
-                    type='event',
-                )
-
-                python_google_cloud_function(
-                    name='gcf-error',
-                    handler='foo.bar.hello_world:handler',
-                    dependencies=[":django-hosts", ":draftjs-exporter"],
-                    runtime='python39',
-                    type='event',
-                )
-                """
-            ),
-        }
+def test_pex3_venv_create_extra_args_are_passed_through() -> None:
+    # Setup
+    addr = Address("addr")
+    extra_args = (
+        "--extra-args-for-test",
+        "distinctive-value-1EE0CE07-2545-4743-81F5-B5A413F73213",
+    )
+    extra_args_field = PythonFaaSPex3VenvCreateExtraArgsField(extra_args, addr)
+    field_set = PythonGoogleCloudFunctionFieldSet(
+        address=addr,
+        handler=Mock(),
+        runtime=Mock(),
+        complete_platforms=Mock(),
+        type=Mock(),
+        output_path=Mock(),
+        environment=Mock(),
+        pex3_venv_create_extra_args=extra_args_field,
     )
 
-    # Verify - without the flag, we get an error
-    target = rule_runner.get_target(Address("src/python/foo/bar", target_name="gcf-error"))
-    with pytest.raises(ExecutionError, match="Encountered collisions"):
-        rule_runner.request(BuiltPackage, [PythonGoogleCloudFunctionFieldSet.create(target)])
+    observed_calls = []
 
-    # Exercise/Verify - passing collisions_ok resolves the issue
-    create_python_google_cloud_function(
-        rule_runner,
-        Address("src/python/foo/bar", target_name="gcf-ok"),
-        expected_extra_log_lines=(
-            "    Runtime: python39",
-            "    Handler: handler",
-        ),
+    def mocked_build(request: BuildPythonFaaSRequest) -> BuiltPackage:
+        observed_calls.append(request.pex3_venv_create_extra_args)
+        return Mock()
+
+    # Exercise
+    run_rule_with_mocks(
+        package_python_google_cloud_function,
+        rule_args=[field_set],
+        mock_gets=[
+            MockGet(
+                output_type=BuiltPackage, input_types=(BuildPythonFaaSRequest,), mock=mocked_build
+            )
+        ],
     )
+
+    # Verify
+    assert len(observed_calls) == 1
+    assert observed_calls[0] is extra_args_field
