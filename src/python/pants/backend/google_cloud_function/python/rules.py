@@ -17,6 +17,7 @@ from pants.backend.python.util_rules.faas import (
     BuildLambdexRequest,
     BuildPythonFaaSRequest,
     PythonFaaSCompletePlatforms,
+    PythonFaaSPex3VenvCreateExtraArgsField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
@@ -35,6 +36,7 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     handler: PythonGoogleCloudFunctionHandlerField
     runtime: PythonGoogleCloudFunctionRuntime
     complete_platforms: PythonFaaSCompletePlatforms
+    pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
     environment: EnvironmentField
@@ -78,6 +80,7 @@ async def package_python_google_cloud_function(
             complete_platforms=field_set.complete_platforms,
             runtime=field_set.runtime,
             handler=field_set.handler,
+            pex3_venv_create_extra_args=field_set.pex3_venv_create_extra_args,
             output_path=field_set.output_path,
             include_requirements=True,
             include_sources=True,
