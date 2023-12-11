@@ -70,9 +70,9 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidTargetException,
     StringField,
+    StringSequenceField,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    StringSequenceField,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
