@@ -156,11 +156,11 @@ class CoursierSubsystem(TemplatedExternalTool):
     )
 
     jvm_index = StrOption(
-        default="cs",
+        default="",
         help=softwrap(
             """
             The JVM index to be used by Coursier.
-            
+
             Possible values are:
               - cs: The default JVM index used and maintained by Coursier.
               - cs-maven: Fetches a JVM index from the io.get-coursier:jvm-index Maven repository.

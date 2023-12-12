@@ -216,7 +216,11 @@ async def prepare_jdk_environment(
     else:
         coursier_jdk_option = shlex.quote(f"--jvm={version}")
 
-    jvm_index = f"--jvm-index {coursier.jvm_index}"
+    if not coursier.jvm_index:
+        coursier_options = ["java-home", coursier_jdk_option]
+    else:
+        jvm_index_option = shlex.quote(f"--jvm-index={coursier.jvm_index}")
+        coursier_options = ["java-home", jvm_index_option, coursier_jdk_option]
 
     # TODO(#16104) This argument re-writing code should use the native {chroot} support.
     # See also `run` for other argument re-writing code.
@@ -226,9 +230,7 @@ async def prepare_jdk_environment(
         else:
             return arg
 
-    optionally_prefixed_coursier_args = [
-        prefixed(arg) for arg in coursier.args(["java-home", jvm_index, coursier_jdk_option])
-    ]
+    optionally_prefixed_coursier_args = [prefixed(arg) for arg in coursier.args(coursier_options)]
     # NB: We `set +e` in the subshell to ensure that it exits as well.
     #  see https://unix.stackexchange.com/a/23099
     java_home_command = " ".join(("set +e;", *optionally_prefixed_coursier_args))
