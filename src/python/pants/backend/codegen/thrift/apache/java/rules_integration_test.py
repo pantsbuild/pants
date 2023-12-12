@@ -154,7 +154,9 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
             "src/thrift/dir1/BUILD": "thrift_sources()",
             "src/thrift/dir2/g.thrift": dedent(
                 """\
+                namespace java org.pantsbuild.example.wrapper
                 include "dir1/f2.thrift"
+
                 struct ManagedPersonWrapper {
                   1: f2.ManagedPerson managed_person
                 }
@@ -164,7 +166,9 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
             # Test another source root.
             "tests/thrift/test_thrifts/f.thrift": dedent(
                 """\
+                namespace java org.pantsbuild.example.test
                 include "dir2/g.thrift"
+
                 struct Executive {
                   1: g.ManagedPersonWrapper managed_person_wrapper
                 }
@@ -174,11 +178,11 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
             "3rdparty/jvm/default.lock": libthrift_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": libthrift_lockfile.requirements_as_jvm_artifact_targets(),
             "src/jvm/BUILD": "java_sources()",
-            "src/jvm/TestScroogeThriftJava.java": dedent(
+            "src/jvm/TestApacheThriftJava.java": dedent(
                 """\
                 package org.pantsbuild.example;
 
-                public class TestScroogeThriftJava {
+                public class TestApacheThriftJava {
                     Person person;
                 }
                 """
@@ -206,24 +210,20 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
             "src/thrift/org/pantsbuild/example/ManagedPerson.java",
         ],
     )
-    # TODO: Fix package namespacing?
     assert_gen(
         Address("src/thrift/dir2", relative_file_path="g.thrift"),
         [
-            "src/thrift/ManagedPersonWrapper.java",
+            "src/thrift/org/pantsbuild/example/wrapper/ManagedPersonWrapper.java",
         ],
     )
-    # TODO: Fix namespacing.
     assert_gen(
         Address("tests/thrift/test_thrifts", relative_file_path="f.thrift"),
         [
-            "tests/thrift/Executive.java",
+            "tests/thrift/org/pantsbuild/example/test/Executive.java",
         ],
     )
 
-    tgt = rule_runner.get_target(
-        Address("src/jvm", relative_file_path="TestScroogeThriftJava.java")
-    )
+    tgt = rule_runner.get_target(Address("src/jvm", relative_file_path="TestApacheThriftJava.java"))
     dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
     assert Address("src/thrift/dir1", relative_file_path="f.thrift") in dependencies
 

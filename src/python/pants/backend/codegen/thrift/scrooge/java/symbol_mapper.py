@@ -9,13 +9,13 @@ from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest
 
 
-class FirstPartyThriftJavaTargetsMappingRequest(FirstPartyMappingRequest):
+class FirstPartyThriftScroogeJavaTargetsMappingRequest(FirstPartyMappingRequest):
     pass
 
 
 @rule
-async def map_first_party_thrif_java_targets_to_symbols(
-    _: FirstPartyThriftJavaTargetsMappingRequest,
+async def map_first_party_thrift_scrooge_java_targets_to_symbols(
+    _: FirstPartyThriftScroogeJavaTargetsMappingRequest,
 ) -> FirstPartyJvmMappingRequest:
     return FirstPartyJvmMappingRequest(lang_ids=("java",))
 
@@ -24,5 +24,5 @@ def rules():
     return [
         *collect_rules(),
         *jvm_symbol_mapper.rules(),
-        UnionRule(FirstPartyMappingRequest, FirstPartyThriftJavaTargetsMappingRequest),
+        UnionRule(FirstPartyMappingRequest, FirstPartyThriftScroogeJavaTargetsMappingRequest),
     ]
