@@ -13,6 +13,7 @@ from pants.backend.scala.dependency_inference.scala_parser import (
     ScalaSourceDependencyAnalysis,
 )
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
+from pants.backend.scala.util_rules import versions
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -37,6 +38,7 @@ def rule_runner() -> RuleRunner:
             *target_types.rules(),
             *jvm_util_rules.rules(),
             *process.rules(),
+            *versions.rules(),
             QueryRule(AnalyzeScalaSourceRequest, (SourceFilesRequest,)),
             QueryRule(ScalaSourceDependencyAnalysis, (AnalyzeScalaSourceRequest,)),
         ],

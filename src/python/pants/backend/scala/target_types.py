@@ -4,14 +4,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
+from pants.backend.scala.util_rules.versions import ScalaCrossVersionMode
+from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import AddressInput
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -413,22 +415,29 @@ class ScalaArtifactArtifactField(StringField):
     )
 
 
-class ScalaCrossVersion(Enum):
-    PARTIAL = "partial"
-    FULL = "full"
-
-
 class ScalaArtifactCrossversionField(StringField):
     alias = "crossversion"
-    default = ScalaCrossVersion.PARTIAL.value
+    default = ScalaCrossVersionMode.BINARY.value
     help = help_text(
-        """
+        f"""
         Whether to use the full Scala version or the partial one to determine the artifact name suffix.
 
-        Default is `partial`.
+        Default is `{ScalaCrossVersionMode.BINARY.value}`.
         """
     )
-    valid_choices = ScalaCrossVersion
+    valid_choices = ScalaCrossVersionMode
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        computed_value = super().compute_value(raw_value, address)
+        if computed_value == ScalaCrossVersionMode.PARTIAL.value:
+            warn_or_error(
+                "2.21.0",
+                f"Scala cross version value '{computed_value}' in target: {address}",
+                "Use value `binary` instead",
+                start_version="2.20.0",
+            )
+        return computed_value
 
 
 @dataclass(frozen=True)
@@ -441,28 +450,36 @@ class ScalaArtifactExclusion(JvmArtifactExclusion):
         """
     )
 
-    crossversion: str = ScalaCrossVersion.PARTIAL.value
+    crossversion: str = ScalaCrossVersionMode.BINARY.value
 
-    def validate(self) -> set[str]:
-        errors = super().validate()
-        valid_crossversions = [x.value for x in ScalaCrossVersion]
+    def validate(self, address: Address) -> set[str]:
+        errors = super().validate(address)
+        valid_crossversions = [x.value for x in ScalaCrossVersionMode]
         if self.crossversion not in valid_crossversions:
             errors.add(
                 softwrap(
                     f"""
-                    Invalid `crossversion` value: {self.crossversion}. Valid values are:
+                    Invalid `crossversion` value '{self.crossversion}' in in list of
+                    exclusions at target: {address}. Valid values are:
                     {', '.join(valid_crossversions)}
                     """
                 )
+            )
+        if self.crossversion == ScalaCrossVersionMode.PARTIAL.value:
+            warn_or_error(
+                "2.21.0",
+                f"Scala cross version value '{self.crossversion}' in list of exclusions at target: {address}",
+                "Use value `binary` instead",
+                start_version="2.20.0",
             )
         return errors
 
 
 class ScalaArtifactExclusionsField(JvmArtifactExclusionsField):
     help = _jvm_artifact_exclusions_field_help(
-        lambda: ScalaArtifactExclusionsField.supported_rule_types
+        lambda: ScalaArtifactExclusionsField.supported_exclusion_types
     )
-    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (
+    supported_exclusion_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (
         JvmArtifactExclusion,
         ScalaArtifactExclusion,
     )
@@ -539,15 +556,6 @@ async def generate_jvm_artifact_targets(
     field_set = ScalaArtifactFieldSet.create(request.generator)
     resolve_name = request.template.get(JvmArtifactResolveField.alias) or jvm.default_resolve
     scala_version = scala.version_for_resolve(resolve_name)
-    scala_version_parts = scala_version.split(".")
-
-    def scala_suffix(crossversion: ScalaCrossVersion) -> str:
-        if crossversion == ScalaCrossVersion.FULL:
-            return scala_version
-        elif int(scala_version_parts[0]) >= 3:
-            return scala_version_parts[0]
-
-        return f"{scala_version_parts[0]}.{scala_version_parts[1]}"
 
     exclusions_field = {}
     if field_set.exclusions.value:
@@ -558,15 +566,19 @@ async def generate_jvm_artifact_targets(
             else:
                 excluded_artifact_name = None
                 if exclusion.artifact:
-                    crossversion = ScalaCrossVersion(exclusion.crossversion)
-                    excluded_artifact_name = f"{exclusion.artifact}_{scala_suffix(crossversion)}"
+                    cross_mode = ScalaCrossVersionMode(exclusion.crossversion)
+                    excluded_artifact_name = (
+                        f"{exclusion.artifact}_{scala_version.crossversion(cross_mode)}"
+                    )
                 exclusions.append(
                     JvmArtifactExclusion(group=exclusion.group, artifact=excluded_artifact_name)
                 )
         exclusions_field[JvmArtifactExclusionsField.alias] = exclusions
 
-    crossversion = ScalaCrossVersion(field_set.crossversion.value)
-    artifact_name = f"{field_set.artifact.value}_{scala_suffix(crossversion)}"
+    cross_mode = ScalaCrossVersionMode(
+        field_set.crossversion.value or ScalaArtifactCrossversionField.default
+    )
+    artifact_name = f"{field_set.artifact.value}_{scala_version.crossversion(cross_mode)}"
     jvm_artifact_target = JvmArtifactTarget(
         {
             **request.template,

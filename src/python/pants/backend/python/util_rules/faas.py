@@ -60,12 +60,28 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidTargetException,
     StringField,
+    StringSequenceField,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
+    alias = "pex3_venv_create_extra_args"
+    default = ()
+    help = help_text(
+        """
+        Any extra arguments to pass to the `pex3 venv create` invocation that is used to create the
+        final zip file.
+
+        For example, `pex3_venv_create_extra_args=["--collisions-ok"]`, if using packages that have
+        colliding files that aren't required at runtime (errors like "Encountered collisions
+        populating ...").
+        """
+    )
 
 
 class PythonFaaSHandlerField(StringField, AsyncFieldMixin):
@@ -405,6 +421,7 @@ class BuildPythonFaaSRequest:
     handler: None | PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
+    pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
 
     include_requirements: bool
     include_sources: bool
@@ -495,6 +512,7 @@ async def build_python_faas(
             layout=PexVenvLayout.FLAT_ZIPPED,
             platforms=platforms.pex_platforms,
             complete_platforms=platforms.complete_platforms,
+            extra_args=request.pex3_venv_create_extra_args.value or (),
             prefix=request.prefix_in_artifact,
             output_path=Path(output_filename),
             description=f"Build {request.target_name} artifact for {request.address}",
