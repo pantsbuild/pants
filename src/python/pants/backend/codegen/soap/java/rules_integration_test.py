@@ -167,11 +167,11 @@ def test_generate_java_from_wsdl(
 ) -> None:
     rule_runner.write_files(
         {
-            "src/wsdl/BUILD": "wsdl_sources()",
+            "src/wsdl/BUILD": "wsdl_sources(java_package='com.example.wsdl.fooservice')",
             "src/wsdl/FooService.wsdl": _FOO_SERVICE_WSDL,
             "3rdparty/jvm/default.lock": wsdl_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": wsdl_lockfile.requirements_as_jvm_artifact_targets(),
-            "src/jvm/BUILD": "java_sources(dependencies=['src/wsdl'])",
+            "src/jvm/BUILD": "java_sources()",
             "src/jvm/FooServiceMain.java": textwrap.dedent(
                 """\
                 package org.pantsbuild.example;

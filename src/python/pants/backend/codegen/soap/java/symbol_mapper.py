@@ -5,11 +5,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import DefaultDict, Mapping, Tuple
 
-from pants.backend.openapi.codegen.java.extra_fields import (
-    OpenApiJavaApiPackageField,
-    OpenApiJavaModelPackageField,
-)
-from pants.backend.openapi.target_types import AllOpenApiDocumentTargets
+from pants.backend.codegen.soap.java.extra_fields import JavaPackageField
+from pants.backend.codegen.soap.target_types import AllWsdlTargets
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -22,30 +19,26 @@ from pants.util.ordered_set import OrderedSet
 _ResolveName = str
 
 
-class FirstPartyOpenAPIJavaTargetsMappingRequest(FirstPartyMappingRequest):
+class FirstPartyWsdlJaxWsTargetsMappingRequest(FirstPartyMappingRequest):
     pass
 
 
-_DEFAULT_API_PACKAGE = "org.openapitools.client.api"
-_DEFAULT_MODEL_PACKAGE = "org.openapitools.client.model"
-
-
 @rule
-async def map_first_party_openapi_java_targets_to_symbols(
-    _: FirstPartyOpenAPIJavaTargetsMappingRequest,
-    all_openapi_document_targets: AllOpenApiDocumentTargets,
-    jvm: JvmSubsystem,
+async def map_first_party_wsdl_jaxws_targets_to_symbols(
+    _: FirstPartyWsdlJaxWsTargetsMappingRequest, wsdl_targets: AllWsdlTargets, jvm: JvmSubsystem
 ) -> SymbolMap:
     package_mapping: DefaultDict[Tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
         OrderedSet
     )
-    for target in all_openapi_document_targets:
+    for target in wsdl_targets:
         resolve_name = target[JvmResolveField].normalized_value(jvm)
-        api_package = target[OpenApiJavaApiPackageField].value or _DEFAULT_API_PACKAGE
-        model_package = target[OpenApiJavaModelPackageField].value or _DEFAULT_MODEL_PACKAGE
+        package_name = target[JavaPackageField].value
 
-        package_mapping[(resolve_name, api_package)].add(target.address)
-        package_mapping[(resolve_name, model_package)].add(target.address)
+        # TODO If no explicit package name is given, parse the WSDL and derive it from its namespace
+        if not package_name:
+            continue
+
+        package_mapping[(resolve_name, package_name)].add(target.address)
 
     symbol_map: Mapping[_ResolveName, MutableTrieNode] = defaultdict(MutableTrieNode)
     for (resolve, package), addresses in package_mapping.items():
@@ -57,5 +50,5 @@ async def map_first_party_openapi_java_targets_to_symbols(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FirstPartyMappingRequest, FirstPartyOpenAPIJavaTargetsMappingRequest),
+        UnionRule(FirstPartyMappingRequest, FirstPartyWsdlJaxWsTargetsMappingRequest),
     ]
