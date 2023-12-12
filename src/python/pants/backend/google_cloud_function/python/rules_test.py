@@ -8,11 +8,15 @@ import subprocess
 import sys
 from io import BytesIO
 from textwrap import dedent
+from unittest.mock import Mock
 from zipfile import ZipFile
 
 import pytest
 
-from pants.backend.google_cloud_function.python.rules import PythonGoogleCloudFunctionFieldSet
+from pants.backend.google_cloud_function.python.rules import (
+    PythonGoogleCloudFunctionFieldSet,
+    package_python_google_cloud_function,
+)
 from pants.backend.google_cloud_function.python.rules import (
     rules as python_google_cloud_function_rules,
 )
@@ -20,7 +24,7 @@ from pants.backend.google_cloud_function.python.target_types import PythonGoogle
 from pants.backend.google_cloud_function.python.target_types import rules as target_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.subsystems.lambdex import Lambdex
+from pants.backend.python.subsystems.lambdex import Lambdex, LambdexLayout
 from pants.backend.python.subsystems.lambdex import (
     rules as python_google_cloud_function_subsystem_rules,
 )
@@ -30,6 +34,11 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.backend.python.util_rules.faas import (
+    BuildLambdexRequest,
+    BuildPythonFaaSRequest,
+    PythonFaaSPex3VenvCreateExtraArgsField,
+)
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
@@ -41,9 +50,10 @@ from pants.core.target_types import (
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import QueryRule
+from pants.testutil.rule_runner import MockGet, QueryRule, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -300,3 +310,49 @@ def test_create_hello_world_gcf(
     assert "mureq/__init__.py" in names
     assert "foo/bar/hello_world.py" in names
     assert zipfile.read("main.py") == b"from foo.bar.hello_world import handler as handler"
+
+
+def test_pex3_venv_create_extra_args_are_passed_through() -> None:
+    # Setup
+    addr = Address("addr")
+    extra_args = (
+        "--extra-args-for-test",
+        "distinctive-value-1EE0CE07-2545-4743-81F5-B5A413F73213",
+    )
+    extra_args_field = PythonFaaSPex3VenvCreateExtraArgsField(extra_args, addr)
+    field_set = PythonGoogleCloudFunctionFieldSet(
+        address=addr,
+        handler=Mock(),
+        runtime=Mock(),
+        complete_platforms=Mock(),
+        type=Mock(),
+        output_path=Mock(),
+        environment=Mock(),
+        pex3_venv_create_extra_args=extra_args_field,
+    )
+
+    lambdex = create_subsystem(Lambdex, layout=LambdexLayout.ZIP)
+
+    observed_calls = []
+
+    def mocked_build(request: BuildPythonFaaSRequest) -> BuiltPackage:
+        observed_calls.append(request.pex3_venv_create_extra_args)
+        return Mock()
+
+    # Exercise
+    run_rule_with_mocks(
+        package_python_google_cloud_function,
+        rule_args=[field_set, lambdex],
+        mock_gets=[
+            MockGet(
+                output_type=BuiltPackage, input_types=(BuildPythonFaaSRequest,), mock=mocked_build
+            ),
+            MockGet(
+                output_type=BuiltPackage, input_types=(BuildLambdexRequest,), mock=lambda _: Mock()
+            ),
+        ],
+    )
+
+    # Verify
+    assert len(observed_calls) == 1
+    assert observed_calls[0] is extra_args_field
