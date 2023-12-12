@@ -37,6 +37,7 @@ pub enum RemoteCacheWarningsBehavior {
     Ignore,
     FirstOnly,
     Backoff,
+    Always,
 }
 
 pub struct RemoteCacheRunnerOptions {
@@ -424,19 +425,24 @@ impl CommandRunner {
             CacheErrorType::ReadError => "read from",
             CacheErrorType::WriteError => "write to",
         };
-        let log_msg = format!(
-            "Failed to {failure_desc} remote cache ({err_count} occurrences so far): {err}"
-        );
+
         let log_at_warn = match self.warnings_behavior {
             RemoteCacheWarningsBehavior::Ignore => false,
             RemoteCacheWarningsBehavior::FirstOnly => err_count == 1,
             RemoteCacheWarningsBehavior::Backoff => err_count.is_power_of_two(),
+            RemoteCacheWarningsBehavior::Always => true,
         };
-        if log_at_warn {
-            log::warn!("{}", log_msg);
+
+        let level = if log_at_warn {
+            Level::Warn
         } else {
-            log::debug!("{}", log_msg);
-        }
+            Level::Debug
+        };
+
+        log::log!(
+            level,
+            "Failed to {failure_desc} remote cache ({err_count} occurrences so far): {err}"
+        );
     }
 }
 

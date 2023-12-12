@@ -46,12 +46,12 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": "python_source(name='t', source='path/to/app0/migrations/0001_initial.py')",
-            "path/to/app0/migrations/0001_initial.py": dedent(
-                """\
+def files(constraints: str) -> dict[str, str]:
+    return {
+        "BUILD": "python_source(name='t', source='path/to/app0/migrations/0001_initial.py')",
+        "path/to/app0/migrations/__init__.py": "",
+        "path/to/app0/migrations/0001_initial.py": dedent(
+            """\
             class Migration(migrations.Migration):
                 dependencies = [
                 ("app1", "0012_some_migration"),
@@ -60,43 +60,82 @@ def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) ->
 
                 operations = []
             """
-            ),
-            "path/to/app1/BUILD": dedent(
-                f"""\
+        ),
+        "path/to/app1/BUILD": dedent(
+            f"""\
                 python_source(
+                  name="app1",
                   source="apps.py",
                   interpreter_constraints=['{constraints}'],
                 )
+                python_source(
+                  name="initpy",
+                  source="__init__.py",
+                )
                 """
-            ),
-            "path/to/app1/apps.py": dedent(
-                """\
+        ),
+        "path/to/app1/__init__.py": "",
+        "path/to/app1/apps.py": dedent(
+            """\
                 class App1AppConfig(AppConfig):
                     name = "path.to.app1"
                     label = "app1"
                 """
-            ),
-            "path/to/app1/migrations/BUILD": "python_source(source='0012_some_migration.py')",
-            "path/to/app1/migrations/0012_some_migration.py": "",
-            "another/path/app2/BUILD": dedent(
-                f"""\
+        ),
+        "path/to/app1/management/commands/BUILD": dedent(
+            """\
+                python_source(source='do_a_thing.py')
+                python_source(
+                    name="initpy",
+                    source="__init__.py",
+                )
+                """
+        ),
+        "path/to/app1/management/commands/__init__.py": "",
+        "path/to/app1/management/commands/do_a_thing.py": "",
+        "path/to/app1/migrations/BUILD": dedent(
+            """\
+                python_source(source='0012_some_migration.py')
+                python_source(
+                    name="initpy",
+                    source="__init__.py",
+                )
+                """
+        ),
+        "path/to/app1/migrations/__init__.py": "",
+        "path/to/app1/migrations/0012_some_migration.py": "",
+        "another/path/app2/BUILD": dedent(
+            f"""\
                 python_source(
                   source="apps.py",
                   interpreter_constraints=['{constraints}'],
                 )
                 """
-            ),
-            "another/path/app2/apps.py": dedent(
-                """\
+        ),
+        "another/path/app2/__init__.py": "",
+        "another/path/app2/apps.py": dedent(
+            """\
                 class App2AppConfig(AppConfig):
                     name = "another.path.app2"
                     label = "app2_label"
                 """
-            ),
-            "another/path/app2/migrations/BUILD": "python_source(source='0042_another_migration.py')",
-            "another/path/app2/migrations/0042_another_migration.py": "",
-        }
-    )
+        ),
+        "another/path/app2/migrations/BUILD": dedent(
+            """\
+                python_source(source='0042_another_migration.py')
+                python_source(
+                    name="initpy",
+                    source="__init__.py",
+                )
+                """
+        ),
+        "another/path/app2/migrations/__init__.py": "",
+        "another/path/app2/migrations/0042_another_migration.py": "",
+    }
+
+
+def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) -> None:
+    rule_runner.write_files(files(constraints))
     tgt = rule_runner.get_target(Address("", target_name="t"))
     result = rule_runner.request(
         InferredDependencies,
@@ -112,21 +151,45 @@ def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) ->
     }
 
 
+def do_test_implicit_app_dependencies(rule_runner: RuleRunner, constraints: str) -> None:
+    rule_runner.write_files(files(constraints))
+    tgt = rule_runner.get_target(Address("path/to/app1", target_name="app1"))
+    print(tgt)
+    result = rule_runner.request(
+        InferredDependencies,
+        [
+            dependency_inference.InferDjangoDependencies(
+                PythonImportDependenciesInferenceFieldSet.create(tgt)
+            )
+        ],
+    )
+    assert set(result.include) == {
+        Address("path/to/app1/migrations", target_name="migrations"),
+        Address("path/to/app1/migrations", target_name="initpy"),
+        Address("path/to/app1/management/commands", target_name="commands"),
+        Address("path/to/app1/management/commands", target_name="initpy"),
+    }
+
+
 @skip_unless_python27_present
 def test_works_with_python2(rule_runner: RuleRunner) -> None:
     do_test_migration_dependencies(rule_runner, constraints="CPython==2.7.*")
+    do_test_implicit_app_dependencies(rule_runner, constraints="CPython==2.7.*")
 
 
 @skip_unless_python37_present
 def test_works_with_python37(rule_runner: RuleRunner) -> None:
     do_test_migration_dependencies(rule_runner, constraints="CPython==3.7.*")
+    do_test_implicit_app_dependencies(rule_runner, constraints="CPython==3.7.*")
 
 
 @skip_unless_python38_present
 def test_works_with_python38(rule_runner: RuleRunner) -> None:
     do_test_migration_dependencies(rule_runner, constraints="CPython==3.8.*")
+    do_test_implicit_app_dependencies(rule_runner, constraints="CPython==3.8.*")
 
 
 @skip_unless_python39_present
 def test_works_with_python39(rule_runner: RuleRunner) -> None:
     do_test_migration_dependencies(rule_runner, constraints="CPython==3.9.*")
+    do_test_implicit_app_dependencies(rule_runner, constraints="CPython==3.9.*")
