@@ -17,7 +17,7 @@ class FirstPartyThriftScroogeJavaTargetsMappingRequest(FirstPartyMappingRequest)
 async def map_first_party_thrift_scrooge_java_targets_to_symbols(
     _: FirstPartyThriftScroogeJavaTargetsMappingRequest,
 ) -> FirstPartyThriftJvmMappingRequest:
-    return FirstPartyThriftJvmMappingRequest(lang_ids=("java",))
+    return FirstPartyThriftJvmMappingRequest()
 
 
 def rules():

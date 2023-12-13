@@ -18,7 +18,7 @@ async def map_first_party_thrift_scrooge_scala_targets_to_symbols(
     _: FirstPartyThriftScroogeScalaTargetsMappingRequest,
 ) -> FirstPartyThriftJvmMappingRequest:
     return FirstPartyThriftJvmMappingRequest(
-        lang_ids=("java", "scala"), extra_namespace_directives=("#@namespace",)
+        extra_lang_ids=("scala",), extra_namespace_directives=("#@namespace",)
     )
 
 

@@ -21,7 +21,7 @@ _ResolveName = str
 
 @dataclass(frozen=True)
 class FirstPartyThriftJvmMappingRequest:
-    lang_ids: tuple[str, ...]
+    extra_lang_ids: tuple[str, ...] = ()
     extra_namespace_directives: tuple[str, ...] = ()
 
 
@@ -45,8 +45,9 @@ async def map_first_party_thirft_targets_to_jvm_symbols(
     package_symbols: DefaultDict[tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(
         OrderedSet
     )
+    lang_ids = {"java", *request.extra_lang_ids}
     for target, parsed_thrift in zip(jvm_thrift_targets, parsed_thrift_sources):
-        for lang_id in request.lang_ids:
+        for lang_id in lang_ids:
             package_name = parsed_thrift.namespaces.get(lang_id)
             if not package_name:
                 continue
