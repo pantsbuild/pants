@@ -142,7 +142,7 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     if templating_config:
         kwargs = {'backend_package_alias': backend_package}
         kwargs.update(templating_config.kwargs)
-        backend_module = templating_config.template + ".register"
+        backend_module = templating_config.package + ".register"
     else:
         kwargs = {}
         backend_module = backend_package + ".register"

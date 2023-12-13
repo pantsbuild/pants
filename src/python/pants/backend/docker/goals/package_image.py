@@ -276,7 +276,7 @@ class DockerInfoV1:
                     repository=r.repository,
                     tags=[
                         DockerInfoV1ImageTag(
-                            template=t.template,
+                            template=t.package,
                             tag=t.formatted,
                             uses_local_alias=t.uses_local_alias,
                             name=t.full_name,

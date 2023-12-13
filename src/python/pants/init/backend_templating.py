@@ -7,13 +7,13 @@ from pants.util.frozendict import FrozenDict
 
 @dataclass(frozen=True)
 class TemplatedBackendConfig:
-    template: str
+    package: str
     kwargs: FrozenDict[str, Any]
 
     @classmethod
     def from_dict(cls, d: Any):
         d = dict(d)
-        template = d.pop('template', None)
-        if not template:
+        package = d.pop('package', None)
+        if not package:
             raise ValueError(f'"template" is a required key for a backend template')
-        return cls(template=cast(str, template), kwargs=FrozenDict(d))
+        return cls(package=cast(str, package), kwargs=FrozenDict(d))
