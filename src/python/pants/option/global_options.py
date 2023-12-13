@@ -13,8 +13,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePath
-
-from pants.init.backend_templating import TemplatedBackendConfig
 from typing import Any, Callable, Type, TypeVar, cast
 
 from pants.base.build_environment import (
@@ -29,6 +27,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import PyExecutor
+from pants.init.backend_templating import TemplatedBackendConfig
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError
 from pants.option.option_types import (
@@ -936,15 +935,14 @@ class BootstrapOptions:
             """
         ),
     )
-    templated_backends = DictOption(
+    templated_backends = DictOption[dict](
         advanced=True,
-        default={},
         help="TODO",
     )
 
     @classmethod
     def parse_templated_backend_configs(
-            cls, bootstrap_options: OptionValueContainer
+        cls, bootstrap_options: OptionValueContainer
     ) -> dict[str, TemplatedBackendConfig]:
         return {
             backend_alias: TemplatedBackendConfig.from_dict(templating_config)

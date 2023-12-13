@@ -4,15 +4,14 @@
 import importlib
 import logging
 import traceback
-
-from pants.init.backend_templating import TemplatedBackendConfig
-from typing import Dict, List, Optional, Mapping
+from typing import Dict, List, Mapping, Optional
 
 from pkg_resources import Requirement, WorkingSet
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal.builtins import register_builtin_goals
+from pants.init.backend_templating import TemplatedBackendConfig
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -30,9 +29,13 @@ class PluginLoadOrderError(PluginLoadingError):
     pass
 
 
-def load_backends_and_plugins(plugins: List[str], working_set: WorkingSet, backends: List[str],
-                              bc_builder: Optional[BuildConfiguration.Builder] = None,
-                              templated_backends: Optional[Mapping[str, TemplatedBackendConfig]] = None) -> BuildConfiguration:
+def load_backends_and_plugins(
+    plugins: List[str],
+    working_set: WorkingSet,
+    backends: List[str],
+    bc_builder: Optional[BuildConfiguration.Builder] = None,
+    templated_backends: Optional[Mapping[str, TemplatedBackendConfig]] = None,
+) -> BuildConfiguration:
     """Load named plugins and source backends.
 
     :param plugins: v2 plugins to load.
@@ -41,7 +44,9 @@ def load_backends_and_plugins(plugins: List[str], working_set: WorkingSet, backe
     :param bc_builder: The BuildConfiguration (for adding aliases).
     """
     bc_builder = bc_builder or BuildConfiguration.Builder()
-    load_build_configuration_from_source(bc_builder, backends, templated_backends=templated_backends)
+    load_build_configuration_from_source(
+        bc_builder, backends, templated_backends=templated_backends
+    )
     load_plugins(bc_builder, plugins, working_set)
     register_builtin_goals(bc_builder)
     return bc_builder.create()
@@ -110,8 +115,11 @@ def load_plugins(
         loaded[dist.as_requirement().key] = dist
 
 
-def load_build_configuration_from_source(build_configuration: BuildConfiguration.Builder, backends: List[str],
-                                         templated_backends: Optional[Mapping[str, TemplatedBackendConfig]] = None) -> None:
+def load_build_configuration_from_source(
+    build_configuration: BuildConfiguration.Builder,
+    backends: List[str],
+    templated_backends: Optional[Mapping[str, TemplatedBackendConfig]] = None,
+) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
     :param build_configuration: The BuildConfiguration (for adding aliases).
@@ -124,12 +132,18 @@ def load_build_configuration_from_source(build_configuration: BuildConfiguration
     templated_backends = templated_backends or {}
 
     for backend_package in backend_packages:
-        load_backend(build_configuration, backend_package,
-                     templating_config=templated_backends.get(backend_package))
+        load_backend(
+            build_configuration,
+            backend_package,
+            templating_config=templated_backends.get(backend_package),
+        )
 
 
-def load_backend(build_configuration: BuildConfiguration.Builder, backend_package: str,
-                 templating_config: Optional[TemplatedBackendConfig]) -> None:
+def load_backend(
+    build_configuration: BuildConfiguration.Builder,
+    backend_package: str,
+    templating_config: Optional[TemplatedBackendConfig],
+) -> None:
     """Installs the given backend package into the build configuration.
 
     :param build_configuration: the BuildConfiguration to install the backend plugin into.
@@ -140,7 +154,7 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     """
 
     if templating_config:
-        kwargs = {'backend_package_alias': backend_package}
+        kwargs = {"backend_package_alias": backend_package}
         kwargs.update(templating_config.kwargs)
         backend_module = templating_config.package + ".register"
     else:
@@ -163,7 +177,9 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
         except TypeError as e:
             traceback.print_exc()
             if not kwargs:
-                err_msg = f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
+                err_msg = (
+                    f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
+                )
             else:
                 err_msg = (
                     f"Entrypoint {name} in {backend_module} backend template "
