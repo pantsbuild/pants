@@ -22,12 +22,12 @@ from pants.init.bootstrap_scheduler import BootstrapScheduler
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.extension_loader import (
     load_backends_and_plugins,
-    load_build_configuration_from_source, TemplatedBackendConfig,
-)
+    load_build_configuration_from_source, )
+from pants.init.backend_templating import TemplatedBackendConfig
 from pants.init.plugin_resolver import PluginResolver
 from pants.init.plugin_resolver import rules as plugin_resolver_rules
 from pants.option.errors import UnknownFlagsError
-from pants.option.global_options import DynamicRemoteOptions
+from pants.option.global_options import DynamicRemoteOptions, BootstrapOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.requirements import parse_requirements_file
@@ -57,10 +57,7 @@ def _initialize_build_configuration(
             sys.path.append(path)
             pkg_resources.fixup_namespace_packages(path)
 
-    templated_backends = {
-        backend_alias: TemplatedBackendConfig.from_dict(templating_config)
-        for backend_alias, templating_config in bootstrap_options.templated_backends.items()
-    }
+    templated_backends = BootstrapOptions.parse_templated_backend_configs(bootstrap_options)
 
     # Load plugins and backends.
     return load_backends_and_plugins(

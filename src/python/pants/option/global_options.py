@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePath
+
+from pants.init.backend_templating import TemplatedBackendConfig
 from typing import Any, Callable, Type, TypeVar, cast
 
 from pants.base.build_environment import (
@@ -939,6 +941,16 @@ class BootstrapOptions:
         default={},
         help="TODO",
     )
+
+    @classmethod
+    def parse_templated_backend_configs(
+            cls, bootstrap_options: OptionValueContainer
+    ) -> dict[str, TemplatedBackendConfig]:
+        return {
+            backend_alias: TemplatedBackendConfig.from_dict(templating_config)
+            for backend_alias, templating_config in bootstrap_options.templated_backends.items()
+        }
+
     plugins = StrListOption(
         advanced=True,
         help=softwrap(
