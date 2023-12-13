@@ -20,14 +20,14 @@ _ResolveName = str
 
 
 @dataclass(frozen=True)
-class FirstPartyJvmMappingRequest:
+class FirstPartyThriftJvmMappingRequest:
     lang_ids: tuple[str, ...]
     extra_namespace_directives: tuple[str, ...] = ()
 
 
 @rule
 async def map_first_party_thirft_targets_to_jvm_symbols(
-    request: FirstPartyJvmMappingRequest, thrift_targets: AllThriftTargets, jvm: JvmSubsystem
+    request: FirstPartyThriftJvmMappingRequest, thrift_targets: AllThriftTargets, jvm: JvmSubsystem
 ) -> SymbolMap:
     jvm_thrift_targets = [tgt for tgt in thrift_targets if tgt.has_field(JvmResolveField)]
 
