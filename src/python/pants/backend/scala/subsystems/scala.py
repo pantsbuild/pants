@@ -3,15 +3,12 @@
 
 from __future__ import annotations
 
-import logging
-
+from pants.backend.scala.util_rules.versions import ScalaVersion
 from pants.option.option_types import BoolOption, DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
-DEFAULT_SCALA_VERSION = "2.13.6"
-
-_logger = logging.getLogger(__name__)
+DEFAULT_SCALA_VERSION = ScalaVersion.parse("2.13.6")
 
 
 class ScalaSubsystem(Subsystem):
@@ -42,8 +39,8 @@ class ScalaSubsystem(Subsystem):
         advanced=True,
     )
 
-    def version_for_resolve(self, resolve: str) -> str:
+    def version_for_resolve(self, resolve: str) -> ScalaVersion:
         version = self._version_for_resolve.get(resolve)
         if version:
-            return version
+            return ScalaVersion.parse(version)
         return DEFAULT_SCALA_VERSION

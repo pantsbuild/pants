@@ -335,6 +335,7 @@ class RemoteCacheWarningsBehavior(Enum):
     ignore = "ignore"
     first_only = "first_only"
     backoff = "backoff"
+    always = "always"
 
 
 @enum.unique
