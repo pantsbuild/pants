@@ -121,7 +121,7 @@ def reversion(
         # Get version from the input whl's metadata.
         input_version = None
         metadata_file = os.path.join(workspace, dist_info_dir, "METADATA")
-        with open(metadata_file, "r") as info:
+        with open(metadata_file) as info:
             for line in info:
                 mo = _version_re.match(line)
                 if mo:

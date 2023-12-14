@@ -97,7 +97,7 @@ def test_partition_sequentially(size_target: int) -> None:
         return {tuple(p) for p in partition_sequentially(items, key=str, size_target=size_target)}
 
     # We start with base items containing every other element from a sorted sequence.
-    all_items = sorted((f"item{i}" for i in range(0, 1024)))
+    all_items = sorted(f"item{i}" for i in range(0, 1024))
     base_items = [item for i, item in enumerate(all_items) if i % 2 == 0]
     base_partitions = partitioned_buckets(base_items)
 

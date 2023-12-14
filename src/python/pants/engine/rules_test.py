@@ -267,7 +267,7 @@ class Example(Goal):
 
 @goal_rule
 async def a_goal_rule_generator(console: Console) -> Example:
-    a = await Get(A, str("a str!"))
+    a = await Get(A, "a str!")
     console.print_stdout(str(a))
     return Example(exit_code=0)
 
