@@ -154,37 +154,30 @@ def load_backend(
     """
 
     if templating_config:
-        kwargs = {"backend_package_alias": backend_package}
-        kwargs.update(templating_config.kwargs)
-        backend_module = templating_config.package + ".register"
+        try:
+            backend_generator_module = importlib.import_module(templating_config.template)
+        except ImportError as ex:
+            traceback.print_exc()
+            raise BackendConfigurationError(f"Failed to load the {templating_config.template} backend template module: {ex!r}")
+        module = backend_generator_module.generate(backend_package, templating_config.kwargs)
+        backend_module = str(module)
     else:
-        kwargs = {}
         backend_module = backend_package + ".register"
-
-    try:
-        module = importlib.import_module(backend_module)
-    except ImportError as ex:
-        traceback.print_exc()
-        raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
-
-    def return_none(**kwargs):
-        return None
+        try:
+            module = importlib.import_module(backend_module)
+        except ImportError as ex:
+            traceback.print_exc()
+            raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
 
     def invoke_entrypoint(name: str):
-        entrypoint = getattr(module, name, return_none)
+        entrypoint = getattr(module, name, lambda: None)
         try:
-            return entrypoint(**kwargs)
+            return entrypoint()
         except TypeError as e:
             traceback.print_exc()
-            if not kwargs:
-                err_msg = (
-                    f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
-                )
-            else:
-                err_msg = (
-                    f"Entrypoint {name} in {backend_module} backend template "
-                    f"must accept {list(kwargs)} as keyword arguments: {e!r}"
-                )
+            err_msg = (
+                f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
+            )
             raise BackendConfigurationError(err_msg)
 
     target_types = invoke_entrypoint("target_types")
