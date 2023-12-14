@@ -23,6 +23,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.rules import rule
 from pants.engine.target import COMMON_TARGET_FIELDS, Target
+from pants.init.backend_templating import TemplatedBackendConfig
 from pants.init.extension_loader import (
     PluginLoadOrderError,
     PluginNotFound,
@@ -294,6 +295,36 @@ class LoaderTest(unittest.TestCase):
             self.bc_builder.create().rules,
             FrozenOrderedSet([example_rule.rule, example_plugin_rule.rule]),
         )
+
+    def test_templated_backend_rules(self):
+        def backend_rules(backend_package_alias: str, config_arg1: int):
+            @rule(canonical_name_suffix=backend_package_alias)
+            def wrap_root_type(root_type: RootType) -> WrapperType:
+                return WrapperType((root_type.value, config_arg1))
+
+            return [wrap_root_type]
+
+        with self.create_register(rules=backend_rules) as package:
+            load_backend(
+                self.bc_builder,
+                backend_package="foo_backend",
+                templating_config=TemplatedBackendConfig.from_dict(
+                    {
+                        "package": package,
+                        "config_arg1": 10,
+                    }
+                ),
+            )
+
+        build_configuration = self.bc_builder.create()
+        rules = build_configuration.rules
+        self.assertEqual(len(rules), 1)
+        templated_rule = list(rules)[0]
+        self.assertEqual(templated_rule.func(RootType("a")), WrapperType(("a", 10)))
+        self.assertEqual(templated_rule.canonical_name.split(".")[-1], "wrap_root_type_foo_backend")
+
+        providers = build_configuration.rule_to_providers[templated_rule]
+        self.assertEqual(providers, ("foo_backend",))
 
     def test_target_types(self):
         def target_types():
