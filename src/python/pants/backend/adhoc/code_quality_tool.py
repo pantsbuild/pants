@@ -333,7 +333,7 @@ class CodeQualityToolUnsupportedGoalError(Exception):
 
 
 @dataclass
-class CodeQualityToolBackend:
+class CodeQualityToolRuleBuilder:
     goal: str
     target: str
     name: str
