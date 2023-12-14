@@ -298,9 +298,13 @@ class LoaderTest(unittest.TestCase):
 
     def test_templated_backend_rules(self):
         def backend_rules(backend_package_alias: str, config_arg1: int):
+            @dataclass(frozen=True)
+            class TemplatedWrapperType:
+                value: Any
+
             @rule(canonical_name_suffix=backend_package_alias)
-            def wrap_root_type(root_type: RootType) -> WrapperType:
-                return WrapperType((root_type.value, config_arg1))
+            def wrap_root_type(root_type: RootType) -> TemplatedWrapperType:
+                return TemplatedWrapperType((root_type.value, config_arg1))
 
             return [wrap_root_type]
 
@@ -311,20 +315,33 @@ class LoaderTest(unittest.TestCase):
                 templating_config=TemplatedBackendConfig.from_dict(
                     {
                         "package": package,
-                        "config_arg1": 10,
+                        "config_arg1": "FOO",
+                    }
+                ),
+            )
+            load_backend(
+                self.bc_builder,
+                backend_package="bar_backend",
+                templating_config=TemplatedBackendConfig.from_dict(
+                    {
+                        "package": package,
+                        "config_arg1": "BAR",
                     }
                 ),
             )
 
         build_configuration = self.bc_builder.create()
         rules = build_configuration.rules
-        self.assertEqual(len(rules), 1)
-        templated_rule = list(rules)[0]
-        self.assertEqual(templated_rule.func(RootType("a")), WrapperType(("a", 10)))
-        self.assertEqual(templated_rule.canonical_name.split(".")[-1], "wrap_root_type_foo_backend")
+        self.assertEqual(len(rules), 2)
 
-        providers = build_configuration.rule_to_providers[templated_rule]
-        self.assertEqual(providers, ("foo_backend",))
+        providers_to_rule = {p: r for r, p in build_configuration.rule_to_providers.items()}
+        foo_rule = providers_to_rule[("foo_backend",)]
+        self.assertEqual(foo_rule.func(RootType("a")).value, ("a", "FOO"))
+        self.assertEqual(foo_rule.canonical_name.split(".")[-1], "wrap_root_type_foo_backend")
+
+        bar_rule = providers_to_rule[("bar_backend",)]
+        self.assertEqual(bar_rule.func(RootType("a")).value, ("a", "BAR"))
+        self.assertEqual(bar_rule.canonical_name.split(".")[-1], "wrap_root_type_bar_backend")
 
     def test_target_types(self):
         def target_types():
