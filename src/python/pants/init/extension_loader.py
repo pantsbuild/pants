@@ -158,7 +158,9 @@ def load_backend(
             backend_generator_module = importlib.import_module(templating_config.template)
         except ImportError as ex:
             traceback.print_exc()
-            raise BackendConfigurationError(f"Failed to load the {templating_config.template} backend template module: {ex!r}")
+            raise BackendConfigurationError(
+                f"Failed to load the {templating_config.template} backend template module: {ex!r}"
+            )
         module = backend_generator_module.generate(backend_package, templating_config.kwargs)
         backend_module = str(module)
     else:
@@ -175,9 +177,7 @@ def load_backend(
             return entrypoint()
         except TypeError as e:
             traceback.print_exc()
-            err_msg = (
-                f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
-            )
+            err_msg = f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
             raise BackendConfigurationError(err_msg)
 
     target_types = invoke_entrypoint("target_types")

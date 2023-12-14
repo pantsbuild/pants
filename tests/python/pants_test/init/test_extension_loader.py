@@ -299,7 +299,6 @@ class LoaderTest(unittest.TestCase):
         )
 
     def test_templated_backend_rules(self):
-
         @dataclass
         class GeneratedBackend:
             _rules: list
@@ -308,7 +307,7 @@ class LoaderTest(unittest.TestCase):
                 return self._rules
 
         def generate(backend_package_alias: str, kwargs: dict):
-            config_arg1 = kwargs['config_arg1']
+            config_arg1 = kwargs["config_arg1"]
 
             @dataclass(frozen=True)
             class TemplatedWrapperType:
@@ -320,13 +319,15 @@ class LoaderTest(unittest.TestCase):
 
             return GeneratedBackend([wrap_root_type])
 
-        with self.create_package(generate=generate, module_name="mock_backend_generator") as package:
+        with self.create_package(
+            generate=generate, module_name="mock_backend_generator"
+        ) as package:
             load_backend(
                 self.bc_builder,
                 backend_package="foo_backend",
                 templating_config=TemplatedBackendConfig.from_dict(
                     {
-                        "template": package + '.mock_backend_generator',
+                        "template": package + ".mock_backend_generator",
                         "config_arg1": "FOO",
                     }
                 ),
@@ -336,7 +337,7 @@ class LoaderTest(unittest.TestCase):
                 backend_package="bar_backend",
                 templating_config=TemplatedBackendConfig.from_dict(
                     {
-                        "template": package + '.mock_backend_generator',
+                        "template": package + ".mock_backend_generator",
                         "config_arg1": "BAR",
                     }
                 ),

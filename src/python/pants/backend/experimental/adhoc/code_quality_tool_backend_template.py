@@ -7,8 +7,8 @@ from pants.backend.adhoc.code_quality_tool import CodeQualityToolRuleBuilder
 
 def generate(backend_package_alias: str, kwargs: dict[str, Any]):
     return CodeQualityToolRuleBuilder(
-        goal=kwargs['goal'],
-        target=kwargs['target'],
-        name=kwargs['name'],
+        goal=kwargs["goal"],
+        target=kwargs["target"],
+        name=kwargs["name"],
         scope=backend_package_alias,
     )
