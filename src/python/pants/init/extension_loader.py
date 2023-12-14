@@ -139,6 +139,29 @@ def load_build_configuration_from_source(
         )
 
 
+def _load_register_module(backend_package: str):
+    module_source = backend_package + ".register"
+    try:
+        module = importlib.import_module(module_source)
+    except ImportError as ex:
+        traceback.print_exc()
+        raise BackendConfigurationError(f"Failed to load the {module_source} backend: {ex!r}")
+    return module, module_source
+
+
+def _generate_backend_module_from_template(backend_package: str, cfg: TemplatedBackendConfig):
+    try:
+        backend_generator_module = importlib.import_module(cfg.template)
+    except ImportError as ex:
+        traceback.print_exc()
+        raise BackendConfigurationError(
+            f"Failed to load the {cfg.template} backend template module: {ex!r}"
+        )
+    module = backend_generator_module.generate(backend_package, cfg.kwargs)
+    module_source = f"{module} generated from {cfg.template}"
+    return module, module_source
+
+
 def load_backend(
     build_configuration: BuildConfiguration.Builder,
     backend_package: str,
@@ -148,28 +171,18 @@ def load_backend(
 
     :param build_configuration: the BuildConfiguration to install the backend plugin into.
     :param backend_package: the package name containing the backend plugin register module that
-      provides the plugin entrypoints.
+      provides the plugin entrypoints. For templated backends, should be a unique alias for the backend.
+    :param templating_config: If supplied, the backend will be generated from this config instead
+      of a `register` module defined in backend_package
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
 
-    if templating_config:
-        try:
-            backend_generator_module = importlib.import_module(templating_config.template)
-        except ImportError as ex:
-            traceback.print_exc()
-            raise BackendConfigurationError(
-                f"Failed to load the {templating_config.template} backend template module: {ex!r}"
-            )
-        module = backend_generator_module.generate(backend_package, templating_config.kwargs)
-        backend_module = str(module)
-    else:
-        backend_module = backend_package + ".register"
-        try:
-            module = importlib.import_module(backend_module)
-        except ImportError as ex:
-            traceback.print_exc()
-            raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
+    module, module_source = (
+        _load_register_module(backend_package)
+        if not templating_config
+        else _generate_backend_module_from_template(backend_package, templating_config)
+    )
 
     def invoke_entrypoint(name: str):
         entrypoint = getattr(module, name, lambda: None)
@@ -177,8 +190,9 @@ def load_backend(
             return entrypoint()
         except TypeError as e:
             traceback.print_exc()
-            err_msg = f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
-            raise BackendConfigurationError(err_msg)
+            raise BackendConfigurationError(
+                f"Entrypoint {name} in {module_source} must be a zero-arg callable: {e!r}"
+            )
 
     target_types = invoke_entrypoint("target_types")
     if target_types:
