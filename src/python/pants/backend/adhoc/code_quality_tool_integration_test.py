@@ -5,7 +5,7 @@ from textwrap import dedent  # noqa: PNT20
 import pytest
 
 from pants.backend.adhoc.code_quality_tool import (
-    CodeQualityToolRuleBuilder,
+    CodeQualityToolBackend,
     CodeQualityToolTarget,
     CodeQualityToolUnsupportedGoalError,
     base_rules,
@@ -24,12 +24,12 @@ from pants.testutil.rule_runner import RuleRunner
 
 def test_error_on_unrecognized_goal():
     with pytest.raises(CodeQualityToolUnsupportedGoalError):
-        CodeQualityToolRuleBuilder(
+        CodeQualityToolBackend(
             goal="package", target="build-support:flake8_tool", name="Flake8", scope="flake8_tool"
         )
 
 
-def make_rule_runner(*cfgs: CodeQualityToolRuleBuilder):
+def make_rule_runner(*cfgs: CodeQualityToolBackend):
     rules = [
         *source_files.rules(),
         *core_rules(),
@@ -51,7 +51,7 @@ def make_rule_runner(*cfgs: CodeQualityToolRuleBuilder):
 
 
 def test_lint_tool():
-    cfg = CodeQualityToolRuleBuilder(
+    cfg = CodeQualityToolBackend(
         goal="lint", target="build-support:no_badcode_tool", name="No Bad Code", scope="nobadcode"
     )
 
@@ -127,7 +127,7 @@ def test_lint_tool():
 
 
 def test_fix_tool():
-    cfg = CodeQualityToolRuleBuilder(
+    cfg = CodeQualityToolBackend(
         goal="fix", target="//:bad_to_good_tool", name="Bad to Good", scope="badtogood"
     )
 
@@ -181,11 +181,11 @@ def test_fix_tool():
 
 
 def test_several_formatters():
-    bad_to_good_cfg = CodeQualityToolRuleBuilder(
+    bad_to_good_cfg = CodeQualityToolBackend(
         goal="fmt", target="//:bad_to_good_tool", name="Bad to Good", scope="badtogood"
     )
 
-    underscoreit_cfg = CodeQualityToolRuleBuilder(
+    underscoreit_cfg = CodeQualityToolBackend(
         goal="fmt", target="//:underscore_it_tool", name="Underscore It", scope="underscoreit"
     )
 
