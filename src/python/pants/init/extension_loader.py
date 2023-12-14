@@ -142,7 +142,7 @@ def load_build_configuration_from_source(
 def load_backend(
     build_configuration: BuildConfiguration.Builder,
     backend_package: str,
-    templating_config: Optional[TemplatedBackendConfig],
+    templating_config: Optional[TemplatedBackendConfig] = None,
 ) -> None:
     """Installs the given backend package into the build configuration.
 
