@@ -6,6 +6,7 @@ from typing import Any
 from pants.backend.adhoc import code_quality_tool, run_system_binary
 from pants.backend.adhoc.code_quality_tool import CodeQualityToolRuleBuilder, CodeQualityToolTarget
 from pants.backend.adhoc.target_types import SystemBinaryTarget
+from pants.base.exceptions import BackendConfigurationError
 from pants.core.util_rules import adhoc_process_support
 
 
@@ -28,7 +29,28 @@ class CodeQualityToolBackend:
         ]
 
 
+@dataclass
+class CodeQualityToolBackendConfig:
+    goal: str
+    target: str
+    name: str
+
+
+def _validate(kwargs: dict[str, Any]) -> dict[str, Any]:
+    required = ["goal", "target", "name"]
+    missing = [k for k in required if k not in kwargs]
+    if missing:
+        raise BackendConfigurationError(
+            f"Missing required keys {missing} for backend template {__name__}."
+            f" Supplied {dict(kwargs)}."
+        )
+
+    return {k: str(v) for k, v in kwargs.items()}
+
+
 def generate(backend_package_alias: str, kwargs: dict[str, Any]):
+    kwargs = _validate(kwargs)
+
     rule_builder = CodeQualityToolRuleBuilder(
         goal=kwargs["goal"],
         target=kwargs["target"],
