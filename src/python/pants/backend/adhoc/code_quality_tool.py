@@ -41,6 +41,8 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     Targets,
+    WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
@@ -158,6 +160,7 @@ class CodeQualityToolTarget(Target):
 @dataclass(frozen=True)
 class CodeQualityToolAddressString:
     address: str
+    description_of_origin: str
 
 
 @dataclass(frozen=True)
@@ -178,12 +181,17 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
         AddressInput,
         AddressInput.parse(request.address, description_of_origin="code quality tool target"),
     )
-
     addresses = Addresses((tool_address,))
     addresses.expect_single()
 
-    tool_targets = await Get(Targets, Addresses, addresses)
-    target = tool_targets[0]
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            address=tool_address,
+            description_of_origin=f"the configured `target` for Code quality tool {request.description_of_origin}",
+        ),
+    )
+    target = wrapped_target.target
     runnable_address_str = target[CodeQualityToolRunnableField].value
     if not runnable_address_str:
         raise Exception(f"Must supply a value for `runnable` for {request.address}.")
@@ -359,6 +367,9 @@ class CodeQualityToolRuleBuilder:
         else:
             raise ValueError(f"Unsupported goal for code quality tool: {self.goal}")
 
+    def _tool_address(self):
+        return CodeQualityToolAddressString(address=self.target, description_of_origin=self.name)
+
     def _build_lint_rules(self) -> Iterable[Rule]:
         class CodeQualityToolInstance(Subsystem):
             options_scope = self.scope
@@ -378,7 +389,7 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
+            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString, self._tool_address())
 
             matching_filepaths = FilespecMatcher(
                 includes=cqt.file_glob_include,
@@ -391,7 +402,7 @@ class CodeQualityToolRuleBuilder:
         async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> LintResult:
             sources_snapshot, code_quality_tool_runner = await MultiGet(
                 Get(Snapshot, PathGlobs(request.elements)),
-                Get(CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)),
+                Get(CodeQualityToolBatchRunner, CodeQualityToolAddressString, self._tool_address()),
             )
 
             proc_result = await Get(
@@ -431,7 +442,7 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
+            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString, self._tool_address())
 
             matching_filepaths = FilespecMatcher(
                 includes=cqt.file_glob_include,
@@ -445,7 +456,7 @@ class CodeQualityToolRuleBuilder:
             sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+                CodeQualityToolBatchRunner, CodeQualityToolAddressString, self._tool_address()
             )
 
             proc_result = await Get(
@@ -493,7 +504,7 @@ class CodeQualityToolRuleBuilder:
             if subsystem.skip:
                 return Partitions()
 
-            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString(address=self.target))
+            cqt = await Get(CodeQualityTool, CodeQualityToolAddressString, self._tool_address())
 
             matching_filepaths = FilespecMatcher(
                 includes=cqt.file_glob_include,
@@ -507,7 +518,7 @@ class CodeQualityToolRuleBuilder:
             sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+                CodeQualityToolBatchRunner, CodeQualityToolAddressString, self._tool_address()
             )
 
             proc_result = await Get(
