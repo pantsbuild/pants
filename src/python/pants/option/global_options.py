@@ -23,6 +23,7 @@ from pants.base.build_environment import (
     pants_version,
 )
 from pants.base.deprecated import resolve_conflicting_options
+from pants.base.exceptions import BackendConfigurationError
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import FileContent
@@ -971,10 +972,15 @@ class BootstrapOptions:
     def parse_templated_backend_configs(
         cls, bootstrap_options: OptionValueContainer
     ) -> dict[str, TemplatedBackendConfig]:
-        return {
-            backend_alias: TemplatedBackendConfig.from_dict(templating_config)
-            for backend_alias, templating_config in bootstrap_options.templated_backends.items()
-        }
+        result = {}
+        for backend_alias, templating_config in bootstrap_options.templated_backends.items():
+            try:
+                result[backend_alias] = TemplatedBackendConfig.from_dict(templating_config)
+            except ValueError as e:
+                raise BackendConfigurationError(
+                    f"Configuration error for templated_backend {backend_alias}: {e}"
+                )
+        return result
 
     plugins = StrListOption(
         advanced=True,

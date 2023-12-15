@@ -16,5 +16,5 @@ class TemplatedBackendConfig:
         d = dict(d)
         template = d.pop("template", None)
         if not template:
-            raise ValueError('"template" is a required key for a backend template')
+            raise ValueError('"template" is a required key for a templated backend')
         return cls(template=cast(str, template), kwargs=FrozenDict(d))
