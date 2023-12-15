@@ -29,13 +29,6 @@ class CodeQualityToolBackend:
         ]
 
 
-@dataclass
-class CodeQualityToolBackendConfig:
-    goal: str
-    target: str
-    name: str
-
-
 def _validate(kwargs: dict[str, Any]) -> dict[str, Any]:
     required = ["goal", "target", "name"]
     missing = [k for k in required if k not in kwargs]
