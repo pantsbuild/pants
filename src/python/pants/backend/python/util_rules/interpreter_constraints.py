@@ -8,6 +8,7 @@ import re
 from collections import defaultdict
 from typing import Iterable, Iterator, Protocol, Sequence, Tuple, TypeVar
 
+from packaging.requirements import InvalidRequirement
 from pkg_resources import Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -65,8 +66,14 @@ def parse_constraint(constraint: str) -> Requirement:
     """
     try:
         parsed_requirement = Requirement.parse(constraint)
-    except ValueError:
-        parsed_requirement = Requirement.parse(f"CPython{constraint}")
+    except ValueError as err:
+        try:
+            parsed_requirement = Requirement.parse(f"CPython{constraint}")
+        except ValueError:
+            raise InvalidRequirement(
+                f"Failed to parse Python interpreter constraint `{constraint}`: {err.args[0]}"
+            )
+
     return parsed_requirement
 
 
