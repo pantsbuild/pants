@@ -5,15 +5,13 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.typescript.goals import tailor
-from pants.backend.typescript.goals.tailor import (
-    PutativeTypeScriptTargetsRequest,
-    _ClassifiedSources,
-)
+from pants.backend.typescript.goals.tailor import PutativeTypeScriptTargetsRequest
 from pants.backend.typescript.target_types import (
     TypeScriptSourcesGeneratorTarget,
     TypeScriptTestsGeneratorTarget,
 )
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
+from pants.core.util_rules.source_files import ClassifiedSources
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -41,7 +39,7 @@ def rule_runner() -> RuleRunner:
                 "src/unowned/UnownedFile3.ts": "",
             },
             [
-                _ClassifiedSources(
+                ClassifiedSources(
                     TypeScriptSourcesGeneratorTarget,
                     ["UnownedFile1.ts", "UnownedFile2.ts", "UnownedFile3.ts"],
                 )
@@ -57,7 +55,7 @@ def rule_runner() -> RuleRunner:
                 "src/unowned/UnownedFile3.test.ts": "",
             },
             [
-                _ClassifiedSources(
+                ClassifiedSources(
                     TypeScriptTestsGeneratorTarget,
                     ["UnownedFile1.test.ts", "UnownedFile2.test.ts", "UnownedFile3.test.ts"],
                     "tests",
@@ -73,17 +71,17 @@ def rule_runner() -> RuleRunner:
                 "src/unowned/UnownedFile1.test.ts": "",
             },
             [
-                _ClassifiedSources(
+                ClassifiedSources(
                     TypeScriptTestsGeneratorTarget, ["UnownedFile1.test.ts"], "tests"
                 ),
-                _ClassifiedSources(TypeScriptSourcesGeneratorTarget, ["UnownedFile1.ts"]),
+                ClassifiedSources(TypeScriptSourcesGeneratorTarget, ["UnownedFile1.ts"]),
             ],
             id="both_tests_and_source",
         ),
     ],
 )
 def test_find_putative_ts_targets(
-    rule_runner: RuleRunner, files: dict, putative_map: list[_ClassifiedSources]
+    rule_runner: RuleRunner, files: dict, putative_map: list[ClassifiedSources]
 ) -> None:
     rule_runner.write_files(files)
     putative_targets = rule_runner.request(
@@ -117,16 +115,14 @@ def test_find_putative_ts_targets(
                 "src/partially_unowned/UnownedFile.test.ts": "",
             },
             [
-                _ClassifiedSources(
-                    TypeScriptTestsGeneratorTarget, ["UnownedFile.test.ts"], "tests"
-                ),
+                ClassifiedSources(TypeScriptTestsGeneratorTarget, ["UnownedFile.test.ts"], "tests"),
             ],
             id="source_tailored_but_tests_are_not",
         ),
     ],
 )
 def test_find_putative_ts_targets_partially_owned(
-    rule_runner: RuleRunner, files: dict, putative_map: list[_ClassifiedSources]
+    rule_runner: RuleRunner, files: dict, putative_map: list[ClassifiedSources]
 ) -> None:
     """Check that if `typescript_sources` target exist owning all `*.ts` files, the `.test.ts` files
     can still be tailored."""
