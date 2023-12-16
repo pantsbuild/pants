@@ -96,7 +96,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "gitpython": ("git",),
     "graphql-core": ("graphql",),
     "grpcio": ("grpc",),
-    "grpcio-health-checking": ("grpc_health"),
+    "grpcio-health-checking": ("grpc_health",),
     "honeycomb-opentelemetry": ("honeycomb.opentelemetry",),
     "ipython": ("IPython",),
     "jack-client": ("jack",),
