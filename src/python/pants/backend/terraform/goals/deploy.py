@@ -6,8 +6,11 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
-from pants.backend.terraform.dependency_inference import find_targets_of_type
-from pants.backend.terraform.target_types import TerraformDeploymentFieldSet, TerraformVarFileTarget
+from pants.backend.terraform.dependency_inference import (
+    TerraformDeploymentInvocationFiles,
+    TerraformDeploymentInvocationFilesRequest,
+)
+from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess
@@ -17,7 +20,7 @@ from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import SourcesField
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -38,10 +41,6 @@ class TerraformDeploymentRequest(EngineAwareParameter):
 async def prepare_terraform_deployment(
     request: TerraformDeploymentRequest, terraform_subsystem: TerraformTool
 ) -> InteractiveProcess:
-    module_dependencies = await Get(
-        TransitiveTargets, TransitiveTargetsRequest((request.field_set.dependencies.address,))
-    )
-
     initialised_terraform = await Get(
         TerraformInitResponse,
         TerraformInitRequest(
@@ -53,12 +52,15 @@ async def prepare_terraform_deployment(
 
     args = ["apply"]
 
-    # TODO: maybe we should identify this earlier?
-    #  if we did at dependency inference,
-    #  we could include only the inferred one directly
-    #  and not involve transitive dependencies
-    vars_files_tgts = find_targets_of_type(module_dependencies.dependencies, TerraformVarFileTarget)
-    var_files = await Get(SourceFiles, SourceFilesRequest(vars_files_tgts))
+    invocation_files = await Get(
+        TerraformDeploymentInvocationFiles,
+        TerraformDeploymentInvocationFilesRequest(
+            request.field_set.dependencies.address, request.field_set.dependencies
+        ),
+    )
+    var_files = await Get(
+        SourceFiles, SourceFilesRequest(e.get(SourcesField) for e in invocation_files.vars_files)
+    )
     for var_file in var_files.files:
         args.append(
             terraform_arg("-var-file", terraform_relpath(initialised_terraform.chdir, var_file))

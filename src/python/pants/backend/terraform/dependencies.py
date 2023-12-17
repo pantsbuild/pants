@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.terraform.dependency_inference import find_targets_of_type
+from pants.backend.terraform.dependency_inference import (
+    TerraformDeploymentInvocationFiles,
+    TerraformDeploymentInvocationFilesRequest,
+)
 from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import (
-    TerraformBackendTarget,
     TerraformDependenciesField,
     TerraformRootModuleField,
 )
@@ -130,14 +132,13 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         ),
     )
     files_by_directory = partition_files_by_directory(source_files.files)
-
-    backend_config_tgts = find_targets_of_type(
-        module_dependencies.dependencies, TerraformBackendTarget
+    invocation_files = await Get(
+        TerraformDeploymentInvocationFiles,
+        TerraformDeploymentInvocationFilesRequest(
+            request.dependencies.address, request.dependencies
+        ),
     )
-    # TODO: maybe we should identify this earlier?
-    #  if we did at dependency inference,
-    #  we could include only the inferred one directly
-    #  and not involve transitive dependencies
+    backend_config_tgts = invocation_files.backend_configs
     if len(backend_config_tgts) == 0:
         backend_config = None
     elif len(backend_config_tgts) == 1:
