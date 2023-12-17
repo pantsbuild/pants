@@ -10,11 +10,13 @@ from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
     TerraformDeploymentFieldSet,
     TerraformModuleSourcesField,
+    TerraformVarFileTarget,
 )
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.base.specs import DirGlobSpec, RawSpecs
+from pants.base.specs import DirGlobSpec, DirLiteralSpec, RawSpecs
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import Address, AddressInput
 from pants.engine.internals.selectors import Get
@@ -152,14 +154,42 @@ class InferTerraformDeploymentDependenciesRequest(InferDependenciesRequest):
     infer_from = TerraformDeploymentDependenciesInferenceFieldSet
 
 
+def find_targets_of_type(tgts, of_type):
+    return (e for e in tgts if isinstance(e, of_type))
+
+
 @rule
 async def infer_terraform_deployment_dependencies(
     request: InferTerraformDeploymentDependenciesRequest,
 ) -> InferredDependencies:
     root_module_address_input = request.field_set.root_module.to_address_input()
     root_module = await Get(Address, AddressInput, root_module_address_input)
-
     deps = [root_module]
+
+    this_address = request.field_set.address
+    tgts = await Get(
+        Targets,
+        RawSpecs(
+            description_of_origin="terraform infer deployment dependencies",
+            dir_literals=(DirLiteralSpec(this_address.spec_path),),
+        ),
+    )
+
+    has_explicit_backend = any(
+        find_targets_of_type(request.field_set.dependencies.value, TerraformBackendTarget)
+    )
+    if not has_explicit_backend:
+        # Note: Terraform does not support multiple backends, but dep inference isn't the place to enforce that
+        backend_files = list(find_targets_of_type(tgts, TerraformBackendTarget))
+        deps.extend(backend_files)
+
+    has_explicit_var = any(
+        find_targets_of_type(request.field_set.dependencies.value, TerraformVarFileTarget)
+    )
+    if not has_explicit_var:
+        vars_files = list(find_targets_of_type(tgts, TerraformVarFileTarget))
+        deps.extend(vars_files)
+
     return InferredDependencies(deps)
 
 
