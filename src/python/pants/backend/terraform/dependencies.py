@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentInvocationFiles,
     TerraformDeploymentInvocationFilesRequest,
 )
-from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
     TerraformRootModuleField,
@@ -32,10 +31,9 @@ from pants.engine.target import (
 
 @dataclass(frozen=True)
 class TerraformDependenciesRequest:
-    source_files: SourceFiles
-    directories: Tuple[str, ...]
+    chdir: str
     backend_config: Optional[str]
-    dependencies_files: SourceFiles
+    dependencies_files: Digest
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
@@ -43,7 +41,7 @@ class TerraformDependenciesRequest:
 
 @dataclass(frozen=True)
 class TerraformDependenciesResponse:
-    fetched_deps: Tuple[Tuple[str, Digest], ...]
+    digest: Digest
 
 
 @rule
@@ -55,41 +53,26 @@ async def get_terraform_providers(
         args.append(
             terraform_arg(
                 "-backend-config",
-                terraform_relpath(req.directories[0], req.backend_config),
+                terraform_relpath(req.chdir, req.backend_config),
             )
         )
 
     args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
-    with_backend_config = await Get(
-        Digest,
-        MergeDigests(
-            [
-                req.source_files.snapshot.digest,
-                req.dependencies_files.snapshot.digest,
-            ]
+    # TODO: Does this need to be a MultiGet? I think we will now always get one directory
+    fetched_deps = await Get(
+        FallibleProcessResult,
+        TerraformProcess(
+            args=tuple(args),
+            input_digest=(req.dependencies_files),
+            output_files=(".terraform.lock.hcl",),
+            output_directories=(".terraform",),
+            description="Run `terraform init` to fetch dependencies",
+            chdir=req.chdir,
         ),
     )
 
-    # TODO: Does this need to be a MultiGet? I think we will now always get one directory
-    fetched_deps = await MultiGet(
-        Get(
-            FallibleProcessResult,
-            TerraformProcess(
-                args=tuple(args),
-                input_digest=with_backend_config,
-                output_files=(".terraform.lock.hcl",),
-                output_directories=(".terraform",),
-                description="Run `terraform init` to fetch dependencies",
-                chdir=directory,
-            ),
-        )
-        for directory in req.directories
-    )
-
-    return TerraformDependenciesResponse(
-        tuple(zip(req.directories, (x.output_digest for x in fetched_deps)))
-    )
+    return TerraformDependenciesResponse(fetched_deps.output_digest)
 
 
 @dataclass(frozen=True)
@@ -104,19 +87,21 @@ class TerraformInitRequest:
 @dataclass(frozen=True)
 class TerraformInitResponse:
     sources_and_deps: Digest
-    terraform_files: tuple[str, ...]
+    terraform_files: SourceFiles
     chdir: str
 
 
 @rule
 async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse:
-    module_dependencies = await Get(
+    this_targets_dependencies = await Get(
         TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
     )
 
-    # TODO: is this still necessary, or do we pull it in with (transitive) depenendencies?
     address_input = request.root_module.to_address_input()
     module_address = await Get(Address, AddressInput, address_input)
+    chdir = module_address.spec_path  # TODO: spec_path is wrong, that's to the build file
+
+    # TODO: is this still necessary, or do we pull it in with (transitive) depenendencies?
     module = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -125,13 +110,17 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
     )
 
     source_files, dependencies_files = await MultiGet(
-        Get(SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])),
+        Get(
+            SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])
+        ),  # TODO: get through transitive deps???
         Get(
             SourceFiles,
-            SourceFilesRequest([tgt.get(SourcesField) for tgt in module_dependencies.dependencies]),
+            SourceFilesRequest(
+                [tgt.get(SourcesField) for tgt in this_targets_dependencies.dependencies]
+            ),
         ),
     )
-    files_by_directory = partition_files_by_directory(source_files.files)
+
     invocation_files = await Get(
         TerraformDeploymentInvocationFiles,
         TerraformDeploymentInvocationFilesRequest(
@@ -152,29 +141,27 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
             f"Found more than 1 backend config for a Terraform deployment. identified {backend_config_names}"
         )
 
-    fetched_deps = await Get(
+    source_for_validate = await Get(
+        Digest, MergeDigests([source_files.snapshot.digest, dependencies_files.snapshot.digest])
+    )
+
+    third_party_deps = await Get(
         TerraformDependenciesResponse,
         TerraformDependenciesRequest(
-            source_files,
-            tuple(files_by_directory.keys()),
+            chdir,
             backend_config,
-            dependencies_files,
+            source_for_validate,
             initialise_backend=request.initialise_backend,
         ),
     )
 
-    merged_fetched_deps = await Get(Digest, MergeDigests([x[1] for x in fetched_deps.fetched_deps]))
-
-    sources_and_deps = await Get(
-        Digest,
-        MergeDigests(
-            [source_files.snapshot.digest, merged_fetched_deps, dependencies_files.snapshot.digest]
-        ),
+    all_terraform_files = await Get(
+        Digest, MergeDigests([third_party_deps.digest, source_for_validate])
     )
 
-    assert len(files_by_directory) == 1, "Multiple directories found, unable to identify a root"
-    chdir, files = next(iter(files_by_directory.items()))
-    return TerraformInitResponse(sources_and_deps, tuple(files), chdir)
+    return TerraformInitResponse(
+        sources_and_deps=all_terraform_files, terraform_files=source_files, chdir=chdir
+    )
 
 
 def rules():
