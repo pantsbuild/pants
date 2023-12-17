@@ -15,7 +15,7 @@ from pants.engine.target import (
     DescriptionField,
     FieldSet,
     MultipleSourcesField,
-    OptionalSingleSourceField,
+    SingleSourceField,
     StringField,
     Target,
     Targets,
@@ -88,17 +88,25 @@ class TerraformRootModuleField(StringField, AsyncFieldMixin):
         )
 
 
-class TerraformBackendConfigField(OptionalSingleSourceField):
-    alias = "backend_config"
+class TerraformBackendConfigField(SingleSourceField):
     help = "Configuration to be merged with what is in the configuration file's 'backend' block"
 
 
-class TerraformVarFileSourcesField(MultipleSourcesField):
-    alias = "var_files"
+class TerraformBackendTarget(Target):
+    alias = "terraform_backend"
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformBackendConfigField)
+
+
+class TerraformVarFileSourceField(MultipleSourcesField):
     expected_file_extensions = (".tfvars",)
     help = generate_multiple_sources_field_help_message(
         "Example: `var_files=['common.tfvars', 'prod.tfvars']`"
     )
+
+
+class TerraformVarFileTarget(Target):
+    alias = "terraform_var_files"
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformVarFileSourceField)
 
 
 class TerraformDeploymentTarget(Target):
@@ -107,8 +115,6 @@ class TerraformDeploymentTarget(Target):
         *COMMON_TARGET_FIELDS,
         TerraformDependenciesField,
         TerraformRootModuleField,
-        TerraformBackendConfigField,
-        TerraformVarFileSourcesField,
     )
     help = "A deployment of Terraform"
 
@@ -122,9 +128,6 @@ class TerraformDeploymentFieldSet(FieldSet):
     description: DescriptionField
     root_module: TerraformRootModuleField
     dependencies: TerraformDependenciesField
-
-    backend_config: TerraformBackendConfigField
-    var_files: TerraformVarFileSourcesField
 
 
 class AllTerraformDeploymentTargets(Targets):
