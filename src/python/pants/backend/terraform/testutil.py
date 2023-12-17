@@ -10,7 +10,12 @@ from pants.backend.terraform import dependencies, dependency_inference, tool
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.goals.deploy import rules as terraform_deploy_rules
-from pants.backend.terraform.target_types import TerraformDeploymentTarget, TerraformModuleTarget
+from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
+    TerraformDeploymentTarget,
+    TerraformModuleTarget,
+    TerraformVarFileTarget,
+)
 from pants.core.goals import deploy
 from pants.core.goals.deploy import DeployProcess
 from pants.core.register import rules as core_rules
@@ -24,7 +29,12 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner_with_auto_approve() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[TerraformModuleTarget, TerraformDeploymentTarget],
+        target_types=[
+            TerraformModuleTarget,
+            TerraformDeploymentTarget,
+            TerraformBackendTarget,
+            TerraformVarFileTarget,
+        ],
         rules=[
             *dependency_inference.rules(),
             *dependencies.rules(),
@@ -60,10 +70,11 @@ def standard_deployment(tmpdir) -> StandardDeployment:
                 """
                 terraform_deployment(
                     name="stg",
-                    var_files=["stg.tfvars"],
-                    backend_config="stg.tfbackend",
                     root_module=":mod",
+                    dependencies=[":stg.tfvars", ":stg.tfbackend"],
                 )
+                terraform_backend(name="stg.tfbackend", source="stg.tfbackend")
+                terraform_var_files(name="stg.tfvars")
                 terraform_module(name="mod")
             """
             ),

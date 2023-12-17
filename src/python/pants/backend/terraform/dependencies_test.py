@@ -31,7 +31,6 @@ def _do_init_terraform(
         [
             TerraformInitRequest(
                 field_set.root_module,
-                field_set.backend_config,
                 field_set.dependencies,
                 initialise_backend=initialise_backend,
             )

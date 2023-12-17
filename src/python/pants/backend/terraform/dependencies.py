@@ -3,24 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
+from pants.backend.terraform.dependency_inference import find_targets_of_type
 from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import (
-    TerraformBackendConfigField,
+    TerraformBackendTarget,
     TerraformDependenciesField,
     TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import (
-    EMPTY_DIGEST,
-    Address,
-    AddressInput,
-    Digest,
-    MergeDigests,
-)
+from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -37,7 +32,7 @@ from pants.engine.target import (
 class TerraformDependenciesRequest:
     source_files: SourceFiles
     directories: Tuple[str, ...]
-    backend_config: SourceFiles
+    backend_config: Optional[str]
     dependencies_files: SourceFiles
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
@@ -54,16 +49,13 @@ async def get_terraform_providers(
     req: TerraformDependenciesRequest,
 ) -> TerraformDependenciesResponse:
     args = ["init"]
-    if req.backend_config.files:
+    if req.backend_config:
         args.append(
             terraform_arg(
                 "-backend-config",
-                terraform_relpath(req.directories[0], req.backend_config.files[0]),
+                terraform_relpath(req.directories[0], req.backend_config),
             )
         )
-        backend_digest = req.backend_config.snapshot.digest
-    else:
-        backend_digest = EMPTY_DIGEST
 
     args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
@@ -72,7 +64,6 @@ async def get_terraform_providers(
         MergeDigests(
             [
                 req.source_files.snapshot.digest,
-                backend_digest,
                 req.dependencies_files.snapshot.digest,
             ]
         ),
@@ -102,7 +93,6 @@ async def get_terraform_providers(
 @dataclass(frozen=True)
 class TerraformInitRequest:
     root_module: TerraformRootModuleField
-    backend_config: TerraformBackendConfigField
     dependencies: TerraformDependenciesField
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
@@ -122,6 +112,7 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
     )
 
+    # TODO: is this still necessary, or do we pull it in with (transitive) depenendencies?
     address_input = request.root_module.to_address_input()
     module_address = await Get(Address, AddressInput, address_input)
     module = await Get(
@@ -131,15 +122,34 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         ),
     )
 
-    source_files, backend_config, dependencies_files = await MultiGet(
+    source_files, dependencies_files = await MultiGet(
         Get(SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])),
-        Get(SourceFiles, SourceFilesRequest([request.backend_config])),
         Get(
             SourceFiles,
             SourceFilesRequest([tgt.get(SourcesField) for tgt in module_dependencies.dependencies]),
         ),
     )
     files_by_directory = partition_files_by_directory(source_files.files)
+
+    backend_config_tgts = find_targets_of_type(
+        module_dependencies.dependencies, TerraformBackendTarget
+    )
+    # TODO: maybe we should identify this earlier?
+    #  if we did at dependency inference,
+    #  we could include only the inferred one directly
+    #  and not involve transitive dependencies
+    if len(backend_config_tgts) == 0:
+        backend_config = None
+    elif len(backend_config_tgts) == 1:
+        backend_config_sources = await Get(
+            SourceFiles, SourceFilesRequest([backend_config_tgts[0].get(SourcesField)])
+        )
+        backend_config = backend_config_sources.snapshot.files[0]
+    else:
+        backend_config_names = [e.address for e in backend_config_tgts]
+        raise ValueError(
+            f"Found more than 1 backend config for a Terraform deployment. identified {backend_config_names}"
+        )
 
     fetched_deps = await Get(
         TerraformDependenciesResponse,

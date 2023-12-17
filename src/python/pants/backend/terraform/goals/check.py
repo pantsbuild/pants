@@ -5,7 +5,6 @@ from typing import Union
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import (
-    TerraformBackendConfigField,
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
     TerraformFieldSet,
@@ -55,14 +54,11 @@ def terraform_fieldset_to_init_request(
 ) -> TerraformInitRequest:
     if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
         deployment = terraform_fieldset
-        return TerraformInitRequest(
-            deployment.root_module, deployment.backend_config, deployment.dependencies
-        )
+        return TerraformInitRequest(deployment.root_module, deployment.dependencies)
     if isinstance(terraform_fieldset, TerraformFieldSet):
         module = terraform_fieldset
         return TerraformInitRequest(
             TerraformRootModuleField(module.address.spec, module.address),
-            TerraformBackendConfigField(None, module.address),
             module.dependencies,
         )
 

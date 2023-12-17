@@ -154,8 +154,11 @@ class InferTerraformDeploymentDependenciesRequest(InferDependenciesRequest):
     infer_from = TerraformDeploymentDependenciesInferenceFieldSet
 
 
-def find_targets_of_type(tgts, of_type):
-    return (e for e in tgts if isinstance(e, of_type))
+def find_targets_of_type(tgts, of_type) -> tuple:
+    if tgts:
+        return tuple(e for e in tgts if isinstance(e, of_type))
+    else:
+        return ()
 
 
 @rule
@@ -181,14 +184,14 @@ async def infer_terraform_deployment_dependencies(
     if not has_explicit_backend:
         # Note: Terraform does not support multiple backends, but dep inference isn't the place to enforce that
         backend_files = list(find_targets_of_type(tgts, TerraformBackendTarget))
-        deps.extend(backend_files)
+        deps.extend(e.address for e in backend_files)
 
     has_explicit_var = any(
         find_targets_of_type(request.field_set.dependencies.value, TerraformVarFileTarget)
     )
     if not has_explicit_var:
         vars_files = list(find_targets_of_type(tgts, TerraformVarFileTarget))
-        deps.extend(vars_files)
+        deps.extend(e.address for e in vars_files)
 
     return InferredDependencies(deps)
 
