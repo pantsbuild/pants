@@ -157,5 +157,3 @@ async def init_fortran(request: FortranInitRequest) -> FortranInitResponse:
     ...
     Get(Snapshot, PathGlobs([(Path(request.root_module.address.spec_path) / ".fortran.lock").as_posix()])),
 ```
-
-TODO: You can also reference this in the dependency inference. This dependency link will result in the lockfile being imported through the standard dependency request, and it will also cause all dependent source files to be marked as transitively changed

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 from pants.backend.terraform.dependency_inference import (
@@ -16,7 +17,14 @@ from pants.backend.terraform.target_types import (
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import Address, AddressInput, Digest, MergeDigests
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.native_engine import (
+    Address,
+    AddressInput,
+    Digest,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -33,10 +41,12 @@ from pants.engine.target import (
 class TerraformDependenciesRequest:
     chdir: str
     backend_config: Optional[str]
+    lockfile: bool
     dependencies_files: Digest
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
+    upgrade: bool = False
 
 
 @dataclass(frozen=True)
@@ -56,6 +66,13 @@ async def get_terraform_providers(
                 terraform_relpath(req.chdir, req.backend_config),
             )
         )
+
+    # If we have a lockfile and aren't regenerating it, don't modify it
+    if req.lockfile and not req.upgrade:
+        args.append("-lockfile=readonly")
+
+    if req.upgrade:
+        args.append("-upgrade")
 
     args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
@@ -82,6 +99,7 @@ class TerraformInitRequest:
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
+    upgrade: bool = False
 
 
 @dataclass(frozen=True)
@@ -109,7 +127,7 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         ),
     )
 
-    source_files, dependencies_files = await MultiGet(
+    source_files, dependencies_files, lockfile = await MultiGet(
         Get(
             SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])
         ),  # TODO: get through transitive deps???
@@ -119,8 +137,13 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
                 [tgt.get(SourcesField) for tgt in this_targets_dependencies.dependencies]
             ),
         ),
+        Get(
+            Snapshot,
+            PathGlobs(
+                [(Path(request.root_module.address.spec_path) / ".terraform.lock.hcl").as_posix()]
+            ),
+        ),
     )
-
     invocation_files = await Get(
         TerraformDeploymentInvocationFiles,
         TerraformDeploymentInvocationFilesRequest(
@@ -142,16 +165,22 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         )
 
     source_for_validate = await Get(
-        Digest, MergeDigests([source_files.snapshot.digest, dependencies_files.snapshot.digest])
+        Digest,
+        MergeDigests(
+            [source_files.snapshot.digest, dependencies_files.snapshot.digest, lockfile.digest]
+        ),
     )
 
+    has_lockfile = len(lockfile.files) > 0
     third_party_deps = await Get(
         TerraformDependenciesResponse,
         TerraformDependenciesRequest(
             chdir,
             backend_config,
+            has_lockfile,
             source_for_validate,
             initialise_backend=request.initialise_backend,
+            upgrade=request.upgrade,
         ),
     )
 
