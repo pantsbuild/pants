@@ -3,7 +3,11 @@
 
 from pants.backend.terraform.goals.tailor import PutativeTerraformTargetsRequest
 from pants.backend.terraform.goals.tailor import rules as terraform_tailor_rules
-from pants.backend.terraform.target_types import TerraformModuleTarget
+from pants.backend.terraform.target_types import (
+    TerraformBackendTarget,
+    TerraformModuleTarget,
+    TerraformVarFileTarget,
+)
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.core.goals.tailor import rules as core_tailor_rules
 from pants.engine.rules import QueryRule
@@ -27,6 +31,10 @@ def test_find_putative_targets() -> None:
             "prod/terraform/owned-module/BUILD": "terraform_module()",
             "prod/terraform/owned-module/versions.tf": "",
             "prod/terraform/unowned-module/versions.tf": "",
+            "prod/terraform/unowned-module/prod0.tfbackend": "",
+            "prod/terraform/unowned-module/prod1.tfbackend": "",
+            "prod/terraform/unowned-module/prod0.tfvars": "",
+            "prod/terraform/unowned-module/prod1.tfvars": "",
         }
     )
     pts = rule_runner.request(
@@ -46,6 +54,30 @@ def test_find_putative_targets() -> None:
                     "prod/terraform/unowned-module",
                     "unowned-module",
                     ("versions.tf",),
+                ),
+                PutativeTarget.for_target_type(
+                    TerraformBackendTarget,
+                    "prod/terraform/unowned-module",
+                    "unowned-module",
+                    ("prod0.tfbackend",),
+                ),
+                PutativeTarget.for_target_type(
+                    TerraformBackendTarget,
+                    "prod/terraform/unowned-module",
+                    "unowned-module",
+                    ("prod1.tfbackend",),
+                ),
+                PutativeTarget.for_target_type(
+                    TerraformVarFileTarget,
+                    "prod/terraform/unowned-module",
+                    "unowned-module",
+                    ("prod0.tfvars",),
+                ),
+                PutativeTarget.for_target_type(
+                    TerraformVarFileTarget,
+                    "prod/terraform/unowned-module",
+                    "unowned-module",
+                    ("prod1.tfvars",),
                 ),
             ]
         )
