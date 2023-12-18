@@ -1,5 +1,6 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import dataclasses
 import json
 import textwrap
 from pathlib import Path
@@ -11,6 +12,7 @@ from pants.backend.terraform.testutil import (
     StandardDeployment,
     rule_runner_with_auto_approve,
     standard_deployment,
+    terraform_lockfile,
 )
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.native_engine import Address
@@ -65,6 +67,39 @@ def test_init_terraform(rule_runner: RuleRunner, standard_deployment: StandardDe
 
     # Assert lockfile is included
     assert find_file(initialised_files, ".terraform.lock.hcl"), "Did not find expected provider"
+
+
+def test_init_terraform_uses_lockfiles(
+    rule_runner: RuleRunner, standard_deployment: StandardDeployment
+) -> None:
+    """Test that we can use generated lockfiles."""
+    requested_version = "3.2.0"
+
+    deployment_with_lockfile = dataclasses.replace(
+        standard_deployment,
+        files={**standard_deployment.files, **{"src/tf/.terraform.lock.hcl": terraform_lockfile}},
+    )
+
+    initialised_files = _do_init_terraform(
+        rule_runner, deployment_with_lockfile, initialise_backend=True
+    )
+
+    # Assert lockfile is not regenerated
+    result_lockfile = find_file(initialised_files, ".terraform.lock.hcl")
+    assert result_lockfile, "Did not find lockfile"
+    assert (
+        f'version     = "{requested_version}"' in result_lockfile.content.decode()
+    ), "version in lockfile has changed, we should not have regenerated the lockfile"
+
+    # Assert dependencies are initialised to the older version
+    result_provider = find_file(
+        initialised_files,
+        ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",
+    )
+    assert result_provider, "Did not find any providers, did we initialise them successfully?"
+    assert (
+        requested_version in result_provider.path
+    ), "initialised provider did not have our requested version, did the lockfile show up and did we regenerate it?"
 
 
 def test_init_terraform_without_backends(
