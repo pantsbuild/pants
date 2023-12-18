@@ -6,11 +6,11 @@ from pathlib import Path
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
-    TerraformDeploymentTarget,
+    TerraformModuleSourcesField,
+    TerraformModuleTarget,
     TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformProcess
-from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -19,7 +19,9 @@ from pants.core.goals.generate_lockfiles import (
     RequestedUserResolveNames,
     UserGenerateLockfiles,
 )
-from pants.engine.internals.selectors import Get
+from pants.engine.addresses import Addresses
+from pants.engine.internals.native_engine import Address, AddressInput
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
@@ -39,10 +41,11 @@ async def identify_user_resolves_from_terraform_files(
     _: KnownTerraformResolveNamesRequest,
     all_targets: AllTargets,
 ) -> KnownUserResolveNames:
-    known_terraform_module_dirs = []
+    known_terraform_module_dirs = set()
+
     for tgt in all_targets:
-        if tgt.has_field(TerraformRootModuleField):
-            known_terraform_module_dirs.append(tgt.residence_dir)
+        if tgt.has_field(TerraformModuleSourcesField):
+            known_terraform_module_dirs.add(tgt.address.spec)
 
     return KnownUserResolveNames(
         names=tuple(known_terraform_module_dirs),
@@ -53,21 +56,24 @@ async def identify_user_resolves_from_terraform_files(
 
 @dataclass(frozen=True)
 class GenerateTerraformLockfile(GenerateLockfile):
-    target: TerraformDeploymentTarget
+    target: TerraformModuleTarget
 
 
 @rule
 async def setup_user_lockfile_requests(
     requested: RequestedTerraformResolveNames,
 ) -> UserGenerateLockfiles:
-    targets_in_dirs = await Get(
-        Targets,
-        RawSpecs(
-            description_of_origin="setup Terraform lockfiles",
-            dir_globs=tuple(DirGlobSpec(d) for d in requested),
-        ),
+    addrs = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(m, description_of_origin="setup Terraform lockfiles"),
+        )
+        for m in requested
     )
-    deployment_targets = [t for t in targets_in_dirs if isinstance(t, TerraformDeploymentTarget)]
+
+    targets = await Get(Targets, Addresses, Addresses(addrs))
+    deployment_targets = [t for t in targets if isinstance(t, TerraformModuleTarget)]
 
     return UserGenerateLockfiles(
         [
@@ -90,7 +96,9 @@ async def generate_lockfile_from_sources(
     initialised_terraform = await Get(
         TerraformInitResponse,
         TerraformInitRequest(
-            lockfile_request.target[TerraformRootModuleField],
+            TerraformRootModuleField(
+                lockfile_request.target.address.spec, lockfile_request.target.address
+            ),
             lockfile_request.target[TerraformDependenciesField],
             initialise_backend=False,
             upgrade=True,

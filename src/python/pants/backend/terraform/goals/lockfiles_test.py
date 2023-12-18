@@ -29,7 +29,7 @@ def test_integration_generate_lockfile(
     result = rule_runner.run_goal_rule(
         GenerateLockfilesGoal,
         global_args=[*rule_runner.options_bootstrapper.args],
-        args=["--generate-lockfiles-resolve=src/tf"],
+        args=["--generate-lockfiles-resolve=src/tf:mod"],
     )
 
     # assert Pants things we succeeded
