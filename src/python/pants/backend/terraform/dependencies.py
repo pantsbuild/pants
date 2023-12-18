@@ -185,7 +185,14 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
     )
 
     all_terraform_files = await Get(
-        Digest, MergeDigests([third_party_deps.digest, source_for_validate])
+        Digest,
+        MergeDigests(
+            [
+                source_files.snapshot.digest,
+                dependencies_files.snapshot.digest,
+                third_party_deps.digest,
+            ]
+        ),
     )
 
     return TerraformInitResponse(
