@@ -65,10 +65,24 @@ def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) ->
                 """\
                 import { x } from "./localModuleA";
                 import { y } from "./localModuleB";
+                import { x, y } from "./localModuleE";
+                import x from "./localModuleF";
+                import * as D from "./localModuleD";
+                import { x as z } from "./localModuleG";
+                import type x from "./localModuleH";
+
+                // You can import a file and not include any variables
+                import "./localModuleC";
                 """
             ),
             "src/ts/localModuleA.ts": "",
             "src/ts/localModuleB.ts": "",
+            "src/ts/localModuleC.ts": "",
+            "src/ts/localModuleD.ts": "",
+            "src/ts/localModuleE.ts": "",
+            "src/ts/localModuleF.ts": "",
+            "src/ts/localModuleG.ts": "",
+            "src/ts/localModuleH.ts": "",
         }
     )
 
@@ -81,4 +95,48 @@ def test_infers_typescript_file_imports_dependencies(rule_runner: RuleRunner) ->
     assert set(addresses) == {
         Address("src/ts", relative_file_path="localModuleA.ts"),
         Address("src/ts", relative_file_path="localModuleB.ts"),
+        Address("src/ts", relative_file_path="localModuleC.ts"),
+        Address("src/ts", relative_file_path="localModuleD.ts"),
+        Address("src/ts", relative_file_path="localModuleE.ts"),
+        Address("src/ts", relative_file_path="localModuleF.ts"),
+        Address("src/ts", relative_file_path="localModuleG.ts"),
+        Address("src/ts", relative_file_path="localModuleH.ts"),
+    }
+
+
+def test_infers_typescript_file_imports_dependencies_parent_dirs(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/ts/BUILD": "typescript_sources()",
+            "src/ts/subdir1/subdir2/BUILD": "typescript_sources()",
+            "src/ts/subdir1/BUILD": "typescript_sources()",
+            "src/ts/subdir1/subdir2/index.ts": dedent(
+                """\
+                import { x } from "../../localModuleA";
+                import { y } from "../../localModuleB";
+                import { w } from "../localModuleC";
+
+                // not a file-based import, can't map to a file on disk
+                import { z } from "localModuleD";
+                """
+            ),
+            "src/ts/localModuleA.ts": "",
+            "src/ts/localModuleB.ts": "",
+            "src/ts/subdir1/localModuleC.ts": "",
+            "src/ts/localModuleD.ts": "",
+        }
+    )
+
+    index_tgt = rule_runner.get_target(
+        Address("src/ts/subdir1/subdir2", relative_file_path="index.ts")
+    )
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferTypeScriptDependenciesRequest(TypeScriptSourceInferenceFieldSet.create(index_tgt))],
+    ).include
+
+    assert set(addresses) == {
+        Address("src/ts", relative_file_path="localModuleA.ts"),
+        Address("src/ts", relative_file_path="localModuleB.ts"),
+        Address("src/ts/subdir1", relative_file_path="localModuleC.ts"),
     }
