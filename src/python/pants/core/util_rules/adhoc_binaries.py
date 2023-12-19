@@ -104,10 +104,11 @@ async def download_python_binary(
             cp -r python "{installation_root}"
             touch "{installation_root}/DONE"
         fi
+        echo $(realpath "{installation_root}")/bin/python3
     """
     )
 
-    await Get(
+    result = await Get(
         ProcessResult,
         Process(
             [bash_binary.path, "-c", installation_script],
@@ -123,7 +124,7 @@ async def download_python_binary(
         ),
     )
 
-    return _PythonBuildStandaloneBinary(f"{installation_root}/bin/python3")
+    return _PythonBuildStandaloneBinary(result.stdout.decode().splitlines()[-1].strip())
 
 
 @dataclass(frozen=True)
