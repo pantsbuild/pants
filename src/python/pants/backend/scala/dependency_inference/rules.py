@@ -6,8 +6,8 @@ from dataclasses import dataclass
 
 from pants.backend.scala.compile import scalac_plugins
 from pants.backend.scala.compile.scalac_plugins import (
-    ScalaPluginsForTargetWithoutResolveRequest,
-    ScalaPluginTargetsForTarget,
+    ScalacPluginsForTargetWithoutResolveRequest,
+    ScalacPluginTargetsForTarget,
 )
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
@@ -186,7 +186,7 @@ async def infer_scala_plugin_dependencies(
     target = wrapped_target.target
 
     scala_plugins = await Get(
-        ScalaPluginTargetsForTarget, ScalaPluginsForTargetWithoutResolveRequest(target)
+        ScalacPluginTargetsForTarget, ScalacPluginsForTargetWithoutResolveRequest(target)
     )
 
     plugin_addresses = [target.address for target in scala_plugins.artifacts]

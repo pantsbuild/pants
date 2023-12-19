@@ -9,10 +9,10 @@ from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.backend.scala.compile.scalac_plugins import (
-    ScalaPlugins,
-    ScalaPluginsForTargetRequest,
-    ScalaPluginsRequest,
-    ScalaPluginTargetsForTarget,
+    ScalacPlugins,
+    ScalacPluginsForTargetRequest,
+    ScalacPluginsRequest,
+    ScalacPluginTargetsForTarget,
 )
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
@@ -111,13 +111,13 @@ async def compile_scala_source(
 
     plugins_ = await MultiGet(
         Get(
-            ScalaPluginTargetsForTarget,
-            ScalaPluginsForTargetRequest(target, request.resolve.name),
+            ScalacPluginTargetsForTarget,
+            ScalacPluginsForTargetRequest(target, request.resolve.name),
         )
         for target in request.component.members
     )
-    plugins_request = ScalaPluginsRequest.from_target_plugins(plugins_, request.resolve)
-    local_plugins = await Get(ScalaPlugins, ScalaPluginsRequest, plugins_request)
+    plugins_request = ScalacPluginsRequest.from_target_plugins(plugins_, request.resolve)
+    local_plugins = await Get(ScalacPlugins, ScalacPluginsRequest, plugins_request)
 
     component_members_and_scala_source_files = [
         (target, sources)

@@ -17,6 +17,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     AsyncFieldMixin,
     Dependencies,
     FieldSet,
@@ -32,6 +33,7 @@ from pants.engine.target import (
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
     TargetGenerator,
+    Targets,
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
@@ -387,6 +389,17 @@ class ScalacPluginTarget(Target):
         If the `scalac`-loaded name of the plugin does not match the target's name,
         additionally set the `plugin_name=` field.
         """
+    )
+
+
+class AllScalacPluginTargets(Targets):
+    pass
+
+
+@rule
+async def all_scala_plugin_targets(targets: AllTargets) -> AllScalacPluginTargets:
+    return AllScalacPluginTargets(
+        tgt for tgt in targets if tgt.has_fields((ScalacPluginArtifactField, ScalacPluginNameField))
     )
 
 

@@ -3,17 +3,22 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Iterator
+from itertools import chain
+from typing import Iterable, Iterator, Mapping, Sequence, Type, cast
 
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import (
+    AllScalacPluginTargets,
     ScalaConsumedPluginNamesField,
     ScalacPluginArtifactField,
     ScalacPluginNameField,
 )
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
+from pants.engine.collection import Collection
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.parametrize import (
@@ -22,7 +27,6 @@ from pants.engine.internals.parametrize import (
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    AllTargets,
     CoarsenedTargets,
     FieldDefaults,
     Target,
@@ -30,36 +34,144 @@ from pants.engine.target import (
     TargetTypesToGenerateTargetsRequests,
     WrappedTarget,
 )
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.jvm.compile import ClasspathEntry, FallibleClasspathEntry
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    find_jvm_artifacts_or_raise,
+)
 from pants.jvm.goals import lockfile
+from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
 from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, softwrap
 
 
 @dataclass(frozen=True)
-class ScalaPluginsForTargetWithoutResolveRequest:
+class GlobalScalacPlugin:
+    name: str
+    subsystem: str
+    coordinate: Coordinate
+    extra_scalac_options: tuple[str, ...]
+
+
+class GlobalScalacPlugins(Collection[GlobalScalacPlugin]):
+    """A collection of global scalac plugins provided programatically.
+
+    Other backends can provide with their own set of global plugins by implementing
+    a rule like the following:
+
+    class MyBackendScalacPluginsRequest(GlobalScalacPluginsRequest):
+        pass
+
+    @rule
+    async def my_backend_scalac_plugins(_: MyBackendScalacPluginsRequest, ...) -> GlobalScalacPlugins:
+        return GlobalScalacPlugins([
+          # Custom list of plugins
+        ])
+
+    def rules():
+        return [
+            *collect_rules(),
+            UnionRule(GlobalScalacPluginsRequest, MyBackendScalacPluginsRequest)
+        ]
+    """
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class GlobalScalacPluginsRequest:
+    resolve_name: str
+
+    @classmethod
+    def rules(cls) -> Iterable:
+        yield UnionRule(GlobalScalacPluginsRequest, cls)
+
+
+@dataclass(frozen=True)
+class ResolvedGlobalScalacPlugins:
+    names: tuple[str, ...]
+    artifacts: tuple[Target, ...]
+    extra_scalac_options: tuple[str, ...]
+
+
+class ResolveGlobalScalacPluginMapping(FrozenDict[str, ResolvedGlobalScalacPlugins]):
+    """A map that links a given resolve with the set of global scalac plugins for that
+    resolve."""
+
+
+@rule(_masked_types=[EnvironmentName])
+async def resolve_all_global_scalac_plugins(
+    jvm: JvmSubsystem,
+    jvm_artifact_targets: AllJvmArtifactTargets,
+    union_membership: UnionMembership,
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> ResolveGlobalScalacPluginMapping:
+    all_resolves = sorted(jvm.resolves.keys())
+    environment_name = local_environment_name.val
+
+    global_plugins_request_types = union_membership.get(GlobalScalacPluginsRequest)
+    global_plugins = await MultiGet(
+        Get(
+            GlobalScalacPlugins,
+            {marker_cls(resolve): GlobalScalacPluginsRequest, environment_name: EnvironmentName},
+        )
+        for resolve in all_resolves
+        for marker_cls in global_plugins_request_types
+    )
+
+    all_addresses: list[Addresses] = []
+    for resolve, plugins in zip(all_resolves, global_plugins):
+        for plugin in plugins:
+            addresses = find_jvm_artifacts_or_raise(
+                required_coordinates=[plugin.coordinate],
+                resolve=resolve,
+                jvm_artifact_targets=jvm_artifact_targets,
+                jvm=jvm,
+                subsystem=plugin.subsystem,
+                target_type="n/a",
+            )
+            all_addresses.append(Addresses(addresses))
+
+    all_targets = await MultiGet(Get(Targets, Addresses, addrs) for addrs in all_addresses)
+
+    mapping: Mapping[str, ResolvedGlobalScalacPlugins] = {
+        resolve: ResolvedGlobalScalacPlugins(
+            names=tuple(plugin.name for plugin in plugins),
+            artifacts=tuple(targets),
+            extra_scalac_options=tuple(
+                chain.from_iterable(plugin.extra_scalac_options for plugin in plugins)
+            ),
+        )
+        for resolve, plugins, targets in zip(all_resolves, global_plugins, all_targets)
+    }
+    return ResolveGlobalScalacPluginMapping(mapping)
+
+
+@dataclass(frozen=True)
+class ScalacPluginsForTargetWithoutResolveRequest:
     target: Target
 
 
 @dataclass(frozen=True)
-class ScalaPluginsForTargetRequest:
+class ScalacPluginsForTargetRequest:
     target: Target
     resolve_name: str
 
 
 @dataclass(frozen=True)
-class ScalaPluginTargetsForTarget:
+class ScalacPluginTargetsForTarget:
     plugins: Targets
     artifacts: Targets
 
 
 @dataclass(frozen=True)
-class ScalaPluginsRequest:
+class ScalacPluginsRequest:
     plugins: Targets
     artifacts: Targets
     resolve: CoursierResolveKey
@@ -67,9 +179,9 @@ class ScalaPluginsRequest:
     @classmethod
     def from_target_plugins(
         cls,
-        seq: Iterable[ScalaPluginTargetsForTarget],
+        seq: Iterable[ScalacPluginTargetsForTarget],
         resolve: CoursierResolveKey,
-    ) -> ScalaPluginsRequest:
+    ) -> ScalacPluginsRequest:
         plugins: OrderedSet[Target] = OrderedSet()
         artifacts: OrderedSet[Target] = OrderedSet()
 
@@ -77,13 +189,14 @@ class ScalaPluginsRequest:
             plugins.update(spft.plugins)
             artifacts.update(spft.artifacts)
 
-        return ScalaPluginsRequest(Targets(plugins), Targets(artifacts), resolve)
+        return ScalacPluginsRequest(Targets(plugins), Targets(artifacts), resolve)
 
 
 @dataclass(frozen=True)
-class ScalaPlugins:
+class ScalacPlugins:
     names: tuple[str, ...]
     classpath: ClasspathEntry
+    extra_scalac_options: tuple[str, ...] = ()
 
     def args(self, prefix: str | None = None) -> Iterator[str]:
         p = f"{prefix}/" if prefix else ""
@@ -91,24 +204,15 @@ class ScalaPlugins:
             yield f"-Xplugin:{p}{scalac_plugin_path}"
         for name in self.names:
             yield f"-Xplugin-require:{name}"
-
-
-class AllScalaPluginTargets(Targets):
-    pass
-
-
-@rule
-async def all_scala_plugin_targets(targets: AllTargets) -> AllScalaPluginTargets:
-    return AllScalaPluginTargets(
-        tgt for tgt in targets if tgt.has_fields((ScalacPluginArtifactField, ScalacPluginNameField))
-    )
+        for scalac_opt in self.extra_scalac_options:
+            yield scalac_opt
 
 
 @rule
 async def add_resolve_name_to_plugin_request(
-    request: ScalaPluginsForTargetWithoutResolveRequest, jvm: JvmSubsystem
-) -> ScalaPluginsForTargetRequest:
-    return ScalaPluginsForTargetRequest(
+    request: ScalacPluginsForTargetWithoutResolveRequest, jvm: JvmSubsystem
+) -> ScalacPluginsForTargetRequest:
+    return ScalacPluginsForTargetRequest(
         request.target, request.target[JvmResolveField].normalized_value(jvm)
     )
 
@@ -167,15 +271,15 @@ async def _resolve_scalac_plugin_artifact(
 
 
 @rule
-async def resolve_scala_plugins_for_target(
-    request: ScalaPluginsForTargetRequest,
-    all_scala_plugins: AllScalaPluginTargets,
+async def resolve_scalac_plugins_for_target(
+    request: ScalacPluginsForTargetRequest,
+    all_scalac_plugins: AllScalacPluginTargets,
     jvm: JvmSubsystem,
     scalac: Scalac,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     local_environment_name: ChosenLocalEnvironmentName,
     field_defaults: FieldDefaults,
-) -> ScalaPluginTargetsForTarget:
+) -> ScalacPluginTargetsForTarget:
     target = request.target
     resolve = request.resolve_name
 
@@ -186,7 +290,7 @@ async def resolve_scala_plugins_for_target(
 
     candidate_plugins = []
     candidate_artifacts = []
-    for plugin in all_scala_plugins:
+    for plugin in all_scalac_plugins:
         if _plugin_name(plugin) not in plugin_names:
             continue
         candidate_plugins.append(plugin)
@@ -215,7 +319,7 @@ async def resolve_scala_plugins_for_target(
             )
 
     plugin_targets, artifact_targets = zip(*plugins.values()) if plugins else ((), ())
-    return ScalaPluginTargetsForTarget(Targets(plugin_targets), Targets(artifact_targets))
+    return ScalacPluginTargetsForTarget(Targets(plugin_targets), Targets(artifact_targets))
 
 
 def _plugin_name(target: Target) -> str:
@@ -223,10 +327,18 @@ def _plugin_name(target: Target) -> str:
 
 
 @rule
-async def fetch_plugins(request: ScalaPluginsRequest) -> ScalaPlugins:
+async def fetch_plugins(
+    request: ScalacPluginsRequest, global_scalac_plugins: ResolveGlobalScalacPluginMapping
+) -> ScalacPlugins:
+    resolved_global_plugins = global_scalac_plugins.get(request.resolve.name)
+
     # Fetch all the artifacts
+    all_plugin_artifacts = [
+        *([tgt for tgt in resolved_global_plugins.artifacts] if resolved_global_plugins else []),
+        *request.artifacts,
+    ]
     coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(target.address for target in request.artifacts)
+        CoarsenedTargets, Addresses(target.address for target in all_plugin_artifacts)
     )
     fallible_artifacts = await MultiGet(
         Get(
@@ -244,9 +356,20 @@ async def fetch_plugins(request: ScalaPluginsRequest) -> ScalaPlugins:
     merged_classpath_digest = await Get(Digest, MergeDigests(i.digest for i in artifacts))
     merged = ClasspathEntry.merge(merged_classpath_digest, artifacts)
 
-    names = tuple(_plugin_name(target) for target in request.plugins)
+    names = tuple(
+        [
+            *([name for name in resolved_global_plugins.names] if resolved_global_plugins else []),
+            *(_plugin_name(target) for target in request.plugins),
+        ]
+    )
 
-    return ScalaPlugins(names=names, classpath=merged)
+    return ScalacPlugins(
+        names=names,
+        classpath=merged,
+        extra_scalac_options=(
+            resolved_global_plugins.extra_scalac_options if resolved_global_plugins else ()
+        ),
+    )
 
 
 def rules():

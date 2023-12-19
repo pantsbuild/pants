@@ -20,10 +20,10 @@ from pants.backend.scala.bsp.spec import (
     ScalaTestClassesResult,
 )
 from pants.backend.scala.compile.scalac_plugins import (
-    ScalaPlugins,
-    ScalaPluginsForTargetRequest,
-    ScalaPluginsRequest,
-    ScalaPluginTargetsForTarget,
+    ScalacPlugins,
+    ScalacPluginsForTargetRequest,
+    ScalacPluginsRequest,
+    ScalacPluginTargetsForTarget,
 )
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
@@ -345,13 +345,13 @@ async def handle_bsp_scalac_options_request(
     resolve = thirdparty_modules.resolve
 
     scalac_plugin_targets = await MultiGet(
-        Get(ScalaPluginTargetsForTarget, ScalaPluginsForTargetRequest(tgt, resolve.name))
+        Get(ScalacPluginTargetsForTarget, ScalacPluginsForTargetRequest(tgt, resolve.name))
         for tgt in targets
     )
 
     local_plugins_prefix = f"jvm/resolves/{resolve.name}/plugins"
     local_plugins = await Get(
-        ScalaPlugins, ScalaPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
+        ScalacPlugins, ScalacPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
     )
 
     thirdparty_modules_prefix = f"jvm/resolves/{resolve.name}/lib"
