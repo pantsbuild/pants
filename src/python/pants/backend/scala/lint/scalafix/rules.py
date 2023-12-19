@@ -132,6 +132,7 @@ async def partition_scalafix(
         for field_set in request.field_sets
     )
     classpath_by_filepath = dict(zip(filepaths, classpaths))
+    print(classpath_by_filepath)
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafixToolLockfileSentinel())
     tool_classpath, config_files = await MultiGet(
@@ -157,7 +158,7 @@ async def partition_scalafix(
     def combine_classpaths(classpaths: Iterable[Classpath]) -> Classpath:
         classpath_entries: set[ClasspathEntry] = set()
         # Requires type annotation due to https://github.com/python/mypy/issues/5423
-        resolve_key: Optional[CoursierResolveKey] = None
+        resolve_key: CoursierResolveKey | None = None
         for clspath in classpaths:
             if resolve_key is None:
                 resolve_key = clspath.resolve
@@ -177,6 +178,7 @@ async def partition_scalafix(
                 if filepath.match(path_pattern):
                     classpaths_to_combine.add(classpath)
 
+        print(classpaths_to_combine)
         return combine_classpaths(classpaths_to_combine)
 
     def partition_info_for(files: Iterable[str], config_snapshot: Snapshot) -> PartitionInfo:
@@ -215,6 +217,8 @@ async def scalafix_fix(
     merged_digest = await Get(
         Digest, MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
     )
+
+    print(partition_info.classpath_entries)
 
     result = await Get(
         ProcessResult,

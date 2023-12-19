@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from itertools import chain
+from pathlib import PurePath
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.backend.scala.compile.scalac_plugins import (
@@ -26,7 +27,7 @@ from pants.backend.scala.util_rules.versions import (
     ScalaVersion,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
@@ -41,6 +42,8 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
+from pants.jvm.jar_tool.jar_tool import JarToolRequest
+from pants.jvm.jar_tool.jar_tool import rules as jar_tool_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
@@ -175,6 +178,11 @@ async def compile_scala_source(
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
     output_file = compute_output_jar_filename(request.component)
+
+    output_dir = "__out"
+    empty_dir = await Get(Digest, CreateDigest([Directory(output_dir)]))
+    merged_digest = await Get(Digest, MergeDigests([sources_digest, empty_dir]))
+
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
@@ -189,10 +197,10 @@ async def compile_scala_source(
                 *scalac.args,
                 # NB: We set a non-existent main-class so that using `-d` produces a `jar` manifest
                 # with stable content.
-                "-Xmain-class",
-                NO_MAIN_CLASS,
+                # "-Xmain-class",
+                # NO_MAIN_CLASS,
                 "-d",
-                output_file,
+                output_dir,
                 *sorted(
                     chain.from_iterable(
                         sources.snapshot.files
@@ -200,17 +208,20 @@ async def compile_scala_source(
                     )
                 ),
             ],
-            input_digest=sources_digest,
+            input_digest=merged_digest,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_nailgun_keys,
-            output_files=(output_file,),
+            output_directories=(output_dir,),
             description=f"Compile {request.component} with scalac",
             level=LogLevel.DEBUG,
         ),
     )
+
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
-        output_digest = process_result.output_digest
+        compilation_results = await Get(Snapshot, RemovePrefix(process_result.output_digest, output_dir))
+        output_digest = await Get(Digest, JarToolRequest(jar_name=output_file, digest=compilation_results.digest, main_class=NO_MAIN_CLASS, file_mappings={f:f for f in compilation_results.files}))
+
         if jvm.reproducible_jars:
             output_digest = await Get(
                 Digest, StripJarRequest(digest=output_digest, filenames=(output_file,))
@@ -248,6 +259,7 @@ def rules():
     return [
         *collect_rules(),
         *jvm_compile_rules(),
+        *jar_tool_rules(),
         *scala_artifact_rules(),
         *scalac_plugins_rules(),
         *versions.rules(),

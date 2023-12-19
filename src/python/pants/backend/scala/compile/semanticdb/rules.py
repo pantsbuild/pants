@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+import logging
 
 from pants.backend.scala.compile import scalac_plugins
 from pants.backend.scala.compile.scalac_plugins import (
@@ -16,6 +17,8 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.common import Coordinate
 
+logger = logging.getLogger(__name__)
+
 
 class ScalafixSemanticDBPluginsRequest(GlobalScalacPluginsRequest):
     pass
@@ -28,6 +31,11 @@ async def scalafix_semanticdb_scalac_plugin(
     semanticdb: SemanticDbSubsystem,
 ) -> GlobalScalacPlugins:
     scala_version = scala.version_for_resolve(request.resolve_name)
+    semanticdb_version = semanticdb.version_for_scala(scala_version)
+    if not semanticdb_version:
+        logger.debug(f"Found no compatible version of `semanticdb-scalac` for Scala version '{scala_version}'.")
+        return GlobalScalacPlugins([])
+
     scala_binary_version = scala_version.crossversion(ScalaCrossVersionMode.FULL)
     return GlobalScalacPlugins(
         [
@@ -37,9 +45,12 @@ async def scalafix_semanticdb_scalac_plugin(
                 coordinate=Coordinate(
                     group="org.scalameta",
                     artifact=f"semanticdb-scalac_{scala_binary_version}",
-                    version=semanticdb.version,
+                    version=semanticdb_version,
                 ),
-                extra_scalac_options=("-Yrangepos",),
+                extra_scalac_options=(
+                    "-Yrangepos",
+                    *(f"-P:semanticdb:{name}:{value}" for name, value in semanticdb.extra_options.items())
+                ),
             )
         ]
     )

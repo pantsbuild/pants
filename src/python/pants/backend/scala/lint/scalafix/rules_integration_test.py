@@ -86,8 +86,8 @@ def rule_runner() -> RuleRunner:
 @pytest.fixture
 def semanticdb_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
-        "semanticdb-scalac-2.13.8.test.lock",
-        ["org.scala-lang:scala-library:2.13.8", "org.scalameta:semanticdb-scalac_2.13.8:4.8.10"],
+        "semanticdb-scalac.test.lock",
+        ["org.scala-lang:scala-library:2.13.6", "org.scalameta:semanticdb-scalac_2.13.6:4.8.10"],
     )
 
 
