@@ -27,7 +27,15 @@ from pants.backend.scala.util_rules.versions import (
     ScalaVersion,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot, RemovePrefix
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    Directory,
+    MergeDigests,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
@@ -219,8 +227,18 @@ async def compile_scala_source(
 
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
-        compilation_results = await Get(Snapshot, RemovePrefix(process_result.output_digest, output_dir))
-        output_digest = await Get(Digest, JarToolRequest(jar_name=output_file, digest=compilation_results.digest, main_class=NO_MAIN_CLASS, file_mappings={f:f for f in compilation_results.files}))
+        compilation_results = await Get(
+            Snapshot, RemovePrefix(process_result.output_digest, output_dir)
+        )
+        output_digest = await Get(
+            Digest,
+            JarToolRequest(
+                jar_name=output_file,
+                digest=compilation_results.digest,
+                main_class=NO_MAIN_CLASS,
+                file_mappings={f: f for f in compilation_results.files},
+            ),
+        )
 
         if jvm.reproducible_jars:
             output_digest = await Get(

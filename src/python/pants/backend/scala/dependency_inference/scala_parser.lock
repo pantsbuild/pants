@@ -8,7 +8,8 @@
 #   "generated_with_requirements": [
 #     "io.circe:circe-generic_2.13:0.14.1,url=not_provided,jar=not_provided",
 #     "org.scala-lang:scala-library:2.13.8,url=not_provided,jar=not_provided",
-#     "org.scalameta:scalameta_2.13:4.8.7,url=not_provided,jar=not_provided"
+#     "org.scalameta:scalameta_2.13:4.8.7,url=not_provided,jar=not_provided",
+#     "org.scalameta:semanticdb-scalac_2.13.8:4.8.4,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -796,6 +797,29 @@ packaging = "jar"
 [entries.file_digest]
 fingerprint = "35f1da67619fefe5092a3ad89120ca8f4384aad5fe29eb2f5956dacd6e37e94d"
 serialized_bytes_length = 809757
+[[entries]]
+file_name = "org.scalameta_semanticdb-scalac_2.13.8_4.8.4.jar"
+[[entries.directDependencies]]
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.11"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.11"
+packaging = "jar"
+
+
+[entries.coord]
+group = "org.scalameta"
+artifact = "semanticdb-scalac_2.13.8"
+version = "4.8.4"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "399998baccc3d16c712d36b650ae35163e8559b166609544ff6923641e51faa3"
+serialized_bytes_length = 17080415
 [[entries]]
 file_name = "org.scalameta_trees_2.13_4.8.7.jar"
 [[entries.directDependencies]]

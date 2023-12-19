@@ -56,7 +56,7 @@ from pants.util.strutil import bullet_list, softwrap
 class GlobalScalacPlugin:
     name: str
     subsystem: str
-    coordinate: Coordinate
+    coordinate: Coordinate | None
     extra_scalac_options: tuple[str, ...]
 
 
@@ -93,6 +93,40 @@ class GlobalScalacPluginsRequest:
         yield UnionRule(GlobalScalacPluginsRequest, cls)
 
 
+class _GlobalScalacPluginsByResolve(FrozenDict[str, GlobalScalacPlugins]):
+    pass
+
+
+@rule
+async def map_global_scalac_plugins_to_resolve(
+    jvm: JvmSubsystem,
+    scala: ScalaSubsystem,
+    union_membership: UnionMembership,
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> _GlobalScalacPluginsByResolve:
+    all_resolves = sorted(jvm.resolves.keys())
+    environment_name = local_environment_name.val
+
+    requests_by_resolve = [
+        (resolve, request_type)
+        for resolve in all_resolves
+        for request_type in union_membership.get(GlobalScalacPluginsRequest)
+        if scala.is_scala_resolve(resolve)
+    ]
+
+    global_plugins = await MultiGet(
+        Get(
+            GlobalScalacPlugins,
+            {marker_cls(resolve): GlobalScalacPluginsRequest, environment_name: EnvironmentName},
+        )
+        for resolve, marker_cls in requests_by_resolve
+    )
+
+    return _GlobalScalacPluginsByResolve(
+        {resolve: plugins for (resolve, _), plugins in zip(requests_by_resolve, global_plugins)}
+    )
+
+
 @dataclass(frozen=True)
 class ResolvedGlobalScalacPlugins:
     names: tuple[str, ...]
@@ -101,33 +135,21 @@ class ResolvedGlobalScalacPlugins:
 
 
 class ResolveGlobalScalacPluginMapping(FrozenDict[str, ResolvedGlobalScalacPlugins]):
-    """A map that links a given resolve with the set of global scalac plugins for that
-    resolve."""
+    """A map that links a given resolve with the set of global scalac plugins for that resolve."""
 
 
 @rule(_masked_types=[EnvironmentName])
 async def resolve_all_global_scalac_plugins(
     jvm: JvmSubsystem,
     jvm_artifact_targets: AllJvmArtifactTargets,
-    union_membership: UnionMembership,
-    local_environment_name: ChosenLocalEnvironmentName,
+    global_plugins_mapping: _GlobalScalacPluginsByResolve,
 ) -> ResolveGlobalScalacPluginMapping:
-    all_resolves = sorted(jvm.resolves.keys())
-    environment_name = local_environment_name.val
-
-    global_plugins_request_types = union_membership.get(GlobalScalacPluginsRequest)
-    global_plugins = await MultiGet(
-        Get(
-            GlobalScalacPlugins,
-            {marker_cls(resolve): GlobalScalacPluginsRequest, environment_name: EnvironmentName},
-        )
-        for resolve in all_resolves
-        for marker_cls in global_plugins_request_types
-    )
-
-    all_addresses: list[Addresses] = []
-    for resolve, plugins in zip(all_resolves, global_plugins):
+    all_addresses: Mapping[str, set[Address]] = defaultdict(set)
+    for resolve, plugins in global_plugins_mapping.items():
         for plugin in plugins:
+            if not plugin.coordinate:
+                continue
+
             addresses = find_jvm_artifacts_or_raise(
                 required_coordinates=[plugin.coordinate],
                 resolve=resolve,
@@ -136,19 +158,31 @@ async def resolve_all_global_scalac_plugins(
                 subsystem=plugin.subsystem,
                 target_type="n/a",
             )
-            all_addresses.append(Addresses(addresses))
+            all_addresses[resolve].update(addresses)
 
-    all_targets = await MultiGet(Get(Targets, Addresses, addrs) for addrs in all_addresses)
+    all_resolves = sorted(jvm.resolves.keys())
+    addresses_by_resolves = [(resolve, all_addresses[resolve]) for resolve in all_resolves]
+
+    all_targets = await MultiGet(
+        Get(Targets, Addresses(addrs)) for (_, addrs) in addresses_by_resolves
+    )
+    targets_by_resolve = {
+        resolve: tgt for (resolve, _), tgt in zip(addresses_by_resolves, all_targets)
+    }
 
     mapping: Mapping[str, ResolvedGlobalScalacPlugins] = {
         resolve: ResolvedGlobalScalacPlugins(
-            names=tuple(plugin.name for plugin in plugins),
-            artifacts=tuple(targets),
+            names=tuple(
+                plugin.name for plugin in global_plugins_mapping[resolve] if plugin.coordinate
+            ),
+            artifacts=tuple(targets_by_resolve.get(resolve)),
             extra_scalac_options=tuple(
-                chain.from_iterable(plugin.extra_scalac_options for plugin in plugins)
+                chain.from_iterable(
+                    plugin.extra_scalac_options for plugin in global_plugins_mapping[resolve]
+                )
             ),
         )
-        for resolve, plugins, targets in zip(all_resolves, global_plugins, all_targets)
+        for resolve in all_resolves
     }
     return ResolveGlobalScalacPluginMapping(mapping)
 

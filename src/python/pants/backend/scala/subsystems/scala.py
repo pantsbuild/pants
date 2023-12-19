@@ -39,6 +39,9 @@ class ScalaSubsystem(Subsystem):
         advanced=True,
     )
 
+    def is_scala_resolve(self, resolve: str) -> bool:
+        return resolve == "jvm-default" or resolve in self._version_for_resolve.keys()
+
     def version_for_resolve(self, resolve: str) -> ScalaVersion:
         version = self._version_for_resolve.get(resolve)
         if version:
