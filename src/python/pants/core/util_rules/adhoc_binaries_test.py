@@ -75,4 +75,4 @@ def test_docker_helper(rule_runner: RuleRunner):
         _PythonBuildStandaloneBinary,
         [_DownloadPythonBuildStandaloneBinaryRequest()],
     )
-    assert not pbs.path.startswith("/")
+    assert pbs.path.startswith("/")
