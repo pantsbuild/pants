@@ -201,6 +201,33 @@ class DockerImageField(StringField):
         """
     )
 
+class DockerBindMountsField(StringSequenceField):
+    alias = "bind_mounts"
+    help = help_text(
+        """
+        Read-only bind mounts to use when starting the container.
+
+        The values should be in the form "<path on host>:<path on container>"
+        """
+    )
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        values = super().compute_value(raw_value, address)
+        if values and (bad_values := [val for val in values if len(val.split(":")) != 2]):
+            raise ValueError(
+                softwrap(
+                    f"""
+                    `bind_mounts` values must be of the form '<val>:<val>', but the following were not:
+
+                    {bullet_list(bad_values)}
+                    """
+                )
+            )
+
+        return values
 
 class DockerPlatformField(StringField):
     alias = "platform"
@@ -263,6 +290,7 @@ class DockerEnvironmentTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         DockerImageField,
+        DockerBindMountsField,
         DockerPlatformField,
         DockerFallbackEnvironmentField,
     )
@@ -896,6 +924,7 @@ async def extract_process_config_from_environment(
     environments_subsystem: EnvironmentsSubsystem,
 ) -> ProcessExecutionEnvironment:
     docker_image = None
+    docker_bind_mounts = None
     remote_execution = False
     raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
 
@@ -909,6 +938,7 @@ async def extract_process_config_from_environment(
         docker_image = (
             tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
         )
+        docker_bind_mounts = tgt.val[DockerBindMountsField].value if tgt.val.has_field(DockerBindMountsField) else None
 
         # If a docker image name is provided, convert to an image ID so caching works properly.
         # TODO(17104): Append image ID instead to the image name.
@@ -937,6 +967,7 @@ async def extract_process_config_from_environment(
         environment_name=tgt.name,
         platform=platform.value,
         docker_image=docker_image,
+        docker_bind_mounts=docker_bind_mounts,
         remote_execution=remote_execution,
         remote_execution_extra_platform_properties=[
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]

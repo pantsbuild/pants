@@ -31,16 +31,20 @@ impl PyProcessExecutionEnvironment {
         remote_execution_extra_platform_properties: Vec<(String, String)>,
         environment_name: Option<String>,
         docker_image: Option<String>,
+        docker_bind_mounts: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
-        let strategy = match (docker_image, remote_execution) {
-            (None, true) => Ok(ProcessExecutionStrategy::RemoteExecution(
+        let strategy = match (docker_image, docker_bind_mounts, remote_execution) {
+            (None, None, true) => Ok(ProcessExecutionStrategy::RemoteExecution(
                 remote_execution_extra_platform_properties,
             )),
-            (None, false) => Ok(ProcessExecutionStrategy::Local),
-            (Some(image), false) => Ok(ProcessExecutionStrategy::Docker(image)),
-            (Some(_), true) => Err(PyAssertionError::new_err(
+            (None, None, false) => Ok(ProcessExecutionStrategy::Local),
+            (Some(image), mounts, false) => Ok(ProcessExecutionStrategy::Docker(image, mounts)),
+            (Some(_), _, true) => Err(PyAssertionError::new_err(
                 "docker_image cannot be set at the same time as remote_execution",
+            )),
+            (None, Some(_), _) => Err(PyAssertionError::new_err(
+                "docker_bind_mounts cannot be set without docker_image",
             )),
         }?;
         Ok(Self {
@@ -104,7 +108,15 @@ impl PyProcessExecutionEnvironment {
     #[getter]
     fn docker_image(&self) -> Option<&str> {
         match &self.environment.strategy {
-            ProcessExecutionStrategy::Docker(image) => Some(image),
+            ProcessExecutionStrategy::Docker(image, _) => Some(image),
+            _ => None,
+        }
+    }
+
+    #[getter]
+    fn docker_bind_mounts(&self) -> Option<Vec<String>> {
+        match &self.environment.strategy {
+            ProcessExecutionStrategy::Docker(_, Some(bind_mounts)) => Some(bind_mounts.to_vec()),
             _ => None,
         }
     }

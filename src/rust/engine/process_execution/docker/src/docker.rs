@@ -410,7 +410,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
 
                 // Obtain ID of the base container in which to run the execution for this process.
                 let (container_id, named_caches) = {
-                    let ProcessExecutionStrategy::Docker(image) =
+                    let ProcessExecutionStrategy::Docker(image, bind_mounts) =
                         &req.execution_environment.strategy
                     else {
                         return Err(ProcessError::Unclassified(
@@ -423,6 +423,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
                     self.container_cache
                         .container_for_image(
                             image,
+                            bind_mounts,
                             &req.execution_environment.platform,
                             &context.build_id,
                         )
@@ -794,6 +795,7 @@ impl<'a> ContainerCache<'a> {
         docker: Docker,
         executor: Executor,
         image_name: String,
+        mut bind_mounts: Vec<String>,
         platform: Platform,
         image_pull_scope: ImagePullScope,
         image_pull_cache: ImagePullCache,
@@ -816,17 +818,16 @@ impl<'a> ContainerCache<'a> {
             .await
             .map_err(|e| format!("Failed to create named cache volume for {image_name}: {e}"))?;
 
+        bind_mounts.extend(vec![
+            format!("{work_dir_base}:{SANDBOX_BASE_PATH_IN_CONTAINER}"),
+            format!("{named_cache_volume_name}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER}",),
+            // DOCKER-TODO: Consider making this bind mount read-only.
+            format!("{immutable_inputs_base_dir}:{IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER}"),
+        ]);
         let config = bollard::container::Config {
             entrypoint: Some(vec!["/bin/sh".to_string()]),
             host_config: Some(bollard::service::HostConfig {
-                binds: Some(vec![
-                    format!("{work_dir_base}:{SANDBOX_BASE_PATH_IN_CONTAINER}"),
-                    format!("{named_cache_volume_name}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER}",),
-                    // DOCKER-TODO: Consider making this bind mount read-only.
-                    format!(
-                        "{immutable_inputs_base_dir}:{IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER}"
-                    ),
-                ]),
+                binds: Some(bind_mounts),
                 // The init process ensures that child processes are properly reaped.
                 init: Some(true),
                 ..bollard::service::HostConfig::default()
@@ -942,6 +943,7 @@ impl<'a> ContainerCache<'a> {
     pub async fn container_for_image(
         &self,
         image_name: &str,
+        bind_mounts: &Option<Vec<String>>,
         platform: &Platform,
         build_generation: &str,
     ) -> Result<(String, NamedCaches), String> {
@@ -966,6 +968,7 @@ impl<'a> ContainerCache<'a> {
                     docker.clone(),
                     executor,
                     image_name.to_string(),
+                    bind_mounts.clone().unwrap_or_default(),
                     *platform,
                     image_pull_scope,
                     self.image_pull_cache.clone(),

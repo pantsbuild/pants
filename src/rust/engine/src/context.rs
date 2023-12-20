@@ -263,7 +263,7 @@ impl Core {
         let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
             matches!(
                 req.execution_environment.strategy,
-                ProcessExecutionStrategy::Docker(_)
+                ProcessExecutionStrategy::Docker(_, _)
             )
         }));
 
