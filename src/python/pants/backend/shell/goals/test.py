@@ -15,6 +15,7 @@ from pants.backend.shell.target_types import (
 from pants.backend.shell.util_rules import shell_command
 from pants.backend.shell.util_rules.shell_command import ShellCommandProcessFromTargetRequest
 from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
@@ -23,11 +24,14 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
+@dataclasses.dataclass(frozen=True)
 class TestShellCommandFieldSet(TestFieldSet):
     required_fields = (
         ShellCommandCommandField,
         ShellCommandTestDependenciesField,
     )
+
+    environment: EnvironmentField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
