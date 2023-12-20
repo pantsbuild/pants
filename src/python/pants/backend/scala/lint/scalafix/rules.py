@@ -6,7 +6,7 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Optional, cast
+from typing import Iterable, cast
 
 from pants.backend.scala.lint.scalafix.skip_field import SkipScalafixField
 from pants.backend.scala.lint.scalafix.subsystem import ScalafixSubsystem
@@ -17,11 +17,12 @@ from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.partitions import Partition
+from pants.core.util_rules.stripped_source_files import _stripped_snapshot_by_source_roots
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.process import FallibleProcessResult, ProcessResult
+from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, FieldSet, Target
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import ClasspathEntry
@@ -30,10 +31,11 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.dirutil import find_nearest_ancestor_file, group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize, softwrap
+from pants.util.strutil import Simplifier, pluralize, softwrap
 
 
 @dataclass(frozen=True)
@@ -130,8 +132,7 @@ async def partition_scalafix(
 
     filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
     classpaths = await MultiGet(
-        Get(Classpath, Addresses([field_set.address]))
-        for field_set in request.field_sets
+        Get(Classpath, Addresses([field_set.address])) for field_set in request.field_sets
     )
     classpath_by_filepath = dict(zip(filepaths, classpaths))
 
@@ -184,8 +185,8 @@ async def partition_scalafix(
     def partition_info_for(files: Iterable[str], config_snapshot: Snapshot) -> PartitionInfo:
         classpath = classpath_for_files(files)
         return PartitionInfo(
-            runtime_classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-            scalafix_classpath_entries=classpath.immutable_inputs_args(),
+            runtime_classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
+            scalafix_classpath_entries=tuple(classpath.immutable_inputs_args()),
             config_snapshot=config_snapshot,
             extra_immutable_input_digests=FrozenDict(
                 {**extra_immutable_input_digests, **dict(classpath.immutable_inputs())}
@@ -203,6 +204,22 @@ async def partition_scalafix(
     )
 
 
+async def _restore_source_roots(source_roots_result: SourceRootsResult, digest: Digest) -> Snapshot:
+    source_roots_to_files = defaultdict(set)
+    for file, root in source_roots_result.path_to_root.items():
+        source_roots_to_files[root.path].add(str(file.relative_to(root.path)))
+
+    digest_subsets = await MultiGet(
+        Get(Digest, DigestSubset(digest, PathGlobs(files)))
+        for files in source_roots_to_files.values()
+    )
+    restored_digests = await MultiGet(
+        Get(Digest, AddPrefix(digest, source_root))
+        for digest, source_root in zip(digest_subsets, source_roots_to_files.keys())
+    )
+    return await Get(Snapshot, MergeDigests(restored_digests))
+
+
 @rule
 async def scalafix_fix(
     request: ScalafixRequest.Batch,
@@ -211,11 +228,18 @@ async def scalafix_fix(
     scala: ScalaSubsystem,
     scalac: Scalac,
 ) -> FixResult:
+    source_roots = await Get(
+        SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(request.snapshot.files)
+    )
+
+    # We need to strip the source files to get semantic rules find SemanticDB metadata in the classpath
+    stripped_snapshot = await _stripped_snapshot_by_source_roots(source_roots, request.snapshot)
+
     partition_info = cast(PartitionInfo, request.partition_metadata)
     merged_digest = await Get(
-        Digest, MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
+        Digest, MergeDigests([partition_info.config_snapshot.digest, stripped_snapshot.digest])
     )
-    
+
     result = await Get(
         ProcessResult,
         JvmProcess(
@@ -226,20 +250,29 @@ async def scalafix_fix(
                 f"--config={partition_info.config_snapshot.files[0]}",
                 f"--classpath={':'.join(partition_info.scalafix_classpath_entries)}",
                 *((f"--scalac-options={','.join(scalac.args)}",) if scalac.args else ()),
-                f"--files={','.join(request.files)}",
+                f"--files={','.join(stripped_snapshot.files)}",
             ],
             classpath_entries=partition_info.runtime_classpath_entries,
             input_digest=merged_digest,
-            output_files=request.files,
+            output_files=stripped_snapshot.files,
             extra_jvm_options=tool.jvm_options,
             extra_immutable_input_digests=partition_info.extra_immutable_input_digests,
             use_nailgun=False,
-            description=f"Run `scalafix` on {pluralize(len(request.files), 'file')}.",
+            description=f"Run `scalafix` on {pluralize(len(stripped_snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
 
-    return await FixResult.create(request, result)
+    # We need now to restore the source roots
+    result_snapshot = await _restore_source_roots(source_roots, result.output_digest)
+    output_simplifier = Simplifier()
+    return FixResult(
+        input=request.snapshot,
+        output=result_snapshot,
+        stdout=output_simplifier.simplify(result.stdout),
+        stderr=output_simplifier.simplify(result.stderr),
+        tool_name=request.tool_name,
+    )
 
 
 @rule

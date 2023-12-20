@@ -6,9 +6,10 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import Iterable, Iterator, Mapping, Sequence, Type, cast
+from typing import Iterable, Iterator, Mapping
 
-from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.resolve.common import AllScalaResolves
+from pants.backend.scala.resolve.common import rules as scala_resolve_rules
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import (
     AllScalacPluginTargets,
@@ -97,21 +98,18 @@ class _GlobalScalacPluginsByResolve(FrozenDict[str, GlobalScalacPlugins]):
     pass
 
 
-@rule
+@rule(_masked_types=[EnvironmentName])
 async def map_global_scalac_plugins_to_resolve(
-    jvm: JvmSubsystem,
-    scala: ScalaSubsystem,
+    all_scala_resolves: AllScalaResolves,
     union_membership: UnionMembership,
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> _GlobalScalacPluginsByResolve:
-    all_resolves = sorted(jvm.resolves.keys())
     environment_name = local_environment_name.val
 
     requests_by_resolve = [
         (resolve, request_type)
-        for resolve in all_resolves
+        for resolve in all_scala_resolves
         for request_type in union_membership.get(GlobalScalacPluginsRequest)
-        if scala.is_scala_resolve(resolve)
     ]
 
     global_plugins = await MultiGet(
@@ -138,7 +136,7 @@ class ResolveGlobalScalacPluginMapping(FrozenDict[str, ResolvedGlobalScalacPlugi
     """A map that links a given resolve with the set of global scalac plugins for that resolve."""
 
 
-@rule(_masked_types=[EnvironmentName])
+@rule
 async def resolve_all_global_scalac_plugins(
     jvm: JvmSubsystem,
     jvm_artifact_targets: AllJvmArtifactTargets,
@@ -160,8 +158,9 @@ async def resolve_all_global_scalac_plugins(
             )
             all_addresses[resolve].update(addresses)
 
-    all_resolves = sorted(jvm.resolves.keys())
-    addresses_by_resolves = [(resolve, all_addresses[resolve]) for resolve in all_resolves]
+    addresses_by_resolves = [
+        (resolve, all_addresses[resolve]) for resolve in global_plugins_mapping.keys()
+    ]
 
     all_targets = await MultiGet(
         Get(Targets, Addresses(addrs)) for (_, addrs) in addresses_by_resolves
@@ -175,14 +174,14 @@ async def resolve_all_global_scalac_plugins(
             names=tuple(
                 plugin.name for plugin in global_plugins_mapping[resolve] if plugin.coordinate
             ),
-            artifacts=tuple(targets_by_resolve.get(resolve)),
+            artifacts=tuple(targets_by_resolve.get(resolve, [])),
             extra_scalac_options=tuple(
                 chain.from_iterable(
                     plugin.extra_scalac_options for plugin in global_plugins_mapping[resolve]
                 )
             ),
         )
-        for resolve in all_resolves
+        for resolve in global_plugins_mapping.keys()
     }
     return ResolveGlobalScalacPluginMapping(mapping)
 
@@ -368,7 +367,7 @@ async def fetch_plugins(
 
     # Fetch all the artifacts
     all_plugin_artifacts = [
-        *([tgt for tgt in resolved_global_plugins.artifacts] if resolved_global_plugins else []),
+        *(resolved_global_plugins.artifacts if resolved_global_plugins else ()),
         *request.artifacts,
     ]
     coarsened_targets = await Get(
@@ -390,11 +389,9 @@ async def fetch_plugins(
     merged_classpath_digest = await Get(Digest, MergeDigests(i.digest for i in artifacts))
     merged = ClasspathEntry.merge(merged_classpath_digest, artifacts)
 
-    names = tuple(
-        [
-            *([name for name in resolved_global_plugins.names] if resolved_global_plugins else []),
-            *(_plugin_name(target) for target in request.plugins),
-        ]
+    names = (
+        *(resolved_global_plugins.names if resolved_global_plugins else ()),
+        *(_plugin_name(target) for target in request.plugins),
     )
 
     return ScalacPlugins(
@@ -407,8 +404,4 @@ async def fetch_plugins(
 
 
 def rules():
-    return (
-        *collect_rules(),
-        *jvm_tool_rules(),
-        *lockfile.rules(),
-    )
+    return (*collect_rules(), *jvm_tool_rules(), *lockfile.rules(), *scala_resolve_rules())

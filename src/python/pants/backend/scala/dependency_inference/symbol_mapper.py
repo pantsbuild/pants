@@ -6,12 +6,11 @@ from collections import defaultdict
 from typing import Mapping
 
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
-from pants.backend.scala.target_types import ScalaSourceField
+from pants.backend.scala.target_types import AllScalaTargets, ScalaSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
@@ -25,19 +24,8 @@ from pants.jvm.target_types import JvmResolveField
 from pants.util.logging import LogLevel
 
 
-# TODO: add third-party targets here? That would allow us to avoid iterating over AllTargets twice.
-#  See `backend/python/dependency_inference/module_mapper.py` for an example.
-class AllScalaTargets(Targets):
-    pass
-
-
 class FirstPartyScalaTargetsMappingRequest(FirstPartyMappingRequest):
     pass
-
-
-@rule(desc="Find all Scala targets in project", level=LogLevel.DEBUG)
-def find_all_scala_targets(targets: AllTargets) -> AllScalaTargets:
-    return AllScalaTargets(tgt for tgt in targets if tgt.has_field(ScalaSourceField))
 
 
 SCALA_PACKAGE_OBJECT_NAMESPACE: SymbolNamespace = "package object"

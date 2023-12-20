@@ -119,7 +119,9 @@ class DigestContents(Collection[FileContent]):
     are holding `DigestContents` simultaneously.
     """
 
+
 DigestEntry = Union[FileEntry, SymlinkEntry, Directory]
+
 
 class DigestEntries(Collection[DigestEntry]):
     """The indirect file contents of a Digest.

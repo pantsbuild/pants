@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from itertools import chain
-from pathlib import PurePath
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.backend.scala.compile.scalac_plugins import (
@@ -26,7 +25,7 @@ from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionResult,
     ScalaVersion,
 )
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import (
     EMPTY_DIGEST,

@@ -4,12 +4,9 @@
 from __future__ import annotations
 
 import ast
-from collections import defaultdict
 import dataclasses
 import os
 from dataclasses import dataclass
-from pathlib import PurePath
-from typing import Mapping
 
 import pytest
 
@@ -18,7 +15,7 @@ from pants.core.util_rules import system_binaries
 from pants.core.util_rules.archive import ExtractedArchive, MaybeExtractArchiveRequest
 from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, DigestContents, DigestEntries, DigestEntry, Directory, FileEntry, PathGlobs, RemovePrefix
+from pants.engine.fs import CreateDigest, DigestContents, PathGlobs, RemovePrefix
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule

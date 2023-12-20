@@ -50,6 +50,7 @@ logger = logging.getLogger(__name__)
 
 _PARSER_SCALA_VERSION = ScalaVersion.parse("2.13.8")
 _PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.binary
+_PARSER_SCALAMETA_VERSION = "4.8.10"
 
 
 class ScalaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -396,7 +397,8 @@ async def generate_scala_parser_lockfile_request(
     return GenerateJvmLockfileFromTool(
         artifact_inputs=FrozenOrderedSet(
             {
-                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.8.7",
+                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:{_PARSER_SCALAMETA_VERSION}",
+                f"org.scalameta:semanticdb-scalac_{_PARSER_SCALA_VERSION}:{_PARSER_SCALAMETA_VERSION}",
                 f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
                 scala_artifacts.library_coordinate.to_coord_str(),
             }

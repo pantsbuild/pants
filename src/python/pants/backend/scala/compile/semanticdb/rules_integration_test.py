@@ -15,11 +15,7 @@ from pants.backend.scala.compile import scalac
 from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.semanticdb.rules import rules as semanticdb_rules
 from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
-from pants.backend.scala.target_types import (
-    ScalaArtifactTarget,
-    ScalaSourcesGeneratorTarget,
-    ScalaSourceTarget,
-)
+from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
@@ -102,7 +98,9 @@ def test_scala2_compile_with_semanticdb(
         }
     )
 
-    rule_runner.set_options([f"--source-root-patterns={repr(['src/jvm'])}"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        [f"--source-root-patterns={repr(['src/jvm'])}"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
 
     request = CompileScalaSourceRequest(
         component=expect_single_expanded_coarsened_target(
@@ -154,7 +152,7 @@ def test_scala3_compile_with_semanticdb(
     rule_runner.set_options(
         [
             f"--scala-version-for-resolve={repr(scala_versions)}",
-            f"--source-root-patterns={repr(['src/jvm'])}"
+            f"--source-root-patterns={repr(['src/jvm'])}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )

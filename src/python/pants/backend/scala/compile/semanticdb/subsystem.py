@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from pants.backend.scala.util_rules.versions import ScalaVersion
-from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.option_types import DictOption, StrOption
+from pants.option.option_types import DictOption
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
 DEFAULT_VERSION_MAPPING = {
     "2.13.6": "4.8.4",
@@ -22,12 +22,20 @@ class SemanticDbSubsystem(Subsystem):
     options_scope = "scalac-semanticdb"
     help = "semanticdb (ttps://scalameta.org/docs/semanticdb/)"
 
-    _version_mapping = DictOption[str](
-        default=DEFAULT_VERSION_MAPPING,
-        help="Version mapping from Scala version to SemanticDB version.",
+    _version_for_resolve = DictOption[str](
+        help=softwrap(
+            """
+            A dictionary mapping the name of a resolve to the SemanticDB version to use for all Scala
+            targets consuming that resolve.
+
+            This is only required when working with Scala 2 as Scala 3 incorporates SemanticDB
+            in the compiler.
+            """
+        )
     )
 
-    extra_options = DictOption[str](help="Additional options to pass to semanticdb compiler.")
-
-    def version_for_scala(self, scala_version: ScalaVersion) -> str | None:
-        return self._version_mapping.get(str(scala_version))
+    def version_for(self, resolve_name: str, scala_version: ScalaVersion) -> str | None:
+        found_version = self._version_for_resolve.get(resolve_name)
+        if not found_version:
+            found_version = DEFAULT_VERSION_MAPPING.get(str(scala_version))
+        return found_version

@@ -79,10 +79,7 @@ class JarToolRequest:
         compress: bool = False,
         update: bool = False,
     ) -> None:
-        _file_mappings = {
-            **(file_mappings or {}),
-            **({f:f for f in (files or [])})
-        }
+        _file_mappings = {**(file_mappings or {}), **({f: f for f in (files or [])})}
 
         object.__setattr__(self, "jar_name", jar_name)
         object.__setattr__(self, "digest", digest)

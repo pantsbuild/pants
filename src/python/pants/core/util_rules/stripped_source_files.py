@@ -31,6 +31,33 @@ class StrippedSourceFiles:
     snapshot: Snapshot
 
 
+async def _stripped_snapshot_by_source_roots(
+    source_roots_result: SourceRootsResult, snapshot: Snapshot
+) -> Snapshot:
+    source_roots_to_files = defaultdict(set)
+    for f, root in source_roots_result.path_to_root.items():
+        source_roots_to_files[root.path].add(str(f))
+
+    if len(source_roots_to_files) == 1:
+        source_root = next(iter(source_roots_to_files.keys()))
+        if source_root == ".":
+            resulting_snapshot = snapshot
+        else:
+            resulting_snapshot = await Get(Snapshot, RemovePrefix(snapshot.digest, source_root))
+    else:
+        digest_subsets = await MultiGet(
+            Get(Digest, DigestSubset(snapshot.digest, PathGlobs(files)))
+            for files in source_roots_to_files.values()
+        )
+        resulting_digests = await MultiGet(
+            Get(Digest, RemovePrefix(digest, source_root))
+            for digest, source_root in zip(digest_subsets, source_roots_to_files.keys())
+        )
+        resulting_snapshot = await Get(Snapshot, MergeDigests(resulting_digests))
+
+    return resulting_snapshot
+
+
 @rule
 async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
     """Removes source roots from a snapshot.
@@ -54,28 +81,9 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
         SourceRootsRequest.for_files(rooted_files_snapshot.files),
     )
 
-    source_roots_to_files = defaultdict(set)
-    for f, root in source_roots_result.path_to_root.items():
-        source_roots_to_files[root.path].add(str(f))
-
-    if len(source_roots_to_files) == 1:
-        source_root = next(iter(source_roots_to_files.keys()))
-        if source_root == ".":
-            resulting_snapshot = rooted_files_snapshot
-        else:
-            resulting_snapshot = await Get(
-                Snapshot, RemovePrefix(rooted_files_snapshot.digest, source_root)
-            )
-    else:
-        digest_subsets = await MultiGet(
-            Get(Digest, DigestSubset(rooted_files_snapshot.digest, PathGlobs(files)))
-            for files in source_roots_to_files.values()
-        )
-        resulting_digests = await MultiGet(
-            Get(Digest, RemovePrefix(digest, source_root))
-            for digest, source_root in zip(digest_subsets, source_roots_to_files.keys())
-        )
-        resulting_snapshot = await Get(Snapshot, MergeDigests(resulting_digests))
+    resulting_snapshot = await _stripped_snapshot_by_source_roots(
+        source_roots_result, rooted_files_snapshot
+    )
 
     # Add the unrooted files back in.
     if source_files.unrooted_files:

@@ -8,8 +8,8 @@
 #   "generated_with_requirements": [
 #     "io.circe:circe-generic_2.13:0.14.1,url=not_provided,jar=not_provided",
 #     "org.scala-lang:scala-library:2.13.8,url=not_provided,jar=not_provided",
-#     "org.scalameta:scalameta_2.13:4.8.7,url=not_provided,jar=not_provided",
-#     "org.scalameta:semanticdb-scalac_2.13.8:4.8.4,url=not_provided,jar=not_provided"
+#     "org.scalameta:scalameta_2.13:4.8.10,url=not_provided,jar=not_provided",
+#     "org.scalameta:semanticdb-scalac_2.13.8:4.8.10,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -543,7 +543,7 @@ packaging = "jar"
 fingerprint = "ac358699f40002fb4f32ad77531765fce23425d0e83c51854d1635118ab285ea"
 serialized_bytes_length = 527352
 [[entries]]
-file_name = "org.scalameta_common_2.13_4.8.7.jar"
+file_name = "org.scalameta_common_2.13_4.8.10.jar"
 [[entries.directDependencies]]
 group = "com.lihaoyi"
 artifact = "sourcecode_2.13"
@@ -602,13 +602,13 @@ packaging = "jar"
 [entries.coord]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "1f4ff54f40e9513b9100595547808af8146888940d74b957875cb418cbb89ba8"
-serialized_bytes_length = 2462814
+fingerprint = "137d07baa33d8fb5243f1e399b4d210b929ce8a5d3b9ec70c9de8e875265d0d4"
+serialized_bytes_length = 2462815
 [[entries]]
-file_name = "org.scalameta_parsers_2.13_4.8.7.jar"
+file_name = "org.scalameta_parsers_2.13_4.8.10.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
@@ -618,7 +618,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scalameta"
 artifact = "trees_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -660,26 +660,26 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "trees_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scalameta"
 artifact = "parsers_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "e35b8e60f887a18c843924d492e5702983b2ecbeed691a6a1751f97cd1fd014a"
-serialized_bytes_length = 1262792
+fingerprint = "27dc6e6da71938717df932236a6301bb98dd1f13f93adaee169ea5408e8f780b"
+serialized_bytes_length = 1263290
 [[entries]]
-file_name = "org.scalameta_scalameta_2.13_4.8.7.jar"
+file_name = "org.scalameta_scalameta_2.13_4.8.10.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
@@ -695,7 +695,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scalameta"
 artifact = "parsers_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -773,32 +773,32 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "parsers_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "trees_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scalameta"
 artifact = "scalameta_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "35f1da67619fefe5092a3ad89120ca8f4384aad5fe29eb2f5956dacd6e37e94d"
+fingerprint = "482bc472be542a43badc1d19b54bedaf2bfc258a433ac6a4c53dd31baa16eb5f"
 serialized_bytes_length = 809757
 [[entries]]
-file_name = "org.scalameta_semanticdb-scalac_2.13.8_4.8.4.jar"
+file_name = "org.scalameta_semanticdb-scalac_2.13.8_4.8.10.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
@@ -815,13 +815,13 @@ packaging = "jar"
 [entries.coord]
 group = "org.scalameta"
 artifact = "semanticdb-scalac_2.13.8"
-version = "4.8.4"
+version = "4.8.10"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "399998baccc3d16c712d36b650ae35163e8559b166609544ff6923641e51faa3"
-serialized_bytes_length = 17080415
+fingerprint = "9894f4ac88885b55a8f9fd692b4a9ee129fc63519f5d2a79e3d16a8ddf0e8ee9"
+serialized_bytes_length = 17096237
 [[entries]]
-file_name = "org.scalameta_trees_2.13_4.8.7.jar"
+file_name = "org.scalameta_trees_2.13_4.8.10.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
@@ -831,7 +831,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -873,17 +873,17 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scalameta"
 artifact = "trees_2.13"
-version = "4.8.7"
+version = "4.8.10"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "90989bd72fc55ddb119eba2cca0b5869df8a8c3c6c9c54d9f70fc268c81e313e"
+fingerprint = "998c9104557d13de9ac1011545c7f958383574f4adde02f0a5ad2f6da3774159"
 serialized_bytes_length = 6359786
 [[entries]]
 file_name = "org.typelevel_cats-core_2.13_2.6.1.jar"

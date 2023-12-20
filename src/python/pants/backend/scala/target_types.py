@@ -61,6 +61,7 @@ from pants.jvm.target_types import (
     JvmRunnableSourceFieldSet,
     _jvm_artifact_exclusions_field_help,
 )
+from pants.util.logging import LogLevel
 from pants.util.strutil import help_text, softwrap
 
 
@@ -287,6 +288,17 @@ class ScalaSourceTarget(Target):
         JvmMainClassNameField,
     )
     help = "A single Scala source file containing application or library code."
+
+
+# TODO: add third-party targets here? That would allow us to avoid iterating over AllTargets twice.
+#  See `backend/python/dependency_inference/module_mapper.py` for an example.
+class AllScalaTargets(Targets):
+    pass
+
+
+@rule(desc="Find all Scala targets in project", level=LogLevel.DEBUG)
+def find_all_scala_targets(targets: AllTargets) -> AllScalaTargets:
+    return AllScalaTargets(tgt for tgt in targets if tgt.has_field(ScalaSourceField))
 
 
 # -----------------------------------------------------------------------------------------------

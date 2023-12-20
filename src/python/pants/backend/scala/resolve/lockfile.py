@@ -1,7 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.target_types import AllScalaTargets
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
     ScalaArtifactsForVersionResult,

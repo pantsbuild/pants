@@ -233,8 +233,8 @@ jar_tool_dev = "src/python/pants/jvm/jar_tool/jar_tool.lock"
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
+[scalac]
+args = [ "-Xlint:unused" ]
+
 [scala-infer]
 force_add_siblings_as_dependencies = false
-
-[scalafix]
-lockfile = "scalafix.lock"

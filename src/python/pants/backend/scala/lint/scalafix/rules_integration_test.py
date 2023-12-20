@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from pants.jvm.target_types import JvmArtifactTarget
-from pants.util.logging import LogLevel
 
 import pytest
 
@@ -26,7 +24,6 @@ from pants.backend.scala.lint.scalafix.rules import (
 from pants.backend.scala.lint.scalafix.rules import rules as scalafix_rules
 from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
 from pants.backend.scala.target_types import (
-    ScalaArtifactTarget,
     ScalacPluginTarget,
     ScalaSourcesGeneratorTarget,
     ScalaSourceTarget,
@@ -36,7 +33,7 @@ from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtResult, Partitions
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.engine.fs import DigestContents, PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath
@@ -45,9 +42,11 @@ from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
+from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
+from pants.util.logging import LogLevel
 
 
 @pytest.fixture
@@ -77,7 +76,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ScalafixConfigFiles, (GatherScalafixConfigFilesRequest,)),
         ],
         target_types=[
-            ScalaSourceTarget,            
+            ScalaSourceTarget,
             ScalacPluginTarget,
             ScalaSourcesGeneratorTarget,
             JvmArtifactTarget,
@@ -138,28 +137,33 @@ def test_remove_unused(rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfile
         {
             "3rdparty/jvm/default.lock": semanticdb_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": semanticdb_lockfile.requirements_as_jvm_artifact_targets(),
-            "Foo.scala": dedent(
+            "src/jvm/Foo.scala": dedent(
                 """\
                 import scala.List
                 import scala.collection.{immutable, mutable}
                 object Foo { immutable.Seq.empty[Int] }
                 """
             ),
-            "BUILD": "scala_sources(name='foo')",
+            "src/jvm/BUILD": "scala_sources()",
             ".scalafix.conf": "rules = [ RemoveUnused ]",
         }
     )
 
-    tgt = rule_runner.get_target(Address("", target_name="foo", relative_file_path="Foo.scala"))
+    tgt = rule_runner.get_target(Address("src/jvm", relative_file_path="Foo.scala"))
 
     scalac_args = ["-Xlint:unused"]
     fix_result = run_scalafix(
-        rule_runner, [tgt], extra_options=[f"--scalac-args={repr(scalac_args)}"]
+        rule_runner,
+        [tgt],
+        extra_options=[
+            f"--source-root-patterns={repr(['src/jvm'])}",
+            f"--scalac-args={repr(scalac_args)}",
+        ],
     )
     assert isinstance(fix_result, FixResult)
     assert fix_result.output == rule_runner.make_snapshot(
         {
-            "Foo.scala": dedent(
+            "src/jvm/Foo.scala": dedent(
                 """
                 import scala.collection.immutable
                 object Foo { immutable.Seq.empty[Int] }
