@@ -284,7 +284,7 @@ class NativeDownloadFile:
 class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
 
-    _scheduler: "SchedulerSession"
+    _scheduler: SchedulerSession
     _enforce_effects: bool = True
 
     def write_digest(
@@ -326,7 +326,7 @@ class SnapshotDiff:
     changed_files: tuple[str, ...] = ()
 
     @classmethod
-    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
+    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> SnapshotDiff:
         return cls(*ours._diff(theirs))
 
 

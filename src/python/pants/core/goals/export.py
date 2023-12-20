@@ -170,7 +170,7 @@ async def export(
             resolves_exported.add(result.resolve)
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
-    unexported_resolves = sorted((set(export_subsys.resolve) - resolves_exported))
+    unexported_resolves = sorted(set(export_subsys.resolve) - resolves_exported)
     if unexported_resolves:
         all_known_user_resolve_names = await MultiGet(
             Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())

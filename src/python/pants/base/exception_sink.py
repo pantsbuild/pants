@@ -92,7 +92,7 @@ class SignalHandler:
             self.signum = signum
             self.signame = signame
             self.traceback_lines = traceback.format_stack()
-            super(SignalHandler.SignalHandledNonLocalExit, self).__init__()
+            super().__init__()
 
             if "I/O operation on closed file" in self.traceback_lines:
                 logger.debug(
