@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import textwrap
 
 import pytest
@@ -723,3 +724,54 @@ def test_failed_to_fetch_jar_given_packaging_pom(rule_runner: RuleRunner) -> Non
         match=r"Exception: No jar found for org.apache.curator:apache-curator:5.5.0. .*",
     ):
         rule_runner.request(CoursierResolvedLockfile, [reqs])
+
+
+@maybe_skip_jdk_test
+def test_force_version(rule_runner):
+    # first check that force_version=False leads to a different version
+    reqs = ArtifactRequirements(
+        [
+            Coordinate(
+                group="org.apache.parquet",
+                artifact="parquet-common",
+                version="1.13.1",
+            ).as_requirement(),
+            Coordinate(
+                group="org.slf4j",
+                artifact="slf4j-api",
+                version="1.7.19",
+            ).as_requirement(),
+        ]
+    )
+    entries = rule_runner.request(CoursierResolvedLockfile, [reqs]).entries
+    assert Coordinate(
+        group="org.slf4j",
+        artifact="slf4j-api",
+        version="1.7.22",
+    ) in [e.coord for e in entries]
+
+    # then check force_version=True pins the version
+    reqs = ArtifactRequirements(
+        [
+            Coordinate(
+                group="org.apache.parquet",
+                artifact="parquet-common",
+                version="1.13.1",
+            ).as_requirement(),
+            dataclasses.replace(
+                Coordinate(
+                    group="org.slf4j",
+                    artifact="slf4j-api",
+                    version="1.7.19",
+                ).as_requirement(),
+                force_version=True,
+            ),
+        ]
+    )
+    entries = rule_runner.request(CoursierResolvedLockfile, [reqs]).entries
+    assert Coordinate(
+        group="org.slf4j",
+        artifact="slf4j-api",
+        version="1.7.19",
+        strict=True,
+    ) in [e.coord for e in entries]
