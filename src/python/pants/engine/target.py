@@ -29,6 +29,7 @@ from typing import (
     KeysView,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
     Set,
     Tuple,
@@ -39,7 +40,7 @@ from typing import (
     get_type_hints,
 )
 
-from typing_extensions import Protocol, Self, final
+from typing_extensions import Self, final
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address

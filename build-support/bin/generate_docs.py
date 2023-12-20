@@ -234,7 +234,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "--no-verify-config",
         "help-all",
     ]
-    run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    run = subprocess.run(argv, capture_output=True, encoding="utf-8")
     try:
         run.check_returncode()
     except subprocess.CalledProcessError:

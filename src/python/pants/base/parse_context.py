@@ -2,9 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from typing import Any, Mapping
-
-from typing_extensions import Protocol
+from typing import Any, Mapping, Protocol
 
 
 class FilePathOracle(Protocol):

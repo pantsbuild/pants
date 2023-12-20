@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import logging
 import os.path
-from typing import Iterable, Mapping, Sequence, TypeVar
-
-from typing_extensions import Protocol
+from typing import Iterable, Mapping, Protocol, Sequence, TypeVar
 
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace

@@ -12,6 +12,7 @@ from typing import (
     Generic,
     Iterable,
     Mapping,
+    Protocol,
     Sequence,
     TextIO,
     Tuple,
@@ -19,7 +20,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Protocol, Self
+from typing_extensions import Self
 
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues

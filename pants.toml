@@ -207,7 +207,7 @@ template_by_globs = "@build-support/preambles/config.yaml"
 diff = true
 
 [pyupgrade]
-args = ["--keep-runtime-typing"]
+args = ["--keep-runtime-typing", "--py38-plus"]
 
 
 [jvm]

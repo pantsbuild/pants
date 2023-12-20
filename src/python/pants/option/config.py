@@ -8,10 +8,9 @@ import os
 import re
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, List, Mapping, Union, cast
+from typing import Any, Dict, Iterable, List, Mapping, Protocol, Union, cast
 
 import toml
-from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
 from pants.option.errors import ConfigError, ConfigValidationError, InterpolationMissingOptionError
