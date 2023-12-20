@@ -6,14 +6,17 @@ import sys
 import pytest
 
 from pants.build_graph.address import Address
-from pants.core.target_types import FileTarget
 from pants.core.util_rules import adhoc_binaries
 from pants.core.util_rules.adhoc_binaries import (
-    PythonBuildStandaloneBinary,
     _DownloadPythonBuildStandaloneBinaryRequest,
     _PythonBuildStandaloneBinary,
 )
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.environments import (
+    DockerEnvironmentTarget,
+    EnvironmentTarget,
+    LocalEnvironmentTarget,
+)
+from pants.engine.environment import EnvironmentName
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 
 
@@ -27,7 +30,7 @@ def rule_runner() -> RuleRunner:
                 [_DownloadPythonBuildStandaloneBinaryRequest],
             ),
         ],
-        target_types=[LocalEnvironmentTarget, FileTarget],
+        target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
     )
 
 
@@ -47,22 +50,35 @@ def test_local(env_tgt) -> None:
     assert result == adhoc_binaries.PythonBuildStandaloneBinary(sys.executable)
 
 
-def test_docker_uses_helper() -> None:
-    result = run_rule_with_mocks(
-        adhoc_binaries.get_python_for_scripts,
-        rule_args=[EnvironmentTarget("docker", FileTarget({"source": ""}, address=Address("")))],
-        mock_gets=[
-            MockGet(
-                output_type=_PythonBuildStandaloneBinary,
-                input_types=(_DownloadPythonBuildStandaloneBinaryRequest,),
-                mock=lambda _: _PythonBuildStandaloneBinary(""),
-            )
+def test_docker_uses_helper(rule_runner: RuleRunner) -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *adhoc_binaries.rules(),
+            QueryRule(
+                _PythonBuildStandaloneBinary,
+                [_DownloadPythonBuildStandaloneBinaryRequest],
+            ),
         ],
+        target_types=[DockerEnvironmentTarget],
+        inherent_environment=EnvironmentName("docker"),
     )
-    assert result == PythonBuildStandaloneBinary("")
+    rule_runner.write_files(
+        {
+            "BUILD": "docker_environment(name='docker', image='ubuntu:latest')",
+        }
+    )
+    rule_runner.set_options(
+        ["--environments-preview-names={'docker': '//:docker'}"], env_inherit={"PATH"}
+    )
+    pbs = rule_runner.request(
+        _PythonBuildStandaloneBinary,
+        [_DownloadPythonBuildStandaloneBinaryRequest()],
+    )
+    assert pbs.path.startswith("/pants-named-caches")
+    assert pbs.path.endswith("/bin/python3")
 
 
-def test_docker_helper(rule_runner: RuleRunner):
+def test_local_environment(rule_runner: RuleRunner):
     rule_runner.write_files(
         {
             "BUILD": "local_environment(name='local')",
@@ -76,3 +92,5 @@ def test_docker_helper(rule_runner: RuleRunner):
         [_DownloadPythonBuildStandaloneBinaryRequest()],
     )
     assert pbs.path.startswith("/")
+    assert pbs.path.endswith("/bin/python3")
+    assert "named_caches/python_build_standalone" in pbs.path
