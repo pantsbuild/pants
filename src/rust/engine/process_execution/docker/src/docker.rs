@@ -741,6 +741,8 @@ impl Command {
 /// multiple tasks trying to access an initializing container do not try to start multiple
 /// containers.
 type CachedContainer = Arc<OnceCell<(String, NamedCaches)>>;
+/// Cache that maps (image name / bind mounts / platform) to a cached container.
+type ContainerMap = BTreeMap<(String, Option<Vec<String>>, Platform), CachedContainer>;
 
 /// Caches running containers so that build actions can be invoked by running "executions"
 /// within those cached containers.
@@ -750,8 +752,7 @@ pub(crate) struct ContainerCache<'a> {
     executor: Executor,
     work_dir_base: String,
     immutable_inputs_base_dir: String,
-    /// Cache that maps image name / platform to a cached container.
-    containers: Mutex<BTreeMap<(String, Platform), CachedContainer>>,
+    containers: Mutex<ContainerMap>,
 }
 
 impl<'a> ContainerCache<'a> {
@@ -956,7 +957,7 @@ impl<'a> ContainerCache<'a> {
         let container_id_cell = {
             let mut containers = self.containers.lock();
             let cell = containers
-                .entry((image_name.to_string(), *platform))
+                .entry((image_name.to_string(), bind_mounts.clone(), *platform))
                 .or_insert_with(|| Arc::new(OnceCell::new()));
             cell.clone()
         };

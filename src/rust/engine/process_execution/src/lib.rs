@@ -444,7 +444,8 @@ impl ProcessExecutionStrategy {
             Self::RemoteExecution(_) => "remote_execution".to_string(),
             // NB: this image will include the container ID, thanks to
             // https://github.com/pantsbuild/pants/pull/17101.
-            Self::Docker(image, bind_mounts) => format!("docker_execution: {image},{bind_mounts:?}"),
+            // NB: We don't include the mount info in the cache.
+            Self::Docker(image, _) => format!("docker_execution: {image}"),
         }
     }
 
