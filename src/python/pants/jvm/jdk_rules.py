@@ -433,7 +433,6 @@ async def jvm_process(
     elif request.use_nailgun:
         remote_cache_speculation_delay_millis = jvm.nailgun_remote_cache_speculation_delay
 
-    print(request.argv)
     return Process(
         [*jdk.args(bash, request.classpath_entries), *jvm_options, *request.argv],
         input_digest=request.input_digest,

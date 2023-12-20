@@ -26,7 +26,7 @@ from pants.backend.scala.target_types import (
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
-from pants.core.util_rules import source_files
+from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Addresses
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
@@ -56,6 +56,7 @@ def rule_runner() -> RuleRunner:
             *strip_jar.rules(),
             *scalac_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *target_types_rules(),
             *testutil.rules(),
             *util_rules(),

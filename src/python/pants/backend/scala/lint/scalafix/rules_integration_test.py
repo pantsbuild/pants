@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from pants.jvm.target_types import JvmArtifactTarget
+from pants.util.logging import LogLevel
 
 import pytest
 
@@ -32,9 +34,9 @@ from pants.backend.scala.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtResult, Partitions
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import DigestContents, PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath
@@ -58,6 +60,7 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *artifact_mapper.rules(),
             *strip_jar.rules(),
             *scalac.rules(),
@@ -74,10 +77,10 @@ def rule_runner() -> RuleRunner:
             QueryRule(ScalafixConfigFiles, (GatherScalafixConfigFilesRequest,)),
         ],
         target_types=[
-            ScalaSourceTarget,
-            ScalaArtifactTarget,
+            ScalaSourceTarget,            
             ScalacPluginTarget,
             ScalaSourcesGeneratorTarget,
+            JvmArtifactTarget,
         ],
     )
     return rule_runner
@@ -86,8 +89,8 @@ def rule_runner() -> RuleRunner:
 @pytest.fixture
 def semanticdb_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
-        "semanticdb-scalac.test.lock",
-        ["org.scala-lang:scala-library:2.13.6", "org.scalameta:semanticdb-scalac_2.13.6:4.8.10"],
+        "semanticdb-scalac-2.13.test.lock",
+        ["org.scala-lang:scala-library:2.13.6", "org.scalameta:semanticdb-scalac_2.13.6:4.8.4"],
     )
 
 
@@ -105,7 +108,6 @@ def run_scalafix(
     expected_partitions: dict[str, tuple[str, ...]] | None = None,
 ) -> FixResult | list[FixResult]:
     rule_runner.set_options(extra_options, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    print(extra_options)
 
     field_sets = [ScalafixFieldSet.create(tgt) for tgt in targets]
     partitions = rule_runner.request(
@@ -129,7 +131,7 @@ def run_scalafix(
     return fix_results if expected_partitions else fix_results[0]
 
 
-@logging
+@logging(level=LogLevel.INFO)
 @maybe_skip_jdk_test
 def test_remove_unused(rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
@@ -150,17 +152,24 @@ def test_remove_unused(rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfile
 
     tgt = rule_runner.get_target(Address("", target_name="foo", relative_file_path="Foo.scala"))
 
-    scalac_args = ["-Ywarn-unused"]
+    scalac_args = ["-Xlint:unused"]
     fix_result = run_scalafix(
         rule_runner, [tgt], extra_options=[f"--scalac-args={repr(scalac_args)}"]
     )
     assert isinstance(fix_result, FixResult)
+    output_contents = rule_runner.request(DigestContents, [fix_result.output.digest])
+    for content in output_contents:
+        print("-------------------------")
+        print(content.content.decode())
+        print("-------------------------")
     assert fix_result.output == rule_runner.make_snapshot(
         {
             "Foo.scala": dedent(
                 """\
+                
                 import scala.collection.immutable
                 object Foo { immutable.Seq.empty[Int] }
+                
                 """
             )
         }

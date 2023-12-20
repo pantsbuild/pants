@@ -20,7 +20,7 @@ from pants.backend.scala.target_types import (
     ScalaSourcesGeneratorTarget,
     ScalaSourceTarget,
 )
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.jvm import classpath, testutil
@@ -48,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *coursier_fetch.rules(),
             *coursier_setup.rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *artifact_mapper.rules(),
             *strip_jar.rules(),
             *scalac.rules(),
@@ -101,6 +102,8 @@ def test_scala2_compile_with_semanticdb(
         }
     )
 
+    rule_runner.set_options([f"--source-root-patterns={repr(['src/jvm'])}"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+
     request = CompileScalaSourceRequest(
         component=expect_single_expanded_coarsened_target(
             rule_runner, Address(spec_path="src/jvm")
@@ -109,7 +112,7 @@ def test_scala2_compile_with_semanticdb(
     )
     rendered_classpath = rule_runner.request(RenderedClasspath, [request])
     assert (
-        "META-INF/semanticdb/src/jvm/Foo.scala.semanticdb"
+        "META-INF/semanticdb/Foo.scala.semanticdb"
         in rendered_classpath.content["src.jvm.Foo.scala.scalac.jar"]
     )
 
@@ -149,7 +152,10 @@ def test_scala3_compile_with_semanticdb(
 
     scala_versions = {"jvm-default": "3.3.1"}
     rule_runner.set_options(
-        [f"--scala-version-for-resolve={repr(scala_versions)}"],
+        [
+            f"--scala-version-for-resolve={repr(scala_versions)}",
+            f"--source-root-patterns={repr(['src/jvm'])}"
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
@@ -161,6 +167,6 @@ def test_scala3_compile_with_semanticdb(
     )
     rendered_classpath = rule_runner.request(RenderedClasspath, [request])
     assert (
-        "META-INF/semanticdb/src/jvm/Foo.scala.semanticdb"
+        "META-INF/semanticdb/Foo.scala.semanticdb"
         in rendered_classpath.content["src.jvm.Foo.scala.scalac.jar"]
     )

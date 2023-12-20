@@ -10,8 +10,8 @@ class ScalafixSubsystem(JvmToolBase):
     name = "scalafix"
     help = "scalafix (https://scalacenter.github.io/scalafix/)"
 
-    default_version = "0.11.0"
-    default_artifacts = ("ch.epfl.scala:scalafix-cli_2.13.11:{version}",)
+    default_version = "0.9.31"
+    default_artifacts = ("ch.epfl.scala:scalafix-cli_2.13.6:{version}",)
     default_lockfile_resource = (
         "pants.backend.scala.lint.scalafix",
         "scalafix.default.lockfile.txt",

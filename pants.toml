@@ -235,3 +235,6 @@ version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
 [scala-infer]
 force_add_siblings_as_dependencies = false
+
+[scalafix]
+lockfile = "scalafix.lock"

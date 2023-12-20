@@ -27,6 +27,7 @@ from pants.backend.scala.util_rules.versions import (
     ScalaVersion,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -109,7 +110,7 @@ async def compile_scala_source(
         component_members_with_sources,
         await MultiGet(
             Get(
-                SourceFiles,
+                StrippedSourceFiles,
                 SourceFilesRequest(
                     (t.get(SourcesField),),
                     for_sources_types=(ScalaSourceField, JavaSourceField),
@@ -230,13 +231,14 @@ async def compile_scala_source(
         compilation_results = await Get(
             Snapshot, RemovePrefix(process_result.output_digest, output_dir)
         )
+        logging.debug(f"Scalac compilation results: {compilation_results.files}")
         output_digest = await Get(
             Digest,
             JarToolRequest(
                 jar_name=output_file,
                 digest=compilation_results.digest,
                 main_class=NO_MAIN_CLASS,
-                file_mappings={f: f for f in compilation_results.files},
+                files=compilation_results.files,
             ),
         )
 

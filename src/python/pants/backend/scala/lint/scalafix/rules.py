@@ -17,8 +17,9 @@ from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.partitions import Partition
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.process import ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -65,8 +66,9 @@ class ScalafixConfigFiles:
 
 @dataclass(frozen=True)
 class PartitionInfo:
-    classpath_entries: tuple[str, ...]
     config_snapshot: Snapshot
+    runtime_classpath_entries: tuple[str, ...]
+    scalafix_classpath_entries: tuple[str, ...]
     extra_immutable_input_digests: FrozenDict[str, Digest]
 
     @property
@@ -128,11 +130,10 @@ async def partition_scalafix(
 
     filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
     classpaths = await MultiGet(
-        Get(Classpath, DependenciesRequest(field_set.dependencies))
+        Get(Classpath, Addresses([field_set.address]))
         for field_set in request.field_sets
     )
     classpath_by_filepath = dict(zip(filepaths, classpaths))
-    print(classpath_by_filepath)
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafixToolLockfileSentinel())
     tool_classpath, config_files = await MultiGet(
@@ -178,16 +179,13 @@ async def partition_scalafix(
                 if filepath.match(path_pattern):
                     classpaths_to_combine.add(classpath)
 
-        print(classpaths_to_combine)
         return combine_classpaths(classpaths_to_combine)
 
     def partition_info_for(files: Iterable[str], config_snapshot: Snapshot) -> PartitionInfo:
         classpath = classpath_for_files(files)
         return PartitionInfo(
-            classpath_entries=(
-                *tool_classpath.classpath_entries(toolcp_relpath),
-                *classpath.immutable_inputs_args(),
-            ),
+            runtime_classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+            scalafix_classpath_entries=classpath.immutable_inputs_args(),
             config_snapshot=config_snapshot,
             extra_immutable_input_digests=FrozenDict(
                 {**extra_immutable_input_digests, **dict(classpath.immutable_inputs())}
@@ -217,9 +215,7 @@ async def scalafix_fix(
     merged_digest = await Get(
         Digest, MergeDigests([partition_info.config_snapshot.digest, request.snapshot.digest])
     )
-
-    print(partition_info.classpath_entries)
-
+    
     result = await Get(
         ProcessResult,
         JvmProcess(
@@ -227,14 +223,12 @@ async def scalafix_fix(
             argv=[
                 "scalafix.cli.Cli",
                 "--verbose",
-                "--config",
-                partition_info.config_snapshot.files[0],
-                "--scalac-options",
-                *scalac.args,
-                "--files",
-                *request.files,
+                f"--config={partition_info.config_snapshot.files[0]}",
+                f"--classpath={':'.join(partition_info.scalafix_classpath_entries)}",
+                *((f"--scalac-options={','.join(scalac.args)}",) if scalac.args else ()),
+                f"--files={','.join(request.files)}",
             ],
-            classpath_entries=partition_info.classpath_entries,
+            classpath_entries=partition_info.runtime_classpath_entries,
             input_digest=merged_digest,
             output_files=request.files,
             extra_jvm_options=tool.jvm_options,
