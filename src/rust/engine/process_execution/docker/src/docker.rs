@@ -218,9 +218,16 @@ async fn credentials_for_image(
                 // TODO: https://github.com/keirlawson/docker_credential/issues/7 means that this will only
                 // work for credential helpers and credentials encoded directly in the docker config,
                 // rather than for general credStore implementations.
-                let Ok(credential) = docker_credential::get_credential(&server) else {
-                    log::warn!("Failed to retrieve credentials for server `{}`", server);
-                    return Ok(None);
+                let credential = match docker_credential::get_credential(&server) {
+                    Ok(credential) => credential,
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to retrieve Docker credentials for server `{}`: {}",
+                            server,
+                            e
+                        );
+                        return Ok(None);
+                    }
                 };
 
                 let bollard_credentials = match credential {
