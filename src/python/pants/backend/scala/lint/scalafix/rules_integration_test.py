@@ -157,19 +157,12 @@ def test_remove_unused(rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfile
         rule_runner, [tgt], extra_options=[f"--scalac-args={repr(scalac_args)}"]
     )
     assert isinstance(fix_result, FixResult)
-    output_contents = rule_runner.request(DigestContents, [fix_result.output.digest])
-    for content in output_contents:
-        print("-------------------------")
-        print(content.content.decode())
-        print("-------------------------")
     assert fix_result.output == rule_runner.make_snapshot(
         {
             "Foo.scala": dedent(
-                """\
-                
+                """
                 import scala.collection.immutable
                 object Foo { immutable.Seq.empty[Int] }
-                
                 """
             )
         }
