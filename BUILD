@@ -13,6 +13,7 @@ python_test_utils(name="test_utils")
 docker_environment(
     name="docker_env",
     image="python:3.9",
+    bind_mounts=["/etc/passwd:/act"],
     python_bootstrap_search_path=["<PATH>"],
 )
 
@@ -49,4 +50,17 @@ experimental_test_shell_command(
     """,
     tools=["echo", "find"],
     execution_dependencies=[":all-__init__.py-files"],
+)
+
+docker_environment(
+    name="docker_env_for_testing",
+    image="debian:stable-slim",
+    bind_mounts=["/etc/passwd:/mount_dir/testfile"],
+)
+
+experimental_test_shell_command(
+    name="test-docker-environment-bind-mounts",
+    tools=["test"],
+    command="test -f /mount_dir/testfile",
+    environment="docker_for_testing"
 )

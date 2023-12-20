@@ -114,6 +114,8 @@ root_patterns = [
 docker = "//:docker_env"
 # Used for iterating on remote-execution.
 remote = "//:buildgrid_remote"
+# Used for testing
+docker_for_testing = "//:docker_env_for_testing"
 
 [tailor]
 build_file_header = """\

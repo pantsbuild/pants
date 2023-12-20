@@ -211,25 +211,6 @@ class DockerBindMountsField(StringSequenceField):
         """
     )
 
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        values = super().compute_value(raw_value, address)
-        if values and (bad_values := [val for val in values if len(val.split(":")) != 2]):
-            raise ValueError(
-                softwrap(
-                    f"""
-                    `bind_mounts` values must be of the form '<val>:<val>', but the following
-                    values for target '{address.target_name}' were not:
-
-                    {bullet_list(bad_values)}
-                    """
-                )
-            )
-
-        return values
-
 class DockerPlatformField(StringField):
     alias = "platform"
     default = None
