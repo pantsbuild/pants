@@ -12,7 +12,7 @@ from pants.backend.scala.lint.scalafix.skip_field import SkipScalafixField
 from pants.backend.scala.lint.scalafix.subsystem import ScalafixSubsystem
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
-from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
+from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -43,7 +43,6 @@ class ScalafixFieldSet(FieldSet):
     required_fields = (ScalaSourceField,)
 
     source: ScalaSourceField
-    dependencies: ScalaDependenciesField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
