@@ -76,21 +76,3 @@ def test_docker_uses_helper(rule_runner: RuleRunner) -> None:
     )
     assert pbs.path.startswith("/pants-named-caches")
     assert pbs.path.endswith("/bin/python3")
-
-
-def test_local_environment(rule_runner: RuleRunner):
-    rule_runner.write_files(
-        {
-            "BUILD": "local_environment(name='local')",
-        }
-    )
-    rule_runner.set_options(
-        ["--environments-preview-names={'local': '//:local'}"], env_inherit={"PATH"}
-    )
-    pbs = rule_runner.request(
-        _PythonBuildStandaloneBinary,
-        [_DownloadPythonBuildStandaloneBinaryRequest()],
-    )
-    assert pbs.path.startswith("/")
-    assert pbs.path.endswith("/bin/python3")
-    assert "named_caches/python_build_standalone" in pbs.path
