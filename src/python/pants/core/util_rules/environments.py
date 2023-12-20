@@ -220,7 +220,8 @@ class DockerBindMountsField(StringSequenceField):
             raise ValueError(
                 softwrap(
                     f"""
-                    `bind_mounts` values must be of the form '<val>:<val>', but the following were not:
+                    `bind_mounts` values must be of the form '<val>:<val>', but the following
+                    values for target '{address.target_name}' were not:
 
                     {bullet_list(bad_values)}
                     """
