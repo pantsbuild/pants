@@ -51,7 +51,6 @@ from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
-from pants.util.logging import LogLevel
 
 
 @pytest.fixture
@@ -247,6 +246,18 @@ def _run_scalafix(
     return results if expected_partitions else results[0]
 
 
+BASIC_SCALAFIX_CONF = dedent(
+    """\
+    rules = [ DisableSyntax ]
+    """
+)
+
+GOOD_FILE = """\
+object Foo {
+  def hello = "hello"
+}
+"""
+
 BAD_FILE = """\
 object Foo {
   def throwException = throw new IllegalArgumentException
@@ -287,6 +298,44 @@ def test_lint_failure(rule_runner: RuleRunner) -> None:
     assert lint_result.exit_code != 0
 
 
+@maybe_skip_jdk_test
+def test_multiple_config_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            DEFAULT_SCALAFIX_CONFIG_FILENAME: BASIC_SCALAFIX_CONF,
+            "foo/BUILD": "scala_sources()",
+            "foo/Foo.scala": GOOD_FILE,
+            "foo/bar/BUILD": "scala_sources()",
+            "foo/bar/Bar.scala": BAD_FILE,
+            f"foo/bar/{DEFAULT_SCALAFIX_CONFIG_FILENAME}": dedent(
+                f"""\
+                {BASIC_SCALAFIX_CONF}
+                DisableSyntax.noThrows = true
+                """
+            ),
+        }
+    )
+
+    tgts = [
+        rule_runner.get_target(Address("foo", target_name="foo", relative_file_path="Foo.scala")),
+        rule_runner.get_target(
+            Address("foo/bar", target_name="bar", relative_file_path="Bar.scala")
+        ),
+    ]
+    lint_results = run_scalafix_lint(
+        rule_runner,
+        tgts,
+        extra_options=["--scalac-semanticdb-enabled=False"],
+        expected_partitions={
+            DEFAULT_SCALAFIX_CONFIG_FILENAME: ("foo/Foo.scala",),
+            "foo/bar/" + DEFAULT_SCALAFIX_CONFIG_FILENAME: ("foo/bar/Bar.scala",),
+        },
+    )
+
+    assert lint_results[0].exit_code == 0
+    assert lint_results[1].exit_code != 0
+
+
 @pytest.fixture
 def semanticdb_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
@@ -302,9 +351,10 @@ def semanticdb_lockfile(
     return semanticdb_lockfile_def.load(request)
 
 
-@logging(level=LogLevel.INFO)
 @maybe_skip_jdk_test
-def test_remove_unused(rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfileFixture) -> None:
+def test_builtin_semanticdb_rule(
+    rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "3rdparty/jvm/default.lock": semanticdb_lockfile.serialized_lockfile,
