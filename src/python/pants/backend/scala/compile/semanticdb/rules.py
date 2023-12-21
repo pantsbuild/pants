@@ -30,6 +30,9 @@ async def scalafix_semanticdb_scalac_plugin(
     scala: ScalaSubsystem,
     semanticdb: SemanticDbSubsystem,
 ) -> GlobalScalacPlugins:
+    if not semanticdb.enabled:
+        return GlobalScalacPlugins([])
+
     scala_version = scala.version_for_resolve(request.resolve_name)
     if scala_version.major == 3:
         # TODO figure out how to pass semanticdb options to Scalac 3

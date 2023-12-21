@@ -8,7 +8,7 @@ from pants.option.option_types import BoolOption, DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
-DEFAULT_SCALA_VERSION = ScalaVersion.parse("2.13.6")
+DEFAULT_SCALA_VERSION = ScalaVersion.parse("2.13.12")
 
 
 class ScalaSubsystem(Subsystem):

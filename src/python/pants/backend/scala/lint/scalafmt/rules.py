@@ -28,8 +28,6 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
-_SCALAFMT_CONF_FILENAME = ".scalafmt.conf"
-
 
 @dataclass(frozen=True)
 class ScalafmtFieldSet(FieldSet):
@@ -76,7 +74,7 @@ class PartitionInfo:
 # @TODO: This logic is very similar, but not identical to the one for yamllint. It should be generalized and shared.
 @rule
 async def gather_scalafmt_config_files(
-    request: GatherScalafmtConfigFilesRequest,
+    request: GatherScalafmtConfigFilesRequest, scalafmt: ScalafmtSubsystem
 ) -> ScalafmtConfigFiles:
     """Gather scalafmt config files and identify which config files to use for each source
     directory."""
@@ -91,7 +89,7 @@ async def gather_scalafmt_config_files(
             source_dir_parts.pop()
 
     config_file_globs = [
-        os.path.join(dir, _SCALAFMT_CONF_FILENAME) for dir in source_dirs_with_ancestors
+        os.path.join(dir, scalafmt.config_filename) for dir in source_dirs_with_ancestors
     ]
     config_files_snapshot = await Get(Snapshot, PathGlobs(config_file_globs))
     config_files_set = set(config_files_snapshot.files)
@@ -99,11 +97,11 @@ async def gather_scalafmt_config_files(
     source_dir_to_config_file: dict[str, str] = {}
     for source_dir in source_dirs:
         config_file = find_nearest_ancestor_file(
-            config_files_set, source_dir, _SCALAFMT_CONF_FILENAME
+            config_files_set, source_dir, scalafmt.config_filename
         )
         if not config_file:
             raise ValueError(
-                f"No scalafmt config file (`{_SCALAFMT_CONF_FILENAME}`) found for "
+                f"No scalafmt config file (`{scalafmt.config_filename}`) found for "
                 f"source directory '{source_dir}'"
             )
         source_dir_to_config_file[source_dir] = config_file

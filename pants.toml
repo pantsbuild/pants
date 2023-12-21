@@ -231,10 +231,10 @@ strip_jar_dev = "src/python/pants/jvm/strip_jar/strip_jar.lock"
 jar_tool_dev = "src/python/pants/jvm/jar_tool/jar_tool.lock"
 
 [scala]
-version_for_resolve = { "scala_parser_dev" = "2.13.8" }
+version_for_resolve = { "scala_parser_dev" = "2.13.12" }
 
 [scalac]
-args = [ "-Xlint:unused" ]
+args = [ "-deprecation", "-Xlint:adapted-args", "-Xlint:unused" ]
 
 [scala-infer]
 force_add_siblings_as_dependencies = false

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pants.backend.scala.util_rules.versions import ScalaVersion
-from pants.option.option_types import DictOption
+from pants.option.option_types import BoolOption, DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -21,6 +21,18 @@ DEFAULT_VERSION_MAPPING = {
 class SemanticDbSubsystem(Subsystem):
     options_scope = "scalac-semanticdb"
     help = "semanticdb (ttps://scalameta.org/docs/semanticdb/)"
+
+    enabled = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Whether SemanticDB compilation should be enabled when compiling Scala sources.
+
+            Please note that disabling SemanticDB may make other tools that require semantic
+            compilation metadata not work properly (i.e. scalafix).
+            """
+        ),
+    )
 
     _version_for_resolve = DictOption[str](
         help=softwrap(

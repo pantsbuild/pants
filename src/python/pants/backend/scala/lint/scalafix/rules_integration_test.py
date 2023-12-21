@@ -22,6 +22,7 @@ from pants.backend.scala.lint.scalafix.rules import (
     ScalafixRequest,
 )
 from pants.backend.scala.lint.scalafix.rules import rules as scalafix_rules
+from pants.backend.scala.lint.scalafix.subsystem import DEFAULT_SCALAFIX_CONFIG_FILENAME
 from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
 from pants.backend.scala.target_types import (
     ScalacPluginTarget,
@@ -85,19 +86,31 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@pytest.fixture
-def semanticdb_lockfile_def() -> JVMLockfileFixtureDefinition:
-    return JVMLockfileFixtureDefinition(
-        "semanticdb-scalac-2.13.test.lock",
-        ["org.scala-lang:scala-library:2.13.6", "org.scalameta:semanticdb-scalac_2.13.6:4.8.4"],
+def test_gather_scalafix_config_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            DEFAULT_SCALAFIX_CONFIG_FILENAME: "",
+            f"foo/bar/{DEFAULT_SCALAFIX_CONFIG_FILENAME}": "",
+            f"hello/{DEFAULT_SCALAFIX_CONFIG_FILENAME}": "",
+            "hello/Foo.scala": "",
+            "hello/world/Foo.scala": "",
+            "foo/bar/Foo.scala": "",
+            "foo/bar/xyyzzy/Foo.scala": "",
+            "foo/blah/Foo.scala": "",
+        }
     )
 
-
-@pytest.fixture
-def semanticdb_lockfile(
-    semanticdb_lockfile_def: JVMLockfileFixtureDefinition, request
-) -> JVMLockfileFixture:
-    return semanticdb_lockfile_def.load(request)
+    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.scala"])])
+    request = rule_runner.request(
+        ScalafixConfigFiles, [GatherScalafixConfigFilesRequest(snapshot.files)]
+    )
+    assert sorted(request.source_dir_to_config_file.items()) == [
+        ("foo/bar", "foo/bar/.scalafix.conf"),
+        ("foo/bar/xyyzzy", "foo/bar/.scalafix.conf"),
+        ("foo/blah", ".scalafix.conf"),
+        ("hello", "hello/.scalafix.conf"),
+        ("hello/world", "hello/.scalafix.conf"),
+    ]
 
 
 def run_scalafix(
@@ -128,6 +141,50 @@ def run_scalafix(
         for partition in partitions
     ]
     return fix_results if expected_partitions else fix_results[0]
+
+
+BAD_FILE = """\
+object Foo {
+  def throwException = throw new IllegalArgumentException
+}
+"""
+
+
+@maybe_skip_jdk_test
+def test_failure(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "Foo.scala": BAD_FILE,
+            "BUILD": "scala_sources(name='test')",
+            ".scalafix.conf": "rules = [ DisableSyntax ]",
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="test", relative_file_path="Foo.scala"))
+
+    fix_result = run_scalafix(
+        rule_runner,
+        [tgt],
+        extra_options=["--scalac-semanticdb-enabled=False"],
+    )
+    assert isinstance(fix_result, FixResult)
+    assert fix_result.output == rule_runner.make_snapshot({"Foo.scala": BAD_FILE})
+    assert not fix_result.did_change
+
+
+@pytest.fixture
+def semanticdb_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "semanticdb-scalac-2.13.test.lock",
+        ["org.scala-lang:scala-library:2.13.12", "org.scalameta:semanticdb-scalac_2.13.12:4.8.14"],
+    )
+
+
+@pytest.fixture
+def semanticdb_lockfile(
+    semanticdb_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return semanticdb_lockfile_def.load(request)
 
 
 @logging(level=LogLevel.INFO)
@@ -175,27 +232,12 @@ def test_remove_unused(rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfile
 
 
 @pytest.fixture
-def scalafix0110_lockfile_def() -> JVMLockfileFixtureDefinition:
-    return JVMLockfileFixtureDefinition(
-        "scalafix-0.11.0.test.lock",
-        ["ch.epfl.scala:scalafix-cli_2.13.11:0.11.0"],
-    )
-
-
-@pytest.fixture
-def scalafix0110_lockfile(
-    scalafix0110_lockfile_def: JVMLockfileFixtureDefinition, request
-) -> JVMLockfileFixture:
-    return scalafix0110_lockfile_def.load(request)
-
-
-@pytest.fixture
 def scala_rewrites_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
         "scala-rewrites-2.13.test.lock",
         [
-            "org.scala-lang:scala-library:2.13.11",
-            "org.scalameta:semanticdb-scalac_2.13.11:4.8.14",
+            "org.scala-lang:scala-library:2.13.12",
+            "org.scalameta:semanticdb-scalac_2.13.12:4.8.14",
             "org.scala-lang:scala-rewrites_2.13:0.1.5",
         ],
     )
@@ -211,13 +253,10 @@ def scala_rewrites_lockfile(
 @logging
 @maybe_skip_jdk_test
 def test_run_custom_rule(
-    rule_runner: RuleRunner,
-    scala_rewrites_lockfile: JVMLockfileFixture,
-    scalafix0110_lockfile: JVMLockfileFixture,
+    rule_runner: RuleRunner, scala_rewrites_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/jvm/scalafix.lock": scalafix0110_lockfile.serialized_lockfile,
             "3rdparty/jvm/default.lock": scala_rewrites_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": scala_rewrites_lockfile.requirements_as_jvm_artifact_targets(),
             "src/jvm/Foo.scala": dedent(
@@ -242,12 +281,8 @@ def test_run_custom_rule(
         rule_runner,
         [tgt],
         extra_options=[
-            f"--scala-version-for-resolve={repr({'jvm-default': '2.13.11'})}",
             f"--source-root-patterns={repr(['src/jvm'])}",
             f"--scalac-semanticdb-extra-options={repr({'synthetics': 'on'})}",
-            "--scalafix-artifacts=['ch.epfl.scala:scalafix-cli_2.13.11:0.11.0']",
-            "--scalafix-version=0.11.0",
-            "--scalafix-lockfile=3rdparty/jvm/scalafix.lock",
             f"--scalafix-extra-rule-targets={repr(extra_rule_targets)}",
         ],
     )

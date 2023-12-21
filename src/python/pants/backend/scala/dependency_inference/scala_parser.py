@@ -48,9 +48,9 @@ from pants.util.resources import read_resource
 logger = logging.getLogger(__name__)
 
 
-_PARSER_SCALA_VERSION = ScalaVersion.parse("2.13.8")
+_PARSER_SCALA_VERSION = ScalaVersion.parse("2.13.12")
 _PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.binary
-_PARSER_SCALAMETA_VERSION = "4.8.10"
+_PARSER_SCALAMETA_VERSION = "4.8.14"
 
 
 class ScalaParserToolLockfileSentinel(GenerateJvmToolLockfileSentinel):

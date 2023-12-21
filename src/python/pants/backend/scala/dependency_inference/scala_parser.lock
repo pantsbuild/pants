@@ -7,9 +7,9 @@
 #   "version": 1,
 #   "generated_with_requirements": [
 #     "io.circe:circe-generic_2.13:0.14.1,url=not_provided,jar=not_provided",
-#     "org.scala-lang:scala-library:2.13.8,url=not_provided,jar=not_provided",
-#     "org.scalameta:scalameta_2.13:4.8.10,url=not_provided,jar=not_provided",
-#     "org.scalameta:semanticdb-scalac_2.13.8:4.8.10,url=not_provided,jar=not_provided"
+#     "org.scala-lang:scala-library:2.13.12,url=not_provided,jar=not_provided",
+#     "org.scalameta:scalameta_2.13:4.8.14,url=not_provided,jar=not_provided",
+#     "org.scalameta:semanticdb-scalac_2.13.12:4.8.14,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -19,13 +19,13 @@ file_name = "com.chuusai_shapeless_2.13_2.3.7.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
@@ -51,28 +51,28 @@ packaging = "jar"
 fingerprint = "6a9a2dff91dcf71f85be71ae971f6164b5a631dcd34bff08f0618535ca44ad02"
 serialized_bytes_length = 1664824
 [[entries]]
-file_name = "com.lihaoyi_sourcecode_2.13_0.3.0.jar"
+file_name = "com.lihaoyi_sourcecode_2.13_0.3.1.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
 [entries.coord]
 group = "com.lihaoyi"
 artifact = "sourcecode_2.13"
-version = "0.3.0"
+version = "0.3.1"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "6e5b2d55e942b450a222bfd3ebc23e99ca03716e42da25af1b2c8cde038100f5"
-serialized_bytes_length = 119136
+fingerprint = "0e663be9a6c81e9515bdd07c04831397e38ea648a211e85ad005300fe840a03d"
+serialized_bytes_length = 119360
 [[entries]]
 file_name = "com.thesamet.scalapb_lenses_2.13_0.11.13.jar"
 [[entries.directDependencies]]
@@ -84,7 +84,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -96,7 +96,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
@@ -131,7 +131,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -155,7 +155,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
@@ -178,7 +178,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.directDependencies]]
@@ -196,7 +196,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -243,7 +243,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -267,7 +267,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -302,13 +302,13 @@ file_name = "io.circe_circe-numbers_2.13_0.14.1.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
@@ -364,13 +364,13 @@ file_name = "org.scala-lang.modules_scala-collection-compat_2.13_2.9.0.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
@@ -383,7 +383,7 @@ packaging = "jar"
 fingerprint = "eb7494e25e62cd272223f5013cfcc31228f01aa23526df70ea6008190de1ae0d"
 serialized_bytes_length = 5596
 [[entries]]
-file_name = "org.scala-lang_scala-compiler_2.13.11.jar"
+file_name = "org.scala-lang_scala-compiler_2.13.12.jar"
 [[entries.directDependencies]]
 group = "io.github.java-diff-utils"
 artifact = "java-diff-utils"
@@ -405,13 +405,13 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-reflect"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -435,66 +435,66 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-reflect"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scala-lang"
 artifact = "scala-compiler"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "c5a14770370e73a69367b131da1533890200b1e2aa70643b73f9ff31ef2e69ec"
-serialized_bytes_length = 12137574
+fingerprint = "583adb1ffa7b29fdbfdd6f4c97a396af06a8a91625d059823bba1b7172242d6a"
+serialized_bytes_length = 12200301
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.scala-lang_scala-library_2.13.11.jar"
+file_name = "org.scala-lang_scala-library_2.13.12.jar"
 
 [entries.coord]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "71853291f61bda32786a866533361cae474344f5b2772a379179b02112444ed3"
-serialized_bytes_length = 5966754
+fingerprint = "c6a879e4973a60f6162668542a33eaccc2bb565d1c934fb061c5844259131dd1"
+serialized_bytes_length = 5917034
 [[entries]]
-file_name = "org.scala-lang_scala-reflect_2.13.11.jar"
+file_name = "org.scala-lang_scala-reflect_2.13.12.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scala-lang"
 artifact = "scala-reflect"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "6a46ed9b333857e8b5ea668bb254ed8e47dacd1116bf53ade9467aa4ae8f1818"
-serialized_bytes_length = 3760106
+fingerprint = "c648ceb93a9fcbd22603e0be3d6a156723ae661f516c772a550a088bb3cbca7a"
+serialized_bytes_length = 3775795
 [[entries]]
-file_name = "org.scala-lang_scalap_2.13.11.jar"
+file_name = "org.scala-lang_scalap_2.13.12.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-compiler"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -518,36 +518,36 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-compiler"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-reflect"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scala-lang"
 artifact = "scalap"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "ac358699f40002fb4f32ad77531765fce23425d0e83c51854d1635118ab285ea"
-serialized_bytes_length = 527352
+fingerprint = "ba4152ca85f42f04d76d903e006f9848f4e7d0629791d016953f05a5a04954c8"
+serialized_bytes_length = 527354
 [[entries]]
-file_name = "org.scalameta_common_2.13_4.8.10.jar"
+file_name = "org.scalameta_common_2.13_4.8.14.jar"
 [[entries.directDependencies]]
 group = "com.lihaoyi"
 artifact = "sourcecode_2.13"
-version = "0.3.0"
+version = "0.3.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
@@ -559,7 +559,7 @@ packaging = "jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -571,7 +571,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "com.lihaoyi"
 artifact = "sourcecode_2.13"
-version = "0.3.0"
+version = "0.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -595,30 +595,30 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "137d07baa33d8fb5243f1e399b4d210b929ce8a5d3b9ec70c9de8e875265d0d4"
-serialized_bytes_length = 2462815
+fingerprint = "49b5831bf995c88ee69681c5c198a6219ceeeb7c894eef0670078dc030055b5c"
+serialized_bytes_length = 2463771
 [[entries]]
-file_name = "org.scalameta_parsers_2.13_4.8.10.jar"
+file_name = "org.scalameta_parsers_2.13_4.8.14.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.scalameta"
 artifact = "trees_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -630,7 +630,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "com.lihaoyi"
 artifact = "sourcecode_2.13"
-version = "0.3.0"
+version = "0.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -654,48 +654,48 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "trees_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scalameta"
 artifact = "parsers_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "27dc6e6da71938717df932236a6301bb98dd1f13f93adaee169ea5408e8f780b"
-serialized_bytes_length = 1263290
+fingerprint = "47030b6edede54f7aa480ba12155677a6c553de74d34265792bca02ea813256b"
+serialized_bytes_length = 867250
 [[entries]]
-file_name = "org.scalameta_scalameta_2.13_4.8.10.jar"
+file_name = "org.scalameta_scalameta_2.13_4.8.14.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scalap"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.scalameta"
 artifact = "parsers_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -707,7 +707,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "com.lihaoyi"
 artifact = "sourcecode_2.13"
-version = "0.3.0"
+version = "0.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -749,89 +749,89 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-compiler"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-reflect"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scalap"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "parsers_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "trees_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scalameta"
 artifact = "scalameta_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "482bc472be542a43badc1d19b54bedaf2bfc258a433ac6a4c53dd31baa16eb5f"
-serialized_bytes_length = 809757
+fingerprint = "d6cd45cfd609064969922ee8e33863842347533f9a8daf6b059a54c29226dac2"
+serialized_bytes_length = 810656
 [[entries]]
-file_name = "org.scalameta_semanticdb-scalac_2.13.8_4.8.10.jar"
+file_name = "org.scalameta_semanticdb-scalac_2.13.12_4.8.14.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scalameta"
-artifact = "semanticdb-scalac_2.13.8"
-version = "4.8.10"
+artifact = "semanticdb-scalac_2.13.12"
+version = "4.8.14"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "9894f4ac88885b55a8f9fd692b4a9ee129fc63519f5d2a79e3d16a8ddf0e8ee9"
-serialized_bytes_length = 17096237
+fingerprint = "516da9260db08ec221f712eaf3c454a693121ebd64da501200bbf29dd28fcfc4"
+serialized_bytes_length = 17218706
 [[entries]]
-file_name = "org.scalameta_trees_2.13_4.8.10.jar"
+file_name = "org.scalameta_trees_2.13_4.8.14.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.directDependencies]]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -843,7 +843,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "com.lihaoyi"
 artifact = "sourcecode_2.13"
-version = "0.3.0"
+version = "0.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -867,30 +867,30 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scalameta"
 artifact = "common_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 
 
 [entries.coord]
 group = "org.scalameta"
 artifact = "trees_2.13"
-version = "4.8.10"
+version = "4.8.14"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "998c9104557d13de9ac1011545c7f958383574f4adde02f0a5ad2f6da3774159"
-serialized_bytes_length = 6359786
+fingerprint = "798493812b8d2a61381de0645f1630cc47eba6a20bbfeb713c636f6b9609d714"
+serialized_bytes_length = 6740138
 [[entries]]
 file_name = "org.typelevel_cats-core_2.13_2.6.1.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.directDependencies]]
@@ -908,7 +908,7 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -937,13 +937,13 @@ file_name = "org.typelevel_cats-kernel_2.13_2.6.1.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 
@@ -960,13 +960,13 @@ file_name = "org.typelevel_simulacrum-scalafix-annotations_2.13_0.5.4.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.11"
+version = "2.13.12"
 packaging = "jar"
 
 

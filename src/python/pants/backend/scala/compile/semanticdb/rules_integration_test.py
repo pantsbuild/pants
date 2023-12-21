@@ -69,7 +69,7 @@ def rule_runner() -> RuleRunner:
 def scala2_semanticdb_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
         "semanticdb-scalac-2.13.test.lock",
-        ["org.scala-lang:scala-library:2.13.6", "org.scalameta:semanticdb-scalac_2.13.6:4.8.4"],
+        ["org.scala-lang:scala-library:2.13.12", "org.scalameta:semanticdb-scalac_2.13.12:4.8.14"],
     )
 
 
@@ -112,6 +112,42 @@ def test_scala2_compile_with_semanticdb(
     assert (
         "META-INF/semanticdb/Foo.scala.semanticdb"
         in rendered_classpath.content["src.jvm.Foo.scala.scalac.jar"]
+    )
+
+
+@maybe_skip_jdk_test
+def test_scala2_compile_with_semanticdb_disabled(
+    rule_runner: RuleRunner, scala2_semanticdb_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": scala2_semanticdb_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala2_semanticdb_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/Foo.scala": dedent(
+                """\
+                import scala.collection.immutable
+                object Foo { immutable.Seq.empty[Int] }
+                """
+            ),
+            "src/jvm/BUILD": "scala_sources()",
+        }
+    )
+
+    rule_runner.set_options(
+        [f"--source-root-patterns={repr(['src/jvm'])}", "--scalac-semanticdb-enabled=False"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="src/jvm")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    rendered_classpath = rule_runner.request(RenderedClasspath, [request])
+    assert (
+        "META-INF/semanticdb/Foo.scala.semanticdb"
+        not in rendered_classpath.content["src.jvm.Foo.scala.scalac.jar"]
     )
 
 

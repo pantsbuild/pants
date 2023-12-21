@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Iterator, cast
 
+from pants.backend.scala.compile.semanticdb.subsystem import SemanticDbSubsystem
 from pants.backend.scala.lint.scalafix.skip_field import SkipScalafixField
 from pants.backend.scala.lint.scalafix.subsystem import ScalafixSubsystem
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
@@ -68,7 +69,7 @@ class ScalafixConfigFiles:
 
 @dataclass(frozen=True)
 class PartitionInfo:
-    scala_version: ScalaVersion
+    scala_version: ScalaVersion | None
     config_snapshot: Snapshot
     runtime_classpath_entries: tuple[str, ...]
     compile_classpath_entries: tuple[str, ...]
@@ -84,6 +85,7 @@ class ScalafixToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = ScalafixSubsystem.options_scope
 
 
+# @TODO: This logic is very similar, but not identical to the one for yamllint. It should be generalized and shared.
 @rule
 async def gather_scalafix_config_files(
     request: GatherScalafixConfigFilesRequest, scalafix: ScalafixSubsystem
@@ -99,7 +101,7 @@ async def gather_scalafix_config_files(
             source_dir_parts.pop()
 
     config_file_globs = [
-        os.path.join(dir, scalafix.config_file_name) for dir in source_dirs_with_ancestors
+        os.path.join(dir, scalafix.config_filename) for dir in source_dirs_with_ancestors
     ]
     config_files_snapshot = await Get(Snapshot, PathGlobs(config_file_globs))
     config_files_set = set(config_files_snapshot.files)
@@ -107,13 +109,13 @@ async def gather_scalafix_config_files(
     source_dir_to_config_file: dict[str, str] = {}
     for source_dir in source_dirs:
         config_file = find_nearest_ancestor_file(
-            config_files_set, source_dir, scalafix.config_file_name
+            config_files_set, source_dir, scalafix.config_filename
         )
         if not config_file:
             raise ValueError(
                 softwrap(
                     f"""
-                    No scalafix config file (`{scalafix.config_file_name}`) found for
+                    No scalafix config file (`{scalafix.config_filename}`) found for
                     source directory '{source_dir}'.
                     """
                 )
@@ -145,25 +147,19 @@ async def _resolve_scalafix_rule_classpath(
     if not scalafix.extra_rule_targets:
         return _ScalafixRuleClasspath(classpath=None)
 
-    classpath = await Get(
-        Classpath,
-        UnparsedAddressInputs(
-            scalafix.extra_rule_targets,
-            owning_address=None,
-            description_of_origin=f"the `[{scalafix.options_scope}].extra_rule_targets` subsystem option",
-        ),
-    )
+    classpath = await Get(Classpath, UnparsedAddressInputs, scalafix.extra_rule_targets)
     return _ScalafixRuleClasspath(classpath)
 
 
 @rule
 async def partition_scalafix(
     request: ScalafixRequest.PartitionRequest,
-    scala: ScalaSubsystem,
-    tool: ScalafixSubsystem,
     rule_classpath: _ScalafixRuleClasspath,
+    scala: ScalaSubsystem,
+    scalafix: ScalafixSubsystem,
+    semanticdb: SemanticDbSubsystem,
 ) -> Partitions[PartitionInfo]:
-    if tool.skip:
+    if scalafix.skip:
         return Partitions()
 
     toolcp_relpath = "__toolcp"
@@ -171,9 +167,11 @@ async def partition_scalafix(
     rulecp_relpath = "__rulecp"
 
     filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
-    classpaths = await MultiGet(
-        Get(Classpath, Addresses([field_set.address])) for field_set in request.field_sets
-    )
+    classpaths: Iterable[Classpath] = ()
+    if semanticdb.enabled:
+        classpaths = await MultiGet(
+            Get(Classpath, Addresses([field_set.address])) for field_set in request.field_sets
+        )
     classpath_by_filepath = dict(zip(filepaths, classpaths))
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafixToolLockfileSentinel())
@@ -212,7 +210,7 @@ async def partition_scalafix(
         assert resolve_key
         return Classpath(tuple(classpath_entries), resolve_key)
 
-    def classpath_for_files(files: Iterable[str]) -> Classpath:
+    def classpath_for_files(files: Iterable[str]) -> Classpath | None:
         classpaths_to_combine: set[Classpath] = set()
         for file in files:
             filepath = PurePath(file)
@@ -220,22 +218,30 @@ async def partition_scalafix(
                 if filepath.match(path_pattern):
                     classpaths_to_combine.add(classpath)
 
+        if not classpaths_to_combine:
+            return None
         return combine_classpaths(classpaths_to_combine)
 
     def partition_info_for(files: Iterable[str], config_snapshot: Snapshot) -> PartitionInfo:
         classpath = classpath_for_files(files)
         return PartitionInfo(
-            scala_version=scala.version_for_resolve(classpath.resolve.name),
+            scala_version=scala.version_for_resolve(classpath.resolve.name) if classpath else None,
             runtime_classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
             compile_classpath_entries=tuple(
                 classpath.immutable_inputs_args(prefix=compilecp_relpath)
-            ),
+            )
+            if classpath
+            else (),
             rule_classpath_entries=tuple(rule_classpath.args(prefix=rulecp_relpath)),
             config_snapshot=config_snapshot,
             extra_immutable_input_digests=FrozenDict(
                 {
                     **extra_immutable_input_digests,
-                    **dict(classpath.immutable_inputs(prefix=compilecp_relpath)),
+                    **(
+                        dict(classpath.immutable_inputs(prefix=compilecp_relpath))
+                        if classpath
+                        else {}
+                    ),
                     **dict(rule_classpath.immutable_inputs(prefix=rulecp_relpath)),
                 }
             ),
@@ -294,15 +300,23 @@ async def scalafix_fix(
             argv=[
                 "scalafix.cli.Cli",
                 f"--config={partition_info.config_snapshot.files[0]}",
-                f"--scala-version={partition_info.scala_version}",
-                f"--classpath={':'.join(partition_info.compile_classpath_entries)}",
+                *(
+                    (f"--scala-version={partition_info.scala_version}",)
+                    if partition_info.scala_version
+                    else ()
+                ),
+                *(
+                    (f"--classpath={':'.join(partition_info.compile_classpath_entries)}",)
+                    if partition_info.compile_classpath_entries
+                    else ()
+                ),
                 *(
                     (f"--tool-classpath={':'.join(partition_info.rule_classpath_entries)}",)
                     if partition_info.rule_classpath_entries
                     else ()
                 ),
-                *((f"--scalac-options={','.join(scalac.args)}",) if scalac.args else ()),
-                f"--files={','.join(stripped_snapshot.files)}",
+                *((f"--scalac-options={arg}" for arg in scalac.args) if scalac.args else ()),
+                *(f"--files={file}" for file in stripped_snapshot.files),
             ],
             classpath_entries=partition_info.runtime_classpath_entries,
             input_digest=merged_digest,
