@@ -42,7 +42,7 @@ Pants is designed for fast, consistent, ergonomic builds. Some noteworthy featur
 Which languages and frameworks does Pants support?
 ==================================================
 
-- Pants [ships](page:language-support) with support for [Python](doc:python), [Go](doc:go), [Java](doc:jvm-overview), [Scala](doc:jvm-overview) and [Shell](doc:shell).
+- Pants [ships](page:language-support) with support for [Python](doc:python), [Go](doc:go), [Java](doc:jvm-overview), [Scala](doc:jvm-overview) and [Shell](doc:shell-overview).
 - Pants supports a wide range of code generators (such as Thrift, Protobuf, Scrooge and Avro), linters and formatters, and it is easy to add support for new or custom ones
 - Pants can create standalone binaries, [Docker images](doc:docker), AWS Lambdas and GCP Cloud Functions
 
