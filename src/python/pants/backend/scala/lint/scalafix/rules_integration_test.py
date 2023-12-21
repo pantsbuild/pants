@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any, Callable, TypeVar, overload
 
 import pytest
 
@@ -36,6 +37,7 @@ from pants.core.goals.fmt import Partitions
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -117,6 +119,28 @@ def test_gather_scalafix_config_files(rule_runner: RuleRunner) -> None:
     ]
 
 
+@overload
+def run_scalafix_fix(
+    rule_runner: RuleRunner,
+    targets: list[Target],
+    *,
+    extra_options: list[str] = [],
+    expected_partitions: None = None,
+) -> FixResult:
+    ...
+
+
+@overload
+def run_scalafix_fix(
+    rule_runner: RuleRunner,
+    targets: list[Target],
+    *,
+    extra_options: list[str] = [],
+    expected_partitions: dict[str, tuple[str, ...]],
+) -> list[FixResult]:
+    ...
+
+
 def run_scalafix_fix(
     rule_runner: RuleRunner,
     targets: list[Target],
@@ -124,28 +148,48 @@ def run_scalafix_fix(
     extra_options: list[str] = [],
     expected_partitions: dict[str, tuple[str, ...]] | None = None,
 ) -> FixResult | list[FixResult]:
-    rule_runner.set_options(extra_options, env_inherit=PYTHON_BOOTSTRAP_ENV)
+    def create_batch_request(
+        name: str, partition: Partition[str, ScalafixPartitionInfo]
+    ) -> ScalafixFixRequest.Batch:
+        snapshot = rule_runner.request(Snapshot, [PathGlobs(partition.elements)])
+        return ScalafixFixRequest.Batch(
+            name,
+            partition.elements,
+            partition_metadata=partition.metadata,
+            snapshot=snapshot,
+        )
 
-    field_sets = [ScalafixFieldSet.create(tgt) for tgt in targets]
-    partitions = rule_runner.request(
-        Partitions[ScalafixPartitionInfo], [ScalafixFixRequest.PartitionRequest(tuple(field_sets))]
+    return _run_scalafix(
+        rule_runner,
+        targets,
+        output_type=FixResult,
+        paritition_req_call=lambda x: ScalafixFixRequest.PartitionRequest(x),
+        batch_req_call=create_batch_request,
+        extra_options=extra_options,
+        expected_partitions=expected_partitions,
     )
 
-    fix_results = [
-        rule_runner.request(
-            FixResult,
-            [
-                ScalafixFixRequest.Batch(
-                    "",
-                    partition.elements,
-                    partition_metadata=partition.metadata,
-                    snapshot=rule_runner.request(Snapshot, [PathGlobs(partition.elements)]),
-                )
-            ],
-        )
-        for partition in partitions
-    ]
-    return fix_results if expected_partitions else fix_results[0]
+
+@overload
+def run_scalafix_lint(
+    rule_runner: RuleRunner,
+    targets: list[Target],
+    *,
+    extra_options: list[str] = [],
+    expected_partitions: None = None,
+) -> LintResult:
+    ...
+
+
+@overload
+def run_scalafix_lint(
+    rule_runner: RuleRunner,
+    targets: list[Target],
+    *,
+    extra_options: list[str] = [],
+    expected_partitions: dict[str, tuple[str, ...]],
+) -> list[LintResult]:
+    ...
 
 
 def run_scalafix_lint(
@@ -155,25 +199,52 @@ def run_scalafix_lint(
     extra_options: list[str] = [],
     expected_partitions: dict[str, tuple[str, ...]] | None = None,
 ) -> LintResult | list[LintResult]:
+    def create_batch_request(
+        name: str, partition: Partition[str, ScalafixPartitionInfo]
+    ) -> ScalafixLintRequest.Batch:
+        return ScalafixLintRequest.Batch(
+            name, partition.elements, partition_metadata=partition.metadata
+        )
+
+    return _run_scalafix(
+        rule_runner,
+        targets,
+        output_type=LintResult,
+        paritition_req_call=lambda x: ScalafixLintRequest.PartitionRequest(x),
+        batch_req_call=create_batch_request,
+        extra_options=extra_options,
+        expected_partitions=expected_partitions,
+    )
+
+
+_Out = TypeVar("_Out")
+
+
+def _run_scalafix(
+    rule_runner: RuleRunner,
+    targets: list[Target],
+    *,
+    output_type: type[_Out],
+    paritition_req_call: Callable[[tuple[ScalafixFieldSet, ...]], Any],
+    batch_req_call: Callable[[str, Partition[str, ScalafixPartitionInfo]], Any],
+    extra_options: list[str] = [],
+    expected_partitions: dict[str, tuple[str, ...]] | None = None,
+) -> _Out | list[_Out]:
     rule_runner.set_options(extra_options, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     field_sets = [ScalafixFieldSet.create(tgt) for tgt in targets]
     partitions = rule_runner.request(
-        Partitions[ScalafixPartitionInfo], [ScalafixLintRequest.PartitionRequest(tuple(field_sets))]
+        Partitions[ScalafixPartitionInfo], [paritition_req_call(tuple(field_sets))]
     )
 
-    lint_results = [
+    results = [
         rule_runner.request(
-            LintResult,
-            [
-                ScalafixLintRequest.Batch(
-                    "", partition.elements, partition_metadata=partition.metadata
-                )
-            ],
+            output_type,
+            [batch_req_call("scalafix", partition)],
         )
         for partition in partitions
     ]
-    return lint_results if expected_partitions else lint_results[0]
+    return results if expected_partitions else results[0]
 
 
 BAD_FILE = """\
@@ -212,7 +283,6 @@ def test_lint_failure(rule_runner: RuleRunner) -> None:
         extra_options=["--scalac-semanticdb-enabled=False"],
     )
 
-    assert isinstance(lint_result, LintResult)
     assert lint_result.stdout == BAD_FILE_STDOUT
     assert lint_result.exit_code != 0
 
@@ -262,7 +332,6 @@ def test_remove_unused(rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfile
             f"--scalac-args={repr(scalac_args)}",
         ],
     )
-    assert isinstance(fix_result, FixResult)
     assert fix_result.output == rule_runner.make_snapshot(
         {
             "src/jvm/Foo.scala": dedent(
@@ -331,7 +400,6 @@ def test_run_custom_rule(
             f"--scalafix-extra-rule-targets={repr(extra_rule_targets)}",
         ],
     )
-    assert isinstance(fix_result, FixResult)
     assert fix_result.output == rule_runner.make_snapshot(
         {
             "src/jvm/Foo.scala": dedent(
