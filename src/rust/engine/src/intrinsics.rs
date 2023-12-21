@@ -641,7 +641,7 @@ fn interactive_process(
         (py_interactive_process.extract().unwrap(), py_process, process_config)
       });
       match process_config.environment.strategy {
-        ProcessExecutionStrategy::Docker(_, _) | ProcessExecutionStrategy::RemoteExecution(_) => {
+        ProcessExecutionStrategy::Docker{..} | ProcessExecutionStrategy::RemoteExecution(_) => {
           // TODO: #17182 covers adding support for running processes interactively in Docker.
           Err(
             format!(

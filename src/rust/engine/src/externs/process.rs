@@ -39,7 +39,7 @@ impl PyProcessExecutionEnvironment {
                 remote_execution_extra_platform_properties,
             )),
             (None, None, false) => Ok(ProcessExecutionStrategy::Local),
-            (Some(image), mounts, false) => Ok(ProcessExecutionStrategy::Docker(image, mounts)),
+            (Some(image), mounts, false) => Ok(ProcessExecutionStrategy::Docker { image, mounts }),
             (Some(_), _, true) => Err(PyAssertionError::new_err(
                 "docker_image cannot be set at the same time as remote_execution",
             )),
@@ -108,7 +108,7 @@ impl PyProcessExecutionEnvironment {
     #[getter]
     fn docker_image(&self) -> Option<&str> {
         match &self.environment.strategy {
-            ProcessExecutionStrategy::Docker(image, _) => Some(image),
+            ProcessExecutionStrategy::Docker { image, .. } => Some(image),
             _ => None,
         }
     }
@@ -116,7 +116,7 @@ impl PyProcessExecutionEnvironment {
     #[getter]
     fn docker_mounts(&self) -> Option<Vec<String>> {
         match &self.environment.strategy {
-            ProcessExecutionStrategy::Docker(_, Some(mounts)) => Some(mounts.to_vec()),
+            ProcessExecutionStrategy::Docker { mounts, .. } => mounts.clone(),
             _ => None,
         }
     }

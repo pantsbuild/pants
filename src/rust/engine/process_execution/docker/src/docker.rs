@@ -410,7 +410,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
 
                 // Obtain ID of the base container in which to run the execution for this process.
                 let (container_id, named_caches) = {
-                    let ProcessExecutionStrategy::Docker(image, mounts) =
+                    let ProcessExecutionStrategy::Docker { image, mounts } =
                         &req.execution_environment.strategy
                     else {
                         return Err(ProcessError::Unclassified(

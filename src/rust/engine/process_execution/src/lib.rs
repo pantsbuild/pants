@@ -431,8 +431,10 @@ pub enum ProcessExecutionStrategy {
     Local,
     /// Stores the platform_properties.
     RemoteExecution(Vec<(String, String)>),
-    /// Stores the image name and mount info.
-    Docker(String, Option<Vec<String>>),
+    Docker {
+        image: String,
+        mounts: Option<Vec<String>>,
+    },
 }
 
 impl ProcessExecutionStrategy {
@@ -445,7 +447,7 @@ impl ProcessExecutionStrategy {
             // NB: this image will include the container ID, thanks to
             // https://github.com/pantsbuild/pants/pull/17101.
             // NB: We don't include the mount info in the cache.
-            Self::Docker(image, _) => format!("docker_execution: {image}"),
+            Self::Docker { image, .. } => format!("docker_execution: {image}"),
         }
     }
 
@@ -453,7 +455,7 @@ impl ProcessExecutionStrategy {
         match self {
             Self::Local => "local",
             Self::RemoteExecution(_) => "remote",
-            Self::Docker(_, _) => "docker",
+            Self::Docker { .. } => "docker",
         }
     }
 }
@@ -655,11 +657,11 @@ impl Process {
     ///
     /// Set the execution environment to Docker, with the specified image.
     ///
-    pub fn docker(mut self, image: String, mount_info: Option<Vec<String>>) -> Process {
+    pub fn docker(mut self, image: String, mounts: Option<Vec<String>>) -> Process {
         self.execution_environment = ProcessExecutionEnvironment {
             name: None,
             platform: Platform::current().unwrap(),
-            strategy: ProcessExecutionStrategy::Docker(image, mount_info),
+            strategy: ProcessExecutionStrategy::Docker { image, mounts },
         };
         self
     }
