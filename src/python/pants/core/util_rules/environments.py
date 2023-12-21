@@ -201,11 +201,11 @@ class DockerImageField(StringField):
         """
     )
 
-class DockerBindMountsField(StringSequenceField):
-    alias = "bind_mounts"
+class DockerMountsField(StringSequenceField):
+    alias = "mounts"
     help = help_text(
         """
-        Read-only bind mounts to use when starting the container.
+        Read-only mounts to use when starting the container.
 
         The values should be in the form "<path on host>:<path on container>"
         """
@@ -272,7 +272,7 @@ class DockerEnvironmentTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         DockerImageField,
-        DockerBindMountsField,
+        DockerMountsField,
         DockerPlatformField,
         DockerFallbackEnvironmentField,
     )
@@ -906,7 +906,7 @@ async def extract_process_config_from_environment(
     environments_subsystem: EnvironmentsSubsystem,
 ) -> ProcessExecutionEnvironment:
     docker_image = None
-    docker_bind_mounts = None
+    docker_mounts = None
     remote_execution = False
     raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
 
@@ -920,7 +920,7 @@ async def extract_process_config_from_environment(
         docker_image = (
             tgt.val[DockerImageField].value if tgt.val.has_field(DockerImageField) else None
         )
-        docker_bind_mounts = tgt.val[DockerBindMountsField].value if tgt.val.has_field(DockerBindMountsField) else None
+        docker_mounts = tgt.val[DockerMountsField].value if tgt.val.has_field(DockerMountsField) else None
 
         # If a docker image name is provided, convert to an image ID so caching works properly.
         # TODO(17104): Append image ID instead to the image name.
@@ -949,7 +949,7 @@ async def extract_process_config_from_environment(
         environment_name=tgt.name,
         platform=platform.value,
         docker_image=docker_image,
-        docker_bind_mounts=docker_bind_mounts,
+        docker_mounts=docker_mounts,
         remote_execution=remote_execution,
         remote_execution_extra_platform_properties=[
             tuple(pair.split("=", maxsplit=1))  # type: ignore[misc]

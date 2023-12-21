@@ -493,7 +493,7 @@ class ProcessExecutionEnvironment:
         environment_name: str | None,
         platform: str,
         docker_image: str | None,
-        docker_bind_mounts: Sequence[str] | None,
+        docker_mounts: Sequence[str] | None,
         remote_execution: bool,
         remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
     ) -> None: ...
