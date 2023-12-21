@@ -6,6 +6,7 @@ use std::fs;
 use std::mem;
 use std::path::Path;
 
+use lazy_static::lazy_static;
 use regex::Regex;
 use toml::value::Table;
 use toml::Value;
@@ -16,12 +17,15 @@ use super::{ListEdit, ListEditAction, OptionsSource};
 
 type InterpolationMap = HashMap<String, String>;
 
+lazy_static! {
+    static ref PLACEHOLDER_RE: Regex = Regex::new(r"%\(([a-zA-Z0-9_.]+)\)s").unwrap();
+}
+
 pub(crate) fn interpolate_string(
     value: String,
     replacements: &InterpolationMap,
 ) -> Result<String, String> {
-    let placeholder_re = Regex::new(r"%\(([a-zA-Z0-9_.]+)\)s").unwrap();
-    let caps_vec: Vec<_> = placeholder_re.captures_iter(&value).collect();
+    let caps_vec: Vec<_> = PLACEHOLDER_RE.captures_iter(&value).collect();
     if caps_vec.is_empty() {
         return Ok(value);
     }

@@ -169,12 +169,7 @@ impl OptionParser {
                 )
             })?;
 
-        let mut seed_values = HashMap::from([
-            ("buildroot".to_string(), buildroot_string.clone()),
-            ("homedir".to_string(), shellexpand::tilde("~").into_owned()),
-            ("user".to_string(), whoami::username()),
-        ]);
-        seed_values.extend(
+        let mut seed_values = HashMap::from_iter(
             env.env
                 .iter()
                 .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
@@ -197,22 +192,23 @@ impl OptionParser {
             &[&default_config_path],
         )?;
 
-        let default_workdir = path_join(&buildroot_string, ".pants.d");
-        let default_distdir = path_join(&buildroot_string, "dist");
-        seed_values.insert(
-            "pants_workdir".to_string(),
-            parser
-                .parse_string(&option_id!("pants", "workdir"), &default_workdir)?
+        let subdir = |subdir_name: &str, default: &str| -> Result<String, String> {
+            Ok(parser
+                .parse_string(
+                    &OptionId::new(Scope::Global, ["pants", subdir_name].iter(), None)?,
+                    &path_join(&buildroot_string, default),
+                )?
                 .value
-                .clone(),
-        );
-        seed_values.insert(
-            "pants_distdir".to_string(),
-            parser
-                .parse_string(&option_id!("pants", "distdir"), &default_distdir)?
-                .value
-                .clone(),
-        );
+                .clone())
+        };
+
+        seed_values.extend([
+            ("buildroot".to_string(), buildroot_string.clone()),
+            ("homedir".to_string(), shellexpand::tilde("~").into_owned()),
+            ("user".to_string(), whoami::username()),
+            ("pants_workdir".to_string(), subdir("workdir", ".pants.d")?),
+            ("pants_distdir".to_string(), subdir("distdir", "dist")?),
+        ]);
 
         let mut config = Config::merged(&repo_config_files, &seed_values)?;
         sources.insert(Source::Config, Rc::new(config.clone()));
