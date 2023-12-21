@@ -143,7 +143,7 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
             ),
             "src/thrift/dir1/f2.thrift": dedent(
                 """\
-                namespace java org.pantsbuild.example
+                namespace java org.pantsbuild.example.mngt
                 include "dir1/f.thrift"
                 struct ManagedPerson {
                   1: f.Person employee
@@ -207,7 +207,7 @@ def test_generates_java(rule_runner: RuleRunner, libthrift_lockfile: JVMLockfile
     assert_gen(
         Address("src/thrift/dir1", relative_file_path="f2.thrift"),
         [
-            "src/thrift/org/pantsbuild/example/ManagedPerson.java",
+            "src/thrift/org/pantsbuild/example/mngt/ManagedPerson.java",
         ],
     )
     assert_gen(
