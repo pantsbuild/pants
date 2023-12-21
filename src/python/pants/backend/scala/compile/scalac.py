@@ -150,7 +150,7 @@ async def compile_scala_source(
         )
 
     toolcp_relpath = "__toolcp"
-    local_scalac_plugins_relpath = "__localplugincp"
+    local_scalac_plugins_relpath = "__plugincp"
     usercp = "__cp"
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
@@ -203,10 +203,6 @@ async def compile_scala_source(
                 *local_plugins.args(local_scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 *scalac.args,
-                # NB: We set a non-existent main-class so that using `-d` produces a `jar` manifest
-                # with stable content.
-                # "-Xmain-class",
-                # NO_MAIN_CLASS,
                 "-d",
                 output_dir,
                 *sorted(

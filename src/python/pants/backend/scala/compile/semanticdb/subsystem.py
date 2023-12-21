@@ -34,6 +34,8 @@ class SemanticDbSubsystem(Subsystem):
         )
     )
 
+    extra_options = DictOption[str](help="Additional options to pass to the semanticdb compiler.")
+
     def version_for(self, resolve_name: str, scala_version: ScalaVersion) -> str | None:
         found_version = self._version_for_resolve.get(resolve_name)
         if not found_version:

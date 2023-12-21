@@ -32,6 +32,7 @@ async def scalafix_semanticdb_scalac_plugin(
 ) -> GlobalScalacPlugins:
     scala_version = scala.version_for_resolve(request.resolve_name)
     if scala_version.major == 3:
+        # TODO figure out how to pass semanticdb options to Scalac 3
         return GlobalScalacPlugins(
             [
                 GlobalScalacPlugin(
@@ -61,7 +62,13 @@ async def scalafix_semanticdb_scalac_plugin(
                     artifact=f"semanticdb-scalac_{scala_binary_version}",
                     version=semanticdb_version,
                 ),
-                extra_scalac_options=("-Yrangepos",),
+                extra_scalac_options=(
+                    "-Yrangepos",
+                    *(
+                        f"-P:semanticdb:{name}:{value}"
+                        for name, value in semanticdb.extra_options.items()
+                    ),
+                ),
             )
         ]
     )

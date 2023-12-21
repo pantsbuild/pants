@@ -237,8 +237,7 @@ class ScalacPlugins:
             yield f"-Xplugin:{p}{scalac_plugin_path}"
         for name in self.names:
             yield f"-Xplugin-require:{name}"
-        for scalac_opt in self.extra_scalac_options:
-            yield scalac_opt
+        yield from self.extra_scalac_options
 
 
 @rule

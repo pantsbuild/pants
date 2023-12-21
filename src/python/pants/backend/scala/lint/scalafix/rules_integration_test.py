@@ -172,3 +172,96 @@ def test_remove_unused(rule_runner: RuleRunner, semanticdb_lockfile: JVMLockfile
         }
     )
     assert fix_result.did_change is True
+
+
+@pytest.fixture
+def scalafix0110_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scalafix-0.11.0.test.lock",
+        ["ch.epfl.scala:scalafix-cli_2.13.11:0.11.0"],
+    )
+
+
+@pytest.fixture
+def scalafix0110_lockfile(
+    scalafix0110_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scalafix0110_lockfile_def.load(request)
+
+
+@pytest.fixture
+def scala_rewrites_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scala-rewrites-2.13.test.lock",
+        [
+            "org.scala-lang:scala-library:2.13.11",
+            "org.scalameta:semanticdb-scalac_2.13.11:4.8.14",
+            "org.scala-lang:scala-rewrites_2.13:0.1.5",
+        ],
+    )
+
+
+@pytest.fixture
+def scala_rewrites_lockfile(
+    scala_rewrites_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala_rewrites_lockfile_def.load(request)
+
+
+@logging
+@maybe_skip_jdk_test
+def test_run_custom_rule(
+    rule_runner: RuleRunner,
+    scala_rewrites_lockfile: JVMLockfileFixture,
+    scalafix0110_lockfile: JVMLockfileFixture,
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/scalafix.lock": scalafix0110_lockfile.serialized_lockfile,
+            "3rdparty/jvm/default.lock": scala_rewrites_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala_rewrites_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/Foo.scala": dedent(
+                """\
+                object Foo {
+                    def hello = "hello"
+                    def nil = Nil + hello
+                }
+                """
+            ),
+            "src/jvm/BUILD": "scala_sources(name='test')",
+            ".scalafix.conf": "rules = [ fix.scala213.Any2StringAdd ]",
+        }
+    )
+
+    tgt = rule_runner.get_target(
+        Address("src/jvm", target_name="test", relative_file_path="Foo.scala")
+    )
+
+    extra_rule_targets = ["3rdparty/jvm:org.scala-lang_scala-rewrites_2.13"]
+    fix_result = run_scalafix(
+        rule_runner,
+        [tgt],
+        extra_options=[
+            f"--scala-version-for-resolve={repr({'jvm-default': '2.13.11'})}",
+            f"--source-root-patterns={repr(['src/jvm'])}",
+            f"--scalac-semanticdb-extra-options={repr({'synthetics': 'on'})}",
+            "--scalafix-artifacts=['ch.epfl.scala:scalafix-cli_2.13.11:0.11.0']",
+            "--scalafix-version=0.11.0",
+            "--scalafix-lockfile=3rdparty/jvm/scalafix.lock",
+            f"--scalafix-extra-rule-targets={repr(extra_rule_targets)}",
+        ],
+    )
+    assert isinstance(fix_result, FixResult)
+    assert fix_result.output == rule_runner.make_snapshot(
+        {
+            "src/jvm/Foo.scala": dedent(
+                """\
+                object Foo {
+                    def hello = "hello"
+                    def nil = String.valueOf(Nil) + hello
+                }
+                """
+            )
+        }
+    )
+    assert fix_result.did_change is True

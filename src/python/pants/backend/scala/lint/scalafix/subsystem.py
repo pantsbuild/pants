@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.option_types import SkipOption, StrOption
+from pants.option.option_types import SkipOption, StrListOption, StrOption
 
 
 class ScalafixSubsystem(JvmToolBase):
@@ -20,5 +20,6 @@ class ScalafixSubsystem(JvmToolBase):
     config_file_name = StrOption(
         default=".scalafix.conf", help="Name to look for when locating scalafix config files."
     )
+    extra_rule_targets = StrListOption(help="List of targets providing additional Scalafix rules.")
 
-    skip = SkipOption("fix", "fmt", "lint")
+    skip = SkipOption("fix", "lint")
