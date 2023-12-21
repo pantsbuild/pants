@@ -54,7 +54,7 @@ experimental_test_shell_command(
 docker_environment(
     name="docker_env_for_testing",
     image="debian:stable-slim",
-    mounts=["/etc/passwd:/mount_dir/testfile"],
+    mounts=["/etc/passwd:/mount_dir/testfile:ro"],
 )
 
 experimental_test_shell_command(

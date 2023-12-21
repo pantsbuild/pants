@@ -205,13 +205,13 @@ class DockerMountsField(StringSequenceField):
     alias = "mounts"
     help = help_text(
         """
-        Read-only mounts to use when starting the container.
+        Mounts to use when starting the container.
 
-        The values should be in the form "<path on host>:<path on container>".
+        The values should be in the form "<path on host>:<path on container>(:<options>)".
 
         For more information, see the documentation for the Rust Crate which powers the underlying
         docker integration: https://docs.rs/bollard/0.15.0/bollard/models/struct.HostConfig.html#structfield.binds
-        and the Docker Bind mounts documentation: https://docs.docker.com/storage/bind-mounts/
+        and the Docker Bind mounts documentation: https://docs.docker.com/storage/bind-mounts/.
         """
     )
 

@@ -819,9 +819,6 @@ impl<'a> ContainerCache<'a> {
             .await
             .map_err(|e| format!("Failed to create named cache volume for {image_name}: {e}"))?;
 
-        for mount in mounts.iter_mut() {
-            mount.push_str(":ro");
-        }
         mounts.extend(vec![
             format!("{work_dir_base}:{SANDBOX_BASE_PATH_IN_CONTAINER}"),
             format!("{named_cache_volume_name}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER}",),
