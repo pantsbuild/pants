@@ -27,9 +27,10 @@ mod parse_tests;
 
 mod types;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
+use std::path;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -158,6 +159,22 @@ pub struct OptionParser {
 
 impl OptionParser {
     pub fn new(env: Env, args: Args) -> Result<OptionParser, String> {
+        let buildroot = BuildRoot::find()?;
+        let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
+            .map_err(|e| {
+                format!(
+                    "Failed to decode build root path {}: {}",
+                    buildroot.display(),
+                    e
+                )
+            })?;
+
+        let mut seed_values = HashMap::from_iter(
+            env.env
+                .iter()
+                .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
+        );
+
         let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
         sources.insert(Source::Env, Rc::new(env));
         sources.insert(Source::Flag, Rc::new(args));
@@ -165,20 +182,35 @@ impl OptionParser {
             sources: sources.clone(),
         };
 
-        let config_path = BuildRoot::find()?.join("pants.toml");
+        fn path_join(a: &str, b: &str) -> String {
+            format!("{}{}{}", a, path::MAIN_SEPARATOR, b)
+        }
+
+        let default_config_path = path_join(&buildroot_string, "pants.toml");
         let repo_config_files = parser.parse_string_list(
             &option_id!("pants", "config", "files"),
-            &[
-                std::str::from_utf8(config_path.as_os_str().as_bytes()).map_err(|e| {
-                    format!(
-                        "Failed to decode build root path {}: {}",
-                        config_path.display(),
-                        e
-                    )
-                })?,
-            ],
+            &[&default_config_path],
         )?;
-        let mut config = Config::merged(&repo_config_files)?;
+
+        let subdir = |subdir_name: &str, default: &str| -> Result<String, String> {
+            Ok(parser
+                .parse_string(
+                    &OptionId::new(Scope::Global, ["pants", subdir_name].iter(), None)?,
+                    &path_join(&buildroot_string, default),
+                )?
+                .value
+                .clone())
+        };
+
+        seed_values.extend([
+            ("buildroot".to_string(), buildroot_string.clone()),
+            ("homedir".to_string(), shellexpand::tilde("~").into_owned()),
+            ("user".to_string(), whoami::username()),
+            ("pants_workdir".to_string(), subdir("workdir", ".pants.d")?),
+            ("pants_distdir".to_string(), subdir("distdir", "dist")?),
+        ]);
+
+        let mut config = Config::merged(&repo_config_files, &seed_values)?;
         sources.insert(Source::Config, Rc::new(config.clone()));
         parser = OptionParser {
             sources: sources.clone(),
@@ -191,7 +223,7 @@ impl OptionParser {
             )? {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
-                    let rc_config = Config::parse(rcfile_path)?;
+                    let rc_config = Config::parse(rcfile_path, &seed_values)?;
                     config = config.merge(rc_config);
                 }
             }
