@@ -18,7 +18,7 @@ DEFAULT_VERSION_MAPPING = {
 }
 
 
-class SemanticDbSubsystem(Subsystem):
+class SemanticdbSubsystem(Subsystem):
     options_scope = "scalac-semanticdb"
     help = "semanticdb (ttps://scalameta.org/docs/semanticdb/)"
 

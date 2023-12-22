@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Iterator, cast
 
-from pants.backend.scala.compile.semanticdb.subsystem import SemanticDbSubsystem
+from pants.backend.scala.compile.semanticdb.subsystem import SemanticdbSubsystem
 from pants.backend.scala.lint.scalafix.skip_field import SkipScalafixField
 from pants.backend.scala.lint.scalafix.subsystem import ScalafixSubsystem
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
@@ -120,7 +120,7 @@ async def _partition_scalafix(
     rule_classpath: _ScalafixRuleClasspath,
     scala: ScalaSubsystem,
     scalafix: ScalafixSubsystem,
-    semanticdb: SemanticDbSubsystem,
+    semanticdb: SemanticdbSubsystem,
 ) -> Partitions[ScalafixPartitionInfo]:
     if scalafix.skip:
         return Partitions()

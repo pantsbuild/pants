@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import Iterable, Iterator, Mapping
 
-from pants.backend.scala.resolve.common import rules as scala_resolve_rules
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import (
     AllScalacPluginTargets,
@@ -17,7 +16,6 @@ from pants.backend.scala.target_types import (
 )
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
-from pants.engine.collection import Collection
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.parametrize import (
@@ -47,60 +45,94 @@ from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
+from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, softwrap
 
 
 @dataclass(frozen=True)
-class InjectedScalacPluginRequirement:
+class InjectedScalacPlugin:
     name: str
     coordinate: Coordinate
+    options: FrozenDict[str, str]
+
+    def __init__(
+        self, name: str, coordinate: Coordinate, *, options: Mapping[str, str] | None = None
+    ) -> None:
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "coordinate", coordinate)
+        object.__setattr__(self, "options", FrozenDict(options or {}))
+
+    @property
+    def scalac_options(self) -> frozenset[str]:
+        return frozenset([f"-P:{self.name}:{opt}:{value}" for opt, value in self.options.items()])
 
 
 @dataclass(frozen=True)
-class InjectedScalacPlugin:
+class InjectedScalacSettings:
+    """A collection of globally injected scalac plugins and compiler options provided
+    programatically by another subsystem.
+
+    Other backends can provide with their own set of global plugins by implementing
+    a rule like the following:
+
+    class MyBackendScalacSettingsRequest(InjectedScalacSettingsRequest):
+        pass
+
+    @rule
+    async def my_backend_scalac_plugins(_: MyBackendScalacSettingsRequest, ...) -> InjectedScalacSettings:
+        return InjectedScalacSettings(
+            subsystem="mysubsystem",
+            plugins=[
+                # List of plugins
+                ...
+            ],
+            extra_scalac_options=[
+                # Additional scalac options
+                ...
+            ]
+        )
+
+    def rules():
+        return [
+            *collect_rules(),
+            UnionRule(InjectedScalacSettingsRequest, MyBackendScalacSettingsRequest)
+        ]
+    """
+
     subsystem: str
-    requirement: InjectedScalacPluginRequirement | None
-    extra_scalac_options: tuple[str, ...]
+    plugins: tuple[InjectedScalacPlugin, ...]
+    _extra_scalac_options: tuple[str, ...]
 
     def __init__(
         self,
         *,
         subsystem: str,
-        requirement: InjectedScalacPluginRequirement | None = None,
+        plugins: Iterable[InjectedScalacPlugin] | None = None,
         extra_scalac_options: Iterable[str] | None = None,
     ) -> None:
         object.__setattr__(self, "subsystem", subsystem)
-        object.__setattr__(self, "requirement", requirement)
-        object.__setattr__(self, "extra_scalac_options", tuple(extra_scalac_options or ()))
+        object.__setattr__(self, "plugins", tuple(plugins or ()))
+        object.__setattr__(self, "_extra_scalac_options", tuple(extra_scalac_options or ()))
 
+    @property
+    def plugin_names(self) -> frozenset[str]:
+        return frozenset([plugin.name for plugin in self.plugins])
 
-class InjectedScalacPlugins(Collection[InjectedScalacPlugin]):
-    """A collection of globally injected scalac plugins provided programatically.
-
-    Other backends can provide with their own set of global plugins by implementing
-    a rule like the following:
-
-    class MyBackendScalacPluginsRequest(InjectScalacPluginsRequest):
-        pass
-
-    @rule
-    async def my_backend_scalac_plugins(_: MyBackendScalacPluginsRequest, ...) -> InjectedScalacPlugins:
-        return InjectedScalacPlugins([
-          # Custom list of plugins
-        ])
-
-    def rules():
-        return [
-            *collect_rules(),
-            UnionRule(InjectScalacPluginsRequest, MyBackendScalacPluginsRequest)
-        ]
-    """
+    @property
+    def extra_scalac_options(self) -> frozenset[str]:
+        return frozenset(
+            [
+                *self._extra_scalac_options,
+                *chain.from_iterable(plugin.scalac_options for plugin in self.plugins),
+            ]
+        )
 
 
 @union(in_scope_types=[EnvironmentName])
 @dataclass(frozen=True)
-class InjectScalacPluginsRequest:
-    """A request to inject scalac plugins for a given target."""
+class InjectScalacSettingsRequest:
+    """A request to inject scalac settings and plugins for a given target."""
 
     target: Target
     resolve_name: str
@@ -142,7 +174,7 @@ class _LocalScalacPlugin:
 
 
 @dataclass(frozen=True)
-class _LocalScalacPlugins:
+class _ConsumedScalacPlugins:
     plugins: tuple[_LocalScalacPlugin, ...]
 
     @property
@@ -159,28 +191,33 @@ class _LocalScalacPlugins:
 
 
 @dataclass(frozen=True)
-class _GlobalScalacPlugins:
-    names: tuple[str, ...]
-    artifacts: tuple[Target, ...]
+class _InjectedScalacSettings:
+    plugin_names: tuple[str, ...]
+    plugin_artifacts: tuple[Target, ...]
     extra_scalac_options: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class ScalacPluginsForTarget:
-    _global: _GlobalScalacPlugins
-    _local: _LocalScalacPlugins
+    _injected_settings: _InjectedScalacSettings
+    _consumed_plugins: _ConsumedScalacPlugins
 
     @property
     def names(self) -> tuple[str, ...]:
-        return (*self._global.names, *self._local.names)
+        return (*self._injected_settings.plugin_names, *self._consumed_plugins.names)
 
     @property
     def artifacts(self) -> Targets:
-        return Targets([*self._global.artifacts, *self._local.artifacts])
+        return Targets(
+            [*self._injected_settings.plugin_artifacts, *self._consumed_plugins.artifacts]
+        )
 
     @property
     def extra_scalac_options(self) -> tuple[str, ...]:
-        return (*self._global.extra_scalac_options, *self._local.extra_scalac_options)
+        return (
+            *self._injected_settings.extra_scalac_options,
+            *self._consumed_plugins.extra_scalac_options,
+        )
 
 
 @dataclass(frozen=True)
@@ -288,7 +325,7 @@ async def _resolve_local_scalac_plugins_for_target(
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     local_environment_name: ChosenLocalEnvironmentName,
     field_defaults: FieldDefaults,
-) -> _LocalScalacPlugins:
+) -> _ConsumedScalacPlugins:
     target = request.target
     resolve = request.resolve_name
 
@@ -332,7 +369,7 @@ async def _resolve_local_scalac_plugins_for_target(
                 f"for target {request.target.address}."
             )
 
-    return _LocalScalacPlugins(tuple(plugins.values()))
+    return _ConsumedScalacPlugins(tuple(plugins.values()))
 
 
 @rule
@@ -341,58 +378,55 @@ async def _resolve_global_scalac_plugins_for_target(
     jvm_artifact_targets: AllJvmArtifactTargets,
     jvm: JvmSubsystem,
     union_membership: UnionMembership,
-) -> _GlobalScalacPlugins:
-    injected_plugins = InjectedScalacPlugins(
-        chain.from_iterable(
-            await MultiGet(
-                Get(
-                    InjectedScalacPlugins,
-                    InjectScalacPluginsRequest,
-                    request_type(request.target, request.resolve_name),
-                )
-                for request_type in union_membership.get(InjectScalacPluginsRequest)
-                if request_type.is_applicable(request.target)
-            )
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> _InjectedScalacSettings:
+    environment_name = local_environment_name.val
+
+    all_injected_settings = await MultiGet(
+        Get(
+            InjectedScalacSettings,
+            {
+                request_type(request.target, request.resolve_name): InjectScalacSettingsRequest,
+                environment_name: EnvironmentName,
+            },
         )
+        for request_type in union_membership.get(InjectScalacSettingsRequest)
+        if request_type.is_applicable(request.target)
     )
 
-    extra_scalac_options: set[str] = set()
-    names_and_addresses = {}
-    for plugin in injected_plugins:
-        extra_scalac_options.update(plugin.extra_scalac_options)
-
-        if not plugin.requirement:
-            continue
-
-        addresses = find_jvm_artifacts_or_raise(
-            required_coordinates=[plugin.requirement.coordinate],
+    plugin_addresses: OrderedSet[Address] = OrderedSet()
+    for injected_settings in all_injected_settings:
+        found_addresses = find_jvm_artifacts_or_raise(
+            required_coordinates=[plugin.coordinate for plugin in injected_settings.plugins],
             resolve=request.resolve_name,
             jvm_artifact_targets=jvm_artifact_targets,
             jvm=jvm,
-            subsystem=plugin.subsystem,
+            subsystem=injected_settings.subsystem,
             target_type=request.target.alias,
         )
-        assert len(addresses) == 1
-        names_and_addresses[plugin.requirement.name] = list(addresses)[0]
+        plugin_addresses.update(found_addresses)
 
-    targets = await Get(Targets, Addresses(names_and_addresses.values()))
-
-    return _GlobalScalacPlugins(
-        names=tuple(names_and_addresses.keys()),
-        artifacts=tuple(targets),
-        extra_scalac_options=tuple(extra_scalac_options),
+    targets = await Get(Targets, Addresses(plugin_addresses))
+    return _InjectedScalacSettings(
+        plugin_names=tuple(
+            chain.from_iterable(settings.plugin_names for settings in all_injected_settings)
+        ),
+        plugin_artifacts=tuple(targets),
+        extra_scalac_options=tuple(
+            chain.from_iterable(settings.extra_scalac_options for settings in all_injected_settings)
+        ),
     )
 
 
 @rule
-async def merge_global_and_local_scalac_plugins(
+async def resolve_all_scalac_plugins_for_target(
     request: ScalacPluginsForTargetRequest,
 ) -> ScalacPluginsForTarget:
-    global_plugins, local_plugins = await MultiGet(
-        Get(_GlobalScalacPlugins, ScalacPluginsForTargetRequest, request),
-        Get(_LocalScalacPlugins, ScalacPluginsForTargetRequest, request),
+    injected, consumed = await MultiGet(
+        Get(_InjectedScalacSettings, ScalacPluginsForTargetRequest, request),
+        Get(_ConsumedScalacPlugins, ScalacPluginsForTargetRequest, request),
     )
-    return ScalacPluginsForTarget(global_plugins, local_plugins)
+    return ScalacPluginsForTarget(injected, consumed)
 
 
 @rule
@@ -433,4 +467,4 @@ async def fetch_plugins(request: ScalacPluginsRequest) -> ScalacPlugins:
 
 
 def rules():
-    return (*collect_rules(), *jvm_tool_rules(), *lockfile.rules(), *scala_resolve_rules())
+    return (*collect_rules(), *jvm_tool_rules(), *lockfile.rules())
