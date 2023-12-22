@@ -18,6 +18,10 @@ from pants.backend.scala.util_rules.versions import ScalaVersion
 from pants.core.goals.fix import FixResult, FixTargetsRequest, Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.util_rules.config_files import (
+    GatherConfigFilesByDirectoriesRequest,
+    GatheredConfigFilesByDirectories,
+)
 from pants.core.util_rules.partitions import Partition
 from pants.core.util_rules.stripped_source_files import _stripped_snapshot_by_source_roots
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
@@ -34,10 +38,10 @@ from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
-from pants.util.dirutil import find_nearest_ancestor_file, group_by_dir
+from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import Simplifier, pluralize, softwrap
+from pants.util.strutil import Simplifier, pluralize
 
 
 @dataclass(frozen=True)
@@ -62,17 +66,6 @@ class ScalafixLintRequest(LintTargetsRequest):
 
 
 @dataclass(frozen=True)
-class GatherScalafixConfigFilesRequest:
-    filepaths: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class ScalafixConfigFiles:
-    snapshot: Snapshot
-    source_dir_to_config_file: FrozenDict[str, str]
-
-
-@dataclass(frozen=True)
 class ScalafixPartitionInfo:
     scala_version: ScalaVersion | None
     config_snapshot: Snapshot
@@ -88,46 +81,6 @@ class ScalafixPartitionInfo:
 
 class ScalafixToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
     resolve_name = ScalafixSubsystem.options_scope
-
-
-# @TODO: This logic is very similar, but not identical to the one for yamllint. It should be generalized and shared.
-@rule
-async def gather_scalafix_config_files(
-    request: GatherScalafixConfigFilesRequest, scalafix: ScalafixSubsystem
-) -> ScalafixConfigFiles:
-    source_dirs = frozenset(os.path.dirname(path) for path in request.filepaths)
-
-    source_dirs_with_ancestors = {"", *source_dirs}
-    for source_dir in source_dirs:
-        source_dir_parts = source_dir.split(os.path.sep)
-        source_dir_parts.pop()
-        while source_dir_parts:
-            source_dirs_with_ancestors.add(os.path.sep.join(source_dir_parts))
-            source_dir_parts.pop()
-
-    config_file_globs = [
-        os.path.join(dir, scalafix.config_filename) for dir in source_dirs_with_ancestors
-    ]
-    config_files_snapshot = await Get(Snapshot, PathGlobs(config_file_globs))
-    config_files_set = set(config_files_snapshot.files)
-
-    source_dir_to_config_file: dict[str, str] = {}
-    for source_dir in source_dirs:
-        config_file = find_nearest_ancestor_file(
-            config_files_set, source_dir, scalafix.config_filename
-        )
-        if not config_file:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    No scalafix config file (`{scalafix.config_filename}`) found for
-                    source directory '{source_dir}'.
-                    """
-                )
-            )
-        source_dir_to_config_file[source_dir] = config_file
-
-    return ScalafixConfigFiles(config_files_snapshot, FrozenDict(source_dir_to_config_file))
 
 
 @dataclass(frozen=True)
@@ -187,7 +140,12 @@ async def _partition_scalafix(
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafixToolLockfileSentinel())
     tool_classpath, config_files = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-        Get(ScalafixConfigFiles, GatherScalafixConfigFilesRequest(filepaths)),
+        Get(
+            GatheredConfigFilesByDirectories,
+            GatherConfigFilesByDirectoriesRequest(
+                tool_name="scalafix", config_filename=scalafix.config_filename, filepaths=filepaths
+            ),
+        ),
     )
 
     extra_immutable_input_digests = {toolcp_relpath: tool_classpath.digest}

@@ -16,8 +16,6 @@ from pants.backend.scala.compile import scalac
 from pants.backend.scala.compile.semanticdb.rules import rules as semanticdb_rules
 from pants.backend.scala.lint.scalafix import skip_field
 from pants.backend.scala.lint.scalafix.rules import (
-    GatherScalafixConfigFilesRequest,
-    ScalafixConfigFiles,
     ScalafixFieldSet,
     ScalafixFixRequest,
     ScalafixLintRequest,
@@ -79,7 +77,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(FixResult, (ScalafixFixRequest.Batch,)),
             QueryRule(LintResult, (ScalafixLintRequest.Batch,)),
             QueryRule(Snapshot, (PathGlobs,)),
-            QueryRule(ScalafixConfigFiles, (GatherScalafixConfigFilesRequest,)),
         ],
         target_types=[
             ScalaSourceTarget,
@@ -89,33 +86,6 @@ def rule_runner() -> RuleRunner:
         ],
     )
     return rule_runner
-
-
-def test_gather_scalafix_config_files(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            DEFAULT_SCALAFIX_CONFIG_FILENAME: "",
-            f"foo/bar/{DEFAULT_SCALAFIX_CONFIG_FILENAME}": "",
-            f"hello/{DEFAULT_SCALAFIX_CONFIG_FILENAME}": "",
-            "hello/Foo.scala": "",
-            "hello/world/Foo.scala": "",
-            "foo/bar/Foo.scala": "",
-            "foo/bar/xyyzzy/Foo.scala": "",
-            "foo/blah/Foo.scala": "",
-        }
-    )
-
-    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.scala"])])
-    request = rule_runner.request(
-        ScalafixConfigFiles, [GatherScalafixConfigFilesRequest(snapshot.files)]
-    )
-    assert sorted(request.source_dir_to_config_file.items()) == [
-        ("foo/bar", "foo/bar/.scalafix.conf"),
-        ("foo/bar/xyyzzy", "foo/bar/.scalafix.conf"),
-        ("foo/blah", ".scalafix.conf"),
-        ("hello", "hello/.scalafix.conf"),
-        ("hello/world", "hello/.scalafix.conf"),
-    ]
 
 
 @overload

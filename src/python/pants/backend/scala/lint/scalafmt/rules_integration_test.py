@@ -10,23 +10,18 @@ import pytest
 from pants.backend.scala import target_types
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.lint.scalafmt import skip_field
-from pants.backend.scala.lint.scalafmt.rules import (
-    GatherScalafmtConfigFilesRequest,
-    PartitionInfo,
-    ScalafmtConfigFiles,
-    ScalafmtFieldSet,
-    ScalafmtRequest,
-)
+from pants.backend.scala.lint.scalafmt.rules import PartitionInfo, ScalafmtFieldSet, ScalafmtRequest
 from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.goals.fmt import FmtResult, Partitions
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath
+from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -46,6 +41,8 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
+            *artifact_mapper.rules(),
             *strip_jar.rules(),
             *scalac_rules(),
             *util_rules(),
@@ -56,7 +53,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(Partitions, (ScalafmtRequest.PartitionRequest,)),
             QueryRule(FmtResult, (ScalafmtRequest.Batch,)),
             QueryRule(Snapshot, (PathGlobs,)),
-            QueryRule(ScalafmtConfigFiles, (GatherScalafmtConfigFilesRequest,)),
         ],
         target_types=[ScalaSourceTarget, ScalaSourcesGeneratorTarget],
     )
@@ -266,30 +262,3 @@ def test_find_nearest_ancestor_file() -> None:
     assert find_nearest_ancestor_file(files2, "foo", "grok.conf") is None
     assert find_nearest_ancestor_file(files2, "foo/", "grok.conf") is None
     assert find_nearest_ancestor_file(files2, "", "grok.conf") is None
-
-
-def test_gather_scalafmt_config_files(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            SCALAFMT_CONF_FILENAME: "",
-            f"foo/bar/{SCALAFMT_CONF_FILENAME}": "",
-            f"hello/{SCALAFMT_CONF_FILENAME}": "",
-            "hello/Foo.scala": "",
-            "hello/world/Foo.scala": "",
-            "foo/bar/Foo.scala": "",
-            "foo/bar/xyyzzy/Foo.scala": "",
-            "foo/blah/Foo.scala": "",
-        }
-    )
-
-    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.scala"])])
-    request = rule_runner.request(
-        ScalafmtConfigFiles, [GatherScalafmtConfigFilesRequest(snapshot.files)]
-    )
-    assert sorted(request.source_dir_to_config_file.items()) == [
-        ("foo/bar", "foo/bar/.scalafmt.conf"),
-        ("foo/bar/xyyzzy", "foo/bar/.scalafmt.conf"),
-        ("foo/blah", ".scalafmt.conf"),
-        ("hello", "hello/.scalafmt.conf"),
-        ("hello/world", "hello/.scalafmt.conf"),
-    ]

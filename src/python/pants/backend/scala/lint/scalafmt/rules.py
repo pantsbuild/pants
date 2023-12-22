@@ -12,6 +12,10 @@ from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.util_rules.config_files import (
+    GatherConfigFilesByDirectoriesRequest,
+    GatheredConfigFilesByDirectories,
+)
 from pants.core.util_rules.partitions import Partition
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -23,7 +27,7 @@ from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
-from pants.util.dirutil import find_nearest_ancestor_file, group_by_dir
+from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -50,17 +54,6 @@ class ScalafmtToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
 
 
 @dataclass(frozen=True)
-class GatherScalafmtConfigFilesRequest:
-    filepaths: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class ScalafmtConfigFiles:
-    snapshot: Snapshot
-    source_dir_to_config_file: FrozenDict[str, str]
-
-
-@dataclass(frozen=True)
 class PartitionInfo:
     classpath_entries: tuple[str, ...]
     config_snapshot: Snapshot
@@ -69,44 +62,6 @@ class PartitionInfo:
     @property
     def description(self) -> str:
         return self.config_snapshot.files[0]
-
-
-# @TODO: This logic is very similar, but not identical to the one for yamllint. It should be generalized and shared.
-@rule
-async def gather_scalafmt_config_files(
-    request: GatherScalafmtConfigFilesRequest, scalafmt: ScalafmtSubsystem
-) -> ScalafmtConfigFiles:
-    """Gather scalafmt config files and identify which config files to use for each source
-    directory."""
-    source_dirs = frozenset(os.path.dirname(path) for path in request.filepaths)
-
-    source_dirs_with_ancestors = {"", *source_dirs}
-    for source_dir in source_dirs:
-        source_dir_parts = source_dir.split(os.path.sep)
-        source_dir_parts.pop()
-        while source_dir_parts:
-            source_dirs_with_ancestors.add(os.path.sep.join(source_dir_parts))
-            source_dir_parts.pop()
-
-    config_file_globs = [
-        os.path.join(dir, scalafmt.config_filename) for dir in source_dirs_with_ancestors
-    ]
-    config_files_snapshot = await Get(Snapshot, PathGlobs(config_file_globs))
-    config_files_set = set(config_files_snapshot.files)
-
-    source_dir_to_config_file: dict[str, str] = {}
-    for source_dir in source_dirs:
-        config_file = find_nearest_ancestor_file(
-            config_files_set, source_dir, scalafmt.config_filename
-        )
-        if not config_file:
-            raise ValueError(
-                f"No scalafmt config file (`{scalafmt.config_filename}`) found for "
-                f"source directory '{source_dir}'"
-            )
-        source_dir_to_config_file[source_dir] = config_file
-
-    return ScalafmtConfigFiles(config_files_snapshot, FrozenDict(source_dir_to_config_file))
 
 
 @rule
@@ -123,8 +78,10 @@ async def partition_scalafmt(
     tool_classpath, config_files = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(
-            ScalafmtConfigFiles,
-            GatherScalafmtConfigFilesRequest(filepaths),
+            GatheredConfigFilesByDirectories,
+            GatherConfigFilesByDirectoriesRequest(
+                tool_name="scalafmt", config_filename=tool.config_filename, filepaths=filepaths
+            ),
         ),
     )
 
