@@ -268,22 +268,38 @@ backend_packages = [
 
 This adds the new `protobuf_source` target, which you can confirm by running `pants help protobuf_source`. 
 
-Lint and Format
----------------
+Fix, Lint and Format
+--------------------
 
-`scalafmt` and `Google Java Format` can be enabled by adding the `pants.backend.experimental.scala.lint.scalafmt` and `pants.backend.experimental.java.lint.google_java_format` backends (respectively) to `backend_packages` in the `[GLOBAL]` section of `pants.toml`.
+`scalafix`, `scalafmt` and `Google Java Format` can be enabled by adding the `pants.backend.experimental.scala.lint.scalafix`, `pants.backend.experimental.scala.lint.scalafmt` and `pants.backend.experimental.java.lint.google_java_format` backends (respectively) to `backend_packages` in the `[GLOBAL]` section of `pants.toml`.
 
-Once enabled, `lint` and `fmt` will check and automatically reformat your code:
+Once enabled, `lint`, `fix` and `fmt` will check and automatically fix or reformat your code:
 
 ```
 # Format this directory and all subdirectories
 ❯ pants fmt src/jvm::
+
+# Fix this directory and all subdirectories
+❯ pants fix src/jvm::
 
 # Check that the whole project is formatted
 ❯ pants lint ::
 
 # Format all changed files
 ❯ pants --changed-since=HEAD fmt
+```
+
+> 🚧 `scalafix` and `semanticdb` plugin
+> 
+> Enabling the `scalafix` backend will automatically enable the `semanticdb` plugin for `scalac`. This is part of the `scalac` compiler in Scala 3 but requires the following third party artifact in Scala 2:
+
+```
+scala_artifact(
+    group="org.scalameta",
+    artifact="semanticdb-scalac",
+    version="<version>",
+    crossversion="full",
+)
 ```
 
 Working in an IDE
