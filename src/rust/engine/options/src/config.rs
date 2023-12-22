@@ -125,10 +125,9 @@ impl Config {
         })?;
 
         fn add_section_to_interpolation_map(
-            imap: &InterpolationMap,
+            mut imap: InterpolationMap,
             section: Option<&Value>,
         ) -> Result<InterpolationMap, String> {
-            let mut imap = imap.clone();
             if let Some(section) = section {
                 if let Some(table) = section.as_table() {
                     for (key, value) in table.iter() {
@@ -141,7 +140,8 @@ impl Config {
             Ok(imap)
         }
 
-        let default_imap = add_section_to_interpolation_map(seed_values, config.get("DEFAULT"))?;
+        let default_imap =
+            add_section_to_interpolation_map(seed_values.clone(), config.get("DEFAULT"))?;
 
         let new_sections: Result<Vec<(String, Value)>, String> = match config {
             Value::Table(t) => t
@@ -160,7 +160,7 @@ impl Config {
                     let section_imap = if section_name == "DEFAULT" {
                         default_imap.clone()
                     } else {
-                        add_section_to_interpolation_map(&default_imap, Some(&section))?
+                        add_section_to_interpolation_map(default_imap.clone(), Some(&section))?
                     };
                     let new_section = interpolate_value("", section.clone(), &section_imap)
                         .map_err(|e| {
