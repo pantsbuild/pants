@@ -26,7 +26,7 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
         "-V".to_owned(),
     ];
     let options_parser =
-        OptionParser::new(Env::new(HashMap::new()), Args::new(args.clone())).unwrap();
+        OptionParser::new(Env::new(HashMap::new()), Args::new(args.clone()), true).unwrap();
 
     let mut cmd = Command::new(build_root.join("pants"));
     cmd.current_dir(build_root.as_path())
