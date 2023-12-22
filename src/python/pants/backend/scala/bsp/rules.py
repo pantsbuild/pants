@@ -19,12 +19,7 @@ from pants.backend.scala.bsp.spec import (
     ScalaTestClassesParams,
     ScalaTestClassesResult,
 )
-from pants.backend.scala.compile.scalac_plugins import (
-    ScalacPlugins,
-    ScalacPluginsForTargetRequest,
-    ScalacPluginsRequest,
-    ScalacPluginTargetsForTarget,
-)
+from pants.backend.scala.compile.scalac_plugins import ScalacPlugins, ScalacPluginsRequest
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
@@ -344,24 +339,19 @@ async def handle_bsp_scalac_options_request(
     )
     resolve = thirdparty_modules.resolve
 
-    scalac_plugin_targets = await MultiGet(
-        Get(ScalacPluginTargetsForTarget, ScalacPluginsForTargetRequest(tgt, resolve.name))
-        for tgt in targets
-    )
-
-    local_plugins_prefix = f"jvm/resolves/{resolve.name}/plugins"
-    local_plugins = await Get(
-        ScalacPlugins, ScalacPluginsRequest.from_target_plugins(scalac_plugin_targets, resolve)
+    scalac_plugins_prefix = f"jvm/resolves/{resolve.name}/plugins"
+    scalac_plugins = await Get(
+        ScalacPlugins, ScalacPluginsRequest(consumer_targets=tuple(targets), resolve=resolve)
     )
 
     thirdparty_modules_prefix = f"jvm/resolves/{resolve.name}/lib"
-    thirdparty_modules_digest, local_plugins_digest = await MultiGet(
+    thirdparty_modules_digest, scalac_plugins_digest = await MultiGet(
         Get(Digest, AddPrefix(thirdparty_modules.merged_digest, thirdparty_modules_prefix)),
-        Get(Digest, AddPrefix(local_plugins.classpath.digest, local_plugins_prefix)),
+        Get(Digest, AddPrefix(scalac_plugins.classpath.digest, scalac_plugins_prefix)),
     )
 
     resolve_digest = await Get(
-        Digest, MergeDigests([thirdparty_modules_digest, local_plugins_digest])
+        Digest, MergeDigests([thirdparty_modules_digest, scalac_plugins_digest])
     )
     workspace.write_digest(resolve_digest, path_prefix=".pants.d/bsp")
 
@@ -376,7 +366,7 @@ async def handle_bsp_scalac_options_request(
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
-            options=(*local_plugins.args(local_plugins_prefix), *scalac.args),
+            options=(*scalac_plugins.args(scalac_plugins_prefix), *scalac.args),
             classpath=classpath,
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"

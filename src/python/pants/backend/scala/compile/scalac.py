@@ -8,12 +8,7 @@ from dataclasses import dataclass
 from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
-from pants.backend.scala.compile.scalac_plugins import (
-    ScalacPlugins,
-    ScalacPluginsForTargetRequest,
-    ScalacPluginsRequest,
-    ScalacPluginTargetsForTarget,
-)
+from pants.backend.scala.compile.scalac_plugins import ScalacPlugins, ScalacPluginsRequest
 from pants.backend.scala.compile.scalac_plugins import rules as scalac_plugins_rules
 from pants.backend.scala.resolve.artifact import rules as scala_artifact_rules
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
@@ -120,15 +115,11 @@ async def compile_scala_source(
         ),
     )
 
-    plugins_ = await MultiGet(
-        Get(
-            ScalacPluginTargetsForTarget,
-            ScalacPluginsForTargetRequest(target, request.resolve.name),
-        )
-        for target in request.component.members
+    scalac_plugins = await Get(
+        ScalacPlugins,
+        ScalacPluginsRequest,
+        ScalacPluginsRequest.for_coarsened_target(request.component, request.resolve),
     )
-    plugins_request = ScalacPluginsRequest.from_target_plugins(plugins_, request.resolve)
-    local_plugins = await Get(ScalacPlugins, ScalacPluginsRequest, plugins_request)
 
     component_members_and_scala_source_files = [
         (target, sources)
@@ -150,7 +141,7 @@ async def compile_scala_source(
         )
 
     toolcp_relpath = "__toolcp"
-    local_scalac_plugins_relpath = "__plugincp"
+    scalac_plugins_relpath = "__plugincp"
     usercp = "__cp"
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
@@ -178,7 +169,7 @@ async def compile_scala_source(
 
     extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
-        local_scalac_plugins_relpath: local_plugins.classpath.digest,
+        scalac_plugins_relpath: scalac_plugins.classpath.digest,
     }
     extra_nailgun_keys = tuple(extra_immutable_input_digests)
     extra_immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
@@ -200,7 +191,7 @@ async def compile_scala_source(
                 scala_artifacts.compiler_main,
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
-                *local_plugins.args(local_scalac_plugins_relpath),
+                *scalac_plugins.args(scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 *scalac.args,
                 "-d",

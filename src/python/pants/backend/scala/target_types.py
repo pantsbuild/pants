@@ -20,6 +20,7 @@ from pants.engine.target import (
     AllTargets,
     AsyncFieldMixin,
     Dependencies,
+    DictStringToStringField,
     FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
@@ -383,12 +384,25 @@ class ScalacPluginNameField(StringField):
     )
 
 
+class ScalacPluginOptionsField(DictStringToStringField):
+    alias = "options"
+    help = help_text(
+        """
+        Plugin configuration options.
+
+        These will be added to `scalac` whenever we need to compile
+        a target that consumes this plugin.
+        """
+    )
+
+
 class ScalacPluginTarget(Target):
     alias = "scalac_plugin"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalacPluginArtifactField,
         ScalacPluginNameField,
+        ScalacPluginOptionsField,
     )
     help = help_text(
         """
@@ -404,15 +418,26 @@ class ScalacPluginTarget(Target):
     )
 
 
+@dataclass(frozen=True)
+class ScalacPluginFieldSet(FieldSet):
+    required_fields = (ScalacPluginArtifactField,)
+
+    name: ScalacPluginNameField
+    artifact: ScalacPluginArtifactField
+    options: ScalacPluginOptionsField
+
+    @property
+    def plugin_name(self) -> str:
+        return self.name.value or self.address.target_name
+
+
 class AllScalacPluginTargets(Targets):
     pass
 
 
 @rule
 async def all_scala_plugin_targets(targets: AllTargets) -> AllScalacPluginTargets:
-    return AllScalacPluginTargets(
-        tgt for tgt in targets if tgt.has_fields((ScalacPluginArtifactField, ScalacPluginNameField))
-    )
+    return AllScalacPluginTargets(tgt for tgt in targets if ScalacPluginFieldSet.is_applicable(tgt))
 
 
 # -----------------------------------------------------------------------------------------------
