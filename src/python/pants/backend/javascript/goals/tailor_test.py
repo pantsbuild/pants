@@ -8,11 +8,11 @@ from pants.backend.javascript.goals import tailor
 from pants.backend.javascript.goals.tailor import (
     PutativeJSTargetsRequest,
     PutativePackageJsonTargetsRequest,
-    _ClassifiedSources,
 )
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSTestsGeneratorTarget
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
+from pants.core.util_rules.source_files import ClassifiedSources
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -41,7 +41,7 @@ def rule_runner() -> RuleRunner:
                 "src/unowned/UnownedFile3.cjs": "",
             },
             [
-                _ClassifiedSources(
+                ClassifiedSources(
                     JSSourcesGeneratorTarget,
                     ["UnownedFile1.js", "UnownedFile2.mjs", "UnownedFile3.cjs"],
                 )
@@ -57,7 +57,7 @@ def rule_runner() -> RuleRunner:
                 "src/unowned/UnownedFile3.test.cjs": "",
             },
             [
-                _ClassifiedSources(
+                ClassifiedSources(
                     JSTestsGeneratorTarget,
                     ["UnownedFile1.test.js", "UnownedFile2.test.mjs", "UnownedFile3.test.cjs"],
                     "tests",
@@ -73,15 +73,15 @@ def rule_runner() -> RuleRunner:
                 "src/unowned/UnownedFile1.test.js": "",
             },
             [
-                _ClassifiedSources(JSTestsGeneratorTarget, ["UnownedFile1.test.js"], "tests"),
-                _ClassifiedSources(JSSourcesGeneratorTarget, ["UnownedFile1.js"]),
+                ClassifiedSources(JSTestsGeneratorTarget, ["UnownedFile1.test.js"], "tests"),
+                ClassifiedSources(JSSourcesGeneratorTarget, ["UnownedFile1.js"]),
             ],
             id="both_tests_and_source",
         ),
     ],
 )
 def test_find_putative_js_targets(
-    rule_runner: RuleRunner, files: dict, putative_map: list[_ClassifiedSources]
+    rule_runner: RuleRunner, files: dict, putative_map: list[ClassifiedSources]
 ) -> None:
     rule_runner.write_files(files)
     putative_targets = rule_runner.request(

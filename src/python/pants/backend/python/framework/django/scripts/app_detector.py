@@ -77,7 +77,7 @@ def handle_file(apps, path):
     visitor.visit(tree)
 
     if visitor.app_name:
-        apps[visitor.app_label] = visitor.app_name
+        apps[visitor.app_label] = {"app_name": visitor.app_name, "config_file": path}
 
 
 def main(paths):

@@ -137,44 +137,46 @@ Normally targets are declared in BUILD files to provide metadata about the proje
 
 To declare synthetic targets from a Plugin, first subclass the `SyntheticTargetsRequest` union type and register it as a union member with `UnionRule(SyntheticTargetsRequest, SubclassedType)`. Secondly there needs to be a rule that takes this union member type as input and returns a `SyntheticAddressMaps`.
 
-    from dataclasses import dataclass
-    from pants.engine.internals.synthetic_targets import (
-        SyntheticAddressMaps,
-        SyntheticTargetsRequest,
-    )
-    from pants.engine.internals.target_adaptor import TargetAdaptor
-    from pants.engine.unions import UnionRule
-    from pants.engine.rules import collect_rules, rule
+```python
+from dataclasses import dataclass
+from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMaps,
+    SyntheticTargetsRequest,
+)
+from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.unions import UnionRule
+from pants.engine.rules import collect_rules, rule
 
 
-    @dataclass(frozen=True)
-    class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
-        pass
+@dataclass(frozen=True)
+class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
+    pass
 
 
-    @rule
-    async def example_synthetic_targets(request: SyntheticExampleTargetsRequest) -> SyntheticAddressMaps:
-        return SyntheticAddressMaps.for_targets_request(
-            request,
-            [
-                (
-                  "BUILD.synthetic-example",
-                  (
-                    TargetAdaptor("<target-type>", "<name>", **target_field_values),
-                    ...
-                  ),
-                ),
+@rule
+async def example_synthetic_targets(request: SyntheticExampleTargetsRequest) -> SyntheticAddressMaps:
+    return SyntheticAddressMaps.for_targets_request(
+        request,
+        [
+            (
+              "BUILD.synthetic-example",
+              (
+                TargetAdaptor("<target-type>", "<name>", **target_field_values),
                 ...
-            ]
-        )
-
-
-    def rules():
-        return (
-            *collect_rules(),
-            UnionRule(SyntheticTargetsRequest, SyntheticExampleTargetsRequest),
+              ),
+            ),
             ...
-        )
+        ]
+    )
+
+
+def rules():
+    return (
+        *collect_rules(),
+        UnionRule(SyntheticTargetsRequest, SyntheticExampleTargetsRequest),
+        ...
+    )
+```
 
 ### Register synthetic targets per directory or globally
 
@@ -184,13 +186,15 @@ If the source information is derived from parsing files from the project source 
 
 The mode of operation is declared per union member (i.e. on the subclass of the `SyntheticTargetsRequest` class) by providing a default value to the `path` field:
 
-    @dataclass(frozen=True)
-    class SyntheticExamplePerDirectoryTargetsRequest(SyntheticTargetsRequest):
-        path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
+```python
+@dataclass(frozen=True)
+class SyntheticExamplePerDirectoryTargetsRequest(SyntheticTargetsRequest):
+    path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
 
-    @dataclass(frozen=True)
-    class SyntheticExampleAllTargetsAtOnceRequest(SyntheticTargetsRequest):
-        path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+@dataclass(frozen=True)
+class SyntheticExampleAllTargetsAtOnceRequest(SyntheticTargetsRequest):
+    path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+```
 
 Any other default value for `path` should be considered invalid and yield undefined behaviour. (that is it may change without notice in future versions of Pants.)
 

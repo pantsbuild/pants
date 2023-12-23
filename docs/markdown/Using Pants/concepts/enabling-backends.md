@@ -47,12 +47,12 @@ This list is also available via `pants backends --help`, which includes any addi
 | `pants.backend.python.lint.pyupgrade`                | Enables Pyupgrade, which upgrades to new Python syntax: <https://pypi.org/project/pyupgrade/>      | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.python.lint.yapf`                     | Enables Yapf, the Python formatter: <https://pypi.org/project/yapf/>                               | [Linters and formatters](doc:python-linters-and-formatters)       |
 | `pants.backend.python.typecheck.mypy`                | Enables MyPy, the Python type checker: <https://mypy.readthedocs.io/en/stable/>.                   | [typecheck](doc:python-check-goal)                                |
-| `pants.backend.shell`                                | Core Shell support, including shUnit2 test runner.                                                 | [Shell overview](doc:shell)                                       |
-| `pants.backend.shell.lint.shfmt`                     | Enables shfmt, a Shell autoformatter: <https://github.com/mvdan/sh>.                               | [Shell overview](doc:shell)                                       |
-| `pants.backend.shell.lint.shellcheck`                | Enables Shellcheck, a Shell linter: <https://www.shellcheck.net/>.                                 | [Shell overview](doc:shell)                                       |
+| `pants.backend.shell`                                | Core Shell support, including shUnit2 test runner.                                                 | [Shell overview](doc:shell-overview)                              |
+| `pants.backend.shell.lint.shfmt`                     | Enables shfmt, a Shell autoformatter: <https://github.com/mvdan/sh>.                               | [Shell overview](doc:shell-overview)                              |
+| `pants.backend.shell.lint.shellcheck`                | Enables Shellcheck, a Shell linter: <https://www.shellcheck.net/>.                                 | [Shell overview](doc:shell-overview)                              |
 | `pants.backend.tools.preamble`                       | Enables "preamble", a Pants fixer for copyright headers and shebang lines                          | [`preamble`](doc:reference-preamble)                              |
 | `pants.backend.tools.taplo`                          | Enables Taplo, a TOML autoformatter: <https://taplo.tamasfe.dev>                                   |                                                                   |
-| `pants.backend.url_handlers.s3`                      | Enables accessing s3 via credentials in `file(source=http_source(...))`                            |                                                              |
+| `pants.backend.url_handlers.s3`                      | Enables accessing s3 via credentials in `file(source=http_source(...))`                            |                                                                   |
 
 Available experimental backends
 -------------------------------

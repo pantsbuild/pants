@@ -964,7 +964,7 @@ async def compute_compile_action_id(
     # See https://github.com/golang/go/blob/master/src/cmd/go/internal/cache/hash.go#L32-L46
     h.update(goroot.full_version.encode())
 
-    h.update("compile\n".encode())
+    h.update(b"compile\n")
     if bq.minimum_go_version:
         h.update(f"go {bq.minimum_go_version}\n".encode())
     h.update(f"goos {goroot.goos} goarch {goroot.goarch}\n".encode())

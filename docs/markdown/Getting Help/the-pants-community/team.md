@@ -24,13 +24,13 @@ Pants open source project has had many team members in over a decade. The curren
 | **Benjy Weinberger**       | "The options system — unifying our flags, config and env vars into a coherent, extensible framework." |
 | **Carina C. Zona**         | "Developing the #welcome channel on Pants community chat"                                             |
 | **Christopher Neugebauer** | Adding multi-architecture Mac support for Apple Silicon (M1s)                                         |
-| **Dan Moran**              | "Enabling batched `pytest` execution in `pants test`"                                          |
+| **Dan Moran**              | "Enabling batched `pytest` execution in `pants test`"                                                 |
 | **Daniel Wagner-Hall**     | Laid the foundation for remote execution                                                              |
 | **Danny McClanahan**       | Implemented bounded runtime polymorphism with union rules and improved plugin UX with async/await     |
 | **Eric Arellano**          | "Migrating Pants to Python 3 for my internship project"                                               |
 | **Henry Fuller**           | "Working on replacing watchman with a kernel based file watcher in the V2 engine"                     |
-| **Huon Wilson**            | "Improving the experiencing of using `mypy` with Pants"          |
-| **Jacob Floyd**            | Gave the idea for `skip_flake8` et al, which grew into a flagship feature: incremental adoption          |
+| **Huon Wilson**            | "Improving the experiencing of using `mypy` with Pants"                                               |
+| **Jacob Floyd**            | Gave the idea for `skip_flake8` et al, which grew into a flagship feature: incremental adoption       |
 | **John Sirois**            |                                                                                                       |
 | **Josh Reed**              | "Remains continually willing to bikeshed about design decisions on the Pants Slack"                   |
 | **Joshua Cannon**          | "I'm proud and thankful my voice can and is being used to shape Pants inside and out"                 |
@@ -53,6 +53,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Doron Somech**        | "Improving Scala dependency inference to support our codebase"                                           |
 | **Gautham Nair**        |                                                                                                          |
 | **Jonas Stendahl**      | "Adding formatting and linting support for Protobuf"                                                     |
+| **Krishnan Chandra**    | "Adding support for the Ruff formatter to Pants"                                                         |
 | **Marcelo Trylesinski** | "Improving onboarding experience"                                                                        |
 | **Nick Grisafi**        | "Participating in podcasts with maintainers (Eric and Josh) on developer experience and Pants!"          |
 | **Raúl Cuza**           | "The first time I was able to help someone else with pants on the Slack <https://pantsbuild.slack.com>." |

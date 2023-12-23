@@ -92,12 +92,13 @@ class Ruff(PythonToolBase):
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # See https://github.com/astral-sh/ruff#configuration for how ruff discovers
         # config files.
+        all_dirs = ("", *dirs)
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
-            check_existence=["ruff.toml", *(os.path.join(d, "ruff.toml") for d in ("", *dirs))],
-            check_content={"pyproject.toml": b"[tool.ruff"},
+            check_existence=[os.path.join(d, "ruff.toml") for d in all_dirs],
+            check_content={os.path.join(d, "pyproject.toml"): b"[tool.ruff" for d in all_dirs},
         )
 
 
