@@ -51,7 +51,7 @@ impl IndicatifInstance {
         let bars = (0..cmp::min(local_parallelism, terminal_height.into()))
             .map(|_n| {
                 let style = ProgressStyle::default_bar()
-                    .template("{spinner} {wide_msg}")
+                    .template("{spinner} {prefix}{msg}")
                     .expect("Valid template.");
 
                 multi_progress.add(ProgressBar::new(terminal_width.into()).with_style(style))
@@ -74,7 +74,11 @@ impl IndicatifInstance {
         future::ready(()).boxed()
     }
 
-    pub fn render(&mut self, heavy_hitters: &HashMap<SpanId, (String, SystemTime)>) {
+    pub fn render(
+        &mut self,
+        heavy_hitters: &HashMap<SpanId, (String, SystemTime)>,
+        log_retriever: &mut dyn FnMut(SpanId) -> Option<Vec<u8>>,
+    ) {
         let tasks_to_display = &mut self.tasks_to_display;
         super::classify_tasks(
             heavy_hitters,
@@ -94,7 +98,9 @@ impl IndicatifInstance {
 
         let now = SystemTime::now();
         for (n, pbar) in self.bars.iter().enumerate() {
-            let maybe_label = tasks_to_display.get_index(n).map(|span_id| {
+            let maybe_label = tasks_to_display.get_index(n).and_then(|span_id| {
+                let log_lines = log_retriever(*span_id);
+
                 let (label, start_time) = heavy_hitters.get(span_id).unwrap();
                 let duration_label = match now.duration_since(*start_time).ok() {
                     None => "(Waiting)".to_string(),
@@ -102,12 +108,33 @@ impl IndicatifInstance {
                         format_workunit_duration_ms!((duration).as_millis()).to_string()
                     }
                 };
-                format!("{duration_label} {label}")
+
+                let label = if log_lines.as_ref().map_or(false, |lines| !lines.is_empty()) {
+                    format!("{duration_label} {label}\n")
+                } else {
+                    format!("{duration_label} {label}")
+                };
+
+                Some((label, log_lines))
             });
 
             match maybe_label {
-                Some(label) => pbar.set_message(label),
-                None => pbar.set_message(""),
+                Some((label, maybe_message)) => {
+                    pbar.set_prefix(label);
+
+                    match maybe_message {
+                        Some(message) if !message.is_empty() => {
+                            let message: String =
+                                String::from_utf8_lossy(message.as_slice()).into();
+                            pbar.set_message(message);
+                        }
+                        _ => pbar.set_message(""),
+                    }
+                }
+                None => {
+                    pbar.set_prefix("");
+                    pbar.set_message("");
+                }
             }
 
             pbar.tick();

@@ -131,6 +131,9 @@ class LocalPantsRunner:
             dynamic_ui=global_options.dynamic_ui,
             ui_use_prodash=global_options.dynamic_ui_renderer
             == DynamicUIRenderer.experimental_prodash,
+            dynamic_ui_log_streaming=global_optoins.dynamic_ui_log_streaming,
+            dynamic_ui_log_streaming_lines=global_optoins.dynamic_ui_log_streaming_lines,
+            dynamic_ui_log_streaming_topn=global_optoins.dynamic_ui_log_streaming_topn,
             use_colors=global_options.get("colors", True),
             max_workunit_level=max(
                 global_options.streaming_workunits_level,

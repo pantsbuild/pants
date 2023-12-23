@@ -352,6 +352,42 @@ class WorkspacePathOption(_OptionBase[str, _StrDefault]):
     option_type: Any = custom_types.workspace_path
 
 
+class IntOrStrOption(_OptionBase[str, _StrDefault]):
+    """An option which takes either an integer or an open or closed set of strings."""
+
+    def __new__(cls, *, allowed_string_values: list[str] | None = None, **kwargs):
+        instance = super().__new__(
+            cls,  # type: ignore[arg-type]
+            **kwargs,
+        )
+
+        instance.allowed_string_values = allowed_string_values
+        return instance
+
+    def get_option_type(self, subsystem_cls):
+        def _type_converter(value: str | int) -> int | str:
+            if not isinstance(value, str) and not isinstance(value, int):
+                raise ValueError(
+                    f"Expected an int or a string, got {type(value)} with value {value}"
+                )
+
+            if isinstance(value, str):
+                if self.allowed_string_values is not None:
+                    if value not in self.allowed_string_values:
+                        raise ValueError(
+                            f"Expected a string from {', '.join(self.allowed_string_values)}, got '{value}'"
+                        )
+
+                return str(value)
+
+            return int(value)
+
+        return _type_converter
+
+    option_type: Any = int | str
+    allowed_string_values: list[str] | None = None
+
+
 # -----------------------------------------------------------------------------------------------
 # Int Concrete Option Classes
 # -----------------------------------------------------------------------------------------------

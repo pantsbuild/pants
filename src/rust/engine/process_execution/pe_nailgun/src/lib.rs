@@ -207,6 +207,7 @@ impl process_execution::CommandRunner for CommandRunner {
                         nailgun_process.workdir_path().to_owned(),
                         (nailgun_process.name().to_owned(), nailgun_process.address()),
                         exclusive_spawn,
+                        workunit,
                     )
                     .await;
 

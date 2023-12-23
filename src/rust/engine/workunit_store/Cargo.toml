@@ -6,6 +6,7 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+bstr = { workspace = true }
 bytes = { workspace = true }
 concrete_time = { path = "../concrete_time" }
 deepsize = { workspace = true }

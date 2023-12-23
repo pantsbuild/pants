@@ -36,6 +36,7 @@ from pants.option.option_types import (
     EnumOption,
     FloatOption,
     IntOption,
+    IntOrStrOption,
     MemorySizeOption,
     StrListOption,
     StrOption,
@@ -1864,6 +1865,20 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     dynamic_ui_renderer = EnumOption(
         default=DynamicUIRenderer.indicatif_spinner,
         help="If `--dynamic-ui` is enabled, selects the renderer.",
+    )
+    dynamic_ui_log_streaming = BoolOption(
+        default=False,
+        help="If `--dynamic-ui` is enabled, whether to stream logs to the UI.",
+    )
+    dynamic_ui_log_streaming_lines = IntOrStrOption(
+        allowed_string_values=["auto"],
+        default="1",
+        help="If `--dynamic-ui` and `--dynamic-ui-log-streaming` is enabled, the number of lines to stream to the UI.",
+    )
+    dynamic_ui_log_streaming_topn = IntOrStrOption(
+        allowed_string_values=["auto"],
+        default="10",
+        help="If `--dynamic-ui` and `--dynamic-ui-log-streaming` is enabled, the number of heavy processes to stream to the UI.",
     )
 
     tag = StrListOption(

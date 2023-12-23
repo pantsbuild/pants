@@ -4,13 +4,14 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Reverse;
-use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
+use std::collections::{hash_map, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::future::Future;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use bstr::ByteSlice;
 use bytes::{BufMut, Bytes, BytesMut};
 use concrete_time::TimeSpan;
 use deepsize::DeepSizeOf;
@@ -348,6 +349,7 @@ pub enum UserMetadataItem {
 enum StoreMsg {
     Started(Workunit),
     Completed(SpanId, Level, Option<WorkunitMetadata>, SystemTime),
+    LogData(SpanId, Vec<u8>),
     Canceled(SpanId, SystemTime),
 }
 
@@ -355,9 +357,10 @@ enum StoreMsg {
 pub struct WorkunitStore {
     log_starting_workunits: bool,
     max_level: Level,
-    senders: [UnboundedSender<StoreMsg>; 2],
+    senders: [UnboundedSender<StoreMsg>; 3],
     streaming_workunit_data: Arc<Mutex<StreamingWorkunitData>>,
     heavy_hitters_data: Arc<Mutex<HeavyHittersData>>,
+    workunit_log_data: Arc<Mutex<WorkunitLogData>>,
     metrics_data: Arc<MetricsData>,
 }
 
@@ -411,6 +414,7 @@ impl StreamingWorkunitData {
                         }
                     }
                 }
+                StoreMsg::LogData(..) => {}
                 StoreMsg::Canceled(..) => (),
             }
         }
@@ -442,6 +446,7 @@ impl HeavyHittersData {
                 StoreMsg::Canceled(span_id, time) => {
                     let _ = self.running_graph.complete(span_id, None, time);
                 }
+                StoreMsg::LogData(..) => {}
             }
         }
     }
@@ -539,6 +544,113 @@ impl HeavyHittersData {
     }
 }
 
+struct SpanLogLines {
+    buffer: Vec<u8>,
+    max_lines: usize,
+    lines: VecDeque<Vec<u8>>,
+}
+
+impl SpanLogLines {
+    fn new(max_lines: usize) -> SpanLogLines {
+        SpanLogLines {
+            buffer: Vec::new(),
+            max_lines,
+            lines: VecDeque::new(),
+        }
+    }
+
+    fn add(&mut self, data: Vec<u8>) {
+        self.buffer.extend_from_slice(&data);
+        let new_lines = self.buffer.lines_with_terminator();
+
+        let mut last_line = None;
+
+        for line in new_lines {
+            if line.is_empty() {
+                continue;
+            }
+
+            if line.ends_with_str("\n") {
+                self.lines.push_back(line.to_vec());
+            } else {
+                // have to allocate here since we're already holding a reference to the
+                // buffer. Optimally bstr would have an API like `drain_lines` that would generate
+                // lines and then shift the remainder the front end.
+                last_line = Some(line.to_vec());
+            }
+        }
+
+        self.buffer.clear();
+        if let Some(last_line) = last_line {
+            self.buffer.extend_from_slice(&last_line);
+        }
+
+        if self.lines.len() > self.max_lines {
+            let num_to_remove = self.lines.len() - self.max_lines;
+            self.lines.drain(0..num_to_remove);
+        }
+    }
+
+    fn lines(&mut self) -> Vec<u8> {
+        let mut output =
+            Vec::with_capacity(self.lines.iter().map(|line| line.len()).sum::<usize>());
+
+        for line in &self.lines {
+            output.extend_from_slice(line);
+        }
+        output
+    }
+}
+
+struct WorkunitLogData {
+    receiver: UnboundedReceiver<StoreMsg>,
+    running_graph: RunningWorkunitGraph,
+    log_lines: HashMap<SpanId, SpanLogLines>,
+}
+
+impl WorkunitLogData {
+    fn new(receiver: UnboundedReceiver<StoreMsg>) -> WorkunitLogData {
+        WorkunitLogData {
+            receiver,
+            running_graph: RunningWorkunitGraph::default(),
+            log_lines: HashMap::new(),
+        }
+    }
+
+    fn refresh_store(&mut self) {
+        while let Ok(msg) = self.receiver.try_recv() {
+            match msg {
+                StoreMsg::Started(started) => {
+                    self.log_lines.insert(started.span_id, SpanLogLines::new(6));
+                    self.running_graph.add(started);
+                }
+
+                StoreMsg::Completed(span_id, _level, new_metadata, time) => {
+                    self.log_lines.remove(&span_id);
+                    let _ = self.running_graph.complete(span_id, new_metadata, time);
+                }
+                StoreMsg::Canceled(span_id, time) => {
+                    self.log_lines.remove(&span_id);
+                    let _ = self.running_graph.complete(span_id, None, time);
+                }
+                StoreMsg::LogData(span_id, data) => {
+                    if let Some(log_lines) = self.log_lines.get_mut(&span_id) {
+                        log_lines.add(data);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn read_log_lines(&mut self, span_id: SpanId) -> Option<Vec<u8>> {
+        self.refresh_store();
+
+        self.log_lines
+            .get_mut(&span_id)
+            .map(|log_lines| log_lines.lines())
+    }
+}
+
 impl WorkunitStore {
     pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
         // NB: Although it would be nice not to have seperate allocations per consumer, it is
@@ -547,14 +659,16 @@ impl WorkunitStore {
         // affects the total number of messages that might be queued at any given time.
         let (sender1, receiver1) = mpsc::unbounded_channel();
         let (sender2, receiver2) = mpsc::unbounded_channel();
+        let (sender3, receiver3) = mpsc::unbounded_channel();
         WorkunitStore {
             log_starting_workunits,
             max_level,
             // TODO: Create one `StreamingWorkunitData` per subscriber, and zero if no subscribers are
             // installed.
-            senders: [sender1, sender2],
+            senders: [sender1, sender2, sender3],
             streaming_workunit_data: Arc::new(Mutex::new(StreamingWorkunitData::new(receiver1))),
             heavy_hitters_data: Arc::new(Mutex::new(HeavyHittersData::new(receiver2))),
+            workunit_log_data: Arc::new(Mutex::new(WorkunitLogData::new(receiver3))),
             metrics_data: Arc::default(),
         }
     }
@@ -586,6 +700,13 @@ impl WorkunitStore {
     ///
     pub fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
         self.heavy_hitters_data.lock().heavy_hitters(k)
+    }
+
+    ///
+    /// Return the log lines for the given SpanId, if any.
+    ///
+    pub fn read_log_lines(&self, span_id: SpanId) -> Option<Vec<u8>> {
+        self.workunit_log_data.lock().read_log_lines(span_id)
     }
 
     fn send(&self, msg: StoreMsg) {
@@ -689,6 +810,10 @@ impl WorkunitStore {
 
         self.send(StoreMsg::Started(workunit.clone()));
         self.complete_workunit_impl(workunit, end_time);
+    }
+
+    pub fn add_log_data(&self, span_id: SpanId, data: Vec<u8>) {
+        self.send(StoreMsg::LogData(span_id, data));
     }
 
     pub fn latest_workunits(&self, max_verbosity: log::Level) -> (Vec<Workunit>, Vec<Workunit>) {
@@ -933,6 +1058,12 @@ impl RunningWorkunit {
     pub fn complete(&mut self) {
         if let Some(workunit) = self.workunit.take() {
             self.store.complete_workunit(workunit);
+        }
+    }
+
+    pub fn log(&mut self, data: Vec<u8>) {
+        if let Some(workunit) = self.workunit.as_ref() {
+            self.store.add_log_data(workunit.span_id, data);
         }
     }
 }

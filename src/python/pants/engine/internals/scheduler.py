@@ -326,17 +326,31 @@ class Scheduler:
         self,
         build_id: str,
         dynamic_ui: bool = False,
+        dynamic_ui_log_streaming: bool = False,
+        dynamic_ui_log_streaming_lines: int | str = 1,
+        dynamic_ui_log_streaming_topn: int | str = "auto",
         ui_use_prodash: bool = False,
         max_workunit_level: LogLevel = LogLevel.DEBUG,
         session_values: SessionValues | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> SchedulerSession:
         """Creates a new SchedulerSession for this Scheduler."""
+
+        # for simplicity at the API level, we use -1 to signal "auto" when moving across the FFI boundary, and then convert to a real Rust enum on the other side.
+        if dynamic_ui_log_streaming_lines == "auto":
+            dynamic_ui_log_streaming_lines = -1
+
+        if dynamic_ui_log_streaming_topn == "auto":
+            dynamic_ui_log_streaming_topn = -1
+
         return SchedulerSession(
             self,
             PySession(
                 scheduler=self.py_scheduler,
                 dynamic_ui=dynamic_ui,
+                dynamic_ui_log_streaming=dynamic_ui_log_streaming,
+                dynamic_ui_log_streaming_lines=dynamic_ui_log_streaming_lines,
+                dynamic_ui_log_streaming_topn=dynamic_ui_log_streaming_topn,
                 ui_use_prodash=ui_use_prodash,
                 max_workunit_level=max_workunit_level.level,
                 build_id=build_id,

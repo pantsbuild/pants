@@ -51,6 +51,9 @@ impl SessionDisplay {
         workunit_store: &WorkunitStore,
         parallelism: usize,
         dynamic_ui: bool,
+        dynamic_ui_log_streaming: bool,
+        dynamic_ui_log_streaming_lines: ui::LogStreamingLines,
+        dynamic_ui_log_streaming_topn: ui::LogStreamingTopn,
         ui_use_prodash: bool,
     ) -> SessionDisplay {
         if dynamic_ui {
@@ -146,6 +149,9 @@ impl Session {
     pub fn new(
         core: Arc<Core>,
         dynamic_ui: bool,
+        dynamic_ui_log_streaming: bool,
+        dynamic_ui_log_streaming_lines: ui::LogStreamingLines,
+        dynamic_ui_log_streaming_topn: ui::LogStreamingTopn,
         ui_use_prodash: bool,
         mut max_workunit_level: log::Level,
         build_id: String,
@@ -165,6 +171,9 @@ impl Session {
             &workunit_store,
             core.local_parallelism,
             dynamic_ui,
+            dynamic_ui_log_streaming,
+            dynamic_ui_log_streaming_lines,
+            dynamic_ui_log_streaming_topn,
             ui_use_prodash,
         ));
 

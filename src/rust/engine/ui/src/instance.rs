@@ -63,9 +63,13 @@ impl Instance {
     ///
     /// Update the rendering with new data.
     ///
-    pub fn render(&mut self, heavy_hitters: &HashMap<SpanId, (String, SystemTime)>) {
+    pub fn render(
+        &mut self,
+        heavy_hitters: &HashMap<SpanId, (String, SystemTime)>,
+        log_retriever: &mut dyn FnMut(SpanId) -> Option<Vec<u8>>,
+    ) {
         match self {
-            Instance::Indicatif(indicatif) => indicatif.render(heavy_hitters),
+            Instance::Indicatif(indicatif) => indicatif.render(heavy_hitters, log_retriever),
             Instance::Prodash(prodash) => prodash.render(heavy_hitters),
         };
     }

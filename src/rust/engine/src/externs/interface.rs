@@ -392,6 +392,9 @@ impl PySession {
     fn __new__(
         scheduler: &PyScheduler,
         dynamic_ui: bool,
+        dynamic_ui_log_streaming: bool,
+        dynamic_ui_log_streaming_lines: i32,
+        dynamic_ui_log_streaming_topn: i32,
         ui_use_prodash: bool,
         max_workunit_level: u64,
         build_id: String,
@@ -406,11 +409,27 @@ impl PySession {
             .map_err(|e| PyException::new_err(format!("{e}")))?;
         // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
         // held.
+
+        let dynamic_ui_log_streaming_lines = if dynamic_ui_log_streaming_lines < 0 {
+            ui::LogStreamingLines::Auto
+        } else {
+            ui::LogStreamingLines::Exact(dynamic_ui_log_streaming_lines as usize)
+        };
+
+        let dynamic_ui_log_streaming_topn = if dynamic_ui_log_streaming_topn < 0 {
+            ui::LogStreamingTopn::Auto
+        } else {
+            ui::LogStreamingTopn::Exact(dynamic_ui_log_streaming_topn as usize)
+        };
+
         let session = py
             .allow_threads(|| {
                 Session::new(
                     core,
                     dynamic_ui,
+                    dynamic_ui_log_streaming,
+                    dynamic_ui_log_streaming_lines,
+                    dynamic_ui_log_streaming_topn,
                     ui_use_prodash,
                     py_level.into(),
                     build_id,

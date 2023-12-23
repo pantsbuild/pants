@@ -10,6 +10,18 @@ use task_executor::Executor;
 use workunit_store::WorkunitStore;
 mod instance;
 
+#[derive(Clone, Copy, Debug)]
+pub enum LogStreamingLines {
+    Exact(usize),
+    Auto,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum LogStreamingTopn {
+    Exact(usize),
+    Auto,
+}
+
 pub struct ConsoleUI {
     workunit_store: WorkunitStore,
     local_parallelism: usize,
@@ -22,6 +34,9 @@ impl ConsoleUI {
     pub fn new(
         workunit_store: WorkunitStore,
         local_parallelism: usize,
+        log_streaming: bool,
+        log_streaming_lines: LogStreamingLines,
+        log_streaming_topn: LogStreamingTopn,
         ui_use_prodash: bool,
     ) -> ConsoleUI {
         ConsoleUI {
@@ -64,7 +79,8 @@ impl ConsoleUI {
         };
 
         let heavy_hitters = self.workunit_store.heavy_hitters(self.local_parallelism);
-        instance.render(&heavy_hitters)
+        let mut log_retriver = |span_id| self.workunit_store.read_log_lines(span_id);
+        instance.render(&heavy_hitters, &mut log_retriver);
     }
 
     ///
