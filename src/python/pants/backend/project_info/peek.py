@@ -216,7 +216,7 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
     target_roots_to_field_sets_get = [Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
-            field_set_superclass=RunFieldSet,
+            field_set_superclass=fs,
             goal_description="",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.ignore,
         ),
