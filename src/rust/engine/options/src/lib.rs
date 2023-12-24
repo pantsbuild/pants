@@ -158,7 +158,7 @@ pub struct OptionParser {
 }
 
 impl OptionParser {
-    pub fn new(env: Env, args: Args) -> Result<OptionParser, String> {
+    pub fn new(env: Env, args: Args, allow_pantsrc: bool) -> Result<OptionParser, String> {
         let buildroot = BuildRoot::find()?;
         let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
             .map_err(|e| {
@@ -216,10 +216,14 @@ impl OptionParser {
             sources: sources.clone(),
         };
 
-        if *parser.parse_bool(&option_id!("pantsrc"), true)? {
+        if allow_pantsrc && *parser.parse_bool(&option_id!("pantsrc"), true)? {
             for rcfile in parser.parse_string_list(
                 &option_id!("pantsrc", "files"),
-                &["/etc/pantsrc", shellexpand::tilde("~/.pants.rc").as_ref()],
+                &[
+                    "/etc/pantsrc",
+                    shellexpand::tilde("~/.pants.rc").as_ref(),
+                    ".pants.rc",
+                ],
             )? {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
