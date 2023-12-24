@@ -471,9 +471,12 @@ async def _gather_transitive_prebuilt_object_files(
     prebuilt_objects: list[tuple[Digest, list[str]]] = []
 
     queue: deque[BuildGoPackageRequest] = deque([build_request])
+    seen: set[BuildGoPackageRequest] = {build_request}
     while queue:
         pkg = queue.popleft()
-        queue.extend(pkg.direct_dependencies)
+        unseen = [dd for dd in build_request.direct_dependencies if dd not in seen]
+        queue.extend(unseen)
+        seen.update(unseen)
         if pkg.prebuilt_object_files:
             prebuilt_objects.append(
                 (
@@ -695,7 +698,7 @@ async def build_go_package(
         )
         symabis_path = symabis_result.symabis_path
 
-    # Build the arguments for compiling the Go coe in this package.
+    # Build the arguments for compiling the Go code in this package.
     compile_args = [
         "tool",
         "compile",
