@@ -13,10 +13,10 @@ from pants.jvm.goals.lockfile import (
     ValidateJvmArtifactsForResolveRequest,
     ValidateJvmArtifactsForResolveResult,
 )
-from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.docutil import bin_name
+from pants.jvm.resolve.coordinate import Coordinate
 
 SCALA_LIBRARY_GROUP = "org.scala-lang"
 SCALA_LIBRARY_ARTIFACT = "scala-library"

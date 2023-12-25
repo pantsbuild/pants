@@ -17,9 +17,9 @@ from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
-    Coordinate,
     GatherJvmCoordinatesRequest,
 )
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem

@@ -15,9 +15,9 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
     find_jvm_artifacts_or_raise,
 )
-from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
+from pants.jvm.resolve.coordinate import Coordinate
 
 
 @dataclass(frozen=True)

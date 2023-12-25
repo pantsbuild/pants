@@ -22,7 +22,6 @@ from pants.jvm import compile as jvm_compile
 from pants.jvm import jdk_rules, non_jvm_dependencies
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
-from pants.jvm.resolve.common import Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierFetchRequest
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
@@ -37,6 +36,7 @@ from pants.jvm.target_types import (
 from pants.jvm.testutil import _get_jar_contents_snapshot, maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as jvm_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.jvm.resolve.coordinate import Coordinate
 
 
 @pytest.fixture

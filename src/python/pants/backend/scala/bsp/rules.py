@@ -64,7 +64,6 @@ from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import JvmBuildTarget, MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
 from pants.jvm.jdk_rules import DefaultJdk, JdkEnvironment, JdkRequest
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
     CoursierResolvedLockfile,
@@ -75,6 +74,9 @@ from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmJdkField, JvmResolveField
 from pants.util.logging import LogLevel
+from pants.jvm.resolve.common import ArtifactRequirement
+from pants.jvm.resolve.common import ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate
 
 LANGUAGE_ID = "scala"
 
