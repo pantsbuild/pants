@@ -4,16 +4,20 @@
 from __future__ import annotations
 
 import dataclasses
+import re
+import xml.etree.ElementTree as ET
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterable, Optional, Tuple, Type, Union
+from typing import Callable, ClassVar, Iterable, Iterator, Optional, Tuple, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
+from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
@@ -21,8 +25,11 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     Dependencies,
+    DictStringToStringSequenceField,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
+    GeneratedTargets,
+    GenerateTargetsRequest,
     InvalidFieldException,
     InvalidTargetException,
     OptionalSingleSourceField,
@@ -32,10 +39,12 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
+    TargetGenerator,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
@@ -424,6 +433,143 @@ class JvmArtifactTarget(Target):
                 f"You cannot specify both the `url` and `jar` fields, but both were set on the "
                 f"`{self.alias}` target {self.address}."
             )
+
+
+# -----------------------------------------------------------------------------------------------
+# Generate `jvm_artifact` targets from pom.xml
+# -----------------------------------------------------------------------------------------------
+
+
+class PomXmlSourceField(SingleSourceField):
+    default = "pom.xml"
+    required = False
+
+
+class JvmArtifactsPackageMappingField(DictStringToStringSequenceField):
+    alias = "package_mapping"
+    help = help_text(
+        f"""
+        A mapping of jvm artifacts to a list of the packages they provide.
+
+        For example, `{{"com.google.guava:guava": ["com.google.common.**"]}}`.
+
+        Any unspecified jvm artifacts will use a default. See the
+        `{JvmArtifactPackagesField.alias}` field from the `{JvmArtifactTarget.alias}`
+        target for more information.
+        """
+    )
+    value: FrozenDict[str, tuple[str, ...]]
+    default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
+
+    @classmethod
+    def compute_value(  # type: ignore[override]
+        cls, raw_value: dict[str, Iterable[str]], address: Address
+    ) -> FrozenDict[tuple[str], tuple[str, ...]]:
+        value_or_default = super().compute_value(raw_value, address)
+        return FrozenDict(
+            {
+                cls._parse_coord(coord): tuple(packages)
+                for coord, packages in value_or_default.items()
+            }
+        )
+
+    @classmethod
+    def _parse_coord(cls, coord: str) -> tuple[str, str]:
+        group, artifact = coord.split(":")
+        return group, artifact
+
+
+class JvmArtifactsTargetGenerator(TargetGenerator):
+    alias = "jvm_artifacts"
+    core_fields = (
+        PomXmlSourceField,
+        JvmArtifactsPackageMappingField,
+        *COMMON_TARGET_FIELDS,
+    )
+    generated_target_cls = JvmArtifactTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (JvmArtifactResolveField,)
+    help = help_text(
+        """
+        Generate a `jvm_artifact` target for each dependency in pom.xml file.
+        """
+    )
+
+
+class GenerateFromPomXmlRequest(GenerateTargetsRequest):
+    generate_from = JvmArtifactsTargetGenerator
+
+
+@rule(
+    desc=("Generate `jvm_artifact` targets from pom.xml"),
+    level=LogLevel.DEBUG,
+)
+async def generate_from_python_requirement(
+    request: GenerateFromPomXmlRequest,
+    union_membership: UnionMembership,
+) -> GeneratedTargets:
+    generator = request.generator
+    pom_xml = await Get(
+        SourceFiles,
+        SourceFilesRequest([generator[PomXmlSourceField]]),
+    )
+    files = await Get(DigestContents, Digest, pom_xml.snapshot.digest)
+    mapping = request.generator[JvmArtifactsPackageMappingField].value
+    coordinates = parse_pom_xml(files[0].content)
+    targets = (
+        JvmArtifactTarget(
+            unhydrated_values={
+                "group": coord.group,
+                "artifact": coord.artifact,
+                "version": coord.version,
+                "packages": mapping.get((coord.group, coord.artifact)),
+                **request.template,
+            },
+            address=request.template_address.create_generated(coord.artifact),
+        )
+        for coord in coordinates
+    )
+    return GeneratedTargets(request.generator, targets)
+
+
+def parse_pom_xml(content: bytes) -> Iterator[_Coordinate]:
+    root = ET.fromstring(content.decode("utf-8"))
+    match = re.match(r"^(\{.*\})project$", root.tag)
+    assert match, root.tag
+    namespace = match.group(1)
+    for dependency in root.iter(f"{namespace}dependency"):
+        yield _Coordinate(
+            group=get_child_text(dependency, f"{namespace}groupId"),
+            artifact=get_child_text(dependency, f"{namespace}artifactId"),
+            version=get_child_text(dependency, f"{namespace}version"),
+        )
+
+
+@dataclass
+class _Coordinate:
+    """We can't import common.Coordinate because of circular dependencies."""
+
+    group: str
+    artifact: str
+    version: str
+
+
+def get_child_text(parent: ET.Element, child: str) -> str:
+    tag = parent.find(child)
+    if tag is None:
+        raise ValueError(f"missing tag: {child}")
+    text = tag.text
+    if text is None:
+        raise ValueError(f"empty tag: {child}")
+    return text
+
+
+class MissingTag(ValueError):
+    pass
+
+
+class EmptyTag(ValueError):
+    pass
 
 
 # -----------------------------------------------------------------------------------------------
@@ -867,6 +1013,7 @@ def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterab
 def rules():
     return [
         *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateFromPomXmlRequest),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
         *JvmArtifactFieldSet.jvm_rules(),
     ]
