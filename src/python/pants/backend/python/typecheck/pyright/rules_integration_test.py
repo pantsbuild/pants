@@ -99,22 +99,18 @@ PYRIGHT_LOCKFILE = json.dumps(
         "lockfileVersion": 2,
         "requires": True,
         "packages": {
-            "": {"name": "@the-company/project", "devDependencies": {"pyright": PYRIGHT_VERSION_STRING}},
+            "": {
+                "name": "@the-company/project",
+                "devDependencies": {"pyright": PYRIGHT_VERSION_STRING},
+            },
             "node_modules/pyright": {
                 "version": "1.1.343",
                 "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.343.tgz",
                 "integrity": "sha512-lOsiufTR94E0Z3O7n19q5Zr9maSI0uDEtyke4ACFuA8gwVdcj3ewOUdzCdPchzJuXTAJq2B+qvyGiNOFF6d0vw==",
                 "dev": True,
-                "bin": {
-                    "pyright": "index.js",
-                    "pyright-langserver": "langserver.index.js"
-                },
-                "engines": {
-                    "node": ">=12.0.0"
-                },
-                "optionalDependencies": {
-                    "fsevents": "~2.3.2"
-                }
+                "bin": {"pyright": "index.js", "pyright-langserver": "langserver.index.js"},
+                "engines": {"node": ">=12.0.0"},
+                "optionalDependencies": {"fsevents": "~2.3.2"},
             },
         },
         "dependencies": {
@@ -230,7 +226,10 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
                 f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
                 "src/js/lib3/BUILD": "package_json()",
                 "src/js/lib3/package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION_STRING}}
+                    {
+                        "name": "@the-company/project",
+                        "dependencies": {"pyright": PYRIGHT_VERSION_STRING},
+                    }
                 ),
                 "src/js/lib3/package-lock.json": PYRIGHT_LOCKFILE,
             },
@@ -248,7 +247,10 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
                 f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
                 "BUILD": "package_json(name='root_package')",
                 "package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION_STRING}}
+                    {
+                        "name": "@the-company/project",
+                        "dependencies": {"pyright": PYRIGHT_VERSION_STRING},
+                    }
                 ),
                 "package-lock.json": PYRIGHT_LOCKFILE,
             },
@@ -370,7 +372,10 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
                 f"{PACKAGE}/BUILD": "python_sources()",
                 "src/js/BUILD": "package_json()",
                 "src/js/package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION_STRING}}
+                    {
+                        "name": "@the-company/project",
+                        "dependencies": {"pyright": PYRIGHT_VERSION_STRING},
+                    }
                 ),
                 "src/js/package-lock.json": PYRIGHT_LOCKFILE,
             },

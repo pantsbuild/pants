@@ -9,7 +9,6 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.option_types import ArgsListOption, SkipOption, StrListOption
 from pants.util.strutil import help_text
 
-
 PYRIGHT_VERSION_STRING = "1.1.343"
 
 
