@@ -464,7 +464,7 @@ class JvmArtifactsPackageMappingField(DictStringToStringSequenceField):
     @classmethod
     def compute_value(  # type: ignore[override]
         cls, raw_value: dict[str, Iterable[str]], address: Address
-    ) -> FrozenDict[tuple[str], tuple[str, ...]]:
+    ) -> FrozenDict[tuple[str, str], tuple[str, ...]]:
         value_or_default = super().compute_value(raw_value, address)
         return FrozenDict(
             {
