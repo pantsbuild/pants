@@ -100,19 +100,27 @@ PYRIGHT_LOCKFILE = json.dumps(
         "packages": {
             "": {"name": "@the-company/project", "devDependencies": {"pyright": "1.1.316"}},
             "node_modules/pyright": {
-                "version": "1.1.316",
-                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.316.tgz",
-                "integrity": "sha512-Pdb9AwOO07uNOuEVtwCThyDpB0wigWmLjeCw5vdPG7gVbVYYgY2iw64kBdwTu78NrO0igVKzmoRuApMoL6ZE0w==",
+                "version": "1.1.343",
+                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.343.tgz",
+                "integrity": "sha512-lOsiufTR94E0Z3O7n19q5Zr9maSI0uDEtyke4ACFuA8gwVdcj3ewOUdzCdPchzJuXTAJq2B+qvyGiNOFF6d0vw==",
                 "dev": True,
-                "bin": {"pyright": "index.js", "pyright-langserver": "langserver.index.js"},
-                "engines": {"node": ">=12.0.0"},
+                "bin": {
+                    "pyright": "index.js",
+                    "pyright-langserver": "langserver.index.js"
+                },
+                "engines": {
+                    "node": ">=12.0.0"
+                },
+                "optionalDependencies": {
+                    "fsevents": "~2.3.2"
+                }
             },
         },
         "dependencies": {
             "pyright": {
-                "version": "1.1.316",
-                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.316.tgz",
-                "integrity": "sha512-Pdb9AwOO07uNOuEVtwCThyDpB0wigWmLjeCw5vdPG7gVbVYYgY2iw64kBdwTu78NrO0igVKzmoRuApMoL6ZE0w==",
+                "version": "1.1.343",
+                "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.343.tgz",
+                "integrity": "sha512-lOsiufTR94E0Z3O7n19q5Zr9maSI0uDEtyke4ACFuA8gwVdcj3ewOUdzCdPchzJuXTAJq2B+qvyGiNOFF6d0vw==",
                 "dev": True,
             }
         },
