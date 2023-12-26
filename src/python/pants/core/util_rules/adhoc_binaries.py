@@ -104,7 +104,7 @@ async def download_python_binary(
             cp -r python "{installation_root}"
             touch "{installation_root}/DONE"
         fi
-        echo $(realpath "{installation_root}")/bin/python3
+        echo "$(realpath "{installation_root}")/bin/python3"
     """
     )
 
