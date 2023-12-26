@@ -23,6 +23,7 @@ from pants.backend.python.typecheck.pyright.rules import (
     PyrightRequest,
 )
 from pants.backend.python.typecheck.pyright.rules import rules as pyright_rules
+from pants.backend.python.typecheck.pyright.subsystem import PYRIGHT_VERSION_STRING
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.check import CheckResult, CheckResults
 from pants.engine.addresses import Address
@@ -98,7 +99,7 @@ PYRIGHT_LOCKFILE = json.dumps(
         "lockfileVersion": 2,
         "requires": True,
         "packages": {
-            "": {"name": "@the-company/project", "devDependencies": {"pyright": "1.1.316"}},
+            "": {"name": "@the-company/project", "devDependencies": {"pyright": PYRIGHT_VERSION_STRING}},
             "node_modules/pyright": {
                 "version": "1.1.343",
                 "resolved": "https://registry.npmjs.org/pyright/-/pyright-1.1.343.tgz",
@@ -229,7 +230,7 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
                 f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
                 "src/js/lib3/BUILD": "package_json()",
                 "src/js/lib3/package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION_STRING}}
                 ),
                 "src/js/lib3/package-lock.json": PYRIGHT_LOCKFILE,
             },
@@ -247,7 +248,7 @@ LIB_2_PACKAGE = f"{PACKAGE}/lib2"
                 f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
                 "BUILD": "package_json(name='root_package')",
                 "package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION_STRING}}
                 ),
                 "package-lock.json": PYRIGHT_LOCKFILE,
             },
@@ -369,7 +370,7 @@ def test_passing_cache_clear(rule_runner: PythonRuleRunner) -> None:
                 f"{PACKAGE}/BUILD": "python_sources()",
                 "src/js/BUILD": "package_json()",
                 "src/js/package.json": json.dumps(
-                    {"name": "@the-company/project", "dependencies": {"pyright": "1.1.316"}}
+                    {"name": "@the-company/project", "dependencies": {"pyright": PYRIGHT_VERSION_STRING}}
                 ),
                 "src/js/package-lock.json": PYRIGHT_LOCKFILE,
             },

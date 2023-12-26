@@ -10,6 +10,9 @@ from pants.option.option_types import ArgsListOption, SkipOption, StrListOption
 from pants.util.strutil import help_text
 
 
+PYRIGHT_VERSION_STRING = "1.1.343"
+
+
 class Pyright(NodeJSToolBase):
     options_scope = "pyright"
     name = "Pyright"
@@ -20,7 +23,7 @@ class Pyright(NodeJSToolBase):
         """
     )
 
-    default_version = "pyright@1.1.343"
+    default_version = f"pyright@{PYRIGHT_VERSION_STRING}"
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--version")
