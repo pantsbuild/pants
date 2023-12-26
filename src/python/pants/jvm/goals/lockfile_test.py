@@ -15,6 +15,8 @@ from pants.engine.fs import DigestContents, FileDigest
 from pants.engine.internals.parametrize import Parametrize
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMUserResolveNames
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -23,10 +25,6 @@ from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.jvm.resolve.common import ArtifactRequirement
-from pants.jvm.resolve.common import ArtifactRequirements
-from pants.jvm.resolve.coordinate import Coordinate
-from pants.jvm.resolve.coordinate import Coordinates
 
 
 @pytest.fixture

@@ -16,9 +16,9 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
     find_jvm_artifacts_or_raise,
 )
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
-from pants.jvm.resolve.coordinate import Coordinate
 
 _SCALAPB_RUNTIME_GROUP = "com.thesamet.scalapb"
 _SCALAPB_RUNTIME_ARTIFACT = "scalapb-runtime"

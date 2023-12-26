@@ -38,9 +38,9 @@ from pants.jvm.compile import (
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.util.logging import LogLevel
-from pants.jvm.resolve.coordinate import Coordinate
 
 logger = logging.getLogger(__name__)
 

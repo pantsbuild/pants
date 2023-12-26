@@ -11,6 +11,7 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import NoCompatibleResolve
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -18,7 +19,6 @@ from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
-from pants.jvm.resolve.coordinate import Coordinate
 
 NAMED_RESOLVE_OPTIONS = (
     '--jvm-resolves={"one": "coursier_resolve.lockfile", "two": "coursier_resolve.lockfile"}'

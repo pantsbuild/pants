@@ -13,6 +13,7 @@ from pants.engine.rules import rule
 from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.goals.lockfile import rules as lockfile_rules
 from pants.jvm.resolve import jvm_tool
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
@@ -20,7 +21,6 @@ from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.jvm.resolve.coordinate import Coordinate
 
 
 class MockJvmTool(JvmToolBase):
