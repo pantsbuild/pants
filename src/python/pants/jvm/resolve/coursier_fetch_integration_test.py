@@ -15,8 +15,9 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import Targets
 from pants.jvm.compile import ClasspathEntry
+from pants.jvm.resolve import coordinate
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
-from pants.jvm.resolve.coordinate import Coordinate, Coordinates
+from pants.jvm.resolve.coordinate import Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.target_types import JvmArtifactJarSourceField, JvmArtifactTarget
@@ -24,6 +25,12 @@ from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import ExtractFileDigest
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
+
+
+class Coordinate(coordinate.Coordinate):
+    def as_requirement(self) -> ArtifactRequirement:
+        return ArtifactRequirement(coordinate=self)
+
 
 HAMCREST_COORD = Coordinate(
     group="org.hamcrest",
@@ -249,7 +256,7 @@ def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
     coordinate = ArtifactRequirement(
-        Coordinate(
+        coordinate=Coordinate(
             group="org.hamcrest",
             artifact="hamcrest-core",
             version="1.3_inexplicably_wrong",  # if the group/artifact/version is real, coursier will fallback
@@ -269,7 +276,7 @@ def test_resolve_with_broken_url(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_resolve_with_working_url(rule_runner: RuleRunner) -> None:
     requirement = ArtifactRequirement(
-        Coordinate(
+        coordinate=Coordinate(
             group="apache-commons-local",
             artifact="commons-collections",
             version="1.0.0_JAR_LOCAL",
@@ -331,7 +338,7 @@ def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
     jar_field = jeremy_target[JvmArtifactJarSourceField]
 
     requirement = ArtifactRequirement(
-        Coordinate(
+        coordinate=Coordinate(
             group="jeremy",
             artifact="jeremy",
             version="4.13.2",
@@ -650,13 +657,13 @@ def test_transitive_excludes(rule_runner: RuleRunner) -> None:
         [
             ArtifactRequirements(
                 [
-                    ArtifactRequirement(
-                        coordinate=Coordinate(
-                            group="com.fasterxml.jackson.core",
-                            artifact="jackson-databind",
-                            version="2.12.1",
-                        )
-                    ).with_extra_excludes("com.fasterxml.jackson.core:jackson-core")
+                    Coordinate(
+                        group="com.fasterxml.jackson.core",
+                        artifact="jackson-databind",
+                        version="2.12.1",
+                    )
+                    .as_requirement()
+                    .with_extra_excludes("com.fasterxml.jackson.core:jackson-core")
                 ]
             ),
         ],
@@ -674,13 +681,13 @@ def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> Non
         [
             ArtifactRequirements(
                 [
-                    ArtifactRequirement(
-                        coordinate=Coordinate(
-                            group="org.apache.hive",
-                            artifact="hive-exec",
-                            version="1.1.0",
-                        )
-                    ).with_extra_excludes(
+                    Coordinate(
+                        group="org.apache.hive",
+                        artifact="hive-exec",
+                        version="1.1.0",
+                    )
+                    .as_requirement()
+                    .with_extra_excludes(
                         "org.apache.calcite:calcite-avatica",
                         "org.apache.calcite:calcite-core",
                         "jdk.tools:jdk.tools",
@@ -706,13 +713,11 @@ def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> Non
 def test_failed_to_fetch_jar_given_packaging_pom(rule_runner: RuleRunner) -> None:
     reqs = ArtifactRequirements(
         [
-            ArtifactRequirement(
-                coordinate=Coordinate(
-                    group="org.apache.curator",
-                    artifact="apache-curator",
-                    version="5.5.0",
-                )
-            )
+            Coordinate(
+                group="org.apache.curator",
+                artifact="apache-curator",
+                version="5.5.0",
+            ).as_requirement()
         ]
     )
 
@@ -729,34 +734,16 @@ def test_force_version(rule_runner):
     # first check that force_version=False leads to a different version
     reqs = ArtifactRequirements(
         [
-            ArtifactRequirement(
-                coordinate=Coordinate(
-                    group="org.apache.parquet",
-                    artifact="parquet-common",
-                    version="1.13.1",
-                )
-            ),
-            Coordinate(
-                group="org.slf4j",
-                artifact="slf4j-api",
-                version="1.7.19",
-            ).as_requirement(),
-        ]
-    )
-    reqs = ArtifactRequirements(
-        [
             Coordinate(
                 group="org.apache.parquet",
                 artifact="parquet-common",
                 version="1.13.1",
             ).as_requirement(),
-            ArtifactRequirement(
-                coordinate=Coordinate(
-                    group="org.slf4j",
-                    artifact="slf4j-api",
-                    version="1.7.19",
-                )
-            ),
+            Coordinate(
+                group="org.slf4j",
+                artifact="slf4j-api",
+                version="1.7.19",
+            ).as_requirement(),
         ]
     )
     entries = rule_runner.request(CoursierResolvedLockfile, [reqs]).entries
@@ -769,38 +756,17 @@ def test_force_version(rule_runner):
     # then check force_version=True pins the version
     reqs = ArtifactRequirements(
         [
-            ArtifactRequirement(
-                coordinate=Coordinate(
-                    group="org.apache.parquet",
-                    artifact="parquet-common",
-                    version="1.13.1",
-                )
-            ),
-            dataclasses.replace(
-                Coordinate(
-                    group="org.slf4j",
-                    artifact="slf4j-api",
-                    version="1.7.19",
-                ).as_requirement(),
-                force_version=True,
-            ),
-        ]
-    )
-    reqs = ArtifactRequirements(
-        [
             Coordinate(
                 group="org.apache.parquet",
                 artifact="parquet-common",
                 version="1.13.1",
             ).as_requirement(),
             dataclasses.replace(
-                ArtifactRequirement(
-                    coordinate=Coordinate(
-                        group="org.slf4j",
-                        artifact="slf4j-api",
-                        version="1.7.19",
-                    )
-                ),
+                Coordinate(
+                    group="org.slf4j",
+                    artifact="slf4j-api",
+                    version="1.7.19",
+                ).as_requirement(),
                 force_version=True,
             ),
         ]
