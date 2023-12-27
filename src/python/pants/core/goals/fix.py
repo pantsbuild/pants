@@ -16,8 +16,13 @@ from pants.core.goals._fix import (
     _FixBatchRequest,
     _FixBatchResult,
 )
+from pants.core.goals.fmt import FmtSubsystem
 from pants.core.goals.lint import LintResult
-from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
+from pants.core.goals.multi_tool_goal_helper import (
+    BatchSizeOption,
+    OnlyOption,
+    determine_specified_tool_ids,
+)
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -74,16 +79,30 @@ async def fix(
     console: Console,
     specs: Specs,
     fix_subsystem: FixSubsystem,
+    fmt_subsystem: FmtSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fix:
+    request_types: Iterable[type[AbstractFixRequest]] = union_membership.get(AbstractFixRequest)
+    if fix_subsystem.skip_formatters:
+        request_types = (
+            request_type for request_type in request_types if not request_type.is_formatter
+        )
+    else:
+        specified_ids = determine_specified_tool_ids(
+            fmt_subsystem.name,
+            fmt_subsystem.only,
+            request_types,
+        )
+        request_types = (
+            request_type
+            for request_type in request_types
+            if not request_type.is_formatter or request_type.tool_id in specified_ids
+        )
+
     return await _do_fix(
         sorted(
-            (
-                request_type
-                for request_type in union_membership.get(AbstractFixRequest)
-                if not (request_type.is_formatter and fix_subsystem.skip_formatters)
-            ),
+            request_types,
             # NB: We sort the core request types so that fixers are first. This is to ensure that, between
             # fixers and formatters, re-running isn't necessary due to tool conflicts (re-running may
             # still be necessary within formatters). This is because fixers are expected to modify
