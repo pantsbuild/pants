@@ -19,6 +19,7 @@ def create_options_bootstrapper(
         args=("--pants-config-files=[]", *(args or [])),
         env=env or {},
         allow_pantsrc=False,
+        working_dir="",
     )
 
 

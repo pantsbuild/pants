@@ -16,6 +16,7 @@ class OptionsInitializerTest(unittest.TestCase):
             env={},
             args=["--backend-packages=[]", "--pants-version=99.99.9999"],
             allow_pantsrc=False,
+            working_dir="",
         )
 
         env = CompleteEnvironmentVars({})
@@ -29,6 +30,7 @@ class OptionsInitializerTest(unittest.TestCase):
             env={},
             args=["--backend-packages=[]", "--no-watch-filesystem", "--loop"],
             allow_pantsrc=False,
+            working_dir="",
         )
         env = CompleteEnvironmentVars({})
         initializer = OptionsInitializer(ob, rule_runner.EXECUTOR)

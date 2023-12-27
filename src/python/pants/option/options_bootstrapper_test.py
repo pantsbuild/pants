@@ -40,7 +40,9 @@ class TestOptionsBootstrapper:
             fp.close()
 
             args = [*self._config_path(fp.name), *(args or [])]
-            bootstrapper = OptionsBootstrapper.create(env=env or {}, args=args, allow_pantsrc=False)
+            bootstrapper = OptionsBootstrapper.create(
+                env=env or {}, args=args, allow_pantsrc=False, working_dir=""
+            )
             vals = bootstrapper.get_bootstrap_options().for_global_scope()
 
         vals_dict = {k: getattr(vals, k) for k in expected_entries}
@@ -127,7 +129,7 @@ class TestOptionsBootstrapper:
             fp.close()
             args = ["--pants-workdir=/qux"] + self._config_path(fp.name)
             bootstrapper = OptionsBootstrapper.create(
-                env={"PANTS_DISTDIR": "/pear"}, args=args, allow_pantsrc=False
+                env={"PANTS_DISTDIR": "/pear"}, args=args, allow_pantsrc=False, working_dir=""
             )
             opts = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
@@ -150,7 +152,7 @@ class TestOptionsBootstrapper:
         included = "PANTS_DISTDIR"
         excluded = "NON_PANTS_ENV"
         bootstrapper = OptionsBootstrapper.create(
-            env={excluded: "pear", included: "banana"}, args=[], allow_pantsrc=False
+            env={excluded: "pear", included: "banana"}, args=[], allow_pantsrc=False, working_dir=""
         )
         assert included in bootstrapper.env
         assert excluded not in bootstrapper.env
@@ -164,6 +166,7 @@ class TestOptionsBootstrapper:
                 env={},
                 args=[f"--pants-config-files={cp}" for cp in config_paths],
                 allow_pantsrc=False,
+                working_dir="",
             )
 
         def assert_config_read_correctly(
@@ -230,6 +233,7 @@ class TestOptionsBootstrapper:
                 env={},
                 args=[f"--pantsrc-files={cp}" for cp in config_paths],
                 allow_pantsrc=True,
+                working_dir="",
             )
 
         with temporary_file(binary_mode=False) as fp:
@@ -257,7 +261,9 @@ class TestOptionsBootstrapper:
     def test_full_options_caching(self) -> None:
         with temporary_file_path() as config:
             args = self._config_path(config)
-            bootstrapper = OptionsBootstrapper.create(env={}, args=args, allow_pantsrc=False)
+            bootstrapper = OptionsBootstrapper.create(
+                env={}, args=args, allow_pantsrc=False, working_dir=""
+            )
 
             opts1 = bootstrapper.full_options_for_scopes(
                 known_scope_infos=[
@@ -302,7 +308,9 @@ class TestOptionsBootstrapper:
         def parse_options(*args: str) -> OptionValueContainer:
             full_args = [*args, *self._config_path(None)]
             return (
-                OptionsBootstrapper.create(env={}, args=full_args, allow_pantsrc=False)
+                OptionsBootstrapper.create(
+                    env={}, args=full_args, allow_pantsrc=False, working_dir=""
+                )
                 .get_bootstrap_options()
                 .for_global_scope()
             )
@@ -325,7 +333,9 @@ class TestOptionsBootstrapper:
         def parse_options(*args: str) -> OptionValueContainer:
             full_args = [*args, *self._config_path(None)]
             return (
-                OptionsBootstrapper.create(env={}, args=full_args, allow_pantsrc=False)
+                OptionsBootstrapper.create(
+                    env={}, args=full_args, allow_pantsrc=False, working_dir=""
+                )
                 .get_bootstrap_options()
                 .for_global_scope()
             )
@@ -399,7 +409,10 @@ class TestOptionsBootstrapper:
         config2.write_text("[DEFAULT]\nlogdir = 'logdir2'\n")
 
         ob = OptionsBootstrapper.create(
-            env={}, args=[f"--pants-config-files=['{config1.as_posix()}']"], allow_pantsrc=False
+            env={},
+            args=[f"--pants-config-files=['{config1.as_posix()}']"],
+            allow_pantsrc=False,
+            working_dir="",
         )
         logdir = ob.get_bootstrap_options().for_global_scope().logdir
         assert "logdir1" == logdir
@@ -441,7 +454,7 @@ class TestOptionsBootstrapper:
             f"'{config0.as_posix()}','{config1.as_posix()}','{config2.as_posix()}']"
         )
         ob = OptionsBootstrapper.create(
-            env={}, args=[config_arg, "pyupgrade", "green"], allow_pantsrc=False
+            env={}, args=[config_arg, "pyupgrade", "green"], allow_pantsrc=False, working_dir=""
         )
         assert (
             config_arg,
@@ -458,7 +471,9 @@ class TestOptionsBootstrapper:
             "--backend-packages=pants.backend.python.lint.pyupgrade",
         ) == ob.bootstrap_args
 
-        ob = OptionsBootstrapper.create(env={}, args=[config_arg, "shell"], allow_pantsrc=False)
+        ob = OptionsBootstrapper.create(
+            env={}, args=[config_arg, "shell"], allow_pantsrc=False, working_dir=""
+        )
         assert (
             config_arg,
             "repl",
