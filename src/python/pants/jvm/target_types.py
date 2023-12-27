@@ -466,6 +466,7 @@ class JvmArtifactsPackageMappingField(DictStringToStringSequenceField):
         cls, raw_value: dict[str, Iterable[str]], address: Address
     ) -> FrozenDict[tuple[str, str], tuple[str, ...]]:
         value_or_default = super().compute_value(raw_value, address)
+        assert value_or_default
         return FrozenDict(
             {
                 cls._parse_coord(coord): tuple(packages)
