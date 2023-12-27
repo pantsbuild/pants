@@ -21,12 +21,11 @@ from pants.core.goals.fix import (
     FixFilesRequest,
     FixResult,
     FixTargetsRequest,
-    Partitions,
 )
 from pants.core.goals.fix import rules as fix_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules import source_files
-from pants.core.util_rules.partitions import PartitionerType
+from pants.core.util_rules.partitions import PartitionerType, Partitions
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     CreateDigest,
