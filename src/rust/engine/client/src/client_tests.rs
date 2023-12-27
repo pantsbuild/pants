@@ -38,6 +38,7 @@ async fn test_client_fingerprint_mismatch() {
             "--pants-subprocessdir={}",
             tmpdir.path().display()
         )]),
+        true,
     )
     .unwrap();
     let error = pantsd::find_pantsd(&build_root, &options_parser)
