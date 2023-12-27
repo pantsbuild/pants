@@ -241,9 +241,7 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
     ]
 
     # Create a mapping from the goal name to a collection of target aliases: e.g. {'run': frozenset({'pyoxidizer_binary', 'pex_binary'}), 'test': frozenset(), ...}
-    goal_to_aliases_map: Mapping[str, frozenset[str]] = {
-        goal: aliases for goal, aliases in zip(peekable_goals, aliases_per_target_root)
-    }
+    goal_to_aliases_map = dict(zip(peekable_goals, aliases_per_target_root))
 
     # Inverse the goal_to_aliases_map to create a mapping from a target alias to a collection of goal names: e.g. {'pyoxidizer_binary': frozenset({'package', 'run'}), 'pex_binary': frozenset({'package', 'run'}), ...}
     alias_to_goals_map: Mapping[str, set[str]] = {}
