@@ -11,7 +11,6 @@ import pytest
 
 from pants.backend.project_info import peek
 from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
-from pants.backend.python.target_types import PythonSourceTarget
 from pants.backend.visibility.rules import rules as visibility_rules
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
@@ -267,7 +266,7 @@ def rule_runner() -> RuleRunner:
             *visibility_rules(),
             QueryRule(TargetDatas, [RawSpecs]),
         ],
-        target_types=[FilesGeneratorTarget, GenericTarget, PythonSourceTarget,],
+        target_types=[FilesGeneratorTarget, GenericTarget],
     )
 
 
@@ -275,7 +274,6 @@ def test_non_matching_build_target(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"some_name/BUILD": "target()"})
     result = rule_runner.run_goal_rule(Peek, args=["other_name"])
     assert result.stdout == "[]\n"
-    
 
 
 def _normalize_fingerprints(tds: Sequence[TargetData]) -> list[TargetData]:
@@ -394,14 +392,3 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
             applicable_dep_rules=(),
         ),
     ]
-
-# def test_including_goals(rule_runner: RuleRunner) -> None:
-#     rule_runner.write_files({
-#         "src/BUILD": "python_source(source='main.py')",
-#         "src/main.py": "print('hello world')"
-#     })
-#     result = rule_runner.run_goal_rule(Peek, args=["--include-goals", "::"])
-#     # TODO: For some reason, TargetRootsToFieldSets is returning empty
-#     print(result.stdout)
-#     print(result.stderr)
-#     assert False
