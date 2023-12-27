@@ -142,9 +142,6 @@ class TargetData:
             **dict(sorted(fields.items())),
         }
 
-    # def as_dict(self) -> Mapping[str, Any]:
-    #     return asdict(self)
-
 
 class TargetDatas(Collection[TargetData]):
     pass
@@ -302,7 +299,6 @@ async def get_target_data(
 
     dependencies_rules_map: dict[Address, tuple[str, ...] | None] = {}
     dependents_rules_map: dict[Address, tuple[str, ...] | None] = {}
-    # applicable_dep_rules_map: dict[Address, tuple[DependenciesRuleApplication, ...]] = {}
     applicable_dep_rules_map = {}
 
     if subsys.include_dep_rules:
@@ -342,6 +338,7 @@ async def get_target_data(
             for application in all_applicable_dep_rules
         }
 
+    # TODO: This currently exists in the `goal_rule` section of code below, but I'd prefer to have it here
     # target_alias_to_goals_map = await _create_target_alias_to_goals_map() if subsys.include_goals else {}
 
     return TargetDatas(
@@ -373,7 +370,7 @@ async def peek(
     """
 
     tds = await Get(TargetDatas, UnexpandedTargets, targets)
-    # TODO: This method needs to be called in a @goal_rule, otherwise it fails out with Rule errors (when called in an @rule)
+    # This method needs to be called in a @goal_rule, otherwise it fails out with Rule errors (when called in an @rule)
     target_alias_to_goals_map = (
         await _create_target_alias_to_goals_map() if subsys.include_goals else {}
     )
