@@ -93,7 +93,7 @@ class ArtifactRequirements(DeduplicatedCollection[ArtifactRequirement]):
 
     @classmethod
     def from_coordinates(cls, coordinates: Iterable[Coordinate]) -> ArtifactRequirements:
-        return ArtifactRequirements(coord.as_requirement() for coord in coordinates)
+        return ArtifactRequirements(ArtifactRequirement(coord) for coord in coordinates)
 
 
 @dataclass(frozen=True)
