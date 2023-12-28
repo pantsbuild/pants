@@ -14,7 +14,7 @@ class FirstPartyThriftJavaTargetsMappingRequest(FirstPartyMappingRequest):
 
 
 @rule
-async def map_first_party_thrif_java_targets_to_symbols(
+async def map_first_party_thrift_java_targets_to_symbols(
     _: FirstPartyThriftJavaTargetsMappingRequest,
 ) -> FirstPartyThriftJvmMappingRequest:
     return FirstPartyThriftJvmMappingRequest()
