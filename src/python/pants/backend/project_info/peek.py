@@ -241,7 +241,7 @@ async def _create_target_alias_to_goals_map() -> dict[str, tuple[str, ...]]:
     goal_to_aliases_map = dict(zip(peekable_goals, aliases_per_target_root))
 
     # Inverse the goal_to_aliases_map to create a mapping from a target alias to a collection of goal names: e.g. {'pyoxidizer_binary': frozenset({'package', 'run'}), 'pex_binary': frozenset({'package', 'run'}), ...}
-    alias_to_goals_map: Mapping[str, set[str]] = {}
+    alias_to_goals_map: dict[str, set[str]] = {}
     for goal, aliases in goal_to_aliases_map.items():
         for alias in aliases:
             alias_to_goals_map.setdefault(alias, set()).add(goal)
@@ -378,18 +378,20 @@ async def peek(
     if target_alias_to_goals_map:
         # Attach the goals to the target data, in the hopes that we can pull `_create_target_alias_to_goals_map` back into `get_target_data`
         # TargetData is frozen so we need to create a new collection
-        tds = [
-            TargetData(
-                td.target,
-                td.expanded_sources,
-                td.expanded_dependencies,
-                td.dependencies_rules,
-                td.dependents_rules,
-                td.applicable_dep_rules,
-                target_alias_to_goals_map.get(td.target.alias),
-            )
-            for td in tds
-        ]
+        tds = TargetDatas(
+            [
+                TargetData(
+                    td.target,
+                    td.expanded_sources,
+                    td.expanded_dependencies,
+                    td.dependencies_rules,
+                    td.dependents_rules,
+                    td.applicable_dep_rules,
+                    target_alias_to_goals_map.get(td.target.alias),
+                )
+                for td in tds
+            ]
+        )
     output = render_json(tds, subsys.exclude_defaults, subsys.include_dep_rules)
 
     with subsys.output(console) as write_stdout:
