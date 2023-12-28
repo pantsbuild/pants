@@ -122,7 +122,7 @@ async def gather_coordinates_for_jvm_lockfile(
         # group name is a file on disk.
         if 2 <= artifact_input.count(":"):
             try:
-                maybe_coord = Coordinate.from_coord_str(artifact_input).as_requirement()
+                maybe_coord = ArtifactRequirement(Coordinate.from_coord_str(artifact_input))
                 requirements.add(maybe_coord)
                 continue
             except Exception:
