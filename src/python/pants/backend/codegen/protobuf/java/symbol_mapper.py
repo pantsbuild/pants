@@ -29,7 +29,7 @@ class FirstPartyProtobufJavaTargetsMappingRequest(FirstPartyMappingRequest):
 
 # Determine generated Java/Scala package name
 # * https://grpc.io/docs/languages/java/generated-code
-def _determing_class_name(file: FileContent) -> str:
+def _determine_class_name(file: FileContent) -> str:
     base_name, _, _ = os.path.basename(file.path).partition(".")
     package_definition = _parse_package_definition(file.content)
     return f"{package_definition}.{base_name.upper()}" if package_definition else base_name.upper()
