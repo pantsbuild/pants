@@ -26,7 +26,7 @@ class FirstPartyThriftJvmMappingRequest:
 
 
 @rule
-async def map_first_party_thirft_targets_to_jvm_symbols(
+async def map_first_party_thrift_targets_to_jvm_symbols(
     request: FirstPartyThriftJvmMappingRequest, thrift_targets: AllThriftTargets, jvm: JvmSubsystem
 ) -> SymbolMap:
     jvm_thrift_targets = [tgt for tgt in thrift_targets if tgt.has_field(JvmResolveField)]
