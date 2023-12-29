@@ -25,6 +25,7 @@ pub enum RemoteProvider {
 // TODO: Consider providing `impl Default`, similar to `remote::LocalOptions`.
 #[derive(Clone)]
 pub struct RemoteStoreOptions {
+    pub provider: RemoteProvider,
     // TODO: this is currently framed for the REAPI provider, with some options used by others, would
     // be good to generalise
     pub store_address: String,

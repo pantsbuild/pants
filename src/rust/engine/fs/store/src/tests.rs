@@ -22,8 +22,8 @@ use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;
 use crate::{
-    EntryType, FileContent, RemoteStoreOptions, Snapshot, Store, StoreError, StoreFileByDigest,
-    UploadSummary, MEGABYTES,
+    EntryType, FileContent, RemoteProvider, RemoteStoreOptions, Snapshot, Store, StoreError,
+    StoreFileByDigest, UploadSummary, MEGABYTES,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -64,6 +64,7 @@ fn remote_options(
     headers: BTreeMap<String, String>,
 ) -> RemoteStoreOptions {
     RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
         store_address,
         instance_name,
         tls_config: tls::Config::default(),

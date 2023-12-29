@@ -40,6 +40,7 @@ use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, DependencyKey, RuleGraph, RuleId};
+use store::RemoteProvider;
 use task_executor::Executor;
 use workunit_store::{
     ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
@@ -299,6 +300,7 @@ struct PyRemotingOptions(RemotingOptions);
 impl PyRemotingOptions {
     #[new]
     fn __new__(
+        provider: String,
         execution_enable: bool,
         store_headers: BTreeMap<String, String>,
         store_chunk_bytes: usize,
@@ -323,6 +325,7 @@ impl PyRemotingOptions {
         append_only_caches_base_path: Option<String>,
     ) -> Self {
         Self(RemotingOptions {
+            provider: RemoteProvider::from_str(&provider).unwrap(),
             execution_enable,
             store_address,
             execution_address,
