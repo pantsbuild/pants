@@ -645,19 +645,17 @@ def test_user_repo_order_is_respected(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_transitive_excludes(rule_runner: RuleRunner) -> None:
+    requirement = ArtifactRequirement(
+        coordinate=Coordinate(
+            group="com.fasterxml.jackson.core",
+            artifact="jackson-databind",
+            version="2.12.1",
+        ),
+        excludes=frozenset(["com.fasterxml.jackson.core:jackson-core"]),
+    )
     resolve = rule_runner.request(
         CoursierResolvedLockfile,
-        [
-            ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="com.fasterxml.jackson.core",
-                        artifact="jackson-databind",
-                        version="2.12.1",
-                    ).with_extra_excludes("com.fasterxml.jackson.core:jackson-core")
-                ]
-            ),
-        ],
+        [ArtifactRequirements([requirement])],
     )
 
     entries = resolve.entries
@@ -667,23 +665,23 @@ def test_transitive_excludes(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_missing_entry_for_transitive_dependency(rule_runner: RuleRunner) -> None:
+    requirement = ArtifactRequirement(
+        coordinate=Coordinate(
+            group="org.apache.hive",
+            artifact="hive-exec",
+            version="1.1.0",
+        ),
+        excludes=frozenset(
+            [
+                "org.apache.calcite:calcite-avatica",
+                "org.apache.calcite:calcite-core",
+                "jdk.tools:jdk.tools",
+            ]
+        ),
+    )
     resolve = rule_runner.request(
         CoursierResolvedLockfile,
-        [
-            ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="org.apache.hive",
-                        artifact="hive-exec",
-                        version="1.1.0",
-                    ).with_extra_excludes(
-                        "org.apache.calcite:calcite-avatica",
-                        "org.apache.calcite:calcite-core",
-                        "jdk.tools:jdk.tools",
-                    )
-                ]
-            )
-        ],
+        [ArtifactRequirements([requirement])],
     )
 
     coords_of_entries = {(entry.coord.group, entry.coord.artifact) for entry in resolve.entries}
