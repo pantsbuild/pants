@@ -3120,6 +3120,8 @@ dependencies = [
  "grpc_util",
  "hashing",
  "protos",
+ "strum",
+ "strum_macros",
  "tokio",
 ]
 
