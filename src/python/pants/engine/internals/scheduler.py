@@ -178,6 +178,7 @@ class Scheduler:
             parsed_javascript_deps_result=NativeParsedJavascriptDependencies,
         )
         remoting_options = PyRemotingOptions(
+            provider=execution_options.remote_provider.value,
             execution_enable=execution_options.remote_execution,
             store_headers=execution_options.remote_store_headers,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,

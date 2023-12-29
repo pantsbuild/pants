@@ -12,6 +12,7 @@ import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.internals.native_engine import PyRemotingOptions
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import OptionsInitializer
@@ -251,3 +252,37 @@ def test_remote_provider_validate_execution_supported_should_match_table(
         provider.validate_execution_supported(
             provider_source="PROVIDER", execution_implied_by="IMPLIED BY"
         )
+
+
+@pytest.mark.parametrize("provider", RemoteProvider)
+def test_remote_provider_matches_rust_enum(
+    provider: RemoteProvider,
+) -> None:
+    PyRemotingOptions(
+        # the string should be converted to the Rust-side enum successfully, i.e. Python matches
+        # Rust
+        provider=provider.value,
+        # all the other fields aren't relevant to this test
+        execution_enable=False,
+        store_headers={},
+        store_chunk_bytes=0,
+        store_rpc_retries=0,
+        store_rpc_concurrency=0,
+        store_rpc_timeout_millis=0,
+        store_batch_api_size_limit=0,
+        cache_warnings_behavior="ignore",
+        cache_content_behavior="validate",
+        cache_rpc_concurrency=0,
+        cache_rpc_timeout_millis=0,
+        execution_headers={},
+        execution_overall_deadline_secs=0,
+        execution_rpc_concurrency=0,
+        store_address=None,
+        execution_address=None,
+        execution_process_cache_namespace=None,
+        instance_name=None,
+        root_ca_certs_path=None,
+        client_certs_path=None,
+        client_key_path=None,
+        append_only_caches_base_path=None,
+    )

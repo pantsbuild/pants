@@ -309,6 +309,7 @@ class AuthPluginResult:
 class DynamicRemoteOptions:
     """Options related to remote execution of processes which are computed dynamically."""
 
+    provider: RemoteProvider
     execution: bool
     cache_read: bool
     cache_write: bool
@@ -373,6 +374,7 @@ class DynamicRemoteOptions:
     @classmethod
     def disabled(cls) -> DynamicRemoteOptions:
         return cls(
+            provider=DEFAULT_EXECUTION_OPTIONS.remote_provider,
             execution=False,
             cache_read=False,
             cache_write=False,
@@ -404,6 +406,7 @@ class DynamicRemoteOptions:
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
+        provider = cast(RemoteProvider, bootstrap_options.remote_provider)
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
@@ -419,6 +422,7 @@ class DynamicRemoteOptions:
         execution_headers.update(token_header)
         store_headers.update(token_header)
         return cls(
+            provider=provider,
             execution=execution,
             cache_read=cache_read,
             cache_write=cache_write,
@@ -484,6 +488,7 @@ class DynamicRemoteOptions:
 
     @classmethod
     def _use_no_auth(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
+        provider = cast(RemoteProvider, bootstrap_options.remote_provider)
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
@@ -497,6 +502,7 @@ class DynamicRemoteOptions:
         cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
         execution_rpc_concurrency = cast(int, bootstrap_options.remote_execution_rpc_concurrency)
         return cls(
+            provider=provider,
             execution=execution,
             cache_read=cache_read,
             cache_write=cache_write,
@@ -520,6 +526,7 @@ class DynamicRemoteOptions:
         prior_result: AuthPluginResult | None,
         remote_auth_plugin_func: Callable,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
+        provider = cast(RemoteProvider, bootstrap_options.remote_provider)
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
@@ -556,6 +563,7 @@ class DynamicRemoteOptions:
         logger.debug(
             f"Remote auth plugin `{plugin_name}` succeeded. Remote caching/execution will be attempted."
         )
+        provider = auth_plugin_result.provider
         execution_headers = auth_plugin_result.execution_headers
         store_headers = auth_plugin_result.store_headers
         plugin_provided_opt_log = "Setting `[GLOBAL].remote_{opt}` is not needed and will be ignored since it is provided by the auth plugin: {plugin_name}."
@@ -579,6 +587,7 @@ class DynamicRemoteOptions:
             execution_address = auth_plugin_result.execution_address
 
         opts = cls(
+            provider=provider,
             execution=execution,
             cache_read=cache_read,
             cache_write=cache_write,
@@ -610,6 +619,8 @@ class ExecutionOptions:
     TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
     allowing Subsystems to be consumed before the Scheduler has been created).
     """
+
+    remote_provider: RemoteProvider
 
     remote_execution: bool
     remote_cache_read: bool
@@ -658,6 +669,7 @@ class ExecutionOptions:
         dynamic_remote_options: DynamicRemoteOptions,
     ) -> ExecutionOptions:
         return cls(
+            remote_provider=dynamic_remote_options.provider,
             # Remote execution strategy.
             remote_execution=dynamic_remote_options.execution,
             remote_cache_read=dynamic_remote_options.cache_read,
@@ -744,6 +756,7 @@ _PER_CHILD_MEMORY_USAGE = "512MiB"
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    remote_provider=RemoteProvider.reapi,
     # Remote execution strategy.
     remote_execution=False,
     remote_cache_read=False,
