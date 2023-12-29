@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.thrift.scrooge.java import symbol_mapper
 from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
@@ -138,6 +139,7 @@ async def inject_scrooge_thrift_java_dependencies(
 def rules():
     return (
         *collect_rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
         UnionRule(InferDependenciesRequest, InferScroogeThriftJavaDependencies),
         ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),
