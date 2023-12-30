@@ -39,6 +39,7 @@ _VALID_PASSTHROUGH_OPTS = [
     "--kube-as-user",
     "--kube-ca-file",
     "--kube-token",
+    "--timeout",
 ]
 
 
@@ -130,6 +131,7 @@ class HelmSubsystem(TemplatedExternalTool):
 
     _registries = DictOption[Any](help=registries_help, fromfile=True)
     lint_strict = BoolOption(default=False, help="Enables strict linting of Helm charts")
+    lint_quiet = BoolOption(default=False, help="Only print warnings and errors for Helm charts")
     default_registry_repository = StrOption(
         default=None,
         help=softwrap(

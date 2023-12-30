@@ -19,6 +19,7 @@ from pants.engine.target import (
 from pants.util.strutil import help_text
 
 TS_FILE_EXTENSIONS = (".ts",)
+TS_TEST_FILE_EXTENSIONS = tuple(f"*.test{ext}" for ext in TS_FILE_EXTENSIONS)
 
 
 class TypeScriptDependenciesField(Dependencies):
@@ -57,7 +58,9 @@ class TypeScriptSourcesOverridesField(OverridesField):
 
 
 class TypeScriptSourcesGeneratorSourcesField(TypeScriptGeneratorSourcesField):
-    default = tuple(f"*{ext}" for ext in TS_FILE_EXTENSIONS)
+    default = tuple(f"*{ext}" for ext in TS_FILE_EXTENSIONS) + tuple(
+        f"!{pat}" for pat in TS_TEST_FILE_EXTENSIONS
+    )
     help = generate_multiple_sources_field_help_message(
         files_example="Example: `sources=['utils.ts', 'subdir/*.ts', '!ignore_me.ts']`"
     )
@@ -125,7 +128,7 @@ class TypeScriptTestsOverridesField(OverridesField):
 
 
 class TypeScriptTestsGeneratorSourcesField(TypeScriptGeneratorSourcesField):
-    default = tuple(f"*.test{ext}" for ext in TS_FILE_EXTENSIONS)
+    default = TS_TEST_FILE_EXTENSIONS
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['utils.test.ts', 'subdir/*.test.ts', '!ignore_me.test.ts']`"
     )

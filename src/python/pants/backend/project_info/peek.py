@@ -6,9 +6,7 @@ from __future__ import annotations
 import collections
 import json
 from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, Iterable, Mapping
-
-from typing_extensions import Protocol, runtime_checkable
+from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection

@@ -22,6 +22,7 @@ from pants.engine.target import (
 from pants.util.strutil import help_text
 
 JS_FILE_EXTENSIONS = (".js", ".cjs", ".mjs")
+JS_TEST_FILE_EXTENSIONS = tuple(f"*.test{ext}" for ext in JS_FILE_EXTENSIONS)
 
 
 class JSDependenciesField(Dependencies):
@@ -60,7 +61,9 @@ class JSSourcesOverridesField(OverridesField):
 
 
 class JSSourcesGeneratorSourcesField(JSGeneratorSourcesField):
-    default = tuple(f"*{ext}" for ext in JS_FILE_EXTENSIONS)
+    default = tuple(f"*{ext}" for ext in JS_FILE_EXTENSIONS) + tuple(
+        f"!{pat}" for pat in JS_TEST_FILE_EXTENSIONS
+    )
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['utils.js', 'subdir/*.js', '!ignore_me.js']`"
     )

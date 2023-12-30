@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.java.target_types import JavaSourceField
-from pants.backend.openapi.codegen.java import extra_fields
+from pants.backend.openapi.codegen.java import extra_fields, symbol_mapper
 from pants.backend.openapi.codegen.java.extra_fields import (
     OpenApiJavaApiPackageField,
     OpenApiJavaModelPackageField,
@@ -263,6 +263,7 @@ def rules():
         *generator_process.rules(),
         *artifact_mapper.rules(),
         *pom_parser.rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromOpenAPIRequest),
         UnionRule(InferDependenciesRequest, InferOpenApiJavaRuntimeDependencyRequest),
     ]

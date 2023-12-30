@@ -59,7 +59,7 @@ class GPGVerifier:
         Looks the import results for one which has an "ok" status. We can't use the number of keys
         imported because a re-import of a key results in 0 keys imported.
         """
-        has_ok = any(("ok" in r for r in import_results.results))
+        has_ok = any("ok" in r for r in import_results.results)
         return has_ok
 
 

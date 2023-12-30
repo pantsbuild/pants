@@ -8,9 +8,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
-
-from typing_extensions import Protocol
+from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Protocol, Sequence, Tuple, cast
 
 from pants.engine.collection import Collection
 from pants.engine.console import Console

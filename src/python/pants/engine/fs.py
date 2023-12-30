@@ -53,6 +53,12 @@ class FileContent:
     content: bytes
     is_executable: bool = False
 
+    def __post_init__(self):
+        if not isinstance(self.content, bytes):
+            raise TypeError(
+                f"Expected 'content' to be bytes, but got {type(self.content).__name__}"
+            )
+
     def __repr__(self) -> str:
         return (
             f"FileContent(path={self.path}, content=(len:{len(self.content)}), "
@@ -278,7 +284,7 @@ class NativeDownloadFile:
 class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
 
-    _scheduler: "SchedulerSession"
+    _scheduler: SchedulerSession
     _enforce_effects: bool = True
 
     def write_digest(
@@ -320,7 +326,7 @@ class SnapshotDiff:
     changed_files: tuple[str, ...] = ()
 
     @classmethod
-    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
+    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> SnapshotDiff:
         return cls(*ours._diff(theirs))
 
 

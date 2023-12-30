@@ -1,6 +1,6 @@
 ---
 title: "Shell overview"
-slug: "shell"
+slug: "shell-overview"
 excerpt: "Pants's support for Shellcheck, shfmt, and shUnit2."
 hidden: false
 createdAt: "2021-04-14T04:21:15.028Z"

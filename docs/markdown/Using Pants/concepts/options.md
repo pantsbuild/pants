@@ -81,22 +81,32 @@ Note that any dashes in the option flag name are converted to underscores: `--mu
 
 ### Config file interpolation
 
-Environment variables can be interpolated by using the syntax `%(env.ENV_VAR)s`, e.g.:
+A string value in a config file can contain placeholders of the form `%(key)s`, which will be replaced with a corresponding value. The `key` can be one of:
+
+- A string-valued option in the DEFAULT section of the same config file.
+- A string-valued option in the same section of the config file as the value containing the placeholder.
+- Any environment variable, prefixed with `env.`: `%(env.ENV_VAR)s`.
+- The following special values:
+  - `%(buildroot)s`: absolute path to the root of your repository.
+  - `%(homedir)s`: equivalent to `$HOME` or `~`.
+  - `%(user)s`: the current user's username, obtained from the system password file.
+  - `%(pants_workdir)s`: the absolute path of the global option `--pants-workdir`, which defaults
+    to `{buildroot}/.pants.d/`.
+  - `%(pants_distdir)s`: the absolute path of the global option `--pants-distdir`, which defaults
+    to `{buildroot}/dist/`.
+
+An interpolated value may itself contain placeholders, that will be recursively interpolated.
+
+For example:
 
 ```toml pants.toml
+[DEFAULT]
+domain = "my.domain"
+
 [python-repos]
-# This will substitute `%(env.PY_REPO)s` with the value of the environment
-# variable PY_REPO
-indexes.add = ["http://%(env.PY_REPO)s@my.custom.repo/index
+repo_host = "repo.%(domain)s"
+indexes.add = ["http://%(env.PY_REPO)s@%(repo_host)s/index
 ```
-
-Additionally, a few special values are pre-populated with the `%(var)s` syntax:
-
-- `%(buildroot)s`: absolute path to the root of your repository
-- `%(homedir)s`: equivalent to `$HOME` or `~`
-- `%(user)s`: equivalent to `$USER`
-- `%(pants_distdir)s`: absolute path of the global option `--pants-distdir`, which defaults 
-   to `{buildroot}/dist/`
 
 Option types
 ============

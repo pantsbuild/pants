@@ -82,6 +82,15 @@ Wrote dist/project/cloud_function.zip
 >
 > If this happens, you must either change your dependencies to only use dependencies with pre-built [wheels](https://pythonwheels.com) or find a Linux environment to run `pants package`.
 
+> 🚧 "Encountering collisions" errors and failing to build?
+>
+> If a build fails with an error like `Encountered collisions populating ... from PEX at faas_repository.pex:`, listing one or more files with different `sha1` hashes, this likely means your dependencies package files in unexpected locations, outside their "scoped" directory (for instance, a package `example-pkg` typically only includes files within `example_pkg/` and `example_pkg-*.dist-info/` directories). When multiple dependencies do this, those files can have exactly matching file paths but different contents, and so it is impossible to create a GCF artifact: which of the files should be installed and which should be ignored? Resolving this requires human intervention to understand whether any of those files are important, and hence PEX emits an error rather than making an (arbitrary) choice that may result in confusing and/or broken behaviour at runtime.
+>
+> Most commonly this seems to happen with metadata like a README or LICENSE file, or test files (in a `tests/` subdirectory), which are likely not important at runtime. In these cases, the collision can be worked around by adding [a `pex3_venv_create_extra_args=["--collisions-ok"]` field](doc:reference-python_google_cloud_function#codepex3_venv_create_extra_argscode) to the `python_google_cloud_function` target.
+>
+> A better solution is to work with the dependencies to stop them from packaging files outside their scoped directories.
+
+
 Step 4: Upload to Google Cloud
 ------------------------------
 

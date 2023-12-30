@@ -23,6 +23,7 @@ from pants.backend.scala.util_rules import versions
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
     ScalaArtifactsForVersionResult,
+    ScalaVersion,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
@@ -58,7 +59,7 @@ class CompileScalaSourceRequest(ClasspathEntryRequest):
 
 @dataclass(frozen=True)
 class ScalaLibraryRequest:
-    version: str
+    version: ScalaVersion
 
 
 # TODO: This code is duplicated in the scalac and BSP rules.

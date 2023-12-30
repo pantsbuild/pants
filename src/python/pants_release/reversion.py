@@ -48,9 +48,9 @@ def locate_dist_info_dir(workspace):
     dir_suffix = "*.dist-info"
     matches = glob.glob(os.path.join(workspace, dir_suffix))
     if not matches:
-        raise Exception("Unable to locate `{}` directory in input whl.".format(dir_suffix))
+        raise Exception(f"Unable to locate `{dir_suffix}` directory in input whl.")
     if len(matches) > 1:
-        raise Exception("Too many `{}` directories in input whl: {}".format(dir_suffix, matches))
+        raise Exception(f"Too many `{dir_suffix}` directories in input whl: {matches}")
     return os.path.relpath(matches[0], workspace)
 
 
@@ -81,9 +81,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
         else:
             mutated_files.add(dst)
     if not dst_record_file:
-        raise Exception(
-            "Malformed whl or bad globs: `{}` was not rewritten.".format(src_record_file)
-        )
+        raise Exception(f"Malformed whl or bad globs: `{src_record_file}` was not rewritten.")
 
     output_records = []
     file_name = os.path.join(workspace, dst_record_file)
@@ -121,14 +119,14 @@ def reversion(
         # Get version from the input whl's metadata.
         input_version = None
         metadata_file = os.path.join(workspace, dist_info_dir, "METADATA")
-        with open(metadata_file, "r") as info:
+        with open(metadata_file) as info:
             for line in info:
                 mo = _version_re.match(line)
                 if mo:
                     input_version = mo.group("version")
                     break
         if not input_version:
-            raise Exception("Could not find `Version:` line in {}".format(metadata_file))
+            raise Exception(f"Could not find `Version:` line in {metadata_file}")
 
         # Rewrite and move all files (including the RECORD file), recording which files need to be
         # re-fingerprinted due to content changes.
@@ -160,7 +158,7 @@ def reversion(
             os.mkdir(check_dst)
             subprocess.run(args=["wheel", "unpack", "-d", check_dst, tmp_whl_file], check=True)
             shutil.move(tmp_whl_file, dst_whl_file)
-        print("Wrote whl with version {} to {}.\n".format(target_version, dst_whl_file))
+        print(f"Wrote whl with version {target_version} to {dst_whl_file}.\n")
 
 
 def create_parser() -> argparse.ArgumentParser:

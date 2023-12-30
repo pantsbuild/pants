@@ -161,10 +161,8 @@ def test_find_python_distributions_with_entry_points_in_stevedore_namespaces(
         )
     ) == set(
         StevedoreExtensionTargets(
-            (
-                rule_runner.get_target(Address(f"runners/{runner}_runner"))
-                for runner in sorted(st2_runners)
-            )
+            rule_runner.get_target(Address(f"runners/{runner}_runner"))
+            for runner in sorted(st2_runners)
         )
     )
 
