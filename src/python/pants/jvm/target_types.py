@@ -459,14 +459,14 @@ class JvmArtifactsPackageMappingField(DictStringToStringSequenceField):
         """
     )
     value: FrozenDict[str, tuple[str, ...]]
-    default: ClassVar[FrozenDict[str, tuple[str, ...]]] = FrozenDict()
+    default: ClassVar[Optional[FrozenDict[str, tuple[str, ...]]]] = FrozenDict()
 
     @classmethod
     def compute_value(  # type: ignore[override]
         cls, raw_value: dict[str, Iterable[str]], address: Address
     ) -> FrozenDict[tuple[str, str], tuple[str, ...]]:
         value_or_default = super().compute_value(raw_value, address)
-        assert value_or_default
+        assert value_or_default is not None
         return FrozenDict(
             {
                 cls._parse_coord(coord): tuple(packages)
@@ -505,7 +505,7 @@ class GenerateFromPomXmlRequest(GenerateTargetsRequest):
     desc=("Generate `jvm_artifact` targets from pom.xml"),
     level=LogLevel.DEBUG,
 )
-async def generate_from_python_requirement(
+async def generate_from_pom_xml(
     request: GenerateFromPomXmlRequest,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:

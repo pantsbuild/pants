@@ -67,3 +67,5 @@ GTAGS
 /.pants.rc
 /.venv
 .tool-versions
+.ropeproject/
+pyrightconfig.json
