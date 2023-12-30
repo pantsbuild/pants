@@ -9,9 +9,7 @@ import re
 from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
-from typing import Iterator, cast
-
-from typing_extensions import Literal
+from typing import Iterator, Literal, cast
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.

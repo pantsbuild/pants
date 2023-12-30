@@ -6,9 +6,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Iterator, cast
-
-from typing_extensions import Protocol
+from typing import ClassVar, Iterable, Iterator, Protocol, cast
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
