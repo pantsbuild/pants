@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future
-from typing import Any, BinaryIO, ClassVar
+from typing import Any, BinaryIO, ClassVar, Protocol
 
 from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
 from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
@@ -22,12 +22,6 @@ from pants.engine.fs import Workspace
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.unions import UnionMembership, union
-
-try:
-    from typing import Protocol  # Python 3.8+
-except ImportError:
-    # See https://github.com/python/mypy/issues/4427 re the ignore
-    from typing_extensions import Protocol  # type: ignore
 
 _logger = logging.getLogger(__name__)
 

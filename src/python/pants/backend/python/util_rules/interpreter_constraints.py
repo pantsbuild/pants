@@ -6,10 +6,9 @@ from __future__ import annotations
 import itertools
 import re
 from collections import defaultdict
-from typing import Iterable, Iterator, Sequence, Tuple, TypeVar
+from typing import Iterable, Iterator, Protocol, Sequence, Tuple, TypeVar
 
 from pkg_resources import Requirement
-from typing_extensions import Protocol
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField

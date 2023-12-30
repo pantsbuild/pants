@@ -34,7 +34,7 @@ def has_python_version(version):
     return python_interpreter_path(version) is not None
 
 
-@lru_cache()
+@lru_cache
 def python_interpreter_path(version):
     """Returns the interpreter path if the current system has the specified version of python.
 

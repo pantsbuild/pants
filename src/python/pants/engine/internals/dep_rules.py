@@ -6,8 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-
-from typing_extensions import Protocol
+from typing import Protocol
 
 from pants.engine.addresses import Address
 from pants.engine.internals.target_adaptor import TargetAdaptor
