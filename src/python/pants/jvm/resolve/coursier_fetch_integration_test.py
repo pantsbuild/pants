@@ -741,15 +741,17 @@ def test_force_version(rule_runner):
     ) in [e.coord for e in entries]
 
     # then check force_version=True pins the version
-    reqs = ArtifactRequirements.from_coordinates(
+    reqs = ArtifactRequirements(
         [
-            Coordinate(
-                group="org.apache.parquet",
-                artifact="parquet-common",
-                version="1.13.1",
-            ),
-            dataclasses.replace(
+            ArtifactRequirement(
                 Coordinate(
+                    group="org.apache.parquet",
+                    artifact="parquet-common",
+                    version="1.13.1",
+                ),
+            ),
+            ArtifactRequirement(
+                coordinate=Coordinate(
                     group="org.slf4j",
                     artifact="slf4j-api",
                     version="1.7.19",
