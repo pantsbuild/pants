@@ -23,6 +23,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.rules import rule
 from pants.engine.target import COMMON_TARGET_FIELDS, Target
+from pants.init.backend_templating import TemplatedBackendConfig
 from pants.init.extension_loader import (
     PluginLoadOrderError,
     PluginNotFound,
@@ -103,11 +104,12 @@ class LoaderTest(unittest.TestCase):
             self.working_set.add_entry(entry)
 
     @contextmanager
-    def create_register(
+    def create_package(
         self,
         build_file_aliases=None,
         rules=None,
         target_types=None,
+        generate=None,
         module_name="register",
     ):
         package_name = f"__test_package_{uuid.uuid4().hex}"
@@ -128,6 +130,7 @@ class LoaderTest(unittest.TestCase):
             register_entrypoint("build_file_aliases", build_file_aliases)
             register_entrypoint("rules", rules)
             register_entrypoint("target_types", target_types)
+            register_entrypoint("generate", generate)
 
             yield package_name
         finally:
@@ -143,13 +146,13 @@ class LoaderTest(unittest.TestCase):
         self.assertEqual(0, len(build_configuration.target_types))
 
     def test_load_valid_empty(self):
-        with self.create_register() as backend_package:
+        with self.create_package() as backend_package:
             load_backend(self.bc_builder, backend_package)
             self.assert_empty()
 
     def test_load_valid_partial_aliases(self):
         aliases = BuildFileAliases(objects={"obj1": DummyObject1, "obj2": DummyObject2})
-        with self.create_register(build_file_aliases=lambda: aliases) as backend_package:
+        with self.create_package(build_file_aliases=lambda: aliases) as backend_package:
             load_backend(self.bc_builder, backend_package)
             build_configuration = self.bc_builder.create()
             registered_aliases = build_configuration.registered_aliases
@@ -160,12 +163,12 @@ class LoaderTest(unittest.TestCase):
         def build_file_aliases(bad_arg):
             return BuildFileAliases()
 
-        with self.create_register(build_file_aliases=build_file_aliases) as backend_package:
+        with self.create_package(build_file_aliases=build_file_aliases) as backend_package:
             with self.assertRaises(BuildConfigurationError):
                 load_backend(self.bc_builder, backend_package)
 
     def test_load_invalid_module(self):
-        with self.create_register(module_name="register2") as backend_package:
+        with self.create_package(module_name="register2") as backend_package:
             with self.assertRaises(BuildConfigurationError):
                 load_backend(self.bc_builder, backend_package)
 
@@ -281,7 +284,7 @@ class LoaderTest(unittest.TestCase):
         def backend_rules():
             return [example_rule]
 
-        with self.create_register(rules=backend_rules) as backend_package:
+        with self.create_package(rules=backend_rules) as backend_package:
             load_backend(self.bc_builder, backend_package)
             self.assertEqual(self.bc_builder.create().rules, FrozenOrderedSet([example_rule.rule]))
 
@@ -295,11 +298,69 @@ class LoaderTest(unittest.TestCase):
             FrozenOrderedSet([example_rule.rule, example_plugin_rule.rule]),
         )
 
+    def test_templated_backend_rules(self):
+        @dataclass
+        class GeneratedBackend:
+            _rules: list
+
+            def rules(self):
+                return self._rules
+
+        def generate(backend_package_alias: str, kwargs: dict):
+            config_arg1 = kwargs["config_arg1"]
+
+            @dataclass(frozen=True)
+            class TemplatedWrapperType:
+                value: Any
+
+            @rule(canonical_name_suffix=backend_package_alias)
+            def wrap_root_type(root_type: RootType) -> TemplatedWrapperType:
+                return TemplatedWrapperType((root_type.value, config_arg1))
+
+            return GeneratedBackend([wrap_root_type])
+
+        with self.create_package(
+            generate=generate, module_name="mock_backend_generator"
+        ) as package:
+            load_backend(
+                self.bc_builder,
+                backend_package="foo_backend",
+                templating_config=TemplatedBackendConfig.from_dict(
+                    {
+                        "template": package + ".mock_backend_generator",
+                        "config_arg1": "FOO",
+                    }
+                ),
+            )
+            load_backend(
+                self.bc_builder,
+                backend_package="bar_backend",
+                templating_config=TemplatedBackendConfig.from_dict(
+                    {
+                        "template": package + ".mock_backend_generator",
+                        "config_arg1": "BAR",
+                    }
+                ),
+            )
+
+        build_configuration = self.bc_builder.create()
+        rules = build_configuration.rules
+        self.assertEqual(len(rules), 2)
+
+        providers_to_rule = {p: r for r, p in build_configuration.rule_to_providers.items()}
+        foo_rule = providers_to_rule[("foo_backend",)]
+        self.assertEqual(foo_rule.func(RootType("a")).value, ("a", "FOO"))
+        self.assertEqual(foo_rule.canonical_name.split(".")[-1], "wrap_root_type_foo_backend")
+
+        bar_rule = providers_to_rule[("bar_backend",)]
+        self.assertEqual(bar_rule.func(RootType("a")).value, ("a", "BAR"))
+        self.assertEqual(bar_rule.canonical_name.split(".")[-1], "wrap_root_type_bar_backend")
+
     def test_target_types(self):
         def target_types():
             return [DummyTarget, DummyTarget2]
 
-        with self.create_register(target_types=target_types) as backend_package:
+        with self.create_package(target_types=target_types) as backend_package:
             load_backend(self.bc_builder, backend_package)
             assert self.bc_builder.create().target_types == (DummyTarget, DummyTarget2)
 
@@ -323,7 +384,7 @@ class LoaderTest(unittest.TestCase):
         self.working_set.add(self.get_mock_plugin("pluginalias", "0.0.1", alias=reg_alias))
         plugins = ["pluginalias==0.0.1"]
         aliases = BuildFileAliases(objects={"override-alias": DummyObject1})
-        with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
+        with self.create_package(build_file_aliases=lambda: aliases) as backend_module:
             backends = [backend_module]
             build_configuration = load_backends_and_plugins(
                 plugins, self.working_set, backends, bc_builder=self.bc_builder

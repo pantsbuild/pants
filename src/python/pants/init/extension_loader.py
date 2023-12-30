@@ -4,13 +4,14 @@
 import importlib
 import logging
 import traceback
-from typing import Dict, List, Optional
+from typing import Dict, List, Mapping, Optional
 
 from pkg_resources import Requirement, WorkingSet
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal.builtins import register_builtin_goals
+from pants.init.backend_templating import TemplatedBackendConfig
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ def load_backends_and_plugins(
     working_set: WorkingSet,
     backends: List[str],
     bc_builder: Optional[BuildConfiguration.Builder] = None,
+    templated_backends: Optional[Mapping[str, TemplatedBackendConfig]] = None,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
@@ -42,7 +44,9 @@ def load_backends_and_plugins(
     :param bc_builder: The BuildConfiguration (for adding aliases).
     """
     bc_builder = bc_builder or BuildConfiguration.Builder()
-    load_build_configuration_from_source(bc_builder, backends)
+    load_build_configuration_from_source(
+        bc_builder, backends, templated_backends=templated_backends
+    )
     load_plugins(bc_builder, plugins, working_set)
     register_builtin_goals(bc_builder)
     return bc_builder.create()
@@ -112,7 +116,9 @@ def load_plugins(
 
 
 def load_build_configuration_from_source(
-    build_configuration: BuildConfiguration.Builder, backends: List[str]
+    build_configuration: BuildConfiguration.Builder,
+    backends: List[str],
+    templated_backends: Optional[Mapping[str, TemplatedBackendConfig]] = None,
 ) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
@@ -123,25 +129,60 @@ def load_build_configuration_from_source(
     """
     # NB: Backends added here must be explicit dependencies of this module.
     backend_packages = FrozenOrderedSet(["pants.core", "pants.backend.project_info", *backends])
+    templated_backends = templated_backends or {}
+
     for backend_package in backend_packages:
-        load_backend(build_configuration, backend_package)
+        load_backend(
+            build_configuration,
+            backend_package,
+            templating_config=templated_backends.get(backend_package),
+        )
 
 
-def load_backend(build_configuration: BuildConfiguration.Builder, backend_package: str) -> None:
+def _load_register_module(backend_package: str):
+    module_source = backend_package + ".register"
+    try:
+        module = importlib.import_module(module_source)
+    except ImportError as ex:
+        traceback.print_exc()
+        raise BackendConfigurationError(f"Failed to load the {module_source} backend: {ex!r}")
+    return module, module_source
+
+
+def _generate_backend_module_from_template(backend_package: str, cfg: TemplatedBackendConfig):
+    try:
+        backend_generator_module = importlib.import_module(cfg.template)
+    except ImportError as ex:
+        traceback.print_exc()
+        raise BackendConfigurationError(
+            f"Failed to load the {cfg.template} backend template module: {ex!r}"
+        )
+    module = backend_generator_module.generate(backend_package, cfg.kwargs)
+    module_source = f"{module} generated from {cfg.template}"
+    return module, module_source
+
+
+def load_backend(
+    build_configuration: BuildConfiguration.Builder,
+    backend_package: str,
+    templating_config: Optional[TemplatedBackendConfig] = None,
+) -> None:
     """Installs the given backend package into the build configuration.
 
     :param build_configuration: the BuildConfiguration to install the backend plugin into.
     :param backend_package: the package name containing the backend plugin register module that
-      provides the plugin entrypoints.
+      provides the plugin entrypoints. For templated backends, should be a unique alias for the backend.
+    :param templating_config: If supplied, the backend will be generated from this config instead
+      of a `register` module defined in backend_package
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
-    backend_module = backend_package + ".register"
-    try:
-        module = importlib.import_module(backend_module)
-    except ImportError as ex:
-        traceback.print_exc()
-        raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
+
+    module, module_source = (
+        _load_register_module(backend_package)
+        if not templating_config
+        else _generate_backend_module_from_template(backend_package, templating_config)
+    )
 
     def invoke_entrypoint(name: str):
         entrypoint = getattr(module, name, lambda: None)
@@ -150,7 +191,7 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
         except TypeError as e:
             traceback.print_exc()
             raise BackendConfigurationError(
-                f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
+                f"Entrypoint {name} in {module_source} must be a zero-arg callable: {e!r}"
             )
 
     target_types = invoke_entrypoint("target_types")

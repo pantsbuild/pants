@@ -27,7 +27,7 @@ from pants.init.extension_loader import (
 from pants.init.plugin_resolver import PluginResolver
 from pants.init.plugin_resolver import rules as plugin_resolver_rules
 from pants.option.errors import UnknownFlagsError
-from pants.option.global_options import DynamicRemoteOptions
+from pants.option.global_options import BootstrapOptions, DynamicRemoteOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.requirements import parse_requirements_file
@@ -57,11 +57,14 @@ def _initialize_build_configuration(
             sys.path.append(path)
             pkg_resources.fixup_namespace_packages(path)
 
+    templated_backends = BootstrapOptions.parse_templated_backend_configs(bootstrap_options)
+
     # Load plugins and backends.
     return load_backends_and_plugins(
         bootstrap_options.plugins,
         working_set,
         bootstrap_options.backend_packages,
+        templated_backends=templated_backends,
     )
 
 

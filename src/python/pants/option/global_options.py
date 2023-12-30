@@ -23,10 +23,12 @@ from pants.base.build_environment import (
     pants_version,
 )
 from pants.base.deprecated import resolve_conflicting_options
+from pants.base.exceptions import BackendConfigurationError
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import PyExecutor
+from pants.init.backend_templating import TemplatedBackendConfig
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError
 from pants.option.option_types import (
@@ -935,6 +937,51 @@ class BootstrapOptions:
             """
         ),
     )
+    templated_backends = DictOption[dict](
+        advanced=True,
+        help=softwrap(
+            """
+            Configure templated backends. An example is as follows:
+
+                {
+                    "backend1": {
+                        "template": "some.backend.generator",
+                        "a": 1,
+                        "b": "b1",
+                    },
+                    "backend2": {
+                        "template": "another.backend.generator",
+                        "c": 100,
+                    },
+                }
+
+            The first entry requests pants to generate a backend by importing
+            the `some.backend.generator` module and calling its `generate` attribute
+            `generate("backend1", {"a": 1, "b": "b1"})`. Pants will load the backend
+            from the generated object by finding and calling any `target_types`, `rules`, etc.
+            attributes defined on it in the same way as it does with the `register` modules
+            of regular packages.
+
+            The loaded backend will be associated with the "backend1" name and should be referred to
+            in the `backend_packages` list.
+            """
+        ),
+    )
+
+    @classmethod
+    def parse_templated_backend_configs(
+        cls, bootstrap_options: OptionValueContainer
+    ) -> dict[str, TemplatedBackendConfig]:
+        result = {}
+        for backend_alias, templating_config in bootstrap_options.templated_backends.items():
+            try:
+                result[backend_alias] = TemplatedBackendConfig.from_dict(templating_config)
+            except ValueError as e:
+                raise BackendConfigurationError(
+                    f"Configuration error for templated_backend {backend_alias}: {e}"
+                )
+        return result
+
     plugins = StrListOption(
         advanced=True,
         help=softwrap(
