@@ -25,7 +25,7 @@ from pants.backend.scala.test.scalatest import rules as scalatest_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
-from pants.core.util_rules import config_files, source_files, system_binaries
+from pants.core.util_rules import config_files, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Addresses
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
@@ -59,6 +59,7 @@ def rule_runner() -> RuleRunner:
             *scala_target_types_rules(),
             *scalac_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *system_binaries.rules(),
             *target_types_rules(),
             *util_rules(),
