@@ -47,8 +47,8 @@ def _initialize_build_configuration(
       2. is expensive to call, because it might resolve plugins from the network
     """
 
-    bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-  
+    bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()  
+
     # Add any extra paths to python path (e.g., for loading extra source backends).
     for path in bootstrap_options.pythonpath:
         if path not in sys.path:
@@ -57,7 +57,7 @@ def _initialize_build_configuration(
 
     backends_requirements = _collect_backends_requirements(bootstrap_options.backend_packages)
     working_set = plugin_resolver.resolve(options_bootstrapper, env, backends_requirements)
-    
+
     # Load plugins and backends.
     return load_backends_and_plugins(
         bootstrap_options.plugins,
