@@ -50,7 +50,85 @@ from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
 FORTRAN_FILE = FileContent("fixed.f98", b"READ INPUT TAPE 5\n")
+RUFF_FILE = FileContent("fixed.py", b"print(input())\n")
 SMALLTALK_FILE = FileContent("fixed.st", b"y := self size + super size.')\n")
+
+
+class RuffSource(SingleSourceField):
+    pass
+
+
+class RuffTarget(Target):
+    alias = "ruff"
+    core_fields = (RuffSource,)
+
+
+@dataclass(frozen=True)
+class RuffFieldSet(FieldSet):
+    required_fields = (RuffSource,)
+
+    sources: RuffSource
+
+
+class RuffFixRequest(FixTargetsRequest):
+    field_set_type = RuffFieldSet
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "ruff check --fix"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "ruff"
+
+
+class RuffFmtRequest(FmtTargetsRequest):
+    field_set_type = RuffFieldSet
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "ruff format"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "ruff"
+
+
+@rule
+async def ruff_fix_partition(request: RuffFixRequest.PartitionRequest) -> Partitions:
+    if not any(fs.address.target_name == "r_needs_fixing" for fs in request.field_sets):
+        return Partitions()
+    return Partitions.single_partition(fs.sources.file_path for fs in request.field_sets)
+
+
+@rule
+async def ruff_fmt_partition(request: RuffFmtRequest.PartitionRequest) -> Partitions:
+    return Partitions.single_partition(fs.sources.file_path for fs in request.field_sets)
+
+
+@rule
+async def ruff_fix(request: RuffFixRequest.Batch) -> FixResult:
+    input = request.snapshot
+    output = await Get(
+        Snapshot, CreateDigest([FileContent(file, RUFF_FILE.content) for file in request.files])
+    )
+    return FixResult(
+        input=input, output=output, stdout="", stderr="", tool_name=RuffFixRequest.tool_name
+    )
+
+
+@rule
+async def ruff_fmt(request: RuffFmtRequest.Batch) -> FmtResult:
+    output = await Get(
+        Snapshot, CreateDigest([FileContent(file, RUFF_FILE.content) for file in request.files])
+    )
+    return FmtResult(
+        input=request.snapshot,
+        output=output,
+        stdout="",
+        stderr="",
+        tool_name=RuffFmtRequest.tool_name,
+    )
 
 
 class FortranSource(SingleSourceField):
@@ -272,12 +350,18 @@ def run_fix(
     rule_runner: RuleRunner,
     *,
     target_specs: List[str],
-    only: list[str] | None = None,
+    fmt_only: list[str] | None = None,
+    fix_only: list[str] | None = None,
     extra_args: Iterable[str] = (),
 ) -> str:
     result = rule_runner.run_goal_rule(
         Fix,
-        args=[f"--only={repr(only or [])}", *target_specs, *extra_args],
+        args=[
+            f"--fmt-only={repr(fmt_only or [])}",
+            f"--fix-only={repr(fix_only or [])}",
+            *target_specs,
+            *extra_args,
+        ],
     )
     assert result.exit_code == 0
     assert not result.stdout
@@ -289,12 +373,16 @@ def write_files(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
+                ruff(name='r1', source="r1.py")
+                ruff(name='r_needs_fixing', source="fixed.py")
                 fortran(name='f1', source="ft1.f98")
                 fortran(name='needs_fixing', source="fixed.f98")
                 smalltalk(name='s1', source="st1.st")
                 smalltalk(name='s2', source="fixed.st")
                 """,
             ),
+            "r1.py": "print(input())",
+            "fixed.py": "print(input())\n",
             "ft1.f98": "READ INPUT TAPE 5\n",
             "fixed.f98": "READ INPUT TAPE 5",
             "st1.st": "y := self size + super size.')",
@@ -329,7 +417,7 @@ def test_batches(capfd) -> None:
 
 def test_summary() -> None:
     rule_runner = fix_rule_runner(
-        target_types=[FortranTarget, SmalltalkTarget],
+        target_types=[FortranTarget, SmalltalkTarget, RuffTarget],
         request_types=[
             FortranFixRequest,
             FortranFmtRequest,
@@ -363,6 +451,8 @@ def test_summary() -> None:
     assert build_file.is_file()
     assert build_file.read_text() == dedent(
         """\
+        brick(brick='brick1', brick="brick1.brick")
+        brick(brick='brick', brick="brick.brick")
         brick(brick='brick1', brick="brick1.brick98")
         brick(brick='brick', brick="brick.brick98")
         brick(brick='brick1', brick="brick1.brick")
@@ -373,7 +463,7 @@ def test_summary() -> None:
 
 def test_skip_formatters() -> None:
     rule_runner = fix_rule_runner(
-        target_types=[FortranTarget, SmalltalkTarget],
+        target_types=[FortranTarget, SmalltalkTarget, RuffTarget],
         request_types=[FortranFmtRequest],
     )
 
@@ -386,7 +476,7 @@ def test_skip_formatters() -> None:
 
 def test_fixers_first() -> None:
     rule_runner = fix_rule_runner(
-        target_types=[FortranTarget, SmalltalkTarget],
+        target_types=[FortranTarget, SmalltalkTarget, RuffTarget],
         # NB: Order is important here
         request_types=[FortranFmtRequest, FortranFixRequest],
     )
@@ -408,7 +498,7 @@ def test_fixers_first() -> None:
 
 def test_only() -> None:
     rule_runner = fix_rule_runner(
-        target_types=[FortranTarget, SmalltalkTarget],
+        target_types=[FortranTarget, SmalltalkTarget, RuffTarget],
         request_types=[
             FortranFixRequest,
             SmalltalkSkipRequest,
@@ -422,14 +512,80 @@ def test_only() -> None:
     stderr = run_fix(
         rule_runner,
         target_specs=["::"],
-        only=[SmalltalkNoopRequest.tool_id],
+        fix_only=[SmalltalkNoopRequest.tool_id],
     )
     assert stderr.strip() == "✓ Smalltalk Did Not Change made no changes."
 
 
+def test_fmt_only() -> None:
+    rule_runner = fix_rule_runner(
+        target_types=[
+            FortranTarget,
+            RuffTarget,
+            SmalltalkTarget,
+        ],
+        request_types=[
+            FortranFixRequest,
+            FortranFmtRequest,
+            RuffFixRequest,
+            RuffFmtRequest,
+        ],
+    )
+
+    write_files(rule_runner)
+
+    stderr = run_fix(
+        rule_runner,
+        target_specs=["::"],
+        fmt_only=[FortranFmtRequest.tool_id],
+    )
+    expected = dedent(
+        """
+        + Fortran Conditionally Did Change made changes.
+        ✓ Fortran Formatter made no changes.
+        + ruff check --fix made changes.
+        """
+    ).strip()
+    assert stderr.strip() == expected
+
+
+def test_fix_only() -> None:
+    rule_runner = fix_rule_runner(
+        target_types=[
+            FortranTarget,
+            RuffTarget,
+            SmalltalkTarget,
+        ],
+        request_types=[
+            BrickyBuildFileFixer,
+            FortranFixRequest,
+            FortranFmtRequest,
+            RuffFixRequest,
+            RuffFmtRequest,
+            SmalltalkNoopRequest,
+            SmalltalkSkipRequest,
+        ],
+    )
+
+    write_files(rule_runner)
+
+    stderr = run_fix(
+        rule_runner,
+        target_specs=["::"],
+        fix_only=[RuffFixRequest.tool_id],
+    )
+    expected = dedent(
+        """
+        + ruff check --fix made changes.
+        ✓ ruff format made no changes.
+        """
+    ).strip()
+    assert stderr.strip() == expected
+
+
 def test_no_targets() -> None:
     rule_runner = fix_rule_runner(
-        target_types=[FortranTarget, SmalltalkTarget],
+        target_types=[FortranTarget, SmalltalkTarget, RuffTarget],
         request_types=[
             FortranFixRequest,
             SmalltalkSkipRequest,
