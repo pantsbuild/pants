@@ -200,7 +200,7 @@ def test_generates_scala(rule_runner: RuleRunner, scrooge_lockfile: JVMLockfileF
         assert_files_generated(
             rule_runner,
             addr,
-            source_roots=["src/python", "/src/thrift", "/tests/thrift"],
+            source_roots=["src/python", "/src/thrift", "/tests/thrift", "src/jvm"],
             expected_files=expected,
         )
 
