@@ -1,16 +1,19 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 import pytest
+
+from pants.backend.experimental.makeself import makeself, system_binaries
+from pants.backend.experimental.makeself.goals import package, run
+from pants.backend.experimental.makeself.goals.package import (
+    BuiltMakeselfArchiveArtifact,
+    MakeselfArchiveFieldSet,
+)
+from pants.backend.experimental.makeself.makeself import RunMakeselfArchive
+from pants.backend.experimental.makeself.target_types import MakeselfArchiveTarget
 from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
-from pants_backend_makeself import makeself, system_binaries
-from pants_backend_makeself.goals import package, run
-from pants_backend_makeself.goals.package import (
-    BuiltMakeselfArchiveArtifact,
-    MakeselfArchiveFieldSet,
-)
-from pants_backend_makeself.makeself import RunMakeselfArchive
-from pants_backend_makeself.target_types import MakeselfArchiveTarget
 
 
 @pytest.fixture

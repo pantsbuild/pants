@@ -1,30 +1,12 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 import dataclasses
 import logging
 import os
 from dataclasses import dataclass
 from typing import Optional
 
-from pants.core.util_rules import external_tool
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
-)
-from pants.core.util_rules.system_binaries import (
-    BashBinary,
-    BinaryShims,
-    BinaryShimsRequest,
-    CatBinary,
-    ChmodBinary,
-    MkdirBinary,
-    TarBinary,
-)
-from pants.engine.fs import Digest, RemovePrefix
-from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
-from pants.util.logging import LogLevel
-from pants_backend_makeself.system_binaries import (
+from pants.backend.experimental.makeself.system_binaries import (
     AwkBinary,
     Base64Binary,
     BasenameBinary,
@@ -56,6 +38,26 @@ from pants_backend_makeself.system_binaries import (
     XzBinary,
     ZstdBinary,
 )
+from pants.core.util_rules import external_tool
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalToolRequest,
+    TemplatedExternalTool,
+)
+from pants.core.util_rules.system_binaries import (
+    BashBinary,
+    BinaryShims,
+    BinaryShimsRequest,
+    CatBinary,
+    ChmodBinary,
+    MkdirBinary,
+    TarBinary,
+)
+from pants.engine.fs import Digest, RemovePrefix
+from pants.engine.platform import Platform
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.engine.rules import Get, collect_rules, rule
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 

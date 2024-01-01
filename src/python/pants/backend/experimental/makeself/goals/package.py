@@ -1,7 +1,16 @@
+# Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
 
+from pants.backend.experimental.makeself.makeself import CreateMakeselfArchive
+from pants.backend.experimental.makeself.target_types import (
+    MakeselfArchiveFilesField,
+    MakeselfArchivePackagesField,
+    MakeselfArchiveStartupScript,
+    MakeselfArthiveLabel,
+)
 from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
@@ -29,13 +38,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants_backend_makeself.makeself import CreateMakeselfArchive
-from pants_backend_makeself.target_types import (
-    MakeselfArchiveFilesField,
-    MakeselfArchivePackagesField,
-    MakeselfArchiveStartupScript,
-    MakeselfArthiveLabel,
-)
 
 logger = logging.getLogger(__name__)
 
