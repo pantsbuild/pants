@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
 
-from pants.backend.experimental.makeself.goals.package import MakeselfArchiveFieldSet
-from pants.backend.experimental.makeself.makeself import RunMakeselfArchive
+from pants.backend.makeself.goals.package import MakeselfArchiveFieldSet
+from pants.backend.makeself.makeself import RunMakeselfArchive
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunRequest
 from pants.engine.process import Process

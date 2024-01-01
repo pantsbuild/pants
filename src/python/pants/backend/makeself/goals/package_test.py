@@ -2,14 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import pytest
 
-from pants.backend.experimental.makeself import makeself, system_binaries
-from pants.backend.experimental.makeself.goals import package, run
-from pants.backend.experimental.makeself.goals.package import (
+from pants.backend.makeself import makeself, system_binaries
+from pants.backend.makeself.goals import package, run
+from pants.backend.makeself.goals.package import (
     BuiltMakeselfArchiveArtifact,
     MakeselfArchiveFieldSet,
 )
-from pants.backend.experimental.makeself.makeself import RunMakeselfArchive
-from pants.backend.experimental.makeself.target_types import MakeselfArchiveTarget
+from pants.backend.makeself.makeself import RunMakeselfArchive
+from pants.backend.makeself.target_types import MakeselfArchiveTarget
 from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.process import ProcessResult

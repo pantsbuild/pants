@@ -4,5 +4,5 @@ python_sources()
 
 python_tests(
     name="tests",
-    # dependencies=["pants-plugins/pants.backend.experimental.makeself#pantsbuild.pants"],
+    # dependencies=["pants-plugins/pants.backend.makeself#pantsbuild.pants"],
 )

@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-from pants.backend.experimental.makeself.system_binaries import (
+from pants.backend.makeself.system_binaries import (
     AwkBinary,
     Base64Binary,
     BasenameBinary,

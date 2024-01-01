@@ -4,8 +4,8 @@ import logging
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.experimental.makeself.makeself import CreateMakeselfArchive
-from pants.backend.experimental.makeself.target_types import (
+from pants.backend.makeself.makeself import CreateMakeselfArchive
+from pants.backend.makeself.target_types import (
     MakeselfArchiveFilesField,
     MakeselfArchivePackagesField,
     MakeselfArchiveStartupScript,
