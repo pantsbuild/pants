@@ -129,7 +129,7 @@ mod tests {
                 .unwrap();
         });
 
-        let uri = Uri::try_from(format!("http://{}", addr.to_string())).unwrap();
+        let uri = Uri::try_from(format!("http://{}", addr)).unwrap();
 
         let mut channel = Channel::new(None, uri).await.unwrap();
 
@@ -168,7 +168,7 @@ mod tests {
             server.serve(router().into_make_service()).await.unwrap();
         });
 
-        let uri = Uri::try_from(format!("https://{}", addr.to_string())).unwrap();
+        let uri = Uri::try_from(format!("https://{}", addr)).unwrap();
 
         let tls_config = ClientConfig::builder()
             .with_safe_defaults()
@@ -269,7 +269,7 @@ mod tests {
             server.serve(router().into_make_service()).await.unwrap();
         });
 
-        let uri = Uri::try_from(format!("https://{}", addr.to_string())).unwrap();
+        let uri = Uri::try_from(format!("https://{}", addr)).unwrap();
 
         let mut tls_config =
             crate::tls::Config::new(Some(&cert_pem), Some((&cert_pem, &key_pem))).unwrap();

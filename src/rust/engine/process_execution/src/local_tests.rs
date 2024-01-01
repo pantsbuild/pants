@@ -257,7 +257,6 @@ async fn output_files_partial_output() {
         ])
         .output_files(
             relative_paths(&["roland.ext", "susannah"])
-                .into_iter()
                 .collect(),
         ),
     )

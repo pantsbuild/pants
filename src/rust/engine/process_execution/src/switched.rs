@@ -99,7 +99,7 @@ mod tests {
         let right = MockCommandRunner(Err(ProcessError::Unclassified("right".to_string())));
 
         let runner =
-            SwitchedCommandRunner::new(left, right, |req| req.argv.get(0).unwrap() == "left");
+            SwitchedCommandRunner::new(left, right, |req| req.argv.first().unwrap() == "left");
 
         let req = Process::new(vec!["left".to_string()]);
         let err = runner

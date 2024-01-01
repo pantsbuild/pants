@@ -33,8 +33,8 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 
     let mut cgroup = c.benchmark_group("materialize_directory");
 
-    for perms in vec![Permissions::ReadOnly, Permissions::Writable] {
-        for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000), (10000, 100)] {
+    for perms in [Permissions::ReadOnly, Permissions::Writable] {
+        for (count, size) in [(100, 100), (20, 10_000_000), (1, 200_000_000), (10000, 100)] {
             let (store, _tempdir, digest) = snapshot(&executor, count, size);
             let parent_dest = TempDir::new().unwrap();
             let parent_dest_path = parent_dest.path();
@@ -50,7 +50,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
                             let new_temp = TempDir::new_in(parent_dest_path).unwrap();
                             let dest = new_temp.path().to_path_buf();
                             std::mem::forget(new_temp);
-                            let _ = executor
+                            executor
                                 .block_on(store.materialize_directory(
                                     dest,
                                     parent_dest_path,
@@ -79,11 +79,9 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
     // The number of files, file size, whether the inputs should be assumed to be immutable, and the
     // number of times to capture (only the first capture actually stores anything: the rest should
     // ignore the duplicated data.)
-    for params in vec![
-        (100, 100, false, 100),
+    for params in [(100, 100, false, 100),
         (20, 10_000_000, true, 10),
-        (1, 200_000_000, true, 10),
-    ] {
+        (1, 200_000_000, true, 10)] {
         let (count, size, immutable, captures) = params;
         let storedir = TempDir::new().unwrap();
         let store = Store::local_only(executor.clone(), storedir.path()).unwrap();
@@ -176,7 +174,7 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
         files: all_file_nodes
             .iter()
             .cloned()
-            .chain(file_nodes_to_modify.into_iter())
+            .chain(file_nodes_to_modify)
             .collect(),
         directories: directory.directories.clone(),
         ..remexec::Directory::default()
