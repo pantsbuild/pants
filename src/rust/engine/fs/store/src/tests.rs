@@ -1529,9 +1529,11 @@ async fn returns_upload_summary_on_empty_cas() {
         .expect("Error uploading file");
 
     // We store all 3 files, and so we must sum their digests
-    let test_data = [testdir.digest().size_bytes,
+    let test_data = [
+        testdir.digest().size_bytes,
         testroland.digest().size_bytes,
-        testcatnip.digest().size_bytes];
+        testcatnip.digest().size_bytes,
+    ];
     let test_bytes = test_data.iter().sum();
     summary.upload_wall_time = Duration::default();
     assert_eq!(

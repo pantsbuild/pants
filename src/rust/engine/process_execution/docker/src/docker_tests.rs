@@ -382,10 +382,7 @@ async fn output_files_partial_output() {
             "-c".to_owned(),
             format!("echo -n {} > roland.ext", TestData::roland().string()),
         ])
-        .output_files(
-            relative_paths(&["roland.ext", "susannah"])
-                .collect(),
-        )
+        .output_files(relative_paths(&["roland.ext", "susannah"]).collect())
         .docker(IMAGE.to_owned()),
     )
     .await

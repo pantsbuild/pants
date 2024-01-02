@@ -16,11 +16,7 @@ fn assert_collected(
         collector.import_map
     );
     assert_eq!(
-        HashMap::from_iter(
-            string_candidates
-                .iter()
-                .map(|(k, v)| (k.to_string(), *v))
-        ),
+        HashMap::from_iter(string_candidates.iter().map(|(k, v)| (k.to_string(), *v))),
         collector.string_candidates
     );
 }

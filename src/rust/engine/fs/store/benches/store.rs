@@ -79,9 +79,11 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
     // The number of files, file size, whether the inputs should be assumed to be immutable, and the
     // number of times to capture (only the first capture actually stores anything: the rest should
     // ignore the duplicated data.)
-    for params in [(100, 100, false, 100),
+    for params in [
+        (100, 100, false, 100),
         (20, 10_000_000, true, 10),
-        (1, 200_000_000, true, 10)] {
+        (1, 200_000_000, true, 10),
+    ] {
         let (count, size, immutable, captures) = params;
         let storedir = TempDir::new().unwrap();
         let store = Store::local_only(executor.clone(), storedir.path()).unwrap();

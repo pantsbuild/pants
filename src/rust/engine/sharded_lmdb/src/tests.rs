@@ -45,23 +45,21 @@ async fn shard_counts() {
 #[tokio::test]
 async fn store_immutable() {
     let (s, _tempdir) = new_store(1);
-    s
-        .store(true, true, Digest::of_bytes(&bytes(0)), || {
-            Ok(bytes(0).reader())
-        })
-        .await
-        .unwrap();
+    s.store(true, true, Digest::of_bytes(&bytes(0)), || {
+        Ok(bytes(0).reader())
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
 async fn store_stable() {
     let (s, _tempdir) = new_store(1);
-    s
-        .store(true, false, Digest::of_bytes(&bytes(0)), || {
-            Ok(bytes(0).reader())
-        })
-        .await
-        .unwrap();
+    s.store(true, false, Digest::of_bytes(&bytes(0)), || {
+        Ok(bytes(0).reader())
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -72,12 +70,11 @@ async fn store_changing() {
     // fourth.
     let contents = Mutex::new(vec![bytes(0), bytes(1), bytes(2), bytes(2)].into_iter());
 
-    s
-        .store(true, false, Digest::of_bytes(&bytes(2)), move || {
-            Ok(contents.lock().next().unwrap().reader())
-        })
-        .await
-        .unwrap();
+    s.store(true, false, Digest::of_bytes(&bytes(2)), move || {
+        Ok(contents.lock().next().unwrap().reader())
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
