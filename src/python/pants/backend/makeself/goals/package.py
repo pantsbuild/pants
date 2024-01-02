@@ -1,5 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -11,6 +12,7 @@ from pants.backend.makeself.target_types import (
     MakeselfArchiveStartupScript,
     MakeselfArthiveLabel,
 )
+from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
@@ -22,7 +24,6 @@ from pants.core.goals.package import (
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules import source_files
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import AddPrefix, Snapshot
@@ -70,7 +71,8 @@ async def package_makeself_binary(
 ) -> BuiltPackage:
     archive_dir = "__archive"
 
-    package_targets, file_targets = await MultiGet(
+    startup_script_targets, package_targets, file_targets = await MultiGet(
+        Get(Targets, UnparsedAddressInputs, field_set.startup_script.to_unparsed_address_inputs()),
         Get(Targets, UnparsedAddressInputs, field_set.packages.to_unparsed_address_inputs()),
         Get(Targets, UnparsedAddressInputs, field_set.files.to_unparsed_address_inputs()),
     )
@@ -83,20 +85,19 @@ async def package_makeself_binary(
         for field_set in package_field_sets_per_target.field_sets
     )
 
-    file_sources = await MultiGet(
+    startup_script, *file_sources = await MultiGet(
         Get(
             HydratedSources,
             HydrateSourcesRequest(
                 tgt.get(SourcesField),
-                for_sources_types=(FileSourceField,),
+                for_sources_types=(FileSourceField, ShellSourceField),
                 enable_codegen=True,
             ),
         )
-        for tgt in file_targets
+        for tgt in itertools.chain(startup_script_targets, file_targets)
     )
 
-    startup_script = await Get(SourceFiles, SourceFilesRequest([field_set.startup_script]))
-    assert len(startup_script.files) == 1, startup_script.files
+    assert len(startup_script.snapshot.files) == 1, (startup_script, file_sources)
 
     input_digest = await Get(
         Digest,
@@ -112,14 +113,14 @@ async def package_makeself_binary(
 
     output_path = PurePath(field_set.output_path.value_or_default(file_ending="run"))
     output_filename = output_path.name
-    startup_script_filename = startup_script.files[0]
+    startup_script_file = startup_script.snapshot.files[0]
     result = await Get(
         ProcessResult,
         CreateMakeselfArchive(
             archive_dir=archive_dir,
             file_name=output_filename,
             label=field_set.label.value or output_filename,
-            startup_script=startup_script_filename,
+            startup_script=startup_script_file,
             input_digest=input_digest,
             output_filename=output_filename,
             description=f"Packaging makeself archive: {field_set.address}",

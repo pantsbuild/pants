@@ -1,9 +1,10 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.core.goals.package import OutputPathField
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    SingleSourceField,
+    AsyncFieldMixin,
     SpecialCasedDependencies,
     StringField,
     Target,
@@ -14,16 +15,30 @@ from pants.util.strutil import help_text
 
 class MakeselfArthiveLabel(StringField):
     alias = "label"
+    help = help_text(
+        """
+        An arbitrary text string describing the package. It will be displayed while extracting
+        the files.
+        """
+    )
 
 
-class MakeselfArchiveStartupScript(SingleSourceField):
+class MakeselfArchiveStartupScript(StringField, AsyncFieldMixin):
     alias = "startup_script"
     help = help_text(
         """
-        Set the startup script, i.e. what gets run when executing `./my_archive.run`,
-        to an address of shell source or a target that can be packaged, e.g. `pex_binary`.
+        The startup script, i.e. what gets run when executing `./my_archive.run`, must be set
+        to an address of shell source.
         """
     )
+
+    def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
+        assert self.value
+        return UnparsedAddressInputs(
+            [self.value],
+            owning_address=self.address,
+            description_of_origin=f"the `{MakeselfArchiveStartupScript.alias}` from the target {self.address}",
+        )
 
 
 class MakeselfArchiveFilesField(SpecialCasedDependencies):
