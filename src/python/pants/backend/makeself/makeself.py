@@ -6,11 +6,22 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-from pants.backend.makeself.system_binaries import (
+from pants.core.util_rules import external_tool
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalToolRequest,
+    TemplatedExternalTool,
+)
+from pants.core.util_rules.system_binaries import (
     AwkBinary,
     Base64Binary,
     BasenameBinary,
+    BashBinary,
+    BinaryShims,
+    BinaryShimsRequest,
     Bzip2Binary,
+    CatBinary,
+    ChmodBinary,
     CksumBinary,
     CutBinary,
     DateBinary,
@@ -25,33 +36,20 @@ from pants.backend.makeself.system_binaries import (
     HeadBinary,
     IdBinary,
     Md5sumBinary,
+    MkdirBinary,
     PwdBinary,
     RmBinary,
     SedBinary,
     ShBinary,
     SortBinary,
     TailBinary,
+    TarBinary,
     TestBinary,
     TrBinary,
     WcBinary,
     XargsBinary,
     XzBinary,
     ZstdBinary,
-)
-from pants.core.util_rules import external_tool
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-    TemplatedExternalTool,
-)
-from pants.core.util_rules.system_binaries import (
-    BashBinary,
-    BinaryShims,
-    BinaryShimsRequest,
-    CatBinary,
-    ChmodBinary,
-    MkdirBinary,
-    TarBinary,
 )
 from pants.engine.fs import Digest, RemovePrefix
 from pants.engine.platform import Platform
