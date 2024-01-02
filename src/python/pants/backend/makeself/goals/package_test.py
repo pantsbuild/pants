@@ -48,8 +48,8 @@ def test_makeself_package_same_directory(rule_runner: RuleRunner) -> None:
         {
             "src/shell/BUILD": dedent(
                 f"""
-                shell_source(name="src", source="run.sh")
-                makeself_archive(name='{binary_name}', startup_script=':src')
+                shell_sources()
+                makeself_archive(name='{binary_name}', startup_script='src/shell/run.sh')
                 """
             ),
             "src/shell/run.sh": "echo test",
@@ -85,11 +85,16 @@ def test_makeself_package_different_path(rule_runner: RuleRunner) -> None:
 
     rule_runner.write_files(
         {
-            "src/shell/BUILD": "shell_sources(name='src')",
-            "src/shell/run.sh": "echo test",
+            "src/shell/BUILD": "shell_sources()",
+            "src/shell/run.sh": dedent(
+                """
+                 #!/bin/bash
+                 echo test
+                 """
+            ),
             "project/BUILD": dedent(
                 f"""
-                makeself_archive(name='{binary_name}', startup_script='src/shell:src')
+                makeself_archive(name='{binary_name}', startup_script='src/shell/run.sh')
                 """
             ),
         }
