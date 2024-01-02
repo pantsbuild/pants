@@ -14,6 +14,7 @@ backend_packages.add = [
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
+  "pants.backend.python.lint.pyupgrade",
   "pants.backend.python.mixed_interpreter_constraints",
   "pants.backend.shell",
   "pants.backend.shell.lint.shellcheck",
@@ -92,7 +93,6 @@ enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
 [cli.alias]
-run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
 --all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 
 [source]
@@ -205,6 +205,10 @@ template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
 diff = true
+
+[pyupgrade]
+args = ["--keep-runtime-typing", "--py38-plus"]
+
 
 [jvm]
 default_resolve = "jvm_testprojects"

@@ -88,9 +88,9 @@ async def validate_scala_runtime_is_present_in_resolve(
             artifact.coordinate.group == SCALA_LIBRARY_GROUP
             and artifact.coordinate.artifact == scala_artifacts.library_coordinate.artifact
         ):
-            if artifact.coordinate.version != scala_version:
+            if artifact.coordinate.version != str(scala_version):
                 raise ConflictingScalaLibraryVersionInResolveError(
-                    request.resolve_name, scala_version, artifact.coordinate
+                    request.resolve_name, str(scala_version), artifact.coordinate
                 )
 
             # This does not `break` so the loop can validate the entire set of requirements to ensure no conflicting

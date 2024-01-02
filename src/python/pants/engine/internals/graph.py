@@ -79,6 +79,8 @@ from pants.engine.target import (
     TargetGenerator,
     Targets,
     TargetTypesToGenerateTargetsRequests,
+    TransitivelyExcludeDependencies,
+    TransitivelyExcludeDependenciesRequest,
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
@@ -413,13 +415,17 @@ def _parametrized_target_generators_with_templates(
     template_fields = {}
     copied_fields = (
         *target_type.copied_fields,
-        *target_type._find_plugin_fields(union_membership),
+        *target_type._find_copied_plugin_fields(union_membership),
+    )
+    moved_fields = (
+        *target_type.moved_fields,
+        *target_type._find_moved_plugin_fields(union_membership),
     )
     for field_type in copied_fields:
         field_value = generator_fields.get(field_type.alias, None)
         if field_value is not None:
             template_fields[field_type.alias] = field_value
-    for field_type in target_type.moved_fields:
+    for field_type in moved_fields:
         field_value = generator_fields.pop(field_type.alias, None)
         if field_value is not None:
             template_fields[field_type.alias] = field_value
@@ -743,27 +749,65 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
 
 @rule(desc="Resolve transitive targets", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
 async def transitive_targets(
-    request: TransitiveTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
+    request: TransitiveTargetsRequest,
+    local_environment_name: ChosenLocalEnvironmentName,
+    union_membership: UnionMembership,
 ) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots."""
+    environment_name = local_environment_name.val
 
     dependency_mapping = await Get(_DependencyMapping, _DependencyMappingRequest(request, True))
+    targets = (*dependency_mapping.roots_as_targets, *dependency_mapping.visited)
 
     # Apply any transitive excludes (`!!` ignores).
-    transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     unevaluated_transitive_excludes = []
-    for t in (*dependency_mapping.roots_as_targets, *dependency_mapping.visited):
+    for t in targets:
         unparsed = t.get(Dependencies).unevaluated_transitive_excludes
         if unparsed.values:
             unevaluated_transitive_excludes.append(unparsed)
+
+    transitive_exclude_addresses = []
     if unevaluated_transitive_excludes:
-        nested_transitive_excludes = await MultiGet(
-            Get(Targets, UnparsedAddressInputs, unparsed)
+        all_transitive_exclude_addresses = await MultiGet(
+            Get(Addresses, UnparsedAddressInputs, unparsed)
             for unparsed in unevaluated_transitive_excludes
         )
-        transitive_excludes = FrozenOrderedSet(
-            itertools.chain.from_iterable(excludes for excludes in nested_transitive_excludes)
+        transitive_exclude_addresses = [
+            *itertools.chain.from_iterable(all_transitive_exclude_addresses)
+        ]
+
+    # Apply plugin-provided transitive excludes
+    if request_types := cast(
+        "Sequence[Type[TransitivelyExcludeDependenciesRequest]]",
+        union_membership.get(TransitivelyExcludeDependenciesRequest),
+    ):
+        tgts_to_request_types = {
+            tgt: [
+                inference_request_type
+                for inference_request_type in request_types
+                if inference_request_type.infer_from.is_applicable(tgt)
+            ]
+            for tgt in targets
+        }
+
+        results = await MultiGet(
+            Get(
+                TransitivelyExcludeDependencies,
+                {
+                    request_type(
+                        request_type.infer_from.create(tgt)
+                    ): TransitivelyExcludeDependenciesRequest,
+                    environment_name: EnvironmentName,
+                },
+            )
+            for tgt, request_types in tgts_to_request_types.items()
+            for request_type in request_types
         )
+        transitive_exclude_addresses.extend(
+            itertools.chain.from_iterable(addresses for addresses in results)
+        )
+
+    transitive_excludes = await Get(Targets, Addresses(transitive_exclude_addresses))
 
     return TransitiveTargets(
         tuple(dependency_mapping.roots_as_targets),

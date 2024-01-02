@@ -52,7 +52,7 @@ GitHub Actions provides a built-in caching service which Pants supports using fo
 Workflow
 --------
 
-The values of the `ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` environment variables need to be provided to Pants via the `[GLOBAL].remote_store_address` and `[GLOBAL].remote_store_headers` options respectively. They are only provided to action calls (not shell steps that use `run: ...`). Include a step like the following in your jobs, which sets those options via environment variables, before executing any Pants commands:
+The values of the `ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` environment variables need to be provided to Pants via the `[GLOBAL].remote_store_address` and `[GLOBAL].remote_oauth_bearer_token` options respectively. They are only provided to action calls (not shell steps that use `run: ...`). Include a step like the following in your jobs, which sets those options via environment variables, before executing any Pants commands:
 
 ```yaml
 - name: Configure Pants caching to GitHub Actions Cache
@@ -60,7 +60,7 @@ The values of the `ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` environment va
   with:
     script: |
       core.exportVariable('PANTS_REMOTE_STORE_ADDRESS', 'experimental:github-actions-cache+' + (process.env.ACTIONS_CACHE_URL || ''));
-      core.exportVariable('PANTS_REMOTE_STORE_HEADERS', `+{'authorization':'Bearer ${process.env.ACTIONS_RUNTIME_TOKEN || ''}'}`);
+      core.exportVariable('PANTS_REMOTE_OAUTH_BEARER_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN);
 ```
 
 Pants Configuration

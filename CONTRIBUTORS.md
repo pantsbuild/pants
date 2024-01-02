@@ -4,6 +4,7 @@ Created as part of the release process.
 + Aaron Mitchell
 + Adam Chainz
 + Adam Retter
++ Aditya Raj Verma
 + Alan Paulin
 + Alan Velasco
 + Alex Bancroft
@@ -11,6 +12,7 @@ Created as part of the release process.
 + Alexander Johnson
 + Alexander Kuhn-Regnier
 + Alexey Tereshenkov
++ Alisha Parveen
 + Andreas Stenius
 + Andrew Hamilton
 + Andrii Porokhnavets
@@ -106,10 +108,13 @@ Created as part of the release process.
 + Gautham Nair
 + Gerald Spencer
 + Gordon Cassie
++ Greg Niemann
 + Greg Shuflin
++ Gregory Borodin
 + Grzegorz Kossakowski
 + Guy Marom
 + Harley Cooper
++ HeetVekariya
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
@@ -161,6 +166,7 @@ Created as part of the release process.
 + Joshua Cohen
 + Joshua Humphries
 + Jovial Joe Jayarson
++ Julio Batista Silva
 + Justin Trobec
 + KadenAgrey
 + Karin Lundberg
@@ -171,6 +177,7 @@ Created as part of the release process.
 + Kevin Sweeney
 + Koki Nishihara
 + Kris Wilson
++ Krishnan Chandra
 + Kushal Dave
 + Kyle Derr
 + Kyujin Cho
@@ -224,6 +231,7 @@ Created as part of the release process.
 + Moses Nakamura
 + Nadav Samet
 + Nathan Levesque
++ Navneeth Jayendran
 + Neeraj Kashyap
 + Neil Sanchala
 + Nicholas Santos
@@ -318,17 +326,22 @@ Created as part of the release process.
 + Win Wang
 + Wolfram Arnold
 + Xaelias
++ Xuanwo
 + Yarden Shoham
 + Yi Cheng
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ andreaimprovised
 + azban
 + bianca rosa
 + billybecker
++ csqzhang
 + eugene yokota
 + gyudoza
 + hephex
++ jgartdele/del
++ offsetcyan
 + olivercoleman-switchdin
 + philipp-sontag-by
 + sww

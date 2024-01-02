@@ -37,33 +37,33 @@ use crate::python::{Key, TypeId};
 /// before the GIL (Value equality in particular might re-acquire it).
 ///
 pub struct Interns {
-  // A mapping between Python objects and integer ids.
-  keys: Py<PyDict>,
-  id_generator: atomic::AtomicU64,
+    // A mapping between Python objects and integer ids.
+    keys: Py<PyDict>,
+    id_generator: atomic::AtomicU64,
 }
 
 impl Interns {
-  pub fn new() -> Self {
-    Self {
-      keys: Python::with_gil(|py| PyDict::new(py).into()),
-      id_generator: atomic::AtomicU64::default(),
+    pub fn new() -> Self {
+        Self {
+            keys: Python::with_gil(|py| PyDict::new(py).into()),
+            id_generator: atomic::AtomicU64::default(),
+        }
     }
-  }
 
-  pub fn key_insert(&self, py: Python, v: PyObject) -> PyResult<Key> {
-    let (id, type_id): (u64, TypeId) = {
-      let v = v.as_ref(py);
-      let keys = self.keys.as_ref(py);
-      let id: u64 = if let Some(key) = keys.get_item(v) {
-        key.extract()?
-      } else {
-        let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
-        keys.set_item(v, id)?;
-        id
-      };
-      (id, v.get_type().into())
-    };
+    pub fn key_insert(&self, py: Python, v: PyObject) -> PyResult<Key> {
+        let (id, type_id): (u64, TypeId) = {
+            let v = v.as_ref(py);
+            let keys = self.keys.as_ref(py);
+            let id: u64 = if let Some(key) = keys.get_item(v) {
+                key.extract()?
+            } else {
+                let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
+                keys.set_item(v, id)?;
+                id
+            };
+            (id, v.get_type().into())
+        };
 
-    Ok(Key::new(id, type_id, v.into()))
-  }
+        Ok(Key::new(id, type_id, v.into()))
+    }
 }

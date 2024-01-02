@@ -71,33 +71,6 @@ def safe_shlex_join(arg_list: Iterable[str]) -> str:
     return " ".join(shell_quote(arg) for arg in arg_list)
 
 
-def create_path_env_var(
-    new_entries: Iterable[str],
-    env: dict[str, str] | None = None,
-    env_var: str = "PATH",
-    delimiter: str = ":",
-    prepend: bool = False,
-):
-    """Join path entries, combining with an environment variable if specified."""
-    if env is None:
-        env = {}
-
-    prev_path = env.get(env_var, None)
-    if prev_path is None:
-        path_dirs: list[str] = []
-    else:
-        path_dirs = list(prev_path.split(delimiter))
-
-    new_entries_list = list(new_entries)
-
-    if prepend:
-        path_dirs = new_entries_list + path_dirs
-    else:
-        path_dirs += new_entries_list
-
-    return delimiter.join(path_dirs)
-
-
 def pluralize(count: int, item_type: str, include_count: bool = True) -> str:
     """Pluralizes the item_type if the count does not equal one.
 

@@ -270,6 +270,12 @@ class Registrar:
         return self._type_alias
 
     def __call__(self, **kwargs: Any) -> TargetAdaptor:
+        if self._parse_state.is_bootstrap and any(
+            isinstance(v, _UnrecognizedSymbol) for v in kwargs.values()
+        ):
+            # Remove any field values that are not recognized during the bootstrap phase.
+            kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, _UnrecognizedSymbol)}
+
         # Target names default to the name of the directory their BUILD file is in
         # (as long as it's not the root directory).
         if "name" not in kwargs:

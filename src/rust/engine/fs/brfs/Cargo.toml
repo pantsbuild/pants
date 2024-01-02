@@ -29,3 +29,6 @@ workunit_store = { path = "../../workunit_store" }
 bytes = { workspace = true }
 tempfile = { workspace = true }
 testutil = { path = "../../testutil" }
+
+[lints]
+workspace = true

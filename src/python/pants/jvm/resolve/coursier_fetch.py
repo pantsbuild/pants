@@ -230,7 +230,18 @@ class CoursierResolvedLockfile:
         if entry is None:
             raise self._coordinate_not_found(key, coord)
 
-        return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
+        return (
+            entry,
+            tuple(
+                dependency_entry
+                for d in entry.dependencies
+                # The dependency might not be present in the entries due to coursier bug:
+                # https://github.com/coursier/coursier/issues/2884
+                # As a workaround, if this happens, we want to skip the dependency.
+                # TODO Drop the check once the bug is fixed.
+                if (dependency_entry := entries.get((d.group, d.artifact))) is not None
+            ),
+        )
 
     @classmethod
     def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
@@ -293,6 +304,7 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 @dataclass(frozen=True)
 class CoursierResolveInfo:
     coord_arg_strings: FrozenSet[str]
+    force_version_coord_arg_strings: FrozenSet[str]
     extra_args: tuple[str, ...]
     digest: Digest
 
@@ -302,7 +314,13 @@ class CoursierResolveInfo:
 
         Must be used in concert with `digest`.
         """
-        return itertools.chain(self.coord_arg_strings, self.extra_args)
+        return itertools.chain(
+            self.coord_arg_strings,
+            itertools.chain.from_iterable(
+                zip(itertools.repeat("--force-version"), self.force_version_coord_arg_strings)
+            ),
+            self.extra_args,
+        )
 
 
 @rule
@@ -377,8 +395,17 @@ async def prepare_coursier_resolve_info(
         ),
     )
 
+    coord_arg_strings = set()
+    force_version_coord_arg_strings = set()
+    for req in to_resolve:
+        coord_arg_str = req.to_coord_arg_str()
+        coord_arg_strings.add(coord_arg_str)
+        if req.force_version:
+            force_version_coord_arg_strings.add(coord_arg_str)
+
     return CoursierResolveInfo(
-        coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
+        coord_arg_strings=frozenset(coord_arg_strings),
+        force_version_coord_arg_strings=frozenset(force_version_coord_arg_strings),
         digest=digest,
         extra_args=tuple(extra_args),
     )

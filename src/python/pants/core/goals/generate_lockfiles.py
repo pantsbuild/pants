@@ -8,9 +8,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
-
-from typing_extensions import Protocol
+from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Protocol, Sequence, Tuple, cast
 
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -298,9 +296,11 @@ class UnrecognizedResolveNamesError(Exception):
         super().__init__(
             softwrap(
                 f"""
-            Unrecognized resolve {name_description} from {description_of_origin}:
-            {unrecognized_str}\n\nAll valid resolve names: {sorted(all_valid_names)}
-            """
+                Unrecognized resolve {name_description} from {description_of_origin}:
+                {unrecognized_str}
+
+                All valid resolve names: {sorted(all_valid_names)}
+                """
             )
         )
 
@@ -420,14 +420,15 @@ def filter_tool_lockfile_requests(
             raise ValueError(
                 softwrap(
                     f"""
-                You requested to generate a lockfile for {resolve} because
-                you included it in `--generate-lockfiles-resolve`, but
-                `[{resolve}].lockfile` is set to `{req.lockfile_dest}`
-                so a lockfile will not be generated.\n\n
-                If you would like to generate a lockfile for {resolve}, please
-                set `[{resolve}].lockfile` to the path where it should be
-                generated and run again.
-                """
+                    You requested to generate a lockfile for {resolve} because
+                    you included it in `--generate-lockfiles-resolve`, but
+                    `[{resolve}].lockfile` is set to `{req.lockfile_dest}`
+                    so a lockfile will not be generated.
+
+                    If you would like to generate a lockfile for {resolve}, please
+                    set `[{resolve}].lockfile` to the path where it should be
+                    generated and run again.
+                    """
                 )
             )
 
@@ -637,11 +638,13 @@ class NoCompatibleResolveException(Exception):
         return NoCompatibleResolveException(
             softwrap(
                 f"""
-            The input targets did not have a resolve in common.\n\n
-            {formatted_resolve_lists}\n\n
-            Targets used together must use the same resolve, set by the `resolve` field. For more
-            information on 'resolves' (lockfiles), see {doc_url(doc_url_slug)}.
-            """
+                The input targets did not have a resolve in common.
+
+                {formatted_resolve_lists}
+
+                Targets used together must use the same resolve, set by the `resolve` field. For more
+                information on 'resolves' (lockfiles), see {doc_url(doc_url_slug)}.
+                """
             )
             + (f"\n\n{workaround}" if workaround else "")
         )

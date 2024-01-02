@@ -7,3 +7,6 @@ publish = false
 
 [dependencies]
 futures = { workspace = true }
+
+[lints]
+workspace = true

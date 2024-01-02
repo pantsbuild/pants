@@ -223,7 +223,7 @@ async def run_helm_unittest(
     reports = await Get(Snapshot, RemovePrefix(reports_digest, setup.reports_output_directory))
 
     return TestResult.from_fallible_process_result(
-        process_result,
+        process_results=(process_result,),
         address=field_set.address,
         output_setting=test_subsystem.output,
         xml_results=reports,

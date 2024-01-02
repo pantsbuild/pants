@@ -693,7 +693,9 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_types)
+                native_engine.tasks_add_get(
+                    tasks, the_get.output_type, the_get.input_types, the_get.rule_id
+                )
 
         native_engine.tasks_task_end(tasks)
 

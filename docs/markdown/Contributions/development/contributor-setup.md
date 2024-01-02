@@ -26,6 +26,10 @@ We use the popular forking workflow typically used by open source projects. See 
 Step 2: Bootstrap the Rust engine
 ---------------------------------
 
+Pants requires several dependencies to be installed: a Python 3.9 interpreter, Rust, the protobuf compiler, clang and others. There is experimental support for the Nix package manager that makes it easy to set up a dev environment. Follow the instructions on the [Nix website](https://nixos.org/download.html) to install Nix. Then `cd` into the directory where you cloned the Pants repo and type `nix-shell`. This will download all the necessary dependencies and start a shell with a suitably configured PATH variable to make them available for use.
+
+Alternatively, you can install the dependencies manually as follows:
+
 Pants uses Rustup to install Rust. Run the command from <https://rustup.rs> to install Rustup; ensure that `rustup` is on your `$PATH`.
 
 If your system Python is not the version Pants expects (currently Python 3.9), you'll need to provide one.  Python interpreters from Linux or Mac distributions sometimes have quirks that can cause headaches with bootstrapping the dev venv.  Some examples of Pythons that work well with Pants are those provided by:
@@ -113,6 +117,9 @@ Add this to your `settings.json` file inside the build root's `.vscode` folder:
   "python.linting.flake8Args": [
     "--config=build-support/flake8/.flake8"
   ],
+  "rust-analyzer.linkedProjects": [
+    "src/rust/engine/Cargo.toml"
+  ]
 }
 ```
 

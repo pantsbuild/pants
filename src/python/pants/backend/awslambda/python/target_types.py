@@ -13,6 +13,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
     PythonFaaSKnownRuntime,
+    PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
@@ -150,6 +151,7 @@ class _AWSLambdaBaseTarget(Target):
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
         PythonFaaSCompletePlatforms,
+        PythonFaaSPex3VenvCreateExtraArgsField,
         PythonResolveField,
         EnvironmentField,
     )
@@ -176,6 +178,9 @@ class _AWSLambdaBaseTarget(Target):
 
 class PythonAWSLambda(_AWSLambdaBaseTarget):
     alias = "python_aws_lambda_function"
+
+    deprecated_alias = "python_awslambda"
+    deprecated_alias_removal_version = "2.21.0.dev0"
 
     core_fields = (
         *_AWSLambdaBaseTarget.core_fields,

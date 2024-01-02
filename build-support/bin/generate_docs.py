@@ -199,6 +199,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.python.lint.add_trailing_comma",
         "pants.backend.experimental.python.lint.ruff",
         "pants.backend.experimental.python.packaging.pyoxidizer",
+        "pants.backend.experimental.python.typecheck.pytype",
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
         "pants.backend.experimental.terraform",
@@ -220,7 +221,6 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.yapf",
         "pants.backend.python.mixed_interpreter_constraints",
         "pants.backend.python.typecheck.mypy",
-        "pants.backend.python.typecheck.pytype",
         "pants.backend.shell",
         "pants.backend.shell.lint.shellcheck",
         "pants.backend.shell.lint.shfmt",
@@ -234,7 +234,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "--no-verify-config",
         "help-all",
     ]
-    run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    run = subprocess.run(argv, capture_output=True, encoding="utf-8")
     try:
         run.check_returncode()
     except subprocess.CalledProcessError:

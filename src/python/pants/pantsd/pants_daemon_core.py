@@ -6,9 +6,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Iterator
-
-from typing_extensions import Protocol
+from typing import Iterator, Protocol
 
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.env_vars import CompleteEnvironmentVars

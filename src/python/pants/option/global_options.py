@@ -287,10 +287,8 @@ _REMOTE_ADDRESS_SCHEMES = (
         description=softwrap(
             f"""
             Use the GitHub Actions Cache for fine-grained caching. This requires extracting
-            `ACTIONS_CACHE_URL` (passing it in `[GLOBAL].remote_store_address`) and
-            `ACTIONS_RUNTIME_TOKEN` (storing it in a file and passing
-            `[GLOBAL].remote_oauth_bearer_token_path` or setting `[GLOBAL].remote_store_headers` to
-            include `authorization: Bearer {{token...}}`). See
+            `ACTIONS_CACHE_URL` (passing it in `PANTS_REMOTE_STORE_ADDRESS`) and
+            `ACTIONS_RUNTIME_TOKEN` (passing it in `PANTS_REMOTE_OAUTH_BEARER_TOKEN`). See
             {doc_url('remote-caching#github-actions-cache')} for more details.
             """
         ),
@@ -336,6 +334,7 @@ class RemoteCacheWarningsBehavior(Enum):
     ignore = "ignore"
     first_only = "first_only"
     backoff = "backoff"
+    always = "always"
 
 
 @enum.unique
@@ -492,17 +491,18 @@ class DynamicRemoteOptions:
 
     @classmethod
     def _use_oauth_token(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
-        oauth_token = (
-            Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
-        )
+        if bootstrap_options.remote_oauth_bearer_token:
+            oauth_token = bootstrap_options.remote_oauth_bearer_token
+            description = "`remote_oauth_bearer_token` option"
+        else:
+            oauth_token = (
+                Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
+            )
+            description = f"`remote_oauth_bearer_token_path` option ({bootstrap_options.remote_oauth_bearer_token_path})"
+
         if set(oauth_token).intersection({"\n", "\r"}):
             raise OptionsError(
-                softwrap(
-                    f"""
-                    OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path}
-                    must not contain multiple lines.
-                    """
-                )
+                f"OAuth bearer token from {description} must not contain multiple lines."
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
@@ -550,16 +550,29 @@ class DynamicRemoteOptions:
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
         if not (execution or cache_read or cache_write):
             return cls.disabled(), None
-        if remote_auth_plugin_func and bootstrap_options.remote_oauth_bearer_token_path:
+
+        sources = {
+            str(remote_auth_plugin_func): bool(remote_auth_plugin_func),
+            "[GLOBAL].remote_oauth_bearer_token_path": bool(
+                bootstrap_options.remote_oauth_bearer_token_path
+            ),
+            "[GLOBAL].remote_oauth_bearer_token": bool(bootstrap_options.remote_oauth_bearer_token),
+        }
+        enabled_sources = [name for name, enabled in sources.items() if enabled]
+        if len(enabled_sources) > 1:
+            rendered = ", ".join(f"`{name}`" for name in enabled_sources)
             raise OptionsError(
                 softwrap(
                     f"""
-                    Both `{remote_auth_plugin_func}` and `[GLOBAL].remote_oauth_bearer_token_path` are set.
-                    This is not supported. Only one of those should be set in order to provide auth information.
+                    Multiple options are set that provide auth information: {rendered}.
+                    This is not supported. Only one of those should be set.
                     """
                 )
             )
-        if bootstrap_options.remote_oauth_bearer_token_path:
+        if (
+            bootstrap_options.remote_oauth_bearer_token_path
+            or bootstrap_options.remote_oauth_bearer_token
+        ):
             return cls._use_oauth_token(bootstrap_options), None
         if remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
@@ -1664,6 +1677,30 @@ class BootstrapOptions:
             You can also manually add this header via `[GLOBAL].remote_execution_headers` and
             `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
             dynamically set the relevant headers. Otherwise, no authorization will be performed.
+            """
+        ),
+        removal_version="2.21.0.dev0",
+        removal_hint=f'use `[GLOBAL].remote_oauth_bearer_token = "@/path/to/token.txt"` instead, see {doc_url("reference-global#remote_oauth_bearer_token")}',
+    )
+
+    remote_oauth_bearer_token = StrOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            f"""
+            An oauth token to use for gGRPC connections to
+            `[GLOBAL].remote_execution_address` and `[GLOBAL].remote_store_address`.
+
+            If specified, Pants will add a header in the format `authorization: Bearer <token>`.
+            You can also manually add this header via `[GLOBAL].remote_execution_headers` and
+            `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
+            dynamically set the relevant headers. Otherwise, no authorization will be performed.
+
+            Recommendation: do not place a token directly in `pants.toml`, instead do one of: set
+            the token via the environment variable (`PANTS_REMOTE_OAUTH_BEARER_TOKEN`), CLI option
+            (`--remote-oauth-bearer-token`), or store the token in a file and set the option to
+            `"@/path/to/token.txt"` to [read the value from that
+            file]({doc_url('options#reading-individual-option-values-from-files')}).
             """
         ),
     )

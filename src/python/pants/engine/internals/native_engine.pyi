@@ -12,6 +12,7 @@ from typing import (
     Generic,
     Iterable,
     Mapping,
+    Protocol,
     Sequence,
     TextIO,
     Tuple,
@@ -19,7 +20,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Protocol, Self
+from typing_extensions import Self
 
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import SessionValues
@@ -652,7 +653,9 @@ def tasks_task_begin(
     level: int,
 ) -> None: ...
 def tasks_task_end(tasks: PyTasks) -> None: ...
-def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
+def tasks_add_get(
+    tasks: PyTasks, output: type, inputs: Sequence[type], rule_id: str | None
+) -> None: ...
 def tasks_add_get_union(
     tasks: PyTasks, output_type: type, input_types: Sequence[type], in_scope_types: Sequence[type]
 ) -> None: ...
@@ -733,9 +736,6 @@ def hash_prefix_zero_bits(item: str) -> int: ...
 # Selectors
 # ------------------------------------------------------------------------------
 
-class PyGeneratorResponseBreak:
-    def __init__(self, val: Any) -> None: ...
-
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
@@ -792,9 +792,6 @@ class PyGeneratorResponseGet(Generic[_Output]):
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
-
-class PyGeneratorResponseGetMulti:
-    def __init__(self, gets: tuple[PyGeneratorResponseGet, ...]) -> None: ...
 
 # ------------------------------------------------------------------------------
 # (uncategorized)

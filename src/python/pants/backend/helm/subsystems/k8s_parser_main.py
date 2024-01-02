@@ -13,7 +13,7 @@ def main(args: list[str]):
 
     found_image_refs: dict[tuple[int, str], str] = {}
 
-    with open(input_filename, "r") as file:
+    with open(input_filename) as file:
         try:
             parsed_docs = load_full_yaml(stream=file)
         except RuntimeError:

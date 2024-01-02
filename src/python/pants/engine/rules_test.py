@@ -25,7 +25,6 @@ from pants.engine.rules import (
     UnrecognizedRuleArgument,
     goal_rule,
     rule,
-    rule_helper,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
@@ -268,7 +267,7 @@ class Example(Goal):
 
 @goal_rule
 async def a_goal_rule_generator(console: Console) -> Example:
-    a = await Get(A, str("a str!"))
+    a = await Get(A, str, "a str!")
     console.print_stdout(str(a))
     return Example(exit_code=0)
 
@@ -1071,40 +1070,4 @@ def test_param_type_overrides() -> None:
 
         @rule(_param_type_overrides={"param1": "A string"})
         async def protect_existence(param1) -> A:
-            return A()
-
-
-def test_invalid_rule_helper_name() -> None:
-    with pytest.raises(ValueError, match="must be private"):
-
-        @rule_helper
-        async def foo() -> A:
-            return A()
-
-    @rule_helper(_public=True)
-    async def bar() -> A:
-        return A()
-
-
-def test_cant_be_both_rule_and_rule_helper() -> None:
-    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
-
-        @rule_helper
-        @rule
-        async def _func1() -> A:
-            return A()
-
-    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
-
-        @rule
-        @rule_helper
-        async def _func2() -> A:
-            return A()
-
-
-def test_synchronous_rule_helper() -> None:
-    with pytest.raises(ValueError, match="must be async"):
-
-        @rule_helper
-        def _foo() -> A:
             return A()

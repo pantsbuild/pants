@@ -73,7 +73,7 @@ def standardize_dist_info_path(build_dir, metadata_path):
         # The wrapped backend does not conform to the latest specs.
         pkg = pkg_version
         version = ""
-        with open(os.path.join(build_dir, metadata_path, "METADATA"), "r") as f:
+        with open(os.path.join(build_dir, metadata_path, "METADATA")) as f:
             lines = f.readlines()
         for line in lines:
             if line.startswith("Version: "):
@@ -170,7 +170,7 @@ def main(build_backend, dist_dir, pth_file_path, wheel_config_settings, tags, di
 
 
 if __name__ == "__main__":
-    with open(sys.argv[1], "r") as f:
+    with open(sys.argv[1]) as f:
         settings = json.load(f)
 
     main(**settings)

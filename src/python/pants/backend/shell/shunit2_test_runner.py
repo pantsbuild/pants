@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -50,7 +51,6 @@ from pants.engine.target import SourcesField, Target, TransitiveTargets, Transit
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.strutil import create_path_env_var
 
 
 @dataclass(frozen=True)
@@ -214,7 +214,7 @@ async def setup_shunit2_for_target(
     )
 
     env_dict = {
-        "PATH": create_path_env_var(shell_setup.executable_search_path),
+        "PATH": os.pathsep.join(shell_setup.executable_search_path),
         # Always include colors and strip them out for display below (if required), for better cache
         # hit rates
         "SHUNIT_COLOR": "always",
@@ -252,7 +252,7 @@ async def run_tests_with_shunit2(
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return TestResult.from_fallible_process_result(
-        result,
+        process_results=(result,),
         address=field_set.address,
         output_setting=test_subsystem.output,
         output_simplifier=global_options.output_simplifier(),

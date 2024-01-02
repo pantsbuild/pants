@@ -19,6 +19,7 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
+    BoolField,
     Dependencies,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
@@ -250,6 +251,18 @@ class JvmArtifactPackagesField(StringSequenceField):
     )
 
 
+class JvmArtifactForceVersionField(BoolField):
+    alias = "force_version"
+    default = False
+    help = help_text(
+        """
+        Force artifact version during resolution.
+
+        If set, pants will pass `--force-version` argument to `coursier fetch` for this artifact.
+        """
+    )
+
+
 class JvmProvidesTypesField(StringSequenceField):
     alias = "experimental_provides_types"
     help = help_text(
@@ -279,7 +292,7 @@ class JvmArtifactExclusion:
     group: str
     artifact: str | None = None
 
-    def validate(self) -> set[str]:
+    def validate(self, _: Address) -> set[str]:
         return set()
 
     def to_coord_str(self) -> str:
@@ -310,10 +323,12 @@ def _jvm_artifact_exclusions_field_help(
 class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
     alias = "exclusions"
     help = _jvm_artifact_exclusions_field_help(
-        lambda: JvmArtifactExclusionsField.supported_rule_types
+        lambda: JvmArtifactExclusionsField.supported_exclusion_types
     )
 
-    supported_rule_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (JvmArtifactExclusion,)
+    supported_exclusion_types: ClassVar[tuple[type[JvmArtifactExclusion], ...]] = (
+        JvmArtifactExclusion,
+    )
     expected_element_type = JvmArtifactExclusion
     expected_type_description = "an iterable of JvmArtifactExclusionRule"
 
@@ -326,7 +341,7 @@ class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
         if computed_value:
             errors: list[str] = []
             for exclusion_rule in computed_value:
-                err = exclusion_rule.validate()
+                err = exclusion_rule.validate(address)
                 if err:
                     errors.extend(err)
 
@@ -334,8 +349,8 @@ class JvmArtifactExclusionsField(SequenceField[JvmArtifactExclusion]):
                 raise InvalidFieldException(
                     softwrap(
                         f"""
-                        Invalid value for `{JvmArtifactExclusionsField.alias}` field.
-                        Found following errors:
+                        Invalid value for `{JvmArtifactExclusionsField.alias}` field at target
+                        {address}. Found following errors:
 
                         {bullet_list(errors)}
                         """
@@ -368,12 +383,14 @@ class JvmArtifactFieldSet(JvmRunnableSourceFieldSet):
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
     url: JvmArtifactUrlField
+    force_version: JvmArtifactForceVersionField
 
     required_fields = (
         JvmArtifactGroupField,
         JvmArtifactArtifactField,
         JvmArtifactVersionField,
         JvmArtifactPackagesField,
+        JvmArtifactForceVersionField,
     )
 
 
@@ -713,8 +730,8 @@ class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
                 raise InvalidFieldException(
                     softwrap(
                         f"""
-                        Invalid value for `{DeployJarDuplicatePolicyField.alias}` field.
-                        Found following errors:
+                        Invalid value for `{DeployJarDuplicatePolicyField.alias}` field at target:
+                        {address}. Found following errors:
 
                         {bullet_list(errors)}
                         """
@@ -732,6 +749,15 @@ class DeployJarShadingRulesField(JvmShadingRulesField):
     help = _shading_rules_field_help("Shading rules to be applied to the final JAR artifact.")
 
 
+class DeployJarExcludeFilesField(StringSequenceField):
+    alias = "exclude_files"
+    help = help_text(
+        """
+        A list of patterns to exclude from the final jar.
+        """
+    )
+
+
 class DeployJarTarget(Target):
     alias = "deploy_jar"
     core_fields = (
@@ -744,6 +770,7 @@ class DeployJarTarget(Target):
         JvmResolveField,
         DeployJarDuplicatePolicyField,
         DeployJarShadingRulesField,
+        DeployJarExcludeFilesField,
     )
     help = help_text(
         """

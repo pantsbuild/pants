@@ -50,7 +50,7 @@ class TestOwnerPrintingInterProcessFileLock(unittest.TestCase):
         self.lock_process.start()
         self.lock_held.wait()
         self.assertTrue(os.path.exists(self.lock.message_path))
-        with open(self.lock.message_path, "r") as f:
+        with open(self.lock.message_path) as f:
             message_content = f.read()
         self.assertIn(str(self.lock_process.pid), message_content)
 

@@ -136,7 +136,7 @@ class Outputting:
 
     @final
     @contextmanager
-    def output(self, console: "Console") -> Iterator[Callable[[str], None]]:
+    def output(self, console: Console) -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for writing data to stdout, or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
@@ -146,7 +146,7 @@ class Outputting:
 
     @final
     @contextmanager
-    def output_sink(self, console: "Console") -> Iterator:
+    def output_sink(self, console: Console) -> Iterator:
         stdout_file = None
         if self.output_file:
             stdout_file = open(self.output_file, "w")
@@ -170,7 +170,7 @@ class LineOriented(Outputting):
 
     @final
     @contextmanager
-    def line_oriented(self, console: "Console") -> Iterator[Callable[[str], None]]:
+    def line_oriented(self, console: Console) -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for printing lines to stdout or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.

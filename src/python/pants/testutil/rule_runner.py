@@ -697,7 +697,7 @@ def run_rule_with_mocks(
     func: Callable[..., Coroutine[Any, Any, _O]] | Callable[..., _O]
 
     # Perform additional validation on `@rule` that the correct args are provided. We don't have
-    # an easy way to do this for `@rule_helper` yet.
+    # an easy way to do this for async helper calls yet.
     if task_rule:
         if len(rule_args) != len(task_rule.input_selectors):
             raise ValueError(

@@ -109,8 +109,8 @@ def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int,
             value = node.value
 
             # This checks for `await Get()` and `await MultiGet()` literally, because there's not
-            # currently MultiGet support for rule_helpers (i.e. `[await some_rule_helper(x) for x in
-            # ...]` cannot become `await MultiGet([rule_helper(x) for x in ...])` ). Once that's
+            # currently MultiGet support for normal async functions (i.e. `[await some_helper(x) for x in
+            # ...]` cannot become `await MultiGet([some_helper(x) for x in ...])` ). Once that's
             # supported, this could flip to default to True, except for `await Effect`.
 
             return (

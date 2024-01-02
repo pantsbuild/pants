@@ -37,3 +37,6 @@ sharded_lmdb = { path = "../../sharded_lmdb" }
 tempfile = { workspace = true }
 testutil = { path = "../../testutil" }
 tokio = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

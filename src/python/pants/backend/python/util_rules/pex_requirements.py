@@ -554,10 +554,8 @@ def _invalid_lockfile_error(
     consumed_msg_parts = [f"`{str(r)}`" for r in user_requirements[0:2]]
     if len(user_requirements) > 2:
         consumed_msg_parts.append(
-            (
-                f"{len(user_requirements) - 2} other "
-                f"{pluralize(len(user_requirements) - 2, 'requirement', include_count=False)}"
-            )
+            f"{len(user_requirements) - 2} other "
+            f"{pluralize(len(user_requirements) - 2, 'requirement', include_count=False)}"
         )
 
     yield f"\n\nYou are consuming {comma_separated_list(consumed_msg_parts)} from "

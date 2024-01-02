@@ -10,13 +10,7 @@ import pytest
 from pants.backend.scala import target_types
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.lint.scalafmt import skip_field
-from pants.backend.scala.lint.scalafmt.rules import (
-    GatherScalafmtConfigFilesRequest,
-    PartitionInfo,
-    ScalafmtConfigFiles,
-    ScalafmtFieldSet,
-    ScalafmtRequest,
-)
+from pants.backend.scala.lint.scalafmt.rules import PartitionInfo, ScalafmtFieldSet, ScalafmtRequest
 from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
@@ -33,7 +27,6 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
-from pants.util.dirutil import find_nearest_ancestor_file
 
 
 @pytest.fixture
@@ -56,7 +49,6 @@ def rule_runner() -> RuleRunner:
             QueryRule(Partitions, (ScalafmtRequest.PartitionRequest,)),
             QueryRule(FmtResult, (ScalafmtRequest.Batch,)),
             QueryRule(Snapshot, (PathGlobs,)),
-            QueryRule(ScalafmtConfigFiles, (GatherScalafmtConfigFilesRequest,)),
         ],
         target_types=[ScalaSourceTarget, ScalaSourcesGeneratorTarget],
     )
@@ -241,55 +233,3 @@ def test_multiple_config_files(rule_runner: RuleRunner) -> None:
     assert fmt_results[1].output == rule_runner.make_snapshot(
         {"foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
     )
-
-
-def test_find_nearest_ancestor_file() -> None:
-    files = {"grok.conf", "foo/bar/grok.conf", "hello/world/grok.conf"}
-    assert find_nearest_ancestor_file(files, "foo/bar", "grok.conf") == "foo/bar/grok.conf"
-    assert find_nearest_ancestor_file(files, "foo/bar/", "grok.conf") == "foo/bar/grok.conf"
-    assert find_nearest_ancestor_file(files, "foo", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "foo/", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "foo/xyzzy", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "hello", "grok.conf") == "grok.conf"
-    assert find_nearest_ancestor_file(files, "hello/", "grok.conf") == "grok.conf"
-    assert (
-        find_nearest_ancestor_file(files, "hello/world/foo", "grok.conf") == "hello/world/grok.conf"
-    )
-    assert (
-        find_nearest_ancestor_file(files, "hello/world/foo/", "grok.conf")
-        == "hello/world/grok.conf"
-    )
-
-    files2 = {"foo/bar/grok.conf", "hello/world/grok.conf"}
-    assert find_nearest_ancestor_file(files2, "foo", "grok.conf") is None
-    assert find_nearest_ancestor_file(files2, "foo/", "grok.conf") is None
-    assert find_nearest_ancestor_file(files2, "", "grok.conf") is None
-
-
-def test_gather_scalafmt_config_files(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            SCALAFMT_CONF_FILENAME: "",
-            f"foo/bar/{SCALAFMT_CONF_FILENAME}": "",
-            f"hello/{SCALAFMT_CONF_FILENAME}": "",
-            "hello/Foo.scala": "",
-            "hello/world/Foo.scala": "",
-            "foo/bar/Foo.scala": "",
-            "foo/bar/xyyzzy/Foo.scala": "",
-            "foo/blah/Foo.scala": "",
-        }
-    )
-
-    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.scala"])])
-    request = rule_runner.request(
-        ScalafmtConfigFiles, [GatherScalafmtConfigFilesRequest(snapshot.files)]
-    )
-    assert sorted(request.source_dir_to_config_file.items()) == [
-        ("foo/bar", "foo/bar/.scalafmt.conf"),
-        ("foo/bar/xyyzzy", "foo/bar/.scalafmt.conf"),
-        ("foo/blah", ".scalafmt.conf"),
-        ("hello", "hello/.scalafmt.conf"),
-        ("hello/world", "hello/.scalafmt.conf"),
-    ]

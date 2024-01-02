@@ -67,10 +67,6 @@ You can address targets from the root of the repository by using plain `::` and 
 
 To ignore something, prefix the argument with `-`. For example, `pants test :: -project/integration_tests` will run all your tests except for those in the directory `project/integration_tests` and `pants package project:: -project:` will package all targets in the subdirectories of the `project` directory, recursively, except for those declared directly under the `project` directory.  
 
-> 🚧 Set `[GLOBAL].use_deprecated_directory_cli_args_semantics = false` in `pants.toml`
-> 
-> This will become the default in Pants 2.14.
-
 > 📘 Tip: advanced target selection, such as running over changed files
 > 
 > See [Advanced target selection](doc:advanced-target-selection) for alternative techniques to specify which files/targets to run on.
