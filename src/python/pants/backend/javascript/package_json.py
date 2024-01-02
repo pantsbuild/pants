@@ -8,10 +8,9 @@ import logging
 import os.path
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
+from typing import Any, ClassVar, Iterable, Literal, Mapping, Optional, Tuple
 
 import yaml
-from typing_extensions import Literal
 
 from pants.backend.project_info import dependencies
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior

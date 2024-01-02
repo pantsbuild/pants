@@ -16,6 +16,7 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
     Tuple,
     Type,
@@ -26,7 +27,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec, Protocol
+from typing_extensions import ParamSpec
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal

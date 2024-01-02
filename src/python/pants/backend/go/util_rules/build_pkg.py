@@ -471,9 +471,12 @@ async def _gather_transitive_prebuilt_object_files(
     prebuilt_objects: list[tuple[Digest, list[str]]] = []
 
     queue: deque[BuildGoPackageRequest] = deque([build_request])
+    seen: set[BuildGoPackageRequest] = {build_request}
     while queue:
         pkg = queue.popleft()
-        queue.extend(pkg.direct_dependencies)
+        unseen = [dd for dd in build_request.direct_dependencies if dd not in seen]
+        queue.extend(unseen)
+        seen.update(unseen)
         if pkg.prebuilt_object_files:
             prebuilt_objects.append(
                 (
@@ -695,7 +698,7 @@ async def build_go_package(
         )
         symabis_path = symabis_result.symabis_path
 
-    # Build the arguments for compiling the Go coe in this package.
+    # Build the arguments for compiling the Go code in this package.
     compile_args = [
         "tool",
         "compile",
@@ -964,7 +967,7 @@ async def compute_compile_action_id(
     # See https://github.com/golang/go/blob/master/src/cmd/go/internal/cache/hash.go#L32-L46
     h.update(goroot.full_version.encode())
 
-    h.update("compile\n".encode())
+    h.update(b"compile\n")
     if bq.minimum_go_version:
         h.update(f"go {bq.minimum_go_version}\n".encode())
     h.update(f"goos {goroot.goos} goarch {goroot.goarch}\n".encode())

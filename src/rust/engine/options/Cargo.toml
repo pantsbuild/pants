@@ -6,10 +6,13 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+lazy_static = { workspace = true }
 log = { workspace = true }
 peg = { workspace = true }
 shellexpand = { workspace = true }
 toml = { workspace = true }
+regex = { workspace = true }
+whoami = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

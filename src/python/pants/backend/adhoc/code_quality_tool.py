@@ -1,27 +1,18 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Mapping
+from typing import ClassVar, Iterable
 
 from pants.core.goals.fix import Fix, FixFilesRequest, FixResult
 from pants.core.goals.fmt import Fmt, FmtFilesRequest, FmtResult
 from pants.core.goals.lint import Lint, LintFilesRequest, LintResult
-from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
-from pants.core.util_rules.adhoc_process_support import (
-    ExtraSandboxContents,
-    MergeExtraSandboxContents,
-    ResolvedExecutionDependencies,
-    ResolveExecutionDependenciesRequest,
-)
+from pants.core.util_rules.adhoc_process_support import ToolRunner, ToolRunnerRequest
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
-from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Addresses
-from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs
 from pants.engine.goal import Goal
 from pants.engine.internals.native_engine import (
-    EMPTY_DIGEST,
     Address,
     AddressInput,
     Digest,
@@ -34,8 +25,6 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    FieldSetsPerTarget,
-    FieldSetsPerTargetRequest,
     SpecialCasedDependencies,
     StringField,
     StringSequenceField,
@@ -200,17 +189,8 @@ async def find_code_quality_tool(request: CodeQualityToolAddressString) -> CodeQ
 
 
 @dataclass(frozen=True)
-class CodeQualityToolBatchRunner:
-    digest: Digest
-    args: tuple[str, ...]
-    extra_env: Mapping[str, str]
-    append_only_caches: Mapping[str, str]
-    immutable_input_digests: Mapping[str, Digest]
-
-
-@dataclass(frozen=True)
 class CodeQualityToolBatch:
-    runner: CodeQualityToolBatchRunner
+    runner: ToolRunner
     sources_snapshot: Snapshot
     output_files: tuple[str, ...]
 
@@ -237,91 +217,15 @@ async def process_files(batch: CodeQualityToolBatch) -> FallibleProcessResult:
 
 
 @rule
-async def hydrate_code_quality_tool(
-    request: CodeQualityToolAddressString,
-) -> CodeQualityToolBatchRunner:
-    cqt = await Get(CodeQualityTool, CodeQualityToolAddressString, request)
-
-    runnable_address = await Get(
-        Address,
-        AddressInput,
-        AddressInput.parse(
-            cqt.runnable_address_str,
-            relative_to=cqt.target.address.spec_path,
-            description_of_origin=f"Runnable target for code quality tool {cqt.target.address.spec_path}",
-        ),
-    )
-
-    addresses = Addresses((runnable_address,))
-    addresses.expect_single()
-
-    runnable_targets = await Get(Targets, Addresses, addresses)
-
-    target = runnable_targets[0]
-
-    run_field_sets, environment_name, execution_environment = await MultiGet(
-        Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)),
-        Get(EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)),
-        Get(
-            ResolvedExecutionDependencies,
-            ResolveExecutionDependenciesRequest(
-                address=runnable_address,
-                execution_dependencies=cqt.execution_dependencies,
-                runnable_dependencies=cqt.runnable_dependencies,
-            ),
-        ),
-    )
-
-    run_field_set: RunFieldSet = run_field_sets.field_sets[0]
-
-    run_request = await Get(
-        RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
-    )
-
-    dependencies_digest = execution_environment.digest
-    runnable_dependencies = execution_environment.runnable_dependencies
-
-    extra_env: dict[str, str] = dict(run_request.extra_env or {})
-    extra_path = extra_env.pop("PATH", None)
-
-    extra_sandbox_contents = []
-
-    extra_sandbox_contents.append(
-        ExtraSandboxContents(
-            EMPTY_DIGEST,
-            extra_path,
-            run_request.immutable_input_digests or FrozenDict(),
-            run_request.append_only_caches or FrozenDict(),
-            run_request.extra_env or FrozenDict(),
-        )
-    )
-
-    if runnable_dependencies:
-        extra_sandbox_contents.append(
-            ExtraSandboxContents(
-                EMPTY_DIGEST,
-                f"{{chroot}}/{runnable_dependencies.path_component}",
-                runnable_dependencies.immutable_input_digests,
-                runnable_dependencies.append_only_caches,
-                runnable_dependencies.extra_env,
-            )
-        )
-
-    merged_extras, main_digest = await MultiGet(
-        Get(ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))),
-        Get(Digest, MergeDigests((dependencies_digest, run_request.digest))),
-    )
-
-    extra_env = dict(merged_extras.extra_env)
-    if merged_extras.path:
-        extra_env["PATH"] = merged_extras.path
-
-    return CodeQualityToolBatchRunner(
-        digest=main_digest,
-        args=run_request.args + tuple(cqt.args),
-        extra_env=FrozenDict(extra_env),
-        append_only_caches=merged_extras.append_only_caches,
-        immutable_input_digests=merged_extras.immutable_input_digests,
+async def runner_request_for_code_quality_tool(
+    cqt: CodeQualityTool,
+) -> ToolRunnerRequest:
+    return ToolRunnerRequest(
+        runnable_address_str=cqt.runnable_address_str,
+        args=cqt.args,
+        execution_dependencies=cqt.execution_dependencies,
+        runnable_dependencies=cqt.runnable_dependencies,
+        target=cqt.target,
     )
 
 
@@ -391,7 +295,7 @@ class CodeQualityToolRuleBuilder:
         async def run_code_quality(request: CodeQualityProcessingRequest.Batch) -> LintResult:
             sources_snapshot, code_quality_tool_runner = await MultiGet(
                 Get(Snapshot, PathGlobs(request.elements)),
-                Get(CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)),
+                Get(ToolRunner, CodeQualityToolAddressString(address=self.target)),
             )
 
             proc_result = await Get(
@@ -445,7 +349,7 @@ class CodeQualityToolRuleBuilder:
             sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+                ToolRunner, CodeQualityToolAddressString(address=self.target)
             )
 
             proc_result = await Get(
@@ -507,7 +411,7 @@ class CodeQualityToolRuleBuilder:
             sources_snapshot = request.snapshot
 
             code_quality_tool_runner = await Get(
-                CodeQualityToolBatchRunner, CodeQualityToolAddressString(address=self.target)
+                ToolRunner, CodeQualityToolAddressString(address=self.target)
             )
 
             proc_result = await Get(
