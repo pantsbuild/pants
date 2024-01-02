@@ -52,7 +52,12 @@ def test_makeself_package_same_directory(rule_runner: RuleRunner) -> None:
                 makeself_archive(name='{binary_name}', startup_script='src/shell/run.sh')
                 """
             ),
-            "src/shell/run.sh": "echo test",
+            "src/shell/run.sh": dedent(
+                """
+                 #!/bin/bash
+                 echo test
+                 """
+            ),
         }
     )
     rule_runner.chmod("src/shell/run.sh", 0o777)
