@@ -41,7 +41,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_makeself_package_same_directory(rule_runner: RuleRunner) -> None:
+def test_same_directory(rule_runner: RuleRunner) -> None:
     binary_name = "archive"
 
     rule_runner.write_files(
@@ -85,7 +85,7 @@ def test_makeself_package_same_directory(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"test\n"
 
 
-def test_makeself_package_different_path(rule_runner: RuleRunner) -> None:
+def test_different_directory(rule_runner: RuleRunner) -> None:
     binary_name = "archive"
 
     rule_runner.write_files(
@@ -127,3 +127,66 @@ def test_makeself_package_different_path(rule_runner: RuleRunner) -> None:
         ],
     )
     assert result.stdout == b"test\n"
+
+
+def test_multiple_scripts(rule_runner: RuleRunner) -> None:
+    binary_name = "archive"
+
+    rule_runner.write_files(
+        {
+            "src/shell/BUILD": dedent(
+                f"""
+                shell_sources()
+                makeself_archive(
+                    name='{binary_name}',
+                    startup_script='src/shell/run.sh',
+                    files=["src/shell/hello.sh", "src/shell/world.sh"],
+                )
+                """
+            ),
+            "src/shell/hello.sh": dedent(
+                """
+                 #!/bin/bash
+                 printf hello
+                 """
+            ),
+            "src/shell/world.sh": dedent(
+                """
+                 #!/bin/bash
+                 printf world
+                 """
+            ),
+            "src/shell/run.sh": dedent(
+                """
+                 #!/bin/bash
+                 src/shell/hello.sh
+                 src/shell/world.sh
+                 """
+            ),
+        }
+    )
+    rule_runner.chmod("src/shell/run.sh", 0o777)
+    rule_runner.chmod("src/shell/hello.sh", 0o777)
+    rule_runner.chmod("src/shell/world.sh", 0o777)
+
+    target = rule_runner.get_target(Address("src/shell", target_name=binary_name))
+    field_set = MakeselfArchiveFieldSet.create(target)
+
+    package = rule_runner.request(BuiltPackage, [field_set])
+
+    assert len(package.artifacts) == 1, field_set
+    assert isinstance(package.artifacts[0], BuiltMakeselfArchiveArtifact)
+    relpath = f"src.shell/{binary_name}.run"
+    assert package.artifacts[0].relpath == relpath
+
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            RunMakeselfArchive(
+                exe=relpath,
+                description="Run built makeself archive",
+                input_digest=package.digest,
+            )
+        ],
+    )
+    assert result.stdout == b"helloworld"
