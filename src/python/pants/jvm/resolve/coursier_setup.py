@@ -86,7 +86,6 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(  # noqa: PNT20
     """
 )
 
-
 # TODO: Coursier renders setrlimit error line on macOS.
 #   see https://github.com/pantsbuild/pants/issues/13942.
 POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(  # noqa: PNT20
@@ -200,7 +199,7 @@ class Coursier:
             self.post_process_stderr,
             *wrapper,
             os.path.join(self.bin_dir, self.coursier.exe),
-            *args,
+            *map(shlex.quote, args),
         )
 
     @memoized_property

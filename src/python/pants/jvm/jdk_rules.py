@@ -7,7 +7,6 @@ import dataclasses
 import logging
 import os
 import re
-import shlex
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
@@ -214,12 +213,12 @@ async def prepare_jdk_environment(
     if version is DefaultJdk.SYSTEM:
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = shlex.quote(f"--jvm={version}")
+        coursier_jdk_option = f"--jvm={version}"
 
     if not coursier.jvm_index:
         coursier_options = ["java-home", coursier_jdk_option]
     else:
-        jvm_index_option = shlex.quote(f"--jvm-index={coursier.jvm_index}")
+        jvm_index_option = f"--jvm-index={coursier.jvm_index}"
         coursier_options = ["java-home", jvm_index_option, coursier_jdk_option]
 
     # TODO(#16104) This argument re-writing code should use the native {chroot} support.
