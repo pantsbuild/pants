@@ -56,7 +56,7 @@ def rule_runner() -> RuleRunner:
 
 
 @dataclass
-class Result:
+class RuffResult:
     fix: FixResult
     check_lint: LintResult
     format_lint: LintResult
@@ -68,7 +68,7 @@ def run_ruff(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
-) -> Result:
+) -> RuffResult:
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
@@ -118,7 +118,7 @@ def run_ruff(
             )
         ],
     )
-    return Result(fix=fix, check_lint=check_lint, format_lint=format_lint, fmt=fmt)
+    return RuffResult(fix=fix, check_lint=check_lint, format_lint=format_lint, fmt=fmt)
 
 
 @pytest.mark.platform_specific_behavior
