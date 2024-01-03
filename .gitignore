@@ -67,3 +67,7 @@ GTAGS
 /.pants.rc
 /.venv
 .tool-versions
+# for rope refactoring
+.ropeproject/
+# for nvim pyright lsp server
+pyrightconfig.json
