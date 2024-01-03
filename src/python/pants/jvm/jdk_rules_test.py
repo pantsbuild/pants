@@ -215,3 +215,26 @@ def test_pass_jvm_options_to_java_program(rule_runner: RuleRunner) -> None:
     assert "java.specification.version=11" in jvm_properties
     assert "pants.jvm.global=true" in jvm_properties
     assert "pants.jvm.extra=true" in jvm_properties
+
+
+@maybe_skip_jdk_test
+def test_jvm_not_found_when_empty_jvm_index(rule_runner: RuleRunner) -> None:
+    filename = "index.json"
+    file_content = textwrap.dedent(
+        """\
+        {}
+        """
+    )
+    rule_runner.write_files({filename: file_content})
+
+    rule_runner.set_options(
+        [
+            f"--coursier-jvm-index={rule_runner.build_root}/{filename}",
+            "--jvm-tool-jdk=adoptium:1.21",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    expected_exception_msg = r".*?JVM adoptium:1.21 not found in index.*?"
+    with pytest.raises(ExecutionError, match=expected_exception_msg):
+        run_javac_version(rule_runner)
