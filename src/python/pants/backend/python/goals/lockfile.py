@@ -266,34 +266,11 @@ async def generate_updated_lockfile(
         PexCliProcess(
             subcommand=("lock", "update"),
             extra_args=(
-                #"--output=lock.json",
                 "--no-emit-warnings",
-                # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
-                # generate universal locks because they have the best compatibility. We may
-                # want to let users change this, as `style=strict` is safer.
-                #"--style=universal",
-                #"--pip-version",
-                #python_setup.pip_version,
-                #"--resolver-version",
-                #"pip-2020-resolver",
-                # PEX files currently only run on Linux and Mac machines; so we hard code this
-                # limit on lock universaility to avoid issues locking due to irrelevant
-                # Windows-only dependency issues. See this Pex issue that originated from a
-                # Pants user issue presented in Slack:
-                #   https://github.com/pantsbuild/pex/issues/1821
-                #
-                # At some point it will probably make sense to expose `--target-system` for
-                # configuration.
-                # "--target-system",
-                #"linux",
-                #"--target-system",
-                #"mac",
-                # This makes diffs more readable when lockfiles change.
                 "--indent=2",
                 *(f"--find-links={link}" for link in req.find_links),
                 *pip_args_setup.args,
                 *req.interpreter_constraints.generate_pex_arg_list(),
-                #*req.requirements,
                 *(f"--project={project}" for project in pex_lock_subsystem.project),
                 *(["--pin"] if pex_lock_subsystem.pin else []),
                 "lock.json"
@@ -301,16 +278,7 @@ async def generate_updated_lockfile(
             additional_input_digest = await Get(Digest, MergeDigests((pip_args_setup.digest, old_lockfile_digest))),
             output_files=("lock.json",),
             description=f"Generate lockfile for {req.resolve_name}",
-            # Instead of caching lockfile generation with LMDB, we instead use the invalidation
-            # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
-            # necessary so that our invalidation is resilient to deleting LMDB or running on a
-            # new machine.
-            #
-            # We disable caching with LMDB so that when you generate a lockfile, you always get
-            # the most up-to-date snapshot of the world. This is generally desirable and also
-            # necessary to avoid an awkward edge case where different developers generate
-            # different lockfiles even when generating at the same time. See
-            # https://github.com/pantsbuild/pants/issues/12591.
+            # See generate_new_lockfile caching note
             cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
