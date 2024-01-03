@@ -38,6 +38,7 @@ from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -78,7 +79,7 @@ def _make_rule(
     func_id: str,
     rule_type: RuleType,
     return_type: Type,
-    parameter_types: Iterable[Type],
+    parameter_types: dict[str, Type],
     masked_types: Iterable[Type],
     *,
     cacheable: bool,
@@ -123,7 +124,7 @@ def _make_rule(
         # engine invokes a @rule under memoization.
         func.rule = TaskRule(
             return_type,
-            parameter_types,
+            FrozenDict(parameter_types),
             awaitables,
             masked_types,
             original_func,
@@ -236,14 +237,14 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
                 + f" Parameter names: '{', '.join(func_params)}'"
             )
 
-    parameter_types = tuple(
-        _ensure_type_annotation(
+    parameter_types = {
+        parameter: _ensure_type_annotation(
             type_annotation=param_type_overrides.get(parameter, type_hints.get(parameter)),
             name=f"{func_id} parameter {parameter}",
             raise_type=MissingParameterTypeAnnotation,
         )
         for parameter in func_params
-    )
+    }
     is_goal_cls = issubclass(return_type, Goal)
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
@@ -309,13 +310,13 @@ def rule_decorator(func: SyncRuleT | AsyncRuleT, **kwargs) -> AsyncRuleT:
 
 def validate_requirements(
     func_id: str,
-    parameter_types: Tuple[Type, ...],
+    parameter_types: dict[str, Type],
     awaitables: Tuple[AwaitableConstraints, ...],
     cacheable: bool,
 ) -> None:
     # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't expose those as
     # part of the API, so it's OK for these errors not to mention them.
-    for ty in parameter_types:
+    for ty in parameter_types.values():
         if cacheable and issubclass(ty, SideEffecting):
             raise ValueError(
                 f"A `@rule` that is not a @goal_rule ({func_id}) may not have "
@@ -438,7 +439,7 @@ def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable
                     continue
                 rule = getattr(item, "rule", None)
                 if isinstance(rule, TaskRule):
-                    for input in rule.input_selectors:
+                    for input in rule.parameters.values():
                         if issubclass(input, Subsystem):
                             yield from input.rules()
                         if issubclass(input, Subsystem.EnvironmentAware):
@@ -459,7 +460,7 @@ class TaskRule:
     """
 
     output_type: Type
-    input_selectors: Tuple[Type, ...]
+    parameters: FrozenDict[str, Type]
     input_gets: Tuple[AwaitableConstraints, ...]
     masked_types: Tuple[Type, ...]
     func: Callable
@@ -472,7 +473,7 @@ class TaskRule:
         return "(name={}, {}, {!r}, {}, gets={})".format(
             getattr(self, "name", "<not defined>"),
             self.output_type.__name__,
-            self.input_selectors,
+            self.parameters.values(),
             self.func.__name__,
             self.input_gets,
         )

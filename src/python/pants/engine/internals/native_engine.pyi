@@ -643,7 +643,7 @@ def tasks_task_begin(
     tasks: PyTasks,
     func: Any,
     return_type: type,
-    arg_types: Sequence[type],
+    arg_types: Sequence[tuple[str, type]],
     masked_types: Sequence[type],
     side_effecting: bool,
     engine_aware_return_type: bool,

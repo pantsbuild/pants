@@ -1134,7 +1134,7 @@ fn tasks_task_begin(
     py_tasks: &PyTasks,
     func: PyObject,
     output_type: &PyType,
-    arg_types: Vec<&PyType>,
+    arg_types: Vec<(String, &PyType)>,
     masked_types: Vec<&PyType>,
     side_effecting: bool,
     engine_aware_return_type: bool,
@@ -1148,7 +1148,10 @@ fn tasks_task_begin(
         .map_err(|e| PyException::new_err(format!("{e}")))?;
     let func = Function(Key::from_value(func.into())?);
     let output_type = TypeId::new(output_type);
-    let arg_types = arg_types.into_iter().map(TypeId::new).collect();
+    let arg_types = arg_types
+        .into_iter()
+        .map(|(name, typ)| (name, TypeId::new(typ)))
+        .collect();
     let masked_types = masked_types.into_iter().map(TypeId::new).collect();
     let mut tasks = py_tasks.0.borrow_mut();
     tasks.task_begin(

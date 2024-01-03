@@ -1211,7 +1211,7 @@ impl Task {
                 self.task
                     .args
                     .iter()
-                    .map(|dependency_key| {
+                    .map(|(_name, dependency_key)| {
                         let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
                             panic!(
                                 "{:?} did not declare a dependency on {dependency_key:?}",

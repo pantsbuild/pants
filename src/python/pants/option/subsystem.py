@@ -17,6 +17,7 @@ from pants.option.option_types import OptionsInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
@@ -199,7 +200,7 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         return TaskRule(
             output_type=cls,
-            input_selectors=(),
+            parameters=FrozenDict(),
             input_gets=(
                 AwaitableConstraints(
                     rule_id=None, output_type=ScopedOptions, input_types=(Scope,), is_effect=False
@@ -229,7 +230,7 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         return TaskRule(
             output_type=cls.EnvironmentAware,
-            input_selectors=(cls, EnvironmentTarget),
+            parameters=FrozenDict({"subsystem_instance": cls, "env_tgt": EnvironmentTarget}),
             input_gets=(
                 AwaitableConstraints(
                     rule_id=None,

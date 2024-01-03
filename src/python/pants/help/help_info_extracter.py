@@ -306,7 +306,7 @@ class RuleInfo:
             description=rule.desc,
             documentation=maybe_cleandoc(rule.func.__doc__),
             provider=provider,
-            input_types=tuple(selector.__name__ for selector in rule.input_selectors),
+            input_types=tuple(typ.__name__ for typ in rule.parameters.values()),
             input_gets=tuple(str(constraints) for constraints in rule.input_gets),
             output_type=rule.output_type.__name__,
         )
@@ -365,7 +365,7 @@ class PluginAPITypeInfo:
     @staticmethod
     def _rule_consumes(api_type: type) -> Callable[[TaskRule], bool]:
         def satisfies(rule: TaskRule) -> bool:
-            return api_type in rule.input_selectors
+            return api_type in rule.parameters.values()
 
         return satisfies
 
@@ -718,7 +718,7 @@ class HelpInfoExtracter:
             return api_type.__module__
 
         def _rule_dependencies(rule: TaskRule) -> Iterator[type]:
-            yield from rule.input_selectors
+            yield from rule.parameters.values()
             for constraint in rule.input_gets:
                 yield constraint.output_type
 
