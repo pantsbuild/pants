@@ -260,6 +260,9 @@ async def generate_updated_lockfile(
        )
     )
 
+    if req.interpreter_constraints != original_loaded_lockfile.metadata.valid_for_interpreter_constraints:
+        raise ValueError(f"Request interpreter constraints {req.interpreter_constraints} do not match {original_loaded_lockfile.metadata.valid_for_interpreter_constraints} in current lockfile, can not update in place")
+
     original_loaded_lockfile_entries = await Get(DigestEntries, Digest, original_loaded_lockfile.lockfile_digest)
     assert len(original_loaded_lockfile_entries) == 1
     old_lockfile_digest = await Get(Digest,
