@@ -59,7 +59,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     strip_comments_from_pex_json_lockfile,
 )
 from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
-
+from packaging.requirements import Requirement
 
 
 class PexLockSubsystem(Subsystem):
@@ -176,7 +176,8 @@ async def generate_new_lockfile(
     python_setup: PythonSetup,
 ) -> ProcessResult:
     req = new_req.gen_req
-    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)    
+    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
+
 
     return await Get(
         ProcessResult,
@@ -242,6 +243,12 @@ async def generate_updated_lockfile(
     req = update_req.gen_req
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
+    existing_dependency_names = {Requirement(dep).name for dep in req.requirements}
+    for project in pex_lock_subsystem.project:
+        req = Requirement(project)
+        print(req, project)
+        if req.name != project:
+            raise ValueError(f"project {project} is not a bare name; specifier, markers must be specified in BUILD files")
 
     original_loaded_lockfile = await Get(
         LoadedLockfile,
@@ -259,7 +266,6 @@ async def generate_updated_lockfile(
     old_lockfile_digest = await Get(Digest,
                                     CreateDigest([FileEntry("lock.json",
                                                             original_loaded_lockfile_entries[0].file_digest)]))
-
 
     return await Get(
         ProcessResult,
