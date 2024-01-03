@@ -245,9 +245,8 @@ async def generate_updated_lockfile(
 
     existing_dependency_names = {Requirement(dep).name for dep in req.requirements}
     for project in pex_lock_subsystem.project:
-        req = Requirement(project)
-        print(req, project)
-        if req.name != project:
+        requirement = Requirement(project)
+        if requirement.name != project:
             raise ValueError(f"project {project} is not a bare name; specifier, markers must be specified in BUILD files")
 
     original_loaded_lockfile = await Get(
