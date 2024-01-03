@@ -320,7 +320,7 @@ async def generate_updated_lockfile(
                *req.interpreter_constraints.generate_pex_arg_list(),
                #*req.requirements,
                *(f"--project={project}" for project in pex_lock_subsystem.project),
-               *(f"--pin" if pex_lock_subsystem.pin else []),
+               *(["--pin"] if pex_lock_subsystem.pin else []),
                "lock.json"
            ),
            #additional_input_digest=pip_args_setup.digest,
