@@ -76,16 +76,18 @@ class PexLockSubsystem(Subsystem):
         ),
     )
     
+    project = StrListOption(
+        advanced=False,
+        help=softwrap(
+            f""" Just attempt to update the given projects in the lock,
+            leaving all others unchanged.  If the projects aren't already in
+            the lock, attempt to add them as top-level requirements leaving
+            all others unchanged.
 
-    # project = StrListOption(
-    #     advanced=False,
-    #     help=softwrap(
-    #         f""" Just attempt to update the given projects in the lock,
-    #         leaving all others unchanged.  If the projects aren't already in
-    #         the lock, attempt to add them as top-level requirements leaving
-    #         all others unchanged.  """
-    #     ),
-    # )
+            Must be combined with `update`
+            """
+        ),
+    )
 
 
 
@@ -157,7 +159,7 @@ async def generate_new_lockfile(
         PexCliProcess(
             subcommand=("lock", "create"),
             extra_args=(
-                "--output=lock.json",
+                "--output=lock.json",                
                 "--no-emit-warnings",
                 # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
                 # generate universal locks because they have the best compatibility. We may
@@ -305,6 +307,7 @@ async def generate_updated_lockfile(
                *pip_args_setup.args,
                *req.interpreter_constraints.generate_pex_arg_list(),
                #*req.requirements,
+               *(f"--project={project}" for project in pex_lock_subsystem.project),
                "lock.json"
            ),
            #additional_input_digest=pip_args_setup.digest,
