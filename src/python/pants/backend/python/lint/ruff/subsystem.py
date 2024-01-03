@@ -40,7 +40,7 @@ class RuffFieldSet(FieldSet):
 class RuffMode(str, Enum):
     CHECK_LINT = "check"
     FIX = "check --fix"
-    FORMAT_LINT = "format --check"
+    FMT_LINT = "format --check"
     FMT = "format"
 
 

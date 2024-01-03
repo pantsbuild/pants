@@ -111,7 +111,7 @@ async def run_ruff(
     extra_initial_args: Tuple[str, ...] = ()
     if request.mode is RuffMode.FMT:
         extra_initial_args = ("format",)
-    elif request.mode is RuffMode.FORMAT_LINT:
+    elif request.mode is RuffMode.FMT_LINT:
         extra_initial_args = ("format", "--check")
     elif request.mode is RuffMode.FIX:
         extra_initial_args = ("check", "--fix")
@@ -166,7 +166,7 @@ async def ruff_format_lint(request: RuffFormatLintRequest.Batch[RuffFieldSet, An
     )
     result = await Get(
         FallibleProcessResult,
-        _RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.FORMAT_LINT),
+        _RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.FMT_LINT),
     )
     return LintResult.create(request, result)
 
