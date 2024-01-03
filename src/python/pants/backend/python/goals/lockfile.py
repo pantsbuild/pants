@@ -35,7 +35,7 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests, DigestEntries
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessCacheScope, ProcessResult
@@ -44,8 +44,50 @@ from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.option.option_types import BoolOption
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.pip_requirement import PipRequirement
+
+import logging
+from pants.option.option_types import StrListOption
+from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
+from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfile,
+    LoadedLockfileRequest,
+    Lockfile,
+    strip_comments_from_pex_json_lockfile,
+)
+from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
+
+
+
+class PexLockSubsystem(Subsystem):
+    options_scope = "pex-lock"
+    help = "Pex lock specific Python lockfile options."
+
+    update = BoolOption(
+        default=False,
+        advanced=False,
+        help=softwrap(
+            f"""
+            update instead of creating a new lockfile
+            """
+        ),
+    )
+    
+
+    # project = StrListOption(
+    #     advanced=False,
+    #     help=softwrap(
+    #         f""" Just attempt to update the given projects in the lock,
+    #         leaving all others unchanged.  If the projects aren't already in
+    #         the lock, attempt to add them as top-level requirements leaving
+    #         all others unchanged.  """
+    #     ),
+    # )
+
+
 
 
 @dataclass(frozen=True)
@@ -98,8 +140,11 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
     return _PipArgsAndConstraintsSetup(resolve_config, tuple(args), input_digest)
 
 
-@rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
-async def generate_lockfile(
+    
+
+
+
+async def generate_new_lockfile(
     req: GeneratePythonLockfile,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
@@ -197,6 +242,144 @@ async def generate_lockfile(
         diff = None
 
     return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest, diff)
+
+
+
+async def generate_updated_lockfile(
+    req: GeneratePythonLockfile,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    pex_lock_subsystem: PexLockSubsystem,        
+    python_setup: PythonSetup,
+) -> GenerateLockfileResult:
+   pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
+
+
+   original_loaded_lockfile = await Get(
+       LoadedLockfile,
+       LoadedLockfileRequest(
+           Lockfile(
+               url=req.lockfile_dest,
+               url_description_of_origin=f"existing lockfile from {req.resolve_name}",
+               resolve_name=req.resolve_name,
+        )
+       )
+   )
+
+   original_loaded_lockfile_entries = await Get(DigestEntries, Digest, original_loaded_lockfile.lockfile_digest)
+   assert len(original_loaded_lockfile_entries) == 1
+   old_lockfile_digest = await Get(Digest,
+                                   CreateDigest([FileEntry("lock.json",
+                                                           original_loaded_lockfile_entries[0].file_digest)]))
+
+   header_delimiter = "//"
+   result = await Get(
+       ProcessResult,
+       PexCliProcess(
+           subcommand=("lock", "update"),
+           extra_args=(
+               #"--output=lock.json",
+               "--no-emit-warnings",
+               # See https://github.com/pantsbuild/pants/issues/12458. For now, we always
+               # generate universal locks because they have the best compatibility. We may
+               # want to let users change this, as `style=strict` is safer.
+               #"--style=universal",
+               #"--pip-version",
+               #python_setup.pip_version,
+               #"--resolver-version",
+               #"pip-2020-resolver",
+               # PEX files currently only run on Linux and Mac machines; so we hard code this
+               # limit on lock universaility to avoid issues locking due to irrelevant
+               # Windows-only dependency issues. See this Pex issue that originated from a
+               # Pants user issue presented in Slack:
+               #   https://github.com/pantsbuild/pex/issues/1821
+               #
+               # At some point it will probably make sense to expose `--target-system` for
+               # configuration.
+               # "--target-system",
+               #"linux",
+               #"--target-system",
+               #"mac",
+               # This makes diffs more readable when lockfiles change.
+                "--indent=2",
+               *(f"--find-links={link}" for link in req.find_links),
+               *pip_args_setup.args,
+               *req.interpreter_constraints.generate_pex_arg_list(),
+               #*req.requirements,
+               "lock.json"
+           ),
+           #additional_input_digest=pip_args_setup.digest,
+           additional_input_digest=old_lockfile_digest,
+
+
+           output_files=("lock.json",),
+           description=f"Generate lockfile for {req.resolve_name}",
+           # Instead of caching lockfile generation with LMDB, we instead use the invalidation
+           # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
+           # necessary so that our invalidation is resilient to deleting LMDB or running on a
+           # new machine.
+           #
+           # We disable caching with LMDB so that when you generate a lockfile, you always get
+           # the most up-to-date snapshot of the world. This is generally desirable and also
+           # necessary to avoid an awkward edge case where different developers generate
+           # different lockfiles even when generating at the same time. See
+           # https://github.com/pantsbuild/pants/issues/12591.
+            cache_scope=ProcessCacheScope.PER_SESSION,
+       ),
+   )
+
+   initial_lockfile_digest_contents = await Get(DigestContents, Digest, result.output_digest)
+   metadata = PythonLockfileMetadata.new(
+       valid_for_interpreter_constraints=req.interpreter_constraints,
+       requirements={
+           PipRequirement.parse(
+               i,
+               description_of_origin=f"the lockfile {req.lockfile_dest} for the resolve {req.resolve_name}",
+           )
+           for i in req.requirements
+       },
+       manylinux=pip_args_setup.resolve_config.manylinux,
+       requirement_constraints=(
+           set(pip_args_setup.resolve_config.constraints_file.constraints)
+           if pip_args_setup.resolve_config.constraints_file
+           else set()
+       ),
+       only_binary=set(pip_args_setup.resolve_config.only_binary),
+       no_binary=set(pip_args_setup.resolve_config.no_binary),
+   )
+   lockfile_with_header = metadata.add_header_to_lockfile(
+       initial_lockfile_digest_contents[0].content,
+       regenerate_command=(
+           generate_lockfiles_subsystem.custom_command
+           or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
+       ),
+       delimeter=header_delimiter,
+   )
+   final_lockfile_digest = await Get(
+       Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
+   )
+   
+   if req.diff:
+       diff = await _generate_python_lockfile_diff(
+           final_lockfile_digest, req.resolve_name, req.lockfile_dest
+       )
+   else:
+       diff = None
+       
+   return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest, diff)
+
+
+
+@rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
+async def generate_lockfile(
+    req: GeneratePythonLockfile,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    pex_lock_subsystem: PexLockSubsystem,
+    python_setup: PythonSetup,
+) -> GenerateLockfileResult:
+    if pex_lock_subsystem.update:
+        return await generate_updated_lockfile(req, generate_lockfiles_subsystem, pex_lock_subsystem, python_setup)        
+    else:
+        return await generate_new_lockfile(req, generate_lockfiles_subsystem, python_setup)
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):
