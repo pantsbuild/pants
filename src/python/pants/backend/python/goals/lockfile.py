@@ -298,11 +298,7 @@ async def generate_updated_lockfile(
                 *(["--pin"] if pex_lock_subsystem.pin else []),
                 "lock.json"
             ),
-            #additional_input_digest=pip_args_setup.digest,
-            #FIXME
-            additional_input_digest=old_lockfile_digest,
-
-
+            additional_input_digest = await Get(Digest, MergeDigests((pip_args_setup.digest, old_lockfile_digest))),
             output_files=("lock.json",),
             description=f"Generate lockfile for {req.resolve_name}",
             # Instead of caching lockfile generation with LMDB, we instead use the invalidation
