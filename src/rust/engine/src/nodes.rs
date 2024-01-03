@@ -107,165 +107,166 @@ impl StoreFileByDigest<Failure> for Context {
     }
 }
 
-///
-/// A Node that selects a product for some Params.
-///
-/// NB: This is a Node so that it can be used as a root in the graph, but it does not implement
-/// CompoundNode, because it should never be requested as a Node using context.get. Select is a thin
-/// proxy to other Node types (which it requests using context.get), and memoizing it would be
-/// redundant.
-///
-/// Instead, use `Select::run_node` to run the Select logic without memoizing it.
-///
-#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct Select {
-    pub params: Params,
-    pub product: TypeId,
+async fn select(
+    context: Context,
+    mut params: Params,
     entry: Intern<rule_graph::Entry<Rule>>,
-}
-
-impl Select {
-    pub fn new(
-        mut params: Params,
-        product: TypeId,
-        entry: Intern<rule_graph::Entry<Rule>>,
-    ) -> Select {
-        params.retain(|k| match entry.as_ref() {
-            rule_graph::Entry::Param(type_id) => type_id == k.type_id(),
-            rule_graph::Entry::WithDeps(with_deps) => with_deps.params().contains(k.type_id()),
-        });
-        Select {
-            params,
-            product,
-            entry,
-        }
-    }
-
-    pub fn new_from_edges(
-        params: Params,
-        dependency_key: &DependencyKey<TypeId>,
-        edges: &rule_graph::RuleEdges<Rule>,
-    ) -> Select {
-        let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
-            panic!("{edges:?} did not declare a dependency on {dependency_key:?}")
-        });
-        Select::new(params, dependency_key.product(), entry)
-    }
-
-    fn reenter<'a>(
-        &self,
-        context: Context,
-        query: &'a Query<TypeId>,
-    ) -> BoxFuture<'a, NodeResult<Value>> {
-        let edges = context
-            .core
-            .rule_graph
-            .find_root(query.params.iter().cloned(), query.product)
-            .map(|(_, edges)| edges);
-
-        let params = self.params.clone();
-        async move {
-            let edges = edges?;
-            Select::new_from_edges(params, &DependencyKey::new(query.product), &edges)
-                .run_node(context)
-                .await
-        }
-        .boxed()
-    }
-
-    fn select_product<'a>(
-        &self,
-        context: Context,
-        dependency_key: &'a DependencyKey<TypeId>,
-        caller_description: &str,
-    ) -> BoxFuture<'a, NodeResult<Value>> {
-        let edges = context
-            .core
-            .rule_graph
-            .edges_for_inner(&self.entry)
-            .ok_or_else(|| {
-                throw(format!(
-                    "Tried to request {dependency_key} for {caller_description} but found no edges"
-                ))
-            });
-        let params = self.params.clone();
-        async move {
-            let edges = edges?;
-            Select::new_from_edges(params, dependency_key, &edges)
-                .run_node(context)
-                .await
-        }
-        .boxed()
-    }
-
-    async fn run_node(self, context: Context) -> NodeResult<Value> {
-        match self.entry.as_ref() {
-            &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
-                rule_graph::EntryWithDeps::Rule(ref rule) => match rule.rule() {
-                    tasks::Rule::Task(task) => {
-                        context
-                            .get(Task {
-                                params: self.params.clone(),
-                                task: *task,
-                                entry: self.entry,
-                                side_effected: Arc::new(AtomicBool::new(false)),
-                            })
-                            .await
-                    }
-                    Rule::Intrinsic(intrinsic) => {
-                        let values = future::try_join_all(
-                            intrinsic
-                                .inputs
-                                .iter()
-                                .map(|dependency_key| {
-                                    self.select_product(
-                                        context.clone(),
-                                        dependency_key,
-                                        "intrinsic",
-                                    )
-                                })
-                                .collect::<Vec<_>>(),
-                        )
-                        .await?;
-                        context
-                            .core
-                            .intrinsics
-                            .run(intrinsic, context.clone(), values)
-                            .await
-                    }
-                },
-                rule_graph::EntryWithDeps::Reentry(reentry) => {
-                    // TODO: Actually using the `RuleEdges` of this entry to compute inputs is not
-                    // implemented: doing so would involve doing something similar to what we do for
-                    // intrinsics above, and waiting to compute inputs before executing the query here.
-                    //
-                    // That doesn't block using a singleton to provide an API type, but it would block a more
-                    // complex use case.
-                    //
-                    // see https://github.com/pantsbuild/pants/issues/16751
-                    self.reenter(context, &reentry.query).await
+) -> NodeResult<Value> {
+    params.retain(|k| match entry.as_ref() {
+        rule_graph::Entry::Param(type_id) => type_id == k.type_id(),
+        rule_graph::Entry::WithDeps(with_deps) => with_deps.params().contains(k.type_id()),
+    });
+    match entry.as_ref() {
+        &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
+            rule_graph::EntryWithDeps::Rule(ref rule) => match rule.rule() {
+                tasks::Rule::Task(task) => {
+                    context
+                        .get(Task {
+                            params: params.clone(),
+                            task: *task,
+                            entry: entry,
+                            side_effected: Arc::new(AtomicBool::new(false)),
+                        })
+                        .await
                 }
-                &rule_graph::EntryWithDeps::Root(_) => {
-                    panic!("Not a runtime-executable entry! {:?}", self.entry)
+                Rule::Intrinsic(intrinsic) => {
+                    let values = future::try_join_all(
+                        intrinsic
+                            .inputs
+                            .iter()
+                            .map(|dependency_key| {
+                                select_product(
+                                    context.clone(),
+                                    params.clone(),
+                                    dependency_key,
+                                    "intrinsic",
+                                    entry,
+                                )
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                    .await?;
+                    context
+                        .core
+                        .intrinsics
+                        .run(intrinsic, context.clone(), values)
+                        .await
                 }
             },
-            &rule_graph::Entry::Param(type_id) => {
-                if let Some(key) = self.params.find(type_id) {
-                    Ok(key.to_value())
-                } else {
-                    Err(throw(format!(
-                        "Expected a Param of type {} to be present, but had only: {}",
-                        type_id, self.params,
-                    )))
-                }
+            rule_graph::EntryWithDeps::Reentry(reentry) => {
+                select_reentry(context, params, &reentry.query).await
+            }
+            &rule_graph::EntryWithDeps::Root(_) => {
+                panic!("Not a runtime-executable entry! {:?}", entry)
+            }
+        },
+        &rule_graph::Entry::Param(type_id) => {
+            if let Some(key) = params.find(type_id) {
+                Ok(key.to_value())
+            } else {
+                Err(throw(format!(
+                    "Expected a Param of type {} to be present, but had only: {}",
+                    type_id, params,
+                )))
             }
         }
     }
 }
 
-impl From<Select> for NodeKey {
-    fn from(n: Select) -> Self {
-        NodeKey::Select(Box::new(n))
+fn select_reentry(
+    context: Context,
+    params: Params,
+    query: &Query<TypeId>,
+) -> BoxFuture<NodeResult<Value>> {
+    // TODO: Actually using the `RuleEdges` of this entry to compute inputs is not
+    // implemented: doing so would involve doing something similar to what we do for
+    // intrinsics above, and waiting to compute inputs before executing the query here.
+    //
+    // That doesn't block using a singleton to provide an API type, but it would block a more
+    // complex use case.
+    //
+    // see https://github.com/pantsbuild/pants/issues/16751
+    let product = query.product;
+    let edges = context
+        .core
+        .rule_graph
+        .find_root(query.params.iter().cloned(), product)
+        .map(|(_, edges)| edges);
+
+    async move {
+        let edges = edges?;
+        let entry = edges
+            .entry_for(&DependencyKey::new(product))
+            .unwrap_or_else(|| panic!("{edges:?} did not declare a dependency on {product}"));
+        select(context, params, entry).await
+    }
+    .boxed()
+}
+
+fn select_product<'a>(
+    context: Context,
+    params: Params,
+    dependency_key: &'a DependencyKey<TypeId>,
+    caller_description: &'a str,
+    entry: Intern<rule_graph::Entry<Rule>>,
+) -> BoxFuture<'a, NodeResult<Value>> {
+    let edges = context
+        .core
+        .rule_graph
+        .edges_for_inner(&entry)
+        .ok_or_else(|| {
+            throw(format!(
+                "Tried to request {dependency_key} for {caller_description} but found no edges"
+            ))
+        });
+    async move {
+        let edges = edges?;
+        let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
+            panic!("{caller_description} did not declare a dependency on {dependency_key:?}")
+        });
+        select(context, params, entry).await
+    }
+    .boxed()
+}
+
+///
+/// A root Node in the execution graph.
+///
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
+pub struct Root {
+    pub params: Params,
+    product: TypeId,
+    entry: Intern<rule_graph::Entry<Rule>>,
+}
+
+impl Root {
+    pub fn new(
+        mut params: Params,
+        dependency_key: &DependencyKey<TypeId>,
+        edges: &rule_graph::RuleEdges<Rule>,
+    ) -> Self {
+        let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
+            panic!("{edges:?} did not declare a dependency on {dependency_key:?}")
+        });
+        params.retain(|k| match entry.as_ref() {
+            rule_graph::Entry::Param(type_id) => type_id == k.type_id(),
+            rule_graph::Entry::WithDeps(with_deps) => with_deps.params().contains(k.type_id()),
+        });
+        Self {
+            params,
+            product: dependency_key.product(),
+            entry,
+        }
+    }
+
+    async fn run_node(self, context: Context) -> NodeResult<Value> {
+        select(context, self.params, self.entry).await
+    }
+}
+
+impl From<Root> for NodeKey {
+    fn from(n: Root) -> Self {
+        NodeKey::Root(Box::new(n))
     }
 }
 
@@ -1034,20 +1035,14 @@ impl Task {
             .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
         // Find the entry for the Call.
-        let select = edges
-            .entry_for(&dependency_key)
-            .map(|entry| {
-                // The params for the Call replace existing params of the same type.
-                Select::new(params.clone(), call.output_type, entry)
-            })
-            .ok_or_else(|| {
-                // NB: The Python constructor for `Call()` will have already errored if
-                // `type(input) != input_type`.
-                throw(format!(
-                    "{call} was not detected in your @rule body at rule compile time."
-                ))
-            })?;
-        select.run_node(context).await
+        let entry = edges.entry_for(&dependency_key).ok_or_else(|| {
+            // NB: The Python constructor for `Call()` will have already errored if
+            // `type(input) != input_type`.
+            throw(format!(
+                "{call} was not detected in your @rule body at rule compile time."
+            ))
+        })?;
+        select(context, params, entry).await
     }
 
     // Handles the case where a generator produces a `Get` for an unknown `@rule`.
@@ -1068,13 +1063,8 @@ impl Task {
             .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
         // Find the entry for the Get.
-        let select = edges
+        let entry = edges
             .entry_for(&dependency_key)
-            .map(|entry| {
-                // The subject of the Get is a new parameter that replaces an existing param of the same
-                // type.
-                Select::new(params.clone(), get.output, entry)
-            })
             .or_else(|| {
                 // The Get might have involved a @union: if so, include its in_scope types in the
                 // lookup.
@@ -1082,13 +1072,11 @@ impl Task {
                     .input_types
                     .iter()
                     .find_map(|t| t.union_in_scope_types())?;
-                edges
-                    .entry_for(
-                        &DependencyKey::new(get.output)
-                            .provided_params(get.inputs.iter().map(|k| *k.type_id()))
-                            .in_scope_params(in_scope_types),
-                    )
-                    .map(|entry| Select::new(params.clone(), get.output, entry))
+                edges.entry_for(
+                    &DependencyKey::new(get.output)
+                        .provided_params(get.inputs.iter().map(|k| *k.type_id()))
+                        .in_scope_params(in_scope_types),
+                )
             })
             .ok_or_else(|| {
                 if get.input_types.iter().any(|t| t.is_union()) {
@@ -1109,7 +1097,7 @@ impl Task {
                     ))
                 }
             })?;
-        select.run_node(context.clone()).await
+        select(context.clone(), params, entry).await
     }
 
     // Handles the case where a generator produces either a `Get` or a generator.
@@ -1224,8 +1212,13 @@ impl Task {
                     .args
                     .iter()
                     .map(|dependency_key| {
-                        Select::new_from_edges(params.clone(), dependency_key, edges)
-                            .run_node(context.clone())
+                        let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
+                            panic!(
+                                "{:?} did not declare a dependency on {dependency_key:?}",
+                                self.task
+                            )
+                        });
+                        select(context.clone(), params.clone(), entry)
                     })
                     .collect::<Vec<_>>(),
             )
@@ -1309,7 +1302,7 @@ pub enum NodeKey {
     ExecuteProcess(Box<ExecuteProcess>),
     ReadLink(ReadLink),
     Scandir(Scandir),
-    Select(Box<Select>),
+    Root(Box<Root>),
     Snapshot(Snapshot),
     SessionValues(SessionValues),
     RunId(RunId),
@@ -1328,7 +1321,7 @@ impl NodeKey {
             // NodeKey represents an FS operation, and accordingly whether they need to add it to the
             // above list or the below list.
             &NodeKey::ExecuteProcess { .. }
-            | &NodeKey::Select { .. }
+            | &NodeKey::Root { .. }
             | &NodeKey::SessionValues { .. }
             | &NodeKey::RunId { .. }
             | &NodeKey::Snapshot { .. }
@@ -1364,7 +1357,7 @@ impl NodeKey {
             NodeKey::DownloadedFile(..) => "downloaded_file",
             NodeKey::ReadLink(..) => "read_link",
             NodeKey::Scandir(..) => "scandir",
-            NodeKey::Select(..) => "select",
+            NodeKey::Root(..) => "root",
             NodeKey::SessionValues(..) => "session_values",
             NodeKey::RunId(..) => "run_id",
         }
@@ -1415,7 +1408,7 @@ impl NodeKey {
                 Some(format!("Reading directory: {}", path.display()))
             }
             NodeKey::DownloadedFile(..)
-            | NodeKey::Select(..)
+            | NodeKey::Root(..)
             | NodeKey::SessionValues(..)
             | NodeKey::RunId(..) => None,
         }
@@ -1502,7 +1495,7 @@ impl Node for NodeKey {
                     NodeKey::Scandir(n) => {
                         n.run_node(context).await.map(NodeOutput::DirectoryListing)
                     }
-                    NodeKey::Select(n) => n.run_node(context).await.map(NodeOutput::Value),
+                    NodeKey::Root(n) => n.run_node(context).await.map(NodeOutput::Value),
                     NodeKey::Snapshot(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
                     NodeKey::SessionValues(n) => n.run_node(context).await.map(NodeOutput::Value),
                     NodeKey::RunId(n) => n.run_node(context).await.map(NodeOutput::Value),
@@ -1604,7 +1597,7 @@ impl Display for NodeKey {
             }
             NodeKey::ReadLink(s) => write!(f, "ReadLink({})", (s.0).path.display()),
             NodeKey::Scandir(s) => write!(f, "Scandir({})", (s.0).0.display()),
-            NodeKey::Select(s) => write!(f, "{}", s.product),
+            NodeKey::Root(s) => write!(f, "{}", s.product),
             NodeKey::Task(task) => {
                 let params = {
                     Python::with_gil(|py| {
