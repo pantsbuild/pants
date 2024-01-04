@@ -17,7 +17,8 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use internment::Intern;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
-use pyo3::prelude::{Py, PyAny, PyErr, Python};
+use pyo3::prelude::{Py, PyAny, PyErr, Python, ToPyObject};
+use pyo3::types::{PyDict, PyTuple};
 use pyo3::IntoPy;
 use url::Url;
 
@@ -123,6 +124,8 @@ async fn select(
                     context
                         .get(Task {
                             params: params.clone(),
+                            // TODO
+                            args: Vec::new(),
                             task: *task,
                             entry: entry,
                             side_effected: Arc::new(AtomicBool::new(false)),
@@ -1006,6 +1009,9 @@ impl From<DownloadedFile> for NodeKey {
 #[derivative(Eq, PartialEq, Hash)]
 pub struct Task {
     pub params: Params,
+    // TODO: Evaluate using an inline Vec here based on the size distributions after most code has
+    // been migrated to positional arguments.
+    args: Vec<Key>,
     task: Intern<tasks::Task>,
     // The Params and the Task struct are sufficient to uniquely identify it.
     #[derivative(PartialEq = "ignore", Hash = "ignore")]
@@ -1225,20 +1231,34 @@ impl Task {
             .await?
         };
 
-        let func = self.task.func.clone();
+        let args = self.args;
 
         let (mut result_val, mut result_type) =
             maybe_side_effecting(self.task.side_effecting, &self.side_effected, async move {
                 Python::with_gil(|py| {
-                    let func_val = func.0.to_value();
-                    let func = (*func_val).as_ref(py);
-                    externs::call_function(func, &deps)
-                        .map(|res| {
-                            let type_id = TypeId::new(res.get_type());
-                            let val = Value::new(res.into_py(py));
-                            (val, type_id)
-                        })
-                        .map_err(Failure::from)
+                    let func = (*self.task.func.0.value).as_ref(py);
+
+                    // If there are no explicit positional arguments, apply any computed arguments as
+                    // positional. Otherwise, apply computed arguments as keywords.
+                    let res = if args.is_empty() {
+                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)));
+                        func.call1(args_tuple)
+                    } else {
+                        let args_tuple =
+                            PyTuple::new(py, args.into_iter().map(|k| k.value.to_object(py)));
+                        let kwargs = PyDict::new(py);
+                        for ((name, _), value) in self.task.args.iter().zip(deps.into_iter()) {
+                            kwargs.set_item(name, &value)?;
+                        }
+                        func.call(args_tuple, Some(kwargs))
+                    };
+
+                    res.map(|res| {
+                        let type_id = TypeId::new(res.get_type());
+                        let val = Value::new(res.into_py(py));
+                        (val, type_id)
+                    })
+                    .map_err(Failure::from)
                 })
             })
             .await?;

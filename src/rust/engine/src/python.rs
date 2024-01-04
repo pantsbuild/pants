@@ -195,8 +195,7 @@ impl Function {
     /// The function represented as `path.to.module:lineno:func_name`.
     pub fn full_name(&self) -> String {
         let (module, name, line_no) = Python::with_gil(|py| {
-            let val = self.0.to_value();
-            let obj = (*val).as_ref(py);
+            let obj = (*self.0.value).as_ref(py);
             let module: String = externs::getattr(obj, "__module__").unwrap();
             let name: String = externs::getattr(obj, "__name__").unwrap();
             // NB: this is a custom dunder method that Python code should populate before sending the
@@ -244,7 +243,7 @@ impl hash::Hash for Key {
 
 impl fmt::Debug for Key {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.to_value())
+        write!(f, "{:?}", self.value)
     }
 }
 

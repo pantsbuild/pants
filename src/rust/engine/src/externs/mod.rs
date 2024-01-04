@@ -255,12 +255,6 @@ pub fn create_exception(py: Python, msg: String) -> Value {
     Value::new(IntrinsicError::new_err(msg).into_py(py))
 }
 
-pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyAny> {
-    let args: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
-    let args_tuple = PyTuple::new(func.py(), &args);
-    func.call1(args_tuple)
-}
-
 pub(crate) enum GeneratorInput {
     Initial,
     Arg(Value),
@@ -375,15 +369,15 @@ pub(crate) fn generator_send(
 /// those configured in types::Types.
 pub fn unsafe_call(py: Python, type_id: TypeId, args: &[Value]) -> Value {
     let py_type = type_id.as_py_type(py);
-    call_function(py_type, args)
-        .map(|obj| Value::new(obj.into_py(py)))
-        .unwrap_or_else(|e| {
-            panic!(
-                "Core type constructor `{}` failed: {:?}",
-                py_type.name().unwrap(),
-                e
-            );
-        })
+    let args_tuple = PyTuple::new(py, args.iter().map(|v| v.to_object(py)));
+    let res = py_type.call1(args_tuple).unwrap_or_else(|e| {
+        panic!(
+            "Core type constructor `{}` failed: {:?}",
+            py_type.name().unwrap(),
+            e
+        );
+    });
+    Value::new(res.into_py(py))
 }
 
 lazy_static! {
