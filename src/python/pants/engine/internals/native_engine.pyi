@@ -741,27 +741,30 @@ _Input = TypeVar("_Input")
 
 class PyGeneratorResponseCall:
     @overload
-    def __init__(self) -> None: ...
-    @overload
     def __init__(
         self,
+        output_type: type,
+        args: tuple[Any, ...],
         input_arg0: dict[Any, type],
     ) -> None: ...
     @overload
-    def __init__(self, input_arg0: _Input) -> None: ...
+    def __init__(self, output_type: type, args: tuple[Any, ...], input_arg0: _Input) -> None: ...
     @overload
     def __init__(
         self,
+        output_type: type,
+        args: tuple[Any, ...],
         input_arg0: type[_Input],
         input_arg1: _Input,
     ) -> None: ...
     @overload
     def __init__(
         self,
+        output_type: type,
+        args: tuple[Any, ...],
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
-    def set_output_type(self, output_type: type) -> None: ...
 
 class PyGeneratorResponseGet(Generic[_Output]):
     output_type: type[_Output]

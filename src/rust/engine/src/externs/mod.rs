@@ -472,15 +472,22 @@ impl PyGeneratorResponseCall {
         py: Python,
         rule_id: String,
         output_type: &PyType,
+        args: &PyTuple,
         input_arg0: Option<&PyAny>,
         input_arg1: Option<&PyAny>,
     ) -> PyResult<Self> {
         let output_type = TypeId::new(output_type);
+        let args = if args.is_empty() {
+            None
+        } else {
+            Some(args.extract::<Key>()?)
+        };
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
         Ok(Self(RefCell::new(Some(Call {
             rule_id: RuleId::from_string(rule_id),
             output_type,
+            args,
             input_types,
             inputs,
         }))))
@@ -604,6 +611,8 @@ impl PyGeneratorResponseGet {
 pub struct Call {
     pub rule_id: RuleId,
     pub output_type: TypeId,
+    // A tuple of arguments.
+    pub args: Option<Key>,
     pub input_types: SmallVec<[TypeId; 2]>,
     pub inputs: SmallVec<[Key; 2]>,
 }

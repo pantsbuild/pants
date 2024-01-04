@@ -110,6 +110,7 @@ impl StoreFileByDigest<Failure> for Context {
 
 async fn select(
     context: Context,
+    args: Option<Key>,
     mut params: Params,
     entry: Intern<rule_graph::Entry<Rule>>,
 ) -> NodeResult<Value> {
@@ -124,8 +125,7 @@ async fn select(
                     context
                         .get(Task {
                             params: params.clone(),
-                            // TODO
-                            args: Vec::new(),
+                            args,
                             task: *task,
                             entry: entry,
                             side_effected: Arc::new(AtomicBool::new(false)),
@@ -201,7 +201,7 @@ fn select_reentry(
         let entry = edges
             .entry_for(&DependencyKey::new(product))
             .unwrap_or_else(|| panic!("{edges:?} did not declare a dependency on {product}"));
-        select(context, params, entry).await
+        select(context, None, params, entry).await
     }
     .boxed()
 }
@@ -227,7 +227,7 @@ fn select_product<'a>(
         let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
             panic!("{caller_description} did not declare a dependency on {dependency_key:?}")
         });
-        select(context, params, entry).await
+        select(context, None, params, entry).await
     }
     .boxed()
 }
@@ -263,7 +263,7 @@ impl Root {
     }
 
     async fn run_node(self, context: Context) -> NodeResult<Value> {
-        select(context, self.params, self.entry).await
+        select(context, None, self.params, self.entry).await
     }
 }
 
@@ -1009,9 +1009,8 @@ impl From<DownloadedFile> for NodeKey {
 #[derivative(Eq, PartialEq, Hash)]
 pub struct Task {
     pub params: Params,
-    // TODO: Evaluate using an inline Vec here based on the size distributions after most code has
-    // been migrated to positional arguments.
-    args: Vec<Key>,
+    // A key for a tuple of arguments.
+    args: Option<Key>,
     task: Intern<tasks::Task>,
     // The Params and the Task struct are sufficient to uniquely identify it.
     #[derivative(PartialEq = "ignore", Hash = "ignore")]
@@ -1048,7 +1047,7 @@ impl Task {
                 "{call} was not detected in your @rule body at rule compile time."
             ))
         })?;
-        select(context, params, entry).await
+        select(context, call.args, params, entry).await
     }
 
     // Handles the case where a generator produces a `Get` for an unknown `@rule`.
@@ -1103,7 +1102,7 @@ impl Task {
                     ))
                 }
             })?;
-        select(context.clone(), params, entry).await
+        select(context.clone(), None, params, entry).await
     }
 
     // Handles the case where a generator produces either a `Get` or a generator.
@@ -1224,7 +1223,7 @@ impl Task {
                                 self.task
                             )
                         });
-                        select(context.clone(), params.clone(), entry)
+                        select(context.clone(), None, params.clone(), entry)
                     })
                     .collect::<Vec<_>>(),
             )
@@ -1238,19 +1237,18 @@ impl Task {
                 Python::with_gil(|py| {
                     let func = (*self.task.func.0.value).as_ref(py);
 
-                    // If there are no explicit positional arguments, apply any computed arguments as
-                    // positional. Otherwise, apply computed arguments as keywords.
-                    let res = if args.is_empty() {
-                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)));
-                        func.call1(args_tuple)
-                    } else {
-                        let args_tuple =
-                            PyTuple::new(py, args.into_iter().map(|k| k.value.to_object(py)));
+                    // If there are explicit positional arguments, apply any computed arguments as
+                    // keywords. Otherwise, apply computed arguments as positional.
+                    let res = if let Some(args) = args {
+                        let args = args.value.extract::<&PyTuple>(py)?;
                         let kwargs = PyDict::new(py);
                         for ((name, _), value) in self.task.args.iter().zip(deps.into_iter()) {
                             kwargs.set_item(name, &value)?;
                         }
-                        func.call(args_tuple, Some(kwargs))
+                        func.call(args, Some(kwargs))
+                    } else {
+                        let args_tuple = PyTuple::new(py, deps.iter().map(|v| v.to_object(py)));
+                        func.call1(args_tuple)
                     };
 
                     res.map(|res| {

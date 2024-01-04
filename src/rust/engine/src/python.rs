@@ -253,6 +253,13 @@ impl fmt::Display for Key {
     }
 }
 
+impl<'source> FromPyObject<'source> for Key {
+    fn extract(obj: &'source PyAny) -> PyResult<Self> {
+        let py = obj.py();
+        externs::INTERNS.key_insert(py, obj.into_py(py))
+    }
+}
+
 impl Key {
     pub fn new(id: Id, type_id: TypeId, value: Value) -> Key {
         Key { id, type_id, value }

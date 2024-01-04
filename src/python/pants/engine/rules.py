@@ -69,7 +69,7 @@ RuleDecorator = Callable[[Union[SyncRuleT, AsyncRuleT]], AsyncRuleT]
 def _rule_call_trampoline(rule_id: str, output_type: type, func: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(func)  # type: ignore
     async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
-        call = Call(rule_id, output_type, *__implicitly)
+        call = Call(rule_id, output_type, args, *__implicitly)  # type: ignore[call-overload]
         return await call
 
     return cast(Callable[P, R], wrapper)
