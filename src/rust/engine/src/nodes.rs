@@ -111,6 +111,7 @@ impl StoreFileByDigest<Failure> for Context {
 async fn select(
     context: Context,
     args: Option<Key>,
+    args_arity: u16,
     mut params: Params,
     entry: Intern<rule_graph::Entry<Rule>>,
 ) -> NodeResult<Value> {
@@ -126,6 +127,7 @@ async fn select(
                         .get(Task {
                             params: params.clone(),
                             args,
+                            args_arity,
                             task: *task,
                             entry: entry,
                             side_effected: Arc::new(AtomicBool::new(false)),
@@ -201,7 +203,7 @@ fn select_reentry(
         let entry = edges
             .entry_for(&DependencyKey::new(product))
             .unwrap_or_else(|| panic!("{edges:?} did not declare a dependency on {product}"));
-        select(context, None, params, entry).await
+        select(context, None, 0, params, entry).await
     }
     .boxed()
 }
@@ -227,7 +229,7 @@ fn select_product<'a>(
         let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
             panic!("{caller_description} did not declare a dependency on {dependency_key:?}")
         });
-        select(context, None, params, entry).await
+        select(context, None, 0, params, entry).await
     }
     .boxed()
 }
@@ -263,7 +265,7 @@ impl Root {
     }
 
     async fn run_node(self, context: Context) -> NodeResult<Value> {
-        select(context, None, self.params, self.entry).await
+        select(context, None, 0, self.params, self.entry).await
     }
 }
 
@@ -1009,8 +1011,10 @@ impl From<DownloadedFile> for NodeKey {
 #[derivative(Eq, PartialEq, Hash)]
 pub struct Task {
     pub params: Params,
-    // A key for a tuple of arguments.
+    // A key for a tuple of explicit positional arguments.
     args: Option<Key>,
+    // The number of explicit positional arguments.
+    args_arity: u16,
     task: Intern<tasks::Task>,
     // The Params and the Task struct are sufficient to uniquely identify it.
     #[derivative(PartialEq = "ignore", Hash = "ignore")]
@@ -1029,8 +1033,9 @@ impl Task {
         call: externs::Call,
     ) -> NodeResult<Value> {
         let context = context.clone();
-        let dependency_key = DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type)
-            .provided_params(call.inputs.iter().map(|t| *t.type_id()));
+        let dependency_key =
+            DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type, call.args_arity)
+                .provided_params(call.inputs.iter().map(|t| *t.type_id()));
         params.extend(call.inputs.iter().cloned());
 
         let edges = context
@@ -1047,7 +1052,7 @@ impl Task {
                 "{call} was not detected in your @rule body at rule compile time."
             ))
         })?;
-        select(context, call.args, params, entry).await
+        select(context, call.args, call.args_arity, params, entry).await
     }
 
     // Handles the case where a generator produces a `Get` for an unknown `@rule`.
@@ -1102,7 +1107,7 @@ impl Task {
                     ))
                 }
             })?;
-        select(context.clone(), None, params, entry).await
+        select(context.clone(), None, 0, params, entry).await
     }
 
     // Handles the case where a generator produces either a `Get` or a generator.
@@ -1216,6 +1221,7 @@ impl Task {
                 self.task
                     .args
                     .iter()
+                    .skip(self.args_arity.into())
                     .map(|(_name, dependency_key)| {
                         let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
                             panic!(
@@ -1223,7 +1229,7 @@ impl Task {
                                 self.task
                             )
                         });
-                        select(context.clone(), None, params.clone(), entry)
+                        select(context.clone(), None, 0, params.clone(), entry)
                     })
                     .collect::<Vec<_>>(),
             )

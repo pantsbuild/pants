@@ -461,7 +461,7 @@ class TaskRule:
 
     output_type: Type
     parameters: FrozenDict[str, Type]
-    input_gets: Tuple[AwaitableConstraints, ...]
+    awaitables: Tuple[AwaitableConstraints, ...]
     masked_types: Tuple[Type, ...]
     func: Callable
     canonical_name: str
@@ -475,7 +475,7 @@ class TaskRule:
             self.output_type.__name__,
             self.parameters.values(),
             self.func.__name__,
-            self.input_gets,
+            self.awaitables,
         )
 
 

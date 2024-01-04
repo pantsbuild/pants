@@ -201,9 +201,13 @@ class Subsystem(metaclass=_SubsystemMeta):
         return TaskRule(
             output_type=cls,
             parameters=FrozenDict(),
-            input_gets=(
+            awaitables=(
                 AwaitableConstraints(
-                    rule_id=None, output_type=ScopedOptions, input_types=(Scope,), is_effect=False
+                    rule_id=None,
+                    output_type=ScopedOptions,
+                    explicit_args_arity=0,
+                    input_types=(Scope,),
+                    is_effect=False,
                 ),
             ),
             masked_types=(),
@@ -231,10 +235,11 @@ class Subsystem(metaclass=_SubsystemMeta):
         return TaskRule(
             output_type=cls.EnvironmentAware,
             parameters=FrozenDict({"subsystem_instance": cls, "env_tgt": EnvironmentTarget}),
-            input_gets=(
+            awaitables=(
                 AwaitableConstraints(
                     rule_id=None,
                     output_type=EnvironmentVars,
+                    explicit_args_arity=0,
                     input_types=(EnvironmentVarsRequest,),
                     is_effect=False,
                 ),

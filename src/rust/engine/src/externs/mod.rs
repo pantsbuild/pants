@@ -477,10 +477,15 @@ impl PyGeneratorResponseCall {
         input_arg1: Option<&PyAny>,
     ) -> PyResult<Self> {
         let output_type = TypeId::new(output_type);
-        let args = if args.is_empty() {
-            None
+        let (args, args_arity) = if args.is_empty() {
+            (None, 0)
         } else {
-            Some(args.extract::<Key>()?)
+            (
+                Some(args.extract::<Key>()?),
+                args.len().try_into().map_err(|e| {
+                    PyException::new_err(format!("Too many explicit arguments for {rule_id}: {e}"))
+                })?,
+            )
         };
         let (input_types, inputs) = interpret_get_inputs(py, input_arg0, input_arg1)?;
 
@@ -488,6 +493,7 @@ impl PyGeneratorResponseCall {
             rule_id: RuleId::from_string(rule_id),
             output_type,
             args,
+            args_arity,
             input_types,
             inputs,
         }))))
@@ -611,8 +617,10 @@ impl PyGeneratorResponseGet {
 pub struct Call {
     pub rule_id: RuleId,
     pub output_type: TypeId,
-    // A tuple of arguments.
+    // A tuple of positional arguments.
     pub args: Option<Key>,
+    // The number of positional arguments which have been provided.
+    pub args_arity: u16,
     pub input_types: SmallVec<[TypeId; 2]>,
     pub inputs: SmallVec<[Key; 2]>,
 }

@@ -143,7 +143,7 @@ async def a() -> A:
     _ = await b(**implicitly(int(1)))
     _ = await c()
     b1, c1, b2 = await MultiGet(
-        b(**implicitly(int(1))),
+        b(1),
         c(),
         Get(B, int(1)),
     )

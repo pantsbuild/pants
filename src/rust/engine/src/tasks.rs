@@ -86,11 +86,12 @@ impl rule_graph::Rule for Rule {
         }
     }
 
-    fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>> {
+    fn dependency_keys(&self, explicit_args_arity: u16) -> Vec<&DependencyKey<Self::TypeId>> {
         match self {
             Rule::Task(task) => task
                 .args
                 .iter()
+                .skip(explicit_args_arity.into())
                 .map(|(_name, dk)| dk)
                 .chain(task.gets.iter())
                 .collect(),
@@ -278,20 +279,35 @@ impl Tasks {
         });
     }
 
-    pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>, rule_id: Option<String>) {
+    pub fn add_call(
+        &mut self,
+        output: TypeId,
+        inputs: Vec<TypeId>,
+        rule_id: String,
+        explicit_args_arity: u16,
+    ) {
+        let gets = &mut self
+            .preparing
+            .as_mut()
+            .expect("Must `begin()` a task creation before adding calls!")
+            .gets;
+        gets.push(
+            DependencyKey::for_known_rule(
+                RuleId::from_string(rule_id),
+                output,
+                explicit_args_arity,
+            )
+            .provided_params(inputs),
+        )
+    }
+
+    pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>) {
         let gets = &mut self
             .preparing
             .as_mut()
             .expect("Must `begin()` a task creation before adding gets!")
             .gets;
-        if let Some(rule_id) = rule_id {
-            gets.push(
-                DependencyKey::for_known_rule(RuleId::from_string(rule_id), output)
-                    .provided_params(inputs),
-            )
-        } else {
-            gets.push(DependencyKey::new(output).provided_params(inputs));
-        }
+        gets.push(DependencyKey::new(output).provided_params(inputs));
     }
 
     pub fn add_get_union(&mut self, output: TypeId, inputs: Vec<TypeId>, in_scope: Vec<TypeId>) {

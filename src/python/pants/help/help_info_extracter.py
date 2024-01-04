@@ -297,7 +297,7 @@ class RuleInfo:
     provider: str
     output_type: str
     input_types: tuple[str, ...]
-    input_gets: tuple[str, ...]
+    awaitables: tuple[str, ...]
 
     @classmethod
     def create(cls, rule: TaskRule, provider: str) -> RuleInfo:
@@ -307,7 +307,7 @@ class RuleInfo:
             documentation=maybe_cleandoc(rule.func.__doc__),
             provider=provider,
             input_types=tuple(typ.__name__ for typ in rule.parameters.values()),
-            input_gets=tuple(str(constraints) for constraints in rule.input_gets),
+            awaitables=tuple(str(constraints) for constraints in rule.awaitables),
             output_type=rule.output_type.__name__,
         )
 
@@ -381,7 +381,7 @@ class PluginAPITypeInfo:
         def satisfies(rule: TaskRule) -> bool:
             return any(
                 api_type in (*constraint.input_types, constraint.output_type)
-                for constraint in rule.input_gets
+                for constraint in rule.awaitables
             )
 
         return satisfies
@@ -719,7 +719,7 @@ class HelpInfoExtracter:
 
         def _rule_dependencies(rule: TaskRule) -> Iterator[type]:
             yield from rule.parameters.values()
-            for constraint in rule.input_gets:
+            for constraint in rule.awaitables:
                 yield constraint.output_type
 
         def _extract_api_types() -> Iterator[tuple[type, str, tuple[type, ...]]]:
@@ -731,7 +731,7 @@ class HelpInfoExtracter:
                 provider = cls.get_provider(providers)
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
-                for constraint in rule.input_gets:
+                for constraint in rule.awaitables:
                     for input_type in constraint.input_types:
                         yield input_type, _find_provider(input_type), ()
 
