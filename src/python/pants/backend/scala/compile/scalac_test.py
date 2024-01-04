@@ -26,7 +26,7 @@ from pants.backend.scala.target_types import (
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
-from pants.core.util_rules import source_files, stripped_source_files
+from pants.core.util_rules import source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Addresses
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
@@ -62,6 +62,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *scala_dep_inf_rules(),
             *scala_artifact_rules(),
+            *system_binaries.rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
@@ -165,7 +166,6 @@ def test_compile_no_deps(
     )
     assert classpath.content == {
         ".ExampleLib.scala.lib.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/lib/C.class",
         }
     }
@@ -291,7 +291,6 @@ def test_compile_with_deps(
     )
     assert classpath.content == {
         ".Example.scala.main.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
         }
@@ -393,7 +392,6 @@ def test_compile_with_maven_deps(
     )
     assert classpath.content == {
         ".Example.scala.main.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
         }
@@ -870,7 +868,6 @@ def test_compile_no_deps_scala3(
     )
     assert classpath.content == {
         ".ExampleLib.scala.lib.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/lib/C.class",
             "org/pantsbuild/example/lib/C.tasty",
         }
@@ -968,7 +965,6 @@ def test_compile_dep_on_scala_artifact(
         ".ExampleLib.scala.lib.scalac.jar": {
             "ExampleLib$.class",
             "ExampleLib.class",
-            "META-INF/MANIFEST.MF",
         }
     }
 
