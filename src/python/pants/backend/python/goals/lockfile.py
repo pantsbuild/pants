@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
+from typing import List
 
 from packaging.requirements import Requirement
 
@@ -19,7 +21,11 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
+from pants.backend.python.util_rules.lockfile_metadata import (
+    PythonLockfileMetadata,
+    PythonLockfileMetadataV2,
+    PythonLockfileMetadataV3,
+)
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
@@ -62,6 +68,8 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 class PexLockSubsystem(Subsystem):
@@ -261,6 +269,17 @@ async def generate_updated_lockfile(
             f"Request interpreter constraints {req.interpreter_constraints} do not match {original_loaded_lockfile.metadata.valid_for_interpreter_constraints} in current lockfile, can not update in place"
         )
 
+    inferred_new_projects: List[str] = []
+    if original_loaded_lockfile.metadata and isinstance(
+        original_loaded_lockfile.metadata, (PythonLockfileMetadataV2, PythonLockfileMetadataV3)
+    ):
+        for new_requirement in req.requirements:
+            new_pip_req = PipRequirement.parse(new_requirement)
+            if new_pip_req not in original_loaded_lockfile.metadata.requirements:
+                inferred_new_projects.append(new_requirement)
+    if len(inferred_new_projects) > 0:
+        logger.info(f"Inferred new requirements for lockfile update: {inferred_new_projects}")
+
     original_loaded_lockfile_entries = await Get(
         DigestEntries, Digest, original_loaded_lockfile.lockfile_digest
     )
@@ -282,6 +301,7 @@ async def generate_updated_lockfile(
                 *pip_args_setup.args,
                 *req.interpreter_constraints.generate_pex_arg_list(),
                 *(f"--project={project}" for project in pex_lock_subsystem.project),
+                *(f"--project={project}" for project in inferred_new_projects),
                 *(["--pin"] if pex_lock_subsystem.pin else []),
                 "lock.json",
             ),
