@@ -9,6 +9,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
 
+from packaging.requirements import Requirement
+
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
@@ -20,6 +22,9 @@ from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockf
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfile,
+    LoadedLockfileRequest,
+    Lockfile,
     PexRequirements,
     ResolvePexConfig,
     ResolvePexConfigRequest,
@@ -35,31 +40,28 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests, DigestEntries
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    DigestEntries,
+    FileContent,
+    FileEntry,
+    MergeDigests,
+)
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
+from pants.option.option_types import BoolOption, StrListOption
+from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.option.option_types import BoolOption
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.pip_requirement import PipRequirement
-
-import logging
-from pants.option.option_types import StrListOption
-from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
-from pants.backend.python.util_rules.pex_requirements import (
-    LoadedLockfile,
-    LoadedLockfileRequest,
-    Lockfile,
-    strip_comments_from_pex_json_lockfile,
-)
-from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
-from packaging.requirements import Requirement
 
 
 class PexLockSubsystem(Subsystem):
@@ -79,7 +81,7 @@ class PexLockSubsystem(Subsystem):
     project = StrListOption(
         advanced=False,
         help=softwrap(
-            f""" Just attempt to update the given projects in the lock,
+            """ Just attempt to update the given projects in the lock,
             leaving all others unchanged.  If the projects aren't already in
             the lock, attempt to add them as top-level requirements leaving
             all others unchanged.
@@ -98,10 +100,8 @@ class PexLockSubsystem(Subsystem):
             else switch repositories from the original ones when used in conjunction with any
             of --index, --no-pypi and --find-links.
             """
-        ))
-
-
-
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -117,14 +117,13 @@ class GeneratePythonLockfile(GenerateLockfile):
 
 
 @dataclass(frozen=True)
-class NewPythonLockfileRequest():
-    new_req: GeneratePythonLockfile
+class NewPythonLockfileRequest:
+    gen_req: GeneratePythonLockfile
 
 
 @dataclass(frozen=True)
-class UpdatePythonLockfileRequest():
+class UpdatePythonLockfileRequest:
     gen_req: GeneratePythonLockfile
-
 
 
 @rule
@@ -165,10 +164,6 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
     return _PipArgsAndConstraintsSetup(resolve_config, tuple(args), input_digest)
 
 
-
-
-
-
 @rule
 async def generate_new_lockfile(
     new_req: NewPythonLockfileRequest,
@@ -177,7 +172,6 @@ async def generate_new_lockfile(
 ) -> ProcessResult:
     req = new_req.gen_req
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
-
 
     return await Get(
         ProcessResult,
@@ -231,8 +225,6 @@ async def generate_new_lockfile(
     )
 
 
-
-
 @rule
 async def generate_updated_lockfile(
     update_req: UpdatePythonLockfileRequest,
@@ -243,11 +235,12 @@ async def generate_updated_lockfile(
     req = update_req.gen_req
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
-    existing_dependency_names = {Requirement(dep).name for dep in req.requirements}
     for project in pex_lock_subsystem.project:
         requirement = Requirement(project)
         if requirement.name != project:
-            raise ValueError(f"project {project} is not a bare name; specifier, markers must be specified in BUILD files")
+            raise ValueError(
+                f"project {project} is not a bare name; specifier, markers must be specified in BUILD files"
+            )
 
     original_loaded_lockfile = await Get(
         LoadedLockfile,
@@ -257,17 +250,26 @@ async def generate_updated_lockfile(
                 url_description_of_origin=f"existing lockfile from {req.resolve_name}",
                 resolve_name=req.resolve_name,
             )
-       )
+        ),
     )
 
-    if req.interpreter_constraints != original_loaded_lockfile.metadata.valid_for_interpreter_constraints:
-        raise ValueError(f"Request interpreter constraints {req.interpreter_constraints} do not match {original_loaded_lockfile.metadata.valid_for_interpreter_constraints} in current lockfile, can not update in place")
+    if original_loaded_lockfile.metadata and (
+        req.interpreter_constraints
+        != original_loaded_lockfile.metadata.valid_for_interpreter_constraints
+    ):
+        raise ValueError(
+            f"Request interpreter constraints {req.interpreter_constraints} do not match {original_loaded_lockfile.metadata.valid_for_interpreter_constraints} in current lockfile, can not update in place"
+        )
 
-    original_loaded_lockfile_entries = await Get(DigestEntries, Digest, original_loaded_lockfile.lockfile_digest)
+    original_loaded_lockfile_entries = await Get(
+        DigestEntries, Digest, original_loaded_lockfile.lockfile_digest
+    )
     assert len(original_loaded_lockfile_entries) == 1
-    old_lockfile_digest = await Get(Digest,
-                                    CreateDigest([FileEntry("lock.json",
-                                                            original_loaded_lockfile_entries[0].file_digest)]))
+    assert isinstance(original_loaded_lockfile_entries[0], FileEntry)
+    old_lockfile_digest = await Get(
+        Digest,
+        CreateDigest([FileEntry("lock.json", original_loaded_lockfile_entries[0].file_digest)]),
+    )
 
     return await Get(
         ProcessResult,
@@ -281,16 +283,17 @@ async def generate_updated_lockfile(
                 *req.interpreter_constraints.generate_pex_arg_list(),
                 *(f"--project={project}" for project in pex_lock_subsystem.project),
                 *(["--pin"] if pex_lock_subsystem.pin else []),
-                "lock.json"
+                "lock.json",
             ),
-            additional_input_digest = await Get(Digest, MergeDigests((pip_args_setup.digest, old_lockfile_digest))),
+            additional_input_digest=await Get(
+                Digest, MergeDigests((pip_args_setup.digest, old_lockfile_digest))
+            ),
             output_files=("lock.json",),
             description=f"Generate lockfile for {req.resolve_name}",
             # See generate_new_lockfile caching note
             cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
-
 
 
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
@@ -300,9 +303,9 @@ async def generate_lockfile(
     pex_lock_subsystem: PexLockSubsystem,
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
-    header_delimiter = "//"    
+    header_delimiter = "//"
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
-    
+
     if pex_lock_subsystem.update:
         result = await Get(ProcessResult, UpdatePythonLockfileRequest(req))
     else:
@@ -347,7 +350,6 @@ async def generate_lockfile(
         diff = None
 
     return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest, diff)
-
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):
