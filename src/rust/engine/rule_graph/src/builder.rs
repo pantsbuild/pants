@@ -21,7 +21,7 @@ enum Node<R: Rule> {
     // A root node in the rule graph.
     Query(Query<R::TypeId>),
     // An inner node in the rule graph.
-    Rule(R),
+    Rule { rule: R },
     // An inner node in the rule graph which must first locate its `in_scope_params`, and will then
     // execute the given Query.
     //
@@ -36,7 +36,7 @@ impl<R: Rule> std::fmt::Display for Node<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Query(q) => write!(f, "{q}"),
-            Node::Rule(r) => write!(f, "{r}"),
+            Node::Rule { rule } => write!(f, "{rule}"),
             Node::Param(p) => write!(f, "Param({p})"),
             Node::Reentry(q, in_scope) => {
                 write!(f, "Reentry({}, {})", q.product, params_str(in_scope))
@@ -49,7 +49,7 @@ impl<R: Rule> Node<R> {
     fn dependency_keys(&self) -> Vec<DependencyKey<R::TypeId>> {
         // TODO: Give Query an internal DependencyKey to avoid cloning here.
         match self {
-            Node::Rule(r) => r.dependency_keys().into_iter().cloned().collect(),
+            Node::Rule { rule } => rule.dependency_keys().into_iter().cloned().collect(),
             Node::Reentry(_, in_scope_params) => in_scope_params
                 .iter()
                 .cloned()
@@ -80,7 +80,7 @@ impl<R: Rule> Node<R> {
                 // Params are always leaves with an in-set of their own value, and no out-set.
                 in_set.insert(*p);
             }
-            Node::Rule(_) | Node::Query(_) => {
+            Node::Rule { .. } | Node::Query(_) => {
                 // Rules and Queries only have in_sets computed from their dependencies.
             }
         }
@@ -395,7 +395,11 @@ impl<R: Rule> Builder<R> {
                     let mut candidates = Vec::new();
                     if let Some(rule_id) = &dependency_key.rule_id {
                         // New call-by-name semantics.
-                        candidates.extend(rules_by_id.get(rule_id).map(|&r| Node::Rule(r.clone())));
+                        candidates.extend(
+                            rules_by_id
+                                .get(rule_id)
+                                .map(|&r| Node::Rule { rule: r.clone() }),
+                        );
                         // TODO: Once we are entirely call-by-name, we can get rid of the entire edifice
                         // of multiple candidates and the unsatisfiable_nodes mechanism, and modify this
                         // function to return a Result, which will be Err if there is no rule with a
@@ -411,7 +415,7 @@ impl<R: Rule> Builder<R> {
                         }
 
                         if let Some(rules) = self.rules.get(&dependency_key.product()) {
-                            candidates.extend(rules.iter().map(|r| Node::Rule(r.clone())));
+                            candidates.extend(rules.iter().map(|r| Node::Rule { rule: r.clone() }));
                         };
                     }
 
@@ -486,7 +490,7 @@ impl<R: Rule> Builder<R> {
                             graph.add_edge(node_id, *reentry_id, dependency_key.clone());
                             to_visit.push(*reentry_id);
                         }
-                        Node::Rule(rule) => {
+                        Node::Rule { rule } => {
                             // If the key provides a Param for the Rule to consume, include it in the out_set for
                             // the dependency node.
                             let out_set = {
@@ -497,7 +501,7 @@ impl<R: Rule> Builder<R> {
                             let rule_id = rules
                                 .entry((rule.clone(), out_set.clone()))
                                 .or_insert_with(|| {
-                                    graph.add_node((Node::Rule(rule.clone()), out_set))
+                                    graph.add_node((Node::Rule { rule: rule.clone() }, out_set))
                                 });
                             graph.add_edge(node_id, *rule_id, dependency_key.clone());
                             to_visit.push(*rule_id);
@@ -631,7 +635,7 @@ impl<R: Rule> Builder<R> {
                 continue;
             };
             match node.node {
-                Node::Rule(_) | Node::Reentry { .. } => {
+                Node::Rule { .. } | Node::Reentry { .. } => {
                     // Fall through to visit the Rule or Reentry node.
                 }
                 Node::Param(_) => {
@@ -1051,7 +1055,7 @@ impl<R: Rule> Builder<R> {
                             })
                             .collect()
                     }
-                    Node::Rule(_) | Node::Reentry { .. } => {
+                    Node::Rule { .. } | Node::Reentry { .. } => {
                         // If there is a provided param, only dependencies that consume it can be used.
                         edge_refs
                             .iter()
@@ -1170,7 +1174,7 @@ impl<R: Rule> Builder<R> {
             }
 
             // Validate masked params.
-            if let Node::Rule(rule) = &graph[node_id].0.node {
+            if let Node::Rule { rule } = &graph[node_id].0.node {
                 for masked_param in rule.masked_params() {
                     if graph[node_id].0.in_set.contains(&masked_param) {
                         let in_set = params_str(&graph[node_id].0.in_set);
@@ -1332,10 +1336,12 @@ impl<R: Rule> Builder<R> {
         let entry_for = |node_id| -> Entry<R> {
             let (node, in_set): &(Node<R>, ParamTypes<_>) = &graph[node_id];
             match node {
-                Node::Rule(rule) => Entry::WithDeps(Intern::new(EntryWithDeps::Rule(RuleEntry {
-                    params: in_set.clone(),
-                    rule: rule.clone(),
-                }))),
+                Node::Rule { rule } => {
+                    Entry::WithDeps(Intern::new(EntryWithDeps::Rule(RuleEntry {
+                        params: in_set.clone(),
+                        rule: rule.clone(),
+                    })))
+                }
                 Node::Query(q) => {
                     Entry::WithDeps(Intern::new(EntryWithDeps::Root(RootEntry(q.clone()))))
                 }
