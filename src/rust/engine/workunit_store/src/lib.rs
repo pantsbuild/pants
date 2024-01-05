@@ -546,15 +546,15 @@ impl HeavyHittersData {
 
 struct SpanLogLines {
     buffer: Vec<u8>,
-    max_lines: usize,
+
     lines: VecDeque<Vec<u8>>,
 }
 
 impl SpanLogLines {
-    fn new(max_lines: usize) -> SpanLogLines {
+    fn new() -> SpanLogLines {
         SpanLogLines {
             buffer: Vec::new(),
-            max_lines,
+
             lines: VecDeque::new(),
         }
     }
@@ -584,19 +584,36 @@ impl SpanLogLines {
         if let Some(last_line) = last_line {
             self.buffer.extend_from_slice(&last_line);
         }
-
-        if self.lines.len() > self.max_lines {
-            let num_to_remove = self.lines.len() - self.max_lines;
-            self.lines.drain(0..num_to_remove);
-        }
     }
 
-    fn lines(&mut self) -> Vec<u8> {
-        let mut output =
-            Vec::with_capacity(self.lines.iter().map(|line| line.len()).sum::<usize>());
+    fn lines(&mut self, count: usize) -> Vec<u8> {
+        let total_lines = self.lines.len();
+        let relevant_lines = if self.buffer.is_empty() {
+            count
+        } else {
+            count.saturating_sub(1)
+        }
+        .min(total_lines);
 
-        for line in &self.lines {
+        let irrelevant_lines = total_lines.saturating_sub(relevant_lines);
+        let byte_count = self
+            .lines
+            .iter()
+            .skip(irrelevant_lines)
+            .map(|l| l.len())
+            .sum::<usize>()
+            + self.buffer.len()
+            + 4 * count;
+        let mut output = Vec::with_capacity(byte_count);
+
+        for line in self.lines.iter().skip(irrelevant_lines) {
+            output.extend_from_slice(&[b' ', b' ', b'|', b' ']);
             output.extend_from_slice(line);
+        }
+
+        if !self.buffer.is_empty() {
+            output.extend_from_slice(&[b' ', b' ', b'|', b' ']);
+            output.extend_from_slice(&self.buffer);
         }
         output
     }
@@ -621,7 +638,7 @@ impl WorkunitLogData {
         while let Ok(msg) = self.receiver.try_recv() {
             match msg {
                 StoreMsg::Started(started) => {
-                    self.log_lines.insert(started.span_id, SpanLogLines::new(6));
+                    self.log_lines.insert(started.span_id, SpanLogLines::new());
                     self.running_graph.add(started);
                 }
 
@@ -642,12 +659,12 @@ impl WorkunitLogData {
         }
     }
 
-    pub fn read_log_lines(&mut self, span_id: SpanId) -> Option<Vec<u8>> {
+    pub fn read_log_lines(&mut self, span_id: SpanId, line_count: usize) -> Option<Vec<u8>> {
         self.refresh_store();
 
         self.log_lines
             .get_mut(&span_id)
-            .map(|log_lines| log_lines.lines())
+            .map(|log_lines| log_lines.lines(line_count))
     }
 }
 
@@ -705,8 +722,10 @@ impl WorkunitStore {
     ///
     /// Return the log lines for the given SpanId, if any.
     ///
-    pub fn read_log_lines(&self, span_id: SpanId) -> Option<Vec<u8>> {
-        self.workunit_log_data.lock().read_log_lines(span_id)
+    pub fn read_log_lines(&self, span_id: SpanId, line_count: usize) -> Option<Vec<u8>> {
+        self.workunit_log_data
+            .lock()
+            .read_log_lines(span_id, line_count)
     }
 
     fn send(&self, msg: StoreMsg) {

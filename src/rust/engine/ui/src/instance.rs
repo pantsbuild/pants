@@ -12,6 +12,9 @@ use workunit_store::SpanId;
 mod indicatif;
 mod prodash;
 
+use crate::LogStreamingLines;
+use crate::LogStreamingTopn;
+
 use self::indicatif::IndicatifInstance;
 use self::prodash::ProdashInstance;
 
@@ -37,6 +40,9 @@ impl Instance {
     ///
     pub fn new(
         ui_use_prodash: bool,
+        log_streaming: bool,
+        log_streaming_lines: LogStreamingLines,
+        log_streaming_topn: LogStreamingTopn,
         local_parallelism: usize,
         executor: Executor,
     ) -> Result<Instance, String> {
@@ -54,6 +60,9 @@ impl Instance {
                 local_parallelism,
                 terminal_width,
                 terminal_height,
+                log_streaming,
+                log_streaming_lines,
+                log_streaming_topn,
             )?;
 
             Ok(Instance::Indicatif(instance))
@@ -66,7 +75,7 @@ impl Instance {
     pub fn render(
         &mut self,
         heavy_hitters: &HashMap<SpanId, (String, SystemTime)>,
-        log_retriever: &mut dyn FnMut(SpanId) -> Option<Vec<u8>>,
+        log_retriever: &mut dyn FnMut(SpanId, usize) -> Option<Vec<u8>>,
     ) {
         match self {
             Instance::Indicatif(indicatif) => indicatif.render(heavy_hitters, log_retriever),

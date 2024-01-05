@@ -372,6 +372,11 @@ class IntOrStrOption(_OptionBase[str, _StrDefault]):
                 )
 
             if isinstance(value, str):
+                try:
+                    return int(value)
+                except ValueError:
+                    pass
+
                 if self.allowed_string_values is not None:
                     if value not in self.allowed_string_values:
                         raise ValueError(
@@ -384,7 +389,7 @@ class IntOrStrOption(_OptionBase[str, _StrDefault]):
 
         return _type_converter
 
-    option_type: Any = int | str
+    option_type: Any = int
     allowed_string_values: list[str] | None = None
 
 

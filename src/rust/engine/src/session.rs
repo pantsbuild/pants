@@ -20,7 +20,7 @@ use pyo3::prelude::*;
 use task_executor::{Executor, TailTasks};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task::JoinHandle;
-use ui::ConsoleUI;
+use ui::{ConsoleUI, LogStreamingLines, LogStreamingTopn};
 use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
@@ -52,14 +52,17 @@ impl SessionDisplay {
         parallelism: usize,
         dynamic_ui: bool,
         dynamic_ui_log_streaming: bool,
-        dynamic_ui_log_streaming_lines: ui::LogStreamingLines,
-        dynamic_ui_log_streaming_topn: ui::LogStreamingTopn,
+        dynamic_ui_log_streaming_lines: LogStreamingLines,
+        dynamic_ui_log_streaming_topn: LogStreamingTopn,
         ui_use_prodash: bool,
     ) -> SessionDisplay {
         if dynamic_ui {
             SessionDisplay::ConsoleUI(Box::new(ConsoleUI::new(
                 workunit_store.clone(),
                 parallelism,
+                dynamic_ui_log_streaming,
+                dynamic_ui_log_streaming_lines,
+                dynamic_ui_log_streaming_topn,
                 ui_use_prodash,
             )))
         } else {
@@ -150,8 +153,8 @@ impl Session {
         core: Arc<Core>,
         dynamic_ui: bool,
         dynamic_ui_log_streaming: bool,
-        dynamic_ui_log_streaming_lines: ui::LogStreamingLines,
-        dynamic_ui_log_streaming_topn: ui::LogStreamingTopn,
+        dynamic_ui_log_streaming_lines: LogStreamingLines,
+        dynamic_ui_log_streaming_topn: LogStreamingTopn,
         ui_use_prodash: bool,
         mut max_workunit_level: log::Level,
         build_id: String,
@@ -221,6 +224,9 @@ impl Session {
             &self.state.workunit_store,
             self.state.core.local_parallelism,
             false,
+            false,
+            LogStreamingLines::Auto,
+            LogStreamingTopn::Auto,
             false,
         ));
         let handle = Arc::new(SessionHandle {
