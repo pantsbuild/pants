@@ -17,9 +17,9 @@ from pants.jvm.goals.lockfile import GenerateJvmLockfile
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
-    Coordinate,
     GatherJvmCoordinatesRequest,
 )
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -122,7 +122,7 @@ async def gather_coordinates_for_jvm_lockfile(
         # group name is a file on disk.
         if 2 <= artifact_input.count(":"):
             try:
-                maybe_coord = Coordinate.from_coord_str(artifact_input).as_requirement()
+                maybe_coord = ArtifactRequirement(Coordinate.from_coord_str(artifact_input))
                 requirements.add(maybe_coord)
                 continue
             except Exception:
