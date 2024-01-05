@@ -189,10 +189,6 @@ fn log_streaming_sizes(
         match (log_streaming_lines, log_streaming_topn) {
             (LogStreamingLines::Exact(l), LogStreamingTopn::Exact(t)) => (l, t),
             (LogStreamingLines::Exact(l), LogStreamingTopn::Auto) => {
-                let remaining = th
-                    .saturating_sub(RESERVED_OUTPUT_LOG_LINES)
-                    .saturating_sub(bars.len());
-
                 // +1 for header
                 let topn = remaining / l;
                 (l, topn)
@@ -202,10 +198,6 @@ fn log_streaming_sizes(
                 (lines, t)
             }
             (LogStreamingLines::Auto, LogStreamingTopn::Auto) => {
-                let remaining = th
-                    .saturating_sub(RESERVED_OUTPUT_LOG_LINES)
-                    .saturating_sub(bars.len());
-
                 let target_topn = bars.len() / 2;
                 let target_lines = remaining / target_topn;
 

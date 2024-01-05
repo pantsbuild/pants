@@ -72,7 +72,7 @@ class GraphScheduler:
         build_id,
         dynamic_ui: bool = False,
         dynamic_ui_log_streaming: bool = False,
-        dynamic_ui_log_streaming_lines: int | str = 1,
+        dynamic_ui_log_streaming_lines: int | str = "auto",
         dynamic_ui_log_streaming_topn: int | str = "auto",
         ui_use_prodash: bool = False,
         use_colors=True,

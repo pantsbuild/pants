@@ -1878,7 +1878,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
     dynamic_ui_log_streaming_lines = IntOrStrOption(
         allowed_string_values=["auto"],
-        default=1,
+        default="auto",
         help=softwrap(
             """
             If `--dynamic-ui` and `--dynamic-ui-log-streaming` is enabled, the number
@@ -1892,7 +1892,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
     dynamic_ui_log_streaming_topn = IntOrStrOption(
         allowed_string_values=["auto"],
-        default=10,
+        default="auto",
         help=softwrap(
             """
             If `--dynamic-ui` and `--dynamic-ui-log-streaming` is enabled, the number
