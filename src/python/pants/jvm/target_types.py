@@ -42,6 +42,7 @@ from pants.engine.target import (
     TargetGenerator,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
@@ -533,26 +534,17 @@ async def generate_from_pom_xml(
     return GeneratedTargets(request.generator, targets)
 
 
-def parse_pom_xml(content: bytes) -> Iterator[_Coordinate]:
+def parse_pom_xml(content: bytes) -> Iterator[Coordinate]:
     root = ET.fromstring(content.decode("utf-8"))
     match = re.match(r"^(\{.*\})project$", root.tag)
     assert match, root.tag
     namespace = match.group(1)
     for dependency in root.iter(f"{namespace}dependency"):
-        yield _Coordinate(
+        yield Coordinate(
             group=get_child_text(dependency, f"{namespace}groupId"),
             artifact=get_child_text(dependency, f"{namespace}artifactId"),
             version=get_child_text(dependency, f"{namespace}version"),
         )
-
-
-@dataclass
-class _Coordinate:
-    """We can't import common.Coordinate because of circular dependencies."""
-
-    group: str
-    artifact: str
-    version: str
 
 
 def get_child_text(parent: ET.Element, child: str) -> str:
