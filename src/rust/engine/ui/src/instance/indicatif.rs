@@ -80,12 +80,6 @@ impl IndicatifInstance {
             log_streaming_topn,
         );
 
-        eprintln!(
-                "log_streaming: {}, log_lines: {}, log_topn: {}, log_streaming_lines: {:?}, log_streaming_topn: {:?}
-",
-                log_streaming, log_lines, log_topn, log_streaming_lines, log_streaming_topn
-            );
-
         Ok(IndicatifInstance {
             tasks_to_display: IndexSet::new(),
             _multi_progress: multi_progress,
@@ -130,7 +124,7 @@ impl IndicatifInstance {
         let now = SystemTime::now();
         for (n, pbar) in self.bars.iter().enumerate() {
             let maybe_label = tasks_to_display.get_index(n).and_then(|span_id| {
-                let log_lines = (self.log_streaming && n <= self.log_streaming_topn)
+                let log_lines = (self.log_streaming && n < self.log_streaming_topn)
                     .then(|| log_retriever(*span_id, self.log_streaming_lines))
                     .flatten();
 
@@ -145,6 +139,7 @@ impl IndicatifInstance {
                 // we remove the duration spinner, space, duration label, space
                 let max_label_len =
                     (self.terminal_width as usize).saturating_sub(duration_label.len() + 3);
+
                 let label = if log_lines.as_ref().map_or(false, |lines| !lines.is_empty()) {
                     format!("{duration_label} {label:.*}\n", max_label_len)
                 } else {
