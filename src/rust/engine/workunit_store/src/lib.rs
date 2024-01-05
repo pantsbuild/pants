@@ -4,7 +4,7 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Reverse;
-use std::collections::{hash_map, BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::future::Future;
 use std::sync::atomic::{self, AtomicBool};
@@ -544,21 +544,19 @@ impl HeavyHittersData {
     }
 }
 
+/// The linearized log lines for a single span. The buffer is used to accumulate partial lines until
+/// they are completed.
+#[derive(Default)]
 struct SpanLogLines {
-    buffer: Vec<u8>,
+    /// The completed lines for this span.
+    lines: Vec<Vec<u8>>,
 
-    lines: VecDeque<Vec<u8>>,
+    /// Any partial line that has not yet been terminated.
+    buffer: Vec<u8>,
 }
 
 impl SpanLogLines {
-    fn new() -> SpanLogLines {
-        SpanLogLines {
-            buffer: Vec::new(),
-
-            lines: VecDeque::new(),
-        }
-    }
-
+    /// Add new data to the recorded lines.
     fn add(&mut self, data: Vec<u8>) {
         self.buffer.extend_from_slice(&data);
         let new_lines = self.buffer.lines_with_terminator();
@@ -571,22 +569,27 @@ impl SpanLogLines {
             }
 
             if line.ends_with_str("\n") {
-                self.lines.push_back(line.to_vec());
+                self.lines.push(line.to_vec());
             } else {
                 // have to allocate here since we're already holding a reference to the
                 // buffer. Optimally bstr would have an API like `drain_lines` that would generate
-                // lines and then shift the remainder the front end.
+                // lines and then shift the remainder the front, but I can't find such an API.
                 last_line = Some(line.to_vec());
             }
         }
 
+        // If the last line is not terminated, then it is a partial line and we should keep it in
+        // the buffer.
         self.buffer.clear();
         if let Some(last_line) = last_line {
             self.buffer.extend_from_slice(&last_line);
         }
     }
 
+    /// Return the last `count` lines for this span.
     fn lines(&mut self, count: usize) -> Vec<u8> {
+        // We want to return the last `count` lines, but we also want to include any partial line
+        // that has not yet been terminated. So we return `count - 1?` lines, plus the partial line.
         let total_lines = self.lines.len();
         let relevant_lines = if self.buffer.is_empty() {
             count
@@ -596,29 +599,34 @@ impl SpanLogLines {
         .min(total_lines);
 
         let irrelevant_lines = total_lines.saturating_sub(relevant_lines);
-        let byte_count = self
-            .lines
+        // each line is prefixed with "  | ", so we need to account for that, as well as the buffer.
+        let byte_count = self.lines[irrelevant_lines..]
             .iter()
-            .skip(irrelevant_lines)
             .map(|l| l.len())
             .sum::<usize>()
             + self.buffer.len()
             + 4 * count;
-        let mut output = Vec::with_capacity(byte_count);
 
+        let mut output = Vec::with_capacity(byte_count);
+        const LINE_PREFIX: &[u8] = b"  | ";
         for line in self.lines.iter().skip(irrelevant_lines) {
-            output.extend_from_slice(&[b' ', b' ', b'|', b' ']);
+            output.extend_from_slice(&LINE_PREFIX);
             output.extend_from_slice(line);
         }
 
         if !self.buffer.is_empty() {
-            output.extend_from_slice(&[b' ', b' ', b'|', b' ']);
+            output.extend_from_slice(&LINE_PREFIX);
             output.extend_from_slice(&self.buffer);
         }
         output
     }
 }
 
+/// Stores the log lines for all running workunits.
+///
+/// The whole log is stored in memory and evicted when workunits complete. This isn't strictly
+/// needed for streaming to the terminal, but if one wants to implement another viewer (i.e. a web
+/// UI) then it's useful to have the whole log available.
 struct WorkunitLogData {
     receiver: UnboundedReceiver<StoreMsg>,
     running_graph: RunningWorkunitGraph,
@@ -634,11 +642,13 @@ impl WorkunitLogData {
         }
     }
 
+    /// Refresh the store by processing any new messages.
     fn refresh_store(&mut self) {
         while let Ok(msg) = self.receiver.try_recv() {
             match msg {
                 StoreMsg::Started(started) => {
-                    self.log_lines.insert(started.span_id, SpanLogLines::new());
+                    self.log_lines
+                        .insert(started.span_id, SpanLogLines::default());
                     self.running_graph.add(started);
                 }
 
@@ -659,6 +669,7 @@ impl WorkunitLogData {
         }
     }
 
+    /// Return the last `count` lines for the given span.
     pub fn read_log_lines(&mut self, span_id: SpanId, line_count: usize) -> Option<Vec<u8>> {
         self.refresh_store();
 
