@@ -1868,17 +1868,42 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
     dynamic_ui_log_streaming = BoolOption(
         default=False,
-        help="If `--dynamic-ui` is enabled, whether to stream logs to the UI.",
+        help=softwrap(
+            """
+            If `--dynamic-ui` is enabled, whether to stream logs to the UI.
+
+            Does not support prodash renderer.
+            """
+        ),
     )
     dynamic_ui_log_streaming_lines = IntOrStrOption(
         allowed_string_values=["auto"],
         default=1,
-        help="If `--dynamic-ui` and `--dynamic-ui-log-streaming` is enabled, the number of lines to stream to the UI.",
+        help=softwrap(
+            """
+            If `--dynamic-ui` and `--dynamic-ui-log-streaming` is enabled, the number
+            of lines to stream to the UI.
+
+            This can be either a positive integer or the string `auto`, which will attempt
+            to show a reasonable number of log lines based on the terminal height and the
+            number of `topn` processes to show logs for.
+            """
+        ),
     )
     dynamic_ui_log_streaming_topn = IntOrStrOption(
         allowed_string_values=["auto"],
         default=10,
-        help="If `--dynamic-ui` and `--dynamic-ui-log-streaming` is enabled, the number of heavy processes to stream to the UI.",
+        help=softwrap(
+            """
+            If `--dynamic-ui` and `--dynamic-ui-log-streaming` is enabled, the number
+            of heavy processes to stream to the UI.
+
+            This can be either a positive integer or the string `auto`, which will attempt
+            to show a reasonable number of processes based on the terminal height and the
+            number of log lines to show. If log lines are also set to `auto` half of the
+            processes will be shown.
+            """
+        ),
     )
 
     tag = StrListOption(
