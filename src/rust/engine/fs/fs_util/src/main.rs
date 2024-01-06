@@ -63,7 +63,7 @@ struct SummaryWithDigest {
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    let workunit_store = WorkunitStore::new(false, log::Level::Debug);
+    let workunit_store = WorkunitStore::new(false, log::Level::Debug, false);
     workunit_store.init_thread_state(None);
 
     match execute(

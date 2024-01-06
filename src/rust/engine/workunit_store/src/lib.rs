@@ -362,6 +362,7 @@ pub struct WorkunitStore {
     heavy_hitters_data: Arc<Mutex<HeavyHittersData>>,
     workunit_log_data: Arc<Mutex<WorkunitLogData>>,
     metrics_data: Arc<MetricsData>,
+    enable_log_streaming: bool,
 }
 
 struct StreamingWorkunitData {
@@ -610,12 +611,12 @@ impl SpanLogLines {
         let mut output = Vec::with_capacity(byte_count);
         const LINE_PREFIX: &[u8] = b"  | ";
         for line in self.lines.iter().skip(irrelevant_lines) {
-            output.extend_from_slice(&LINE_PREFIX);
+            output.extend_from_slice(LINE_PREFIX);
             output.extend_from_slice(line);
         }
 
         if !self.buffer.is_empty() {
-            output.extend_from_slice(&LINE_PREFIX);
+            output.extend_from_slice(LINE_PREFIX);
             output.extend_from_slice(&self.buffer);
         }
         output
@@ -680,7 +681,11 @@ impl WorkunitLogData {
 }
 
 impl WorkunitStore {
-    pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
+    pub fn new(
+        log_starting_workunits: bool,
+        max_level: Level,
+        enable_log_streaming: bool,
+    ) -> WorkunitStore {
         // NB: Although it would be nice not to have seperate allocations per consumer, it is
         // difficult to use a channel like `tokio::sync::broadcast` due to that channel being bounded.
         // Subscribers receive messages at very different rates, and adjusting the workunit level
@@ -691,6 +696,8 @@ impl WorkunitStore {
         WorkunitStore {
             log_starting_workunits,
             max_level,
+            enable_log_streaming,
+
             // TODO: Create one `StreamingWorkunitData` per subscriber, and zero if no subscribers are
             // installed.
             senders: [sender1, sender2, sender3],
@@ -843,6 +850,10 @@ impl WorkunitStore {
     }
 
     pub fn add_log_data(&self, span_id: SpanId, data: Vec<u8>) {
+        if !self.enable_log_streaming {
+            return;
+        }
+
         self.send(StoreMsg::LogData(span_id, data));
     }
 
@@ -914,7 +925,7 @@ impl WorkunitStore {
     }
 
     pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
-        let store = WorkunitStore::new(false, Level::Trace);
+        let store = WorkunitStore::new(false, Level::Trace, false);
         store.init_thread_state(None);
         let workunit =
             store._start_workunit(SpanId(0), "testing", Level::Info, None, Option::default());

@@ -169,7 +169,11 @@ impl Session {
         if dynamic_ui {
             max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
         }
-        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level);
+        let workunit_store = WorkunitStore::new(
+            !dynamic_ui,
+            max_workunit_level,
+            dynamic_ui && dynamic_ui_log_streaming,
+        );
         let display = tokio::sync::Mutex::new(SessionDisplay::new(
             &workunit_store,
             core.local_parallelism,

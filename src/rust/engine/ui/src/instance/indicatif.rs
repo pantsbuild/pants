@@ -123,7 +123,7 @@ impl IndicatifInstance {
 
         let now = SystemTime::now();
         for (n, pbar) in self.bars.iter().enumerate() {
-            let maybe_label = tasks_to_display.get_index(n).and_then(|span_id| {
+            let maybe_label = tasks_to_display.get_index(n).map(|span_id| {
                 let log_lines = (self.log_streaming && n < self.log_streaming_topn)
                     .then(|| log_retriever(*span_id, self.log_streaming_lines))
                     .flatten();
@@ -146,7 +146,7 @@ impl IndicatifInstance {
                     format!("{duration_label} {label:.*}", max_label_len)
                 };
 
-                Some((label, log_lines))
+                (label, log_lines)
             });
 
             match maybe_label {
@@ -154,7 +154,8 @@ impl IndicatifInstance {
                     pbar.set_prefix(label);
 
                     match maybe_message {
-                        Some(message) if !message.is_empty() => {
+                        Some(mut message) if !message.is_empty() => {
+                            message.push(b'\n');
                             let message: String =
                                 String::from_utf8_lossy(message.as_slice()).into();
                             pbar.set_message(message);
@@ -190,16 +191,16 @@ fn log_streaming_sizes(
             (LogStreamingLines::Exact(l), LogStreamingTopn::Exact(t)) => (l, t),
             (LogStreamingLines::Exact(l), LogStreamingTopn::Auto) => {
                 // +1 for header
-                let topn = remaining / l;
+                let topn = remaining / (l + 1);
                 (l, topn)
             }
             (LogStreamingLines::Auto, LogStreamingTopn::Exact(t)) => {
-                let lines = remaining / t;
+                let lines = (remaining / t) - 1;
                 (lines, t)
             }
             (LogStreamingLines::Auto, LogStreamingTopn::Auto) => {
                 let target_topn = bars.len() / 2;
-                let target_lines = remaining / target_topn;
+                let target_lines = (remaining / target_topn) - 1;
 
                 (target_lines, target_topn)
             }

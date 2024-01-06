@@ -26,6 +26,7 @@ from pants.option.option_types import (
     FloatOption,
     IntListOption,
     IntOption,
+    IntOrStrOption,
     MemorySizeListOption,
     MemorySizeOption,
     OptionsInfo,
@@ -177,6 +178,22 @@ def test_other_options() -> None:
     assert my_subsystem.dyn_enum_list_prop == (MyEnum.Val2,)
     assert my_subsystem.defaultless_enum_list_prop == (MyEnum.Val2,)
     assert my_subsystem.dict_prop == {"key1": "val1"}
+
+
+@pytest.mark.parametrize("value, valid", ((1, True), (2, True), ("foobar", True), ("qux", False)))
+def test_int_or_str_prop(value, valid) -> None:
+    int_or_str_prop = IntOrStrOption(
+        default=0,
+        allowed_string_values=["foobar"],
+        help="",
+    )
+
+    if valid:
+        assert int_or_str_prop.get_option_type(None)(value).value == value
+
+    else:
+        with pytest.raises(ValueError, match="Expected a string from {foobar}, got '"):
+            int_or_str_prop.get_option_type(None)(value)
 
 
 def test_specialized_options() -> None:
