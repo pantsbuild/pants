@@ -6,12 +6,14 @@ import pytest
 
 from pants.backend.terraform import dependency_inference
 from pants.backend.terraform.dependency_inference import (
+    InferTerraformDeploymentDependenciesRequest,
     InferTerraformModuleDependenciesRequest,
     ParseTerraformModuleSources,
+    TerraformDeploymentDependenciesInferenceFieldSet,
     TerraformHcl2Parser,
     TerraformModuleDependenciesInferenceFieldSet,
 )
-from pants.backend.terraform.target_types import TerraformModuleTarget
+from pants.backend.terraform.target_types import TerraformDeploymentTarget, TerraformModuleTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import external_tool, source_files
 from pants.engine.process import ProcessResult
@@ -31,12 +33,13 @@ from pants.util.ordered_set import FrozenOrderedSet
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[TerraformModuleTarget],
+        target_types=[TerraformModuleTarget, TerraformDeploymentTarget],
         rules=[
             *external_tool.rules(),
             *source_files.rules(),
             *dependency_inference.rules(),
             QueryRule(InferredDependencies, [InferTerraformModuleDependenciesRequest]),
+            QueryRule(InferredDependencies, [InferTerraformDeploymentDependenciesRequest]),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(ProcessResult, [ParseTerraformModuleSources]),
         ],
@@ -48,7 +51,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_dependency_inference(rule_runner: RuleRunner) -> None:
+def test_dependency_inference_module(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/tf/modules/foo/BUILD": "terraform_module()\n",
@@ -96,6 +99,28 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
                 Address("src/tf/resources/grok/subdir"),
             ]
         ),
+    )
+
+
+def test_dependency_inference_deployment(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/tf/BUILD": "terraform_module(name='mod')\nterraform_deployment(name='deployment',root_module=':mod')",
+            "src/tf/main.tf": "",
+        }
+    )
+
+    target = rule_runner.get_target(Address("src/tf", target_name="deployment"))
+    inferred_deps = rule_runner.request(
+        InferredDependencies,
+        [
+            InferTerraformDeploymentDependenciesRequest(
+                TerraformDeploymentDependenciesInferenceFieldSet.create(target)
+            )
+        ],
+    )
+    assert inferred_deps == InferredDependencies(
+        FrozenOrderedSet([Address("src/tf", target_name="mod")])
     )
 
 
