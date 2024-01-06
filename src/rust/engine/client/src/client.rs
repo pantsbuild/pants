@@ -55,7 +55,7 @@ pub async fn execute_command(
     }
 
     let command = argv
-        .get(0)
+        .first()
         .ok_or_else(|| "Failed to determine current process argv0".to_owned())?
         .clone();
 
