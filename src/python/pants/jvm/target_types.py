@@ -557,14 +557,6 @@ def get_child_text(parent: ET.Element, child: str) -> str:
     return text
 
 
-class MissingTag(ValueError):
-    pass
-
-
-class EmptyTag(ValueError):
-    pass
-
-
 # -----------------------------------------------------------------------------------------------
 # JUnit test support field(s)
 # -----------------------------------------------------------------------------------------------
