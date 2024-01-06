@@ -6,11 +6,8 @@ import pytest
 
 from pants.backend.makeself import makeself
 from pants.backend.makeself.goals import package, run
-from pants.backend.makeself.goals.package import (
-    BuiltMakeselfArchiveArtifact,
-    MakeselfArchiveFieldSet,
-)
-from pants.backend.makeself.makeself import RunMakeselfArchive
+from pants.backend.makeself.goals.package import BuiltMakeselfArchiveArtifact
+from pants.backend.makeself.goals.run import MakeselfArchiveFieldSet, RunMakeselfArchive
 from pants.backend.makeself.target_types import MakeselfArchiveTarget
 from pants.backend.shell import register
 from pants.core.goals.package import BuiltPackage

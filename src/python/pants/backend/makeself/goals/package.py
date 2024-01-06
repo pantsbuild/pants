@@ -5,23 +5,16 @@ import logging
 from dataclasses import dataclass
 from pathlib import PurePath
 
+from pants.backend.makeself.goals.run import MakeselfArchiveFieldSet
 from pants.backend.makeself.makeself import CreateMakeselfArchive
-from pants.backend.makeself.target_types import (
-    MakeselfArchiveFilesField,
-    MakeselfArchivePackagesField,
-    MakeselfArchiveStartupScript,
-    MakeselfArthiveLabel,
-)
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
     EnvironmentAwarePackageRequest,
-    OutputPathField,
     PackageFieldSet,
 )
-from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules import source_files
 from pants.engine.addresses import UnparsedAddressInputs
@@ -53,22 +46,8 @@ class BuiltMakeselfArchiveArtifact(BuiltPackageArtifact):
         )
 
 
-@dataclass(frozen=True)
-class MakeselfArchiveFieldSet(PackageFieldSet, RunFieldSet):
-    required_fields = (MakeselfArchiveStartupScript,)
-    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
-
-    startup_script: MakeselfArchiveStartupScript
-    label: MakeselfArthiveLabel
-    files: MakeselfArchiveFilesField
-    packages: MakeselfArchivePackagesField
-    output_path: OutputPathField
-
-
 @rule
-async def package_makeself_binary(
-    field_set: MakeselfArchiveFieldSet,
-) -> BuiltPackage:
+async def package_makeself_binary(field_set: MakeselfArchiveFieldSet) -> BuiltPackage:
     archive_dir = "__archive"
 
     startup_script_targets, package_targets, file_targets = await MultiGet(
