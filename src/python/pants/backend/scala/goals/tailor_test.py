@@ -4,7 +4,9 @@
 
 from pants.backend.scala.goals.tailor import classify_source_files
 from pants.backend.scala.target_types import (
+    ScalaJmhBenchmarksGeneratorTarget,
     ScalaJunitTestsGeneratorTarget,
+    ScalameterBenchmarksGeneratorTarget,
     ScalaSourcesGeneratorTarget,
     ScalatestTestsGeneratorTarget,
 )
@@ -17,10 +19,20 @@ def test_classify_source_files() -> None:
     junit_files = {
         "foo/bar/BazTest.scala",
     }
+    jmh_files = {
+        "foo/bar/BazBenchmark.scala",
+    }
+    scalameter_files = {
+        "foo/bar/BazBench.scala",
+    }
     lib_files = {"foo/bar/Baz.scala"}
 
     assert {
         ScalatestTestsGeneratorTarget: scalatest_files,
         ScalaJunitTestsGeneratorTarget: junit_files,
         ScalaSourcesGeneratorTarget: lib_files,
-    } == classify_source_files(junit_files | lib_files | scalatest_files)
+        ScalaJmhBenchmarksGeneratorTarget: jmh_files,
+        ScalameterBenchmarksGeneratorTarget: scalameter_files,
+    } == classify_source_files(
+        junit_files | lib_files | scalatest_files | jmh_files | scalameter_files
+    )

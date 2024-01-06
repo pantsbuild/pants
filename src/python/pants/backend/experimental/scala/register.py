@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pants.backend.scala.bench import scalameter
 from pants.backend.scala.bsp.rules import rules as bsp_rules
 from pants.backend.scala.compile import scalac
 from pants.backend.scala.dependency_inference import rules as dep_inf_rules
@@ -8,8 +9,12 @@ from pants.backend.scala.resolve.lockfile import rules as scala_lockfile_rules
 from pants.backend.scala.target_types import (
     ScalaArtifactTarget,
     ScalacPluginTarget,
+    ScalaJmhBenchmarksGeneratorTarget,
+    ScalaJmhBenchmarkTarget,
     ScalaJunitTestsGeneratorTarget,
     ScalaJunitTestTarget,
+    ScalameterBenchmarksGeneratorTarget,
+    ScalameterBenchmarkTarget,
     ScalaSourceField,
     ScalaSourcesGeneratorTarget,
     ScalaSourceTarget,
@@ -35,6 +40,10 @@ def target_types():
         ScalatestTestTarget,
         ScalatestTestsGeneratorTarget,
         ScalaArtifactTarget,
+        ScalaJmhBenchmarkTarget,
+        ScalaJmhBenchmarksGeneratorTarget,
+        ScalameterBenchmarkTarget,
+        ScalameterBenchmarksGeneratorTarget,
         *jvm_common.target_types(),
         *wrap_scala.target_types,
     ]
@@ -44,6 +53,7 @@ def rules():
     return [
         *scalac.rules(),
         *scalatest.rules(),
+        *scalameter.rules(),
         *check.rules(),
         *tailor.rules(),
         *repl.rules(),

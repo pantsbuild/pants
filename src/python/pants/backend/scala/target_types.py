@@ -12,6 +12,7 @@ from pants.backend.scala.util_rules.versions import ScalaCrossVersionMode
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import AddressInput
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.bench import BenchmarkExtraEnvVarsField, BenchmarkTimeoutField
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
@@ -39,6 +40,7 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm import target_types as jvm_target_types
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
+    JmhBenchmarkSourceField,
     JunitTestExtraEnvVarsField,
     JunitTestSourceField,
     JunitTestTimeoutField,
@@ -591,6 +593,134 @@ async def generate_jvm_artifact_targets(
     )
 
     return GeneratedTargets(request.generator, (jvm_artifact_target,))
+
+
+# -----------------------------------------------------------------------------------------------
+# `scala_jmh_benchmark` and `scala_jmh_benchmarks` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ScalaJmhBenchmarkSourceField(ScalaSourceField, JmhBenchmarkSourceField):
+    pass
+
+
+class ScalaJmhBenchmarkTimeoutField(BenchmarkTimeoutField):
+    pass
+
+
+class ScalaJmhBenchmarkExtraEnvVarsField(BenchmarkExtraEnvVarsField):
+    pass
+
+
+class ScalaJmhBenchmarkTarget(Target):
+    alias = "scala_jmh_benchmark"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalaDependenciesField,
+        ScalaJmhBenchmarkSourceField,
+        ScalaJmhBenchmarkTimeoutField,
+        ScalaJmhBenchmarkExtraEnvVarsField,
+        JvmJdkField,
+        JvmResolveField,
+        JvmProvidesTypesField,
+    )
+    help = "A single Scala benchmark, run with JMH"
+
+
+class ScalaJmhBenchmarksGeneratorSourcesField(ScalaGeneratorSourcesField):
+    default = ("*Benchmark.scala",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Benchmark.scala', '!BenchmarkIgnore.scala']`"
+    )
+
+
+class ScalaJmhBenchmarksGeneratorTarget(TargetFilesGenerator):
+    alias = "scala_jmh_benchmarks"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalaJmhBenchmarksGeneratorSourcesField,
+        ScalaDependenciesField,
+        ScalaJmhBenchmarkTimeoutField,
+        ScalaJmhBenchmarkExtraEnvVarsField,
+        JvmJdkField,
+        JvmResolveField,
+        JvmProvidesTypesField,
+    )
+    generated_target_cls = ScalaJmhBenchmarkTarget
+    copied_fields = (*COMMON_TARGET_FIELDS, JvmResolveField, JvmProvidesTypesField)
+    moved_fields = (
+        ScalaDependenciesField,
+        ScalaJmhBenchmarkTimeoutField,
+        ScalaJmhBenchmarkExtraEnvVarsField,
+    )
+    help = (
+        "Generate a `scala_jmh_benchmark` target for each file in the `sources` field (defaults to "
+        f"all files in the directory matching {ScalaJmhBenchmarksGeneratorSourcesField.default})."
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `scalameter_benchmark` and `scalameter_benchmarks` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ScalameterBenchmarkSourceField(ScalaSourceField):
+    pass
+
+
+class ScalameterBenchmarkTimeoutField(BenchmarkTimeoutField):
+    pass
+
+
+class ScalameterBenchmarkExtraEnvVarsField(BenchmarkExtraEnvVarsField):
+    pass
+
+
+class ScalameterBenchmarkTarget(Target):
+    alias = "scalameter_benchmark"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalaDependenciesField,
+        ScalameterBenchmarkSourceField,
+        ScalameterBenchmarkTimeoutField,
+        ScalameterBenchmarkExtraEnvVarsField,
+        JvmJdkField,
+        JvmResolveField,
+        JvmProvidesTypesField,
+    )
+    help = "A single Scala benchmark, run with ScalaMeter"
+
+
+class ScalameterBenchmarksGeneratorSourcesField(ScalaGeneratorSourcesField):
+    default = ("*Bench.scala",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Bench.scala', '!BenchIgnore.scala']`"
+    )
+
+
+class ScalameterBenchmarksGeneratorTarget(TargetFilesGenerator):
+    alias = "scalameter_benchmarks"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ScalameterBenchmarksGeneratorSourcesField,
+        ScalaDependenciesField,
+        ScalameterBenchmarkTimeoutField,
+        ScalameterBenchmarkExtraEnvVarsField,
+        JvmJdkField,
+        JvmResolveField,
+        JvmProvidesTypesField,
+    )
+    generated_target_cls = ScalameterBenchmarkTarget
+    copied_fields = (*COMMON_TARGET_FIELDS, JvmResolveField, JvmProvidesTypesField)
+    moved_fields = (
+        ScalaDependenciesField,
+        ScalameterBenchmarkTimeoutField,
+        ScalameterBenchmarkExtraEnvVarsField,
+    )
+    help = (
+        "Generate a `scalameter_benchmark` target for each file in the `sources` field (defaults to "
+        f"all files in the directory matching {ScalameterBenchmarksGeneratorSourcesField.default})."
+    )
 
 
 def rules():

@@ -10,6 +10,8 @@ from pants.backend.java.target_types import (
     JavaSourceField,
     JavaSourcesGeneratorTarget,
     JavaSourceTarget,
+    JmhBenchmarkTarget,
+    JmhBenckmarksGeneratorTarget,
     JunitTestsGeneratorTarget,
     JunitTestTarget,
 )
@@ -27,6 +29,8 @@ def target_types():
         JavaSourcesGeneratorTarget,
         JunitTestTarget,
         JunitTestsGeneratorTarget,
+        JmhBenchmarkTarget,
+        JmhBenckmarksGeneratorTarget,
         *jvm_common.target_types(),
         *wrap_java.target_types,
     ]

@@ -9,6 +9,8 @@ from typing import Iterable
 
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
 from pants.backend.kotlin.target_types import (
+    KotlinJmhBenckmarksGeneratorSourcesField,
+    KotlinJmhBenckmarksGeneratorTarget,
     KotlinJunitTestsGeneratorSourcesField,
     KotlinJunitTestsGeneratorTarget,
     KotlinSourcesGeneratorTarget,
@@ -43,10 +45,20 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
         if os.path.basename(path)
         in set(junit_filespec_matcher.matches([os.path.basename(path) for path in paths]))
     }
-    sources_files = set(paths) - junit_files
+
+    jmh_filespec_matcher = FilespecMatcher(KotlinJmhBenckmarksGeneratorSourcesField.default, ())
+    jmh_files = {
+        path
+        for path in paths
+        if os.path.basename(path)
+        in set(jmh_filespec_matcher.matches([os.path.basename(path) for path in paths]))
+    }
+
+    sources_files = set(paths) - junit_files - jmh_files
     return {
         KotlinJunitTestsGeneratorTarget: junit_files,
         KotlinSourcesGeneratorTarget: sources_files,
+        KotlinJmhBenckmarksGeneratorTarget: jmh_files,
     }
 
 

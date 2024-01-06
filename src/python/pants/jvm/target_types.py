@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Callable, ClassVar, Iterable, Optional, Tuple, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.bench import BenchmarkExtraEnvVarsField, BenchmarkTimeoutField
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
@@ -830,6 +831,23 @@ class JvmWarTarget(Target):
         deploys in Java Servlet containers.
         """
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# JMH benchmark support field(s)
+# -----------------------------------------------------------------------------------------------
+
+
+class JmhBenchmarkSourceField(SingleSourceField, metaclass=ABCMeta):
+    """A marker that indicates that a source field represents a JMH benchmark."""
+
+
+class JmhBenchmarkTimeoutField(BenchmarkTimeoutField):
+    pass
+
+
+class JmhBenchmarkExtraEnvVarsField(BenchmarkExtraEnvVarsField):
+    pass
 
 
 # -----------------------------------------------------------------------------------------------

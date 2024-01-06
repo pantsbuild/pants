@@ -5,6 +5,8 @@ from pants.backend.kotlin.dependency_inference.rules import rules as dep_inf_rul
 from pants.backend.kotlin.goals import check, tailor
 from pants.backend.kotlin.target_types import (
     KotlincPluginTarget,
+    KotlinJmhBenchmarkTarget,
+    KotlinJmhBenckmarksGeneratorTarget,
     KotlinJunitTestsGeneratorTarget,
     KotlinJunitTestTarget,
     KotlinSourceField,
@@ -25,6 +27,8 @@ def target_types():
         KotlinSourceTarget,
         KotlinSourcesGeneratorTarget,
         KotlincPluginTarget,
+        KotlinJmhBenchmarkTarget,
+        KotlinJmhBenckmarksGeneratorTarget,
         KotlinJunitTestTarget,
         KotlinJunitTestsGeneratorTarget,
         *jvm_common.target_types(),
