@@ -76,7 +76,6 @@ async def get_terraform_providers(
 
     args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
-    # TODO: Does this need to be a MultiGet? I think we will now always get one directory
     fetched_deps = await Get(
         FallibleProcessResult,
         TerraformProcess(
@@ -117,9 +116,13 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
 
     address_input = request.root_module.to_address_input()
     module_address = await Get(Address, AddressInput, address_input)
-    chdir = module_address.spec_path  # TODO: spec_path is wrong, that's to the build file
 
-    # TODO: is this still necessary, or do we pull it in with (transitive) depenendencies?
+    chdir = module_address.spec_path  # TODO: spec_path is wrong, that's to the build file
+    # if the Terraform module is in the root, chdir will be "". Terraform needs a valid dir to change to
+    if not chdir:
+        chdir = "."
+
+    # TODO: is this still necessary, or do we pull it in with (transitive) dependencies?
     module = await Get(
         WrappedTarget,
         WrappedTargetRequest(
