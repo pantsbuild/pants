@@ -4,7 +4,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.makeself import makeself
+from pants.backend.makeself import subsystem
 from pants.backend.makeself.goals import package, run
 from pants.backend.makeself.goals.package import BuiltMakeselfArchiveArtifact
 from pants.backend.makeself.goals.run import MakeselfArchiveFieldSet, RunMakeselfArchive
@@ -25,7 +25,7 @@ def rule_runner() -> RuleRunner:
             *register.target_types(),
         ],
         rules=[
-            *makeself.rules(),
+            *subsystem.rules(),
             *package.rules(),
             *run.rules(),
             *system_binaries.rules(),
@@ -74,7 +74,7 @@ def test_same_directory(rule_runner: RuleRunner) -> None:
         [
             RunMakeselfArchive(
                 exe=relpath,
-                description="Run built makeself archive",
+                description="Run built subsystem archive",
                 input_digest=package.digest,
             )
         ],
@@ -118,7 +118,7 @@ def test_different_directory(rule_runner: RuleRunner) -> None:
         [
             RunMakeselfArchive(
                 exe=relpath,
-                description="Run built makeself archive",
+                description="Run built subsystem archive",
                 input_digest=package.digest,
             )
         ],
@@ -181,7 +181,7 @@ def test_multiple_scripts(rule_runner: RuleRunner) -> None:
         [
             RunMakeselfArchive(
                 exe=relpath,
-                description="Run built makeself archive",
+                description="Run built subsystem archive",
                 input_digest=package.digest,
             )
         ],

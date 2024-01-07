@@ -9,7 +9,7 @@ from pathlib import PurePath
 from typing import Optional
 
 from pants.backend.makeself.goals.run import MakeselfArchiveFieldSet
-from pants.backend.makeself.makeself import MakeselfTool
+from pants.backend.makeself.subsystem import MakeselfTool
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals import package
 from pants.core.goals.package import (
