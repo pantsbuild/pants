@@ -6,13 +6,14 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from pants.backend.adhoc.target_types import (
     SystemBinaryExtraSearchPathsField,
     SystemBinaryFingerprintArgsField,
     SystemBinaryFingerprintDependenciesField,
     SystemBinaryFingerprintPattern,
+    SystemBinaryExtraEnvVarsField,
     SystemBinaryNameField,
 )
 from pants.build_graph.address import Address
@@ -32,6 +33,7 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,7 @@ class SystemBinaryFieldSet(RunFieldSet):
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
         SystemBinaryFingerprintDependenciesField,
+        SystemBinaryExtraEnvVarsField,
     )
 
     name: SystemBinaryNameField
@@ -54,6 +57,7 @@ class SystemBinaryFieldSet(RunFieldSet):
     fingerprint_pattern: SystemBinaryFingerprintPattern
     fingerprint_argv: SystemBinaryFingerprintArgsField
     fingerprint_dependencies: SystemBinaryFingerprintDependenciesField
+    extra_env_vars: SystemBinaryExtraEnvVarsField
 
 
 async def _find_binary(
@@ -63,6 +67,7 @@ async def _find_binary(
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
+    extra_env_vars: Iterable[str] = (),
 ) -> BinaryPath:
     binaries = await Get(
         BinaryPaths,
@@ -87,6 +92,9 @@ async def _find_binary(
         env.update(**(rds.extra_env or {}))
         append_only_caches = rds.append_only_caches
         immutable_input_digests = rds.immutable_input_digests
+    if extra_env_vars:
+        extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
+        env.update(extra_env)
 
     tests: tuple[FallibleProcessResult, ...] = await MultiGet(
         Get(
@@ -143,6 +151,7 @@ async def create_system_binary_run_request(
         field_set.fingerprint_pattern.value,
         field_set.fingerprint_argv.value,
         field_set.fingerprint_dependencies.value,
+        field_set.extra_env_vars.value,
     )
 
     return RunRequest(
