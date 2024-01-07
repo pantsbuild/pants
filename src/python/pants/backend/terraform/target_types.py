@@ -89,7 +89,8 @@ class TerraformRootModuleField(StringField, AsyncFieldMixin):
 
 
 class TerraformBackendConfigField(SingleSourceField):
-    help = "Configuration to be merged with what is in the configuration file's 'backend' block"
+    default = "*.tfbackend"
+    help = "Configuration to be merged with what is in the root module's 'backend' block"
 
 
 class TerraformBackendTarget(Target):
@@ -98,6 +99,7 @@ class TerraformBackendTarget(Target):
 
 
 class TerraformVarFileSourceField(MultipleSourcesField):
+    default = ("*.tfvars",)
     expected_file_extensions = (".tfvars",)
     help = generate_multiple_sources_field_help_message(
         "Example: `var_files=['common.tfvars', 'prod.tfvars']`"
