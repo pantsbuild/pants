@@ -67,6 +67,14 @@ async def extract_makeself_distribution(
         ProcessResult,
         RunMakeselfArchive(
             exe=dist.exe,
+            extra_args=(
+                "--accept",
+                "--noprogress",
+                "--nox11",
+                "--nochown",
+                "--nodiskspace",
+                "--quiet",
+            ),
             input_digest=dist.digest,
             output_directory=out,
             description=f"Extracting Makeself archive: {out}",

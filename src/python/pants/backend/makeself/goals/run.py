@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from pants.backend.makeself.target_types import (
     MakeselfArchiveFilesField,
@@ -57,6 +57,7 @@ class RunMakeselfArchive:
     description: str
     level: LogLevel = LogLevel.INFO
     output_directory: Optional[str] = None
+    extra_args: Optional[Tuple[str, ...]] = None
 
 
 @rule(desc="Run makeself archive", level=LogLevel.DEBUG)
@@ -128,22 +129,14 @@ async def run_makeself_archive(
         ),
     )
     output_directories = []
-    argv = [
-        request.exe,
-        "--accept",
-        "--noprogress",
-        "--nox11",
-        "--nochown",
-        "--nodiskspace",
-        "--quiet",
-    ]
+    argv: Tuple[str, ...] = (request.exe,)
 
     if output_directory := request.output_directory:
         output_directories = [output_directory]
-        argv.extend(["--keep", "--target", request.output_directory])
+        argv += ("--keep", "--target", request.output_directory)
 
     return Process(
-        argv=argv,
+        argv=argv + (request.extra_args or ()),
         input_digest=request.input_digest,
         immutable_input_digests=shims.immutable_input_digests,
         output_directories=output_directories,

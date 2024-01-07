@@ -74,6 +74,7 @@ def test_same_directory(rule_runner: RuleRunner) -> None:
         [
             RunMakeselfArchive(
                 exe=relpath,
+                extra_args=("--quiet",),
                 description="Run built subsystem archive",
                 input_digest=package.digest,
             )
@@ -118,6 +119,7 @@ def test_different_directory(rule_runner: RuleRunner) -> None:
         [
             RunMakeselfArchive(
                 exe=relpath,
+                extra_args=("--quiet",),
                 description="Run built subsystem archive",
                 input_digest=package.digest,
             )
@@ -181,6 +183,7 @@ def test_multiple_scripts(rule_runner: RuleRunner) -> None:
         [
             RunMakeselfArchive(
                 exe=relpath,
+                extra_args=("--quiet",),
                 description="Run built subsystem archive",
                 input_digest=package.digest,
             )
