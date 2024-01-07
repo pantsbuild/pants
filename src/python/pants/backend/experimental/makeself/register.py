@@ -1,6 +1,6 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-"""Make self-extractable archives on Unix
+"""Make self-extractable archives on Unix.
 
 See https://github.com/megastep/subsystem.
 """
