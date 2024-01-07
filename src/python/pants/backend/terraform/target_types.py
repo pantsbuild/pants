@@ -96,19 +96,21 @@ class TerraformBackendConfigField(SingleSourceField):
 class TerraformBackendTarget(Target):
     alias = "terraform_backend"
     core_fields = (*COMMON_TARGET_FIELDS, TerraformBackendConfigField)
+    help = "Configuration to be merged with what is in the root module's 'backend' block"
 
 
 class TerraformVarFileSourceField(MultipleSourcesField):
     default = ("*.tfvars",)
     expected_file_extensions = (".tfvars",)
     help = generate_multiple_sources_field_help_message(
-        "Example: `var_files=['common.tfvars', 'prod.tfvars']`"
+        "Example: `sources=['common.tfvars', 'prod.tfvars']`"
     )
 
 
 class TerraformVarFileTarget(Target):
     alias = "terraform_var_files"
     core_fields = (*COMMON_TARGET_FIELDS, TerraformVarFileSourceField)
+    help = "Terraform vars files"
 
 
 class TerraformDeploymentTarget(Target):
