@@ -63,6 +63,13 @@ class HelpJSONEncoder(json.JSONEncoder):
             return type.__name__
         if isinstance(o, Enum):
             return o.value
+
+        # IntOrStrOption uses a shim class to help parsing, and the
+        # result value goes here. Kept separate from enum even though
+        # seemingly redundant, for clarity.
+        if hasattr(o, "value"):
+            return o.value
+
         return super().default(o)
 
 

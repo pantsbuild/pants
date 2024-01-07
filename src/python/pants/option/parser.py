@@ -526,6 +526,7 @@ class Parser:
                 return ListValueComponent.create(val_str, member_type=member_type)
             if type_arg == dict:
                 return DictValueComponent.create(val_str)
+
             return type_arg(val_str)
         except (TypeError, ValueError) as e:
             if issubclass(type_arg, Enum):

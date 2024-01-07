@@ -374,18 +374,12 @@ class IntOrStrOption(_OptionBase[Union[str, int], _StrDefault]):
                     try:
                         value = int(value)
                     except ValueError:
-                        if value not in allowed_string_values:
+                        if allowed_string_values is not None and value not in allowed_string_values:
                             raise ValueError(
                                 f"Expected an integer or a string from {{{', '.join(allowed_string_values)}}}, got '{value}'"
                             )
 
                 self.value = value
-
-            def __str__(self) -> str:
-                return str(self.value)
-
-            def __int__(self) -> int:
-                return int(self.value)
 
         instance.option_type = _OptionType
 

@@ -192,7 +192,9 @@ def test_int_or_str_prop(value, valid) -> None:
         assert int_or_str_prop.get_option_type(None)(value).value == value
 
     else:
-        with pytest.raises(ValueError, match="Expected a string from {foobar}, got '"):
+        with pytest.raises(
+            ValueError, match="Expected an integer or a string from {foobar}, got 'qux'"
+        ):
             int_or_str_prop.get_option_type(None)(value)
 
 
