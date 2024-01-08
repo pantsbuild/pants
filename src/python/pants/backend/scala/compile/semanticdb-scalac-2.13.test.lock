@@ -6,7 +6,8 @@
 # {
 #   "version": 1,
 #   "generated_with_requirements": [
-#     "org.scala-lang:scala3-library_3:3.2.0,url=not_provided,jar=not_provided"
+#     "org.scala-lang:scala-library:2.13.12,url=not_provided,jar=not_provided",
+#     "org.scalameta:semanticdb-scalac_2.13.12:4.8.14,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -14,36 +15,36 @@
 [[entries]]
 directDependencies = []
 dependencies = []
-file_name = "org.scala-lang_scala-library_2.13.8.jar"
+file_name = "org.scala-lang_scala-library_2.13.12.jar"
 
 [entries.coord]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.8"
+version = "2.13.12"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "a0882b82514190c2bac7d1a459872a75f005fc0f3e88b2bc0390367146e35db7"
-serialized_bytes_length = 6003601
+fingerprint = "c6a879e4973a60f6162668542a33eaccc2bb565d1c934fb061c5844259131dd1"
+serialized_bytes_length = 5917034
 [[entries]]
-file_name = "org.scala-lang_scala3-library_3_3.2.0.jar"
+file_name = "org.scalameta_semanticdb-scalac_2.13.12_4.8.14.jar"
 [[entries.directDependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.8"
+version = "2.13.12"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
-version = "2.13.8"
+version = "2.13.12"
 packaging = "jar"
 
 
 [entries.coord]
-group = "org.scala-lang"
-artifact = "scala3-library_3"
-version = "3.2.0"
+group = "org.scalameta"
+artifact = "semanticdb-scalac_2.13.12"
+version = "4.8.14"
 packaging = "jar"
 [entries.file_digest]
-fingerprint = "e1ebe7ff1052233692b1d4bbb68012f5c9108b9c11310e4e0ab14d4094a19529"
-serialized_bytes_length = 1230497
+fingerprint = "516da9260db08ec221f712eaf3c454a693121ebd64da501200bbf29dd28fcfc4"
+serialized_bytes_length = 17218706

@@ -28,7 +28,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet

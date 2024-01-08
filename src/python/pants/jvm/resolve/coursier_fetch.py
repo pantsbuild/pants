@@ -49,10 +49,9 @@ from pants.jvm.resolve import coursier_setup
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
-    Coordinate,
-    Coordinates,
     GatherJvmCoordinatesRequest,
 )
+from pants.jvm.resolve.coordinate import Coordinate, Coordinates
 from pants.jvm.resolve.coursier_setup import Coursier, CoursierFetchProcess
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileContext
