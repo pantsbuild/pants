@@ -63,20 +63,24 @@ async def find_putative_terrform_module_targets(
             PutativeTarget.for_target_type(
                 TerraformBackendTarget,
                 path=dirname,
-                name=None,
+                name=filename,
+                kwargs={"source": filename},
                 triggering_sources=(filename,),
             )
         )
 
+    # We generate separate targets for each var file,
+    # to not make assumptions that they're all together.
     all_var_files = await Get(Paths, PathGlobs, request.path_globs("*.tfvars"))
     unowned_var_files = set(all_var_files.files) - set(all_owned_sources)
-    for backend_file in unowned_var_files:
-        dirname, filename = os.path.split(backend_file)
+    for var_file in unowned_var_files:
+        dirname, filename = os.path.split(var_file)
         putative_targets.append(
             PutativeTarget.for_target_type(
                 TerraformVarFileTarget,
                 path=dirname,
-                name=None,
+                name=filename,
+                kwargs={"sources": (filename,)},
                 triggering_sources=(filename,),
             )
         )

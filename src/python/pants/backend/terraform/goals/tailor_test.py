@@ -58,26 +58,30 @@ def test_find_putative_targets() -> None:
                 PutativeTarget.for_target_type(
                     TerraformBackendTarget,
                     "prod/terraform/unowned-module",
-                    "unowned-module",
+                    "prod0.tfbackend",
                     ("prod0.tfbackend",),
+                    kwargs={"source": "prod0.tfbackend"},
                 ),
                 PutativeTarget.for_target_type(
                     TerraformBackendTarget,
                     "prod/terraform/unowned-module",
-                    "unowned-module",
+                    "prod1.tfbackend",
                     ("prod1.tfbackend",),
+                    kwargs={"source": "prod1.tfbackend"},
                 ),
                 PutativeTarget.for_target_type(
                     TerraformVarFileTarget,
                     "prod/terraform/unowned-module",
-                    "unowned-module",
+                    "prod0.tfvars",
                     ("prod0.tfvars",),
+                    kwargs={"sources": ("prod0.tfvars",)},
                 ),
                 PutativeTarget.for_target_type(
                     TerraformVarFileTarget,
                     "prod/terraform/unowned-module",
-                    "unowned-module",
+                    "prod1.tfvars",
                     ("prod1.tfvars",),
+                    kwargs={"sources": ("prod1.tfvars",)},
                 ),
             ]
         )
