@@ -89,7 +89,7 @@ class TerraformRootModuleField(StringField, AsyncFieldMixin):
 
 
 class TerraformBackendConfigField(SingleSourceField):
-    default = "*.tfbackend"
+    default = ".tfbackend"
     help = "Configuration to be merged with what is in the root module's 'backend' block"
 
 

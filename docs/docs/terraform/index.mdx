@@ -54,7 +54,7 @@ Created src/terraform/root/BUILD:
 ```
 terraform_module(name="root")
 terraform_deployment(name="prod", root_module=":root")
-terraform_backend(name="tfbackend")
+terraform_backend(name="tfbackend", source="main.tfbackend")
 terraform_var_files(name="tfvars")
 ```
 
