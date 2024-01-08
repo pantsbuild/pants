@@ -21,6 +21,9 @@ debug = 1
 # Optimise for the speed of our binary, rather than the speed of compilation.
 codegen-units = 1
 
+[profile.dev.package.indicatif]
+opt-level = 0
+
 [lib]
 crate-type = ["cdylib"]
 
@@ -338,8 +341,9 @@ tree-sitter-python = "0.20.4"
 [patch.crates-io]
 # https://github.com/console-rs/console/pull/186
 console = { version = "0.15.7", git = "https://github.com/tgolsson/console.git", rev = "5483880905f384679d322e83c37180f122951995" }
-# https://github.com/console-rs/indicatif/pull/608
-indicatif = { version = "0.17.7", git = "https://github.com/tgolsson/indicatif.git", rev = "31890f0ac55f9727d152ad314a78757ccc0142b6" }
+# 0.17.7 has a panic in some situations, as well as bad overflow calculations.
+# this should be fixed once 0.17.8 is out.
+indicatif = { version = "0.17.7", git = "https://github.com/console-rs/indicatif.git", rev = "2a8b2ea2cd56b5de11da7f79da41e6dd404b2a83" }
 
 
 # Default lints adopted by most crates in this workspace.

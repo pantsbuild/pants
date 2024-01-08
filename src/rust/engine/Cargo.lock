@@ -1761,7 +1761,7 @@ dependencies = [
 [[package]]
 name = "indicatif"
 version = "0.17.7"
-source = "git+https://github.com/tgolsson/indicatif.git?rev=31890f0ac55f9727d152ad314a78757ccc0142b6#31890f0ac55f9727d152ad314a78757ccc0142b6"
+source = "git+https://github.com/console-rs/indicatif.git?rev=2a8b2ea2cd56b5de11da7f79da41e6dd404b2a83#2a8b2ea2cd56b5de11da7f79da41e6dd404b2a83"
 dependencies = [
  "console",
  "instant",
