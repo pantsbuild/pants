@@ -26,7 +26,7 @@ from pants.engine.internals.native_engine import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     SourcesField,
@@ -35,6 +35,7 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
 )
+from pants.option.global_options import KeepSandboxes
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ class TerraformDependenciesResponse:
 @rule
 async def get_terraform_providers(
     req: TerraformDependenciesRequest,
+    keep_sandboxes: KeepSandboxes,
 ) -> TerraformDependenciesResponse:
     args = ["init"]
     if req.backend_config:
@@ -76,6 +78,9 @@ async def get_terraform_providers(
 
     args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
+    init_process_description = (
+        f"Running `init` on Terraform module at `{req.chdir}` to fetch dependencies"
+    )
     fetched_deps = await Get(
         FallibleProcessResult,
         TerraformProcess(
@@ -83,10 +88,18 @@ async def get_terraform_providers(
             input_digest=(req.dependencies_files),
             output_files=(".terraform.lock.hcl",),
             output_directories=(".terraform",),
-            description="Run `terraform init` to fetch dependencies",
+            description=init_process_description,
             chdir=req.chdir,
         ),
     )
+    if fetched_deps.exit_code != 0:
+        raise ProcessExecutionFailure(
+            fetched_deps.exit_code,
+            fetched_deps.stdout,
+            fetched_deps.stderr,
+            init_process_description,
+            keep_sandboxes=keep_sandboxes,
+        )
 
     return TerraformDependenciesResponse(fetched_deps.output_digest)
 
