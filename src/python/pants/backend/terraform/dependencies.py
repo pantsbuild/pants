@@ -175,10 +175,18 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         )
         backend_config = backend_config_sources.snapshot.files[0]
     else:
-        backend_config_names = [e.address for e in backend_config_tgts]
-        raise ValueError(
-            f"Found more than 1 backend config for a Terraform deployment. identified {backend_config_names}"
-        )
+        # We've found multiple backend files, but that's only a problem if we need to initialise the backend.
+        # For example, we might be `validate`ing a `terraform_module` that has multiple backend files in the same dir,
+        # so we don't need to init the backend.
+        # The `terraform_deployment`s will have the references to the correct backends
+
+        if request.initialise_backend:
+            backend_config_names = [e.address for e in backend_config_tgts]
+            raise ValueError(
+                f"Found more than 1 backend config for a Terraform deployment. identified {backend_config_names}"
+            )
+        else:
+            backend_config = None
 
     source_for_validate = await Get(
         Digest,
