@@ -252,14 +252,6 @@ async def generate_updated_lockfile(
         ),
     )
 
-    if original_loaded_lockfile.metadata and (
-        req.interpreter_constraints
-        != original_loaded_lockfile.metadata.valid_for_interpreter_constraints
-    ):
-        raise ValueError(
-            f"Request interpreter constraints {req.interpreter_constraints} do not match {original_loaded_lockfile.metadata.valid_for_interpreter_constraints} in current lockfile, can not update in place"
-        )
-
     inferred_new_projects: List[str] = []
     if original_loaded_lockfile.metadata and isinstance(
         original_loaded_lockfile.metadata, (PythonLockfileMetadataV2, PythonLockfileMetadataV3)
