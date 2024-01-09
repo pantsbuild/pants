@@ -824,7 +824,7 @@ class PySession:
         scheduler: PyScheduler,
         dynamic_ui: bool,
         dynamic_ui_log_streaming: bool,
-        dynamic_ui_log_streaing_lines: int,
+        dynamic_ui_log_streaming_lines: int,
         dynamic_ui_log_streaming_topn: int,
         ui_use_prodash: bool,
         max_workunit_level: int,

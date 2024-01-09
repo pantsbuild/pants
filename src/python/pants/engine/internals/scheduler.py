@@ -339,9 +339,17 @@ class Scheduler:
         # for simplicity at the API level, we use -1 to signal "auto" when moving across the FFI boundary, and then convert to a real Rust enum on the other side.
         if dynamic_ui_log_streaming_lines == "auto":
             dynamic_ui_log_streaming_lines = -1
+        elif isinstance(dynamic_ui_log_streaming_lines, str):
+            raise ValueError(
+                f"dynamic_ui_log_streaming_lines must be an int or 'auto', but was {dynamic_ui_log_streaming_lines}"
+            )
 
         if dynamic_ui_log_streaming_topn == "auto":
             dynamic_ui_log_streaming_topn = -1
+        elif isinstance(dynamic_ui_log_streaming_topn, str):
+            raise ValueError(
+                f"dynamic_ui_log_streaming_topn must be an int or 'auto', but was {dynamic_ui_log_streaming_topn}"
+            )
 
         return SchedulerSession(
             self,
