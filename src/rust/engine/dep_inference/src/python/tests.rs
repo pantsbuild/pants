@@ -12,15 +12,11 @@ fn assert_collected(
     let mut collector = ImportCollector::new(code);
     collector.collect();
     assert_eq!(
-        HashMap::from_iter(import_map.iter().map(|(k, v)| (k.to_string(), v.clone()))),
+        HashMap::from_iter(import_map.iter().map(|(k, v)| (k.to_string(), *v))),
         collector.import_map
     );
     assert_eq!(
-        HashMap::from_iter(
-            string_candidates
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.clone()))
-        ),
+        HashMap::from_iter(string_candidates.iter().map(|(k, v)| (k.to_string(), *v))),
         collector.string_candidates
     );
 }

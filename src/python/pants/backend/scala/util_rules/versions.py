@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from pants.engine.rules import collect_rules, rule
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.util.strutil import softwrap
 
 

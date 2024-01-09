@@ -234,7 +234,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
         assert_files_generated(
             rule_runner,
             addr,
-            source_roots=["src/python", "/src/protobuf", "/tests/protobuf"],
+            source_roots=["src/python", "/src/protobuf", "/tests/protobuf", "src/jvm"],
             expected_files=list(expected),
         )
 

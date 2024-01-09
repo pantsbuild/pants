@@ -15,7 +15,7 @@ from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.goals.fmt import FmtResult, Partitions
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
@@ -39,6 +39,7 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *external_tool_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *strip_jar.rules(),
             *scalac_rules(),
             *util_rules(),

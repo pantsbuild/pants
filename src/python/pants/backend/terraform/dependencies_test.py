@@ -87,7 +87,13 @@ def test_init_terraform_without_backends(
     ), "Did not find expected provider"
 
 
-def test_init_terraform_with_in_repo_module(rule_runner: RuleRunner, tmpdir) -> None:
+def assert_init_module(modules, target_module_id: str, message: str) -> None:
+    assert (
+        target_module_id in modules
+    ), f"{message}: Did not find {target_module_id} in modules.json. Found modules are {list(modules.items())}"
+
+
+def test_init_terraform_with_transitive_module(rule_runner: RuleRunner, tmpdir) -> None:
     deployment_files = {
         "src/tf/deployment/BUILD": textwrap.dedent(
             """\
@@ -105,26 +111,36 @@ def test_init_terraform_with_in_repo_module(rule_runner: RuleRunner, tmpdir) -> 
     }
     module_files = {
         "src/tf/module/BUILD": "terraform_module()",
-        "src/tf/module/main.tf": 'resource "null_resource" "dep" {}',
+        "src/tf/module/main.tf": 'module "transitive" { source = "../transitive/" }',
+    }
+    transitive_module_files = {
+        "src/tf/transitive/BUILD": "terraform_module()",
+        "src/tf/transitive/main.tf": 'resource "null_resource" "dep" {}',
     }
 
     deployment = StandardDeployment(
-        {**deployment_files, **module_files},
+        {**deployment_files, **module_files, **transitive_module_files},
         Path(str(tmpdir.mkdir(".terraform").join("state.json"))),
         Address("src/tf/deployment", target_name="root"),
     )
     initialised_files = _do_init_terraform(rule_runner, deployment, initialise_backend=True)
 
-    # Assert that our module got included in the module.json
     assert initialised_files
+    # Assert that init succeeded and created the modules mapping
     modules_file_raw = find_file(initialised_files, ".terraform/modules/modules.json")
     assert modules_file_raw
-    modules_file = json.loads(modules_file_raw.content)
-    assert any(
-        module for module in modules_file["Modules"] if module["Key"] == "mod0"
-    ), "Did not find our module in modules.json"
 
-    # Assert that the module was explored as part of init
+    modules_file = json.loads(modules_file_raw.content)
+    modules = {module["Key"]: module for module in modules_file["Modules"]}
+
+    assert_init_module(
+        modules, "mod0", message="Assert that the deployment pulled in it root module"
+    )
+    assert_init_module(
+        modules, "mod0.transitive", message="Assert that the root module pulled in its dependents"
+    )
+
+    # Assert that the provider dependency was initialised
     assert find_file(
         initialised_files,
         ".terraform/providers/registry.terraform.io/hashicorp/null/*/*/terraform-provider-null*",

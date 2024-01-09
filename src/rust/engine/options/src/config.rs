@@ -93,6 +93,99 @@ fn interpolate_value(
     })
 }
 
+struct ValueConversionError<'a> {
+    expected_type: &'static str,
+    given_value: &'a Value,
+}
+
+trait FromValue: Sized {
+    fn from_value(value: &Value) -> Result<Self, ValueConversionError>;
+
+    fn from_config(config: &Config, id: &OptionId) -> Result<Option<Self>, String> {
+        if let Some(value) = config.get_value(id) {
+            match Self::from_value(value) {
+                Ok(x) => Ok(Some(x)),
+                Err(verr) => Err(format!(
+                    "Expected {id} to be a {} but given {}",
+                    verr.expected_type, verr.given_value
+                )),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn extract_list(option_name: &str, value: &Value) -> Result<Vec<Self>, String> {
+        if let Some(array) = value.as_array() {
+            let mut items = vec![];
+            for item in array {
+                items.push(Self::from_value(item).map_err(|verr|
+                    format!(
+                        "Expected {option_name} to be an array of {0}s but given {value} containing \
+                        non-{0} item {item}", verr.expected_type
+                    ))?);
+            }
+            Ok(items)
+        } else {
+            Err(format!(
+                "Expected {option_name} to be a toml array or Python sequence, but given {value}."
+            ))
+        }
+    }
+}
+
+impl FromValue for String {
+    fn from_value(value: &Value) -> Result<String, ValueConversionError> {
+        if let Some(string) = value.as_str() {
+            Ok(string.to_owned())
+        } else {
+            Err(ValueConversionError {
+                expected_type: "string",
+                given_value: value,
+            })
+        }
+    }
+}
+
+impl FromValue for bool {
+    fn from_value(value: &Value) -> Result<bool, ValueConversionError> {
+        if let Some(boolean) = value.as_bool() {
+            Ok(boolean)
+        } else {
+            Err(ValueConversionError {
+                expected_type: "bool",
+                given_value: value,
+            })
+        }
+    }
+}
+
+impl FromValue for i64 {
+    fn from_value(value: &Value) -> Result<i64, ValueConversionError> {
+        if let Some(int) = value.as_integer() {
+            Ok(int)
+        } else {
+            Err(ValueConversionError {
+                expected_type: "int",
+                given_value: value,
+            })
+        }
+    }
+}
+
+impl FromValue for f64 {
+    fn from_value(value: &Value) -> Result<f64, ValueConversionError> {
+        if let Some(float) = value.as_float() {
+            Ok(float)
+        } else {
+            Err(ValueConversionError {
+                expected_type: "float",
+                given_value: value,
+            })
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct Config {
     config: Value,
@@ -206,26 +299,6 @@ impl Config {
         id.name("_", NameTransform::None)
     }
 
-    fn extract_string_list(option_name: &str, value: &Value) -> Result<Vec<String>, String> {
-        if let Some(array) = value.as_array() {
-            let mut items = vec![];
-            for item in array {
-                if let Some(value) = item.as_str() {
-                    items.push(value.to_owned())
-                } else {
-                    return Err(format!(
-            "Expected {option_name} to be an array of strings but given {value} containing non string item {item}"
-          ));
-                }
-            }
-            Ok(items)
-        } else {
-            Err(format!(
-                "Expected {option_name} to be a toml array or Python sequence, but given {value}."
-            ))
-        }
-    }
-
     fn get_value(&self, id: &OptionId) -> Option<&Value> {
         self.config
             .get(id.scope())
@@ -258,51 +331,19 @@ impl OptionsSource for Config {
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
-        if let Some(value) = self.get_value(id) {
-            if let Some(string) = value.as_str() {
-                Ok(Some(string.to_owned()))
-            } else {
-                Err(format!("Expected {id} to be a string but given {value}."))
-            }
-        } else {
-            Ok(None)
-        }
+        String::from_config(self, id)
     }
 
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
-        if let Some(value) = self.get_value(id) {
-            if let Some(bool) = value.as_bool() {
-                Ok(Some(bool))
-            } else {
-                Err(format!("Expected {id} to be a bool but given {value}."))
-            }
-        } else {
-            Ok(None)
-        }
+        bool::from_config(self, id)
     }
 
     fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
-        if let Some(value) = self.get_value(id) {
-            if let Some(int) = value.as_integer() {
-                Ok(Some(int))
-            } else {
-                Err(format!("Expected {id} to be an int but given {value}."))
-            }
-        } else {
-            Ok(None)
-        }
+        i64::from_config(self, id)
     }
 
     fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
-        if let Some(value) = self.get_value(id) {
-            if let Some(float) = value.as_float() {
-                Ok(Some(float))
-            } else {
-                Err(format!("Expected {id} to be a float but given {value}."))
-            }
-        } else {
-            Ok(None)
-        }
+        f64::from_config(self, id)
     }
 
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
@@ -326,16 +367,13 @@ impl OptionsSource for Config {
                         if let Some(add) = sub_table.get("add") {
                             list_edits.push(ListEdit {
                                 action: ListEditAction::Add,
-                                items: Self::extract_string_list(
-                                    &format!("{option_name}.add"),
-                                    add,
-                                )?,
+                                items: String::extract_list(&format!("{option_name}.add"), add)?,
                             })
                         }
                         if let Some(remove) = sub_table.get("remove") {
                             list_edits.push(ListEdit {
                                 action: ListEditAction::Remove,
-                                items: Self::extract_string_list(
+                                items: String::extract_list(
                                     &format!("{option_name}.remove"),
                                     remove,
                                 )?,
@@ -347,7 +385,7 @@ impl OptionsSource for Config {
                     }
                     value => list_edits.push(ListEdit {
                         action: ListEditAction::Replace,
-                        items: Self::extract_string_list(&option_name, value)?,
+                        items: String::extract_list(&option_name, value)?,
                     }),
                 }
             }

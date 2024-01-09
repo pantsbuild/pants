@@ -13,7 +13,7 @@ from pants.jvm.goals.lockfile import (
     ValidateJvmArtifactsForResolveRequest,
     ValidateJvmArtifactsForResolveResult,
 )
-from pants.jvm.resolve.common import Coordinate
+from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.docutil import bin_name

@@ -2683,7 +2683,7 @@ async fn make_store(
 ) -> Store {
     Store::local_only(executor, store_dir)
         .unwrap()
-        .into_with_remote(remote_options_for_cas(&cas))
+        .into_with_remote(remote_options_for_cas(cas))
         .await
         .unwrap()
 }

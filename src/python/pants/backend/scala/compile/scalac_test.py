@@ -26,7 +26,7 @@ from pants.backend.scala.target_types import (
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
-from pants.core.util_rules import source_files
+from pants.core.util_rules import source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Addresses
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
@@ -56,11 +56,13 @@ def rule_runner() -> RuleRunner:
             *strip_jar.rules(),
             *scalac_rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *target_types_rules(),
             *testutil.rules(),
             *util_rules(),
             *scala_dep_inf_rules(),
             *scala_artifact_rules(),
+            *system_binaries.rules(),
             QueryRule(CheckResults, (ScalacCheckRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
@@ -164,7 +166,6 @@ def test_compile_no_deps(
     )
     assert classpath.content == {
         ".ExampleLib.scala.lib.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/lib/C.class",
         }
     }
@@ -290,7 +291,6 @@ def test_compile_with_deps(
     )
     assert classpath.content == {
         ".Example.scala.main.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
         }
@@ -392,7 +392,6 @@ def test_compile_with_maven_deps(
     )
     assert classpath.content == {
         ".Example.scala.main.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/Main$.class",
             "org/pantsbuild/example/Main.class",
         }
@@ -869,7 +868,6 @@ def test_compile_no_deps_scala3(
     )
     assert classpath.content == {
         ".ExampleLib.scala.lib.scalac.jar": {
-            "META-INF/MANIFEST.MF",
             "org/pantsbuild/example/lib/C.class",
             "org/pantsbuild/example/lib/C.tasty",
         }
@@ -967,7 +965,6 @@ def test_compile_dep_on_scala_artifact(
         ".ExampleLib.scala.lib.scalac.jar": {
             "ExampleLib$.class",
             "ExampleLib.class",
-            "META-INF/MANIFEST.MF",
         }
     }
 
@@ -1103,3 +1100,66 @@ def test_cross_compile_with_scalac_plugin(
 
     assert classpath_2_13.result == CompileResult.FAILED and classpath_2_13.stderr
     assert "error: Unwanted cyclic dependency" in classpath_2_13.stderr
+
+
+@pytest.fixture
+def scala2_semanticdb_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "semanticdb-scalac-2.13.test.lock",
+        ["org.scala-lang:scala-library:2.13.12", "org.scalameta:semanticdb-scalac_2.13.12:4.8.14"],
+    )
+
+
+@pytest.fixture
+def scala2_semanticdb_lockfile(
+    scala2_semanticdb_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala2_semanticdb_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_scalac_plugin_extra_output(
+    rule_runner: RuleRunner, scala2_semanticdb_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": scala2_semanticdb_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala2_semanticdb_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/Foo.scala": dedent(
+                """\
+                import scala.collection.immutable
+                object Foo { immutable.Seq.empty[Int] }
+                """
+            ),
+            "src/jvm/BUILD": dedent(
+                """\
+                scalac_plugin(
+                    name="semanticdb",
+                    artifact="//3rdparty/jvm:org.scalameta_semanticdb-scalac_2.13.12",
+                )
+
+                scala_sources(scalac_plugins=["semanticdb"])
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(['src/jvm'])}",
+            f"--scala-version-for-resolve={repr({'jvm-default': '2.13.12'})}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    request = CompileScalaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="src/jvm")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    rendered_classpath = rule_runner.request(RenderedClasspath, [request])
+    assert (
+        "META-INF/semanticdb/Foo.scala.semanticdb"
+        in rendered_classpath.content["src.jvm.Foo.scala.scalac.jar"]
+    )
