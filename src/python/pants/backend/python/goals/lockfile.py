@@ -308,7 +308,7 @@ async def generate_lockfile(
     header_delimiter = "//"
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
-    if pex_lock_subsystem.use_pex_update_subcmd:
+    if pex_lock_subsystem.use_pex_update_subcmd():
         result = await Get(ProcessResult, UpdatePythonLockfileRequest(req))
     else:
         result = await Get(ProcessResult, NewPythonLockfileRequest(req))
