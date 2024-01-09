@@ -11,16 +11,20 @@ peg::parser! {
         rule whitespace() -> ()
             = quiet!{ " " / "\n" / "\r" / "\t" }
 
-        rule string() -> String
+        rule value<T>(parse_value: rule<T>) -> T
+            = whitespace()* value:parse_value() whitespace()* { value }
+
+        rule integer() -> i64
+            = i:$("-"?['0'..='9']+) { i.parse::<i64>().unwrap() }
+
+        rule unquoted_string() -> String
             = s:(non_escaped_character() / escaped_character())+ { s.into_iter().collect() }
 
         rule non_escaped_character() -> char
             = !"\\" c:$([_]) { c.chars().next().unwrap() }
 
         rule quoted_string() -> String
-            = whitespace()*
-            string:(double_quoted_string() / single_quoted_string())
-            whitespace()* { string }
+            = string:(double_quoted_string() / single_quoted_string()) { string }
 
         rule double_quoted_string() -> String
             = "\"" s:double_quoted_character()* "\"" { s.into_iter().collect() }
@@ -64,10 +68,10 @@ peg::parser! {
             = quiet!{ ")" }
             / expected!("the end of a tuple indicated by ')'")
 
-        rule tuple_items() -> Vec<String>
+        rule tuple_items<T>(parse_value: rule<T>) -> Vec<T>
             = tuple_start()
-            items:quoted_string() ** ","
-            whitespace()* ","? whitespace()*
+            items:value(&parse_value) ** ","
+            ","? whitespace()*
             tuple_end() {
                 items
             }
@@ -80,41 +84,44 @@ peg::parser! {
             = quiet!{ "]" }
             / expected!("the end of a list indicated by ']'")
 
-        rule list_items() -> Vec<String>
+        rule list_items<T>(parse_value: rule<T>) -> Vec<T>
             = list_start()
-            items:quoted_string() ** ","
-            whitespace()* ","? whitespace()*
+            items:value(&parse_value) ** ","
+            ","? whitespace()*
             list_end() {
                 items
             }
 
-        rule items() -> Vec<String>
+        rule items<T>(parse_value: rule<T>) -> Vec<T>
             = whitespace()*
-            items:(tuple_items() / list_items())
+            items:(tuple_items(&parse_value) / list_items(&parse_value))
             whitespace()* { items }
 
-        rule list_edit() -> ListEdit<String>
-            = whitespace()* action:action() items:items() whitespace()* {
+        rule list_edit<T>(parse_value: rule<T>) -> ListEdit<T>
+            = whitespace()* action:action() items:items(&parse_value) whitespace()* {
                 ListEdit { action, items }
             }
 
-        rule list_edits() -> Vec<ListEdit<String>>
-            = e:list_edit() ** "," ","? { e }
+        rule list_edits<T>(parse_value: rule<T>) -> Vec<ListEdit<T>>
+            = e:list_edit(&parse_value) ** "," ","? { e }
 
-        rule list_replace() -> Vec<ListEdit<String>>
-            = items:items() {
+        rule list_replace<T>(parse_value: rule<T>) -> Vec<ListEdit<T>>
+            = items:items(&parse_value) {
                 vec![ListEdit { action: ListEditAction::Replace, items }]
             }
 
-        rule implicit_add() -> Vec<ListEdit<String>>
+        rule implicit_add<T>(parse_raw_value: rule<T>) -> Vec<ListEdit<T>>
             // If the value is not prefixed with any of the syntax that we recognize as indicating
             // our list edit syntax, then it is implicitly an Add.
-            = !(whitespace() / (action() list_start()) / (action() tuple_start()) / tuple_start() / list_start()) item:string() {
-                vec![ListEdit { action: ListEditAction::Add, items: vec![item.to_owned()] }]
+            = !(whitespace() / (action() list_start()) / (action() tuple_start()) / tuple_start() / list_start()) item:parse_raw_value() {
+                vec![ListEdit { action: ListEditAction::Add, items: vec![item] }]
             }
 
+        pub(crate) rule int_list_edits() -> Vec<ListEdit<i64>>
+            = implicit_add(<integer()>) / list_replace(<integer()>) / list_edits(<integer()>)
+
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>
-            = implicit_add() / list_replace() / list_edits()
+            = implicit_add(<unquoted_string()>) / list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
     }
 }
 
@@ -188,6 +195,11 @@ fn format_parse_error(
         line = parse_error.location.line,
         column = parse_error.location.column,
     ))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_int_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
+    option_value_parser::int_list_edits(value).map_err(|e| format_parse_error("int list", value, e))
 }
 
 pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
