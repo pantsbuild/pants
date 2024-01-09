@@ -10,7 +10,7 @@ fasteners==0.16.3
 freezegun==1.2.1
 ijson==3.1.4
 packaging==21.3
-pex==2.1.152
+pex==2.1.155
 psutil==5.9.0
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
