@@ -48,14 +48,15 @@ def _initialize_build_configuration(
     """
 
     bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-    backends_requirements = _collect_backends_requirements(bootstrap_options.backend_packages)
-    working_set = plugin_resolver.resolve(options_bootstrapper, env, backends_requirements)
 
     # Add any extra paths to python path (e.g., for loading extra source backends).
     for path in bootstrap_options.pythonpath:
         if path not in sys.path:
             sys.path.append(path)
             pkg_resources.fixup_namespace_packages(path)
+
+    backends_requirements = _collect_backends_requirements(bootstrap_options.backend_packages)
+    working_set = plugin_resolver.resolve(options_bootstrapper, env, backends_requirements)
 
     # Load plugins and backends.
     return load_backends_and_plugins(
