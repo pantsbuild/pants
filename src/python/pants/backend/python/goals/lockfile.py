@@ -53,7 +53,9 @@ from pants.engine.fs import (
     DigestEntries,
     FileContent,
     FileEntry,
+    GlobMatchErrorBehavior,
     MergeDigests,
+    PathGlobs,
 )
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -240,6 +242,22 @@ async def generate_updated_lockfile(
             raise ValueError(
                 f"project {project} is not a bare name; specifier, markers must be specified in BUILD files"
             )
+
+    # Assuming that any lockfile we are trying to update has a destination
+    # that is a file and not an embedded read only resource.  See
+    # pex_requirements.py
+    maybe_lockfile = await Get(
+        Digest,
+        PathGlobs(
+            [req.lockfile_dest],
+            glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+            # description_of_origin=lockfile.url_description_of_origin,
+        ),
+    )
+    if maybe_lockfile.serialized_bytes_length == 0:
+        raise ValueError(
+            f"Empty or non-existent lockfile at {req.lockfile_dest}. Unable to update in place"
+        )
 
     original_loaded_lockfile = await Get(
         LoadedLockfile,
