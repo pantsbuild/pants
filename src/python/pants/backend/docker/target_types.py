@@ -29,7 +29,10 @@ from pants.engine.target import (
     DictStringToStringField,
     Field,
     InvalidFieldException,
+    MultipleSourcesField,
     OptionalSingleSourceField,
+    OverridesField,
+    SingleSourceField,
     StringField,
     StringSequenceField,
     Target,
@@ -612,6 +615,73 @@ class DockerImageTarget(Target):
             ...
 
         """
+    )
+
+
+class DockerMirrorImagesSourcesField(MultipleSourcesField):
+    help = (
+        "Filename globs for Docker image sources text files, with one image name per line.\n\n"
+        "The lines may use the full syntax of the Dockerfile `FROM` instruction, except the "
+        "instruction keyword itself."
+    )
+
+
+class DockerMirrorOverridesField(OverridesField):
+    help = (
+        "Add additional attributes to the generated `docker_image` targets.\n\n"
+        "Use the image or stage name as key.\n\n"
+        + softwrap(
+            """\
+            Example:
+
+                docker_mirror_images(
+                  overrides={
+                    "upstream/image": { ... },
+                    ("python", "stage-name",): { ... },
+                    ...
+                  },
+                )
+            """
+        )
+    )
+
+
+class DockerMirrorImagesTarget(Target):
+    alias = "docker_mirror_images"
+    help = (
+        "Translates from spec files with Docker image names to targets that can be published to "
+        "the default registries.\n\n"
+        + softwrap(
+            """\
+            Example spec file:
+
+                # Comment line.
+                upstream/image:1.2.3
+                python:3.8
+                some/image:latest AS stage-name
+
+                # The full syntax of the FROM instruction is supported
+                --platform=... image/ref:latest AS name
+            """
+        )
+    )
+
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        DockerMirrorImagesSourcesField,
+        DockerMirrorOverridesField,
+    )
+
+
+class DockerMirrorImagesSpecFileSourceField(SingleSourceField):
+    help = "Filename for a Docker image sources text file, with one image name per line."
+
+
+class DockerMirrorImagesSpecFileTarget(Target):
+    alias = "_docker_mirror_images_spec_file"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        DockerMirrorImagesSpecFileSourceField,
     )
 
 

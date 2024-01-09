@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import difflib
 import os.path
+import re
+from dataclasses import dataclass
 from fnmatch import fnmatch
 from typing import Callable, Iterable, Iterator, Sequence, TypeVar
 
@@ -164,3 +166,94 @@ def format_rename_suggestion(src_path: str, dst_path: str, *, colors: bool) -> s
     rem = color.maybe_red(src_path)
     add = color.maybe_green(dst_path)
     return f"{rem} => {add}"
+
+
+@dataclass
+class DockerImageRef:
+    """See Docker image reference parsing code at github:
+
+    https://github.com/distribution/distribution/blob/main/reference/reference.go
+    """
+
+    image: str
+    tag: str | None = None
+    digest: str | None = None
+    name: str | None = None
+    platform: str | None = None
+    registry: str | None = None
+
+    def __post_init__(self):
+        name_parts = self.image.split("/")
+        if self.registry:
+            if len(name_parts) < 2 and ":" not in self.registry:
+                self.image = f"{self.registry}/{self.image}"
+                self.registry = None
+        else:
+            if len(name_parts) > 2 or ":" in name_parts[0]:
+                self.registry = name_parts[0]
+                self.image = "/".join(name_parts[1:])
+                assert self.image, f"Bad image ref: {self.registry!r}"
+
+    @property
+    def image_tag(self) -> str:
+        if self.tag:
+            return self.tag
+        if self.digest:
+            return self.digest.split(":", 1)[-1]
+        return "latest"
+
+    @property
+    def target_name(self) -> str:
+        return self.name or "/".join(
+            [s.replace(":", "_") for s in [self.registry, self.image] if s]
+        )
+
+    def __str__(self) -> str:
+        def _parts():
+            if self.platform:
+                yield f"--platform={self.platform} "
+
+            image = self.image
+            if self.registry:
+                image = "/".join([self.registry, self.image])
+            if self.tag:
+                image += f":{self.tag}"
+            if self.digest:
+                image += f"@{self.digest}"
+
+            yield image
+
+            if self.name:
+                yield f" AS {self.name}"
+
+        return "".join(_parts())
+
+
+class DockerImageRefParser:
+    def __init__(self):
+        self._image_ref_pattern = re.compile(
+            r"""
+            ^
+            # optional platform
+            (--platform=(?P<platform>\S+)\s+)?
+            # optional registry
+            ((?P<registry>[^/:_ ]+:?[^/:_ ]*)/)?
+            # image
+            (?P<image>[^:@ \t\n\r\f\v]+)
+            # optionally with :tag
+            (:(?P<tag>[^@ ]+))?
+            # optionally with @digest
+            (@(?P<digest>\S+))?
+            # optional name
+            (\s+[Aa][Ss]\s+(?P<name>\S+))?
+            $
+            """,
+            re.VERBOSE,
+        )
+
+    def parse(self, image_ref: str) -> DockerImageRef:
+        m = self._image_ref_pattern.match(image_ref)
+        if not m:
+            raise ValueError(f"Invalid Docker image: {image_ref!r}")
+
+        return DockerImageRef(**m.groupdict())

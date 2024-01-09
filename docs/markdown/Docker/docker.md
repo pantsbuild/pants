@@ -273,6 +273,42 @@ print(msg)
 Docker image ID: 1fe744d52222
 ```
 
+
+Mirroring Docker images to other registries
+-------------------------------------------
+
+To ease the use of in-house registries, to support air-gapped setups for instance, it is beneficial
+to sync upstream images from public registries to the internal ones. The `docker_mirror_images`
+target is purpose built for this use case, generating `docker_image` targets for each image name in
+the provided spec files. (Basically with a single `FROM` instruction.) Using `overrides` the
+destination image name can be customized using the regular `docker_image` fields to provide
+repository, registry and all those options for the mirrored image. These targets can then be built
+and published as any other `docker_image` target.
+
+```python BUILD
+docker_mirror_images(
+  sources=["mirror_images.txt"],
+  overrides={
+    "ubuntu": {
+      "image_tags": ["latest"],
+    },
+    "tekton": {
+      "registry": "@cicd",
+    },
+  },
+)
+```
+
+```text mirror_images.txt
+# One image name per line.
+python:3.12
+ubuntu
+
+# Using a stage name can be useful in case overrides are being used for a complex image name
+gcr.io/tekton-releases/github.com/tektoncd/operator/cmd/kubernetes/operator:v0.54.0@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d AS tekton
+```
+
+
 Running a Docker image
 ----------------------
 
