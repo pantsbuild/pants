@@ -35,7 +35,7 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 > 
 > In CI, the cache must be uploaded and downloaded every run. This takes time, so there is a tradeoff where too large a cache will slow down your CI.
 > 
-> You can use this script to nuke the cache when it gets too big:
+> You can use this script to nuke the cache when it gets too big (you must ensure that uuidgen is installed on the system):
 > 
 > ```bash
 >  function nuke_if_too_big() {
@@ -44,8 +44,9 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 >    size_mb=$(du -m -d0 "${path}" | cut -f 1)
 >    if (( size_mb > limit_mb )); then
 >      echo "${path} is too large (${size_mb}mb), nuking it."
->      mv "${path}" "${path}.nuke"
->      rm -rf "${path}.nuke"
+>      nuke_path="${path}.$(uuidgen)"
+>      mv "${path}" "${nuke_path}"
+>      rm -rf "${nuke_path}"
 >    fi
 >  }
 >
