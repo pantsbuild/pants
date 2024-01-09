@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(dependencies=[":lockfile"])
-resource(name="lockfile", source="mypy_protobuf.lock")
+resources(name="lockfile", sources=["mypy_protobuf.lock", "grpclib.lock"])
 resource(name="test_lockfile", source="test_grpc_pre_v2_mypy_plugin.lock")
 
 python_tests(

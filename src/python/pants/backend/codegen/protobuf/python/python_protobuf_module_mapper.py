@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import DefaultDict
 
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
     ProtobufGrpcToggleField,
@@ -39,8 +40,15 @@ class PythonProtobufMappingMarker(FirstPartyPythonMappingImplMarker):
 async def map_protobuf_to_python_modules(
     protobuf_targets: AllProtobufTargets,
     python_setup: PythonSetup,
+    python_protobuf_subsystem: PythonProtobufSubsystem,
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
+    grpc_suffixes = []
+    if python_protobuf_subsystem.grpcio_plugin:
+        grpc_suffixes.append("_pb2_grpc")
+    if python_protobuf_subsystem.grpclib_plugin:
+        grpc_suffixes.append("_grpc")
+
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
@@ -60,10 +68,11 @@ async def map_protobuf_to_python_modules(
             ModuleProvider(tgt.address, ModuleProviderType.IMPL)
         )
         if tgt.get(ProtobufGrpcToggleField).value:
-            module = proto_path_to_py_module(stripped_file.value, suffix="_pb2_grpc")
-            resolves_to_modules_to_providers[resolve][module].append(
-                ModuleProvider(tgt.address, ModuleProviderType.IMPL)
-            )
+            for suffix in grpc_suffixes:
+                module = proto_path_to_py_module(stripped_file.value, suffix=suffix)
+                resolves_to_modules_to_providers[resolve][module].append(
+                    ModuleProvider(tgt.address, ModuleProviderType.IMPL)
+                )
 
     return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
 
