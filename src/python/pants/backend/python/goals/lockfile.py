@@ -99,18 +99,6 @@ class PexLockSubsystem(Subsystem):
         ),
     )
 
-    pin = BoolOption(
-        default=False,
-        advanced=False,
-        help=softwrap(
-            """When performing the update, pin all projects in the lock to their current
-            versions. This is useful to pick up newly published wheels for those projects or
-            else switch repositories from the original ones when used in conjunction with any
-            of --index, --no-pypi and --find-links.
-            """
-        ),
-    )
-
 
 @dataclass(frozen=True)
 class GeneratePythonLockfile(GenerateLockfile):
@@ -302,7 +290,6 @@ async def generate_updated_lockfile(
                 *req.interpreter_constraints.generate_pex_arg_list(),
                 *(f"--project={project}" for project in pex_lock_subsystem.project),
                 *(f"--project={project}" for project in inferred_new_projects),
-                *(["--pin"] if pex_lock_subsystem.pin else []),
                 "lock.json",
             ),
             additional_input_digest=await Get(
