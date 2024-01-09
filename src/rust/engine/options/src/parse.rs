@@ -40,6 +40,8 @@ peg::parser! {
             = quoted_character("'")
             / escaped_character()
 
+        // NB: ##method(X) is an undocumented peg feature expression that calls input.method(pos, X)
+        // (see https://github.com/kevinmehall/rust-peg/issues/283).
         rule quoted_character(quote_char: &'static str) -> char
             = !(##parse_string_literal(quote_char) / "\\") c:$([_]) { c.chars().next().unwrap() }
 
