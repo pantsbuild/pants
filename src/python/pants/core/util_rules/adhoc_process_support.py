@@ -222,8 +222,14 @@ async def _resolve_runnable_dependencies(
         FieldSetsPerTargetRequest(RunFieldSet, targets),
     )
 
+    # stores extra_env_vars from system binaries to be passed on to the adhoc_tool
+    runnable_extra_env_vars_unresolved = ()
+
     for address, field_set in zip(addresses, fspt.collection):
-        if not field_set:
+        if field_set:
+            if field_set[0].extra_env_vars.value:
+                runnable_extra_env_vars_unresolved += field_set[0].extra_env_vars.value
+        else:
             raise ValueError(
                 dedent(
                     f"""\
@@ -232,6 +238,11 @@ async def _resolve_runnable_dependencies(
                     """
                 )
             )
+
+    runnable_extra_env_vars = {}
+    if runnable_extra_env_vars_unresolved:
+        runnable_extra_env_vars_resolved = await Get(EnvironmentVars, EnvironmentVarsRequest(runnable_extra_env_vars_unresolved))
+        runnable_extra_env_vars = dict(runnable_extra_env_vars_resolved)
 
     runnables = await MultiGet(
         Get(RunInSandboxRequest, RunFieldSet, field_set[0]) for field_set in fspt.collection
@@ -266,6 +277,8 @@ async def _resolve_runnable_dependencies(
     shim_digest_path = f"_runnable_dependency_shims_{shim_digest.fingerprint}"
     immutable_input_digests = {shim_digest_path: shim_digest}
     _safe_update(immutable_input_digests, merged_extras.immutable_input_digests)
+    environment = {"_PANTS_SHIM_ROOT": "{chroot}"}
+    environment.update(runnable_extra_env_vars)
 
     return (
         merged_extras.digest,
@@ -273,7 +286,7 @@ async def _resolve_runnable_dependencies(
             shim_digest_path,
             FrozenDict(immutable_input_digests),
             merged_extras.append_only_caches,
-            FrozenDict({"_PANTS_SHIM_ROOT": "{chroot}"}),
+            FrozenDict(environment),
         ),
     )
 
@@ -554,11 +567,15 @@ async def prepare_adhoc_process(
 
     command_env: dict[str, str] = {}
 
-    extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(fetch_env_vars))
-    command_env.update(extra_env)
-
+    # env vars may come from 2 sources:
+    # 1. system_binary parameter extra_env_vars, coming in from runnable_dependencies
+    # 2. adhoc_tool parameter extra_env vars
+    # below logic handles 1. first, so 2. can override
     if supplied_env_vars:
         command_env.update(supplied_env_vars)
+
+    extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(fetch_env_vars))
+    command_env.update(extra_env)
 
     input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 
