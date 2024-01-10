@@ -553,13 +553,15 @@ You can change the output dir with the `output_dir` option in the `[coverage-py]
 
 You may want to set `[coverage-py].fail_under` to cause Pants to gracefully fail if coverage is too low, e.g. `fail_under = 70`.
 
-You may use a Coverage config file, e.g. `.coveragerc` or `pyproject.toml`. Pants will autodiscover the config file for you, and you can also set `[coverage-py].config` in your `pants.toml` to point to a non-standard location. You must include `relative_files = true` in the `[run]` section for Pants to work.
+You may use a Coverage config file, e.g. `.coveragerc` or `pyproject.toml`. Pants will autodiscover the config file for you, and you can also set `[coverage-py].config` in your `pants.toml` to point to a non-standard location.
 
-```text .coveragerc
-[run]
-relative_files = true
-branch = true
-```
+> 📘 You must include `relative_files = true` in the `[run]` section for Pants to work:
+> 
+> ```toml .coveragerc
+> [run]
+> relative_files = true
+> branch = true
+> ```
 
 When generating HTML, XML, and JSON reports, you can automatically open the reports through the option `--test-open-coverage`.
 
