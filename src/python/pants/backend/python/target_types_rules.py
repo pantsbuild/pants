@@ -19,10 +19,11 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.rules import UnownedDependencyError, import_rules
 from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
     PythonInferSubsystem,
+    UnownedDependencyUsage,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -272,10 +273,45 @@ async def infer_pex_binary_entry_point_dependency(
     maybe_disambiguated = explicitly_provided_deps.disambiguated(
         owners.ambiguous, owners_must_be_ancestors=entry_point.file_name_used
     )
-    unambiguous_owners = owners.unambiguous or (
-        (maybe_disambiguated,) if maybe_disambiguated else ()
-    )
+
+    if owners.unambiguous:
+        unambiguous_owners = owners.unambiguous
+    elif maybe_disambiguated:
+        unambiguous_owners = (maybe_disambiguated,)
+    elif owners.ambiguous and not maybe_disambiguated:
+        _handle_unresolved_pex_entrypoint(
+            address,
+            entry_point_field.value,
+            owners.ambiguous,
+            python_infer_subsystem.unowned_dependency_behavior,
+        )
+        unambiguous_owners = ()
+    else:
+        unambiguous_owners = ()
     return InferredDependencies(unambiguous_owners)
+
+
+def _handle_unresolved_pex_entrypoint(
+    address: Address,
+    entry_point: str,
+    ambiguous_owners,
+    unowned_dependency_behavior: UnownedDependencyUsage,
+):
+    """Raise an error if we could not disambiguate an entrypoint for the PEX."""
+    msg = softwrap(
+        f"""
+        Pants cannot resolve the entrypoint for the target {address}.
+        The entrypoint {entry_point} might refer to the following:
+
+        {bullet_list(o.spec for o in ambiguous_owners)}
+        """
+    )
+    if unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
+        return
+    elif unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
+        logger.warning(msg)
+    else:
+        raise UnownedDependencyError(msg)
 
 
 # -----------------------------------------------------------------------------------------------

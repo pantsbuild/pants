@@ -10,7 +10,7 @@ from typing import Iterable
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.rules import UnownedDependencyError, import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -146,6 +146,7 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
         ],
         target_types=[PexBinary, PythonRequirementTarget, PythonSourcesGeneratorTarget],
     )
+    rule_runner.set_options(["--python-infer-unowned-dependency-behavior=error"])
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -237,7 +238,9 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
 
     # Warn if there's ambiguity, meaning we cannot infer.
     caplog.clear()
-    assert_inferred(Address("project", target_name="ambiguous"), expected=None)
+    with pytest.raises(ExecutionError) as ambiguous_error:
+        assert_inferred(Address("project", target_name="ambiguous"), expected=None)
+    assert isinstance(ambiguous_error.value.wrapped_exceptions[0], UnownedDependencyError)
     assert len(caplog.records) == 1
     assert (
         softwrap(
@@ -270,8 +273,11 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
             relative_file_path="ambiguous_in_another_root.py",
         ),
     )
+
     caplog.clear()
-    assert_inferred(Address("project", target_name="another_root__module_used"), expected=None)
+    with pytest.raises(ExecutionError) as ambiguous_error_2:
+        assert_inferred(Address("project", target_name="another_root__module_used"), expected=None)
+    assert isinstance(ambiguous_error_2.value.wrapped_exceptions[0], UnownedDependencyError)
     assert len(caplog.records) == 1
     assert (
         softwrap(
