@@ -26,6 +26,14 @@ backend_packages = [
 
 The Terraform backend also needs Python to run Pants's analysers. The setting `[python].interpreter_constraints` will need to be set.
 
+Terraform needs git to download modules. Many providers and provisioners need additional binaries to be available on the PATH. Currently, you can forward your PATH by adding `"PATH"` to `[download-terraform].extra_env_vars` in `pants.toml`, like:
+```toml pants.toml
+[download-terraform]
+extra_env_vars = [
+  "PATH"
+]
+```
+
 ### Adding Terraform targets
 
 The Terraform backend has 2 target types:
@@ -35,7 +43,7 @@ The Terraform backend has 2 target types:
 
 #### Modules
 
-The `tailor` goal will automatically generate `terraform_module` targets. Run [`pants tailor ::`](../getting-started/initial-configuration.mdx#5-generate-build-files). For example:
+The `tailor` goal will automatically generate `terraform_module`, `terraform_backend`, and `terraform_var_files` targets. Run [`pants tailor ::`](../getting-started/initial-configuration.mdx#5-generate-build-files). For example:
 
 ```
 ❯ pants tailor ::
@@ -146,7 +154,7 @@ terraform_module(skip_terraform_validate=True)
 
 :::caution Terraform deployment support is in alpha stage
 Many options and features aren't supported yet.
-Local state backends aren't supported.
+For the local state backend, use an absolute path.
 :::
 
 Run `terraform apply` as part of the `experimental-deploy` goal. The process is run interactively, so you will be prompted for variables and confirmation as usual.
