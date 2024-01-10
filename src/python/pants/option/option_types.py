@@ -366,6 +366,7 @@ class IntOrStrOption(_OptionBase[Union[str, int], _StrDefault]):
 
         class _OptionType:
             def __init__(self, value: str | int) -> None:
+                self._allowed_string_values = allowed_string_values
                 if not isinstance(value, str) and not isinstance(value, int):
                     raise ValueError(
                         f"Expected an int or a string, got {type(value)} with value {value}"
@@ -380,6 +381,15 @@ class IntOrStrOption(_OptionBase[Union[str, int], _StrDefault]):
                             )
 
                 self.value = value
+
+            def __repr__(self):
+                return f"IntOrStrOption<{{{', '.join(allowed_string_values)}}}>(value={self.value})"
+
+            def __eq__(self, other):
+                return (
+                    self.value == other.value
+                    and self._allowed_string_values == other._allowed_string_values
+                )
 
         instance.option_type = _OptionType
 
