@@ -14,8 +14,28 @@ peg::parser! {
         rule value<T>(parse_value: rule<T>) -> T
             = whitespace()* value:parse_value() whitespace()* { value }
 
-        rule integer() -> i64
-            = i:$("-"?['0'..='9']+) { i.parse::<i64>().unwrap() }
+        rule false() -> bool
+            = ("F"/"f") ("A"/"a") ("L"/"l") ("S"/"s") ("E"/"e") { false }
+
+        rule true() -> bool
+            = ("T"/"t") ("R"/"r") ("U"/"u") ("E"/"e") { true }
+
+        pub(crate) rule bool() -> bool
+            = b:(true() / false()) { b }
+
+        // Python numeric literals can include digit-separator underscores. It's unlikely
+        // that anyone relies on those in option values, but since the old Python options
+        // system accepted them, we support them here.
+        rule digitpart() -> &'input str
+            = dp:$(['0'..='9'] ("_"? ['0'..='9'])*) { dp }
+
+        pub(crate) rule int() -> i64
+            = i:$(("+" / "-")?digitpart()) { i.replace('_', "").parse::<i64>().unwrap() }
+
+        pub(crate) rule float() -> f64
+            = f:$(("+" / "-")?digitpart() "." digitpart()? (("e" / "E") ("+" / "-") digitpart())?) {
+            f.replace('_', "").parse::<f64>().unwrap()
+        }
 
         rule unquoted_string() -> String
             = s:(non_escaped_character() / escaped_character())+ { s.into_iter().collect() }
@@ -23,7 +43,7 @@ peg::parser! {
         rule non_escaped_character() -> char
             = !"\\" c:$([_]) { c.chars().next().unwrap() }
 
-        rule quoted_string() -> String
+        pub(crate) rule quoted_string() -> String
             = string:(double_quoted_string() / single_quoted_string()) { string }
 
         rule double_quoted_string() -> String
@@ -119,8 +139,14 @@ peg::parser! {
                 vec![ListEdit { action: ListEditAction::Add, items: vec![item] }]
             }
 
-        pub(crate) rule int_list_edits() -> Vec<ListEdit<i64>>
-            = implicit_add(<integer()>) / list_replace(<integer()>) / list_edits(<integer()>)
+        rule scalar_list_edits<T>(parse_scalar: rule<T>) -> Vec<ListEdit<T>>
+            = implicit_add(&parse_scalar) / list_replace(&parse_scalar) / list_edits(&parse_scalar)
+
+        pub(crate) rule bool_list_edits() -> Vec<ListEdit<bool>> = scalar_list_edits(<bool()>)
+
+        pub(crate) rule int_list_edits() -> Vec<ListEdit<i64>> = scalar_list_edits(<int()>)
+
+        pub(crate) rule float_list_edits() -> Vec<ListEdit<f64>> = scalar_list_edits(<float()>)
 
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>
             = implicit_add(<unquoted_string()>) / list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
@@ -200,8 +226,44 @@ fn format_parse_error(
 }
 
 #[allow(dead_code)]
+pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
+    // This is a more readable error message than the one format_parse_error emits, which
+    // would say something like `Expected \"F\", \"T\", \"f\" or \"t\" at...`.
+    option_value_parser::bool(value).map_err(|e| ParseError::new(
+        format!("Got '{value}' for {{name}}. Expected 'true' or 'false', at line {line} column {column}.",
+                line = e.location.line, column = e.location.column,)))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_int(value: &str) -> Result<i64, ParseError> {
+    option_value_parser::int(value).map_err(|e| format_parse_error("int", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_float(value: &str) -> Result<f64, ParseError> {
+    option_value_parser::float(value).map_err(|e| format_parse_error("float", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_quoted_string(value: &str) -> Result<String, ParseError> {
+    option_value_parser::quoted_string(value).map_err(|e| format_parse_error("string", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_bool_list(value: &str) -> Result<Vec<ListEdit<bool>>, ParseError> {
+    option_value_parser::bool_list_edits(value)
+        .map_err(|e| format_parse_error("bool list", value, e))
+}
+
+#[allow(dead_code)]
 pub(crate) fn parse_int_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
     option_value_parser::int_list_edits(value).map_err(|e| format_parse_error("int list", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_float_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseError> {
+    option_value_parser::float_list_edits(value)
+        .map_err(|e| format_parse_error("float list", value, e))
 }
 
 pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
@@ -209,12 +271,12 @@ pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, Pa
         .map_err(|e| format_parse_error("string list", value, e))
 }
 
-pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
-    match value.to_lowercase().as_str() {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        _ => Err(ParseError::new(format!(
-            "Got '{value}' for {{name}}. Expected 'true' or 'false'."
-        ))),
-    }
-}
+// pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
+//     match value.to_lowercase().as_str() {
+//         "true" => Ok(true),
+//         "false" => Ok(false),
+//         _ => Err(ParseError::new(format!(
+//             "Got '{value}' for {{name}}. Expected 'true' or 'false'."
+//         ))),
+//     }
+// }

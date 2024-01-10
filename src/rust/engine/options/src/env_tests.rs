@@ -111,7 +111,7 @@ fn test_bool() {
 
     assert!(env.get_bool(&option_id!("dne")).unwrap().is_none());
     assert_eq!(
-        "Got 'swallow' for PANTS_EGGS. Expected 'true' or 'false'.".to_owned(),
+        "Got 'swallow' for PANTS_EGGS. Expected 'true' or 'false', at line 1 column 1.".to_owned(),
         env.get_bool(&option_id!("pants", "eggs")).unwrap_err()
     );
 }

@@ -68,7 +68,7 @@ fn test_bool() {
 
     assert!(args.get_bool(&option_id!("dne")).unwrap().is_none());
     assert_eq!(
-        "Got 'swallow' for -c. Expected 'true' or 'false'.".to_owned(),
+        "Got 'swallow' for -c. Expected 'true' or 'false', at line 1 column 1.".to_owned(),
         args.get_bool(&option_id!(-'c', "unladen", "capacity"))
             .unwrap_err()
     );
