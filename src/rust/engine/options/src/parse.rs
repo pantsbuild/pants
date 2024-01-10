@@ -270,13 +270,3 @@ pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, Pa
     option_value_parser::string_list_edits(value)
         .map_err(|e| format_parse_error("string list", value, e))
 }
-
-// pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
-//     match value.to_lowercase().as_str() {
-//         "true" => Ok(true),
-//         "false" => Ok(false),
-//         _ => Err(ParseError::new(format!(
-//             "Got '{value}' for {{name}}. Expected 'true' or 'false'."
-//         ))),
-//     }
-// }
