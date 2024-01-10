@@ -44,10 +44,10 @@ See [Troubleshooting](doc:troubleshooting#how-to-change-your-cache-directory) fo
 >    size_mb=$(du -m -d0 "${path}" | cut -f 1)
 >    if (( size_mb > limit_mb )); then
 >      echo "${path} is too large (${size_mb}mb), nuking it."
->      parent_dir=$(dirname "${path}")
->      nuke_path=$(mktemp -d "${parent_dir}/nuke.XXXXXX")
+>      nuke_prefix="$(dirname "${path}")/$(basename "${path}").nuke"
+>      nuke_path=$(mktemp -d "${nuke_prefix}.XXXXXX")
 >      mv "${path}" "${nuke_path}/"
->      rm -rf "${parent_dir}/nuke.*"
+>      rm -rf "${nuke_prefix}.*"
 >    fi
 >  }
 >
