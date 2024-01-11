@@ -234,7 +234,7 @@ async def generate_updated_lockfile(
     python_setup: PythonSetup,
 ) -> ProcessResult:
     req = update_req.gen_req
-    pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
+    resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(req.resolve_name))
 
     for project in pex_lock_subsystem.project:
         requirement = Requirement(project)
@@ -299,15 +299,13 @@ async def generate_updated_lockfile(
                 "--no-emit-warnings",
                 "--indent=2",
                 *(f"--find-links={link}" for link in req.find_links),
-                *pip_args_setup.args,
+                *resolve_config.pex_args(),
                 *req.interpreter_constraints.generate_pex_arg_list(),
                 *(f"--project={project}" for project in pex_lock_subsystem.project),
                 *(f"--project={project}" for project in inferred_new_projects),
                 "lock.json",
             ),
-            additional_input_digest=await Get(
-                Digest, MergeDigests((pip_args_setup.digest, old_lockfile_digest))
-            ),
+            additional_input_digest=old_lockfile_digest,
             output_files=("lock.json",),
             description=f"Generate lockfile for {req.resolve_name}",
             # See generate_new_lockfile caching note
