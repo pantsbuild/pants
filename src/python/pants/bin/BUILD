@@ -97,6 +97,7 @@ target(
         "src/python/pants/backend/shell/lint/shfmt",
         "src/python/pants/backend/tools/preamble",
         "src/python/pants/backend/tools/taplo",
+        "src/python/pants/backend/tools/workunit_logger",
         "src/python/pants/backend/url_handlers/s3",
         "src/python/pants/core",
     ],
