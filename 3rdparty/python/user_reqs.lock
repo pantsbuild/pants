@@ -22,7 +22,7 @@
 //     "mypy-typing-asserts==0.1.1",
 //     "node-semver==0.9.0",
 //     "packaging==21.3",
-//     "pex==2.1.155",
+//     "pex==2.1.156",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -909,13 +909,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c0edd74bf00c4cc73f4b0117498113d9eb6ea05c0d219936fe1686306d029d05",
-              "url": "https://files.pythonhosted.org/packages/07/90/1cb58e83604eb82436bc72a431a3a693d4db4cc81eed8fb56accc02ac1d2/pex-2.1.155-py2.py3-none-any.whl"
+              "hash": "e7c00fe6f12f6b2ed57ab8e55c4d422647b30e25a4a275cfbc3d3b0bc26e774a",
+              "url": "https://files.pythonhosted.org/packages/f6/88/bbee170b731c326ec90fc79ad13d10f834be56b0b449affa2b1855ee026d/pex-2.1.156-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ec5b4d84a227e167d9f10234f7226d2fb09d561fe0b9a92e69ca8ce9c8d9813f",
-              "url": "https://files.pythonhosted.org/packages/59/ab/7563b395f5a7701ca0952fecd2f5bf755fdf5565340e63e0a957bdc42e27/pex-2.1.155.tar.gz"
+              "hash": "542ecb457c21f5ae8fa749894098e1c54e8639628efee70ece7f89da602aa4c2",
+              "url": "https://files.pythonhosted.org/packages/92/2c/75759b0c4f8a909014f7a78be7e1ea237354b2b8b94c7475408e5038299a/pex-2.1.156.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -923,7 +923,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.13,>=2.7",
-          "version": "2.1.155"
+          "version": "2.1.156"
         },
         {
           "artifacts": [
@@ -2212,7 +2212,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.155",
+  "pex_version": "2.1.156",
   "pip_version": "23.3.2",
   "prefer_older_binary": false,
   "requirements": [
@@ -2229,7 +2229,7 @@
     "mypy-typing-asserts==0.1.1",
     "node-semver==0.9.0",
     "packaging==21.3",
-    "pex==2.1.155",
+    "pex==2.1.156",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
