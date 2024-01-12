@@ -1,0 +1,96 @@
+---
+    title: run
+    sidebar_position: 6
+---
+
+Run a `pex_binary` target.
+
+---
+
+To run an executable/script, use `pants run` on one of the following target types:
+
+- [`pex_binary`](../../../reference/targets/pex_binary.mdx)
+- [`python_source`](../../../reference/targets/python_source.mdx)
+
+(See [package](./package.mdx) for more on the `pex_binary` target.)
+
+```bash
+# A python_source target (usually referred to by the filename)
+$ pants run project/app.py
+```
+
+or
+
+```bash
+# A pex_binary target (must be referred to by target name)
+$ pants run project:app
+```
+
+To pass arguments to the script/executable, use `--` at the end of the command, like this:
+
+```bash
+$ pants run project/app.py -- --arg1 arg2
+```
+
+You may only run one target at a time.
+
+The program will have access to the same environment used by the parent `pants` process, so you can set environment variables in the external environment, e.g. `FOO=bar pants run project/app.py`. (Pants will auto-set some values like `$PATH`).
+
+:::note Tip: check the return code
+Pants will propagate the return code from the underlying executable. Run `echo $?` after the Pants run to see the return code.
+:::
+
+:::caution Issues finding files?
+Run `pants dependencies --transitive path/to/binary.py` to ensure that all the files you need are showing up, including for any [assets](../../using-pants/assets-and-archives.mdx) you intend to use.
+:::
+
+## Execution Semantics
+
+Running a `pex_binary` is equivalent to `package`-ing the target followed by executing the built PEX from the repo root.
+
+Running a `python_source` with the `run_goal_use_sandbox` field set to `True` (the default) runs your code in an ephemeral sandbox (temporary directory) with your firstparty code and Pants-generated files (such as a `relocated_files` or `archive`) copied inside. If you are using generated files like this, you may need to set the `run_goal_use_sandbox` to `True` for file loading to work properly.
+
+Running a `python_source` with the `run_goal_use_sandbox` field set to `False` is equivalent to running the source directly (a la `python ...`) with the set of third-party dependencies exposed to the interpreter. This is comparable to using a virtual environment or Poetry to run your script (E.g. `venv/bin/python ...` or `poetry run python ...`). When scripts write in-repo files—such as Django's `manage.py makemigrations` - it is often necessary to set `run_goal_use_sandbox` to `False` so that the file is written into the expected location.
+
+## Watching the filesystem
+
+If the app that you are running is long lived and safe to restart (including web apps like Django and Flask or other types of servers/services), you can set `restartable=True` on your `pex_binary` target to indicate this to Pants. The `run` goal will then automatically restart the app when its input files change!
+
+On the other hand, if your app is short lived (like a script) and you'd like to re-run it when files change but never interrupt an ongoing run, consider using `pants --loop run` instead. See [Goals](../../using-pants/key-concepts/goals.mdx#running-goals) for more information on `--loop`.
+
+## Debugging
+
+:::note Tip: using the VS Code (or any [DAP](https://microsoft.github.io/debug-adapter-protocol/)-compliant editor) remote debugger
+
+1. In your editor, set your breakpoints and any other debug settings (like break-on-exception).
+2. Run your code with `pants run --debug-adapter`.
+3. Connect your editor to the server. The server host and port are logged by Pants when executing `run --debug-adapter`. (They can also be configured using the `[debug-adapter]` subsystem).
+
+:::
+
+:::note Tip: Using the IntelliJ/PyCharm remote debugger
+First, add the following target in some BUILD file (e.g., the one containing your other 3rd-party dependencies):
+
+```
+python_requirement(
+  name = "pydevd-pycharm",
+  requirements=["pydevd-pycharm==203.5419.8"],  # Or whatever version you choose.
+)
+```
+
+You can check this into your repo, for convenience.
+
+Now, use the remote debugger as usual:
+
+1.  Start a Python remote debugging session in PyCharm, say on port 5000.
+2.  Add the following code at the point where you want execution to pause and connect to the debugger:
+
+```
+import pydevd_pycharm
+pydevd_pycharm.settrace('localhost', port=5000, stdoutToServer=True, stderrToServer=True)
+```
+
+Run your executable with `pants run` as usual.
+
+Note: The first time you do so you may see some extra dependency resolution work, as `pydevd-pycharm` has now been added to the binary's dependencies, via inference. If you have dependency inference turned off in your repo, you will have to manually add a temporary explicit dependency in your binary target on the `pydevd-pycharm` target.
+:::
