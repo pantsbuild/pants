@@ -13,7 +13,7 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
 )
 from pants.backend.scala import target_types
 from pants.backend.scala.compile import scalac
-from pants.backend.scala.lint.scalafix import skip_field
+from pants.backend.scala.lint.scalafix import extra_fields
 from pants.backend.scala.lint.scalafix.rules import (
     ScalafixFieldSet,
     ScalafixFixRequest,
@@ -69,7 +69,7 @@ def rule_runner() -> RuleRunner:
             *target_types.rules(),
             *scala_artifact_rules(),
             *scalafix_rules(),
-            *skip_field.rules(),
+            *extra_fields.rules(),
             *system_binaries.rules(),
             QueryRule(Partitions, (ScalafixFixRequest.PartitionRequest,)),
             QueryRule(Partitions, (ScalafixLintRequest.PartitionRequest,)),
@@ -268,6 +268,35 @@ def test_lint_failure(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_multiple_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "Foo.scala": BAD_FILE,
+            "Bar.scala": GOOD_FILE,
+            "BUILD": "scala_sources(name='test')",
+            ".scalafix.conf": dedent(
+                """\
+                rules = [ DisableSyntax ]
+                DisableSyntax.noThrows = true
+                """
+            ),
+        }
+    )
+
+    tgts = [
+        rule_runner.get_target(Address("", target_name="test", relative_file_path="Foo.scala")),
+        rule_runner.get_target(Address("", target_name="test", relative_file_path="Bar.scala")),
+    ]
+
+    lint_result = run_scalafix_lint(
+        rule_runner,
+        tgts,
+        extra_options=["--scalafix-semantic-rules=False"],
+    )
+    assert lint_result.exit_code != 0
+
+
+@maybe_skip_jdk_test
 def test_multiple_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -428,7 +457,7 @@ def test_run_custom_rule(
         Address("src/jvm", target_name="test", relative_file_path="Foo.scala")
     )
 
-    extra_rule_targets = ["3rdparty/jvm:org.scala-lang_scala-rewrites_2.13"]
+    rule_targets = ["3rdparty/jvm:org.scala-lang_scala-rewrites_2.13"]
     scalac_args = ["-Yrangepos", "-deprecation"]
     fix_result = run_scalafix_fix(
         rule_runner,
@@ -437,7 +466,7 @@ def test_run_custom_rule(
             f"--scala-version-for-resolve={repr({'jvm-default': '2.13.12'})}",
             f"--source-root-patterns={repr(['src/jvm'])}",
             f"--scalac-args={repr(scalac_args)}",
-            f"--scalafix-extra-rule-targets={repr(extra_rule_targets)}",
+            f"--scalafix-rule-targets={repr(rule_targets)}",
         ],
     )
     assert fix_result.output == rule_runner.make_snapshot(
@@ -448,6 +477,71 @@ def test_run_custom_rule(
                     def hello = "hello"
                     def nil = String.valueOf(Nil) + hello
                 }
+                """
+            )
+        }
+    )
+    assert fix_result.did_change is True
+
+
+@pytest.fixture
+def scala3_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scala3.test.lock",
+        ["org.scala-lang:scala3-library_3:3.3.1"],
+    )
+
+
+@pytest.fixture
+def scala3_lockfile(
+    scala3_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala3_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_builtin_syntactic_rule_scala3(
+    rule_runner: RuleRunner, scala3_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": scala3_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scala3_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/Foo.scala": dedent(
+                """\
+                object SignificantIndentation:
+                    implicit class XtensionVal(val str: String) extends AnyVal:
+                        def doubled: String = str + str
+                """
+            ),
+            "src/jvm/BUILD": dedent(
+                """\
+                scala_sources()
+                """
+            ),
+            ".scalafix.conf": "rules = [ LeakingImplicitClassVal ]",
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/jvm", relative_file_path="Foo.scala"))
+
+    fix_result = run_scalafix_fix(
+        rule_runner,
+        [tgt],
+        extra_options=[
+            f"--scala-version-for-resolve={repr({'jvm-default': '3.3.1'})}",
+            f"--source-root-patterns={repr(['src/jvm'])}",
+            "--scalafix-semantic-rules=False",
+        ],
+    )
+
+    assert fix_result.output == rule_runner.make_snapshot(
+        {
+            "src/jvm/Foo.scala": dedent(
+                """\
+                object SignificantIndentation:
+                    implicit class XtensionVal(private val str: String) extends AnyVal:
+                        def doubled: String = str + str
                 """
             )
         }

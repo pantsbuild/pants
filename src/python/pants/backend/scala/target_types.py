@@ -593,6 +593,16 @@ async def generate_jvm_artifact_targets(
     return GeneratedTargets(request.generator, (jvm_artifact_target,))
 
 
+SCALA_SOURCES_TARGET_TYPES: list[type[Target]] = [
+    ScalaSourceTarget,
+    ScalaSourcesGeneratorTarget,
+    ScalatestTestTarget,
+    ScalatestTestsGeneratorTarget,
+    ScalaJunitTestTarget,
+    ScalaJunitTestsGeneratorTarget,
+]
+
+
 def rules():
     return (
         *collect_rules(),

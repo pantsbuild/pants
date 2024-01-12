@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, cast
 
-from pants.backend.scala.lint.scalafix.skip_field import SkipScalafixField
+from pants.backend.scala.lint.scalafix.extra_fields import SkipScalafixField
 from pants.backend.scala.lint.scalafix.subsystem import ScalafixSubsystem
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
@@ -37,6 +37,8 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, GenerateJvmToolLockfileSentinel
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
@@ -49,6 +51,7 @@ class ScalafixFieldSet(FieldSet):
     required_fields = (ScalaSourceField,)
 
     source: ScalaSourceField
+    resolve: JvmResolveField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -75,7 +78,7 @@ class ScalafixLintRequest(LintTargetsRequest):
 
 @dataclass(frozen=True)
 class ScalafixPartitionInfo:
-    scala_version: ScalaVersion | None
+    scala_version: ScalaVersion
     config_snapshot: Snapshot
     runtime_classpath_entries: tuple[str, ...]
     compile_classpath_entries: tuple[str, ...]
@@ -92,7 +95,7 @@ class ScalafixToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
 
 
 @dataclass(frozen=True)
-class _ScalafixRuleClasspath:
+class _MaybeClasspath:
     classpath: Classpath | None
 
     def args(self, *, prefix: str = "") -> Iterable[str]:
@@ -108,15 +111,14 @@ class _ScalafixRuleClasspath:
         return self.classpath.immutable_inputs(prefix=prefix)
 
 
-@rule
 async def _resolve_scalafix_rule_classpath(
     scalafix: ScalafixSubsystem,
-) -> _ScalafixRuleClasspath:
-    if not scalafix.extra_rule_targets:
-        return _ScalafixRuleClasspath(classpath=None)
+) -> _MaybeClasspath:
+    if not scalafix.rule_targets:
+        return _MaybeClasspath(classpath=None)
 
-    classpath = await Get(Classpath, UnparsedAddressInputs, scalafix.extra_rule_targets)
-    return _ScalafixRuleClasspath(classpath)
+    classpath = await Get(Classpath, UnparsedAddressInputs, scalafix.rule_targets)
+    return _MaybeClasspath(classpath)
 
 
 @dataclass(frozen=True)
@@ -127,27 +129,28 @@ class _ScalafixPartitionRequest:
 @rule
 async def _partition_scalafix(
     request: _ScalafixPartitionRequest,
-    rule_classpath: _ScalafixRuleClasspath,
     scala: ScalaSubsystem,
     scalafix: ScalafixSubsystem,
+    jvm: JvmSubsystem,
 ) -> Partitions[ScalafixPartitionInfo]:
     if scalafix.skip:
         return Partitions()
 
-    toolcp_relpath = "__toolcp"
+    runtimecp_relpath = "__runtimecp"
     compilecp_relpath = "__compilecp"
     rulecp_relpath = "__rulecp"
 
-    filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
     classpaths: Iterable[Classpath] = ()
     if scalafix.semantic_rules:
         classpaths = await MultiGet(
             Get(Classpath, Addresses([field_set.address])) for field_set in request.field_sets
         )
+    rule_classpath = await _resolve_scalafix_rule_classpath(scalafix)
 
+    filepaths = tuple(field_set.source.file_path for field_set in request.field_sets)
     classpath_by_filepath = dict(zip(filepaths, classpaths))
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafixToolLockfileSentinel())
-    tool_classpath, config_files = await MultiGet(
+    tool_runtime_classpath, config_files = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(
             GatheredConfigFilesByDirectories,
@@ -160,19 +163,29 @@ async def _partition_scalafix(
         ),
     )
 
-    extra_immutable_input_digests = {toolcp_relpath: tool_classpath.digest}
+    # Determine the Scala version being used by each file.
+    # A single file can be mapped to more than one Scala version in cross-compilation scenarios.
+    scala_versions_by_filepath: dict[str, set[ScalaVersion]] = defaultdict(set)
+    for field_set in request.field_sets:
+        resolve = field_set.resolve.normalized_value(jvm)
+        scala_versions_by_filepath[field_set.source.file_path].add(
+            scala.version_for_resolve(resolve)
+        )
 
-    # Partition the work by which source files share the same config file (regardless of directory).
-    source_files_by_config_file: dict[str, set[str]] = defaultdict(set)
+    # Partition the work by which source files share the same config file and Scala version (regardless of directory).
+    partitioned_source_files: dict[tuple[str, ScalaVersion], set[str]] = defaultdict(set)
     for source_dir, files_in_source_dir in group_by_dir(filepaths).items():
         config_file = config_files.source_dir_to_config_file[source_dir]
-        source_files_by_config_file[config_file].update(
-            os.path.join(source_dir, name) for name in files_in_source_dir
-        )
+        for name in files_in_source_dir:
+            filename = os.path.join(source_dir, name)
+            # We choose the earliest Scala version for those cases in which we have
+            # cross-compiled sources.
+            scala_version = sorted(scala_versions_by_filepath[filename])[0]
+            partitioned_source_files[(config_file, scala_version)].add(filename)
 
     config_file_snapshots = await MultiGet(
         Get(Snapshot, DigestSubset(config_files.snapshot.digest, PathGlobs([config_file])))
-        for config_file in source_files_by_config_file
+        for (config_file, _) in partitioned_source_files
     )
 
     def combine_classpaths(classpaths: Iterable[Classpath]) -> Classpath:
@@ -189,7 +202,7 @@ async def _partition_scalafix(
         assert resolve_key
         return Classpath(tuple(classpath_entries), resolve_key)
 
-    def classpath_for_files(files: Iterable[str]) -> Classpath | None:
+    def classpath_for_files(files: Iterable[str]) -> _MaybeClasspath:
         classpaths_to_combine: set[Classpath] = set()
         for file in files:
             filepath = PurePath(file)
@@ -198,32 +211,26 @@ async def _partition_scalafix(
                     classpaths_to_combine.add(classpath)
 
         if not classpaths_to_combine:
-            return None
+            return _MaybeClasspath(None)
 
-        return combine_classpaths(classpaths_to_combine)
+        return _MaybeClasspath(combine_classpaths(classpaths_to_combine))
 
     def partition_info_for(
-        files: Iterable[str], config_snapshot: Snapshot
+        files: Iterable[str], config_snapshot: Snapshot, scala_version: ScalaVersion
     ) -> ScalafixPartitionInfo:
         classpath = classpath_for_files(files)
         return ScalafixPartitionInfo(
-            scala_version=scala.version_for_resolve(classpath.resolve.name) if classpath else None,
-            runtime_classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
-            compile_classpath_entries=tuple(
-                classpath.immutable_inputs_args(prefix=compilecp_relpath)
-            )
-            if classpath
-            else (),
+            scala_version=scala_version,
+            runtime_classpath_entries=tuple(
+                tool_runtime_classpath.classpath_entries(runtimecp_relpath)
+            ),
+            compile_classpath_entries=tuple(classpath.args(prefix=compilecp_relpath)),
             rule_classpath_entries=tuple(rule_classpath.args(prefix=rulecp_relpath)),
             config_snapshot=config_snapshot,
             extra_immutable_input_digests=FrozenDict(
                 {
-                    **extra_immutable_input_digests,
-                    **(
-                        dict(classpath.immutable_inputs(prefix=compilecp_relpath))
-                        if classpath
-                        else {}
-                    ),
+                    runtimecp_relpath: tool_runtime_classpath.digest,
+                    **dict(classpath.immutable_inputs(prefix=compilecp_relpath)),
                     **dict(rule_classpath.immutable_inputs(prefix=rulecp_relpath)),
                 }
             ),
@@ -232,10 +239,10 @@ async def _partition_scalafix(
     return Partitions(
         Partition(
             tuple(files),
-            partition_info_for(files, config_snapshot),
+            partition_info_for(files, config_snapshot, scala_version),
         )
-        for files, config_snapshot in zip(
-            source_files_by_config_file.values(), config_file_snapshots
+        for ((_, scala_version), files), config_snapshot in zip(
+            partitioned_source_files.items(), config_file_snapshots
         )
     )
 
@@ -295,11 +302,7 @@ async def _run_scalafix_process(
             argv=[
                 "scalafix.cli.Cli",
                 f"--config={partition_info.config_snapshot.files[0]}",
-                *(
-                    (f"--scala-version={partition_info.scala_version}",)
-                    if partition_info.scala_version
-                    else ()
-                ),
+                f"--scala-version={partition_info.scala_version}",
                 *(
                     (f"--classpath={':'.join(partition_info.compile_classpath_entries)}",)
                     if partition_info.compile_classpath_entries

@@ -60,19 +60,19 @@ class ScalafixSubsystem(JvmToolBase):
         ),
     )
 
-    _extra_rule_targets = StrListOption(
+    _rule_targets = StrListOption(
         advanced=True, help="List of targets providing additional Scalafix rules."
     )
 
     skip = SkipOption("fix", "lint")
 
     @memoized_property
-    def extra_rule_targets(self) -> UnparsedAddressInputs | None:
-        if not self._extra_rule_targets:
+    def rule_targets(self) -> UnparsedAddressInputs | None:
+        if not self._rule_targets:
             return None
 
         return UnparsedAddressInputs(
-            self._extra_rule_targets,
+            self._rule_targets,
             owning_address=None,
             description_of_origin=f"the `[{self.options_scope}].extra_rule_targets` subsystem option",
         )
