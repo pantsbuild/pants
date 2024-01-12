@@ -251,7 +251,6 @@ async def generate_updated_lockfile(
         PathGlobs(
             [req.lockfile_dest],
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-            description_of_origin=f"lockfile update for {req.lockfile_dest}",
         ),
     )
     if maybe_lockfile.serialized_bytes_length == 0:
@@ -270,16 +269,26 @@ async def generate_updated_lockfile(
         ),
     )
 
-    inferred_new_projects: List[str] = []
-    if original_loaded_lockfile.metadata and isinstance(
-        original_loaded_lockfile.metadata, (PythonLockfileMetadataV2, PythonLockfileMetadataV3)
+    if not (original_loaded_lockfile.metadata and isinstance(
+        original_loaded_lockfile.metadata, (PythonLockfileMetadataV2, PythonLockfileMetadataV3))
     ):
-        for new_requirement in req.requirements:
-            new_pip_req = PipRequirement.parse(new_requirement)
-            if new_pip_req not in original_loaded_lockfile.metadata.requirements:
-                inferred_new_projects.append(new_requirement)
+        raise ValueErorr(f"Pants metadata for lockfile at {req.lockfile_dest} is in old V1 format. Unable to update in place.")
+
+
+    inferred_new_projects: List[str] = []
+    for maybe_new_requirement in req.requirements:
+        maybe_new_pip_req = PipRequirement.parse(maybe_new_requirement)
+        if maybe_new_pip_req not in original_loaded_lockfile.metadata.requirements:
+            inferred_new_projects.append(maybe_new_requirement)
     if len(inferred_new_projects) > 0:
         logger.info(f"Inferred new requirements for lockfile update: {inferred_new_projects}")
+
+    # Make sure to keep pant's record of the specifier as the source of truth
+    # and not introduce inconsistencies with CLI arguments
+    existing_projects_to_update: List[str] = []
+    print(type(req.requirements, req.requirements))
+    #for project in pex_lock_subsystem.project:
+    #    existing_projects_to_update
 
     original_loaded_lockfile_entries = await Get(
         DigestEntries, Digest, original_loaded_lockfile.lockfile_digest
