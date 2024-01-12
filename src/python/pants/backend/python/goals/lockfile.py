@@ -11,8 +11,6 @@ from dataclasses import dataclass
 from operator import itemgetter
 from typing import List
 
-from packaging.requirements import Requirement  # TODO: drop
-
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
@@ -237,8 +235,7 @@ async def generate_updated_lockfile(
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(req.resolve_name))
 
     for project in pex_lock_subsystem.project:
-        requirement = Requirement(project)
-        if requirement.name != project:
+        if PipRequirement.parse(project).project_name != project:
             raise ValueError(
                 f"project {project} is not a bare name; specifier, markers must be specified in Pants targets"
             )
