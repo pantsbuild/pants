@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from operator import itemgetter
 from typing import List
 
-from packaging.requirements import Requirement
+from packaging.requirements import Requirement  # TODO: drop
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -240,7 +240,7 @@ async def generate_updated_lockfile(
         requirement = Requirement(project)
         if requirement.name != project:
             raise ValueError(
-                f"project {project} is not a bare name; specifier, markers must be specified in BUILD files"
+                f"project {project} is not a bare name; specifier, markers must be specified in Pants targets"
             )
 
     # Assuming that any lockfile we are trying to update has a destination
@@ -269,26 +269,42 @@ async def generate_updated_lockfile(
         ),
     )
 
-    if not (original_loaded_lockfile.metadata and isinstance(
-        original_loaded_lockfile.metadata, (PythonLockfileMetadataV2, PythonLockfileMetadataV3))
+    if not (
+        original_loaded_lockfile.metadata
+        and isinstance(
+            original_loaded_lockfile.metadata, (PythonLockfileMetadataV2, PythonLockfileMetadataV3)
+        )
     ):
-        raise ValueErorr(f"Pants metadata for lockfile at {req.lockfile_dest} is in old V1 format. Unable to update in place.")
+        raise ValueError(
+            f"Pants metadata for lockfile at {req.lockfile_dest} is in old V1 format. Unable to update in place."
+        )
 
+    # Make sure to keep Pant's record of the specifier as the source of truth
+    # and not introduce inconsistencies with CLI arguments
+    requirements_projects_to_update: List[str] = []
+    requirements_projects = {
+        PipRequirement.parse(requirement).project_name: requirement
+        for requirement in req.requirements
+    }
+    for project in pex_lock_subsystem.project:
+        if project not in requirements_projects:
+            raise ValueError(
+                f"project {project} not found among known requirements. Projects msut be listed in known Pants targets"
+            )
+        requirements_projects_to_update.append(requirements_projects[project])
+    if len(requirements_projects_to_update):
+        logger.info(f"Updating requirements for lockfile: {requirements_projects_to_update}")
 
     inferred_new_projects: List[str] = []
     for maybe_new_requirement in req.requirements:
         maybe_new_pip_req = PipRequirement.parse(maybe_new_requirement)
-        if maybe_new_pip_req not in original_loaded_lockfile.metadata.requirements:
+        if (
+            maybe_new_pip_req not in original_loaded_lockfile.metadata.requirements
+            and str(maybe_new_requirement) not in requirements_projects_to_update
+        ):
             inferred_new_projects.append(maybe_new_requirement)
     if len(inferred_new_projects) > 0:
         logger.info(f"Inferred new requirements for lockfile update: {inferred_new_projects}")
-
-    # Make sure to keep pant's record of the specifier as the source of truth
-    # and not introduce inconsistencies with CLI arguments
-    existing_projects_to_update: List[str] = []
-    print(type(req.requirements, req.requirements))
-    #for project in pex_lock_subsystem.project:
-    #    existing_projects_to_update
 
     original_loaded_lockfile_entries = await Get(
         DigestEntries, Digest, original_loaded_lockfile.lockfile_digest
@@ -310,7 +326,7 @@ async def generate_updated_lockfile(
                 *(f"--find-links={link}" for link in req.find_links),
                 *resolve_config.pex_args(),
                 *req.interpreter_constraints.generate_pex_arg_list(),
-                *(f"--project={project}" for project in pex_lock_subsystem.project),
+                *(f"--project={project}" for project in requirements_projects_to_update),
                 *(f"--project={project}" for project in inferred_new_projects),
                 "lock.json",
             ),
