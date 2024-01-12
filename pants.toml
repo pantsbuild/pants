@@ -238,6 +238,3 @@ args = ["-Yrangepos", "-Xlint:unused"]
 
 [scala-infer]
 force_add_siblings_as_dependencies = false
-
-# [scalafix]
-# lockfile = "src/python/pants/backend/scala/lint/scalafix/scalafix.default.lockfile.txt"
