@@ -251,7 +251,7 @@ async def generate_updated_lockfile(
         PathGlobs(
             [req.lockfile_dest],
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-            # description_of_origin=lockfile.url_description_of_origin,
+            description_of_origin=f"lockfile update for {req.lockfile_dest}",
         ),
     )
     if maybe_lockfile.serialized_bytes_length == 0:
