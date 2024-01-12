@@ -1,0 +1,240 @@
+---
+    title: "Environments: Cross-Platform or Remote Builds"
+    sidebar_position: 9
+---
+
+---
+
+# Environments
+
+:::caution Environments are currently in `preview`, and have not yet stabilized.
+We'd love your feedback on how Environments could be most useful to you! Please refer to [the tracking issue](https://github.com/pantsbuild/pants/issues/17355) for known stabilization blockers.
+:::
+
+By default, Pants will execute all sandboxed build work directly on localhost. But defining and using additional "environments" for particular targets allows Pants to transparently execute some or all of your build either:
+
+1. locally in Docker containers
+2. remotely via [remote execution](./remote-caching-&-execution/remote-execution.mdx)
+3. locally, but with a non-default set of environment variables and settings (such as when different platforms need different values, or when cross-building)
+
+## Defining environments
+
+Environments are defined using environment targets:
+
+- [`local_environment`](../../reference/targets/local_environment.mdx) - Runs without containerization on localhost (which is also the default if no environment targets are defined).
+- [`docker_environment`](../../reference/targets/docker_environment.mdx) - Runs in a cached container using the specified Docker image using a local installation of Docker. If the image does not already exist locally, it will be pulled.
+- [`remote_environment`](../../reference/targets/remote_environment.mdx) - Runs in a remote worker via [remote execution](./remote-caching-&-execution/remote-execution.mdx) (possibly with containerization, depending on the server implementation).
+
+Give your environment targets short, descriptive names using the [`[environments-previews.names]` option](../../reference/subsystems/environments-preview.mdx#names) (usually defined in `pants.toml`), which consuming targets use to refer to them in `BUILD` files. That might look like a `pants.toml` section and `BUILD` file (at the root of the repository in this case) containing:
+
+```toml tab={"label":"pants.toml"}
+[environments-preview.names]
+linux = "//:local_linux"
+linux_docker = "//:local_busybox"
+```
+
+```python tab={"label":"BUILD"}
+local_environment(
+  name="local_linux",
+  compatible_platforms=["linux_x86_64"],
+  fallback_environment="local_busybox",
+  ..
+)
+
+docker_environment(
+  name="local_busybox",
+  platform="linux_x86_64",
+  image="busybox:latest@sha256-abcd123...",
+  ..
+)
+```
+
+:::caution Environment targets and macros
+Environment targets are loaded before regular targets in a bootstrap phase, during which macros are unavailable. As such any required field values must be fully defined in the BUILD file without referencing any macros. For optional fields, the use of macros are still discouraged as it may or may not work and Pants makes no guarantees that it will not break in a future version if it were to currently work.
+:::
+
+### Environment-aware options
+
+Environment targets have fields ([target](./key-concepts/targets-and-build-files.mdx) arguments) which correspond to [options](./key-concepts/options.mdx) which are marked "environment-aware". When an option is environment-aware, the value of the option that will be used in an environment can be overridden by setting the corresponding field value on the associated environment target. If an environment target does not set a value, it defaults to the value which is set globally via options values.
+
+For example, the [`[python-bootstrap].search_path` option](../../reference/subsystems/python-bootstrap.mdx#search_path) is environment-aware, which is indicated in its help. It can be overridden for a particular environment by a corresponding environment target field, such as [the one on `local_environment`](../../reference/targets/local_environment.mdx#python_bootstrap_search_path).
+
+:::tip See an option which should be environment-aware, but isn't?
+Environments are a new concept: if you see an option value which should be marked environment-aware but isn't, please definitely [file an issue](https://github.com/pantsbuild/pants/issues/new/choose)!
+:::
+
+## Consuming environments
+
+To declare which environment they should build with, many target types (but particularly "root" targets like tests or binaries) have an `environment=` field: for example, [`python_tests(environment=..)`](../../reference/targets/python_tests.mdx#environment).
+
+The `environment=` field may either:
+
+1. refer to an environment by name
+2. use a special `__local__` environment name, which resolves to any matching `local_environment` (see "Environment matching" below)
+
+:::caution Environment compatibility
+Currently, there is no static validation that a target's environment is compatible with its dependencies' environments -- only the implicit validation of the goals that you run successfully against those targets (`check`, `lint`, `test`, `package`, etc).
+
+As we gain more experience with how environments are used in the wild, it's possible that more static validation can be added: your feedback would be very welcome!
+:::
+
+### Setting the environment on many targets at once
+
+To use an environment everywhere in your repository (or only within a particular subdirectory, or with a particular target
+type), you can use the [`__defaults__` builtin](./key-concepts/targets-and-build-files.mdx#field-default-values). For example, to use an environment named `my_default_environment` globally by default, you would add the following to a `BUILD` file at the root of the repository:
+
+```python title="BUILD"
+__defaults__(all=dict(environment="my_default_environment"))
+```
+
+... and individual targets could override the default as needed.
+
+### Building one target in multiple environments
+
+If a target will always need to be built in multiple environments (rather than conditionally based on which user is building it: see the "Toggle use of an environment for some consumers" section), then you can use the [`parametrize` builtin](./key-concepts/targets-and-build-files.mdx#parametrizing-targets) for the `environment=` field. If you had two environments named `linux` and `macos`, that would look like:
+
+```python title="BUILD"
+pex_binary(
+  name="bin",
+  environment=parametrize("linux", "macos"),
+)
+```
+
+### Environment matching
+
+A single environment name may end up referring to different environment targets on different physical machines, or with different global settings applied: this is known as environment "matching".
+
+- `local_environment` targets will match if their `compatible_platforms=` field matches localhost's platform.
+- `docker_environment` targets will match [if Docker is enabled](../../reference/global-options.mdx#docker_execution), and if their `platform=` field is compatible with localhost's platform.
+- `remote_environment` targets will match [if Remote execution is enabled](../../reference/global-options.mdx#remote_execution).
+
+If a particular environment target _doesn't_ match, it can configure a `fallback_environment=` which will be attempted next. This allows for forming preference chains which are referred to by whichever environment name is at the head of the chain.
+
+For example: a chain like "prefer remote execution if enabled, but fall back to local execution if the platform matches, otherwise use docker" might be configured via the targets:
+
+```python title="BUILD"
+remote_environment(
+  name="remote",
+  fallback_environment="local",
+  ..
+)
+
+local_environment(
+  name="local",
+  compatible_platforms=["linux_x86_64"],
+  fallback_environment="docker",
+)
+
+docker_environment(
+  name="docker",
+  ..
+)
+```
+
+In future versions, environment targets will gain additional predicates to control whether they match (for example: `local_environment` will likely gain a predicate that looks for the [presence or value of an environment variable](https://github.com/pantsbuild/pants/issues/17107). But in the meantime, it's possible to override which environments are matched for particular use cases by overriding their configured names: see the "Toggle use of an environment" workflow below for an example.
+
+## Example workflows
+
+### Enabling remote execution globally
+
+`remote_environment` targets match unless the [`--remote-execution`](../../reference/global-options.mdx#remote_execution) option is disabled. So to cause a particular environment name to use remote execution whenever it is enabled, you could define environment targets which try remote execution first, and then fall back to local execution:
+
+```python title="BUILD"
+remote_environment(
+  name="remote_busybox",
+  platform="linux_x86_64",
+  extra_platform_properties={"container-image=busybox:latest"},
+  fallback_environment="local",
+)
+
+local_environment(
+  name="local",
+  compatible_platforms=[...],
+)
+```
+
+You'd then give your `remote_environment` target an unassuming name like "default":
+
+```toml title="pants.toml"
+[environments-preview.names]
+default = "//:remote_busybox"
+local = "//:local"
+```
+
+... and use that environment by default with all targets. Users or consumers like CI could then toggle whether remote execution is used by setting `--remote-execution`.
+
+:::caution Speculation of remote execution
+The `2.15.x` series of Pants does not yet support ["speculating" remote execution](https://github.com/pantsbuild/pants/issues/8353) by racing it against another environment (usually local or docker). While we expect that this will be necessary to make remote execution a viable option for local execution on user's laptops (where network connections are less reliable), it is less critical for CI use-cases.
+:::
+
+### Use a `docker_environment` to build the inputs to a `docker_image`
+
+To build a `docker_image` target containing a `pex_binary` which uses native (i.e. compiled) dependencies on a `macOS` machine, you can configure the `pex_binary` to be built in a `docker_environment`.
+
+You'll need a `docker_environment` which uses an image containing the relevant build-time requirements of your PEX. At a minimum, you'll need Python itself:
+
+```python title="BUILD"
+docker_environment(
+  name="python_bullseye",
+  platform="linux_x86_64",
+  image="python:3.9.14-slim-bullseye@sha256-abcd123...",
+  ..
+)
+```
+
+Next, mark your `pex_binary` target with this environment (with the name `python_bullseye`: see "Defining environments" above), and define a `docker_image` target depending on it.
+
+```python title="BUILD"
+pex_binary(
+  name="main",
+  environment="python_bullseye",
+)
+
+docker_image(
+    name="docker_image",
+    instructions=[
+        "FROM python:3.9.14-slim-bullseye@sha256-abcd123...",
+        "ENTRYPOINT ["/main"]",
+        "COPY examples/main.pex /main",
+    ],
+)
+```
+
+:::tip Compatibility of `docker_environment` and `docker_image`
+Note that the Docker image used in your `docker_environment` does not need to match the base image of the `docker_image` targets that consume them: they only need to be compatible. This is because execution of build steps in a `docker_environment` occurs in an anonymous container, and only the required inputs are provided to the `docker_image` build.
+
+This means that your `docker_environment` can include things like compilers or other tools relevant to your build, without needing to manually use multi-stage Docker builds.
+:::
+
+### Toggle use of an environment for some consumers
+
+As mentioned above in "Environment matching", environment targets "match" based on their field values and global options. But if two environment targets would be ambiguous in some cases, or if you'd otherwise like to control what a particular environment name means (in CI, for example), you can override an environment name via options.
+
+For example: if you'd like to use a particular `macOS` environment target locally, but override it for a particular use case in CI, you'd start by defining two `local_environment` targets which would usually match ambiguously:
+
+```python title="BUILD"
+local_environment(
+  name="macos_laptop",
+  compatible_platforms=["macos_x86_64"],
+)
+
+local_environment(
+  name="macos_ci",
+  compatible_platforms=["macos_x86_64"],
+)
+```
+
+... and then assign one of them a (generic) environment name in `pants.toml`:
+
+```toml title="pants.toml"
+[environments-preview.names]
+macos = "//:macos_laptop"
+...
+```
+
+You could then _override_ that name definition in `pants.ci.toml` (note the use of the `.add` suffix, in order to preserve any other named environments):
+
+```toml title="pants.ci.toml"
+[environments-preview.names.add]
+macos = "//:macos_ci"
+```
