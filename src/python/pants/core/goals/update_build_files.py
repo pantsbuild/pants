@@ -7,11 +7,12 @@ import dataclasses
 import logging
 import os.path
 import tokenize
+from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
-from typing import DefaultDict, cast
+from typing import DefaultDict, Literal, cast
 
 from colors import green, red
 
@@ -22,6 +23,8 @@ from pants.backend.build_files.fmt.yapf.register import YapfRequest
 from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.ruff.rules import RuffFormatRequest, _run_ruff_fmt
+from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.rules import _run_yapf
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
@@ -69,6 +72,7 @@ class RewrittenBuildFile:
 class Formatter(Enum):
     YAPF = "yapf"
     BLACK = "black"
+    RUFF = "ruff"
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -107,6 +111,10 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
     """
 
 
+class FormatWithPythonToolRequest(RewrittenBuildFileRequest, ABC):
+    formatter: Formatter
+
+
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
     help = help_text(
@@ -139,12 +147,12 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         default=True,
         help=softwrap(
             """
-            Format BUILD files using Black or Yapf.
+            Format BUILD files using Black, Ruff or Yapf.
 
-            Set `[black].args` / `[yapf].args`, `[black].config` / `[yapf].config` ,
-            and `[black].config_discovery` / `[yapf].config_discovery` to change
-            Black's or Yapf's behavior. Set
-            `[black].interpreter_constraints` / `[yapf].interpreter_constraints`
+            Set `[black].args` / `[ruff].args` / `[yapf].args`, `[black].config` / `[ruff].config`, `[yapf].config` ,
+            and `[black].config_discovery` / `[ruff].config_discovery`, `[yapf].config_discovery` to change
+            Black's, Ruff's, or Yapf's behavior. Set
+            `[black].interpreter_constraints` / `[ruff].interpreter_constraints` / `[yapf].interpreter_constraints`
             and `[python].interpreter_search_path` to change which interpreter is
             used to run the formatter.
             """
@@ -218,10 +226,18 @@ async def update_build_files(
     )
 
     rewrite_request_classes = []
+    formatter_to_request_class: dict[Formatter, type[RewrittenBuildFileRequest]] = {
+        Formatter.BLACK: FormatWithBlackRequest,
+        Formatter.YAPF: FormatWithYapfRequest,
+        Formatter.RUFF: FormatWithRuffRequest,
+    }
     for request in union_membership[RewrittenBuildFileRequest]:
-        if issubclass(request, (FormatWithBlackRequest, FormatWithYapfRequest)):
-            is_chosen_formatter = issubclass(request, FormatWithBlackRequest) ^ (
-                update_build_files_subsystem.formatter == Formatter.YAPF
+        if issubclass(request, FormatWithPythonToolRequest):
+            chosen_formatter_request_class = formatter_to_request_class.get(
+                update_build_files_subsystem.formatter
+            )
+            is_chosen_formatter = chosen_formatter_request_class is not None and issubclass(
+                request, chosen_formatter_request_class
             )
 
             if update_build_files_subsystem.fmt and is_chosen_formatter:
@@ -304,8 +320,8 @@ async def update_build_files(
 # ------------------------------------------------------------------------------------------
 
 
-class FormatWithYapfRequest(RewrittenBuildFileRequest):
-    pass
+class FormatWithYapfRequest(FormatWithPythonToolRequest):
+    formatter: Literal[Formatter.YAPF] = Formatter.YAPF
 
 
 @rule
@@ -339,7 +355,7 @@ async def format_build_file_with_yapf(
 
 
 class FormatWithBlackRequest(RewrittenBuildFileRequest):
-    pass
+    formatter: Literal[Formatter.BLACK] = Formatter.BLACK
 
 
 @rule
@@ -363,6 +379,38 @@ async def format_build_file_with_black(
     formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)
     build_lines = tuple(formatted_build_file_content.content.decode("utf-8").splitlines())
     change_descriptions = ("Format with Black",) if result.did_change else ()
+
+    return RewrittenBuildFile(request.path, build_lines, change_descriptions=change_descriptions)
+
+
+# ------------------------------------------------------------------------------------------
+# Ruff formatter fixer
+# ------------------------------------------------------------------------------------------
+
+
+class FormatWithRuffRequest(FormatWithPythonToolRequest):
+    formatter: Literal[Formatter.RUFF] = Formatter.RUFF
+
+
+@rule
+async def format_build_file_with_ruff(
+    request: FormatWithRuffRequest, ruff: Ruff
+) -> RewrittenBuildFile:
+    input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
+    result = await _run_ruff_fmt(
+        RuffFormatRequest.Batch(
+            Ruff.options_scope,
+            input_snapshot.files,
+            partition_metadata=None,
+            snapshot=input_snapshot,
+        ),
+        ruff,
+    )
+    output_content = await Get(DigestContents, Digest, result.output.digest)
+
+    formatted_build_file_content = next(fc for fc in output_content if fc.path == request.path)
+    build_lines = tuple(formatted_build_file_content.content.decode("utf-8").splitlines())
+    change_descriptions = ("Format with Ruff",) if result.did_change else ()
 
     return RewrittenBuildFile(request.path, build_lines, change_descriptions=change_descriptions)
 
@@ -436,4 +484,5 @@ def rules():
         # after all our deprecation fixers.
         UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
         UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
+        # UnionRule(RewrittenBuildFileRequest, FormatWithRuffRequest),
     )
