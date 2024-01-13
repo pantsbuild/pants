@@ -21,7 +21,6 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadata,
-    PythonLockfileMetadataV2,
     PythonLockfileMetadataV3,
 )
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
@@ -268,12 +267,18 @@ async def generate_updated_lockfile(
 
     if not (
         original_loaded_lockfile.metadata
-        and isinstance(
-            original_loaded_lockfile.metadata, (PythonLockfileMetadataV2, PythonLockfileMetadataV3)
-        )
+        and isinstance(original_loaded_lockfile.metadata, (PythonLockfileMetadataV3))
     ):
         raise ValueError(
-            f"Pants metadata for lockfile at {req.lockfile_dest} is in old V1 format. Unable to update in place."
+            f"Pants metadata for lockfile at {req.lockfile_dest} is in old <V3 format. Unable to update in place."
+        )
+    elif set(resolve_config.no_binary) != original_loaded_lockfile.metadata.no_binary:
+        raise ValueError(
+            f"Resolve Config no_binary {set(resolve_config.no_binary)} does not match {original_loaded_lockfile.metadata.no_binary} in last lockfile, can not update in place"
+        )
+    elif set(resolve_config.only_binary) != original_loaded_lockfile.metadata.only_binary:
+        raise ValueError(
+            f"Resolve Config only_binary {set(resolve_config.only_binary)} does not match {original_loaded_lockfile.metadata.only_binary} in last lockfile, can not update in place"
         )
 
     # Make sure to keep Pant's record of the specifier as the source of truth
