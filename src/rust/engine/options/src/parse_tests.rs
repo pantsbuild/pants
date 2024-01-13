@@ -1,8 +1,23 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::parse::{parse_bool, parse_int_list, parse_string_list};
+use crate::parse::*;
 use crate::{ListEdit, ListEditAction};
+
+#[test]
+fn test_parse_quoted_string() {
+    fn check(expected: &str, input: &str) {
+        assert_eq!(Ok(expected.to_string()), parse_quoted_string(input));
+    }
+    check("", "''");
+    check("", r#""""#);
+    check("foo", "'foo'");
+    check("foo", r#""foo""#);
+    check("hanakapi'ai", r#"'hanakapi\'ai'"#);
+    check("hanakapi'ai", r#""hanakapi'ai""#);
+    check("bs\"d", r#""bs\"d""#);
+    check("1995", r#""1995""#);
+}
 
 #[test]
 fn test_parse_bool() {
@@ -15,19 +30,58 @@ fn test_parse_bool() {
     assert_eq!(Ok(false), parse_bool("FALSE"));
 
     assert_eq!(
-        "Got '1' for foo. Expected 'true' or 'false'.".to_owned(),
+        "Got '1' for foo. Expected 'true' or 'false', at line 1 column 1.".to_owned(),
         parse_bool("1").unwrap_err().render("foo")
     )
 }
 
 #[test]
-fn test_parse_string_list_empty() {
-    assert!(parse_string_list("").unwrap().is_empty());
+fn test_parse_int() {
+    assert_eq!(Ok(0), parse_int("0"));
+    assert_eq!(Ok(1), parse_int("1"));
+    assert_eq!(Ok(1), parse_int("+1"));
+    assert_eq!(Ok(-1), parse_int("-1"));
+    assert_eq!(Ok(42), parse_int("42"));
+    assert_eq!(Ok(999), parse_int("999"));
+    assert_eq!(Ok(-123456789), parse_int("-123456789"));
+    assert_eq!(Ok(-123456789), parse_int("-123_456_789"));
+    assert_eq!(Ok(9223372036854775807), parse_int("9223372036854775807"));
+    assert_eq!(Ok(-9223372036854775808), parse_int("-9223372036854775808"));
+    assert_eq!(
+        "Problem parsing foo int value:\n1:badint\n  ^\nExpected \"+\", \"-\" or ['0' ..= '9'] \
+               at line 1 column 1"
+            .to_owned(),
+        parse_int("badint").unwrap_err().render("foo")
+    );
+    assert_eq!(
+        "Problem parsing foo int value:\n1:12badint\n  --^\nExpected \"_\", EOF or ['0' ..= '9'] \
+               at line 1 column 3"
+            .to_owned(),
+        parse_int("12badint").unwrap_err().render("foo")
+    );
 }
 
 #[test]
-fn test_parse_int_list_empty() {
+fn test_parse_float() {
+    assert_eq!(Ok(0.0), parse_float("0.0"));
+    assert_eq!(Ok(0.0), parse_float("-0.0"));
+    assert_eq!(Ok(0.0), parse_float("0."));
+    assert_eq!(Ok(1.0), parse_float("1.0"));
+    assert_eq!(Ok(0.1), parse_float("0.1"));
+    assert_eq!(Ok(0.01), parse_float("+0.01"));
+    assert_eq!(Ok(-98.101), parse_float("-98.101"));
+    assert_eq!(Ok(-245678.1012), parse_float("-245_678.10_12"));
+    assert_eq!(Ok(6.022141793e+23), parse_float("6.022141793e+23"));
+    assert_eq!(Ok(5.67123e+11), parse_float("567.123e+9"));
+    assert_eq!(Ok(9.1093837e-31), parse_float("9.1093837E-31"));
+}
+
+#[test]
+fn test_parse_list_from_empty_string() {
+    assert!(parse_string_list("").unwrap().is_empty());
+    assert!(parse_bool_list("").unwrap().is_empty());
     assert!(parse_int_list("").unwrap().is_empty());
+    assert!(parse_float_list("").unwrap().is_empty());
 }
 
 fn string_list_edit<I: IntoIterator<Item = &'static str>>(
@@ -40,7 +94,7 @@ fn string_list_edit<I: IntoIterator<Item = &'static str>>(
     }
 }
 
-fn int_list_edit<I: IntoIterator<Item = i64>>(action: ListEditAction, items: I) -> ListEdit<i64> {
+fn scalar_list_edit<T, I: IntoIterator<Item = T>>(action: ListEditAction, items: I) -> ListEdit<T> {
     ListEdit {
         action,
         items: items.into_iter().collect(),
@@ -48,7 +102,9 @@ fn int_list_edit<I: IntoIterator<Item = i64>>(action: ListEditAction, items: I) 
 }
 
 const EMPTY_STRING_LIST: [&str; 0] = [];
+const EMPTY_BOOL_LIST: [bool; 0] = [];
 const EMPTY_INT_LIST: [i64; 0] = [];
+const EMPTY_FLOAT_LIST: [f64; 0] = [];
 
 #[test]
 fn test_parse_string_list_replace() {
@@ -67,18 +123,50 @@ fn test_parse_string_list_replace() {
 }
 
 #[test]
+fn test_parse_bool_list_replace() {
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Replace, EMPTY_BOOL_LIST)],
+        parse_bool_list("[]").unwrap()
+    );
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Replace, [true])],
+        parse_bool_list("[True]").unwrap()
+    );
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Replace, [true, false])],
+        parse_bool_list("[True,FALSE]").unwrap()
+    );
+}
+
+#[test]
 fn test_parse_int_list_replace() {
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, EMPTY_INT_LIST)],
+        vec![scalar_list_edit(ListEditAction::Replace, EMPTY_INT_LIST)],
         parse_int_list("[]").unwrap()
     );
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, [42])],
+        vec![scalar_list_edit(ListEditAction::Replace, [42])],
         parse_int_list("[42]").unwrap()
     );
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, [42, -127])],
+        vec![scalar_list_edit(ListEditAction::Replace, [42, -127])],
         parse_int_list("[42,-127]").unwrap()
+    );
+}
+
+#[test]
+fn test_parse_float_list_replace() {
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Replace, EMPTY_FLOAT_LIST)],
+        parse_float_list("[]").unwrap()
+    );
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Replace, [123456.78])],
+        parse_float_list("[123_456.78]").unwrap()
+    );
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Replace, [42.0, -1.27e+7])],
+        parse_float_list("[42.0,-127.0e+5]").unwrap()
     );
 }
 
@@ -91,9 +179,9 @@ fn test_parse_string_list_add() {
 }
 
 #[test]
-fn test_parse_int_list_add() {
+fn test_parse_scalar_list_add() {
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Add, EMPTY_INT_LIST)],
+        vec![scalar_list_edit(ListEditAction::Add, EMPTY_INT_LIST)],
         parse_int_list("+[]").unwrap()
     );
 }
@@ -107,10 +195,10 @@ fn test_parse_string_list_remove() {
 }
 
 #[test]
-fn test_parse_int_list_remove() {
+fn test_parse_scalar_list_remove() {
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Remove, EMPTY_INT_LIST)],
-        parse_int_list("-[]").unwrap()
+        vec![scalar_list_edit(ListEditAction::Remove, EMPTY_BOOL_LIST)],
+        parse_bool_list("-[]").unwrap()
     );
 }
 
@@ -127,14 +215,38 @@ fn test_parse_string_list_edits() {
 }
 
 #[test]
+fn test_parse_bool_list_edits() {
+    assert_eq!(
+        vec![
+            scalar_list_edit(ListEditAction::Remove, [true, false]),
+            scalar_list_edit(ListEditAction::Add, [false]),
+            scalar_list_edit(ListEditAction::Remove, EMPTY_BOOL_LIST),
+        ],
+        parse_bool_list("-[True, FALSE],+[false],-[]").unwrap()
+    );
+}
+
+#[test]
 fn test_parse_int_list_edits() {
     assert_eq!(
         vec![
-            int_list_edit(ListEditAction::Remove, [-3, 4]),
-            int_list_edit(ListEditAction::Add, [42]),
-            int_list_edit(ListEditAction::Remove, EMPTY_INT_LIST),
+            scalar_list_edit(ListEditAction::Remove, [-3, 4]),
+            scalar_list_edit(ListEditAction::Add, [42]),
+            scalar_list_edit(ListEditAction::Remove, EMPTY_INT_LIST),
         ],
         parse_int_list("-[-3, 4],+[42],-[]").unwrap()
+    );
+}
+
+#[test]
+fn test_parse_float_list_edits() {
+    assert_eq!(
+        vec![
+            scalar_list_edit(ListEditAction::Remove, [-3.0, 4.1]),
+            scalar_list_edit(ListEditAction::Add, [42.7]),
+            scalar_list_edit(ListEditAction::Remove, EMPTY_FLOAT_LIST),
+        ],
+        parse_float_list("-[-3.0, 4.1],+[42.7],-[]").unwrap()
     );
 }
 
@@ -150,13 +262,13 @@ fn test_parse_string_list_edits_whitespace() {
 }
 
 #[test]
-fn test_parse_int_list_edits_whitespace() {
+fn test_parse_scalar_list_edits_whitespace() {
     assert_eq!(
         vec![
-            int_list_edit(ListEditAction::Remove, [42]),
-            int_list_edit(ListEditAction::Add, [-127, 0]),
+            scalar_list_edit(ListEditAction::Remove, [42.0]),
+            scalar_list_edit(ListEditAction::Add, [-127.1, 0.0]),
         ],
-        parse_int_list(" - [ 42 , ] , + [ -127  ,0 ] ").unwrap()
+        parse_float_list(" - [ 42.0 , ] , + [ -127.1  ,0. ] ").unwrap()
     );
 }
 
@@ -177,18 +289,18 @@ fn test_parse_string_list_implicit_add() {
 }
 
 #[test]
-fn test_parse_int_list_implicit_add() {
+fn test_parse_scalar_list_implicit_add() {
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Add, vec![999])],
-        parse_int_list("999").unwrap()
+        vec![scalar_list_edit(ListEditAction::Add, vec![true])],
+        parse_bool_list("True").unwrap()
     );
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Add, vec![0])],
-        parse_int_list("0").unwrap()
-    );
-    assert_eq!(
-        vec![int_list_edit(ListEditAction::Add, vec![-127])],
+        vec![scalar_list_edit(ListEditAction::Add, vec![-127])],
         parse_int_list("-127").unwrap()
+    );
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Add, vec![0.7])],
+        parse_float_list("0.7").unwrap()
     );
 }
 
@@ -250,14 +362,18 @@ fn test_parse_string_list_trailing_comma() {
 }
 
 #[test]
-fn test_parse_int_list_trailing_comma() {
+fn test_parse_scalar_list_trailing_comma() {
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, [42])],
+        vec![scalar_list_edit(ListEditAction::Replace, [false, true])],
+        parse_bool_list("[false,true,]").unwrap()
+    );
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Replace, [42])],
         parse_int_list("[42,]").unwrap()
     );
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, [42, -127])],
-        parse_int_list("[42,-127,]").unwrap()
+        vec![scalar_list_edit(ListEditAction::Replace, [42.0, -127.1])],
+        parse_float_list("[42.0,-127.1,]").unwrap()
     );
 }
 
@@ -274,14 +390,18 @@ fn test_parse_string_list_whitespace() {
 }
 
 #[test]
-fn test_parse_int_list_whitespace() {
+fn test_parse_scalar_list_whitespace() {
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, [42])],
+        vec![scalar_list_edit(ListEditAction::Replace, [true, false])],
+        parse_bool_list("  [  True,  False  ] ").unwrap()
+    );
+    assert_eq!(
+        vec![scalar_list_edit(ListEditAction::Replace, [42])],
         parse_int_list(" [ 42 ] ").unwrap()
     );
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, [42, -127])],
-        parse_int_list(" [ 42 , -127 , ] ").unwrap()
+        vec![scalar_list_edit(ListEditAction::Replace, [42.0, -127.1])],
+        parse_float_list(" [ 42.0 , -127.1 , ] ").unwrap()
     );
 }
 
@@ -302,18 +422,18 @@ fn test_parse_string_list_tuple() {
 }
 
 #[test]
-fn test_parse_int_list_tuple() {
+fn test_parse_scalar_list_tuple() {
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, EMPTY_INT_LIST)],
+        vec![scalar_list_edit(ListEditAction::Replace, EMPTY_INT_LIST)],
         parse_int_list("()").unwrap()
     );
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, [42])],
-        parse_int_list("(42)").unwrap()
+        vec![scalar_list_edit(ListEditAction::Replace, [true])],
+        parse_bool_list("(True)").unwrap()
     );
     assert_eq!(
-        vec![int_list_edit(ListEditAction::Replace, [42, -127])],
-        parse_int_list(r#" (42, -127,)"#).unwrap()
+        vec![scalar_list_edit(ListEditAction::Replace, [42.0, -127.1])],
+        parse_float_list(r#" (42.0, -127.1,)"#).unwrap()
     );
 }
 
