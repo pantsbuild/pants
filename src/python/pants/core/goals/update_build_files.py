@@ -111,7 +111,13 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
     """
 
 
-class FormatWithPythonToolRequest(RewrittenBuildFileRequest, ABC):
+#
+class FormatWithToolRequest(ABC):
+    """Discriminated union for formatting tools.
+
+    Subclasses should be scoped to specific tools and set the formatter
+    using an enum literal.
+    """
     formatter: Formatter
 
 
@@ -232,7 +238,7 @@ async def update_build_files(
         Formatter.RUFF: FormatWithRuffRequest,
     }
     for request in union_membership[RewrittenBuildFileRequest]:
-        if issubclass(request, FormatWithPythonToolRequest):
+        if issubclass(request, FormatWithToolRequest):
             chosen_formatter_request_class = formatter_to_request_class.get(
                 update_build_files_subsystem.formatter
             )
@@ -321,7 +327,7 @@ async def update_build_files(
 # ------------------------------------------------------------------------------------------
 
 
-class FormatWithYapfRequest(FormatWithPythonToolRequest):
+class FormatWithYapfRequest(RewrittenBuildFileRequest, FormatWithToolRequest):
     formatter: Literal[Formatter.YAPF] = Formatter.YAPF
 
 
@@ -355,7 +361,7 @@ async def format_build_file_with_yapf(
 # ------------------------------------------------------------------------------------------
 
 
-class FormatWithBlackRequest(RewrittenBuildFileRequest):
+class FormatWithBlackRequest(RewrittenBuildFileRequest, FormatWithToolRequest):
     formatter: Literal[Formatter.BLACK] = Formatter.BLACK
 
 
@@ -389,7 +395,7 @@ async def format_build_file_with_black(
 # ------------------------------------------------------------------------------------------
 
 
-class FormatWithRuffRequest(FormatWithPythonToolRequest):
+class FormatWithRuffRequest(RewrittenBuildFileRequest, FormatWithToolRequest):
     formatter: Literal[Formatter.RUFF] = Formatter.RUFF
 
 
