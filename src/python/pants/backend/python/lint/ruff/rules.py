@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 from typing_extensions import assert_never
 
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet, RuffMode
 from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
@@ -76,6 +77,7 @@ class RuffFormatRequest(FmtTargetsRequest):
 class _RunRuffRequest:
     snapshot: Snapshot
     mode: RuffMode
+    interpreter_constraints: Optional[InterpreterConstraints] = None
 
 
 @rule(level=LogLevel.DEBUG)
@@ -83,7 +85,11 @@ async def run_ruff(
     request: _RunRuffRequest,
     ruff: Ruff,
 ) -> FallibleProcessResult:
-    ruff_pex_get = Get(VenvPex, PexRequest, ruff.to_pex_request())
+    ruff_pex_get = Get(
+        VenvPex,
+        PexRequest,
+        ruff.to_pex_request(interpreter_constraints=request.interpreter_constraints),
+    )
 
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, ruff.config_request(request.snapshot.dirs)
@@ -154,10 +160,18 @@ async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
 
 # Note - this function is kept separate because it is invoked from update_build_files.py, but
 # not as a rule.
-async def _run_ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
+async def _run_ruff_fmt(
+    request: RuffFormatRequest.Batch,
+    ruff: Ruff,
+    interpreter_constraints: Optional[InterpreterConstraints] = None,
+) -> FmtResult:
     result = await Get(
         FallibleProcessResult,
-        _RunRuffRequest(snapshot=request.snapshot, mode=RuffMode.FORMAT),
+        _RunRuffRequest(
+            snapshot=request.snapshot,
+            mode=RuffMode.FORMAT,
+            interpreter_constraints=interpreter_constraints,
+        ),
     )
     return await FmtResult.create(request, result)
 

@@ -23,7 +23,7 @@ from pants.backend.build_files.fmt.yapf.register import YapfRequest
 from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.ruff.rules import RuffFormatRequest, _run_ruff_fmt
+from pants.backend.python.lint.ruff.rules import _run_ruff_fmt
 from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.rules import _run_yapf
 from pants.backend.python.lint.yapf.subsystem import Yapf
