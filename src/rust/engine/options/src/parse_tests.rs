@@ -30,7 +30,9 @@ fn test_parse_bool() {
     assert_eq!(Ok(false), parse_bool("FALSE"));
 
     assert_eq!(
-        "Got '1' for foo. Expected 'true' or 'false', at line 1 column 1.".to_owned(),
+        "Problem parsing foo bool value:\n1:1\n  ^\nExpected 'true' or 'false' \
+        at line 1 column 1"
+            .to_owned(),
         parse_bool("1").unwrap_err().render("foo")
     )
 }
