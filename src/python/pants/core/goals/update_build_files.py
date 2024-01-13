@@ -115,9 +115,9 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
 class FormatWithToolRequest(ABC):
     """Discriminated union for formatting tools.
 
-    Subclasses should be scoped to specific tools and set the formatter
-    using an enum literal.
+    Subclasses should be scoped to specific tools and set the formatter using an enum literal.
     """
+
     formatter: Formatter
 
 
