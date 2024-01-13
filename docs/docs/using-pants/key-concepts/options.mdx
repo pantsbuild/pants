@@ -270,12 +270,12 @@ PANTS_SCOPE_DICTOPT="{'foo':1,'bar':2}"
 
 You can use TOML's [nested table features](https://toml.io/en/v1.0.0#inline-table). These are equivalent:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [scope]
 dictopt = { foo = 1, bar = 2}
 ```
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [scope.dictopt]
 foo = 1
 bar = 2
@@ -324,7 +324,7 @@ Otherwise, the file is parsed as a literal as described above for each option ty
 
 Note that you can use this feature on the command-line, in an env var, or in a config file:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [scope]
 opt = "@path/to/file.json"
 ```

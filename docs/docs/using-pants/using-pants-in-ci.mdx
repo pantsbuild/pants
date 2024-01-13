@@ -128,14 +128,14 @@ By default, Checkout will only fetch the latest commit; you likely want to set `
 :::note GitLab CI: disable shallow clones or fetch main branch
 GitLab's merge pipelines make a shallow clone by default, which only contains recent commits for the feature branch being merged. That severely limits `--changed-since`. There are two possible workarounds:
 
-1.  Clone the entire repository by going to "CI / CD" settings and erase the number from the "Git shallow clone" field of the "General pipelines" section. Don't forget to "Save changes". This has the advantage of cloning everything, which also is the biggest long-term disadvantage.
-2.  A more targeted and hence light-weight intervention leaves the shallow clone setting at its default value and instead fetches the `main` branch as well:
+1. Clone the entire repository by going to "CI / CD" settings and erase the number from the "Git shallow clone" field of the "General pipelines" section. Don't forget to "Save changes". This has the advantage of cloning everything, which also is the biggest long-term disadvantage.
+2. A more targeted and hence light-weight intervention leaves the shallow clone setting at its default value and instead fetches the `main` branch as well:
 
 ```
 git branch -a
 git remote set-branches origin main
 git fetch --depth 1 origin main
-git branch -a`
+git branch -a
 ```
 
 The `git branch` commands are only included to print out all available branches before and after fetching `origin/main`.

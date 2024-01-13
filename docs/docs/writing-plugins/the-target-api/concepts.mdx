@@ -134,44 +134,46 @@ Normally targets are declared in BUILD files to provide metadata about the proje
 
 To declare synthetic targets from a Plugin, first subclass the `SyntheticTargetsRequest` union type and register it as a union member with `UnionRule(SyntheticTargetsRequest, SubclassedType)`. Secondly there needs to be a rule that takes this union member type as input and returns a `SyntheticAddressMaps`.
 
-    from dataclasses import dataclass
-    from pants.engine.internals.synthetic_targets import (
-        SyntheticAddressMaps,
-        SyntheticTargetsRequest,
-    )
-    from pants.engine.internals.target_adaptor import TargetAdaptor
-    from pants.engine.unions import UnionRule
-    from pants.engine.rules import collect_rules, rule
+```python
+from dataclasses import dataclass
+from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMaps,
+    SyntheticTargetsRequest,
+)
+from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.unions import UnionRule
+from pants.engine.rules import collect_rules, rule
 
 
-    @dataclass(frozen=True)
-    class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
-        pass
+@dataclass(frozen=True)
+class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
+    pass
 
 
-    @rule
-    async def example_synthetic_targets(request: SyntheticExampleTargetsRequest) -> SyntheticAddressMaps:
-        return SyntheticAddressMaps.for_targets_request(
-            request,
-            [
+@rule
+async def example_synthetic_targets(request: SyntheticExampleTargetsRequest) -> SyntheticAddressMaps:
+    return SyntheticAddressMaps.for_targets_request(
+        request,
+        [
+            (
+                "BUILD.synthetic-example",
                 (
-                  "BUILD.synthetic-example",
-                  (
-                    TargetAdaptor("<target-type>", "<name>", **target_field_values),
-                    ...
-                  ),
-                ),
+                TargetAdaptor("<target-type>", "<name>", **target_field_values),
                 ...
-            ]
-        )
-
-
-    def rules():
-        return (
-            *collect_rules(),
-            UnionRule(SyntheticTargetsRequest, SyntheticExampleTargetsRequest),
+                ),
+            ),
             ...
-        )
+        ]
+    )
+
+
+def rules():
+    return (
+        *collect_rules(),
+        UnionRule(SyntheticTargetsRequest, SyntheticExampleTargetsRequest),
+        ...
+    )
+```
 
 ### Register synthetic targets per directory or globally
 

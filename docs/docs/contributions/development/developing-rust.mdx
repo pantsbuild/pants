@@ -80,10 +80,10 @@ When debugging, it can be helpful to capture logs with [`env_logger`](https://do
 
 To enable logging:
 
-1.  Add `env_logger = "..."` to `dev-dependencies` in the crate's `Cargo.toml`, replacing the `...` with the relevant version. Search for the version used in other crates.
-2.  At the start of your test, add `let _logger = env_logger::try_init();`.
-3.  Add log statements wherever you'd like using `log::info!()` et al.
-4.  Run your test with `RUST_LOG=trace ./cargo test -p $crate test_name -- --nocapture`, using one of `error`, `warn`, `info`, `debug`, or `trace`.
+1. Add `env_logger = "..."` to `dev-dependencies` in the crate's `Cargo.toml`, replacing the `...` with the relevant version. Search for the version used in other crates.
+2. At the start of your test, add `let _logger = env_logger::try_init();`.
+3. Add log statements wherever you'd like using `log::info!()` et al.
+4. Run your test with `RUST_LOG=trace ./cargo test -p $crate test_name -- --nocapture`, using one of `error`, `warn`, `info`, `debug`, or `trace`.
 
 :::
 
