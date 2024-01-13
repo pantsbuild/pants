@@ -15,13 +15,13 @@ peg::parser! {
             = whitespace()* value:parse_value() whitespace()* { value }
 
         rule false() -> bool
-            = ("F"/"f") ("A"/"a") ("L"/"l") ("S"/"s") ("E"/"e") { false }
+            = quiet!{ ("F"/"f") ("A"/"a") ("L"/"l") ("S"/"s") ("E"/"e") } { false }
 
         rule true() -> bool
-            = ("T"/"t") ("R"/"r") ("U"/"u") ("E"/"e") { true }
+            = quiet!{ ("T"/"t") ("R"/"r") ("U"/"u") ("E"/"e") } { true }
 
         pub(crate) rule bool() -> bool
-            = b:(true() / false()) { b }
+            = b:(true() / false() / expected!("'true' or 'false'")) { b }
 
         // Python numeric literals can include digit-separator underscores. It's unlikely
         // that anyone relies on those in option values, but since the old Python options
@@ -227,11 +227,7 @@ fn format_parse_error(
 
 #[allow(dead_code)]
 pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
-    // This is a more readable error message than the one format_parse_error emits, which
-    // would say something like `Expected \"F\", \"T\", \"f\" or \"t\" at...`.
-    option_value_parser::bool(value).map_err(|e| ParseError::new(
-        format!("Got '{value}' for {{name}}. Expected 'true' or 'false', at line {line} column {column}.",
-                line = e.location.line, column = e.location.column,)))
+    option_value_parser::bool(value).map_err(|e| format_parse_error("bool", value, e))
 }
 
 #[allow(dead_code)]
