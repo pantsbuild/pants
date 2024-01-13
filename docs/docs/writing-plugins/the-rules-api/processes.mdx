@@ -84,12 +84,12 @@ from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 
 @rule
 async def demo(...) -> Foo:
-    process = Process(
-        argv=["/bin/echo", "hello world"],
-        description="Not persisted between Pants runs ('sessions').",
-        cache_scope=ProcessCacheScope.PER_SESSION,
-    )
-    ...
+process = Process(
+argv=["/bin/echo", "hello world"],
+description="Not persisted between Pants runs ('sessions').",
+cache_scope=ProcessCacheScope.PER_SESSION,
+)
+...
 ```
 
 `ProcessCacheScope` supports other options as well, including `ALWAYS`.

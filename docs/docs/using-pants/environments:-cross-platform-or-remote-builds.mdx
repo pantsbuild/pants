@@ -27,13 +27,13 @@ Environments are defined using environment targets:
 
 Give your environment targets short, descriptive names using the [`[environments-previews.names]` option](../../reference/subsystems/environments-preview.mdx#names) (usually defined in `pants.toml`), which consuming targets use to refer to them in `BUILD` files. That might look like a `pants.toml` section and `BUILD` file (at the root of the repository in this case) containing:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [environments-preview.names]
 linux = "//:local_linux"
 linux_docker = "//:local_busybox"
 ```
 
-```python tab={"label":"BUILD"}
+```python title="BUILD"
 local_environment(
   name="local_linux",
   compatible_platforms=["linux_x86_64"],
@@ -57,7 +57,7 @@ Environment targets are loaded before regular targets in a bootstrap phase, duri
 
 Environment targets have fields ([target](./key-concepts/targets-and-build-files.mdx) arguments) which correspond to [options](./key-concepts/options.mdx) which are marked "environment-aware". When an option is environment-aware, the value of the option that will be used in an environment can be overridden by setting the corresponding field value on the associated environment target. If an environment target does not set a value, it defaults to the value which is set globally via options values.
 
-For example, the [`[python-bootstrap].search_path` option](../../reference/subsystems/python-bootstrap.mdx#search_path) is environment-aware, which is indicated in its help. It can be overridden for a particular environment by a corresponding environment target field, such as [the one on `local_environment`](../../reference/targets/local_environment.mdx#python_bootstrap_search_path).
+For example, the [`[python-bootstrap].search_path` option](../../reference/subsystems/python-bootstrap.mdx#search_path) is environment-aware, which is indicated in its help. It can be overridden for a particular environment by a corresponding environment target field, such as [the one on `local_environment`](../../reference/targets/local_environment.mdx#codepython_bootstrap_search_pathcode).
 
 :::tip See an option which should be environment-aware, but isn't?
 Environments are a new concept: if you see an option value which should be marked environment-aware but isn't, please definitely [file an issue](https://github.com/pantsbuild/pants/issues/new/choose)!
@@ -65,7 +65,7 @@ Environments are a new concept: if you see an option value which should be marke
 
 ## Consuming environments
 
-To declare which environment they should build with, many target types (but particularly "root" targets like tests or binaries) have an `environment=` field: for example, [`python_tests(environment=..)`](../../reference/targets/python_tests.mdx#environment).
+To declare which environment they should build with, many target types (but particularly "root" targets like tests or binaries) have an `environment=` field: for example, [`python_tests(environment=..)`](../../reference/targets/python_tests.mdx#codeenvironmentcode).
 
 The `environment=` field may either:
 

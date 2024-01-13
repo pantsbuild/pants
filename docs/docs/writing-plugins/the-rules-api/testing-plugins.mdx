@@ -54,9 +54,9 @@ For example, given this target definition for `project/app:tgt`:
 
 ```python
 python_test(
-    name="tgt",
-    source="app_test.py",
-    timeout=120,
+name="tgt",
+source="app_test.py",
+timeout=120,
 )
 ```
 
@@ -64,8 +64,8 @@ We would write:
 
 ```python
 tgt = PythonTestTarget(
-    {"source": "app_test.py", "timeout": 120},
-    Address("project/app", target_name="tgt"),
+{"source": "app_test.py", "timeout": 120},
+Address("project/app", target_name="tgt"),
 )
 ```
 

@@ -50,13 +50,13 @@ The `python_requirements()` target generator parses a [`requirements.txt`-style 
 
 For example:
 
-```text tab={"label":"requirements.txt"}
+```text title="requirements.txt"
 flask>=1.1.2,<1.3
 requests[security]==2.23.0
 dataclasses ; python_version<'3.7'
 ```
 
-```python tab={"label":"BUILD"}
+```python title="BUILD"
 # This will generate three targets:
 #
 #  - //:reqs#flask
@@ -103,7 +103,7 @@ python_requirements(source="pyproject.toml")
 
 Further information about PEP 621 fields can be found in the PEP documentation. Pants will read dependencies from the `project.dependencies` list, as well as the `project.optional-dependencies` mappings. Pants makes no distinction between `dependencies` and `optional-dependencies`, all dependencies are treated in the same manner as though they were listed in the `dependencies` list. For example:
 
-```toml tab={"label":"pyproject.toml"}
+```toml title="pyproject.toml"
 [project]
 dependencies = [
     "flask>=1.1.2,<1.3",
@@ -114,7 +114,7 @@ dependencies = [
 dataclass = ["dataclasses ; python_version<'3.7'"]
 ```
 
-```python tab={"label":"BUILD"}
+```python title="BUILD"
 # This will generate three targets:
 #
 #  - //:reqs#flask
@@ -141,7 +141,7 @@ python_requirement(
 
 The `poetry_requirements()` target generator parses the [Poetry](https://python-poetry.org/docs/) section in `pyproject.toml` to produce a `python_requirement` target for each entry.
 
-```toml tab={"label":"pyproject.toml"}
+```toml title="pyproject.toml"
 [tool.poetry.dependencies]
 python = "^3.8"
 requests = {extras = ["security"], version = "~1"}
@@ -151,7 +151,7 @@ flask = "~1.12"
 isort = "~5.5"
 ```
 
-```python tab={"label":"BUILD"}
+```python title="BUILD"
 # This will generate three targets:
 #
 #  - //:poetry#flask
@@ -264,7 +264,7 @@ python_requirement(
 
 If you are using the `python_requirements` and `poetry_requirements` target generators, you can use the `overrides` field to do the same thing:
 
-```python tab={"label":"BUILD"}
+```python title="BUILD"
 python_requirements(
     name="reqs",
     overrides={
@@ -273,7 +273,7 @@ python_requirements(
 )
 ```
 
-```text tab={"label":"requirements.txt"}
+```text title="requirements.txt"
 setuptools
 mongomock
 ```
@@ -301,12 +301,12 @@ target@ git+ssh://git@github.com:/myorg/myrepo.git@myhash
 ...you may see errors like:
 
 ```
- Complete output (5 lines):
-  git@github.com: Permission denied (publickey).
-  fatal: Could not read from remote repository.
-  Please make sure you have the correct access rights
-  and the repository exists.
-  ----------------------------------------
+Complete output (5 lines):
+git@github.com: Permission denied (publickey).
+fatal: Could not read from remote repository.
+Please make sure you have the correct access rights
+and the repository exists.
+----------------------------------------
 ```
 
 To fix this, Pants needs to be configured to pass relevant SSH specific environment variables to processes by adding the following to `pants.toml`:
@@ -314,7 +314,7 @@ To fix this, Pants needs to be configured to pass relevant SSH specific environm
 ```
 [subprocess-environment]
 env_vars.add = [
-  "SSH_AUTH_SOCK",
+"SSH_AUTH_SOCK",
 ]
 ```
 
@@ -388,7 +388,7 @@ python_requirement(
 
 - The option `[python-repos].find_links`
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [python-repos]
 # Use an absolute path to a directory containing `.whl` and/or sdist files.
 find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
@@ -400,7 +400,7 @@ ansicolors-1.1.8-py2.py3-none-any.whl
 django-3.1.1-py3-none-any.whl
 ```
 
-```python tab={"label":"3rdparty/BUILD"}
+```python title="3rdparty/BUILD"
 # Use normal requirement strings, i.e. without file paths.
 python_requirement(name="ansicolors", requirements=["ansicolors==1.1.8"])
 python_requirement(name="django", requirements=["django>=3.1,<3.2"])
@@ -451,13 +451,13 @@ Sometimes, transitive dependencies of one of your third-party requirements can c
 
 Constraints files are configured per-resolve, meaning that the resolves for your user code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different configuration. Use the option `[python].resolves_to_constraints_file` to map resolve names to paths to pip-compatible constraints files. For example:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [python.resolves_to_constraints_file]
 data-science = "3rdparty/python/data_science_constraints.txt"
 pytest = "3rdparty/python/pytest_constraints.txt"
 ```
 
-```text tab={"label":"3rdparty/python/data_science_constraints.txt"}
+```text title="3rdparty/python/data_science_constraints.txt"
 requests==22.1.0
 urrllib3==4.2
 ```

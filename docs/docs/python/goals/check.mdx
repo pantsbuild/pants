@@ -96,12 +96,12 @@ Pants's dependency inference knows to infer a dependency both on the implementat
 
 When writing stubs for third-party libraries, you may need the set up the `[source].root_patterns` option so that [source roots](../../using-pants/key-concepts/source-roots.mdx) are properly stripped. For example:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [source]
 root_patterns = ["mypy-stubs", "src/python"]
 ```
 
-```python tab={"label":"mypy-stubs/colors.pyi"}
+```python title="mypy-stubs/colors.pyi"
 # Because we set `mypy-stubs` as a source root, this file will be
 # stripped to be simply `colors.pyi`. MyPy will look at this file for
 # imports of the `colors` module.
@@ -109,18 +109,18 @@ root_patterns = ["mypy-stubs", "src/python"]
 def red(s: str) -> str: ...
 ```
 
-```python tab={"label":"mypy-stubs/BUILD"}
+```python title="mypy-stubs/BUILD"
 python_sources(name="lib")
 ```
 
-```python tab={"label":"src/python/project/app.py"}
+```python title="src/python/project/app.py"
 from colors import red
 
 if __name__ == "__main__":
     print(red("I'm red!"))
 ```
 
-```python tab={"label":"src/python/project/BUILD"}
+```python title="src/python/project/BUILD"
 # Pants will infer a dependency both on the `ansicolors` requirement
 # and our type stub.
 python_sources(name="lib")
@@ -138,7 +138,7 @@ This ensures that the stubs are only used when running MyPy and are not included
 
 Add any third-party MyPy plugins to a [custom lockfile](../python-overview/lockfiles.mdx#lockfiles-for-tools):
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [python.resolves]
 mypy = "3rdparty/python/mypy-lock.txt"
 
@@ -146,12 +146,12 @@ mypy = "3rdparty/python/mypy-lock.txt"
 install_from_resolve = "mypy"
 ```
 
-```text tab={"label":"3rdparty/python/mypy-requirements.txt"}
+```Text title="3rdparty/python/mypy-requirements.txt"
 mypy==1.3.0
 pydantic==1.6.1
 ```
 
-```python tab={"label":"3rdparty/python/BUILD"}
+```python title="3rdparty/python/BUILD"
 python_requirements(
     name="mypy",
     source="mypy-requirements.txt",
@@ -171,7 +171,7 @@ For some plugins, such as `django-stubs`, you may need to always load certain so
 
 For example, to fully use the `django-stubs` plugin, your setup might look like this:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [source]
 root_patterns = ["src/python"]
 
@@ -180,12 +180,12 @@ install_from_resolve = "mypy"
 source_plugins = ["src/python/project:django_settings"]
 ```
 
-```text tab={"label":"3rdparty/python/mypy-requirements.txt"}
+```Text title="3rdparty/python/mypy-requirements.txt"
 mypy==1.3.0
 django-stubs==1.5.0
 ```
 
-```python tab={"label":"3rdparty/python/BUILD"}
+```python title="3rdparty/python/BUILD"
 python_requirements(
     name="mypy",
     source="mypy-requirements.txt",
@@ -193,7 +193,7 @@ python_requirements(
 )
 ```
 
-```text tab={"label":"mypy.ini"}
+```text title="mypy.ini"
 [mypy]
 plugins =
     mypy_django_plugin.main
@@ -202,7 +202,7 @@ plugins =
 django_settings_module = project.django_settings
 ```
 
-```python tab={"label":"src/python/project/django_settings.py"}
+```python title="src/python/project/django_settings.py"
 from django.urls import URLPattern
 
 DEBUG = True
@@ -211,26 +211,26 @@ SECRET_KEY = "not so secret"
 MY_SETTING = URLPattern(pattern="foo", callback=lambda: None)
 ```
 
-```python tab={"label":"src/python/project/BUILD"}
+```python title="src/python/project/BUILD"
 python_source(name="django_settings", source="django_settings.py")
 ```
 
 :::caution Importing type stubs
 Type stubs specified in the MyPy custom lockfile are not visible to the `python-infer` subsystem, and cannot be referenced as explicit `dependencies`. If you `import` from a stubs module in your code, and it does not have a corresponding implementation `python_requirement` target that provides the imported module, you may see a warning/error depending on the value you've configured for `[python-infer].unowned_dependency_behavior`. Goals other than `check` will also raise `ImportError`s if the `import` isn't conditional on the value of `typing.TYPE_CHECKING`:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [python-infer]
 unowned_dependency_behavior = "warning"
 [mypy]
 install_from_resolve = "mypy"
 ```
 
-```Text tab={"label":"3rdparty/python/mypy-requirements.txt"}
+```Text title="3rdparty/python/mypy-requirements.txt"
 mypy==1.3.0
 mypy_boto3_ec2==1.26.136
 ```
 
-```python tab={"label":"3rdparty/python/BUILD"}
+```python title="3rdparty/python/BUILD"
 python_requirements(
 name="mypy",
 source="mypy-requirements.txt",
@@ -238,15 +238,15 @@ resolve="mypy",
 )
 ```
 
-```python tab={"label":"src/example.py"}
+```python title="src/example.py"
 from typing import TYPE_CHECKING
 
 # Unsafe! Will fail outside of `check`
 from mypy_boto3_ec2 import EC2Client
 
 if TYPE_CHECKING:
-    # Safe, but will be flagged as a warning
-    from mypy_boto3_ec2 import EC2ServiceResource
+# Safe, but will be flagged as a warning
+from mypy_boto3_ec2 import EC2ServiceResource
 ```
 
 For these reasons, it's recommended to load any type-stub libraries that require explicit imports as part of your normal [third-party dependencies](../python-overview/third-party-dependencies.mdx). Alternatively, you can set `# pants: no-infer-dep` on the lines of type-stub imports "guarded" by a check of `if TYPE_CHECKING`.
@@ -266,21 +266,21 @@ Finally, set the option `source_plugins` in the `[mypy]` scope to include this t
 
 For example:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [mypy]
 source_plugins = ["pants-plugins/mypy_plugins:plugin"]
 ```
 
-```text tab={"label":"mypy.ini"}
+```text title="mypy.ini"
 plugins =
     mypy_plugins.change_return_type
 ```
 
-```python tab={"label":"pants-plugins/mypy_plugins/BUILD"}
+```python title="pants-plugins/mypy_plugins/BUILD"
 python_source(name="plugin", source="change_return_type.py")
 ```
 
-```python tab={"label":"pants-plugins/mypy_plugins/change_return_type.py"}
+```python title="pants-plugins/mypy_plugins/change_return_type.py"
 """A contrived plugin that changes the return type of any
 function ending in `__overriden_by_plugin` to return None."""
 

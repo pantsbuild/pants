@@ -95,7 +95,7 @@ A Pants [_backend_](../using-pants/key-concepts/backends.mdx) is a Python packag
 
 A plugin will contain one or more backends, with the hooks for each one defined in a file called `register.py`. To enable a custom plugin you add its backends to your `backend_packages` configuration:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [GLOBAL]
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
@@ -106,7 +106,7 @@ backend_packages.add = [
 ]
 ```
 
-```python tab={"label":"pants-plugins/plugin1/register.py"}
+```python title="pants-plugins/plugin1/register.py"
 from plugin1.lib import CustomTargetType, rule1, rule2
 
 

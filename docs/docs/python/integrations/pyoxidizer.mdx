@@ -141,7 +141,7 @@ As explained at [Building distributions](../python-overview/building-distributio
 
 When this happens, PyOxidizer would naively try installing that first-party dependency from PyPI, which will likely fail. Instead, include all relevant `python_distribution` targets in the `dependencies` field of the `pyoxidizer_binary` target.
 
-```python tab={"label":"project/BUILD"}
+```python title="project/BUILD"
 python_sources(name="lib")
 
 python_distribution(
@@ -162,17 +162,17 @@ pyoxidizer_binary(
 )
 ```
 
-```python tab={"label":"project/main.py"}
+```python title="project/main.py"
 from hellotest.utils.greeter import GREET
 
 print(GREET)
 ```
 
-```python tab={"label":"project/utils/greeter.py"}
+```python title="project/utils/greeter.py"
 GREET = 'Hello world!'
 ```
 
-```python tab={"label":"project/utils/BUILD"}
+```python title="project/utils/BUILD"
 python_sources(name="lib")
 
 python_distribution(

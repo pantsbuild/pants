@@ -446,7 +446,7 @@ $ pants project-version myapp:
 
 Let's get all of this code in one place:
 
-```python tab={"label":"pants-plugins/project_version/register.py"}
+```python title="pants-plugins/project_version/register.py"
 from typing import Iterable
 
 import project_version.rules as project_version_rules
@@ -463,7 +463,7 @@ def rules():
     return [*project_version_rules.rules(), *tailor_rules.rules()]
 ```
 
-```python tab={"label":"pants-plugins/project_version/rules.py"}
+```python title="pants-plugins/project_version/rules.py"
 import dataclasses
 import json
 from dataclasses import dataclass
@@ -599,7 +599,7 @@ def rules():
     return collect_rules()
 ```
 
-```python tab={"label":"pants-plugins/project_version/tailor.py"}
+```python title="pants-plugins/project_version/tailor.py"
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -658,7 +658,7 @@ def rules():
     ]
 ```
 
-```python tab={"label":"pants-plugins/project_version/target_types.py"}
+```python title="pants-plugins/project_version/target_types.py"
 from pants.engine.target import COMMON_TARGET_FIELDS, SingleSourceField, Target
 
 

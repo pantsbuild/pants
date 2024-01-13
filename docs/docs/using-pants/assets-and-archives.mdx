@@ -19,7 +19,7 @@ To reduce boilerplate, the [`resources`](../../reference/targets/resources.mdx) 
 
 For example, to load resources in Python:
 
-```python tab={"label":"src/python/project/app.py"}
+```python title="src/python/project/app.py"
 import importlib.resources
 
 if __name__ == "__main__":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     print(f"Config: {config}")
 ```
 
-```python tab={"label":"src/python/project/BUILD"}
+```python title="src/python/project/BUILD"
 python_source(
   name="app",
   source="app.py",
@@ -41,7 +41,7 @@ resource(
 )
 ```
 
-```json tab={"label":"src/python/project/config.json"}
+```json title="src/python/project/config.json"
 { "k1": "v", "k2": "v" }
 ```
 
@@ -55,14 +55,14 @@ To reduce boilerplate, the [`files`](../../reference/targets/files.mdx) target g
 
 For example, to load loose files in Python:
 
-```python tab={"label":"src/python/project/app_test.py"}
+```python title="src/python/project/app_test.py"
 def test_open_file():
     with open("src/python/project/config.json") as f:
         content = f.read().decode()
     assert content == '{"k1": "v", "k2": "v"}'
 ```
 
-```python tab={"label":"src/python/project/BUILD"}
+```python title="src/python/project/BUILD"
 python_test(
     name="app_test",
     source="app_test.py",
@@ -76,7 +76,7 @@ file(
 )
 ```
 
-```json tab={"label":"src/python/project/config.json"}
+```json title="src/python/project/config.json"
 { "k1": "v", "k2": "v" }
 ```
 

@@ -238,10 +238,10 @@ from typing import Iterable
 
 @dataclass(frozen=True)
 class Example:
-    args: tuple[str, ...]
+args: tuple[str, ...]
 
-    def __init__(self, args: Iterable[str]) -> None:
-        object.__setattr__(self, "args", tuple(args))
+def __init__(self, args: Iterable[str]) -> None:
+object.__setattr__(self, "args", tuple(args))
 ```
 
 :::
@@ -302,14 +302,14 @@ def rules():
 
 Conventionally, each file will have a function called `rules()` and then `register.py` will re-export them. This is meant to make imports more organized. Within each file, you can use `collect_rules()` to automatically find the rules in the file.
 
-```python tab={"label":"pants-plugins/fortran/register.py"}
+```python title="pants-plugins/fortran/register.py"
 from fortran import fmt, test
 
 def rules():
     return [*fmt.rules(), *test.rules()]
 ```
 
-```python tab={"label":"pants-plugins/fortran/fmt.py"}
+```python title="pants-plugins/fortran/fmt.py"
 from pants.engine.rules import collect_rules, rule
 
 @rule
@@ -324,7 +324,7 @@ def rules():
     return collect_rules()
 ```
 
-```python tab={"label":"pants-plugins/fortran/test.py"}
+```python title="pants-plugins/fortran/test.py"
 from pants.engine.rules import collect_rules, rule
 
 @rule

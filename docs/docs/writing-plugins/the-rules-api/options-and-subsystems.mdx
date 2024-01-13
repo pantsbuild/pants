@@ -21,7 +21,7 @@ To add new options:
 3. Register the `Subsystem` with `Subsystem.rules()` and `register.py`.
    - You don't need `Subsystem.rules()` if the `Subsystem` is used in an `@rule` because `collect_rules()` will recognize it. It doesn't hurt to keep this around, though.
 
-```python tab={"label":"pants-plugins/example/shellcheck.py"}
+```python title="pants-plugins/example/shellcheck.py"
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 
@@ -41,7 +41,7 @@ def rules():
     return [*ShellcheckSubsystem.rules()]
 ```
 
-```python tab={"label":"pants-plugins/example/register.py"}
+```python title="pants-plugins/example/register.py"
 from example import shellcheck
 
 def rules():

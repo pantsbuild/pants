@@ -207,9 +207,9 @@ To use shunit2 with Pants:
 2. Create a `shunit2_test` or `shunit2_tests` target in the directory's BUILD file.
    - You can run [`pants tailor`](../getting-started/initial-configuration.mdx#5-generate-build-files) to automate this step.
 3. Specify which shell to run your tests with, either by setting a shebang directly in the test file or by setting the field `shell` on the `shunit2_test` / `shunit2_tests` target.
-   - See [here](../../reference/targets/shunit2_tests.mdx#shell) for all supported shells.
+   - See [here](../../reference/targets/shunit2_tests.mdx#codeshellcode) for all supported shells.
 
-```shell tab={"label":"scripts/tests.sh"}
+```shell title="scripts/tests.sh"
 #!/usr/bin/env bash
 
 testEquality() {
@@ -217,7 +217,7 @@ testEquality() {
 }
 ```
 
-```python tab={"label":"scripts/BUILD"}
+```python title="scripts/BUILD"
 shunit2_tests(name="tests")
 ```
 
@@ -238,7 +238,7 @@ Pants will download the `./shunit2` script and will add `source ./shunit2` with 
 
 You can import your production code by using `source`. Make sure the code belongs to a `shell_source` or `shell_sources` target. Pants's [dependency inference](../using-pants/key-concepts/targets-and-build-files.mdx) will add the relevant dependencies, which you can confirm by running `pants dependencies scripts/tests.sh`. You can also manually add to the `dependencies` field of your `shunit2_tests` target.
 
-```shell tab={"label":"scripts/tests.sh"}
+```shell title="scripts/tests.sh"
 #!/usr/bin/bash
 
 source scripts/lib.sh
@@ -248,13 +248,13 @@ testAdd() {
 }
 ```
 
-```shell tab={"label":"scripts/lib.sh"}
+```shell title="scripts/lib.sh"
 add_one() {
     echo $(($1 + 1))
 }
 ```
 
-```shell tab={"label":"scripts/BUILD"}
+```shell title="scripts/BUILD"
 shell_sources(name="lib")
 shell_tests(name="tests")
 ```
@@ -266,8 +266,8 @@ To test multiple shells, use the `parametrize` mechanism, like this:
 
 ```python
 shunit2_tests(
-    name="tests",
-    shell=parametrize("bash", "zsh"),
+name="tests",
+shell=parametrize("bash", "zsh"),
 )
 ```
 
@@ -360,7 +360,7 @@ To depend on a built package, use the `runtime_package_dependencies` field on th
 
 For example:
 
-```python tab={"label":"helloworld/BUILD"}
+```python title="helloworld/BUILD"
 python_source(name="py_src", source="say_hello.py")
 pex_binary(name="pex", entry_point="say_hello.py")
 
@@ -371,11 +371,11 @@ shunit2_test(
 )
 ```
 
-```python tab={"label":"helloworld/say_hello.py"}
+```python title="helloworld/say_hello.py"
 print("Hello, test!")
 ```
 
-```shell tab={"label":"helloworld/tests.sh"}
+```shell title="helloworld/tests.sh"
 #!/usr/bin/bash
 
 testArchiveCreated() {

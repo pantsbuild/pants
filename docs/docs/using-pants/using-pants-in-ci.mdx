@@ -38,18 +38,15 @@ In CI, the cache must be uploaded and downloaded every run. This takes time, so 
 You can use this script to nuke the cache when it gets too big:
 
 ```bash
- function nuke_if_too_big() {
-   path=$1
-   limit_mb=$2
-   size_mb=$(du -m -d0 "${path}" | cut -f 1)
-   if (( size_mb > limit_mb )); then
-     echo "${path} is too large (${size_mb}mb), nuking it."
-     nuke_prefix="$(dirname "${path}")/$(basename "${path}").nuke"
-     nuke_path=$(mktemp -d "${nuke_prefix}.XXXXXX")
-     mv "${path}" "${nuke_path}/"
-     rm -rf "${nuke_prefix}.*"
-   fi
- }
+function nuke_if_too_big() {
+path=$1
+limit_mb=$2
+size_mb=$(du -m -d0 "${path}" | cut -f 1)
+if (( size_mb > limit_mb )); then
+echo "${path} is too large (${size_mb}mb), nuking it."
+rm -rf "${path}"
+fi
+}
 
 nuke_if_too_big ~/.cache/nce 512
 nuke_if_too_big ~/.cache/pants/named_caches 1024
@@ -61,10 +58,10 @@ nuke_if_too_big ~/.cache/pants/named_caches 1024
 Set the option `[stats].log = true` in `pants.ci.toml` for Pants to print metrics of your cache's performance at the end of the run, including the number of cache hits and the total time saved thanks to caching, e.g.:
 
 ```
-  local_cache_requests: 204
-  local_cache_requests_cached: 182
-  local_cache_requests_uncached: 22
-  local_cache_total_time_saved_ms: 307200
+local_cache_requests: 204
+local_cache_requests_cached: 182
+local_cache_requests_uncached: 22
+local_cache_total_time_saved_ms: 307200
 ```
 
 You can also add `plugins = ["hdrhistogram"]` to the `[GLOBAL]` section of `pants.ci.toml` for Pants to print histograms of cache performance, e.g. the size of blobs cached.
@@ -77,8 +74,8 @@ This brings several benefits over local caching:
 
 - All machines and CI jobs share the same cache.
 - Remote caching downloads precisely what is needed by your run—when it's needed—rather than pessimistically downloading the entire cache at the start of the run.
-  - No download and upload stage for your cache.
-  - No need to "nuke" your cache when it gets too big.
+- No download and upload stage for your cache.
+- No need to "nuke" your cache when it gets too big.
 
 See [Remote Caching and Execution](./remote-caching-&-execution/index.mdx) for more information.
 :::
@@ -138,11 +135,10 @@ GitLab's merge pipelines make a shallow clone by default, which only contains re
 git branch -a
 git remote set-branches origin main
 git fetch --depth 1 origin main
-git branch -a`
+git branch -a
 ```
 
 The `git branch` commands are only included to print out all available branches before and after fetching `origin/main`.
-
 :::
 
 :::note Using partial clones in CI

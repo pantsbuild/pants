@@ -37,7 +37,7 @@ Add a `python_aws_lambda_function` target and define the `runtime` and `handler`
 
 For example:
 
-```python tab={"label":"project/BUILD"}
+```python title="project/BUILD"
 # The default `sources` field will include our handler file.
 python_sources(name="lib")
 
@@ -49,7 +49,7 @@ python_aws_lambda_function(
 )
 ```
 
-```python tab={"label":"project/lambda_example.py"}
+```python title="project/lambda_example.py"
 def example_handler(event, context):
     print("Hello AWS!")
 ```
@@ -83,7 +83,7 @@ If this happens, you must either change your dependencies to only use dependenci
 :::caution "Encountering collisions" errors and failing to build?
 If a build fails with an error like `Encountered collisions populating ... from PEX at faas_repository.pex:`, listing one or more files with different `sha1` hashes, this likely means your dependencies package files in unexpected locations, outside their "scoped" directory (for instance, a package `example-pkg` typically only includes files within `example_pkg/` and `example_pkg-*.dist-info/` directories). When multiple dependencies do this, those files can have exactly matching file paths but different contents, and so it is impossible to create a Lambda artifact: which of the files should be installed and which should be ignored? Resolving this requires human intervention to understand whether any of those files are important, and hence PEX emits an error rather than making an (arbitrary) choice that may result in confusing and/or broken behaviour at runtime.
 
-Most commonly this seems to happen with metadata like a README or LICENSE file, or test files (in a `tests/` subdirectory), which are likely not important at runtime. In these cases, the collision can be worked around by adding [a `pex3_venv_create_extra_args=["--collisions-ok"]` field](../../../reference/targets/python_aws_lambda_function.mdx#pex3_venv_create_extra_args) to the `python_aws_lambda_...` targets.
+Most commonly this seems to happen with metadata like a README or LICENSE file, or test files (in a `tests/` subdirectory), which are likely not important at runtime. In these cases, the collision can be worked around by adding [a `pex3_venv_create_extra_args=["--collisions-ok"]` field](../../../reference/targets/python_aws_lambda_function.mdx#codepex3_venv_create_extra_argscode) to the `python_aws_lambda_...` targets.
 
 A better solution is to work with the dependencies to stop them from packaging files outside their scoped directories.
 :::
@@ -100,7 +100,7 @@ To [deploy a Python lambda function with container images](https://docs.aws.amaz
 
 For example:
 
-```dockerfile tab={"label":"project/Dockerfile"}
+```dockerfile title="project/Dockerfile"
 FROM public.ecr.aws/lambda/python:3.8
 
 RUN yum install unzip -y
@@ -109,7 +109,7 @@ RUN unzip lambda.zip -d "${LAMBDA_TASK_ROOT}"
 CMD ["lambda_function.handler"]
 ```
 
-```python tab={"label":"project/BUILD"}
+```python title="project/BUILD"
 python_sources()
 
 python_aws_lambda_function(
@@ -139,7 +139,7 @@ For example, one use of layers is splitting the deployment package for a Lambda 
 
 This split means making a change to first-party sources only requires rebuilding and re-deploying the function artifact. Since this artifact doesn't need to include all of the third-party requirements, rebuilding is likely to much faster and the resulting package will be smaller. The layer will only need to be rebuilt and redeployed if the third-party dependencies change, like a version upgrade or an additional `import`.
 
-```python tab={"label":"project/BUILD"}
+```python title="project/BUILD"
 python_sources(name="lib")
 
 python_aws_lambda_function(
@@ -160,14 +160,14 @@ python_aws_lambda_layer(
 )
 ```
 
-```python tab={"label":"project/lambda_example.py"}
+```python title="project/lambda_example.py"
 from . import library_code
 
 def example_handler(event, context):
     library_code.say_hi()
 ```
 
-```python tab={"label":"project/library_code.py"}
+```python title="project/library_code.py"
 # an example dependency
 import boto3
 
@@ -188,7 +188,7 @@ The handler of a `pex_binary` is not re-exported at the fixed `lambda_function.h
 
 For example:
 
-```python tab={"label":"project/BUILD"}
+```python title="project/BUILD"
 python_sources()
 
 pex_binary(
@@ -199,7 +199,7 @@ pex_binary(
 )
 ```
 
-```python tab={"label":"project/lambda_example.py"}
+```python title="project/lambda_example.py"
 def example_handler(event, context):
     print("Hello AWS!")
 ```

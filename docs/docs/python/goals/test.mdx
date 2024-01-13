@@ -45,7 +45,7 @@ install_from_resolve = "pytest"
 
 Then, add a `requirements.txt` file specifying the version of `pytest` and other plugins:
 
-```text title="pytest-requirements.txt"
+```Text title="pytest-requirements.txt"
 pytest>=5.4
 pytest-django>=3.9.0,<4
 pytest-rerunfailures==9.0
@@ -55,15 +55,15 @@ Finally, generate the relevant lockfile with `pants generate-lockfiles --resolve
 
 Alternatively, if you only want to install the plugin for certain tests, you can add the plugin to the `dependencies` field of your `python_test` / `python_tests` target. See [Third-party dependencies](../python-overview/third-party-dependencies.mdx) for how to install Python dependencies. For example:
 
-```text tab={"label":"requirements.txt"}
+```text title="requirements.txt"
 pytest-django==3.10.0
 ```
 
-```python tab={"label":"BUILD"}
+```python title="BUILD"
 python_requirements(name="reqs")
 ```
 
-```python tab={"label":"helloworld/util/BUILD"}
+```python title="helloworld/util/BUILD"
 python_tests(
    name="tests",
    # Normally, Pants infers dependencies based on imports.
@@ -158,12 +158,12 @@ To add any arbitrary environment variable back to the process, you can either ad
 
 With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [test]
 extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
 ```
 
-```python tab={"label":"project/BUILD"}
+```python title="project/BUILD"
 python_tests(
     name="tests",
     # Adds to all generated `python_test` targets,
@@ -180,20 +180,20 @@ python_tests(
 :::note Tip: avoiding collisions between concurrent `pytest` runs using env vars
 Sometimes your tests/code will need to reach outside of the sandbox, for example to initialize a test DB schema. In these cases you may see conflicts between concurrent `pytest` processes scheduled by Pants, when two or more tests try to set up / tear down the same resource concurrently. To avoid this issue, you can set `[pytest].execution_slot_var` to be a valid environment variable name. Pants will then inject a variable with that name into each `pytest` run, using the process execution slot ID (an integer) as the variable's value. You can then update your test code to check for the presence of the variable and incorporate its value into generated DB names / file paths. For example, in a project using `pytest-django` you could do:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [pytest]
 execution_slot_var = "PANTS_EXECUTION_SLOT"
 ```
 
-```python tab={"label":"src/conftest.py"}
+```python title="src/conftest.py"
 from pytest_django.fixtures import _set_suffix_to_test_databases
 from pytest_django.lazy_django import skip_if_no_django
 
 @pytest.fixture(scope="session")
 def django_db_modify_db_settings():
-    skip_if_no_django()
-    if "PANTS_EXECUTION_SLOT" in os.environ:
-        _set_suffix_to_test_databases(os.environ["PANTS_EXECUTION_SLOT"])
+skip_if_no_django()
+if "PANTS_EXECUTION_SLOT" in os.environ:
+_set_suffix_to_test_databases(os.environ["PANTS_EXECUTION_SLOT"])
 ```
 
 :::
@@ -283,13 +283,13 @@ Because Pants runs multiple test targets in parallel, you will not see your test
 
 Instead, if you want to run a test interactively—such as to use a debugger like `pdb`—run your tests with `pants test --debug`. For example:
 
-```python tab={"label":"test_debug_example.py"}
+```python title="test_debug_example.py"
 def test_debug():
     import pdb; pdb.set_trace()
     assert 1 + 1 == 2
 ```
 
-```text tab={"label":"Shell"}
+```text title="Shell"
 ❯ pants test --debug test_debug_example.py
 
 ===================================================== test session starts =====================================================
@@ -410,7 +410,7 @@ To reduce boilerplate, you can use either the [`python_sources`](../../../refere
 
 For example:
 
-```python tab={"label":"helloworld/BUILD"}
+```python title="helloworld/BUILD"
 # The default `sources` includes all files other than
 # `!*_test.py`, `!test_*.py`, and `tests.py`, and `conftest.py`.
 python_sources(name="lib")
@@ -420,7 +420,7 @@ python_sources(name="lib")
 python_tests(name="tests")
 ```
 
-```python tab={"label":"helloworld/testutils.py"}
+```python title="helloworld/testutils.py"
 ...
 
 @contextmanager
@@ -430,7 +430,7 @@ def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
         yield rel_tmpdir
 ```
 
-```python tab={"label":"helloworld/app_test.py"}
+```python title="helloworld/app_test.py"
 from helloworld.testutils import setup_tmpdir
 
 def test_app() -> None:
@@ -454,7 +454,7 @@ To depend on a built package, use the `runtime_package_dependencies` field on th
 
 For example:
 
-```python tab={"label":"helloworld/BUILD"}
+```python title="helloworld/BUILD"
 # This target teaches Pants about our non-test Python files.
 python_sources(name="lib")
 
@@ -469,11 +469,11 @@ python_tests(
 )
 ```
 
-```python tab={"label":"helloworld/say_hello.py"}
+```python title="helloworld/say_hello.py"
 print("Hello, test!")
 ```
 
-```python tab={"label":"helloworld/test_binary.py"}
+```python title="helloworld/test_binary.py"
 import subprocess
 
 def test_say_hello():
@@ -555,17 +555,13 @@ You can change the output dir with the `output_dir` option in the `[coverage-py]
 
 You may want to set `[coverage-py].fail_under` to cause Pants to gracefully fail if coverage is too low, e.g. `fail_under = 70`.
 
-You may use a Coverage config file, e.g. `.coveragerc` or `pyproject.toml`. Pants will autodiscover the config file for you, and you can also set `[coverage-py].config` in your `pants.toml` to point to a non-standard location.
+You may use a Coverage config file, e.g. `.coveragerc` or `pyproject.toml`. Pants will autodiscover the config file for you, and you can also set `[coverage-py].config` in your `pants.toml` to point to a non-standard location. You must include `relative_files = true` in the `[run]` section for Pants to work.
 
-:::note You must include `relative_files = true` in the `[run]` section for Pants to work:
-
-```toml title=".coveragerc"
- [run]
- relative_files = true
- branch = true
+```text title=".coveragerc"
+[run]
+relative_files = true
+branch = true
 ```
-
-:::
 
 When generating HTML, XML, and JSON reports, you can automatically open the reports through the option `--test-open-coverage`.
 

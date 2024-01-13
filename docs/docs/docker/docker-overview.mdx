@@ -45,7 +45,7 @@ Or you can add them manually, such as:
 docker_image(name="docker")
 ```
 
-Alternatively you may provide the Docker build instructions inline in your BUILD file as [`instructions`](../../reference/targets/docker_image.mdx#instructions) on your `docker_image` if you don't want to create a `Dockerfile`.
+Alternatively you may provide the Docker build instructions inline in your BUILD file as [`instructions`](../../reference/targets/docker_image.mdx#codeinstructionscode) on your `docker_image` if you don't want to create a `Dockerfile`.
 
 ```python title="src/docker/app1/BUILD"
 docker_image(
@@ -109,7 +109,7 @@ To provide values to any [build `ARG`s](https://docs.docker.com/engine/reference
 
 The build args use the same syntax as the [docker build --build-arg](https://docs.docker.com/engine/reference/commandline/build/#set-build-time-variables---build-arg) command line option: `VARNAME=VALUE`, where the value is optional, and if left out, the value is taken from the environment instead.
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [docker]
 build_args = [
   "VAR1=value1",
@@ -117,14 +117,14 @@ build_args = [
 ]
 ```
 
-```python tab={"label":"example/BUILD"}
+```python title="example/BUILD"
 docker_image(
   name="docker",
   extra_build_args=["VAR1=my_value", "VAR3"]
 )
 ```
 
-```dockerfile tab={"label":"example/Dockerfile"}
+```dockerfile title="example/Dockerfile"
 FROM python:3.8
 ARG VAR1
 ARG VAR2
@@ -134,7 +134,7 @@ ARG VAR3=default
 
 ### Target build stage
 
-When your `Dockerfile` is a multi-stage build file, you may specify which stage to build with the [`--docker-build-target-stage`](../../reference/subsystems/docker.mdx#section-build-target-stage) for all images, or provide a per image setting with the `docker_image` field [`target_stage`](../../reference/targets/docker_image.mdx#target_stage).
+When your `Dockerfile` is a multi-stage build file, you may specify which stage to build with the [`--docker-build-target-stage`](../../reference/subsystems/docker.mdx#section-build-target-stage) for all images, or provide a per image setting with the `docker_image` field [`target_stage`](../../reference/targets/docker_image.mdx#codetarget_stagecode).
 
 ```dockerfile
 FROM python:3.8 AS base
@@ -152,9 +152,9 @@ See this [blog post](https://blog.pantsbuild.org/optimizing-python-docker-deploy
 
 ### Build time secrets
 
-Secrets are supported for `docker_image` targets with the [`secrets`](../../reference/targets/docker_image.mdx#secrets) field. The defined secrets may then be mounted in the `Dockerfile` as [usual](https://docs.docker.com/develop/develop-images/build_enhancements/#new-docker-build-secret-information).
+Secrets are supported for `docker_image` targets with the [`secrets`](../../reference/targets/docker_image.mdx#codesecretscode) field. The defined secrets may then be mounted in the `Dockerfile` as [usual](https://docs.docker.com/develop/develop-images/build_enhancements/#new-docker-build-secret-information).
 
-```python tab={"label":"BUILD"}
+```python title="BUILD"
 docker_image(
   secrets={
     "mysecret": "mysecret.txt",
@@ -172,19 +172,19 @@ RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret
 RUN --mount=type=secret,id=mysecret,dst=/foobar cat /foobar
 ```
 
-```text tab={"label":"mysecret.txt"}
+```text title="mysecret.txt"
 very-secret-value
 ```
 
 :::note Secret file path
 Secrets should not be checked into version control. Use absolute paths to reference a file that is not in the project source tree. However, to keep the BUILD file as hermetic as possible, the files may be placed within the project source tree at build time for instance, and referenced with a path relative to the project root by default, or relative to the directory of the BUILD file when prefixed with `./`.
 
-See the example for the [`secrets`](../../reference/targets/docker_image.mdx#secrets) field.
+See the example for the [`secrets`](../../reference/targets/docker_image.mdx#codesecretscode) field.
 :::
 
 ### External cache storage backends
 
-BuildKit supports exporting build cache to an external location, making it possible to import in future builds. Cache backends can be configured using the [`cache_to`](../../reference/targets/docker_image.mdx#cache_to) and [`cache_from`](../../reference/targets/docker_image.mdx#cache_from) fields.
+BuildKit supports exporting build cache to an external location, making it possible to import in future builds. Cache backends can be configured using the [`cache_to`](../../reference/targets/docker_image.mdx#codecache_tocode) and [`cache_from`](../../reference/targets/docker_image.mdx#codecache_fromcode) fields.
 
 Create a builder using a [build driver](https://docs.docker.com/build/drivers/) that is compatible with the cache backend:
 
@@ -208,7 +208,7 @@ Optionally, validate a build with the Docker CLI directly:
 
 Configure Pants to use buildx and pass the BUILDX_BUILDER environment variable:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [docker]
 use_buildx = true
 env_vars = [
@@ -216,7 +216,7 @@ env_vars = [
 ]
 ```
 
-```python tab={"label":"example/BUILD"}
+```python title="example/BUILD"
 docker_image(
     name="with-local-cache-backend",
     cache_to={
@@ -234,7 +234,7 @@ docker_image(
 
 This example copies both a `file` and `pex_binary`. The file is specified as an explicit dependency in the `BUILD` file, whereas the `pex_binary` dependency is inferred from the path in the `Dockerfile`.
 
-```python tab={"label":"src/docker/hw/BUILD"}
+```python title="src/docker/hw/BUILD"
 file(name="msg", source="msg.txt")
 
 docker_image(
@@ -243,24 +243,24 @@ docker_image(
 )
 ```
 
-```dockerfile tab={"label":"src/docker/hw/Dockerfile"}
+```dockerfile title="src/docker/hw/Dockerfile"
 FROM python:3.8
 ENTRYPOINT ["/bin/helloworld"]
 COPY src/docker/hw/msg.txt /var/msg
 COPY src.python.hw/bin.pex /bin/helloworld
 ```
 
-```text tab={"label":"src/docker/hw/msg.txt"}
+```text title="src/docker/hw/msg.txt"
 Hello, Docker!
 ```
 
-```python tab={"label":"src/python/hw/BUILD"}
+```python title="src/python/hw/BUILD"
 python_sources(name="lib")
 
 pex_binary(name="bin", entry_point="main.py")
 ```
 
-```python tab={"label":"src/python/hw/main.py"}
+```python title="src/python/hw/main.py"
 import os
 
 msg = "Hello"
@@ -382,8 +382,8 @@ It can help to simulate a hermetic environment by using `env -i`. With credentia
 ```
 ❯ echo europe-north1-docker.pkg.dev | env -i PATH=/some/isolated/directory docker-credential-gcr get
 {
-  "Secret": "ya29.A0ARrdaM-...-ZhScVscwTVtQ",
-  "Username": "_dcgcloud_token"
+"Secret": "ya29.A0ARrdaM-...-ZhScVscwTVtQ",
+"Username": "_dcgcloud_token"
 }
 ```
 

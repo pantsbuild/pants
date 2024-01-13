@@ -20,7 +20,7 @@ For example:
 ❯ hyperfine --runs=5 'pants --no-pantsd --no-local-cache lint ::'
 ```
 
-## CPU profiling with py-spy
+## Profiling with py-spy
 
 `py-spy` is a profiling sampler which can also be used to compare the impact of a change before and after: [https://github.com/benfred/py-spy](https://github.com/benfred/py-spy).
 
@@ -28,32 +28,14 @@ To profile with `py-spy`:
 
 1. Activate Pants' development venv
    - `source ~/.cache/pants/pants_dev_deps/<your platform dir>/bin/activate`
-2. Install `py-spy` into it
-   - `pip install py-spy`
+2. Add Pants' code to Python's path
+   - `export PYTHONPATH=src/pants:$PYTHONPATH`
 3. Run Pants with `py-spy` (be sure to disable `pantsd`)
-   - `PYTHONPATH=src/python NO_SCIE_WARNING=1 py-spy record --subprocesses -- python -m pants.bin.pants_loader --no-pantsd <pants args>`
-   - If you're running Pants from sources on code in another repo, set `PYTHONPATH` to the `src/python` dir in the pants repo, and set `PANTS_VERSION` to the current dev version in that repo.
-   - On MacOS you may have to run this as root, under `sudo`.
+   - `py-spy record --subprocesses -- python -m pants.bin.pants_loader --no-pantsd <pants args>`
 
 The default output is a flamegraph. `py-spy` can also output speedscope ([https://github.com/jlfwong/speedscope](https://github.com/jlfwong/speedscope)) JSON with the `--format speedscope` flag. The resulting file can be uploaded to [https://www.speedscope.app/](https://www.speedscope.app/) which provides a per-process, interactive, detailed UI.
 
 Additionally, to profile the Rust code the `--native` flag can be passed to `py-spy` as well. The resulting output will contain frames from Pants Rust code.
-
-## Memory profiling with memray
-
-`memray` is a Python memory profiler that can also track allocation in native extension modules: [https://bloomberg.github.io/memray/](https://bloomberg.github.io/memray/).
-
-To profile with `memray`:
-
-1. Activate Pants' development venv
-   - `source ~/.cache/pants/pants_dev_deps/<your platform dir>/bin/activate`
-2. Install `memray` into it
-   - `pip install memray`
-3. Run Pants with `memray`
-   - `PYTHONPATH=src/python NO_SCIE_WARNING=1 memray run --native -o output.bin -m pants.bin.pants_loader --no-pantsd <pants args>`
-   - If you're running Pants from sources on code in another repo, set `PYTHONPATH` to the `src/python` dir in the pants repo, and set `PANTS_VERSION` to the current dev version in that repo.
-
-Note that in many cases it will be easier and more useful to run Pants with the `--stats-memory-summary` flag.
 
 ## Debugging `rule` code with a debugger in VSCode
 

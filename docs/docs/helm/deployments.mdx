@@ -23,18 +23,18 @@ Pants solves this problem by providing with the ability to manage the configurat
 
 Helm deployments are defined using the `helm_deployment` target which has a series of fields that can be used to guarantee the reproducibility of the given deployment. `helm_deployment` targets need to be added by hand as there is no deterministic way of instrospecting your repository to find sources that are specific to Helm:
 
-```python tab={"label":"src/chart/BUILD"}
+```python title="src/chart/BUILD"
 helm_chart()
 ```
 
-```yaml tab={"label":"src/chart/Chart.yaml"}
+```yaml title="src/chart/Chart.yaml"
 apiVersion: v2
 description: Example Helm chart
 name: example
 version: 0.1.0
 ```
 
-```python tab={"label":"src/deployment/BUILD"}
+```python title="src/deployment/BUILD"
 helm_deployment(
   name="dev",
   chart="//src/chart",
@@ -54,25 +54,25 @@ helm_deployment(
 )
 ```
 
-```yaml tab={"label":"src/deployment/common-values.yaml"}
+```yaml title="src/deployment/common-values.yaml"
 # Default values common to all deployments
 env:
   SERVICE_NAME: my-service
 ```
 
-```yaml tab={"label":"src/deployment/dev-override.yaml"}
+```yaml title="src/deployment/dev-override.yaml"
 # Specific values to the DEV environment
 env:
   ENV_ID: dev
 ```
 
-```yaml tab={"label":"src/deployment/stage-override.yaml"}
+```yaml title="src/deployment/stage-override.yaml"
 # Specific values to the STAGE environment
 env:
   ENV_ID: stage
 ```
 
-```yaml tab={"label":"src/deployment/prod-override.yaml"}
+```yaml title="src/deployment/prod-override.yaml"
 # Specific values to the PRODUCTION environment
 env:
   ENV_ID: prod
@@ -93,31 +93,31 @@ A Helm deployment will in most cases deploy one or more Docker images into Kuber
 
 To illustrate this, let's imagine the following scenario: Let's say we have a first-party Docker image that we want to deploy into Kubernetes as a `Pod` resource kind. For achieving this we define the following workspace:
 
-```python tab={"label":"src/docker/BUILD"}
+```python title="src/docker/BUILD"
 docker_image()
 ```
 
-```text tab={"label":"src/docker/Dockerfile"}
+```text title="src/docker/Dockerfile"
 FROM busybox:1.28
 ```
 
-```python tab={"label":"src/chart/BUILD"}
+```python title="src/chart/BUILD"
 helm_chart()
 ```
 
-```yaml tab={"label":"src/chart/Chart.yaml"}
+```yaml title="src/chart/Chart.yaml"
 apiVersion: v2
 description: Example Helm chart
 name: example
 version: 0.1.0
 ```
 
-```yaml tab={"label":"src/chart/values.yaml"}
+```yaml title="src/chart/values.yaml"
 # Default image in case this chart is used by other tools after being published
 image: example.com/registry/my-app:latest
 ```
 
-```yaml tab={"label":"src/chart/templates/pod.yaml"}
+```yaml title="src/chart/templates/pod.yaml"
 ---
 apiVersion: v1
 kind: Pod
@@ -132,7 +132,7 @@ spec:
       image: {{ .Values.image }}
 ```
 
-```python tab={"label":"src/deployment/BUILD"}
+```python title="src/deployment/BUILD"
 # Overrides the `image` value for the chart using the target address for the first-party docker image.
 helm_deployment(chart="src/chart", values={"image": "src/docker:docker"})
 ```
@@ -263,7 +263,7 @@ Previous examples on the usage of the `helm_deployment` target are all based on 
 
 However, `helm_deployment`s are not limited to only first party charts, as it is also possible to declare a deployment having a dependency on a 3rd party Helm artifact instead. As an example, consider the following workspace layout:
 
-```python tab={"label":"3rdparty/helm/jetstack/BUILD"}
+```python title="3rdparty/helm/jetstack/BUILD"
 helm_artifact(
   name="cert-manager",
   artifact="cert-manager",
@@ -272,7 +272,7 @@ helm_artifact(
 )
 ```
 
-```python tab={"label":"src/deploy/BUILD"}
+```python title="src/deploy/BUILD"
 helm_deployment(
   name="main",
   chart="//3rdparty/helm/jetstack:cert-manager",
@@ -290,18 +290,18 @@ User-defined [Helm post-renderers](https://helm.sh/docs/topics/advanced/#post-re
 
 As an example, let's show how we can use the tool [`vals`](https://github.com/variantdev/vals) as a post-renderer and replace all references to secret values stored in HashiCorp Vault by their actual values. The following example is composed of a Helm chart that creates a secret resource in Kubernetes and a Helm deployment that is configured to use `vals` as a post-renderer:
 
-```python tab={"label":"src/chart/BUILD"}
+```python title="src/chart/BUILD"
 helm_chart()
 ```
 
-```yaml tab={"label":"src/chart/Chart.yaml"}
+```yaml title="src/chart/Chart.yaml"
 apiVersion: v2
 description: Example Helm chart with vals
 name: example
 version: 0.1.0
 ```
 
-```yaml tab={"label":"src/chart/templates/secret.yaml"}
+```yaml title="src/chart/templates/secret.yaml"
 apiVersion: v1
 kind: Secret
 metadata:
@@ -314,7 +314,7 @@ data:
 type: Opaque
 ```
 
-```python tab={"label":"src/deploy/BUILD"}
+```python title="src/deploy/BUILD"
 run_shell_command(
   name="vals",
   command="vals eval -f -",

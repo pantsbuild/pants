@@ -75,15 +75,15 @@ from pants.engine.target import Target
 from pants.util.ordered_set import FrozenOrderedSet
 
 class DjangoEntryPointField(PexEntryPointField):
-   default = "manage.py"
+default = "manage.py"
 
 
 class DjangoManagePyTarget(Target):
-   alias = "django_manage_py"
-   core_fields = (
-       *(FrozenOrderedSet(PexBinaryTarget.core_fields) - {PexEntryPoint}),
-       DjangoEntryPointField,
-   )
+alias = "django_manage_py"
+core_fields = (
+*(FrozenOrderedSet(PexBinaryTarget.core_fields) - {PexEntryPoint}),
+DjangoEntryPointField,
+)
 ```
 
 In this example, we register all of the fields of `PexBinaryTarget`, except for the field `PexEntryPoint `. We instead register our custom field `DjangoEntryPointField `.

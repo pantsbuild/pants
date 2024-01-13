@@ -37,7 +37,7 @@ Add a `python_google_cloud_function` target and define the `runtime`, `handler`,
 
 For example:
 
-```python tab={"label":"project/BUILD"}
+```python title="project/BUILD"
 # The default `sources` field will include our handler file.
 python_sources(name="lib")
 
@@ -50,7 +50,7 @@ python_google_cloud_function(
 )
 ```
 
-```python tab={"label":"project/google_cloud_function_example.py"}
+```python title="project/google_cloud_function_example.py"
 def example_handler(event, context):
     print("Hello Google Cloud Function!")
 ```
@@ -84,7 +84,7 @@ If this happens, you must either change your dependencies to only use dependenci
 :::caution "Encountering collisions" errors and failing to build?
 If a build fails with an error like `Encountered collisions populating ... from PEX at faas_repository.pex:`, listing one or more files with different `sha1` hashes, this likely means your dependencies package files in unexpected locations, outside their "scoped" directory (for instance, a package `example-pkg` typically only includes files within `example_pkg/` and `example_pkg-*.dist-info/` directories). When multiple dependencies do this, those files can have exactly matching file paths but different contents, and so it is impossible to create a GCF artifact: which of the files should be installed and which should be ignored? Resolving this requires human intervention to understand whether any of those files are important, and hence PEX emits an error rather than making an (arbitrary) choice that may result in confusing and/or broken behaviour at runtime.
 
-Most commonly this seems to happen with metadata like a README or LICENSE file, or test files (in a `tests/` subdirectory), which are likely not important at runtime. In these cases, the collision can be worked around by adding [a `pex3_venv_create_extra_args=["--collisions-ok"]` field](../../../reference/targets/python_google_cloud_function.mdx#pex3_venv_create_extra_args) to the `python_google_cloud_function` target.
+Most commonly this seems to happen with metadata like a README or LICENSE file, or test files (in a `tests/` subdirectory), which are likely not important at runtime. In these cases, the collision can be worked around by adding [a `pex3_venv_create_extra_args=["--collisions-ok"]` field](../../../reference/targets/python_google_cloud_function.mdx#codepex3_venv_create_extra_argscode) to the `python_google_cloud_function` target.
 
 A better solution is to work with the dependencies to stop them from packaging files outside their scoped directories.
 :::
@@ -103,7 +103,7 @@ The handler of a `pex_binary` is not re-exported at the fixed `main.handler` pat
 
 For example:
 
-```python tab={"label":"project/BUILD"}
+```python title="project/BUILD"
 python_sources()
 
 pex_binary(
@@ -114,7 +114,7 @@ pex_binary(
 )
 ```
 
-```python tab={"label":"project/gcf_example.py"}
+```python title="project/gcf_example.py"
 def example_handler(event, context):
     print("Hello GCF!")
 ```

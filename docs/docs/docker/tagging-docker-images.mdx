@@ -50,7 +50,7 @@ Options for `registries` in `pants.toml`:
 
 Example:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [docker.registries.company-registry1]
 address = "reg1.company.internal"
 default = true
@@ -66,7 +66,7 @@ repository = "{parent_directory}/{name}"
 use_local_alias = true
 ```
 
-```python tab={"label":"src/example/BUILD"}
+```python title="src/example/BUILD"
 docker_image(name="demo")
 
 # This is equivalent to the previous target,
@@ -92,7 +92,7 @@ In Docker parlance, an image is identified by a _repository_ and one or more _ta
 
 You set a repository name using the `repository` field on `docker_image`:
 
-```python tab={"label":"src/example/BUILD"}
+```python title="src/example/BUILD"
 docker_image(
     name="demo",
     repository="example/demo",
@@ -117,12 +117,12 @@ repository = "example/{name}"
 You can also specify a default repository name in config, and this name can contain placeholders in
 curly braces that will be interpolated for each `docker_image`:
 
-```toml tab={"label":"pants.toml"}
+```toml title="pants.toml"
 [docker]
 default_repository = "{directory}/{name}"
 ```
 
-```python tab={"label":"src/example/BUILD"}
+```python title="src/example/BUILD"
 docker_image(
     name="demo",
 )
@@ -151,7 +151,7 @@ the `image_tags` field of `docker_image`, and any additional tags if defined fro
 configuration (see [Configuring registries](./tagging-docker-images.mdx#configuring-registries).
 
 (Note that the field is named `image_tags` and not just `tags`, because Pants has [its own tags
-concept](doc:reference-target#tags), which is unrelated.)
+concept](doc:reference-target#codetagscode), which is unrelated.)
 
 ```python title="src/example/BUILD"
 docker_image(
@@ -170,7 +170,7 @@ It's often useful to keep versions of derived images and their base images in sy
 out with this by interpolating tags referenced in `FROM` commands in your Dockerfile into the
 `image_tags` in the corresponding `docker_image`:
 
-```python tab={"label":"src/example/BUILD"}
+```python title="src/example/BUILD"
 # These three are equivalent
 docker_image(name="demo1", image_tags=["{tags.upstream}"])
 docker_image(name="demo1", image_tags=["{tags.stage0}"])
@@ -181,7 +181,7 @@ docker_image(name="demo1", image_tags=["{tags.baseimage}"])
 docker_image(name="demo1", image_tags=["{tags.stage1}-custom-suffix"])
 ```
 
-```dockerfile tab={"label":"src/example/Dockerfile"}
+```dockerfile title="src/example/Dockerfile"
 FROM upstream:1.2 as upstream
 # ...
 FROM scratch

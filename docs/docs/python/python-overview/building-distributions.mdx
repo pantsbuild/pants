@@ -137,18 +137,18 @@ You can use almost any [keyword argument](https://packaging.python.org/guides/di
 However, you cannot use `data_files`, `install_requires`, `namespace_packages`, `package_dir`, `package_data`, or `packages` because Pants will generate these for you, based on the data derived from your code and dependencies.
 
 :::note Use the `entry_points` field to register entry points like `console_scripts`
-The [`entry_points` field](../../../reference/targets/python_distribution.mdx#entry_points) allows you to configure [setuptools-style entry points](https://packaging.python.org/specifications/entry-points/#entry-points-specification):
+The [`entry_points` field](../../../reference/targets/python_distribution.mdx#codeentry_pointscode) allows you to configure [setuptools-style entry points](https://packaging.python.org/specifications/entry-points/#entry-points-specification):
 
 ```python
 python_distribution(
-   name="my-dist",
-   entry_points={
-       "console_scripts": {"some-command": "project.app:main"},
-       "flake8_entry_point": {
-           "PB1": "my_flake8_plugin:Plugin",
-           "PB2": "my_flake8_plugin:AnotherPlugin",
-       },
-   provides=python_artifact(...),
+name="my-dist",
+entry_points={
+"console_scripts": {"some-command": "project.app:main"},
+"flake8_entry_point": {
+"PB1": "my_flake8_plugin:Plugin",
+"PB2": "my_flake8_plugin:AnotherPlugin",
+},
+provides=python_artifact(...),
 )
 ```
 

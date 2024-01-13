@@ -13,7 +13,7 @@ For example, Pants has many generic goals like `lint` and `test`. Those `@goal_r
 
 Unions allow a specific linter to be registered with `UnionRule(LintTargetsRequest, ShellcheckRequest)`, and then for `lint.py` to access its type:
 
-```python tab={"label":"pants/core/goals/lint.py"}
+```python title="pants/core/goals/lint.py"
 from pants.engine.rules import Get, MultiGet, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership
@@ -37,7 +37,7 @@ async def lint(..., targets: Targets, union_membership: UnionMembership) -> Lint
     )
 ```
 
-```python tab={"label":"pants-plugins/bash/shellcheck.py"}
+```python title="pants-plugins/bash/shellcheck.py"
 from pants.core.goals.lint import LintTargetsRequest
 
 
