@@ -37,6 +37,8 @@ __dependents_rules__(
             "[/python/lint/black/subsystem.py]",
             "[/python/lint/yapf/rules.py]",
             "[/python/lint/yapf/subsystem.py]",
+            "[/python/lint/ruff/rules.py]",
+            "[/python/lint/ruff/subsystem.py]",
             "[src/python/pants/backend/python/goals/lockfile.py]",
             "[src/python/pants/backend/python/subsystems/python_tool_base.py]",
         ),
