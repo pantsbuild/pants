@@ -236,8 +236,9 @@ async def update_build_files(
             chosen_formatter_request_class = formatter_to_request_class.get(
                 update_build_files_subsystem.formatter
             )
-            is_chosen_formatter = chosen_formatter_request_class is not None and issubclass(
-                request, chosen_formatter_request_class
+            is_chosen_formatter = (
+                chosen_formatter_request_class is not None
+                and request == chosen_formatter_request_class
             )
 
             if update_build_files_subsystem.fmt and is_chosen_formatter:
