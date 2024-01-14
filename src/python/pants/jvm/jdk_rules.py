@@ -7,6 +7,7 @@ import dataclasses
 import logging
 import os
 import re
+import shlex
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
@@ -229,7 +230,9 @@ async def prepare_jdk_environment(
         else:
             return arg
 
-    optionally_prefixed_coursier_args = [prefixed(arg) for arg in coursier.args(coursier_options)]
+    optionally_prefixed_coursier_args = [
+        prefixed(shlex.quote(arg)) for arg in coursier.args(coursier_options)
+    ]
     # NB: We `set +e` in the subshell to ensure that it exits as well.
     #  see https://unix.stackexchange.com/a/23099
     java_home_command = " ".join(("set +e;", *optionally_prefixed_coursier_args))

@@ -199,7 +199,7 @@ class Coursier:
             self.post_process_stderr,
             *wrapper,
             os.path.join(self.bin_dir, self.coursier.exe),
-            *map(shlex.quote, args),
+            *args,
         )
 
     @memoized_property
