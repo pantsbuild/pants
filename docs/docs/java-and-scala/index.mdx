@@ -64,13 +64,13 @@ Pants `2.11.x` adds support for choosing JDK and Scala versions per target in yo
 
 JDKs used by Pants are automatically fetched using [Coursier](https://get-coursier.io/), and are chosen using the [`[jvm].jdk` setting](../../reference/subsystems/jvm.mdx#section-jdk) to set a repository-wide default.
 
-To override the default on a particular target, you can use the [`jdk=` field](../../reference/targets/java_source.mdx#codejdkcode). It can be useful to use the [`parametrize` builtin](../using-pants/key-concepts/targets-and-build-files.mdx#parametrizing-targets) with the `jdk=` field, particularly to run test targets under multiple JDKs.
+To override the default on a particular target, you can use the [`jdk=` field](../../reference/targets/java_source.mdx#jdk). It can be useful to use the [`parametrize` builtin](../using-pants/key-concepts/targets-and-build-files.mdx#parametrizing-targets) with the `jdk=` field, particularly to run test targets under multiple JDKs.
 
 #### Scala version
 
 The Scala version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[scala].version_for_resolve` option](../../reference/subsystems/scala.mdx#section-version_for_resolve). The default Scala version for your repository will thus be whichever Scala version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](reference-jvm#section-default-resolve).
 
-To use multiple Scala versions in a repository, you would define multiple resolves, and then adjust the [`resolve` field](../../reference/targets/scalatest_test.mdx#coderesolvecode) of any targets which should be used with the non-`default_resolve` resolve.
+To use multiple Scala versions in a repository, you would define multiple resolves, and then adjust the [`resolve` field](../../reference/targets/scalatest_test.mdx#resolve) of any targets which should be used with the non-`default_resolve` resolve.
 
 To cross-build a set of Scala targets for multiple Scala versions, you can use the [`parametrize` builtin](../using-pants/key-concepts/targets-and-build-files.mdx#parametrizing-targets) with the `resolve=` field of the target and its dependencies.
 
@@ -114,7 +114,7 @@ Pants requires use of a lockfile for thirdparty dependencies. After adding or ed
 :::note Thirdparty symbols and the `packages` argument
 To efficiently determine which symbols are provided by thirdparty code (i.e., without hitting the network in order to compute dependencies in the common case), Pants relies on a static mapping of which artifacts provide which symbols, and defaults to treating each `jvm_artifact` as providing symbols within its `group`.
 
-The `packages` argument allows you to override which symbols a `jvm_artifact` provides. See the [`jvm_artifact` docs](../../reference/targets/jvm_artifact.mdx#codepackagescode) for more information.
+The `packages` argument allows you to override which symbols a `jvm_artifact` provides. See the [`jvm_artifact` docs](../../reference/targets/jvm_artifact.mdx#packages) for more information.
 :::
 
 ### `resource` targets
@@ -127,20 +127,20 @@ To have your code [load files as "resources"](https://docs.oracle.com/javase/8/d
 
 For example:
 
-```toml title="pants.toml"
+```toml tab={"label":"pants.toml"}
 [source]
 # In order for the resource to be loadable as `org/pantsbuild/example/lib/hello.txt`,
 # the `/src/jvm/ prefix needs to be stripped.
 root_patterns = ["/src/*"]
 ```
 
-```python title="src/jvm/org/pantsbuild/example/lib/BUILD"
+```python tab={"label":"src/jvm/org/pantsbuild/example/lib/BUILD"}
 java_sources(dependencies=[":hello"])
 
 resources(name="hello", sources=["hello.txt"])
 ```
 
-```java title="src/jvm/org/pantsbuild/example/lib/Loader.java"
+```java tab={"label":"src/jvm/org/pantsbuild/example/lib/Loader.java"}
 package org.pantsbuild.example.lib;
 
 import com.google.common.io.Resources;
@@ -152,7 +152,7 @@ public class Loader {
 }
 ```
 
-```text title="src/jvm/org/pantsbuild/example/lib/hello.txt"
+```text tab={"label":"src/jvm/org/pantsbuild/example/lib/hello.txt"}
 Hello world!
 ```
 
@@ -237,12 +237,12 @@ To add any arbitrary environment variable back to the process, you can either ad
 
 With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
 
-```toml title="pants.toml"
+```toml tab={"label":"pants.toml"}
 [test]
 extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
 ```
 
-```python title="project/BUILD"
+```python tab={"label":"project/BUILD"}
 junit_tests(
     name="tests",
     # Adds to all generated `junit_test` targets,
@@ -307,18 +307,18 @@ After Setup (see below), and after IntelliJ has finished indexing your code, you
    2. Versions after `2.13.0.dev2` support test running.
 2. Add a `.gitignore` entry for the `.bsp` directory:
 
-```Text title=".gitignore"
+```text tab={"label":".gitignore"}
 # This directory is not committed: each BSP user will create it independently.
 /.bsp/
 ```
 
-```Text title="..."
+```text tab={"label":"..."}
 
 ```
 
 3. Add a "group" config file like the one below, adjusting the address specs and resolve name as appropriate.
 
-```toml title="bsp-groups.toml"
+```toml tab={"label":"bsp-groups.toml"}
 # A "group" named `default`.
 # Multiple groups are supported: consider creating a group per project or team.
 [groups.default]
@@ -330,18 +330,18 @@ addresses = [
 resolve = "jvm:jvm-default"
 ```
 
-```Text title="..."
+```text tab={"label":"..."}
 
 ```
 
 4. Add to `pants.toml` an option to point at the BSP configuration file:
 
-```toml title="pants.toml"
+```toml tab={"label":"pants.toml"}
 [experimental-bsp]
 groups_config_files = ["bsp-groups.toml"]
 ```
 
-```Text title="..."
+```text tab={"label":"..."}
 
 ```
 

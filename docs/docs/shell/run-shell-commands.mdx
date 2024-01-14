@@ -9,7 +9,7 @@ How to execute arbitrary scripts and programs
 
 The [`shell_command`](../../reference/targets/shell_command.mdx) target allows you to run any command during a Pants execution, for the purpose of modifying or creating files to be used by other targets, or its (idempotent: see below) side-effects when accessing services over the network.
 
-```python title="BUILD"
+```python tab={"label":"BUILD"}
 shell_command(
     command="./my-script.sh download some-archive.tar.gz",
     tools=["curl", "env", "bash", "mkdir", "tar"],
@@ -21,7 +21,7 @@ shell_sources(name="shell-scripts")
 files(name="images", sources=["*.png"])
 ```
 
-```shell title="my-script.sh"
+```shell tab={"label":"my-script.sh"}
 #!/usr/bin/env bash
 case "$1" in
     download)

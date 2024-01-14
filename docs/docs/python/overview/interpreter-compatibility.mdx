@@ -77,8 +77,8 @@ Instead, consider running your unit tests with every Python version you claim to
 
 ```python
 python_test(
-source="util_test.py",
-interpreter_constraints=parametrize(py2=["==2.7.*"], py3=["==3.6.*"]),
+   source="util_test.py",
+   interpreter_constraints=parametrize(py2=["==2.7.*"], py3=["==3.6.*"]),
 )
 ```
 

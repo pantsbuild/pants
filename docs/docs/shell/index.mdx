@@ -135,7 +135,7 @@ pants fmt --only=shfmt ::
 ```
 
 :::tip Benefit of Pants: shfmt runs in parallel with Python, Java, Scala, and Go formatters
-Normally, Pants runs formatters sequentially so that it can pipe the results of one formatter into the next. However, Pants will run shfmt in parallel to formatters for other languages, [like Python](../python/python-overview/linters-and-formatters.mdx), because shfmt does not operate on those languages.
+Normally, Pants runs formatters sequentially so that it can pipe the results of one formatter into the next. However, Pants will run shfmt in parallel to formatters for other languages, [like Python](../python/overview/linters-and-formatters.mdx), because shfmt does not operate on those languages.
 
 You can see this concurrency through Pants's dynamic UI.
 :::
@@ -193,7 +193,7 @@ pants lint --only=shellcheck ::
 ```
 
 :::tip Benefit of Pants: Shellcheck runs in parallel with other linters
-Pants will attempt to run all activated linters and formatters at the same time for improved performance, including [Python](../python/python-overview/linters-and-formatters.mdx), Go, Java, and Scala linters. You can see this through Pants's dynamic UI.
+Pants will attempt to run all activated linters and formatters at the same time for improved performance, including [Python](../python/overview/linters-and-formatters.mdx), Go, Java, and Scala linters. You can see this through Pants's dynamic UI.
 :::
 
 ## shUnit2 test runner
@@ -207,9 +207,9 @@ To use shunit2 with Pants:
 2. Create a `shunit2_test` or `shunit2_tests` target in the directory's BUILD file.
    - You can run [`pants tailor`](../getting-started/initial-configuration.mdx#5-generate-build-files) to automate this step.
 3. Specify which shell to run your tests with, either by setting a shebang directly in the test file or by setting the field `shell` on the `shunit2_test` / `shunit2_tests` target.
-   - See [here](../../reference/targets/shunit2_tests.mdx#codeshellcode) for all supported shells.
+   - See [here](../../reference/targets/shunit2_tests.mdx#shell) for all supported shells.
 
-```shell title="scripts/tests.sh"
+```shell tab={"label":"scripts/tests.sh"}
 #!/usr/bin/env bash
 
 testEquality() {
@@ -217,7 +217,7 @@ testEquality() {
 }
 ```
 
-```python title="scripts/BUILD"
+```python tab={"label":"scripts/BUILD"}
 shunit2_tests(name="tests")
 ```
 
@@ -238,7 +238,7 @@ Pants will download the `./shunit2` script and will add `source ./shunit2` with 
 
 You can import your production code by using `source`. Make sure the code belongs to a `shell_source` or `shell_sources` target. Pants's [dependency inference](../using-pants/key-concepts/targets-and-build-files.mdx) will add the relevant dependencies, which you can confirm by running `pants dependencies scripts/tests.sh`. You can also manually add to the `dependencies` field of your `shunit2_tests` target.
 
-```shell title="scripts/tests.sh"
+```shell tab={"label":"scripts/tests.sh"}
 #!/usr/bin/bash
 
 source scripts/lib.sh
@@ -248,13 +248,13 @@ testAdd() {
 }
 ```
 
-```shell title="scripts/lib.sh"
+```shell tab={"label":"scripts/lib.sh"}
 add_one() {
     echo $(($1 + 1))
 }
 ```
 
-```shell title="scripts/BUILD"
+```shell tab={"label":"scripts/BUILD"}
 shell_sources(name="lib")
 shell_tests(name="tests")
 ```
@@ -266,8 +266,8 @@ To test multiple shells, use the `parametrize` mechanism, like this:
 
 ```python
 shunit2_tests(
-name="tests",
-shell=parametrize("bash", "zsh"),
+    name="tests",
+    shell=parametrize("bash", "zsh"),
 )
 ```
 
@@ -360,7 +360,7 @@ To depend on a built package, use the `runtime_package_dependencies` field on th
 
 For example:
 
-```python title="helloworld/BUILD"
+```python tab={"label":"helloworld/BUILD"}
 python_source(name="py_src", source="say_hello.py")
 pex_binary(name="pex", entry_point="say_hello.py")
 
@@ -371,11 +371,11 @@ shunit2_test(
 )
 ```
 
-```python title="helloworld/say_hello.py"
+```python tab={"label":"helloworld/say_hello.py"}
 print("Hello, test!")
 ```
 
-```shell title="helloworld/tests.sh"
+```shell tab={"label":"helloworld/tests.sh"}
 #!/usr/bin/bash
 
 testArchiveCreated() {

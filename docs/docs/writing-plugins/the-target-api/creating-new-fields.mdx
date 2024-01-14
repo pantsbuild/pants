@@ -125,21 +125,21 @@ For example:
 
 ```python
 class LeafyGreensField(StringField):
-alias = "leafy_greens"
-valid_choices = ("kale", "spinach", "chard")
+    alias = "leafy_greens"
+    valid_choices = ("kale", "spinach", "chard")
 ```
 
 or:
 
 ```python
 class LeafyGreens(Enum):
-KALE = "kale"
-SPINACH = "spinach"
-CHARD = "chard"
+    KALE = "kale"
+    SPINACH = "spinach"
+    CHARD = "chard"
 
 class LeafyGreensField(StringField):
-alias = "leafy_greens"
-valid_choices = LeafyGreens
+    alias = "leafy_greens"
+    valid_choices = LeafyGreens
 ```
 
 :::

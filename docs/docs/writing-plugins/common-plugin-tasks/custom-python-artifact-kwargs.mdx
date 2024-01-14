@@ -7,7 +7,7 @@ How to add your own logic to `python_artifact()`.
 
 ---
 
-Pants can build [Python distributions](../../python/python-overview/building-distributions.mdx), such as wheels and sdists, from information you provide in a [`python_distribution`](../../../reference/targets/python_distribution.mdx) target.
+Pants can build [Python distributions](../../python/overview/building-distributions.mdx), such as wheels and sdists, from information you provide in a [`python_distribution`](../../../reference/targets/python_distribution.mdx) target.
 
 When doing so, and if you don't provide your own `setup.py` file, Pants generates one and passes it the kwargs provided in the `provides=python_artifact(...)` field to the `setup(...)` call (Pants also generates some of the kwargs, such as `install_requires` and `namespace_packages` by analyzing your code).
 
@@ -74,15 +74,15 @@ For example, a user could do this:
 
 ```python
 pants_python_distribution(
-name="my-dist",
-dependencies=[...],
-provides=python_artifact(...)
+   name="my-dist",
+   dependencies=[...],
+   provides=python_artifact(...)
 )
 
 pants_contrib_python_distribution(
-name="my-dist",
-dependencies=[...],
-provides=python_artifact(...)
+   name="my-dist",
+   dependencies=[...],
+   provides=python_artifact(...)
 )
 ```
 
@@ -90,21 +90,21 @@ To support this workflow, [create new target types](../the-target-api/creating-n
 
 ```python
 class PantsPythonDistribution(Target):
-alias = "pants_python_distribution"
-core_fields = PythonDistribution.core_fields
+   alias = "pants_python_distribution"
+   core_fields = PythonDistribution.core_fields
 
 class PantsContribPythonDistribution(Target):
-alias = "pants_contrib_python_distribution"
-core_fields = PythonDistribution.core_fields
+   alias = "pants_contrib_python_distribution"
+   core_fields = PythonDistribution.core_fields
 ```
 
 Then, for each `SetupKwargsRequest` subclass, check which target type was used:
 
 ```python
 class PantsSetupKwargsRequest(SetupKwargsRequest):
-@classmethod
-def is_applicable(cls, target: Target) -> bool:
-return isinstance(target, PantsPythonDistribution)
+    @classmethod
+    def is_applicable(cls, target: Target) -> bool:
+        return isinstance(target, PantsPythonDistribution)
 ```
 
 :::
