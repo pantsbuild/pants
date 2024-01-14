@@ -45,7 +45,7 @@ There are several fields you can set on a `pex_binary` to configure the layout, 
 
 ## Setting the target platforms for a PEX
 
-By default, the `package` goal builds a PEX that runs on the architecture and OS of the local machine (or local [environment](../../using-pants/environments:-cross-platform-or-remote-builds.mdx)), and on a locally-found interpreter compatible with your code's [interpreter constraints](./interpreter-compatibility.mdx). However, you can also build a multiplatform PEX - one that will run on multiple architecture+OS+interpreter combinations.
+By default, the `package` goal builds a PEX that runs on the architecture and OS of the local machine (or local [environment](../../using-pants/environments.mdx)), and on a locally-found interpreter compatible with your code's [interpreter constraints](./interpreter-compatibility.mdx). However, you can also build a multiplatform PEX - one that will run on multiple architecture+OS+interpreter combinations.
 
 To do so, you must configure the [`complete_platforms`](../../../reference/targets/pex_binary.mdx#complete_platforms) field on your `pex_binary` to point to `file` targets that provide detailed information about your target platforms. This is information that Pants can't determine itself because it's not running on those platforms:
 
@@ -70,7 +70,7 @@ pex_binary(
 You can generate the JSON content for these files by installing the [Pex](https://github.com/pantsbuild/pex) command-line tool on the target platform and running `pex3 interpreter inspect --markers --tags` against the appropriate interpreter. You can run `pex3 interpreter inspect --help` for more options, and in particular for how to select the desired target interpreter.
 
 :::caution Platform-specific dependencies must be available as wheels
-Some Python distributions include native code, and therefore require platform-specific artifacts. Often, such artifacts are pre-built and available on PyPI as platform-specific wheels. But in some cases they are only available as source distributions (sdists) and must be compiled into platform-specific wheels at build time. Pants can only build platform-specific sdists for the local machine or [environment](../../using-pants/environments:-cross-platform-or-remote-builds.mdx), and cannot cross-compile for other target platforms. Therefore, to build for platforms other than the local one, all the platform-specific third-party packages that your PEX transitively depends on must be available as prebuilt wheels for each platform you care about. If those wheels aren't available on PyPI you can always build them manually once and host them on a private package repository.
+Some Python distributions include native code, and therefore require platform-specific artifacts. Often, such artifacts are pre-built and available on PyPI as platform-specific wheels. But in some cases they are only available as source distributions (sdists) and must be compiled into platform-specific wheels at build time. Pants can only build platform-specific sdists for the local machine or [environment](../../using-pants/environments.mdx), and cannot cross-compile for other target platforms. Therefore, to build for platforms other than the local one, all the platform-specific third-party packages that your PEX transitively depends on must be available as prebuilt wheels for each platform you care about. If those wheels aren't available on PyPI you can always build them manually once and host them on a private package repository.
 :::
 
 ## Setting the .pex file's shebang
