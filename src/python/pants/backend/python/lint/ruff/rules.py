@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Any, Iterable, Tuple
 
 from typing_extensions import assert_never
 
@@ -13,14 +13,15 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.goals.lint import AbstractLintRequest, LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
@@ -180,12 +181,24 @@ async def ruff_fmt(request: RuffFmtRequest.Batch, ruff: Ruff) -> FmtResult:
     return await FmtResult.create(request, result)
 
 
+def without_lint(rules: Iterable[Rule]) -> Iterable[Rule]:
+    return (
+        rule
+        for rule in rules
+        if not isinstance(rule, UnionRule)
+        or (
+            rule.union_base is not AbstractLintRequest
+            and rule.union_base is not AbstractLintRequest.Batch
+        )
+    )
+
+
 def rules():
     return [
         *collect_rules(),
-        *RuffFixRequest.rules(),
+        *without_lint(RuffFixRequest.rules()),
         *RuffCheckLintRequest.rules(),
         *RuffFormatLintRequest.rules(),
-        *RuffFmtRequest.rules(),
+        *without_lint(RuffFmtRequest.rules()),
         *pex.rules(),
     ]
