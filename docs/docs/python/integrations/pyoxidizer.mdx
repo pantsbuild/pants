@@ -7,7 +7,7 @@ Creating Python binaries through PyOxidizer.
 
 ---
 
-PyOxidizer allows you to distribute your code as a single binary file, similar to [Pex files](../python-overview/pex-files.mdx). Unlike Pex, these binaries include a Python interpreter, often greatly simplifying distribution.
+PyOxidizer allows you to distribute your code as a single binary file, similar to [Pex files](../overview/pex-files.mdx). Unlike Pex, these binaries include a Python interpreter, often greatly simplifying distribution.
 
 See our blog post on [Packaging Python with the Pants PyOxidizer Plugin](https://blog.pantsbuild.org/packaging-python-with-the-pyoxidizer-pants-plugin/) for more discussion of the benefits of PyOxidizer.
 
@@ -35,7 +35,7 @@ We would [love your feedback](/community/getting-help) on this backend!
 
 The `pyoxidizer_binary` target works by pointing to a `python_distribution` target with the code you want included. Pants then passes the distribution to PyOxidizer to install it as a binary.
 
-So, to get started, create a `python_distribution` target per [Building distributions](../python-overview/building-distributions.mdx).
+So, to get started, create a `python_distribution` target per [Building distributions](../overview/building-distributions.mdx).
 
 ```python title="project/BUILD"
 python_sources(name="lib")
@@ -137,7 +137,7 @@ Currently, PyOxidizer can only resolve dependencies from PyPI and your first-par
 
 ### `python_distribution`s that implicitly depend on each other
 
-As explained at [Building distributions](../python-overview/building-distributions.mdx#mapping-source-files-to-distributions), Pants automatically detects when one `python_distribution` depends on another, and it will add that dependency to the `install_requires` for the distribution.
+As explained at [Building distributions](../overview/building-distributions.mdx#mapping-source-files-to-distributions), Pants automatically detects when one `python_distribution` depends on another, and it will add that dependency to the `install_requires` for the distribution.
 
 When this happens, PyOxidizer would naively try installing that first-party dependency from PyPI, which will likely fail. Instead, include all relevant `python_distribution` targets in the `dependencies` field of the `pyoxidizer_binary` target.
 

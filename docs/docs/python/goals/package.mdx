@@ -26,12 +26,12 @@ See [test](./test.mdx) for more information.
 :::
 
 :::tip Streamling Docker builds
-Check out our blog [Streamling Docker Builds](https://blog.pantsbuild.org/pants-pex-and-docker/) to read about how you can combine these `package` formats with Pants's Docker support. Also see our [Docker docs](../../docker/docker-overview.mdx)
+Check out our blog [Streamling Docker Builds](https://blog.pantsbuild.org/pants-pex-and-docker/) to read about how you can combine these `package` formats with Pants's Docker support. Also see our [Docker docs](../../docker/index.mdx)
 :::
 
 ## Creating a PEX file from a `pex_binary` target
 
-Running `package` on a `pex_binary` target will create an executable [PEX file](../python-overview/pex-files.mdx).
+Running `package` on a `pex_binary` target will create an executable [PEX file](../overview/pex-files.mdx).
 
 The PEX file will contain all the code needed to run the binary, namely:
 
@@ -41,7 +41,7 @@ The PEX file will contain all the code needed to run the binary, namely:
 The PEX metadata will include:
 
 - The entry point or console script specified by the `pex_binary` target, if any.
-- The intersection of all interpreter constraints applicable to the code in the Pex. See [Interpreter compatibility](../python-overview/interpreter-compatibility.mdx).
+- The intersection of all interpreter constraints applicable to the code in the Pex. See [Interpreter compatibility](../overview/interpreter-compatibility.mdx).
 
 You can also tweak many options, such as the `execution_mode` option to optimize for faster initial runs vs. subsequent runs. Run `pants help pex_binary`.
 
@@ -210,7 +210,7 @@ Use `pants peek path/to/dir:` to inspect the generated `pex_binary` targets.
 
 ## Create a setuptools distribution
 
-Running `package` on a `python_distribution` target will create a standard setuptools-style Python distribution, such as an sdist or a wheel. See [Building Distributions](../python-overview/building-distributions.mdx) for details.
+Running `package` on a `python_distribution` target will create a standard setuptools-style Python distribution, such as an sdist or a wheel. See [Building Distributions](../overview/building-distributions.mdx) for details.
 
 ## Create a `zip` or `tar` file
 

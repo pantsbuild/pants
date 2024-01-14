@@ -135,7 +135,7 @@ pants fmt --only=shfmt ::
 ```
 
 :::tip Benefit of Pants: shfmt runs in parallel with Python, Java, Scala, and Go formatters
-Normally, Pants runs formatters sequentially so that it can pipe the results of one formatter into the next. However, Pants will run shfmt in parallel to formatters for other languages, [like Python](../python/python-overview/linters-and-formatters.mdx), because shfmt does not operate on those languages.
+Normally, Pants runs formatters sequentially so that it can pipe the results of one formatter into the next. However, Pants will run shfmt in parallel to formatters for other languages, [like Python](../python/overview/linters-and-formatters.mdx), because shfmt does not operate on those languages.
 
 You can see this concurrency through Pants's dynamic UI.
 :::
@@ -193,7 +193,7 @@ pants lint --only=shellcheck ::
 ```
 
 :::tip Benefit of Pants: Shellcheck runs in parallel with other linters
-Pants will attempt to run all activated linters and formatters at the same time for improved performance, including [Python](../python/python-overview/linters-and-formatters.mdx), Go, Java, and Scala linters. You can see this through Pants's dynamic UI.
+Pants will attempt to run all activated linters and formatters at the same time for improved performance, including [Python](../python/overview/linters-and-formatters.mdx), Go, Java, and Scala linters. You can see this through Pants's dynamic UI.
 :::
 
 ## shUnit2 test runner

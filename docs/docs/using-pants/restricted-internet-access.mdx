@@ -59,7 +59,7 @@ Pants downloads the various Python-related tools it uses from [PyPI](https://pyp
 
 If you use Python but cannot access PyPI directly, then you probably have an internal mirror or a custom Python package repository. So all you have to do is configure Pants to access this custom repository, and ensure that the tools it needs are available there.
 
-See [Python third-party dependencies](../python/python-overview/third-party-dependencies.mdx#custom-repositories) for instructions on how to set up Pants to access a custom Python package repository.
+See [Python third-party dependencies](../python/overview/third-party-dependencies.mdx#custom-repositories) for instructions on how to set up Pants to access a custom Python package repository.
 
 ### JVM tools
 
@@ -89,7 +89,7 @@ This is best understood by looking at an example:
 - We see the `version` option is set to `3.11.4`.
 - We are running on macOS ARM, so look up `macos_arm64` in the `url_platform_mapping` option and find the string `osx-x86_64`.
 
-Thus, the final URL is:  
+Thus, the final URL is:
 `https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-osx-x86_64.zip`.
 
 It should be clear from this example how to modify the URL template to point to your own hosted binaries:

@@ -125,7 +125,7 @@ Then, use `pants package project:gcf`, and upload the resulting `project/gcf.pex
 
 Pants has implemented a new way to package Google Cloud Functions in 2.17, which is now the default in 2.18, resulting in smaller packages and faster cold starts. This involves some changes:
 
-- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](../python-overview/pex-files.mdx) and then use Lambdex to adapt this to be better understood by GCF by adding a shim handler. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during initialization.
+- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](../overview/pex-files.mdx) and then use Lambdex to adapt this to be better understood by GCF by adding a shim handler. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during initialization.
 - In Pants 2.17, the use of Lambdex was deprecated, in favour of choosing the appropriate dependencies ahead of time, as described above, without needing to do this on each cold start. This results in a zip file laid out in the format recommended by GCF, and includes a re-export of the handler.
 - In Pants 2.18, the new behaviour is now the default behaviour.
 - In Pants 2.19, the old Lambdex behaviour will be entirely removed.

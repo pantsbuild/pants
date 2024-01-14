@@ -97,7 +97,7 @@ Using own classes via subclassing will also help with refactoring if you decide 
 
 ### Ensuring a version follows a semver convention
 
-With the current implementation, we have simply returned the contents of the file as is. We may want to add some validation, for instance, to check that a version string follows a semver convention. Let's learn how to [bring a 3rd party Python package](../writing-plugins/plugins-overview.mdx#thirdparty-dependencies), namely, [packaging](https://pypi.org/project/packaging/), into our plugin to do that!
+With the current implementation, we have simply returned the contents of the file as is. We may want to add some validation, for instance, to check that a version string follows a semver convention. Let's learn how to [bring a 3rd party Python package](../writing-plugins/overview.mdx#thirdparty-dependencies), namely, [packaging](https://pypi.org/project/packaging/), into our plugin to do that!
 
 To start depending on the `packaging` package in our in-repo plugin, we must extend the `pants.toml` file:
 
