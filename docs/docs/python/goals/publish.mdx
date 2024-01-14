@@ -22,7 +22,7 @@ This will register a new `repositories` field on the `python_distribution` targe
 
 When publishing a `python_distribution`, you need to tell Pants which repositories to publish to. That is done with a new `repositories` field on `python_distribution` targets.
 
-```python title="src/python/BUILD"
+```python tab={"label":"src/python/BUILD"}
 python_distribution(
   name="demo",
   # ...
@@ -34,7 +34,7 @@ python_distribution(
 )
 ```
 
-```text title=".pypirc"
+```text tab={"label":".pypirc"}
 [distutils]
 index-servers =
 	pypi

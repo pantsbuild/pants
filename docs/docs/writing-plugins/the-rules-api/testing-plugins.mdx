@@ -11,7 +11,7 @@ There are four main approaches to testing your plugin, ranging in terms of scope
 
 All approaches use [Pytest](https://docs.pytest.org/en/latest/)-style tests, rather than [`unittest`](https://docs.python.org/3/library/unittest.html)-style tests.
 
-You must also install the distribution `pantsbuild.pants.testutil`. We recommend using the [`pants_requirements` target to do this](../plugins-overview.mdx).
+You must also install the distribution `pantsbuild.pants.testutil`. We recommend using the [`pants_requirements` target to do this](../overview.mdx).
 
 ## Approach 1: normal unit tests
 
@@ -54,9 +54,9 @@ For example, given this target definition for `project/app:tgt`:
 
 ```python
 python_test(
-name="tgt",
-source="app_test.py",
-timeout=120,
+    name="tgt",
+    source="app_test.py",
+    timeout=120,
 )
 ```
 
@@ -64,8 +64,8 @@ We would write:
 
 ```python
 tgt = PythonTestTarget(
-{"source": "app_test.py", "timeout": 120},
-Address("project/app", target_name="tgt"),
+    {"source": "app_test.py", "timeout": 120},
+    Address("project/app", target_name="tgt"),
 )
 ```
 

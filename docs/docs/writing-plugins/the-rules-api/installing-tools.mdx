@@ -55,9 +55,9 @@ Why do this? This is helpful to ensure that all discovered binaries are valid an
 from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPathTest
 
 BinaryPathRequest(
-binary_name="docker",
-search_path=["/usr/bin", "/bin"],
-test=BinaryPathTest(args=["--version"]),
+    binary_name="docker",
+    search_path=["/usr/bin", "/bin"],
+    test=BinaryPathTest(args=["--version"]),
 )
 ```
 
@@ -196,21 +196,21 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.option.option_types import StrOption
 
 class Black(PythonToolBase):
-options_scope = "black"
-help = "The Black Python code formatter (https://black.readthedocs.io/)."
+    options_scope = "black"
+    help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-default_main = ConsoleScript("black")
+    default_main = ConsoleScript("black")
 
-register_interpreter_constraints = True
-default_interpreter_constraints = ["CPython>=3.8,<3.9"]
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.8,<3.9"]
 
-default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
+    default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
 
-config = StrOption(
-default=None,
-advanced=True,
-help="Path to Black's pyproject.toml config file",
-)
+    config = StrOption(
+        default=None,
+        advanced=True,
+        help="Path to Black's pyproject.toml config file",
+    )
 ```
 
 You must define the class properties `options_scope` and `default_main`, and a
@@ -221,7 +221,7 @@ Then, you can set up your `Pex` like this:
 ```python
 @rule
 async def demo(black: Black, ...) -> Foo:
-pex = await Get(Pex, PexRequest, black.to_pex_request())
+    pex = await Get(Pex, PexRequest, black.to_pex_request())
 ```
 
 :::

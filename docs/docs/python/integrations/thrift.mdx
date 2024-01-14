@@ -58,7 +58,7 @@ thrift_sources(name="thrift")
 
 Generated Python files require the [`thrift` dependency](https://pypi.org/project/thrift/) for their imports to work properly.
 
-Add `thrift` to your project, e.g. your `requirements.txt` (see [Third-party dependencies](../python-overview/third-party-dependencies.mdx)).
+Add `thrift` to your project, e.g. your `requirements.txt` (see [Third-party dependencies](../overview/third-party-dependencies.mdx)).
 
 ```text title="requirements.txt"
 thrift==0.15.0
@@ -117,7 +117,7 @@ You do not need to run this goal for codegen to work when using Pants; `export-c
 
 ## Multiple resolves
 
-If you're using [multiple resolves](../python-overview/third-party-dependencies.mdx) (i.e. multiple lockfiles), then you may need to set the `python_resolve` field. `thrift_source` targets only work with a single resolve, meaning, for example, that a `python_source` target that uses the resolve 'a' can only depend on Thrift targets that also uses this same resolve.
+If you're using [multiple resolves](../overview/third-party-dependencies.mdx) (i.e. multiple lockfiles), then you may need to set the `python_resolve` field. `thrift_source` targets only work with a single resolve, meaning, for example, that a `python_source` target that uses the resolve 'a' can only depend on Thrift targets that also uses this same resolve.
 
 By default, `thrift_source` / `thrift_sources` targets use the resolve set by the option `[python].default_resolve`. To use a different resolve, set the field `python_resolve: str` to one of the values from the option `[python].resolves`.
 
