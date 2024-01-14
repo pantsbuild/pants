@@ -37,7 +37,7 @@ remote_instance_name = "main"
 
 The REAPI execution service selects a worker for a process by consulting the "platform properties" that are passed in a remote execution request. These platform properties are key/value pairs that are configured for particular workers in the server. Generally, you will configure these in the server (or be provided them by your server's administrator), and then configure Pants to match particular workers using their relevant platform properties.
 
-To define platform properties (as well as to configure any other settings which are specific to running on a remote worker), you should define a remote environment. Building on the first example earlier, you would add [`remote_environment` targets](../../../reference/targets/remote_environment.mdx) (see [environment](../environments:-cross-platform-or-remote-builds.mdx) for more information) corresponding to each set of distinct workers you want to use in the server. Assuming that the REAPI server is configured with a particular worker type labeled `docker-container=busybox:latest`, that might look like a `BUILD` file containing:
+To define platform properties (as well as to configure any other settings which are specific to running on a remote worker), you should define a remote environment. Building on the first example earlier, you would add [`remote_environment` targets](../../../reference/targets/remote_environment.mdx) (see [environment](../environments.mdx) for more information) corresponding to each set of distinct workers you want to use in the server. Assuming that the REAPI server is configured with a particular worker type labeled `docker-container=busybox:latest`, that might look like a `BUILD` file containing:
 
 ```python
 remote_environment(
@@ -50,7 +50,7 @@ remote_environment(
 )
 ```
 
-Your `remote_environment` will also need to override any [environment-aware options](../environments:-cross-platform-or-remote-builds.mdx) which configure the relevant tools used in your repository. For example: if building Python code, a Python interpreter must be available and matched via the environment-aware options of `[python-bootstrap]`. If using protobuf support, then you may also need `unzip` available in the remote execution environment in order to unpack the protoc archive. Etc.
+Your `remote_environment` will also need to override any [environment-aware options](../environments.mdx) which configure the relevant tools used in your repository. For example: if building Python code, a Python interpreter must be available and matched via the environment-aware options of `[python-bootstrap]`. If using protobuf support, then you may also need `unzip` available in the remote execution environment in order to unpack the protoc archive. Etc.
 
 ### Concurrency
 
