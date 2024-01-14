@@ -162,7 +162,7 @@ class AbstractLintRequest:
 
     # Enables lint rules which run the formatter/fixer and check if it made changes.
     # If it did make changes shows an error. This makes sure the user didn't forget
-    # to run the formatter/fixer.
+    # to run the formatter/fixer. You most probably don't want to disable this flag.
     enable_lint_rules: ClassVar[bool] = True
 
     @final
