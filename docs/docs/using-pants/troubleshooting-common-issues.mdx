@@ -89,9 +89,9 @@ Is the missing import from a third-party dependency? Common issues:
   - Run `pants tailor ::`, or manually add the relevant targets.
 - The dependency is missing from your third-party requirements list, e.g. `go.mod` or `requirements.txt`.
 - The dependency exposes a module different than the default Pants uses, e.g. Python's `ansicolors` exposing `colors`.
-  - [Python](../python/python-overview/third-party-dependencies.mdx): set the `modules` field and `module_mapping` fields.
+  - [Python](../python/overview/third-party-dependencies.mdx): set the `modules` field and `module_mapping` fields.
   - [JVM](../../reference/targets/jvm_artifact.mdx): set the `packages` field on `jvm_artifact` targets.
-- Python: check for any [undeclared transitive dependencies](../python/python-overview/third-party-dependencies.mdx#advanced-usage).
+- Python: check for any [undeclared transitive dependencies](../python/overview/third-party-dependencies.mdx#advanced-usage).
 
 Is the missing import from first-party code? Common issues:
 
@@ -108,13 +108,13 @@ Is the missing import from first-party code? Common issues:
 Common issues with both first and third-party imports:
 
 - Ambiguity. >1 target exposes the same module/package.
-  - If it's a third-party dependency, you should likely use multiple "resolves" (lockfiles). Each resolve should have no more than one of the same requirement. See [Python](../python/python-overview/lockfiles.mdx#multiple-lockfiles) and [JVM](../java-and-scala/java-and-scala-overview.mdx).
+  - If it's a third-party dependency, you should likely use multiple "resolves" (lockfiles). Each resolve should have no more than one of the same requirement. See [Python](../python/overview/lockfiles.mdx#multiple-lockfiles) and [JVM](../java-and-scala/index.mdx).
   - If it's a first-party dependency, you may have unintentionally created multiple targets owning the same file. Run `pants list path/to/file.ext` to see all owners. This often happens from overlapping `sources` fields. If this was intentional, follow the instructions in the ambiguity warning to disambiguate via the `dependencies` field.
 - Some target types like `resources` and `files` often need to be explicitly added to the `dependencies` field and cannot be inferred (yet).
 - Multiple resolves (Python and JVM).
   - A target can only depend on targets that share the same "resolve" (lockfile).
   - Pants will warn when it detects that the import exists in another resolve. This usually implies you should either change the current target's `resolve` field, or use the `parametrize()` mechanism so that the code works with multiple resolves.
-  - See [Python](../python/python-overview/lockfiles.mdx#multiple-lockfiles) and [JVM](../java-and-scala/java-and-scala-overview.mdx).
+  - See [Python](../python/overview/lockfiles.mdx#multiple-lockfiles) and [JVM](../java-and-scala/index.mdx).
 
 When debugging dependency inference, it can help to explicitly add the problematic dependency to the `dependencies` field to see if it gets the code running. If so, you can then try to figure out why dependency inference is not working.
 
@@ -185,7 +185,7 @@ The macOS system Python interpreters are broken in several ways, such as sometim
 ERROR: Could not install packages due to an EnvironmentError: [Errno 13] Permission denied: '/Library/Python/3.7'
 ```
 
-You can set the option `interpreter_search_paths` in the `[python]` scope to teach Pants to ignore the interpreters in `/usr/bin`. See [here](../python/python-overview/interpreter-compatibility.mdx#changing-the-interpreter-search-path) for more information.
+You can set the option `interpreter_search_paths` in the `[python]` scope to teach Pants to ignore the interpreters in `/usr/bin`. See [here](../python/overview/interpreter-compatibility.mdx#changing-the-interpreter-search-path) for more information.
 
 ## "Too many open files" error
 

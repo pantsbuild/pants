@@ -51,9 +51,9 @@ pytest-django>=3.9.0,<4
 pytest-rerunfailures==9.0
 ```
 
-Finally, generate the relevant lockfile with `pants generate-lockfiles --resolve=pytest`. For more information, see [Lockfiles for tools](../python-overview/lockfiles.mdx#lockfiles-for-tools).
+Finally, generate the relevant lockfile with `pants generate-lockfiles --resolve=pytest`. For more information, see [Lockfiles for tools](../overview/lockfiles.mdx#lockfiles-for-tools).
 
-Alternatively, if you only want to install the plugin for certain tests, you can add the plugin to the `dependencies` field of your `python_test` / `python_tests` target. See [Third-party dependencies](../python-overview/third-party-dependencies.mdx) for how to install Python dependencies. For example:
+Alternatively, if you only want to install the plugin for certain tests, you can add the plugin to the `dependencies` field of your `python_test` / `python_tests` target. See [Third-party dependencies](../overview/third-party-dependencies.mdx) for how to install Python dependencies. For example:
 
 ```text tab={"label":"requirements.txt"}
 pytest-django==3.10.0

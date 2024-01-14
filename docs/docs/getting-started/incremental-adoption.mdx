@@ -29,11 +29,11 @@ Formatters and linters are often the simplest to get working because—for all t
 
 First, run [`pants tailor ::`](./initial-configuration.mdx#5-generate-build-files) to generate BUILD files. This tells Pants which files to operate on, and will allow you to set additional metadata over time like test timeouts and dependencies on resources.
 
-Then, activate the [Linters and formatters](../python/python-overview/linters-and-formatters.mdx) you'd like to use. Hook up the `fmt` and `lint` goals to your [CI](../using-pants/using-pants-in-ci.mdx).
+Then, activate the [Linters and formatters](../python/overview/linters-and-formatters.mdx) you'd like to use. Hook up the `fmt` and `lint` goals to your [CI](../using-pants/using-pants-in-ci.mdx).
 
 ### 3. Set up tests
 
-To get [tests](../python/goals/test.mdx) working, you will first need to set up [source roots](../using-pants/key-concepts/source-roots.mdx) and [third-party dependencies](../python/python-overview/third-party-dependencies.mdx).
+To get [tests](../python/goals/test.mdx) working, you will first need to set up [source roots](../using-pants/key-concepts/source-roots.mdx) and [third-party dependencies](../python/overview/third-party-dependencies.mdx).
 
 Pants's [dependency inference](../using-pants/key-concepts/targets-and-build-files.mdx) will infer most dependencies for you by looking at your import statements. However, some dependencies cannot be inferred, such as [resources](../using-pants/assets-and-archives.mdx).
 
@@ -76,7 +76,7 @@ We recommend manually verifying that this step is working how you'd like by insp
 
 Pants is highly extensible. In fact, all of Pants's core functionality is implemented using the exact same API used by plugins.
 
-Check out [Plugins Overview](../writing-plugins/plugins-overview.mdx). We'd also love to help in the #plugins channel on [Slack](/community/members).
+Check out [Plugins Overview](../writing-plugins/overview.mdx). We'd also love to help in the #plugins channel on [Slack](/community/members).
 
 Some example plugins that users have written:
 

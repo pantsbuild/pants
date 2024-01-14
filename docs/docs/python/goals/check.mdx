@@ -29,7 +29,7 @@ $ pants check ::
 :::tip Benefit of Pants: typecheck Python 2-only and Python 3-only code at the same time
 MyPy determines which Python version to use based on its `python_version` option. If that's undefined, MyPy uses the interpreter the tool is run with. Because you can only use one config file at a time with MyPy, you cannot normally say to use `2.7` for part of your codebase but `3.6` for the rest; you must choose a single version.
 
-Instead, Pants will group your targets based on their [interpreter constraints](../python-overview/interpreter-compatibility.mdx), and run all the Python 2 targets together and all the Python 3 targets together. It will automatically set `python_version` to the minimum compatible interpreter, such as a constraint like `["==2.7.*", ">3.6"]` using `2.7`.
+Instead, Pants will group your targets based on their [interpreter constraints](../overview/interpreter-compatibility.mdx), and run all the Python 2 targets together and all the Python 3 targets together. It will automatically set `python_version` to the minimum compatible interpreter, such as a constraint like `["==2.7.*", ">3.6"]` using `2.7`.
 
 To turn this off, you can still set `python_version` in `mypy.ini` or `--python-version`/`--py2` in `--mypy-args`; Pants will respect the value you set.
 :::
@@ -57,7 +57,7 @@ mypy = "3rdparty/python/mypy.lock"
 install_from_resolve = "mypy"
 ```
 
-See [Lockfiles for tools](../python-overview/lockfiles.mdx#lockfiles-for-tools).
+See [Lockfiles for tools](../overview/lockfiles.mdx#lockfiles-for-tools).
 
 ### Incrementally adopt MyPy with `skip_mypy=True`
 
@@ -128,15 +128,15 @@ python_sources(name="lib")
 
 ### Third-party type stubs
 
-You can install third-party type stubs (for example, `types-requests`) like [normal Python requirements](../python-overview/third-party-dependencies.mdx). Pants will infer a dependency on both the type stub and the actual dependency, for example, both `types-requests` and `requests`, which you can confirm by running `pants dependencies path/to/f.py`.
+You can install third-party type stubs (for example, `types-requests`) like [normal Python requirements](../overview/third-party-dependencies.mdx). Pants will infer a dependency on both the type stub and the actual dependency, for example, both `types-requests` and `requests`, which you can confirm by running `pants dependencies path/to/f.py`.
 
-If you install MyPy from a [custom lockfile](../python-overview/lockfiles.mdx#lockfiles-for-tools) you can also add type stub requirements to that lockfile.
+If you install MyPy from a [custom lockfile](../overview/lockfiles.mdx#lockfiles-for-tools) you can also add type stub requirements to that lockfile.
 This ensures that the stubs are only used when running MyPy and are not included when, for example,
 [packaging a PEX](./package.mdx).
 
 ### Add a third-party plugin
 
-Add any third-party MyPy plugins to a [custom lockfile](../python-overview/lockfiles.mdx#lockfiles-for-tools):
+Add any third-party MyPy plugins to a [custom lockfile](../overview/lockfiles.mdx#lockfiles-for-tools):
 
 ```toml tab={"label":"pants.toml"}
 [python.resolves]
@@ -249,7 +249,7 @@ if TYPE_CHECKING:
     from mypy_boto3_ec2 import EC2ServiceResource
 ```
 
-For these reasons, it's recommended to load any type-stub libraries that require explicit imports as part of your normal [third-party dependencies](../python-overview/third-party-dependencies.mdx). Alternatively, you can set `# pants: no-infer-dep` on the lines of type-stub imports "guarded" by a check of `if TYPE_CHECKING`.
+For these reasons, it's recommended to load any type-stub libraries that require explicit imports as part of your normal [third-party dependencies](../overview/third-party-dependencies.mdx). Alternatively, you can set `# pants: no-infer-dep` on the lines of type-stub imports "guarded" by a check of `if TYPE_CHECKING`.
 :::
 
 :::note MyPy Protobuf support
