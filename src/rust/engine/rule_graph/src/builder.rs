@@ -6,6 +6,7 @@ use crate::{
     params_str, Entry, EntryWithDeps, Reentry, RootEntry, RuleEdges, RuleEntry, RuleGraph,
 };
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, VecDeque};
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
@@ -44,7 +45,14 @@ impl<R: Rule> std::fmt::Display for Node<R> {
             Node::Rule {
                 rule,
                 explicit_args_arity,
-            } => write!(f, "Rule({rule}, {explicit_args_arity:?})"),
+            } => {
+                let explicit_args_arity: Cow<str> = if *explicit_args_arity > 0 {
+                    format!(" <{}>", explicit_args_arity).into()
+                } else {
+                    "".into()
+                };
+                write!(f, "{rule}{explicit_args_arity}")
+            }
             Node::Param(p) => write!(f, "Param({p})"),
             Node::Reentry(q, in_scope) => {
                 write!(f, "Reentry({}, {})", q.product, params_str(in_scope))

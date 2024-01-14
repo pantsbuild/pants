@@ -436,7 +436,7 @@ def test_trace_includes_rule_exception_traceback() -> None:
          1 Exception encountered:
 
          Engine traceback:
-           in select
+           in root
              ..
            in {__name__}.{nested_raise.__name__}
              Nested raise
@@ -462,7 +462,7 @@ def test_trace_includes_nested_exception_traceback() -> None:
         1 Exception encountered:
 
         Engine traceback:
-          in select
+          in root
             ..
           in {__name__}.{catch_and_reraise.__name__}
             error chain
