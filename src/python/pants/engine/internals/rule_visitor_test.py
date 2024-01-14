@@ -134,11 +134,12 @@ def test_byname() -> None:
         return 2
 
     async def rule3() -> int:
-        one = await rule1(**implicitly(int(1)))
+        one_explicit = await rule1(1)
+        one_implicit = await rule1(**implicitly(int(1)))
         two = await rule2()
-        return one + two
+        return one_explicit + one_implicit + two
 
-    assert_awaitables(rule3, [(int, int), (int, [])])
+    assert_awaitables(rule3, [(int, []), (int, int), (int, [])])
 
 
 def test_rule_helpers_free_functions() -> None:

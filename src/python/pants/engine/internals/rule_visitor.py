@@ -237,6 +237,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         return AwaitableConstraints(
             None,
             self._check_constraint_arg_type(output_type, output_node),
+            0,
             tuple(
                 self._check_constraint_arg_type(input_type, input_node)
                 for input_type, input_node in zip(input_types, input_nodes)
@@ -253,16 +254,10 @@ class _AwaitableCollector(ast.NodeVisitor):
 
         output_type = _lookup_return_type(rule_func, check=True)
 
-        if call_node.args:
-            raise parse_error(
-                self._format(
-                    call_node,
-                    (
-                        f"Expected no positional arguments (got {len(call_node.args)}), and "
-                        "a `**implicitly(..)` application."
-                    ),
-                )
-            )
+        # To support explicit positional arguments, we record the number passed positionally.
+        # TODO: To support keyword arguments, we would additionally need to begin recording the
+        # argument names of kwargs. But positional-only callsites can avoid those allocations.
+        explicit_args_arity = len(call_node.args)
 
         input_types: tuple[type, ...]
         if not call_node.keywords:
@@ -282,13 +277,14 @@ class _AwaitableCollector(ast.NodeVisitor):
             raise parse_error(
                 self._format(
                     call_node,
-                    "Expected an `**implicitly(..)` application as the only input.",
+                    "Expected an `**implicitly(..)` application as the only keyword input.",
                 )
             )
 
         return AwaitableConstraints(
             rule_id,
             output_type,
+            explicit_args_arity,
             input_types,
             # TODO: Extract this from the callee? Currently only intrinsics can be Effects, so need
             # to figure out their new syntax first.
