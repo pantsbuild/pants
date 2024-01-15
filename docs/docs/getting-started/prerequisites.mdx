@@ -43,7 +43,7 @@ If you need to run an earlier version of Pants on ARM, you can try [building Pan
 :::note Apple Silicon (M1/M2) support
 If running Pants inside a Docker container on an Apple Silicon machine you may need to set `--no-watch-filesystem --no-pantsd`. This is because notifications on native macOS files aren't mirrored over to the virtualized Linux system.
 
-We don't recommend setting this permanently, as these options are crucial for performance when iterating. Instead, you may want to look at the new [Environments](../using-pants/environments:-cross-platform-or-remote-builds.mdx) feature, that lets Pants run natively on macOS but selectively invoke processes in a Docker container.
+We don't recommend setting this permanently, as these options are crucial for performance when iterating. Instead, you may want to look at the new [Environments](../using-pants/environments.mdx) feature, that lets Pants run natively on macOS but selectively invoke processes in a Docker container.
 :::
 
 ### Microsoft Windows
