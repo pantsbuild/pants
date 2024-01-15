@@ -72,6 +72,32 @@ protobuf>=3.12.1
 
 Pants will then automatically add these dependencies to your `protobuf_source` targets created in the next step.
 
+### Use alternative grpc plugins
+
+By default, the `grpcio` plugin is used to generate the services stubs. Pants can also generate services stubs using [`grpclib`](https://github.com/vmagamedov/grpclib).
+
+To use `grpclib`, set `grpclib_plugin = true` in the `[python-protobuf]` scope. You probably also want to disable the `grpcio` plugin if you don't use it.
+
+```toml title="pants.toml"
+[python-protobuf]
+grpclib_plugin = true
+grpcio_plugin = false
+```
+
+Don't forget to add the `grpclib` dependency to your requirements.
+
+It is recommended to share the same dependencies versions between the protobuf plugin and your code runtime dependency (see [Python Lockfile](../overview/lockfiles.mdx#sharing-lockfiles-between-tools-and-code). The requirements for the `grpclib` plugin can be defined this way:
+
+```toml title="pants.toml"
+[python-protobuf-grpclib]
+install_from_resolve = python-default
+# Change the path to your requirements.
+requirements = [
+  "//3rdparty/python#grpclib",
+  "//3rdparty/python#protobuf",
+]
+```
+
 ## Step 3: Generate `protobuf_sources` target
 
 Run [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files) for Pants to create a `protobuf_sources` target wherever you have `.proto` files:
