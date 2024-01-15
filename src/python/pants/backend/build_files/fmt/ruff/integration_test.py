@@ -93,10 +93,17 @@ def test_multiple_files(rule_runner: RuleRunner) -> None:
     (["pyproject.toml", []], ["custom_config.toml", ["--ruff-config=custom_config.toml"]]),
 )
 def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
+    # Force single-quote formatting to pass config and ensure there are no changes.
+    # Use the `tool.ruff` key in pyproject.toml, but don't include in custom config.
+    config_content = (
+        "[tool.ruff]\n[format]\nquote-style = 'single'\n"
+        if config_path == "pyproject.toml"
+        else "[format]\nquote-style = 'single'\n"
+    )
     rule_runner.write_files(
         {
             "BUILD": "python_sources(name='t')\n",
-            config_path: "[tool.ruff]\nskip-string-normalization = 'true'\n",
+            config_path: config_content,
         }
     )
     fmt_result = run_ruff(rule_runner, extra_args=extra_args)
