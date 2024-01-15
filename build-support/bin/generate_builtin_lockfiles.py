@@ -15,7 +15,10 @@ from typing import Generic, Sequence, Type, TypeVar, cast
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.protobuf.java.subsystem import JavaProtobufGrpcSubsystem
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    PythonProtobufGrpclibPlugin,
+    PythonProtobufMypyPlugin,
+)
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
@@ -120,6 +123,7 @@ all_python_tools = tuple(
             PythonTool(PyUpgrade, "pants.backend.python.lint.pyupgrade"),
             PythonTool(Pylint, "pants.backend.python.lint.pylint"),
             PythonTool(PythonProtobufMypyPlugin, "pants.backend.codegen.protobuf.python"),
+            PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(
                 Pytype, "pants.backend.experimental.python.typecheck.pytype", "CPython>=3.7,<3.11"
             ),
