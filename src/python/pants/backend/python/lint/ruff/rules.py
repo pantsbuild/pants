@@ -169,6 +169,7 @@ async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
 # not as a rule.
 async def _run_ruff_fmt(
     request: RuffFormatRequest.Batch,
+    ruff: Ruff,
     interpreter_constraints: Optional[InterpreterConstraints] = None,
 ) -> FmtResult:
     result = await Get(

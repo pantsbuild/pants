@@ -405,6 +405,7 @@ async def format_build_file_with_ruff(
     request: FormatWithRuffRequest, ruff: Ruff
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
+    ruff_ics = await get_lockfile_interpreter_constraints(ruff)
     result = await _run_ruff_fmt(
         RuffRequest.Batch(
             Ruff.options_scope,
@@ -413,6 +414,7 @@ async def format_build_file_with_ruff(
             snapshot=input_snapshot,
         ),
         ruff,
+        ruff_ics,
     )
     output_content = await Get(DigestContents, Digest, result.output.digest)
 
