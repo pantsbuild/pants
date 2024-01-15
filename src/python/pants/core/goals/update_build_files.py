@@ -19,6 +19,7 @@ from colors import green, red
 from pants.backend.build_files.fix.deprecations import renamed_fields_rules, renamed_targets_rules
 from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
+from pants.backend.build_files.fmt.ruff.register import RuffRequest
 from pants.backend.build_files.fmt.yapf.register import YapfRequest
 from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.black.rules import _run_black
@@ -405,7 +406,7 @@ async def format_build_file_with_ruff(
 ) -> RewrittenBuildFile:
     input_snapshot = await Get(Snapshot, CreateDigest([request.to_file_content()]))
     result = await _run_ruff_fmt(
-        RuffFormatRequest.Batch(
+        RuffRequest.Batch(
             Ruff.options_scope,
             input_snapshot.files,
             partition_metadata=None,
