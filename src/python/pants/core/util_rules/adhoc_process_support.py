@@ -277,8 +277,8 @@ async def _resolve_runnable_dependencies(
     shim_digest_path = f"_runnable_dependency_shims_{shim_digest.fingerprint}"
     immutable_input_digests = {shim_digest_path: shim_digest}
     _safe_update(immutable_input_digests, merged_extras.immutable_input_digests)
-    environment = {"_PANTS_SHIM_ROOT": "{chroot}"}
-    environment.update(runnable_extra_env_vars)
+    environment = runnable_extra_env_vars
+    environment["_PANTS_SHIM_ROOT"] = "{chroot}"
 
     return (
         merged_extras.digest,

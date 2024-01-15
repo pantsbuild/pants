@@ -87,14 +87,14 @@ async def _find_binary(
     env: dict[str, str] = {}
     append_only_caches: Mapping[str, str] = {}
     immutable_input_digests: Mapping[str, Digest] = {}
+    if extra_env_vars:
+        extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
+        env.update(extra_env)
     if rds:
         env = {"PATH": rds.path_component}
         env.update(**(rds.extra_env or {}))
         append_only_caches = rds.append_only_caches
         immutable_input_digests = rds.immutable_input_digests
-    if extra_env_vars:
-        extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
-        env.update(extra_env)
 
     tests: tuple[FallibleProcessResult, ...] = await MultiGet(
         Get(
