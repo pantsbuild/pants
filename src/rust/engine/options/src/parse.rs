@@ -1,8 +1,10 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use super::{ListEdit, ListEditAction};
+use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
 use crate::render_choice;
+
+use std::collections::HashMap;
 
 peg::parser! {
     grammar option_value_parser() for str {
@@ -11,7 +13,7 @@ peg::parser! {
         rule whitespace() -> ()
             = quiet!{ " " / "\n" / "\r" / "\t" }
 
-        rule value<T>(parse_value: rule<T>) -> T
+        rule value_with_ws<T>(parse_value: rule<T>) -> T
             = whitespace()* value:parse_value() whitespace()* { value }
 
         rule false() -> bool
@@ -68,14 +70,14 @@ peg::parser! {
         rule escaped_character() -> char
             = "\\" c:$([_]) { c.chars().next().unwrap() }
 
-        rule add() -> ListEditAction
+        rule list_add() -> ListEditAction
             = "+" { ListEditAction::Add }
 
-        rule remove() -> ListEditAction
+        rule list_remove() -> ListEditAction
             = "-" { ListEditAction::Remove }
 
-        rule action() -> ListEditAction
-            = quiet!{ action:(add() / remove()) { action } }
+        rule list_action() -> ListEditAction
+            = quiet!{ action:(list_add() / list_remove()) { action } }
             / expected!(
                 "an optional list edit action of '+' indicating `add` or '-' indicating `remove`"
             )
@@ -92,7 +94,7 @@ peg::parser! {
 
         rule tuple_items<T>(parse_value: rule<T>) -> Vec<T>
             = tuple_start()
-            items:value(&parse_value) ** ","
+            items:value_with_ws(&parse_value) ** ","
             ","? whitespace()*
             tuple_end() {
                 items
@@ -108,7 +110,7 @@ peg::parser! {
 
         rule list_items<T>(parse_value: rule<T>) -> Vec<T>
             = list_start()
-            items:value(&parse_value) ** ","
+            items:value_with_ws(&parse_value) ** ","
             ","? whitespace()*
             list_end() {
                 items
@@ -120,7 +122,7 @@ peg::parser! {
             whitespace()* { items }
 
         rule list_edit<T>(parse_value: rule<T>) -> ListEdit<T>
-            = whitespace()* action:action() items:items(&parse_value) whitespace()* {
+            = whitespace()* action:list_action() items:items(&parse_value) whitespace()* {
                 ListEdit { action, items }
             }
 
@@ -135,7 +137,9 @@ peg::parser! {
         rule implicit_add<T>(parse_raw_value: rule<T>) -> Vec<ListEdit<T>>
             // If the value is not prefixed with any of the syntax that we recognize as indicating
             // our list edit syntax, then it is implicitly an Add.
-            = !(whitespace() / (action() list_start()) / (action() tuple_start()) / tuple_start() / list_start()) item:parse_raw_value() {
+            = !(whitespace() / (list_action() list_start()) / (list_action() tuple_start()) /
+                tuple_start() / list_start()
+               ) item:parse_raw_value() {
                 vec![ListEdit { action: ListEditAction::Add, items: vec![item] }]
             }
 
@@ -150,6 +154,51 @@ peg::parser! {
 
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>
             = implicit_add(<unquoted_string()>) / list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
+
+        // Heterogeneous values embedded in dicts. Note that float_val() must precede int_val() so that
+        // the integer prefix of a float is not interpreted as an int.
+        rule val() -> Val
+            = v:(bool_val() / float_val() / int_val() / string_val() / list_val() / tuple_val() / dict_val()) {
+            v
+        }
+
+        rule bool_val() -> Val = x:bool() { Val::Bool(x) }
+        rule float_val() -> Val = x:float() { Val::Float(x) }
+        rule int_val() -> Val = x:int() { Val::Int(x) }
+        rule string_val() -> Val = x:quoted_string() { Val::String(x) }
+        rule list_val() -> Val = items:list_items(<val()>) { Val::List(items) }
+        rule tuple_val() -> Val = items:tuple_items(<val()>) { Val::List(items) }
+        rule dict_val() -> Val = whitespace()* d:dict() { Val::Dict(d) }
+
+        rule dict() -> HashMap<String, Val>
+            = dict_start()
+            items:dict_item() ** ","
+            whitespace()* ","? whitespace()*
+            dict_end()
+            whitespace()* {
+                items.into_iter().collect()
+            }
+
+        rule dict_start() -> ()
+            = quiet!{ "{" }
+            / expected!("the start of a dict indicated by '{' or '+{'")
+
+        rule dict_end() -> ()
+            = quiet!{ "}" }
+            / expected!("the end of a dict indicated by '}'")
+
+        rule dict_item() -> (String, Val)
+            = whitespace()* key:quoted_string() whitespace()* ":" whitespace()* value:val() whitespace()* {
+                (key, value)
+            }
+
+        pub(crate) rule dict_edit() -> DictEdit
+            = whitespace()* plus:"+"? d:dict() {
+                DictEdit {
+                    action: if plus.is_some() { DictEditAction::Add } else { DictEditAction::Replace },
+                    items: d,
+                }
+            }
     }
 }
 
@@ -265,4 +314,9 @@ pub(crate) fn parse_float_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseE
 pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
     option_value_parser::string_list_edits(value)
         .map_err(|e| format_parse_error("string list", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
+    option_value_parser::dict_edit(value).map_err(|e| format_parse_error("dict", value, e))
 }
