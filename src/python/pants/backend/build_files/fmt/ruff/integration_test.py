@@ -60,7 +60,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
         rule_runner,
         extra_args=[f"--ruff-interpreter-constraints=['{interpreter_constraint}']"],
     )
-    assert "1 file left unchanged" in fmt_result.stderr
+    assert "1 file left unchanged" in fmt_result.stdout
     assert fmt_result.output == rule_runner.make_snapshot({"BUILD": 'python_sources(name="t")\n'})
     assert fmt_result.did_change is False
 
@@ -68,7 +68,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": "python_sources(name='t')\n"})
     fmt_result = run_ruff(rule_runner)
-    assert "1 file reformatted" in fmt_result.stderr
+    assert "1 file reformatted" in fmt_result.stdout
     assert fmt_result.output == rule_runner.make_snapshot({"BUILD": 'python_sources(name="t")\n'})
     assert fmt_result.did_change is True
 
@@ -81,7 +81,7 @@ def test_multiple_files(rule_runner: RuleRunner) -> None:
         }
     )
     fmt_result = run_ruff(rule_runner)
-    assert "1 file reformatted, 1 file left unchanged" in fmt_result.stderr
+    assert "1 file reformatted, 1 file left unchanged" in fmt_result.stdout
     assert fmt_result.output == rule_runner.make_snapshot(
         {"good/BUILD": 'python_sources(name="t")\n', "bad/BUILD": 'python_sources(name="t")\n'}
     )
@@ -100,7 +100,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
         }
     )
     fmt_result = run_ruff(rule_runner, extra_args=extra_args)
-    assert "1 file left unchanged" in fmt_result.stderr
+    assert "1 file left unchanged" in fmt_result.stdout
     assert fmt_result.output == rule_runner.make_snapshot({"BUILD": "python_sources(name='t')\n"})
     assert fmt_result.did_change is False
 
@@ -109,6 +109,6 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"BUILD": "python_sources(name='t')\n"})
     # Pass through the diff argument, which should cause no files to be changed
     fmt_result = run_ruff(rule_runner, extra_args=["--diff"])
-    assert "1 file left unchanged" in fmt_result.stderr
+    assert "1 file left unchanged" in fmt_result.stdout
     assert fmt_result.output == rule_runner.make_snapshot({"BUILD": "python_sources(name='t')\n"})
     assert fmt_result.did_change is False
