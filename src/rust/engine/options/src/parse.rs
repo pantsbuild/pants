@@ -158,7 +158,7 @@ peg::parser! {
         // Heterogeneous values embedded in dicts. Note that float_val() must precede int_val() so that
         // the integer prefix of a float is not interpreted as an int.
         rule val() -> Val
-            = v:(bool_val() / float_val()/ int_val() / string_val() / list_val() / tuple_val() / dict_val()) {
+            = v:(bool_val() / float_val() / int_val() / string_val() / list_val() / tuple_val() / dict_val()) {
             v
         }
 
