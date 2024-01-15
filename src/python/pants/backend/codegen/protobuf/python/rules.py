@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import logging
 import os
 from pathlib import PurePath
 
@@ -7,6 +8,7 @@ from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    PythonProtobufGrpclibPlugin,
     PythonProtobufMypyPlugin,
     PythonProtobufSubsystem,
 )
@@ -40,6 +42,8 @@ from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
+logger = logging.getLogger(__name__)
+
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
     input = ProtobufSourceField
@@ -53,6 +57,7 @@ async def generate_python_from_protobuf(
     grpc_python_plugin: GrpcPythonPlugin,
     python_protobuf_subsystem: PythonProtobufSubsystem,
     python_protobuf_mypy_plugin: PythonProtobufMypyPlugin,
+    python_protobuf_grpclib_plugin: PythonProtobufGrpclibPlugin,
     pex_environment: PexEnvironment,
     platform: Platform,
 ) -> GeneratedSources:
@@ -96,12 +101,22 @@ async def generate_python_from_protobuf(
         target_stripped_sources_request,
     )
 
-    protoc_gen_mypy_script = "protoc-gen-mypy"
-    protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
-    mypy_pex = None
+    grpc_enabled = request.protocol_target.get(ProtobufGrpcToggleField).value
+    protoc_relpath = "__protoc"
+    unmerged_digests = [
+        all_sources_stripped.snapshot.digest,
+        empty_output_dir,
+    ]
+    protoc_argv = [
+        os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
+        "--python_out",
+        output_dir,
+    ]
     complete_pex_env = pex_environment.in_sandbox(working_directory=None)
 
     if python_protobuf_subsystem.mypy_plugin:
+        protoc_gen_mypy_script = "protoc-gen-mypy"
+        protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
         mypy_request = python_protobuf_mypy_plugin.to_pex_request()
         mypy_pex = await Get(
             VenvPex,
@@ -111,8 +126,15 @@ async def generate_python_from_protobuf(
                 bin_names=[protoc_gen_mypy_script],
             ),
         )
+        protoc_argv.extend(
+            [
+                f"--plugin=protoc-gen-mypy={mypy_pex.bin[protoc_gen_mypy_script].argv0}",
+                "--mypy_out",
+                output_dir,
+            ]
+        )
 
-        if request.protocol_target.get(ProtobufGrpcToggleField).value:
+        if grpc_enabled and python_protobuf_subsystem.grpcio_plugin:
             mypy_pex_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
 
             # In order to generate stubs for gRPC code, we need mypy-protobuf 2.0 or above.
@@ -127,56 +149,63 @@ async def generate_python_from_protobuf(
                         bin_names=[protoc_gen_mypy_script, protoc_gen_mypy_grpc_script],
                     ),
                 )
-
-    downloaded_grpc_plugin = (
-        await Get(
-            DownloadedExternalTool,
-            ExternalToolRequest,
-            grpc_python_plugin.get_request(platform),
-        )
-        if request.protocol_target.get(ProtobufGrpcToggleField).value
-        else None
-    )
-
-    protoc_relpath = "__protoc"
-    unmerged_digests = [
-        all_sources_stripped.snapshot.digest,
-        empty_output_dir,
-    ]
-    if mypy_pex:
+                protoc_argv.extend(
+                    [
+                        f"--plugin=protoc-gen-mypy_grpc={mypy_pex.bin[protoc_gen_mypy_grpc_script].argv0}",
+                        "--mypy_grpc_out",
+                        output_dir,
+                    ]
+                )
         unmerged_digests.append(mypy_pex.digest)
-    if downloaded_grpc_plugin:
-        unmerged_digests.append(downloaded_grpc_plugin.digest)
-    input_digest = await Get(Digest, MergeDigests(unmerged_digests))
 
-    argv = [os.path.join(protoc_relpath, downloaded_protoc_binary.exe), "--python_out", output_dir]
-    if mypy_pex:
-        argv.extend(
-            [
-                f"--plugin=protoc-gen-mypy={mypy_pex.bin[protoc_gen_mypy_script].argv0}",
-                "--mypy_out",
-                output_dir,
-            ]
-        )
-    if downloaded_grpc_plugin:
-        argv.extend(
-            [f"--plugin=protoc-gen-grpc={downloaded_grpc_plugin.exe}", "--grpc_out", output_dir]
-        )
+    if grpc_enabled:
+        if not (
+            python_protobuf_subsystem.grpcio_plugin or python_protobuf_subsystem.grpclib_plugin
+        ):
+            logger.warning(
+                """
+            No Python grpc plugins have been enabled. Make sure to enable at least one of the
+            following under the [python-protobuf] configuration: grpcio_plugin, grpclib_plugin.
+            """
+            )
 
-        if mypy_pex and protoc_gen_mypy_grpc_script in mypy_pex.bin:
-            argv.extend(
+        if python_protobuf_subsystem.grpcio_plugin:
+            downloaded_grpc_plugin = await Get(
+                DownloadedExternalTool,
+                ExternalToolRequest,
+                grpc_python_plugin.get_request(platform),
+            )
+            unmerged_digests.append(downloaded_grpc_plugin.digest)
+            protoc_argv.extend(
+                [f"--plugin=protoc-gen-grpc={downloaded_grpc_plugin.exe}", "--grpc_out", output_dir]
+            )
+
+        if python_protobuf_subsystem.grpclib_plugin:
+            protoc_gen_grpclib_script = "protoc-gen-grpclib_python"
+            grpclib_request = python_protobuf_grpclib_plugin.to_pex_request()
+            grpclib_pex = await Get(
+                VenvPex,
+                VenvPexRequest(
+                    pex_request=grpclib_request,
+                    complete_pex_env=complete_pex_env,
+                    bin_names=[protoc_gen_grpclib_script],
+                ),
+            )
+            unmerged_digests.append(grpclib_pex.digest)
+            protoc_argv.extend(
                 [
-                    f"--plugin=protoc-gen-mypy_grpc={mypy_pex.bin[protoc_gen_mypy_grpc_script].argv0}",
-                    "--mypy_grpc_out",
+                    f"--plugin=protoc-gen-grpclib_python={grpclib_pex.bin[protoc_gen_grpclib_script].argv0}",
+                    "--grpclib_python_out",
                     output_dir,
                 ]
             )
 
-    argv.extend(target_sources_stripped.snapshot.files)
+    input_digest = await Get(Digest, MergeDigests(unmerged_digests))
+    protoc_argv.extend(target_sources_stripped.snapshot.files)
     result = await Get(
         ProcessResult,
         Process(
-            argv,
+            protoc_argv,
             input_digest=input_digest,
             immutable_input_digests={
                 protoc_relpath: downloaded_protoc_binary.digest,

@@ -1,8 +1,10 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use super::{ListEdit, ListEditAction};
+use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
 use crate::render_choice;
+
+use std::collections::HashMap;
 
 peg::parser! {
     grammar option_value_parser() for str {
@@ -11,11 +13,31 @@ peg::parser! {
         rule whitespace() -> ()
             = quiet!{ " " / "\n" / "\r" / "\t" }
 
-        rule value<T>(parse_value: rule<T>) -> T
+        rule value_with_ws<T>(parse_value: rule<T>) -> T
             = whitespace()* value:parse_value() whitespace()* { value }
 
-        rule integer() -> i64
-            = i:$("-"?['0'..='9']+) { i.parse::<i64>().unwrap() }
+        rule false() -> bool
+            = quiet!{ ("F"/"f") ("A"/"a") ("L"/"l") ("S"/"s") ("E"/"e") } { false }
+
+        rule true() -> bool
+            = quiet!{ ("T"/"t") ("R"/"r") ("U"/"u") ("E"/"e") } { true }
+
+        pub(crate) rule bool() -> bool
+            = b:(true() / false() / expected!("'true' or 'false'")) { b }
+
+        // Python numeric literals can include digit-separator underscores. It's unlikely
+        // that anyone relies on those in option values, but since the old Python options
+        // system accepted them, we support them here.
+        rule digitpart() -> &'input str
+            = dp:$(['0'..='9'] ("_"? ['0'..='9'])*) { dp }
+
+        pub(crate) rule int() -> i64
+            = i:$(("+" / "-")?digitpart()) { i.replace('_', "").parse::<i64>().unwrap() }
+
+        pub(crate) rule float() -> f64
+            = f:$(("+" / "-")?digitpart() "." digitpart()? (("e" / "E") ("+" / "-") digitpart())?) {
+            f.replace('_', "").parse::<f64>().unwrap()
+        }
 
         rule unquoted_string() -> String
             = s:(non_escaped_character() / escaped_character())+ { s.into_iter().collect() }
@@ -23,7 +45,7 @@ peg::parser! {
         rule non_escaped_character() -> char
             = !"\\" c:$([_]) { c.chars().next().unwrap() }
 
-        rule quoted_string() -> String
+        pub(crate) rule quoted_string() -> String
             = string:(double_quoted_string() / single_quoted_string()) { string }
 
         rule double_quoted_string() -> String
@@ -48,14 +70,14 @@ peg::parser! {
         rule escaped_character() -> char
             = "\\" c:$([_]) { c.chars().next().unwrap() }
 
-        rule add() -> ListEditAction
+        rule list_add() -> ListEditAction
             = "+" { ListEditAction::Add }
 
-        rule remove() -> ListEditAction
+        rule list_remove() -> ListEditAction
             = "-" { ListEditAction::Remove }
 
-        rule action() -> ListEditAction
-            = quiet!{ action:(add() / remove()) { action } }
+        rule list_action() -> ListEditAction
+            = quiet!{ action:(list_add() / list_remove()) { action } }
             / expected!(
                 "an optional list edit action of '+' indicating `add` or '-' indicating `remove`"
             )
@@ -72,7 +94,7 @@ peg::parser! {
 
         rule tuple_items<T>(parse_value: rule<T>) -> Vec<T>
             = tuple_start()
-            items:value(&parse_value) ** ","
+            items:value_with_ws(&parse_value) ** ","
             ","? whitespace()*
             tuple_end() {
                 items
@@ -88,7 +110,7 @@ peg::parser! {
 
         rule list_items<T>(parse_value: rule<T>) -> Vec<T>
             = list_start()
-            items:value(&parse_value) ** ","
+            items:value_with_ws(&parse_value) ** ","
             ","? whitespace()*
             list_end() {
                 items
@@ -100,7 +122,7 @@ peg::parser! {
             whitespace()* { items }
 
         rule list_edit<T>(parse_value: rule<T>) -> ListEdit<T>
-            = whitespace()* action:action() items:items(&parse_value) whitespace()* {
+            = whitespace()* action:list_action() items:items(&parse_value) whitespace()* {
                 ListEdit { action, items }
             }
 
@@ -115,15 +137,68 @@ peg::parser! {
         rule implicit_add<T>(parse_raw_value: rule<T>) -> Vec<ListEdit<T>>
             // If the value is not prefixed with any of the syntax that we recognize as indicating
             // our list edit syntax, then it is implicitly an Add.
-            = !(whitespace() / (action() list_start()) / (action() tuple_start()) / tuple_start() / list_start()) item:parse_raw_value() {
+            = !(whitespace() / (list_action() list_start()) / (list_action() tuple_start()) /
+                tuple_start() / list_start()
+               ) item:parse_raw_value() {
                 vec![ListEdit { action: ListEditAction::Add, items: vec![item] }]
             }
 
-        pub(crate) rule int_list_edits() -> Vec<ListEdit<i64>>
-            = implicit_add(<integer()>) / list_replace(<integer()>) / list_edits(<integer()>)
+        rule scalar_list_edits<T>(parse_scalar: rule<T>) -> Vec<ListEdit<T>>
+            = implicit_add(&parse_scalar) / list_replace(&parse_scalar) / list_edits(&parse_scalar)
+
+        pub(crate) rule bool_list_edits() -> Vec<ListEdit<bool>> = scalar_list_edits(<bool()>)
+
+        pub(crate) rule int_list_edits() -> Vec<ListEdit<i64>> = scalar_list_edits(<int()>)
+
+        pub(crate) rule float_list_edits() -> Vec<ListEdit<f64>> = scalar_list_edits(<float()>)
 
         pub(crate) rule string_list_edits() -> Vec<ListEdit<String>>
             = implicit_add(<unquoted_string()>) / list_replace(<quoted_string()>) / list_edits(<quoted_string()>)
+
+        // Heterogeneous values embedded in dicts. Note that float_val() must precede int_val() so that
+        // the integer prefix of a float is not interpreted as an int.
+        rule val() -> Val
+            = v:(bool_val() / float_val() / int_val() / string_val() / list_val() / tuple_val() / dict_val()) {
+            v
+        }
+
+        rule bool_val() -> Val = x:bool() { Val::Bool(x) }
+        rule float_val() -> Val = x:float() { Val::Float(x) }
+        rule int_val() -> Val = x:int() { Val::Int(x) }
+        rule string_val() -> Val = x:quoted_string() { Val::String(x) }
+        rule list_val() -> Val = items:list_items(<val()>) { Val::List(items) }
+        rule tuple_val() -> Val = items:tuple_items(<val()>) { Val::List(items) }
+        rule dict_val() -> Val = whitespace()* d:dict() { Val::Dict(d) }
+
+        rule dict() -> HashMap<String, Val>
+            = dict_start()
+            items:dict_item() ** ","
+            whitespace()* ","? whitespace()*
+            dict_end()
+            whitespace()* {
+                items.into_iter().collect()
+            }
+
+        rule dict_start() -> ()
+            = quiet!{ "{" }
+            / expected!("the start of a dict indicated by '{' or '+{'")
+
+        rule dict_end() -> ()
+            = quiet!{ "}" }
+            / expected!("the end of a dict indicated by '}'")
+
+        rule dict_item() -> (String, Val)
+            = whitespace()* key:quoted_string() whitespace()* ":" whitespace()* value:val() whitespace()* {
+                (key, value)
+            }
+
+        pub(crate) rule dict_edit() -> DictEdit
+            = whitespace()* plus:"+"? d:dict() {
+                DictEdit {
+                    action: if plus.is_some() { DictEditAction::Add } else { DictEditAction::Replace },
+                    items: d,
+                }
+            }
     }
 }
 
@@ -200,8 +275,40 @@ fn format_parse_error(
 }
 
 #[allow(dead_code)]
+pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
+    option_value_parser::bool(value).map_err(|e| format_parse_error("bool", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_int(value: &str) -> Result<i64, ParseError> {
+    option_value_parser::int(value).map_err(|e| format_parse_error("int", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_float(value: &str) -> Result<f64, ParseError> {
+    option_value_parser::float(value).map_err(|e| format_parse_error("float", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_quoted_string(value: &str) -> Result<String, ParseError> {
+    option_value_parser::quoted_string(value).map_err(|e| format_parse_error("string", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_bool_list(value: &str) -> Result<Vec<ListEdit<bool>>, ParseError> {
+    option_value_parser::bool_list_edits(value)
+        .map_err(|e| format_parse_error("bool list", value, e))
+}
+
+#[allow(dead_code)]
 pub(crate) fn parse_int_list(value: &str) -> Result<Vec<ListEdit<i64>>, ParseError> {
     option_value_parser::int_list_edits(value).map_err(|e| format_parse_error("int list", value, e))
+}
+
+#[allow(dead_code)]
+pub(crate) fn parse_float_list(value: &str) -> Result<Vec<ListEdit<f64>>, ParseError> {
+    option_value_parser::float_list_edits(value)
+        .map_err(|e| format_parse_error("float list", value, e))
 }
 
 pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, ParseError> {
@@ -209,12 +316,7 @@ pub(crate) fn parse_string_list(value: &str) -> Result<Vec<ListEdit<String>>, Pa
         .map_err(|e| format_parse_error("string list", value, e))
 }
 
-pub(crate) fn parse_bool(value: &str) -> Result<bool, ParseError> {
-    match value.to_lowercase().as_str() {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        _ => Err(ParseError::new(format!(
-            "Got '{value}' for {{name}}. Expected 'true' or 'false'."
-        ))),
-    }
+#[allow(dead_code)]
+pub(crate) fn parse_dict(value: &str) -> Result<DictEdit, ParseError> {
+    option_value_parser::dict_edit(value).map_err(|e| format_parse_error("dict", value, e))
 }

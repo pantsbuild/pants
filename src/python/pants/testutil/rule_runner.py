@@ -699,15 +699,15 @@ def run_rule_with_mocks(
     # Perform additional validation on `@rule` that the correct args are provided. We don't have
     # an easy way to do this for async helper calls yet.
     if task_rule:
-        if len(rule_args) != len(task_rule.input_selectors):
+        if len(rule_args) != len(task_rule.parameters):
             raise ValueError(
-                f"Rule expected to receive arguments of the form: {task_rule.input_selectors}; got: {rule_args}"
+                f"Rule expected to receive arguments of the form: {task_rule.parameters}; got: {rule_args}"
             )
 
-        if len(mock_gets) != len(task_rule.input_gets):
+        if len(mock_gets) != len(task_rule.awaitables):
             raise ValueError(
                 f"Rule expected to receive Get providers for:\n"
-                f"{pformat(task_rule.input_gets)}\ngot:\n"
+                f"{pformat(task_rule.awaitables)}\ngot:\n"
                 f"{pformat(mock_gets)}"
             )
         # Access the original function, rather than the trampoline that we would get by calling
