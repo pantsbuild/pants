@@ -349,9 +349,9 @@ class SystemBinaryExtraEnvVarsField(StringSequenceField):
     alias: ClassVar[str] = "extra_env_vars"
     help = help_text(
         """
-        Additional environment variables to provide to the system binary during fingerprinting.
-        This has no effect on the execution of the binary in the scope of an `adhoc_tool` or
-        `shell_command`. These targets have their own        `extra_env_vars` parameter.
+        Additional environment variables to provide to the system binary during fingerprinting
+        and execution. `extra_env_vars` defined at targets `adhoc_tool` and `shell_command`
+        have higher precedence over any dependent `system_binary`.
 
         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
         `ENV_VAR` to copy the value of a variable in Pants's own environment.
