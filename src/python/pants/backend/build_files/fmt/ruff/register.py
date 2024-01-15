@@ -18,7 +18,7 @@ class RuffRequest(FmtBuildFilesRequest):
 @rule(desc="Format with Ruff", level=LogLevel.DEBUG)
 async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
     ruff_ics = await get_lockfile_interpreter_constraints(ruff)
-    return await _run_ruff_fmt(request, ruff_ics)
+    return await _run_ruff_fmt(request, ruff, ruff_ics)
 
 
 def rules():
