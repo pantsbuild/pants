@@ -155,14 +155,7 @@ async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintRe
 
 @rule(desc="Format with `ruff format`", level=LogLevel.DEBUG)
 async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
-    result = await Get(
-        FallibleProcessResult,
-        _RunRuffRequest(
-            snapshot=request.snapshot,
-            mode=RuffMode.FORMAT,
-        ),
-    )
-    return await FmtResult.create(request, result)
+    return await _run_ruff_fmt(request, ruff)
 
 
 # Note - this function is kept separate because it is invoked from update_build_files.py, but
