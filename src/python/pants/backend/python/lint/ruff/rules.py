@@ -79,6 +79,7 @@ class _RunRuffRequest:
     mode: RuffMode
     interpreter_constraints: Optional[InterpreterConstraints] = None
 
+
 # Note - this function is kept separate because it is invoked from update_build_files.py, but
 # not as a rule.
 async def _run_ruff_fmt(
