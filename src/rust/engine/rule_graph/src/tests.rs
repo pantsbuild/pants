@@ -110,15 +110,42 @@ fn by_name_simple() {
         Rule::new(
             "a",
             "a_from_b",
-            vec![DependencyKey::for_known_rule(RuleId::new("b_from_c"), "b")]
+            vec![DependencyKey::for_known_rule(
+                RuleId::new("b_from_c"),
+                "b",
+                0
+            )]
         ),
         Rule::new("b", "b_from_c", vec![DependencyKey::new("c")]),
         Rule::new("b", "b_from_d", vec![DependencyKey::new("d")]),
     ];
-    let queries = indexset![Query::new("a", vec!["c", "d"])];
+    let queries = indexset![Query::new("a", vec!["c"])];
     let graph = RuleGraph::new(rules, queries).unwrap();
     graph.validate_reachability().unwrap();
-    graph.find_root_edges(vec!["c", "d"], "a").unwrap();
+    graph.find_root_edges(vec!["c"], "a").unwrap();
+}
+
+#[test]
+fn by_name_positional() {
+    let rules = indexset![
+        Rule::new(
+            "a",
+            "a_from_b",
+            vec![DependencyKey::for_known_rule(
+                RuleId::new("b_from_c"),
+                "b",
+                1
+            )]
+        ),
+        Rule::new("b", "b_from_c", vec![DependencyKey::new("c")]),
+        Rule::new("b", "b_from_d", vec![DependencyKey::new("d")]),
+    ];
+    // Because we explicitly pass an argument to `b_from_c`, no arguments are required in our
+    // query.
+    let queries = indexset![Query::new("a", vec![])];
+    let graph = RuleGraph::new(rules, queries).unwrap();
+    graph.validate_reachability().unwrap();
+    graph.find_root_edges(vec![], "a").unwrap();
 }
 
 #[test]
@@ -699,7 +726,8 @@ fn full_scale_target() {
                     .provided_params(vec!["SourceFilesRequest"]),
                 DependencyKey::for_known_rule(
                     RuleId::new("map_module_to_address"),
-                    "PythonModuleOwner"
+                    "PythonModuleOwner",
+                    0,
                 )
                 .provided_params(vec!["PythonModule"]),
             ],
@@ -1087,8 +1115,12 @@ impl super::Rule for Rule {
         self.product
     }
 
-    fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>> {
-        self.dependency_keys.iter().collect()
+    fn dependency_keys(&self, explicit_args_arity: u16) -> Vec<&DependencyKey<Self::TypeId>> {
+        // TODO: This does not differentiate positional arguments from gets, but should.
+        self.dependency_keys
+            .iter()
+            .skip(explicit_args_arity.into())
+            .collect()
     }
 
     fn masked_params(&self) -> Vec<Self::TypeId> {

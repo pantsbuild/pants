@@ -14,9 +14,9 @@ use log::debug;
 use tokio::time;
 
 use crate::context::{Context, Core};
-use crate::nodes::{NodeKey, Select};
+use crate::nodes::{NodeKey, Root};
 use crate::python::{Failure, Params, TypeId, Value};
-use crate::session::{ObservedValueResult, Root, Session};
+use crate::session::{ObservedValueResult, Session};
 
 use graph::LastObserved;
 use ui::ConsoleUI;
@@ -86,7 +86,7 @@ impl Scheduler {
             .core
             .rule_graph
             .find_root_edges(params.type_ids(), product)?;
-        request.roots.push(Select::new_from_edges(
+        request.roots.push(Root::new(
             params,
             &rule_graph::DependencyKey::new(product),
             &edges,

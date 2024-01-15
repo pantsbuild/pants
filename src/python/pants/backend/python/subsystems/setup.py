@@ -239,7 +239,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    _resolves_to_interpreter_constraints = DictOption["list[str]"](
+    _resolves_to_interpreter_constraints = DictOption[List[str]](
         help=softwrap(
             """
             Override the interpreter constraints to use when generating a resolve's lockfile

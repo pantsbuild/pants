@@ -58,6 +58,8 @@ class AwaitableConstraints:
     # If this is a call-by-name, then we will already know the callable `@rule` that will be used.
     rule_id: str | None
     output_type: type
+    # The number of explicit positional arguments passed to a call-by-name awaitable.
+    explicit_args_arity: int
     input_types: tuple[type, ...]
     is_effect: bool
 

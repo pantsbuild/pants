@@ -27,7 +27,10 @@ impl DisplayForGraph for Rule {
                 let task_name = task.func.full_name();
                 let product = format!("{}", task.product);
 
-                let clause_portion = Self::formatted_positional_arguments(&task.args, display_args);
+                let clause_portion = Self::formatted_positional_arguments(
+                    task.args.iter().map(|(_name, dk)| dk),
+                    display_args,
+                );
 
                 let get_clauses = task
                     .gets
@@ -83,9 +86,15 @@ impl rule_graph::Rule for Rule {
         }
     }
 
-    fn dependency_keys(&self) -> Vec<&DependencyKey<Self::TypeId>> {
+    fn dependency_keys(&self, explicit_args_arity: u16) -> Vec<&DependencyKey<Self::TypeId>> {
         match self {
-            Rule::Task(task) => task.args.iter().chain(task.gets.iter()).collect(),
+            Rule::Task(task) => task
+                .args
+                .iter()
+                .skip(explicit_args_arity.into())
+                .map(|(_name, dk)| dk)
+                .chain(task.gets.iter())
+                .collect(),
             Rule::Intrinsic(intrinsic) => intrinsic.inputs.iter().collect(),
         }
     }
@@ -113,12 +122,12 @@ impl rule_graph::Rule for Rule {
 }
 
 impl Rule {
-    fn formatted_positional_arguments(
-        clause: &[DependencyKey<TypeId>],
+    fn formatted_positional_arguments<'a, I: IntoIterator<Item = &'a DependencyKey<TypeId>>>(
+        clause: I,
         display_args: DisplayForGraphArgs,
     ) -> String {
         let select_clauses = clause
-            .iter()
+            .into_iter()
             .map(|type_id| type_id.to_string())
             .collect::<Vec<_>>();
 
@@ -151,7 +160,7 @@ pub struct Task {
     pub product: TypeId,
     pub side_effecting: bool,
     pub engine_aware_return_type: bool,
-    pub args: Vec<DependencyKey<TypeId>>,
+    pub args: Vec<(String, DependencyKey<TypeId>)>,
     pub gets: Vec<DependencyKey<TypeId>>,
     pub masked_types: Vec<TypeId>,
     pub func: Function,
@@ -240,7 +249,7 @@ impl Tasks {
         return_type: TypeId,
         side_effecting: bool,
         engine_aware_return_type: bool,
-        arg_types: Vec<TypeId>,
+        arg_types: Vec<(String, TypeId)>,
         masked_types: Vec<TypeId>,
         cacheable: bool,
         name: String,
@@ -251,7 +260,10 @@ impl Tasks {
             self.preparing.is_none(),
             "Must `end()` the previous task creation before beginning a new one!"
         );
-        let args = arg_types.into_iter().map(DependencyKey::new).collect();
+        let args = arg_types
+            .into_iter()
+            .map(|(name, typ)| (name, DependencyKey::new(typ)))
+            .collect();
 
         self.preparing = Some(Task {
             id: RuleId::new(&name),
@@ -267,20 +279,35 @@ impl Tasks {
         });
     }
 
-    pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>, rule_id: Option<String>) {
+    pub fn add_call(
+        &mut self,
+        output: TypeId,
+        inputs: Vec<TypeId>,
+        rule_id: String,
+        explicit_args_arity: u16,
+    ) {
+        let gets = &mut self
+            .preparing
+            .as_mut()
+            .expect("Must `begin()` a task creation before adding calls!")
+            .gets;
+        gets.push(
+            DependencyKey::for_known_rule(
+                RuleId::from_string(rule_id),
+                output,
+                explicit_args_arity,
+            )
+            .provided_params(inputs),
+        )
+    }
+
+    pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>) {
         let gets = &mut self
             .preparing
             .as_mut()
             .expect("Must `begin()` a task creation before adding gets!")
             .gets;
-        if let Some(rule_id) = rule_id {
-            gets.push(
-                DependencyKey::for_known_rule(RuleId::from_string(rule_id), output)
-                    .provided_params(inputs),
-            )
-        } else {
-            gets.push(DependencyKey::new(output).provided_params(inputs));
-        }
+        gets.push(DependencyKey::new(output).provided_params(inputs));
     }
 
     pub fn add_get_union(&mut self, output: TypeId, inputs: Vec<TypeId>, in_scope: Vec<TypeId>) {

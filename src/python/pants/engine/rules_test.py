@@ -1058,7 +1058,8 @@ def test_param_type_overrides() -> None:
     async def dont_injure_humans(param1: str, param2, param3: list) -> A:
         return A()
 
-    assert dont_injure_humans.rule.input_selectors == (int, dict, list)  # type: ignore[attr-defined]
+    dont_injure_humans_rule = dont_injure_humans.rule  # type: ignore[attr-defined]
+    assert tuple(dont_injure_humans_rule.parameters.values()) == (int, dict, list)
 
     with pytest.raises(ValueError, match="paramX"):
 

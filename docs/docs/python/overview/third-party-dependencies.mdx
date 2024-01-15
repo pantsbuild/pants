@@ -1,0 +1,488 @@
+---
+    title: Third-party dependencies
+    sidebar_position: 1
+---
+
+How to use third-party Python libraries in your project.
+
+---
+
+Pants handles dependencies with more precision than traditional Python workflows. Traditionally, you have a single heavyweight [virtual environment](https://docs.python.org/3/tutorial/venv.html) that includes a large set of dependencies, whether or not you actually need them for your current task.
+
+Instead, Pants understands exactly which dependencies every file in your project needs, and efficiently uses just that subset of dependencies needed for the task.
+
+```
+❯ pants dependencies src/py/util.py
+3rdparty/py#requests
+
+❯ pants dependencies --transitive src/py/app.py
+3rdparty/py#flask
+3rdparty/py#requests
+```
+
+Among other benefits, this precise and automatic understanding of your dependencies gives you fine-grained caching. This means, for example, that if none of the dependencies for a particular test file have changed, the cached result can be safely used.
+
+## Teaching Pants your "universe"(s) of dependencies
+
+For Pants to know which dependencies each file uses, it must first know which specific dependencies are in your "universe", that is, all the third-party dependencies your project directly uses.
+
+By default, Pants uses a single universe for your whole project, but it's possible to set up multiple. See the header "Multiple resolves" in the "Lockfiles" section.
+
+Each third-party dependency you directly use is modeled by a `python_requirement` target:
+
+```python title="BUILD"
+python_requirement(
+    name="django",
+    requirements=["Django==3.2.1"],
+)
+```
+
+You do not need a `python_requirement` target for transitive dependencies, that is, requirements that you do not directly import.
+
+To minimize boilerplate, Pants has target generators to generate `python_requirement` targets for you:
+
+- `python_requirements` for `requirements.txt` or [PEP 621](https://peps.python.org/pep-0621/)-compliant `pyproject.toml`.
+- `poetry_requirements` for Poetry projects.
+
+### `requirements.txt`
+
+The `python_requirements()` target generator parses a [`requirements.txt`-style file](https://pip.pypa.io/en/stable/user_guide/#requirements-files) to produce a `python_requirement` target for each entry.
+
+For example:
+
+```text tab={"label":"requirements.txt"}
+flask>=1.1.2,<1.3
+requests[security]==2.23.0
+dataclasses ; python_version<'3.7'
+```
+
+```python tab={"label":"BUILD"}
+# This will generate three targets:
+#
+#  - //:reqs#flask
+#  - //:reqs#requests
+#  - //:reqs#dataclasses
+python_requirements(name="reqs")
+
+# The above target generator is spiritually equivalent to this:
+python_requirement(
+    name="flask",
+    requirements=["flask>=1.1.2,<1.3"],
+)
+python_requirement(
+    name="requests",
+    requirements=["requests[security]==2.23.0"],
+)
+python_requirement(
+    name="dataclasses",
+    requirements=["dataclasses ; python_version<'3.7'"],
+)
+```
+
+If the file uses a different name than `requirements.txt`, set `source` like this:
+
+```python
+python_requirements(source="reqs.txt")
+```
+
+:::note Where should I put the `requirements.txt`?
+You can name the file whatever you want, and put it wherever makes the most sense for your project.
+
+In smaller repositories that only use Python, it's often convenient to put the file at the "build root" (top-level), as used on this page.
+
+For larger repositories or multilingual repositories, it's often useful to have a `3rdparty` or `3rdparty/python` directory. Rather than the target's address being `//:reqs#my_requirement`, its address would be `3rdparty/python:reqs#my_requirement`, for example; or `3rdparty/python#my_requirement` if you leave off the `name` field for `python_requirements`. See [Target Generation](../../using-pants/key-concepts/targets-and-build-files.mdx#target-generation).
+:::
+
+### PEP 621-compliant `pyproject.toml`
+
+The `python_requirements()` target generator also supports parsing dependencies from a [PEP 621](https://peps.python.org/pep-0621/)-compliant `pyproject.toml`. You must manually specify the source file if you want to use a `pyproject.toml` file to generate `python_requirement` targets. For example:
+
+```python
+python_requirements(source="pyproject.toml")
+```
+
+Further information about PEP 621 fields can be found in the PEP documentation. Pants will read dependencies from the `project.dependencies` list, as well as the `project.optional-dependencies` mappings. Pants makes no distinction between `dependencies` and `optional-dependencies`, all dependencies are treated in the same manner as though they were listed in the `dependencies` list. For example:
+
+```toml tab={"label":"pyproject.toml"}
+[project]
+dependencies = [
+    "flask>=1.1.2,<1.3",
+    "requests[security]==2.23.0",
+]
+
+[project.optional-dependencies]
+dataclass = ["dataclasses ; python_version<'3.7'"]
+```
+
+```python tab={"label":"BUILD"}
+# This will generate three targets:
+#
+#  - //:reqs#flask
+#  - //:reqs#requests
+#  - //:reqs#dataclasses
+python_requirements(source="pyproject.toml")
+
+# The above target generator is spiritually equivalent to this:
+python_requirement(
+    name="flask",
+    requirements=["flask>=1.1.2,<1.3"],
+)
+python_requirement(
+    name="requests",
+    requirements=["requests[security]==2.23.0"],
+)
+python_requirement(
+    name="dataclasses",
+    requirements=["dataclasses ; python_version<'3.7'"],
+)
+```
+
+### Poetry
+
+The `poetry_requirements()` target generator parses the [Poetry](https://python-poetry.org/docs/) section in `pyproject.toml` to produce a `python_requirement` target for each entry.
+
+```toml tab={"label":"pyproject.toml"}
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = {extras = ["security"], version = "~1"}
+flask = "~1.12"
+
+[tool.poetry.dev-dependencies]
+isort = "~5.5"
+```
+
+```python tab={"label":"BUILD"}
+# This will generate three targets:
+#
+#  - //:poetry#flask
+#  - //:poetry#requests
+#  - //:poetry#dataclasses
+poetry_requirements(name="poetry")
+
+# The above target generator is spiritually equivalent to this:
+python_requirement(
+    name="requests",
+    requirements=["requests[security]>=1,<2.0"],
+)
+python_requirement(
+    name="flask",
+    requirements=["flask>=1.12,<1.13"],
+)
+python_requirement(
+    name="isort",
+    requirements=["isort>=5.5,<5.6"],
+)
+```
+
+Note that Pants does not consume your `poetry.lock` file. Instead, see the [page on lockfiles](./lockfiles.mdx).
+
+## How dependencies are chosen
+
+Once Pants knows about your "universe"(s) of dependencies, it determines which subset should be used through [dependency inference](https://blog.pantsbuild.org/dependency-inference/). Pants will read your import statements, like `import django`, and map it back to the relevant `python_requirement` target. Run [`pants dependencies path/to/file.py`](../../using-pants/project-introspection.mdx) or `pants dependencies path/to:target` to confirm this works.
+
+If dependency inference does not work—such as because it's a runtime dependency you do not import—you can explicitly add the `python_requirement` target to the `dependencies` field, like this:
+
+```python title="project/BUILD"
+python_sources(
+    name="lib",
+    dependencies=[
+        # We don't have an import statement for this dep, so inference
+        # won't add it automatically. We add it explicitly instead.
+        "3rdparty/python#psycopg2-binary",
+    ],
+)
+```
+
+### Use `modules` and `module_mapping` when the module name is not standard
+
+Some dependencies expose a module different than their project name, such as `beautifulsoup4` exposing `bs4`. Pants assumes that a dependency's module is its normalized name—i.e. `My-distribution` exposes the module `my_distribution`. If that default does not apply to a dependency, it will not be inferred.
+
+Pants already defines a [default module mapping](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/python/dependency_inference/default_module_mapping.py) for some common Python requirements, but you may need to augment this by teaching Pants additional mappings:
+
+```python title="3rdparty/python/BUILD"
+# `modules` and `module_mapping` is only needed for requirements where
+# the defaults do not work.
+
+python_requirement(
+    name="my_distribution",
+    requirements=["my_distribution==4.1"],
+    modules=["custom_module"],
+)
+
+python_requirements(
+    name="reqs",
+    module_mapping={"my_distribution": ["custom_module"]},
+)
+
+poetry_requirements(
+    name="poetry",
+    module_mapping={"my_distribution": ["custom_module"]},
+)
+```
+
+If the dependency is a type stub, and the default does not work, set `type_stub_modules` on the `python_requirement` target, and `type_stubs_module_mapping` on the `python_requirements` and `poetry_requirements` target generators. (The default for type stubs is to strip off `types-`, `-types`, `-stubs`, and `stubs-`. So, `types-requests` gives type stubs for the module `requests`.)
+
+### Warning: multiple versions of the same dependency
+
+It's invalid in Python to have conflicting versions of the same requirement, e.g. `Django==2` and `Django==3`. Instead, Pants supports "multiple resolves" (i.e. multiple lockfiles), as explained in the below section on lockfiles.
+
+When you have multiple targets for the same dependency and they belong to the same [resolve](./lockfiles.mdx), dependency inference will not work due to ambiguity. If you're using lockfiles—which we strongly recommend—the solution is to set the `resolve` field for problematic `python_requirement` targets so that each resolve has only one requirement and there is no ambiguity.
+
+This ambiguity is often a problem when you have 2+ `requirements.txt` or `pyproject.toml` files in your project, such as `project1/requirements.txt` and `project2/requirements.txt` both specifying `django`. You may want to set up each `poetry_requirements`/`python_requirements` target generator to use a distinct resolve so that there is no overlap. Alternatively, if the versions are the same, you may want to consolidate the requirements into a common file.
+
+## Lockfiles
+
+We strongly recommend using [lockfiles](./lockfiles.mdx) to ensure secure, repeatable dependency resolution. See [here](./lockfiles.mdx) for details on how to do so.
+
+## Advanced usage
+
+### Requirements with undeclared dependencies
+
+Sometimes a requirement does not properly declare in its packaging metadata the other dependencies it depends on, so those will not be installed. It's especially common to leave off dependencies on `setuptools`, which results in import errors like this:
+
+```
+import pkg_resources
+ModuleNotFoundError: No module named 'pkg_resources'
+```
+
+To work around this, you can use the `dependencies` field of `python_requirement`, so that anytime you depend on your requirement, you also bring in the undeclared dependency.
+
+```python title="BUILD"
+# First, make sure you have a `python_requirement` target for
+# the undeclared dependency.
+python_requirement(
+    name="setuptools",
+    requirements=["setuptools"],
+)
+
+python_requirement(
+    name="mongomock",
+    requirements=["mongomock"],
+    dependencies=[":setuptools"],
+)
+```
+
+If you are using the `python_requirements` and `poetry_requirements` target generators, you can use the `overrides` field to do the same thing:
+
+```python tab={"label":"BUILD"}
+python_requirements(
+    name="reqs",
+    overrides={
+        "mongomock": {"dependencies": [":reqs#setuptools"]},
+    },
+)
+```
+
+```text tab={"label":"requirements.txt"}
+setuptools
+mongomock
+```
+
+### Version control requirements
+
+You can install requirements from version control using two styles:
+
+- pip's proprietary VCS-style requirements, e.g.
+  - `git+https://github.com/django/django.git#egg=Django`
+  - `git+https://github.com/django/django.git@stable/2.1.x#egg=Django`
+  - `git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8#egg=Django`
+- direct references from [PEP 440](https://www.python.org/dev/peps/pep-0440/#direct-references), e.g.
+  - `Django@ git+https://github.com/django/django.git`
+  - `Django@ git+https://github.com/django/django.git@stable/2.1.x`
+  - `Django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8`
+
+:::note Version control via SSH
+When using version controlled direct references hosted on private repositories with SSH access:
+
+```
+target@ git+ssh://git@github.com:/myorg/myrepo.git@myhash
+```
+
+...you may see errors like:
+
+```
+ Complete output (5 lines):
+  git@github.com: Permission denied (publickey).
+  fatal: Could not read from remote repository.
+  Please make sure you have the correct access rights
+  and the repository exists.
+  ----------------------------------------
+```
+
+To fix this, Pants needs to be configured to pass relevant SSH specific environment variables to processes by adding the following to `pants.toml`:
+
+```
+[subprocess-environment]
+env_vars.add = [
+  "SSH_AUTH_SOCK",
+]
+```
+
+:::
+
+### Custom repositories
+
+There are two mechanisms for setting up custom Python distribution repositories:
+
+#### PEP-503 compatible indexes
+
+Use `[python-repos].indexes` to add [PEP 503-compatible](https://peps.python.org/pep-0503/) indexes, like PyPI.
+
+```toml title="pants.toml"
+[python-repos]
+indexes.add = ["https://custom-cheeseshop.net/simple"]
+```
+
+To exclusively use your custom index, i.e. to not use the default of PyPI, use `indexes = [..]` instead of `indexes.add = [..]`.
+
+#### pip `--find-links`
+
+Use the option `[python-repos].find_links` for flat lists of packages. Same as pip's [`--find-links`](https://pip.pypa.io/en/stable/cli/pip_wheel/?highlight=find%20links#cmdoption-f) option, you can either use:
+
+- a URL to an HTML file with links to wheel and/or sdist files, or
+- a `file://` absolute path to an HTML file with links, or to a local directory with wheel and/or
+  sdist files. See the section on local requirements below.
+
+```toml
+[python-repos]
+find_links = [
+  "https://your/repo/here",
+  "file:///Users/pantsbuild/prebuilt_wheels",
+]
+```
+
+#### Authenticating to custom repos
+
+To authenticate to custom repos, you may need to provide credentials (such as a username and password) in the URL.
+
+You can use [config file `%(env.ENV_VAR)s` interpolation](../../using-pants/key-concepts/options.mdx#config-file-interpolation) to load the values via environment variables. This avoids checking in sensitive information to version control.
+
+```toml title="pants.toml"
+[python-repos]
+indexes.add = ["http://%(env.INDEX_USERNAME)s:%(INDEX_PASSWORD)s@my.custom.repo/index"]
+```
+
+Alternatively, you can hardcode the value in a private (not checked-in) [.pants.rc file](../../using-pants/key-concepts/options.mdx#pantsrc-file) in each user's Pants repo, that sets this config for the user:
+
+```toml title=".pants.rc"
+[python-repos]
+indexes.add = ["http://$USERNAME:$PASSWORD@my.custom.repo/index"]
+```
+
+### Local requirements
+
+There are two ways to specify local requirements from the filesystem:
+
+- [PEP 440 direct references](https://www.python.org/dev/peps/pep-0440/#direct-references)
+
+```python title="3rdparty/python"
+python_requirement(
+    name="django",
+    # Use an absolute path to a .whl or sdist file.
+    requirements=["Django @ file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl"],
+)
+
+# Reminder: we could also put this requirement string in requirements.txt and use the
+# `python_requirements` target generator.
+```
+
+- The option `[python-repos].find_links`
+
+```toml tab={"label":"pants.toml"}
+[python-repos]
+# Use an absolute path to a directory containing `.whl` and/or sdist files.
+find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
+```
+
+```shell
+❯ ls /Users/pantsbuild/prebuilt_wheels
+ansicolors-1.1.8-py2.py3-none-any.whl
+django-3.1.1-py3-none-any.whl
+```
+
+```python tab={"label":"3rdparty/BUILD"}
+# Use normal requirement strings, i.e. without file paths.
+python_requirement(name="ansicolors", requirements=["ansicolors==1.1.8"])
+python_requirement(name="django", requirements=["django>=3.1,<3.2"])
+
+# Reminder: we could also put these requirement strings in requirements.txt and use the
+# `python_requirements` target generator
+```
+
+Unlike PEP 440 direct references, `[python-repos].find_links` allows you to use multiple artifacts for the same project name. For example, you can include multiple `.whl` and sdist files for the same project in the directory; if `[python-repos].indexes` is still set, then Pex/pip may use artifacts both from indexes like PyPI and from your local `--find-links`.
+
+Both approaches require using absolute paths, and the files must exist on your machine. This is usually fine when locally iterating and debugging. This approach also works well if your entire team can use the same fixed location. Otherwise, see the below section.
+
+#### Working around absolute paths
+
+If you need to share a lockfile on different machines, and you cannot use the same absolute path, then you can use the option `[python-repos].path_mappings` along with `[python-repos].find_links`. (`path_mappings` is not intended for PEP 440 direct requirements.)
+
+The `path_mappings` option allows you to substitute a portion of the absolute path with a logical name, which can be set to a different value than your teammates. For example, the path
+`file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could become `file://${WHEELS_DIR}/django-3.1.1-py3-none-any.whl`, where each Pants user defines what `WHEELS_DIR` should be on their machine.
+
+This feature only works when using Pex lockfiles via `[python].resolves`.
+
+`[python-repos].path_mappings` expects values in the form `NAME|PATH`, e.g. `WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels`. Also, still use an absolute path for `[python-repos].find_links`.
+
+If possible, we recommend using a common file location for your whole team, and leveraging [Pants's interpolation](../../using-pants/key-concepts/options.mdx#config-file-interpolation), so that you avoid each user needing to manually configure `[python-repos].path_mappings` and `[python-repos].find_links`. For example, in `pants.toml`, you could set `[python-repos].path_mappings` to `WHEELS_DIR|%(buildroot)s/python_wheels` and `[python-repos].find_links` to `%(buildroot)s/python_wheels`. Then, as long as every user has the folder `python_wheels` in the root of the repository, things will work without additional configuration. Or, you could use a value like `%(env.HOME)s/pants_wheels` for the path `~/pants_wheels`.
+
+```toml title="pants.toml"
+[python-repos]
+# No one needs to change these values, as long as they can use the same shared location.
+find_links = ["file://%(buildroot)s/prebuilt_wheels"]
+path_mappings = ["WHEELS_DIR|%(buildroot)s/prebuilt_wheels"]
+```
+
+If you cannot use a common file location via interpolation, then we recommend setting these options in a [`.pants.rc` file](../../using-pants/key-concepts/options.mdx#pantsrc-file). Every teammate will need to set this up for their machine.
+
+```toml title=".pants.rc"
+[python-repos]
+# Each user must set both of these to the absolute paths on their machines.
+find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
+path_mappings = ["WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels"]
+```
+
+After initially setting up `[python-repos].path_mappings` and `[python-repos].find_links`, run `pants generate-lockfiles` or `pants generate-lockfiles --resolve=<resolve-name>`. You should see the `path_mappings` key set in the lockfile's JSON.
+
+### Constraints files
+
+Sometimes, transitive dependencies of one of your third-party requirements can cause trouble. For example, sometimes requirements do not pin their dependencies well enough, and a newer version of its transitive dependency is released that breaks the requirement.
+[Constraints files](https://pip.pypa.io/en/stable/user_guide/?highlight=constraints#constraints-files) allow you to pin transitive dependencies to certain versions, overriding the version that pip/Pex would normally choose.
+
+Constraints files are configured per-resolve, meaning that the resolves for your user code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different configuration. Use the option `[python].resolves_to_constraints_file` to map resolve names to paths to pip-compatible constraints files. For example:
+
+```toml tab={"label":"pants.toml"}
+[python.resolves_to_constraints_file]
+data-science = "3rdparty/python/data_science_constraints.txt"
+pytest = "3rdparty/python/pytest_constraints.txt"
+```
+
+```text tab={"label":"3rdparty/python/data_science_constraints.txt"}
+requests==22.1.0
+urrllib3==4.2
+```
+
+You can also set the key `__default__` to apply the same constraints file to every resolve by default, although this is not always useful because resolves often need different constraints.
+
+### `only_binary` and `no_binary`
+
+You can use `[python].resolves_to_only_binary` to avoid using sdists (source distributions) for certain requirements, and `[python].resolve_to_no_binary` to avoid using bdists (wheel files) for certain requirements.
+
+`only_binary` and `no_binary` are configured per-resolve, meaning that the resolves for your user code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different configuration. Use the options `[python].resolves_to_only_binary` and `[python].resolves_to_no_binary` to map resolve names to list of Python requirement names.
+
+For example:
+
+```toml title="pants.toml"
+[python.resolves_to_only_binary]
+data-science = ["numpy"]
+
+[python.resolves_to_no_binary]
+pytest = ["pytest-xdist"]
+mypy = ["django-stubs"]
+```
+
+You can also set the key `__default__` to apply the same value to every resolve by default.
+
+## Tip: use `pants export` to create a virtual environment for IDEs
+
+See [Setting up an IDE](../../using-pants/setting-up-an-ide.mdx) for more information on `pants export`. This will create a virtual environment for your user code for compatibility with the rest of the Python ecosystem, e.g. IDEs like Pycharm.
