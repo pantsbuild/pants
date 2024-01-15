@@ -86,7 +86,7 @@ async def _django_migration_dependencies(
     # default for decode(), we make that explicit here for emphasis.
     process_output = process_result.stdout.decode("utf8") or "{}"
     modules = [
-        "{}.migrations.{}".format(django_apps.label_to_name[label], migration)
+        f"{django_apps.label_to_name[label]}.migrations.{migration}"
         for label, migration in json.loads(process_output)
         if label in django_apps.label_to_name
     ]

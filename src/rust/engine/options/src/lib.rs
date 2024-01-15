@@ -41,6 +41,25 @@ pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 pub use types::OptionType;
 
+// NB: The legacy Python options parser supported dicts with member_type "Any", which means
+// the values can be arbitrarily-nested lists, tuples and dicts, including heterogeneous
+// ones that are not supported as top-level option values. We have very few dict[Any] options,
+// but there are a handful, and user plugins may also define them. Therefore we must continue
+// to support this in the Rust options parser, hence this clunky enum.
+//
+// We only use this for parsing values in dicts, as in other cases we know that the type must
+// be some scalar or string, or a uniform list of one type of scalar or string, so we can
+// parse as such.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Val {
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    String(String),
+    List(Vec<Val>),
+    Dict(HashMap<String, Val>),
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ListEditAction {
     Replace,
@@ -52,6 +71,18 @@ pub(crate) enum ListEditAction {
 pub(crate) struct ListEdit<T> {
     pub action: ListEditAction,
     pub items: Vec<T>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DictEditAction {
+    Replace,
+    Add,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct DictEdit {
+    pub action: DictEditAction,
+    pub items: HashMap<String, Val>,
 }
 
 ///

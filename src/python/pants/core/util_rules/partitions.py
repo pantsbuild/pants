@@ -8,9 +8,7 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Iterable, TypeVar, overload
-
-from typing_extensions import Protocol
+from typing import Generic, Iterable, Protocol, TypeVar, overload
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.collection import Collection

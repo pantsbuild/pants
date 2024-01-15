@@ -418,3 +418,37 @@ def test_non_hermetic_venv_scripts(rule_runner: PythonRuleRunner) -> None:
     )
     assert "bob" == non_hermetic_results.pythonpath
     assert bob_sys_path_entry in non_hermetic_results.sys_path
+
+
+def test_sh_boot_plumb(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    sh_boot=True
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert len(result.artifacts) == 1
+    expected_pex_relpath = "src.py.project/project.pex"
+    assert expected_pex_relpath == result.artifacts[0].relpath
+
+    rule_runner.write_digest(result.digest)
+
+    executable = os.path.join(rule_runner.build_root, expected_pex_relpath)
+    with open(executable, "rb") as f:
+        shebang = f.readline().decode()
+        assert "#!/bin/sh" in shebang

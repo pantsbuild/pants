@@ -25,9 +25,9 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
-    DependenciesRequest,
     SourcesField,
-    Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
     WrappedTarget,
     WrappedTargetRequest,
 )
@@ -118,6 +118,10 @@ class TerraformInitResponse:
 
 @rule
 async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse:
+    module_dependencies = await Get(
+        TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
+    )
+
     address_input = request.root_module.to_address_input()
     module_address = await Get(Address, AddressInput, address_input)
     module = await Get(
@@ -127,19 +131,12 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         ),
     )
 
-    root_dependencies, module_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(request.dependencies)),
-        Get(Targets, DependenciesRequest(module.target.get(TerraformDependenciesField))),
-    )
-
     source_files, backend_config, dependencies_files = await MultiGet(
         Get(SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])),
         Get(SourceFiles, SourceFilesRequest([request.backend_config])),
         Get(
             SourceFiles,
-            SourceFilesRequest(
-                [tgt.get(SourcesField) for tgt in (*root_dependencies, *module_dependencies)]
-            ),
+            SourceFilesRequest([tgt.get(SourcesField) for tgt in module_dependencies.dependencies]),
         ),
     )
     files_by_directory = partition_files_by_directory(source_files.files)

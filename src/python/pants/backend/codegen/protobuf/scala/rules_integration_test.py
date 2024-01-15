@@ -26,9 +26,16 @@ from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaS
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, distdir, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import QueryRule
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    GeneratedSources,
+    HydratedSources,
+    HydrateSourcesRequest,
+)
 from pants.jvm import classpath, testutil
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.jdk_rules import rules as jdk_rules
@@ -40,6 +47,7 @@ from pants.jvm.testutil import (
     RenderedClasspath,
     expect_single_expanded_coarsened_target,
     make_resolve,
+    maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
@@ -111,6 +119,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(GeneratedSources, [GenerateScalaFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
             QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
+            QueryRule(Addresses, (DependenciesRequest,)),
         ],
         target_types=[
             ScalaSourceTarget,
@@ -147,12 +156,14 @@ def assert_files_generated(
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
+@maybe_skip_jdk_test
 def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileFixture) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
     #  * Protobuf files can import other protobuf files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
+    #  * Dependency inference between Scala and Protobuf sources.
     rule_runner.write_files(
         {
             "src/protobuf/dir1/f.proto": dedent(
@@ -178,7 +189,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
                 """
             ),
             "src/protobuf/dir1/BUILD": "protobuf_sources()",
-            "src/protobuf/dir2/f.proto": dedent(
+            "src/protobuf/dir2/f3.proto": dedent(
                 """\
                 syntax = "proto3";
                 option java_package = "org.pantsbuild.scala.proto";
@@ -196,7 +207,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
 
                 package test_protos;
 
-                import "dir2/f.proto";
+                import "dir2/f3.proto";
                 """
             ),
             "tests/protobuf/test_protos/BUILD": (
@@ -204,11 +215,13 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
             ),
             "3rdparty/jvm/default.lock": scalapb_lockfile.serialized_lockfile,
             "3rdparty/jvm/BUILD": scalapb_lockfile.requirements_as_jvm_artifact_targets(),
-            "src/jvm/BUILD": "scala_sources(dependencies=['src/protobuf/dir1'])",
+            "src/jvm/BUILD": "scala_sources()",
             "src/jvm/ScalaPBExample.scala": dedent(
                 """\
                 package org.pantsbuild.scala.example
+
                 import org.pantsbuild.scala.proto.f.Person
+
                 trait TestScrooge {
                   val person: Person
                 }
@@ -221,7 +234,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
         assert_files_generated(
             rule_runner,
             addr,
-            source_roots=["src/python", "/src/protobuf", "/tests/protobuf"],
+            source_roots=["src/python", "/src/protobuf", "/tests/protobuf", "src/jvm"],
             expected_files=list(expected),
         )
 
@@ -237,13 +250,17 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
         ["src/protobuf/org/pantsbuild/scala/proto/f2/F2Proto.scala"],
     )
     assert_gen(
-        Address("src/protobuf/dir2", relative_file_path="f.proto"),
-        ["src/protobuf/org/pantsbuild/scala/proto/f/FProto.scala"],
+        Address("src/protobuf/dir2", relative_file_path="f3.proto"),
+        ["src/protobuf/org/pantsbuild/scala/proto/f3/F3Proto.scala"],
     )
     assert_gen(
         Address("tests/protobuf/test_protos", relative_file_path="f.proto"),
         ["tests/protobuf/test_protos/f/FProto.scala"],
     )
+
+    tgt = rule_runner.get_target(Address("src/jvm", relative_file_path="ScalaPBExample.scala"))
+    dependencies = rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
+    assert Address("src/protobuf/dir1", relative_file_path="f.proto") in dependencies
 
     coarsened_target = expect_single_expanded_coarsened_target(
         rule_runner, Address(spec_path="src/jvm")
@@ -254,6 +271,7 @@ def test_generates_scala(rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileF
     )
 
 
+@maybe_skip_jdk_test
 def test_top_level_proto_root(
     rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileFixture
 ) -> None:

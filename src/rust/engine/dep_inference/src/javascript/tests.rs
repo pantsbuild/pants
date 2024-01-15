@@ -255,7 +255,7 @@ fn dynamic_scope() {
 #[test]
 fn adds_dir_to_file_imports() -> Result<(), Box<dyn std::error::Error>> {
     let result = get_dependencies(
-        &"import a from './file.js'",
+        "import a from './file.js'",
         Path::new("dir/index.js").to_path_buf(),
         Default::default(),
     )?;
@@ -270,7 +270,7 @@ fn adds_dir_to_file_imports() -> Result<(), Box<dyn std::error::Error>> {
 fn root_level_files_have_no_dir() {
     assert_dependency_imports(
         "index.mjs",
-        &r#"import a from "./file.js""#,
+        r#"import a from "./file.js""#,
         ["file.js"],
         [],
         given_metadata(Default::default(), Default::default()),
@@ -281,7 +281,7 @@ fn root_level_files_have_no_dir() {
 fn only_walks_one_dir_level_for_curdir() {
     assert_dependency_imports(
         "src/js/index.mjs",
-        &r#"
+        r#"
     import fs from "fs";
     import { x } from "./xes.mjs";
   "#,
@@ -295,7 +295,7 @@ fn only_walks_one_dir_level_for_curdir() {
 fn walks_two_dir_levels_for_pardir() {
     assert_dependency_imports(
         "src/js/a/index.mjs",
-        &r#"
+        r#"
     import fs from "fs";
     import { x } from "../xes.mjs";
   "#,
@@ -309,7 +309,7 @@ fn walks_two_dir_levels_for_pardir() {
 fn silly_walking() {
     assert_dependency_imports(
         "src/js/a/index.mjs",
-        &r#"
+        r#"
     import { x } from "././///../../xes.mjs";
   "#,
         ["src/xes.mjs"],
@@ -322,7 +322,7 @@ fn silly_walking() {
 fn imports_outside_of_provided_source_root_are_unchanged() {
     assert_dependency_imports(
         "src/index.mjs",
-        &r#"
+        r#"
     import { x } from "../../xes.mjs";
   "#,
         ["../../xes.mjs"],
@@ -332,7 +332,7 @@ fn imports_outside_of_provided_source_root_are_unchanged() {
 
     assert_dependency_imports(
         "js/src/lib/index.mjs",
-        &r#"
+        r#"
     import { x } from "./../../../../lib2/xes.mjs";
   "#,
         ["./../../../../lib2/xes.mjs"],
@@ -345,7 +345,7 @@ fn imports_outside_of_provided_source_root_are_unchanged() {
 fn subpath_package_import() {
     assert_dependency_imports(
         "js/src/lib/index.mjs",
-        &r#"
+        r#"
     import chalk from '#myChalk';
     "#,
         [],
@@ -361,7 +361,7 @@ fn subpath_package_import() {
 fn subpath_file_import() {
     assert_dependency_imports(
         "js/src/lib/index.mjs",
-        &r#"
+        r#"
     import stuff from '#nested/stuff.mjs';
     "#,
         ["js/src/lib/nested/stuff.mjs"],
@@ -380,7 +380,7 @@ fn subpath_file_import() {
 fn polyfills() {
     assert_dependency_imports(
         "js/src/index.mjs",
-        &r#"
+        r#"
     import { ws } from '#websockets';
     "#,
         ["js/websockets-polyfill.js"],

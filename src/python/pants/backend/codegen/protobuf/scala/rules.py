@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.scala import dependency_inference
+from pants.backend.codegen.protobuf.scala import dependency_inference, symbol_mapper
 from pants.backend.codegen.protobuf.scala.subsystem import PluginArtifactSpec, ScalaPBSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
@@ -322,6 +322,7 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         *dependency_inference.rules(),
+        *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),

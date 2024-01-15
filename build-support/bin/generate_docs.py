@@ -35,6 +35,7 @@ from readme_api import DocRef, ReadmeAPI
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.help.help_info_extracter import to_help_str
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.strutil import softwrap
 from pants.version import MAJOR_MINOR
 
@@ -234,7 +235,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "--no-verify-config",
         "help-all",
     ]
-    run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    run = subprocess.run(argv, capture_output=True, encoding="utf-8")
     try:
         run.check_returncode()
     except subprocess.CalledProcessError:
@@ -332,6 +333,10 @@ class ReferenceGenerator:
         if not option_data.get("config_key", None):
             # This option is not configurable.
             return ""
+
+        if scope == GLOBAL_SCOPE:
+            # make sure we're rendering with the section name as appears in pants.toml
+            scope = GLOBAL_SCOPE_CONFIG_SECTION
 
         toml_lines = []
         example_cli = option_data["display_args"][0]

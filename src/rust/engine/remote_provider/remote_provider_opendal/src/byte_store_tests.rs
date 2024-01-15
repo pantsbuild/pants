@@ -46,7 +46,7 @@ fn new_provider() -> Provider {
 async fn write_test_data(provider: &Provider, data: &TestData) {
     provider
         .operator
-        .write(&test_path(&data), data.bytes())
+        .write(&test_path(data), data.bytes())
         .await
         .unwrap();
 }

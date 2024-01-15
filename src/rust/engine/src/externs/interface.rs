@@ -102,6 +102,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
     m.add_function(wrap_pyfunction!(tasks_task_begin, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_task_end, m)?)?;
+    m.add_function(wrap_pyfunction!(tasks_add_call, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_add_get, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_add_get_union, m)?)?;
     m.add_function(wrap_pyfunction!(tasks_add_query, m)?)?;
@@ -1137,7 +1138,7 @@ fn tasks_task_begin(
     py_tasks: &PyTasks,
     func: PyObject,
     output_type: &PyType,
-    arg_types: Vec<&PyType>,
+    arg_types: Vec<(String, &PyType)>,
     masked_types: Vec<&PyType>,
     side_effecting: bool,
     engine_aware_return_type: bool,
@@ -1151,7 +1152,10 @@ fn tasks_task_begin(
         .map_err(|e| PyException::new_err(format!("{e}")))?;
     let func = Function(Key::from_value(func.into())?);
     let output_type = TypeId::new(output_type);
-    let arg_types = arg_types.into_iter().map(TypeId::new).collect();
+    let arg_types = arg_types
+        .into_iter()
+        .map(|(name, typ)| (name, TypeId::new(typ)))
+        .collect();
     let masked_types = masked_types.into_iter().map(TypeId::new).collect();
     let mut tasks = py_tasks.0.borrow_mut();
     tasks.task_begin(
@@ -1176,16 +1180,25 @@ fn tasks_task_end(py_tasks: &PyTasks) {
 }
 
 #[pyfunction]
-fn tasks_add_get(
+fn tasks_add_call(
     py_tasks: &PyTasks,
     output: &PyType,
     inputs: Vec<&PyType>,
-    rule_id: Option<String>,
+    rule_id: String,
+    explicit_args_arity: u16,
 ) {
     let output = TypeId::new(output);
     let inputs = inputs.into_iter().map(TypeId::new).collect();
     let mut tasks = py_tasks.0.borrow_mut();
-    tasks.add_get(output, inputs, rule_id);
+    tasks.add_call(output, inputs, rule_id, explicit_args_arity);
+}
+
+#[pyfunction]
+fn tasks_add_get(py_tasks: &PyTasks, output: &PyType, inputs: Vec<&PyType>) {
+    let output = TypeId::new(output);
+    let inputs = inputs.into_iter().map(TypeId::new).collect();
+    let mut tasks = py_tasks.0.borrow_mut();
+    tasks.add_get(output, inputs);
 }
 
 #[pyfunction]
