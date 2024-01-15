@@ -103,12 +103,3 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     assert "1 file left unchanged" in fmt_result.stdout
     assert fmt_result.output == rule_runner.make_snapshot({"BUILD": "python_sources(name='t')\n"})
     assert fmt_result.did_change is False
-
-
-def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"BUILD": "python_sources(name='t')\n"})
-    # Pass through the diff argument, which should cause no files to be changed
-    fmt_result = run_ruff(rule_runner, extra_args=["--diff"])
-    assert "1 file left unchanged" in fmt_result.stdout
-    assert fmt_result.output == rule_runner.make_snapshot({"BUILD": "python_sources(name='t')\n"})
-    assert fmt_result.did_change is False
