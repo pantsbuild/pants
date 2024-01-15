@@ -13,7 +13,7 @@ You can follow along this tutorial in your own repository; you only need to be o
 
 ### Registering a plugin
 
-We'll be writing an [in-repo plugin](../writing-plugins/plugins-overview.mdx#in-repo-plugins), and expect you to have the `pants-plugins/project_version` directory as well as the `pants.toml` file with this configuration:
+We'll be writing an [in-repo plugin](../writing-plugins/overview.mdx#in-repo-plugins), and expect you to have the `pants-plugins/project_version` directory as well as the `pants.toml` file with this configuration:
 
 ```toml title="pants.toml"
 # Specifying the path to our plugin's top-level folder using the `pythonpath` option:
@@ -116,7 +116,7 @@ $ pants peek myapp:main-project-version
 
 For the purposes of our tutorial, to be able to get a project version number (using a target we've just created), we need to [create a new goal](../writing-plugins/the-rules-api/goal-rules.mdx). The code below is the boilerplate necessary to create a goal, so it's not really necessary to understand how, for instance, subsystems work right now. The function decorated with the `@goal_rule` can be named anything, but it's helpful for the name to represent the functionality your goal provides. To make your goal part of the plugin's interface, add it to the `rules` function in the `register.py` module.
 
-```python title="pants-plugins/project_version/rules.py"
+```python tab={"label":"pants-plugins/project_version/rules.py"}
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import collect_rules, goal_rule
 
@@ -140,7 +140,7 @@ def rules():
     return collect_rules()
 ```
 
-```python title="pants-plugins/project_version/register.py"
+```python tab={"label":"pants-plugins/project_version/register.py"}
 from typing import Iterable
 
 import project_version.rules as project_version_rules
@@ -312,7 +312,7 @@ async def goal_show_project_version(console: Console, targets: Targets) -> Proje
 
 Let's get all of this code in one place and see what happens!
 
-```python title="pants-plugins/project_version/rules.py"
+```python tab={"label":"pants-plugins/project_version/rules.py"}
 from dataclasses import dataclass
 
 from pants.engine.console import Console
@@ -371,7 +371,7 @@ def rules():
     return collect_rules()
 ```
 
-```python title="pants-plugins/project_version/target_types.py"
+```python tab={"label":"pants-plugins/project_version/target_types.py"}
 from pants.engine.target import COMMON_TARGET_FIELDS, SingleSourceField, Target
 
 
@@ -381,7 +381,7 @@ class ProjectVersionTarget(Target):
     help = "A project version target representing the VERSION file."
 ```
 
-```python title="pants-plugins/project_version/register.py"
+```python tab={"label":"pants-plugins/project_version/register.py"}
 from typing import Iterable
 
 import project_version.rules as project_version_rules

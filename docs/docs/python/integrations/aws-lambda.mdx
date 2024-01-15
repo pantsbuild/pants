@@ -37,7 +37,7 @@ Add a `python_aws_lambda_function` target and define the `runtime` and `handler`
 
 For example:
 
-```python title="project/BUILD"
+```python tab={"label":"project/BUILD"}
 # The default `sources` field will include our handler file.
 python_sources(name="lib")
 
@@ -49,7 +49,7 @@ python_aws_lambda_function(
 )
 ```
 
-```python title="project/lambda_example.py"
+```python tab={"label":"project/lambda_example.py"}
 def example_handler(event, context):
     print("Hello AWS!")
 ```
@@ -83,7 +83,7 @@ If this happens, you must either change your dependencies to only use dependenci
 :::caution "Encountering collisions" errors and failing to build?
 If a build fails with an error like `Encountered collisions populating ... from PEX at faas_repository.pex:`, listing one or more files with different `sha1` hashes, this likely means your dependencies package files in unexpected locations, outside their "scoped" directory (for instance, a package `example-pkg` typically only includes files within `example_pkg/` and `example_pkg-*.dist-info/` directories). When multiple dependencies do this, those files can have exactly matching file paths but different contents, and so it is impossible to create a Lambda artifact: which of the files should be installed and which should be ignored? Resolving this requires human intervention to understand whether any of those files are important, and hence PEX emits an error rather than making an (arbitrary) choice that may result in confusing and/or broken behaviour at runtime.
 
-Most commonly this seems to happen with metadata like a README or LICENSE file, or test files (in a `tests/` subdirectory), which are likely not important at runtime. In these cases, the collision can be worked around by adding [a `pex3_venv_create_extra_args=["--collisions-ok"]` field](../../../reference/targets/python_aws_lambda_function.mdx#codepex3_venv_create_extra_argscode) to the `python_aws_lambda_...` targets.
+Most commonly this seems to happen with metadata like a README or LICENSE file, or test files (in a `tests/` subdirectory), which are likely not important at runtime. In these cases, the collision can be worked around by adding [a `pex3_venv_create_extra_args=["--collisions-ok"]` field](../../../reference/targets/python_aws_lambda_function.mdx#pex3_venv_create_extra_args) to the `python_aws_lambda_...` targets.
 
 A better solution is to work with the dependencies to stop them from packaging files outside their scoped directories.
 :::
@@ -96,11 +96,11 @@ You can specify the AWS lambda handler as `lambda_function.handler`. This is a r
 
 ## Docker Integration
 
-To [deploy a Python lambda function with container images](https://docs.aws.amazon.com/lambda/latest/dg/python-image.html), you can use Pants's [Docker](../../docker/docker-overview.mdx) support.
+To [deploy a Python lambda function with container images](https://docs.aws.amazon.com/lambda/latest/dg/python-image.html), you can use Pants's [Docker](../../docker/index.mdx) support.
 
 For example:
 
-```dockerfile title="project/Dockerfile"
+```dockerfile tab={"label":"project/Dockerfile"}
 FROM public.ecr.aws/lambda/python:3.8
 
 RUN yum install unzip -y
@@ -109,7 +109,7 @@ RUN unzip lambda.zip -d "${LAMBDA_TASK_ROOT}"
 CMD ["lambda_function.handler"]
 ```
 
-```python title="project/BUILD"
+```python tab={"label":"project/BUILD"}
 python_sources()
 
 python_aws_lambda_function(
@@ -139,7 +139,7 @@ For example, one use of layers is splitting the deployment package for a Lambda 
 
 This split means making a change to first-party sources only requires rebuilding and re-deploying the function artifact. Since this artifact doesn't need to include all of the third-party requirements, rebuilding is likely to much faster and the resulting package will be smaller. The layer will only need to be rebuilt and redeployed if the third-party dependencies change, like a version upgrade or an additional `import`.
 
-```python title="project/BUILD"
+```python tab={"label":"project/BUILD"}
 python_sources(name="lib")
 
 python_aws_lambda_function(
@@ -160,14 +160,14 @@ python_aws_lambda_layer(
 )
 ```
 
-```python title="project/lambda_example.py"
+```python tab={"label":"project/lambda_example.py"}
 from . import library_code
 
 def example_handler(event, context):
     library_code.say_hi()
 ```
 
-```python title="project/library_code.py"
+```python tab={"label":"project/library_code.py"}
 # an example dependency
 import boto3
 
@@ -188,7 +188,7 @@ The handler of a `pex_binary` is not re-exported at the fixed `lambda_function.h
 
 For example:
 
-```python title="project/BUILD"
+```python tab={"label":"project/BUILD"}
 python_sources()
 
 pex_binary(
@@ -199,7 +199,7 @@ pex_binary(
 )
 ```
 
-```python title="project/lambda_example.py"
+```python tab={"label":"project/lambda_example.py"}
 def example_handler(event, context):
     print("Hello AWS!")
 ```
@@ -210,7 +210,7 @@ Then, use `pants package project:lambda`, and upload the resulting `project/lamb
 
 Pants implemented a new way to package Lambda functions in 2.17, which became the only option in 2.19, resulting in smaller packages and faster cold starts. This involves some changes:
 
-- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](../python-overview/pex.mdx) and then use Lambdex to adapt this to be better understood by AWS by adding a shim handler at the path `lambdex_handler.handler`. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during the "INIT" phase.
+- In Pants 2.16 and earlier, Pants used the [Lambdex](https://github.com/pantsbuild/lambdex) project. First, Pants would convert your code into a [Pex file](../overview/pex.mdx) and then use Lambdex to adapt this to be better understood by AWS by adding a shim handler at the path `lambdex_handler.handler`. This shim handler first triggers the Pex initialization to choose and unzip dependencies, during the "INIT" phase.
 - In Pants 2.17, the use of Lambdex was deprecated, in favour of choosing the appropriate dependencies ahead of time, as described above, without needing to do this on each cold start. This results in a zip file laid out in the format recommended by AWS, and includes a re-export of the handler at the path `lambda_function.handler`.
 - In Pants 2.18, the new behaviour is now the default behaviour. Layers can now be built using Pants, and this addition includes renaming the `python_awslambda` target to `python_aws_lambda_function`.
 - In Pants 2.19 and later, the old Lambdex behaviour has been entirely removed.

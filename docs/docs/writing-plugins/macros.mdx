@@ -95,14 +95,14 @@ def custom_python_sources(**kwargs):
 
 A macro can take new parameters to generate the target dynamically. For example:
 
-```python title="pants-plugins/macros.py"
+```python tab={"label":"pants-plugins/macros.py"}
 def custom_python_sources(has_type_hints: bool = True, **kwargs):
     if has_type_hints:
         kwargs["tags"] = kwargs.get("tags", []) + ["type_checked"]
     python_sources(**kwargs)
 ```
 
-```python title="project/BUILD"
+```python tab={"label":"project/BUILD"}
 custom_python_sources(
     has_type_hints=False,
 )

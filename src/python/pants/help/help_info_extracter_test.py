@@ -529,7 +529,7 @@ def test_get_all_help_info():
             "construct_scope_foo": {
                 "description": None,
                 "documentation": "A foo.",
-                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                "awaitables": ("Get(ScopedOptions, Scope, ..)",),
                 "input_types": (),
                 "name": "construct_scope_foo",
                 "output_type": "Foo",
@@ -538,7 +538,7 @@ def test_get_all_help_info():
             "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test": {
                 "description": None,
                 "documentation": "This rule is for testing info extraction only.",
-                "input_gets": (),
+                "awaitables": (),
                 "input_types": ("Foo",),
                 "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
                 "output_type": "Target",

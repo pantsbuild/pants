@@ -47,7 +47,7 @@ There are several fields you can set on a `pex_binary` to configure the layout, 
 
 By default, the `package` goal builds a PEX that runs on the architecture and OS of the local machine (or local [environment](../../using-pants/environments:-cross-platform-or-remote-builds.mdx)), and on a locally-found interpreter compatible with your code's [interpreter constraints](./interpreter-compatibility.mdx). However, you can also build a multiplatform PEX - one that will run on multiple architecture+OS+interpreter combinations.
 
-To do so, you must configure the [`complete_platforms`](../../../reference/targets/pex_binary.mdx#codecomplete_platformscode) field on your `pex_binary` to point to `file` targets that provide detailed information about your target platforms. This is information that Pants can't determine itself because it's not running on those platforms:
+To do so, you must configure the [`complete_platforms`](../../../reference/targets/pex_binary.mdx#complete_platforms) field on your `pex_binary` to point to `file` targets that provide detailed information about your target platforms. This is information that Pants can't determine itself because it's not running on those platforms:
 
 ```python title="BUILD"
 file(
@@ -81,7 +81,7 @@ You can invoke a `.pex` file either directly, as in `path/to/mybinary.pex`, or v
 - If the interpreter on the target system is not present on the PATH.
 - If `/usr/bin/env` is not available on the target system.
 
-In these cases you can override the default shebang using the [`shebang`](../../../reference/targets/pex_binary.mdx#codeshebangcode) field on the `pex_binary` target, or invoke the `.pex` via an explicit interpreter.
+In these cases you can override the default shebang using the [`shebang`](../../../reference/targets/pex_binary.mdx#shebang) field on the `pex_binary` target, or invoke the `.pex` via an explicit interpreter.
 
 ## Setting Pex and Pip versions
 

@@ -63,7 +63,7 @@ MyPy will use the generated `.pyi` type stub file, rather than looking at the `.
 
 Generated Python files require the [`protobuf` dependency](https://pypi.org/project/protobuf/) for their imports to work properly. If you're using gRPC, you also need the [`grpcio` dependency](https://pypi.org/project/grpcio/).
 
-Add `protobuf`—and `grpcio`, if relevant— to your project, e.g. your `requirements.txt` (see [Third-party dependencies](../python-overview/third-party-dependencies.mdx)).
+Add `protobuf`—and `grpcio`, if relevant— to your project, e.g. your `requirements.txt` (see [Third-party dependencies](../overview/third-party-dependencies.mdx)).
 
 ```text title="requirements.txt"
 grpcio==1.32.0
@@ -184,7 +184,7 @@ For example, if you have a file at `src/proto/example/subdir/f.proto`, you'd set
 
 ## Multiple resolves
 
-If you're using [multiple resolves](../python-overview/third-party-dependencies.mdx) (i.e. multiple lockfiles), then you may need to set the `python_resolve` field. `protobuf_source` targets only work with a single resolve, meaning, for example, that a `python_source` target that uses the resolve 'a' can only depend on Protobuf targets that also uses this same resolve.
+If you're using [multiple resolves](../overview/third-party-dependencies.mdx) (i.e. multiple lockfiles), then you may need to set the `python_resolve` field. `protobuf_source` targets only work with a single resolve, meaning, for example, that a `python_source` target that uses the resolve 'a' can only depend on Protobuf targets that also uses this same resolve.
 
 By default, `protobuf_source` / `protobuf_sources` targets use the resolve set by the option `[python].default_resolve`. To use a different resolve, set the field `python_resolve: str` to one of the values from the option `[python].resolves`.
 

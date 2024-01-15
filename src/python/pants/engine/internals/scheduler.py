@@ -663,9 +663,9 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             tasks,
             rule.func,
             rule.output_type,
-            rule.input_selectors,
+            tuple(rule.parameters.items()),
             rule.masked_types,
-            side_effecting=any(issubclass(t, SideEffecting) for t in rule.input_selectors),
+            side_effecting=any(issubclass(t, SideEffecting) for t in rule.parameters.values()),
             engine_aware_return_type=issubclass(rule.output_type, EngineAwareReturnType),
             cacheable=rule.cacheable,
             name=rule.canonical_name,
@@ -673,8 +673,8 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             level=rule.level.level,
         )
 
-        for the_get in rule.input_gets:
-            unions = [t for t in the_get.input_types if is_union(t)]
+        for awaitable in rule.awaitables:
+            unions = [t for t in awaitable.input_types if is_union(t)]
             if len(unions) == 1:
                 # Register the union by recording a copy of the Get for each union member.
                 union = unions[0]
@@ -683,19 +683,26 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                 for union_member in union_membership.get(union):
                     native_engine.tasks_add_get_union(
                         tasks,
-                        the_get.output_type,
-                        tuple(union_member if t == union else t for t in the_get.input_types),
+                        awaitable.output_type,
+                        tuple(union_member if t == union else t for t in awaitable.input_types),
                         in_scope_types,
                     )
             elif len(unions) > 1:
                 raise TypeError(
-                    "Only one @union may be used in a Get, but {the_get} used: {unions}."
+                    "Only one @union may be used in a Get, but {awaitable} used: {unions}."
+                )
+            elif awaitable.rule_id is not None:
+                # Is a call to a known rule.
+                native_engine.tasks_add_call(
+                    tasks,
+                    awaitable.output_type,
+                    awaitable.input_types,
+                    awaitable.rule_id,
+                    awaitable.explicit_args_arity,
                 )
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                native_engine.tasks_add_get(
-                    tasks, the_get.output_type, the_get.input_types, the_get.rule_id
-                )
+                native_engine.tasks_add_get(tasks, awaitable.output_type, awaitable.input_types)
 
         native_engine.tasks_task_end(tasks)
 

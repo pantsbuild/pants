@@ -97,7 +97,7 @@ Using own classes via subclassing will also help with refactoring if you decide 
 
 ### Ensuring a version follows a semver convention
 
-With the current implementation, we have simply returned the contents of the file as is. We may want to add some validation, for instance, to check that a version string follows a semver convention. Let's learn how to [bring a 3rd party Python package](../writing-plugins/plugins-overview.mdx#thirdparty-dependencies), namely, [packaging](https://pypi.org/project/packaging/), into our plugin to do that!
+With the current implementation, we have simply returned the contents of the file as is. We may want to add some validation, for instance, to check that a version string follows a semver convention. Let's learn how to [bring a 3rd party Python package](../writing-plugins/overview.mdx#thirdparty-dependencies), namely, [packaging](https://pypi.org/project/packaging/), into our plugin to do that!
 
 To start depending on the `packaging` package in our in-repo plugin, we must extend the `pants.toml` file:
 
@@ -446,7 +446,7 @@ $ pants project-version myapp:
 
 Let's get all of this code in one place:
 
-```python title="pants-plugins/project_version/register.py"
+```python tab={"label":"pants-plugins/project_version/register.py"}
 from typing import Iterable
 
 import project_version.rules as project_version_rules
@@ -463,7 +463,7 @@ def rules():
     return [*project_version_rules.rules(), *tailor_rules.rules()]
 ```
 
-```python title="pants-plugins/project_version/rules.py"
+```python tab={"label":"pants-plugins/project_version/rules.py"}
 import dataclasses
 import json
 from dataclasses import dataclass
@@ -599,7 +599,7 @@ def rules():
     return collect_rules()
 ```
 
-```python title="pants-plugins/project_version/tailor.py"
+```python tab={"label":"pants-plugins/project_version/tailor.py"}
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -658,7 +658,7 @@ def rules():
     ]
 ```
 
-```python title="pants-plugins/project_version/target_types.py"
+```python tab={"label":"pants-plugins/project_version/target_types.py"}
 from pants.engine.target import COMMON_TARGET_FIELDS, SingleSourceField, Target
 
 

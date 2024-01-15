@@ -224,29 +224,29 @@ Some introspection goals, such as `filter`, `dependencies` and `dependents` emit
 ```bash
 pants dependents  helloworld/main.py:lib | xargs pants peek --exclude-defaults
 [
-{
-"address": "helloworld:lib",
-"target_type": "python_sources",
-"dependencies": [
-"helloworld/__init__.py:lib",
-"helloworld/main.py:lib"
-],
-"sources": [
-"helloworld/__init__.py",
-"helloworld/main.py"
-]
-},
-{
-"address": "helloworld:pex_binary",
-"target_type": "pex_binary",
-"dependencies": [
-"helloworld/main.py:lib"
-],
-"entry_point": {
-"module": "main.py",
-"function": null
-}
-}
+  {
+    "address": "helloworld:lib",
+    "target_type": "python_sources",
+    "dependencies": [
+      "helloworld/__init__.py:lib",
+      "helloworld/main.py:lib"
+    ],
+    "sources": [
+      "helloworld/__init__.py",
+      "helloworld/main.py"
+    ]
+  },
+  {
+    "address": "helloworld:pex_binary",
+    "target_type": "pex_binary",
+    "dependencies": [
+      "helloworld/main.py:lib"
+    ],
+    "entry_point": {
+      "module": "main.py",
+      "function": null
+    }
+  }
 ]
 ```
 

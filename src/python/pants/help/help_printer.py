@@ -571,7 +571,7 @@ class HelpPrinter(MaybeColor):
                 "activated by": rule.provider,
                 "returns": rule.output_type,
                 f"takes {pluralize(len(rule.input_types), 'input')}": ", ".join(rule.input_types),
-                f"awaits {pluralize(len(rule.input_gets), 'get')}": "\n".join(rule.input_gets)
+                f"awaits {pluralize(len(rule.awaitables), 'get')}": "\n".join(rule.awaitables)
                 if show_advanced
                 else None,
             }
