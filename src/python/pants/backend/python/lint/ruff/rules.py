@@ -13,7 +13,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fix import FixResult, FixTargetsRequest
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.goals.fmt import AbstractFmtRequest, FmtResult, FmtTargetsRequest
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
@@ -168,7 +168,7 @@ async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
 # Note - this function is kept separate because it is invoked from update_build_files.py, but
 # not as a rule.
 async def _run_ruff_fmt(
-    request: RuffFormatRequest.Batch,
+    request: AbstractFmtRequest.Batch,
     ruff: Ruff,
     interpreter_constraints: Optional[InterpreterConstraints] = None,
 ) -> FmtResult:

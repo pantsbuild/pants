@@ -36,19 +36,6 @@ def rule_runner() -> RuleRunner:
 def run_ruff(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) -> FmtResult:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.build_files.fmt.ruff", *(extra_args or ())],
-        # We propagate LANG and LC_ALL to satisfy click, which black depends upon. Without this we
-        # see something like the following in CI:
-        #
-        # RuntimeError: Click will abort further execution because Python was configured to use
-        # ASCII as encoding for the environment. Consult
-        # https://click.palletsprojects.com/unicode-support/ for mitigation steps.
-        #
-        # This system supports the C.UTF-8 locale which is recommended. You might be able to
-        # resolve your issue by exporting the following environment variables:
-        #
-        #     export LC_ALL=C.UTF-8
-        #     export LANG=C.UTF-8
-        #
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/BUILD"])])
@@ -68,9 +55,7 @@ def run_ruff(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) ->
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"BUILD": 'python_sources(name="t")\n'})
-    interpreter_constraint = (
-        ">=3.6.2,<3.7" if major_minor_interpreter == "3.6" else f"=={major_minor_interpreter}.*"
-    )
+    interpreter_constraint = f"=={major_minor_interpreter}.*"
     fmt_result = run_ruff(
         rule_runner,
         extra_args=[f"--ruff-interpreter-constraints=['{interpreter_constraint}']"],
