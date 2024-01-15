@@ -124,6 +124,7 @@ Created as part of the release process.
 + Igor Morozov
 + Ikai Lan
 + In-Ho Yi
++ Israël Hallé
 + Itay Donanhirsh
 + Ity Kaul
 + JC (Jonathan Chen)
