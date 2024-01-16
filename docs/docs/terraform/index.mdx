@@ -11,7 +11,7 @@ Pants is currently building support for developing and deploying Terraform. Simp
 Please share feedback for what you need to use Pants with your Terraform modules and deployments by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](/community/getting-help)!
 :::
 
-# Initial setup
+## Initial setup
 
 First, activate the relevant backend in `pants.toml`:
 
@@ -26,14 +26,14 @@ backend_packages = [
 
 The Terraform backend also needs Python to run Pants's analysers. The setting `[python].interpreter_constraints` will need to be set.
 
-## Adding Terraform targets
+### Adding Terraform targets
 
 The Terraform backend has 2 target types:
 
 - `terraform_module` for Terraform source code
 - `terraform_deployment` for deployments that can be deployed with the `experimental-deploy` goal
 
-### Modules
+#### Modules
 
 The `tailor` goal will automatically generate `terraform_module` targets. Run [`pants tailor ::`](../getting-started/initial-configuration.mdx#5-generate-build-files). For example:
 
@@ -43,7 +43,7 @@ Created src/terraform/root/BUILD:
   - Add terraform_module target root
 ```
 
-### Deployments
+#### Deployments
 
 `terraform_deployments` must be manually created. The deployment points to a `terraform_module` target as its `root_module` field. This module will be the "root" module that Terraform operations will be run on. You can reference vars files with the `var_files` field. You can have multiple deployments reference the same module:
 
@@ -53,7 +53,7 @@ terraform_deployment(name="prod", root_module=":root", var_files=["prod.tfvars"]
 terraform_deployment(name="test", root_module=":root", var_files=["test.tfvars"])
 ```
 
-### Lockfiles
+#### Lockfiles
 
 Automatic lockfile management is currently in progress. You can include lockfiles manually as a dependency:
 
@@ -62,9 +62,9 @@ terraform_deployment(name="prod", root_module=":root", dependencies=[":lockfile"
 file(name="lockfile", source=".terraform.lock.hcl")
 ```
 
-## Basic Operations
+### Basic Operations
 
-### Formatting
+#### Formatting
 
 Run `terraform fmt` as part of the `fix`, `fmt`, or `lint` goals.
 
@@ -75,7 +75,7 @@ pants fix ::
 ✓ terraform-fmt made no changes.
 ```
 
-### Validate
+#### Validate
 
 Run `terraform validate` as part of the `check` goal.
 
@@ -94,7 +94,7 @@ Success! The configuration is valid.
 terraform_module(skip_terraform_validate=True)
 ```
 
-### Deploying
+#### Deploying
 
 :::caution Terraform deployment support is in alpha stage
 Many options and features aren't supported yet.

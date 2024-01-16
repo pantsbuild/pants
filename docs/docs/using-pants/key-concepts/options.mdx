@@ -7,7 +7,7 @@ A deep dive into how options may be configured.
 
 ---
 
-# Option scopes
+## Option scopes
 
 Options are partitioned into named _scopes_.
 
@@ -15,7 +15,7 @@ Some systemwide options belong in the _global scope_. For example, the `--level`
 
 Other options belong to a _subsystem scope_. A _subsystem_ is simply a collection of related options, in a scope. For example, the `pytest` subsystem contains options related to [Python's test framework pytest](../../../reference/subsystems/pytest.mdx).
 
-# Setting options
+## Setting options
 
 Every option can be set in the following ways, in order of precedence:
 
@@ -27,7 +27,7 @@ If an option isn't set in one of these ways, it will take on a default value.
 
 You can inspect both the current value and the default value by using `pants help $scope` or `pants help-advanced $scope`, e.g. `pants help global`.
 
-## Command-line flags
+### Command-line flags
 
 Global options are set using an unqualified flag:
 
@@ -41,7 +41,7 @@ Subsystem options are set by providing the flag, with the name prefixed with the
 pants --source-root-patterns="['^ext']"
 ```
 
-## Environment variables
+### Environment variables
 
 Global options are set using the environment variable `PANTS_{OPTION_NAME}`:
 
@@ -58,7 +58,7 @@ PANTS_SOURCE_ROOT_PATTERNS="['^ext']" pants ...
 
 Note that the scope and option name are upper-cased, and any dashes in the option flag name are converted to underscores: `--multiword-name` becomes `MULTIWORD_NAME`.
 
-## Config file entries
+### Config file entries
 
 Global options are set in the `GLOBAL` section of the config file:
 
@@ -76,7 +76,7 @@ root_patterns = ["/src/python"]
 
 Note that any dashes in the option flag name are converted to underscores: `--multiword-name` becomes `multiword_name`.
 
-### Config file interpolation
+#### Config file interpolation
 
 Environment variables can be interpolated by using the syntax `%(env.ENV_VAR)s`, e.g.:
 
@@ -95,7 +95,7 @@ Additionally, a few special values are pre-populated with the `%(var)s` syntax:
 - `%(pants_distdir)s`: absolute path of the global option `--pants-distdir`, which defaults
   to `{buildroot}/dist/`
 
-# Option types
+## Option types
 
 Every option has a type, and any values you set must be of that type.
 
@@ -109,25 +109,25 @@ The option types are:
 
 A list-valued option may also declare a specific type for its members (e.g., a list of strings, or a list of integers).
 
-## String and integer values
+### String and integer values
 
 Standalone string and integer values are written without quotes. Any quotes will be considered part of the value, after shell escaping.
 
-### Command-line flags:
+#### Command-line flags:
 
 ```bash
 pants --scope-intopt=42
 pants --scope-stropt=qux
 ```
 
-### Environment variables:
+#### Environment variables:
 
 ```bash
 PANTS_SCOPE_INTOPT=42
 PANTS_SCOPE_STROPT=qux
 ```
 
-### Config file entries:
+#### Config file entries:
 
 ```toml title="pants.toml"
 [scope]
@@ -135,11 +135,11 @@ intopt = 42
 stropt = "qux"
 ```
 
-## Boolean values
+### Boolean values
 
 Boolean values can be specified using the special strings `true` and `false`. When specifying them via command-line flags you can also use the `--boolopt/--no-boolopt` syntax.
 
-### Command-line flags:
+#### Command-line flags:
 
 ```bash
 pants --scope-boolopt=true
@@ -147,24 +147,24 @@ pants --scope-boolopt
 pants --no-scope-boolopt
 ```
 
-### Environment variables:
+#### Environment variables:
 
 ```bash
 PANTS_SCOPE_BOOLOPT=true
 ```
 
-### Config file entries:
+#### Config file entries:
 
 ```toml title="pants.toml"
 [scope]
 boolopt = true
 ```
 
-## List values
+### List values
 
 List values are parsed as Python list literals, so you must quote string values, and you may need to apply shell-level quoting and/or escaping, as required.
 
-### Command-line flags:
+#### Command-line flags:
 
 ```bash
 pants --scope-listopt="['foo','bar']"
@@ -178,7 +178,7 @@ pants --scope-listopt=foo --scope-listopt=bar
 
 Appending will add to any values from lower-precedence sources, such as config files (`pants.toml`) and possibly Pants's `default`. Otherwise, using `[]` will override any lower-precedence sources.
 
-### Environment variables:
+#### Environment variables:
 
 ```bash
 PANTS_SCOPE_LISTOPT="['foo','bar']"
@@ -190,7 +190,7 @@ Like with command-line flags, you can leave off the `[]` to _append_ elements:
 PANTS_SCOPE_LISTOPT=foo
 ```
 
-### Config file entries:
+#### Config file entries:
 
 ```toml title="pants.toml"
 [scope]
@@ -200,7 +200,7 @@ listopt = [
 ]
 ```
 
-### Add/remove semantics
+#### Add/remove semantics
 
 List values have some extra semantics:
 
@@ -250,23 +250,23 @@ listopt.remove = [3, 4]
 But note that this only works in Pants's `.toml` config files, not in environment variables or command-line flags.
 :::
 
-## Dict values
+### Dict values
 
 Dict values are parsed as Python dict literals on the command-line and environment variables, so you must quote string keys and values, and you may need to apply shell-level quoting and/or escaping, as required.
 
-### Command-line flags:
+#### Command-line flags:
 
 ```bash
 pants --scope-dictopt="{'foo':1,'bar':2}"
 ```
 
-### Environment variables:
+#### Environment variables:
 
 ```bash
 PANTS_SCOPE_DICTOPT="{'foo':1,'bar':2}"
 ```
 
-### Config file entries:
+#### Config file entries:
 
 You can use TOML's [nested table features](https://toml.io/en/v1.0.0#inline-table). These are equivalent:
 
@@ -291,7 +291,7 @@ dictopt = """{
 }"""
 ```
 
-### Add/replace semantics
+#### Add/replace semantics
 
 - A value can be preceded by `+`, which will _update_ the value obtained from lower-precedence sources with the entries.
 - Otherwise, the value _replaces_ the one obtained from lower-precendence sources.
@@ -310,7 +310,7 @@ pants --scope-dictopt="{'foo':42,'baz':3}"
 
 will set the value to `{'foo': 42, 'baz': 3}`.
 
-# Reading individual option values from files
+## Reading individual option values from files
 
 If an option value is too large or elaborate to use directly, or if you don't want to hard-code
 values directly in `pants.toml`, you can set the value of any option to the string
@@ -345,7 +345,7 @@ do so by `kill`ing it (after using `ps -ef | grep pantsd` to find its pid), or b
 Pants once with `--no-pantsd`.
 :::
 
-# `.pants.rc` file
+## `.pants.rc` file
 
 You can set up personal Pants config files, using the same TOML syntax as `pants.toml`. By default, Pants looks for the paths `/etc/pantsrc`, `~/.pants.rc`, and `.pants.rc` in the repository root.
 

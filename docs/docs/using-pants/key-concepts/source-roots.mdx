@@ -13,7 +13,7 @@ Go does have a notion of source roots: where your `go.mod` is located. However, 
 Shell does not have any notion of source roots.
 :::
 
-# What are source roots?
+## What are source roots?
 
 Some project layouts use top-level folders for namespace purposes, but have the code live underneath. However, the code's imports will ignore these top-level folders, thanks to mechanisms like the `$PYTHONPATH` and the JVM classpath. _Source roots_ are a generic equivalent of these concepts.
 
@@ -44,7 +44,7 @@ pkgutil.get_data("project.config", "prod.json")
 
 In the example above, `src/python` is a source root. So, when some code says `from project.app import App`, Pants can know that this corresponds to the code in `src/python/project/app.py`.
 
-# Configuring source roots
+## Configuring source roots
 
 There are two ways to configure source roots:
 
@@ -60,7 +60,7 @@ src/python
 src/rust
 ```
 
-## Configuring source roots using patterns
+### Configuring source roots using patterns
 
 You can provide a set of patterns that match your source roots:
 
@@ -85,7 +85,7 @@ You can use `*` as a glob. For example, `root_patterns = ["/src/*"]` would consi
 - `src/java`
 - `src/assets`
 
-### Configuring no source roots
+#### Configuring no source roots
 
 Many projects do not have any top-level folders used for namespacing.
 
@@ -125,7 +125,7 @@ The default value of the `root_patterns` config key is `["/", "src", "src/python
 These capture a range of common cases, including a source root at the root of the repository. If your source roots match these patterns, you don't need to explicitly configure them.
 :::
 
-## Configuring source roots using marker files
+### Configuring source roots using marker files
 
 You can also denote your source roots using specially-named marker files. To do so, first pick a name (or multiple names) to use:
 
@@ -182,15 +182,15 @@ import server.server.app
 from utils.utils.strutil import capitalize
 ```
 
-# Examples
+## Examples
 
 These project structures are all valid; Pants does not expect you to reorganize your codebase to use the tool.
 
-## `src/<lang>` setup
+### `src/<lang>` setup
 
 This setup is common in "polyglot" repositories: i.e. repos with multiple languages.
 
-### Project:
+#### Project:
 
 ```
 .
@@ -228,7 +228,7 @@ This setup is common in "polyglot" repositories: i.e. repos with multiple langua
 
 While we have tests in a separate source root here, it's also valid to have tests colocated with their src files.
 
-### Example imports:
+#### Example imports:
 
 ```python
 # Python
@@ -242,7 +242,7 @@ import org.pantsbuild.project.App
 import org.pantsbuild.project.util.Math
 ```
 
-### Config:
+#### Config:
 
 ```toml title="pants.toml"
 [source]
@@ -255,9 +255,9 @@ root_patterns = [
 
 Note that we organized our 3rdparty requirements in the top-level folders `3rdparty/python` and `3rdparty/java`, but we do not need to include them as source roots because we do not have any first-party code there.
 
-## Multiple top-level projects
+### Multiple top-level projects
 
-### Project:
+#### Project:
 
 This layout has lots of nesting; this is only one possible way to organize the repository.
 
@@ -289,7 +289,7 @@ This layout has lots of nesting; this is only one possible way to organize the r
         └── spa.js
 ```
 
-### Example imports:
+#### Example imports:
 
 ```python
 import ads.billing.calculate_bill
@@ -299,7 +299,7 @@ from base.util.math import add_two
 
 Note that even though the projects live in different top-level folders, you are still able to import from other projects. If you would like to limit this, you can use `pants dependents` or `pants dependencies` in CI to track where imports are being used. See [Project introspection](../project-introspection.mdx).
 
-### Config:
+#### Config:
 
 Either of these are valid and they have the same result:
 
@@ -320,11 +320,11 @@ root_patterns = [
 ]
 ```
 
-## No source root
+### No source root
 
 Warning: while this project structure is valid, it often does not scale as well as your codebase grows, such as adding new languages.
 
-### Project:
+#### Project:
 
 ```
 .
@@ -340,7 +340,7 @@ Warning: while this project structure is valid, it often does not scale as well 
 └── pyproject.toml
 ```
 
-### Example imports:
+#### Example imports:
 
 ```python
 from project.app import App
@@ -349,7 +349,7 @@ from project.util.math import add_two
 pkgutil.get_data("project.config", "prod.json")
 ```
 
-### Config:
+#### Config:
 
 Either of these are valid and they have the same result:
 

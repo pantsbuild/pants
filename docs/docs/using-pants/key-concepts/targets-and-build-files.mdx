@@ -23,7 +23,7 @@ To reduce boilerplate, some targets also generate other targets:
 - `shell_sources` -> `shell_source`
 - `go_mod` -> `go_third_party_package`
 
-# BUILD files
+## BUILD files
 
 Targets are defined in files with the name `BUILD`. For example:
 
@@ -45,7 +45,7 @@ All target types have a `name` field, which is used to identify the target. Targ
 
 You can autoformat `BUILD` files by enabling a `BUILD` file formatter by adding it to `[GLOBAL].backend_packages` in `pants.toml` (such as `pants.backend.build_files.fmt.black` [or others](./backends.mdx)). Then to format, run `pants fmt '**/BUILD'` or `pants fmt ::` (formats everything).
 
-## Environment variables
+### Environment variables
 
 BUILD files are very hermetic in nature with no support for using `import` or other I/O operations. In order to have dynamic data in BUILD files, you may inject values from the local environment using the `env()` function. It takes the variable name and optional default value as arguments.
 
@@ -60,7 +60,7 @@ python_distribution(
 )
 ```
 
-# Target addresses
+## Target addresses
 
 A target is identified by its unique address, in the form `path/to/dir:name`. The above example has the addresses `helloworld/greet:tests` and `helloworld/greet:bin`.
 
@@ -83,7 +83,7 @@ You can refer to this target with either `helloworld/greet:greet` or the abbrevi
 Addresses defined in the `BUILD` file at the root of your repository are prefixed with `//`, e.g. `//:my_tgt`.
 :::
 
-# `source` and `sources` field
+## `source` and `sources` field
 
 Targets like `python_test` and `resource` have a `source: str` field, while target generators like `python_tests` and `resources` have a `sources: list[str]` field. This determines which source files belong to the target.
 
@@ -123,7 +123,7 @@ Including the same file in the `source` / `sources` field for multiple targets c
 You can run `pants list path/to/file.ext` to see all "owning" targets to check if >1 target has the file in its `source` field.
 :::
 
-# `dependencies` field
+## `dependencies` field
 
 A target's dependencies determines which other first-party code and third-party requirements to include when building the target.
 
@@ -166,7 +166,7 @@ You can use the prefix `!!` to transitively exclude a dependency, meaning that e
 Transitive excludes can only be used in target types that conventionally are not depended upon by other targets, such as `pex_binary`, `python_distribution`, and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
 :::
 
-# Field default values
+## Field default values
 
 As mentioned above in [BUILD files](./targets-and-build-files.mdx#build-files), most target fields have sensible defaults. And it's easy to override those values on a specific target. But applying the same non-default value on many targets can get unwieldy, error-prone and hard to maintain. Enter `__defaults__`.
 
@@ -215,7 +215,7 @@ To reset any modified defaults, simply override with the empty dict:
     __defaults__(all={})
 ```
 
-## Supporting optional plugin fields
+### Supporting optional plugin fields
 
 Normally Pants presents an error message when attempting to provide a default value for a field that doesn't exist for the target. However, some fields comes from plugins, and to support disabling a plugin without having to remove any default values referencing any plugin fields it was providing, there is a `ignore_unknown_fields` option to use:
 
@@ -228,7 +228,7 @@ Normally Pants presents an error message when attempting to provide a default va
     )
 ```
 
-## Extending field defaults
+### Extending field defaults
 
 To add to a default value rather than replacing it, the current default value for a target field is available in the BUILD file using `<target>.<field>.default`. This allows you to augment a field's default value with much more precision. As an example, if you want to make the default sources for a `python_sources` target to work recursively you may specify a target augmenting the default sources field:
 
@@ -242,7 +242,7 @@ python_sources(
 )
 ```
 
-# Target generation
+## Target generation
 
 To reduce boilerplate, Pants provides target types that generate other targets. For example:
 
@@ -320,7 +320,7 @@ It's useful for metadata to be as fine-grained as feasible, such as by using the
 [`pants tailor ::`](../../getting-started/initial-configuration.mdx#5-generate-build-files) will automatically create targets that only apply metadata for the directory.
 :::
 
-# Parametrizing targets
+## Parametrizing targets
 
 It can be useful to create multiple targets describing the same entity, each with different metadata. For example:
 
