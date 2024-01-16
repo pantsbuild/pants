@@ -5,7 +5,7 @@
 
 ---
 
-# What is remote caching?
+## What is remote caching?
 
 Remote caching allows Pants to store and retrieve the results of process execution to and from a remote server, rather than only using your machine's local Pants cache. This allows Pants to efficiently share a cache across different runs and different machines, for example, all of your CI workers sharing the same fine-grained cache.
 
@@ -15,13 +15,13 @@ Pants supports several remote caching providers:
 - GitHub Actions Cache
 - Local file system
 
-# Remote Execution API
+## Remote Execution API
 
-## Server
+### Server
 
 See the [REAPI server compatibility guide](./index.mdx#server-compatibility) for more information about REAPI-compatible caches.
 
-## Pants Configuration
+### Pants Configuration
 
 After you have either set up a REAPI cache server or obtained access to one, the next step is to point Pants to it so that Pants will use it to read and write process results.
 
@@ -37,6 +37,6 @@ remote_instance_name = "main"
 
 If the endpoint is using TLS, then the `remote_store_address` option would be specified with the `grpcs://` scheme, i.e. `"grpcs://cache.corp.example.com:8980"`.
 
-# Reference
+## Reference
 
 Run `pants help-advanced global` or refer to [Global options](../../../reference/global-options.mdx). Most remote execution and caching options begin with the prefix `--remote`.
