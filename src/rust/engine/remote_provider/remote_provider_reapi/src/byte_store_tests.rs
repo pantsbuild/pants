@@ -12,7 +12,7 @@ use testutil::file::mk_tempfile;
 use tokio::fs::File;
 use workunit_store::WorkunitStore;
 
-use remote_provider_traits::{ByteStoreProvider, RemoteStoreOptions};
+use remote_provider_traits::{ByteStoreProvider, RemoteProvider, RemoteStoreOptions};
 
 use crate::byte_store::Provider;
 
@@ -25,6 +25,7 @@ fn remote_options(
     batch_api_size_limit: usize,
 ) -> RemoteStoreOptions {
     RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
         store_address,
         instance_name: None,
         tls_config: tls::Config::default(),

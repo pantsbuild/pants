@@ -215,3 +215,34 @@ def test_pass_jvm_options_to_java_program(rule_runner: RuleRunner) -> None:
     assert "java.specification.version=11" in jvm_properties
     assert "pants.jvm.global=true" in jvm_properties
     assert "pants.jvm.extra=true" in jvm_properties
+
+
+@maybe_skip_jdk_test
+def test_jvm_not_found_when_empty_jvm_index(rule_runner: RuleRunner) -> None:
+    # Prepare empty JVM Index file
+    filename = "index.json"
+    file_content = textwrap.dedent(
+        """\
+        {}
+        """
+    )
+    rule_runner.write_files({filename: file_content})
+
+    jdk_release_version = "21"
+    jdk_binary = f"adoptium:1.{jdk_release_version}"
+
+    # Assert jdk_binary is found with default JVM Index
+    rule_runner.set_options([f"--jvm-tool-jdk={jdk_binary}"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    assert f'openjdk version "{jdk_release_version}' in run_javac_version(rule_runner)
+
+    # Assert jdk_binary is not found with empty JVM Index
+    rule_runner.set_options(
+        [
+            f"--coursier-jvm-index={rule_runner.build_root}/{filename}",
+            f"--jvm-tool-jdk={jdk_binary}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    expected_exception_msg = rf".*?JVM {jdk_binary} not found in index.*?"
+    with pytest.raises(ExecutionError, match=expected_exception_msg):
+        run_javac_version(rule_runner)

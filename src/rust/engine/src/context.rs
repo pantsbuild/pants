@@ -35,7 +35,7 @@ use regex::Regex;
 use remote::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, RemoteStoreOptions, Store};
+use store::{self, ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
@@ -83,6 +83,7 @@ pub struct Core {
 
 #[derive(Clone, Debug)]
 pub struct RemotingOptions {
+    pub provider: RemoteProvider,
     pub execution_enable: bool,
     pub store_address: Option<String>,
     pub execution_address: Option<String>,
@@ -119,6 +120,7 @@ impl RemotingOptions {
             .clone();
 
         Ok(RemoteStoreOptions {
+            provider: self.provider,
             store_address,
             instance_name: self.instance_name.clone(),
             tls_config,
