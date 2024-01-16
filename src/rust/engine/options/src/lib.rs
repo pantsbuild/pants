@@ -37,6 +37,7 @@ use std::rc::Rc;
 pub use self::args::Args;
 use self::config::Config;
 pub use self::env::Env;
+use crate::parse::{parse_float, parse_int};
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 pub use types::OptionType;
@@ -116,18 +117,13 @@ pub(crate) trait OptionsSource {
     /// Errors when this source has an option value for `id` but that value is not an int.
     ///
     /// The default implementation looks for a string value for `id` and then attempts to parse it as
-    /// a int value.
+    /// an int value.
     ///
     fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
         if let Some(value) = self.get_string(id)? {
-            value.parse().map(Some).map_err(|e| {
-                format!(
-                    "Problem parsing {} value {} as an int value: {}",
-                    self.display(id),
-                    value,
-                    e
-                )
-            })
+            parse_int(&value)
+                .map(Some)
+                .map_err(|e| e.render(self.display(id)))
         } else {
             Ok(None)
         }
@@ -142,24 +138,39 @@ pub(crate) trait OptionsSource {
     ///
     fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
         if let Some(value) = self.get_string(id)? {
-            value.parse().map(Some).map_err(|e| {
-                format!(
-                    "Problem parsing {} value {} as a float value: {}",
-                    self.display(id),
-                    value,
-                    e
-                )
-            })
+            parse_float(&value)
+                .map(Some)
+                .map_err(|e| e.render(self.display(id)))
         } else {
             Ok(None)
         }
     }
 
     ///
+    /// Get the bool list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a bool list.
+    ///
+    fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String>;
+
+    ///
+    /// Get the int list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not an int list.
+    ///
+    fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String>;
+
+    ///
+    /// Get the float list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a float list.
+    ///
+    fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String>;
+
+    ///
     /// Get the string list option identified by `id` from this source.
     /// Errors when this source has an option value for `id` but that value is not a string list.
     ///
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String>;
+
+    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String>;
 }
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]

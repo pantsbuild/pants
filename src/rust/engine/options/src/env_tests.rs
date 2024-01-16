@@ -121,7 +121,7 @@ fn test_bool() {
 #[test]
 fn test_float() {
     let env = env([
-        ("PANTS_FOO", "4"),
+        ("PANTS_FOO", "4.0"),
         ("PANTS_BAR_BAZ", "3.14"),
         ("PANTS_EGGS", "1.137"),
         ("PANTS_BAD", "swallow"),
@@ -130,14 +130,15 @@ fn test_float() {
     let assert_float =
         |expected: f64, id: OptionId| assert_eq!(expected, env.get_float(&id).unwrap().unwrap());
 
-    assert_float(4_f64, option_id!("foo"));
+    assert_float(4.0, option_id!("foo"));
     assert_float(3.14, option_id!("bar", "baz"));
     assert_float(1.137, option_id!("pants", "eggs"));
 
     assert!(env.get_float(&option_id!("dne")).unwrap().is_none());
 
     assert_eq!(
-        "Problem parsing PANTS_BAD value swallow as a float value: invalid float literal"
+        "Problem parsing PANTS_BAD float value:\n1:swallow\n  ^\n\
+        Expected \"+\", \"-\" or ['0' ..= '9'] at line 1 column 1"
             .to_owned(),
         env.get_float(&option_id!("pants", "bad")).unwrap_err()
     );
