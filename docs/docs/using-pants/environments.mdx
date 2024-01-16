@@ -5,7 +5,7 @@
 
 ---
 
-# Environments
+## Environments
 
 :::caution Environments are currently in `preview`, and have not yet stabilized.
 We'd love your feedback on how Environments could be most useful to you! Please refer to [the tracking issue](https://github.com/pantsbuild/pants/issues/17355) for known stabilization blockers.
@@ -17,7 +17,7 @@ By default, Pants will execute all sandboxed build work directly on localhost. B
 2. remotely via [remote execution](./remote-caching-&-execution/remote-execution.mdx)
 3. locally, but with a non-default set of environment variables and settings (such as when different platforms need different values, or when cross-building)
 
-## Defining environments
+### Defining environments
 
 Environments are defined using environment targets:
 
@@ -53,7 +53,7 @@ docker_environment(
 Environment targets are loaded before regular targets in a bootstrap phase, during which macros are unavailable. As such any required field values must be fully defined in the BUILD file without referencing any macros. For optional fields, the use of macros are still discouraged as it may or may not work and Pants makes no guarantees that it will not break in a future version if it were to currently work.
 :::
 
-### Environment-aware options
+#### Environment-aware options
 
 Environment targets have fields ([target](./key-concepts/targets-and-build-files.mdx) arguments) which correspond to [options](./key-concepts/options.mdx) which are marked "environment-aware". When an option is environment-aware, the value of the option that will be used in an environment can be overridden by setting the corresponding field value on the associated environment target. If an environment target does not set a value, it defaults to the value which is set globally via options values.
 
@@ -63,7 +63,7 @@ For example, the [`[python-bootstrap].search_path` option](../../reference/subsy
 Environments are a new concept: if you see an option value which should be marked environment-aware but isn't, please definitely [file an issue](https://github.com/pantsbuild/pants/issues/new/choose)!
 :::
 
-## Consuming environments
+### Consuming environments
 
 To declare which environment they should build with, many target types (but particularly "root" targets like tests or binaries) have an `environment=` field: for example, [`python_tests(environment=..)`](../../reference/targets/python_tests.mdx#environment).
 
@@ -78,7 +78,7 @@ Currently, there is no static validation that a target's environment is compatib
 As we gain more experience with how environments are used in the wild, it's possible that more static validation can be added: your feedback would be very welcome!
 :::
 
-### Setting the environment on many targets at once
+#### Setting the environment on many targets at once
 
 To use an environment everywhere in your repository (or only within a particular subdirectory, or with a particular target
 type), you can use the [`__defaults__` builtin](./key-concepts/targets-and-build-files.mdx#field-default-values). For example, to use an environment named `my_default_environment` globally by default, you would add the following to a `BUILD` file at the root of the repository:
@@ -89,7 +89,7 @@ __defaults__(all=dict(environment="my_default_environment"))
 
 ... and individual targets could override the default as needed.
 
-### Building one target in multiple environments
+#### Building one target in multiple environments
 
 If a target will always need to be built in multiple environments (rather than conditionally based on which user is building it: see the "Toggle use of an environment for some consumers" section), then you can use the [`parametrize` builtin](./key-concepts/targets-and-build-files.mdx#parametrizing-targets) for the `environment=` field. If you had two environments named `linux` and `macos`, that would look like:
 
@@ -100,7 +100,7 @@ pex_binary(
 )
 ```
 
-### Environment matching
+#### Environment matching
 
 A single environment name may end up referring to different environment targets on different physical machines, or with different global settings applied: this is known as environment "matching".
 
@@ -133,9 +133,9 @@ docker_environment(
 
 In future versions, environment targets will gain additional predicates to control whether they match (for example: `local_environment` will likely gain a predicate that looks for the [presence or value of an environment variable](https://github.com/pantsbuild/pants/issues/17107). But in the meantime, it's possible to override which environments are matched for particular use cases by overriding their configured names: see the "Toggle use of an environment" workflow below for an example.
 
-## Example workflows
+### Example workflows
 
-### Enabling remote execution globally
+#### Enabling remote execution globally
 
 `remote_environment` targets match unless the [`--remote-execution`](../../reference/global-options.mdx#remote_execution) option is disabled. So to cause a particular environment name to use remote execution whenever it is enabled, you could define environment targets which try remote execution first, and then fall back to local execution:
 
@@ -167,7 +167,7 @@ local = "//:local"
 The `2.15.x` series of Pants does not yet support ["speculating" remote execution](https://github.com/pantsbuild/pants/issues/8353) by racing it against another environment (usually local or docker). While we expect that this will be necessary to make remote execution a viable option for local execution on user's laptops (where network connections are less reliable), it is less critical for CI use-cases.
 :::
 
-### Use a `docker_environment` to build the inputs to a `docker_image`
+#### Use a `docker_environment` to build the inputs to a `docker_image`
 
 To build a `docker_image` target containing a `pex_binary` which uses native (i.e. compiled) dependencies on a `macOS` machine, you can configure the `pex_binary` to be built in a `docker_environment`.
 
@@ -206,7 +206,7 @@ Note that the Docker image used in your `docker_environment` does not need to ma
 This means that your `docker_environment` can include things like compilers or other tools relevant to your build, without needing to manually use multi-stage Docker builds.
 :::
 
-### Toggle use of an environment for some consumers
+#### Toggle use of an environment for some consumers
 
 As mentioned above in "Environment matching", environment targets "match" based on their field values and global options. But if two environment targets would be ambiguous in some cases, or if you'd otherwise like to control what a particular environment name means (in CI, for example), you can override an environment name via options.
 

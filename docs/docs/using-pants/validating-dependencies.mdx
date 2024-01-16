@@ -76,7 +76,7 @@ backend_packages.add = [
 This does not mean you should not use it, only that it is in "preview" mode meaning that things may change between releases without following our deprecation policy as we work on stabilizing this feature. See [the stabilization ticket](https://github.com/pantsbuild/pants/issues/17634) for what remains to be done for the visibility backend to graduate out of preview.
 :::
 
-# Dependencies and dependents
+## Dependencies and dependents
 
 The visibility rules operates on the dependency link between two targets. Dependencies are directional, so if target `A` depends on another target `B` the dependency goes from the "origin" target `A` -> `B`, we say that `B` is the **dependency** of `A`, while `A` is the **dependent** of `B`.
 
@@ -180,7 +180,7 @@ If your codebase has a very complex dependency graph, you may need to make sure 
 
 In this scenario, you may need to look into alternative solutions to codify these constraints. For example, to check for violations, you could query the dependencies of component `C1` (transitively) using the `dependencies` goal with the `--transitive` option to confirm none of the modules from component `C3` are listed. If there are some, you may find the `paths` goal helpful as it would show you exactly why a certain module from component `C1` depends on a given module in component `C3` if it is unclear.
 
-## Rule sets
+### Rule sets
 
 As there may be many targets and files with dependencies, odds are that they won't all share the same set of rules. The rules keywords accepts multiple sets of rules, or "rule sets", along with "selector rules" that is used to select which set to use for each target.
 
@@ -289,7 +289,7 @@ The previous example, using this alternative syntax for the selectors, would loo
   )
 ```
 
-## Glob syntax
+### Glob syntax
 
 The visibility rules are all about matching globs. There are two wildcards: the `*` matches anything except `/`, and the `**` matches anything including `/`. (For paths that is non-recursive and recursive globbing respectively.)
 
@@ -319,7 +319,7 @@ some/directory/*
 
 So far the rule globs have been matched from anywhere in the matched to path up to the end. To ensure the path begins with a certain pattern we'd have to provide full paths in our rules, like `src/python/proj/lib/file.py` if we want to make sure that our `file.py` is from the `src/` tree. To avoid lengthy and rigid rule globs hurting refactorings etc, there's a concept of "anchoring" the rule. That will apply the rule glob from a fixed point in the matched to path, and there are three such points: project root, rule declaration path and rule invocation path. The difference between declaration and invocation is explained below.
 
-#### Anchoring mode for path globs
+##### Anchoring mode for path globs
 
 The glob prefix specifies which "anchoring mode" to use, and are:
 
@@ -340,7 +340,7 @@ The glob prefix specifies which "anchoring mode" to use, and are:
 
 > 🚧 Regardless of anchoring mode, all rules are always anchored to the end of the matched path.
 
-#### Targeting non-source files
+##### Targeting non-source files
 
 So far most examples have been about providing rules that match source files. This will likely be the most common scenario, but other targets may just as well need to be considered. For the general case, non-source file targets will be matched using the directory where it has been declared (the path containing the BUILD file in most cases).
 
@@ -391,7 +391,7 @@ __dependencies_rules__(
 )
 ```
 
-## Rule actions
+### Rule actions
 
 When a matching rule is found for a path, the path is either allowed or denied based on the rule's action. The dependency link as a whole is only allowed if both ends of the dependency allow it. By default a rule's action is `ALLOW`, but may be changed to `DENY` or `WARN`. The `WARN` action logs a warning message rather than raising an error, but will otherwise allow the dependency.
 
