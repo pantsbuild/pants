@@ -182,23 +182,20 @@ Secrets should not be checked into version control. Use absolute paths to refere
 See the example for the [`secrets`](../../reference/targets/docker_image.mdx#secrets) field.
 :::
 
-### External cache storage backends
+### Buildx Support
 
-BuildKit supports exporting build cache to an external location, making it possible to import in future builds. Cache backends can be configured using the [`cache_to`](../../reference/targets/docker_image.mdx#cache_to) and [`cache_from`](../../reference/targets/docker_image.mdx#cache_from) fields.
+Buildx (using BuildKit) supports exporting build cache to an external location, making it possible to import in future builds. Cache backends can be configured using the [`cache_to`](../../reference/targets/docker_image.mdx#cache_to) and [`cache_from`](../../reference/targets/docker_image.mdx#cache_from) fields.
 
-Create a builder using a [build driver](https://docs.docker.com/build/drivers/) that is compatible with the cache backend:
-
-```
-❯ docker buildx create --name container --driver=docker-container container
-```
-
-Use the builder:
-
-```
-❯ export BUILDX_BUILDER=container
+To use BuildKit with Pants, enable the [Containerd Image Store](https://docs.docker.com/desktop/containerd/), either via [Docker Desktop settings](https://docs.docker.com/storage/containerd/) or by [setting daemon config](https://docs.docker.com/storage/containerd/#enable-containerd-image-store-on-docker-engine):
+```json
+{
+  "features": {
+    "containerd-snapshotter": true
+  }
+}
 ```
 
-Optionally, validate a build with the Docker CLI directly:
+Optionally, run a build with the Docker CLI directly to validate buildx support on your system:
 
 ```
 ❯ docker buildx build -t pants-cache-test:latest \
@@ -206,14 +203,11 @@ Optionally, validate a build with the Docker CLI directly:
   --cache-from type=local,src=/tmp/docker/pants-test-cache .
 ```
 
-Configure Pants to use buildx and pass the BUILDX_BUILDER environment variable:
+Configure Pants to use buildx:
 
 ```toml tab={"label":"pants.toml"}
 [docker]
 use_buildx = true
-env_vars = [
-  "BUILDX_BUILDER"
-]
 ```
 
 ```python tab={"label":"example/BUILD"}
@@ -229,6 +223,8 @@ docker_image(
     }
 )
 ```
+
+For working examples, including multi-platform builds with Github Actions, refer to the [example-docker](https://github.com/pantsbuild/example-docker) repository.
 
 ### Build Docker image example
 
