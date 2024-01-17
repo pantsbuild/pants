@@ -1506,6 +1506,7 @@ def test_parametrize_partial_exclude(generated_targets_rule_runner: RuleRunner) 
 
 
 def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
+    """Field subclassing defeats automatic filling of parameters for explicit dependencies on parametrized targets."""
     class ParentField(Field):
         alias = "parent"
         help = "foo"
@@ -1558,6 +1559,7 @@ def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
     ],
 )
 def test_parametrize_16910(generated_targets_rule_runner: RuleRunner, field_content: str) -> None:
+    """Misleading errror message for parametrized field that is unknown."""
     with engine_error(
         InvalidTargetException, contains=f"demo/BUILD:1: Unrecognized field `{field_content}`"
     ):
@@ -1585,6 +1587,38 @@ def test_parametrize_single_value_16978(generated_targets_rule_runner: RuleRunne
         },
         expected_dependencies={
             "demo@resolve=demo": set(),
+        },
+    )
+
+
+def test_parametrize_group_on_target_generator_20418(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t"),
+        dedent(
+            """\
+            generator(
+              name='t',
+              sources=['f1.ext', 'f2.ext'],
+              **parametrize('a1', resolve='a', tags=['1']),
+              **parametrize('b2', resolve='b', tags=['2']),
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext"],
+        expected_dependencies={
+            "demo/f1.ext:t@parametrize=a1": set(),
+            "demo/f1.ext:t@parametrize=b2": set(),
+            "demo/f2.ext:t@parametrize=a1": set(),
+            "demo/f2.ext:t@parametrize=b2": set(),
+            "demo:t@parametrize=a1": {
+                "demo/f1.ext:t@parametrize=a1",
+                "demo/f2.ext:t@parametrize=a1",
+            },
+            "demo:t@parametrize=b2": {
+                "demo/f1.ext:t@parametrize=b2",
+                "demo/f2.ext:t@parametrize=b2",
+            },
         },
     )
 
