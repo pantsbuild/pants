@@ -24,11 +24,11 @@ In your CI's config file, we recommend caching these directories:
 - `$HOME/.cache/pants/named_caches`<br/>
   Caches used by some underlying tools. Cache this against the inputs to those tools. For the `pants.backend.python` backend, named caches are used by PEX, and therefore its inputs are your lockfiles. Again, see [pantsbuild/example-python](https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml) for an example.
 
-If you're not using a fine-grained [remote caching](./remote-caching-&-execution/index.mdx) service, then you may also want to preserve the local Pants cache at `$HOME/.cache/pants/lmdb_store`. This has to be invalidated on any file that can affect any process, e.g., `hashFiles('**/*')` on GitHub Actions.
+If you're not using a fine-grained [remote caching](./remote-caching-and-execution/index.mdx) service, then you may also want to preserve the local Pants cache at `$HOME/.cache/pants/lmdb_store`. This has to be invalidated on any file that can affect any process, e.g., `hashFiles('**/*')` on GitHub Actions.
 
 Computing such a coarse hash, and saving and restoring large directories, can be unwieldy. So this may be impractical and slow on medium and large repos.
 
-A [remote cache service](./remote-caching-&-execution/index.mdx) integrates with Pants's fine-grained invalidation and avoids these problems, and is recommended for the best CI performance.
+A [remote cache service](./remote-caching-and-execution/index.mdx) integrates with Pants's fine-grained invalidation and avoids these problems, and is recommended for the best CI performance.
 
 See [Troubleshooting](./troubleshooting-common-issues.mdx#how-to-change-your-cache-directory) for how to change these cache locations.
 
@@ -80,7 +80,7 @@ This brings several benefits over local caching:
   - No download and upload stage for your cache.
   - No need to "nuke" your cache when it gets too big.
 
-See [Remote Caching and Execution](./remote-caching-&-execution/index.mdx) for more information.
+See [Remote Caching and Execution](./remote-caching-and-execution/index.mdx) for more information.
 :::
 
 ## Recommended commands
@@ -89,7 +89,7 @@ See [Remote Caching and Execution](./remote-caching-&-execution/index.mdx) for m
 The goals `fmt` and `fix` will attempt to automatically correct your code and then return zero if they were able to do so. This generally counts as "success" for most CI systems. In contrast the `lint` goal will not modify code and instead exit with a non-zero status if any tools detected a problem. In other words the `lint` goal is like the "checking" version of `fmt/fix`. Prefer `lint` if you want your CI system to return job failures to enforce linting and format rules.
 :::
 
-With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism. See [Advanced Target Selection](./advanced-target-selection.mdx#sharding-the-input-targets). (This is typically less necessary when using [remote caching](./remote-caching-&-execution/index.mdx).)
+With both approaches, you may want to shard the input targets into multiple CI jobs, for increased parallelism. See [Advanced Target Selection](./advanced-target-selection.mdx#sharding-the-input-targets). (This is typically less necessary when using [remote caching](./remote-caching-and-execution/index.mdx).)
 
 ### Approach #1: only run over changed files
 
@@ -174,7 +174,7 @@ Alternatively, you can simply run over all your code. Pants's caching means that
 
 However, when the cache gets too big, it should be nuked (see "Directories to cache"), so your CI may end up doing more work than Approach #1.
 
-This approach works particularly well if you are using [remote caching](./remote-caching-&-execution/remote-caching.mdx).
+This approach works particularly well if you are using [remote caching](./remote-caching-and-execution/remote-caching.mdx).
 
 ## Configuring Pants for CI: `pants.ci.toml` (optional)
 

@@ -14,7 +14,7 @@ We'd love your feedback on how Environments could be most useful to you! Please 
 By default, Pants will execute all sandboxed build work directly on localhost. But defining and using additional "environments" for particular targets allows Pants to transparently execute some or all of your build either:
 
 1. locally in Docker containers
-2. remotely via [remote execution](./remote-caching-&-execution/remote-execution.mdx)
+2. remotely via [remote execution](./remote-caching-and-execution/remote-execution.mdx)
 3. locally, but with a non-default set of environment variables and settings (such as when different platforms need different values, or when cross-building)
 
 ### Defining environments
@@ -23,7 +23,7 @@ Environments are defined using environment targets:
 
 - [`local_environment`](../../reference/targets/local_environment.mdx) - Runs without containerization on localhost (which is also the default if no environment targets are defined).
 - [`docker_environment`](../../reference/targets/docker_environment.mdx) - Runs in a cached container using the specified Docker image using a local installation of Docker. If the image does not already exist locally, it will be pulled.
-- [`remote_environment`](../../reference/targets/remote_environment.mdx) - Runs in a remote worker via [remote execution](./remote-caching-&-execution/remote-execution.mdx) (possibly with containerization, depending on the server implementation).
+- [`remote_environment`](../../reference/targets/remote_environment.mdx) - Runs in a remote worker via [remote execution](./remote-caching-and-execution/remote-execution.mdx) (possibly with containerization, depending on the server implementation).
 
 Give your environment targets short, descriptive names using the [`[environments-previews.names]` option](../../reference/subsystems/environments-preview.mdx#names) (usually defined in `pants.toml`), which consuming targets use to refer to them in `BUILD` files. That might look like a `pants.toml` section and `BUILD` file (at the root of the repository in this case) containing:
 
