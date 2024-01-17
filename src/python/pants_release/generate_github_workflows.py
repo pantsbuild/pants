@@ -1261,6 +1261,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 {
                     "name": "Trigger docs sync",
+                    "if": "needs.release_info.outputs.is-release == 'true'",
                     "env": {
                         "GH_TOKEN": "${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}",
                     },

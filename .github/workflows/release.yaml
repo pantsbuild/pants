@@ -440,6 +440,7 @@ jobs:
         '
     - env:
         GH_TOKEN: ${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}
+      if: needs.release_info.outputs.is-release == 'true'
       name: Trigger docs sync
       run: 'RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
 
