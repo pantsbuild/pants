@@ -11,7 +11,7 @@ Pants has good support for the most common operations for managing Helm charts s
 Please share feedback for what you need to use Pants with your Helm charts by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](/community/getting-help)!
 :::
 
-# Initial setup
+## Initial setup
 
 First, activate the relevant backend in `pants.toml`:
 
@@ -40,7 +40,7 @@ name: bar
 version: 0.1.0
 ```
 
-## Adding `helm_chart` targets
+### Adding `helm_chart` targets
 
 Helm charts are identified by the presence of a `Chart.yaml` or `Chart.yml` file, which contains relevant metadata about the chart like its name, version, dependencies, etc. To get started quickly you can create a simple `Chart.yaml` file in your sources folder:
 
@@ -65,11 +65,11 @@ Created src/helm/example/BUILD:
 
 If your workspace contains any Helm unit tests (under a `tests` folder), Pants will also idenfity them and create `helm_unittest_tests` targets for them. Additionally, if your unit tests also have snapshots (under a `tests/__snapshot__` folder), `tailor` will identify those files as test snapshots and will create `resources` targets for them. See "Snapshot testing" below for more info.
 
-## Basic operations
+### Basic operations
 
 The given setup is enough to now do some common operations on our Helm chart source code.
 
-### Linting
+#### Linting
 
 The Helm backend has an implementation of the Pants' `lint` goal which hooks it with the `helm lint` command:
 
@@ -100,7 +100,7 @@ Likewise, in a similar way you could enable strict linting globally and then cho
 
 You can set the field `skip_lint=True` on each `helm_chart` target to avoid linting it.
 
-### Package
+#### Package
 
 Packing helm charts is supported out of the box via the Pants' `package` goal. The final package will be saved as a `.tgz` file under the `dist` folder at your source root.
 
@@ -113,7 +113,7 @@ Built Helm chart artifact: testprojects.src.helm.example/example/example-0.2.0.t
 
 The final output folder can customised using the `output_path` field in the `helm_chart` target. Run `pants help helm_chart` for more information.
 
-### Helm chart version
+#### Helm chart version
 
 Helm charts are versioned artifacts with the value of the `version` field in `Chart.yaml` determining the actual version of the chart. Pants needs to know the version of a first party chart to be able to build packages and correctly establish the dependencies among them. By default, Pants will use the value in `Chart.yaml` as the given version of a chart but it also supports overriding that value via the `version` field in the `helm_chart` target.
 
@@ -153,7 +153,7 @@ helm_chart(version=env('HELM_CHART_VERSION'))
 
 Now the version value for this chart will be what has been set as the value of the environment variable `HELM_CHART_VERSION`.
 
-# Helm Unit tests
+## Helm Unit tests
 
 The Helm backend supports running Helm unit tests via the [Helm `unittest` plugin](https://github.com/quintush/helm-unittest). To run unit tests follow the instructions on how to use that plugin and then create a `BUILD` file in the same folder where your tests live with the following target:
 
@@ -201,7 +201,7 @@ pants test ::
 ✓ testprojects/src/helm/example/tests/env-configmap_test.yaml succeeded in 0.75s.
 ```
 
-### Feeding additional files to unit tests
+#### Feeding additional files to unit tests
 
 In some cases we may want our tests to have access to additional files which are not part of the chart. This can be achieved by setting a dependency between our unit test targets and a `resources` target as follows:
 
@@ -304,7 +304,7 @@ not affected by the source roots setting. When using `relocated_files`, the file
 to the value set in the `dest` field.
 :::
 
-### Snapshot testing
+#### Snapshot testing
 
 Unit test snapshots are supported by Pants by wrapping the snapshots in resources targets, as shown in the previous section. Snapshot resources will be automatically inferred as dependencies of the tests where they reside, so there is no need to add a explicit `dependencies` relationship in your `helm_unittest_tests` targets.
 
@@ -318,7 +318,7 @@ This will generate test snapshots for tests that require them, with out-of-date 
 
 If new `__snapshot__` folders are created after running the `generate-snapshots` target, we recommend running the `tailor` goal again so that Pants can detect these new folders and create `resources` targets as appropriate.
 
-### Timeouts
+#### Timeouts
 
 Pants can cancel tests that take too long, which is useful to prevent tests from hanging indefinitely.
 
@@ -352,13 +352,13 @@ If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will 
 
 Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
-# Publishing Helm charts
+## Publishing Helm charts
 
 Pants only supports publishing Helm charts to OCI registries, a feature that was made generally available in Helm 3.8.
 
 The publishing is done with Pants' `publish` goal but first you will need to tell Pants what are the possible destination registries where to upload your charts.
 
-## Configuring OCI registries
+### Configuring OCI registries
 
 In a similar way as the `docker_image` target, a `helm_chart` target takes an optional `registries` field whose value is a list of registry endpoints (prefixed by the `oci://` protocol):
 
@@ -406,7 +406,7 @@ helm_chart(
 )
 ```
 
-## Setting a repository name
+### Setting a repository name
 
 When publishing charts into an OCI registry, you most likely will be interested on separating them from other kind of OCI assets (i.e. container images). For doing so you can set a `repository` field in the `helm_chart` target so the chart artifact will be uploaded to the given path:
 
@@ -426,7 +426,7 @@ You can also set a default global repository in `pants.toml` as in the following
 default_registry_repository = "charts"
 ```
 
-# Managing Chart Dependencies
+## Managing Chart Dependencies
 
 Helm charts can depend on other charts, whether first-party charts defined in the same repo, or third-party charts published in a registry. Pants uses this dependency information to know when work needs to be re-run.
 
@@ -434,7 +434,7 @@ Helm charts can depend on other charts, whether first-party charts defined in th
 To benefit from Pants dependency management and inference in your Helm charts, you will need to use `apiVersion: v2` in your `Chart.yaml` file.
 :::
 
-## `Chart.yaml` dependencies
+### `Chart.yaml` dependencies
 
 Pants will automatically infer dependencies from the `Chart.yaml` file.
 
@@ -471,7 +471,7 @@ pants dependencies src/helm/bar
 src/helm/foo
 ```
 
-## Explicitly provided dependencies in `BUILD` files
+### Explicitly provided dependencies in `BUILD` files
 
 If you prefer, you can let your BUILD files be the "source of truth" for dependencies, instead of specifying them in `Chart.yaml`:
 
@@ -499,7 +499,7 @@ helm_chart(dependencies=["//src/helm/foo"])
 
 In this case, the `pants dependencies` command will show the same result and, in addition, Pants will modify its copy of `bar`'s `Chart.yaml` before using it, so that it includes `foo` in its dependency list. Note that Pants will not modify the original copy in your source tree, only the copy it uses in the sandboxed execution environment.
 
-## Third party chart artifacts
+### Third party chart artifacts
 
 Third party charts are provided to Pants using the `helm_artifact` target:
 
