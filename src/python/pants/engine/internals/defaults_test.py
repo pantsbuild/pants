@@ -306,6 +306,31 @@ Scenario = namedtuple(
             ),
             id="overrides value not frozen (issue #18784)",
         ),
+        pytest.param(
+            Scenario(
+                args=(
+                    {
+                        TestGenTargetGenerator.alias: {
+                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),
+                            **Parametrize(
+                                "splat", description="splat-desc", dependencies=["splat:dep"]
+                            ),
+                        }
+                    },
+                ),
+                expected_defaults={
+                    "test_gen_targets": _determenistic_parametrize_group_keys(
+                        {
+                            "tags": ParametrizeDefault(("foo",), ("bar",), baz=("baz",)),  # type: ignore[arg-type]
+                            **ParametrizeDefault(
+                                "splat", description="splat-desc", dependencies=["splat:dep"]
+                            ),
+                        }
+                    )
+                },
+            ),
+            id="parametrizations on target generator (issue #20418)",
+        ),
     ],
 )
 def test_set_defaults(
