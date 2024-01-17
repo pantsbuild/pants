@@ -9,7 +9,7 @@ Creating the configuration necessary to run Pants.
 
 To get started in a new repository, follow these steps, and then visit one of the language-specific overview pages.
 
-1. # Create `pants.toml`
+## 1. Create `pants.toml`
 
 Pants configuration lives in a file called `pants.toml` in the root of the repo. This file uses the [TOML](https://github.com/toml-lang/toml) format.
 
@@ -22,7 +22,7 @@ pants_version = "$PANTS_VERSION"
 
 where `$PANTS_VERSION` is the version of Pants that you want to pin your repo to. When you'd like to upgrade Pants, edit `pants_version` and the `pants` script will self-update on the next run.
 
-2. # Configure source roots
+## 2. Configure source roots
 
 Many languages organize code in a package hierarchy, so that the relative location of a source file on the filesystem corresponds to a logical package name. The directories that correspond to the roots of the language's package hierarchy are referred to as [source roots](../using-pants/key-concepts/source-roots.mdx). These are the filesystem locations from which import paths are computed.
 
@@ -38,7 +38,7 @@ If your project has a different structure, see [Source roots](../using-pants/key
 Golang projects already use `go.mod` to indicate source roots.
 :::
 
-3. # Enable backends
+## 3. Enable backends
 
 Most Pants functionality is provided via pluggable [_backends_](../using-pants/key-concepts/backends.mdx), which are activated by adding to the `[GLOBAL].backend_packages` option like this:
 
@@ -54,7 +54,7 @@ backend_packages = [
 
 See [here](../using-pants/key-concepts/backends.mdx) for a list of available backends.
 
-4. # Update `.gitignore`
+## 4. Update `.gitignore`
 
 If you use Git, we recommend adding these lines to your top-level `.gitignore` file:
 
@@ -68,7 +68,7 @@ If you use Git, we recommend adding these lines to your top-level `.gitignore` f
 The `pants_ignore` option tells Pants which files to avoid looking at, but it additionally ignores all `.gitignore`d files by default. Occasionally, you will want to ignore something with Git, but still want Pants to work on the file. See [Troubleshooting / common issues](../using-pants/troubleshooting-common-issues.mdx) for how to do this.
 :::
 
-5. # Generate BUILD files
+## 5. Generate BUILD files
 
 Once you have enabled the backends for the language(s) you'd like to use, run [`pants tailor ::`](./initial-configuration.mdx#5-generate-build-files) to generate an initial set of [BUILD](../using-pants/key-concepts/targets-and-build-files.mdx) files.
 
@@ -106,6 +106,6 @@ To fix `tailor` failures, run `pants tailor`.
 
 :::
 
-6. # Visit a language specific overview
+## 6. Visit a language specific overview
 
 You're almost ready to go! Next up is visiting one of the language-specific overviews listed below.
