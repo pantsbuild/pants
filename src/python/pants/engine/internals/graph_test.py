@@ -1506,7 +1506,9 @@ def test_parametrize_partial_exclude(generated_targets_rule_runner: RuleRunner) 
 
 
 def test_parametrize_16190(generated_targets_rule_runner: RuleRunner) -> None:
-    """Field subclassing defeats automatic filling of parameters for explicit dependencies on parametrized targets."""
+    """Field subclassing defeats automatic filling of parameters for explicit dependencies on
+    parametrized targets."""
+
     class ParentField(Field):
         alias = "parent"
         help = "foo"
@@ -1591,7 +1593,9 @@ def test_parametrize_single_value_16978(generated_targets_rule_runner: RuleRunne
     )
 
 
-def test_parametrize_group_on_target_generator_20418(generated_targets_rule_runner: RuleRunner) -> None:
+def test_parametrize_group_on_target_generator_20418(
+    generated_targets_rule_runner: RuleRunner,
+) -> None:
     assert_generated(
         generated_targets_rule_runner,
         Address("demo", target_name="t"),
