@@ -432,6 +432,16 @@ jobs:
 
         '
     - env:
+        GH_TOKEN: ${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}
+      name: Trigger docs sync
+      run: 'RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
+
+        RELEASE_VERSION="${RELEASE_TAG#release_}"
+
+        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -R pantsbuild/pantsbuild.org
+
+        '
+    - env:
         GH_TOKEN: ${{ secrets.WORKER_PANTS_CHEESESHOP_TRIGGER_PAT }}
       name: Trigger cheeseshop build
       run: 'gh api -X POST "/repos/pantsbuild/wheels.pantsbuild.org/dispatches" -F

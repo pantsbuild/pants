@@ -1249,6 +1249,19 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     ),
                 },
                 {
+                    "name": "Trigger docs sync",
+                    "env": {
+                        "GH_TOKEN": "${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}",
+                    },
+                    "run": dedent(
+                        """\
+                        RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
+                        RELEASE_VERSION="${RELEASE_TAG#release_}"
+                        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -R pantsbuild/pantsbuild.org
+                        """
+                    ),
+                },
+                {
                     "name": "Trigger cheeseshop build",
                     "env": {
                         "GH_TOKEN": "${{ secrets.WORKER_PANTS_CHEESESHOP_TRIGGER_PAT }}",
