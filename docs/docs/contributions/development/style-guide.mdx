@@ -418,17 +418,7 @@ It may be helpful to consider the following:
 - if you experience `mypy` typing issues using the `softwrap` for documenting subclasses of `Field` and `Target` classes, consider using the `help_text` convenience function
 - text inside the angle brackets (e.g. `<value>`) will be ignored when rendered if not wrapped in backticks
 - to create a numbered or bullet list, use 2 space indentation (or use the `bullet_list` convenience function)
-- to create a codeblock, use 4 space indentation (no need for triple backticks) and add one empty line between the code block and the text
+- to create a codeblock, never use indentation. Only ever use triple-backtick blocks.
 - make sure to use backticks to highlight config sections, command-line arguments, target names, and inline code examples.
 
-It may be difficult to confirm the accuracy of text formatting in plain Python, so you may want to generate the relevant Markdown files to be able to preview them to confirm your help strings are rendered as expected. They can be converted into Markdown files for visual inspection using a custom build script.
-
-You can run these commands to convert help strings to Markdown files for the `main` and your local feature branches to identify the changed files and then preview only the relevant files to confirm the rendering makes sense.
-
-```text
-$ git checkout main
-$ pants run build-support/bin/generate_docs.py -- --no-prompt --output main-docs
-$ git checkout <your-branch>
-$ pants run build-support/bin/generate_docs.py -- --no-prompt --output branch-docs
-$ diff -qr main-docs branch-docs
-```
+It may be difficult to confirm the accuracy of text formatting in plain Python, so you may want to run `pants help` on the relevant target/subsystem to see the resulting string.
