@@ -1269,7 +1269,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         """\
                         RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
                         RELEASE_VERSION="${RELEASE_TAG#release_}"
-                        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -R pantsbuild/pantsbuild.org
+                        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -F "reviewer=${{ github.actor }}" -R pantsbuild/pantsbuild.org 
                         """
                     ),
                 },
