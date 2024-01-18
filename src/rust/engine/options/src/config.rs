@@ -12,8 +12,10 @@ use toml::value::Table;
 use toml::Value;
 
 use super::id::{NameTransform, OptionId};
-use super::parse::parse_string_list;
-use super::{ListEdit, ListEditAction, OptionsSource};
+use super::parse::{
+    parse_bool_list, parse_dict, parse_float_list, parse_int_list, parse_string_list, ParseError,
+};
+use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
 
 type InterpolationMap = HashMap<String, String>;
 
@@ -186,6 +188,34 @@ impl FromValue for f64 {
     }
 }
 
+fn toml_value_to_val(value: &Value) -> Val {
+    match value {
+        Value::String(s) => Val::String(s.to_owned()),
+        Value::Integer(i) => Val::Int(*i),
+        Value::Float(f) => Val::Float(*f),
+        Value::Boolean(b) => Val::Bool(*b),
+        Value::Datetime(d) => Val::String(d.to_string()),
+        Value::Array(a) => Val::List(a.iter().map(toml_value_to_val).collect()),
+        Value::Table(t) => Val::Dict(
+            t.iter()
+                .map(|(k, v)| (k.to_string(), toml_value_to_val(v)))
+                .collect(),
+        ),
+    }
+}
+
+// Helper function. Only call if you know that the arg is a Value::Table.
+fn toml_table_to_dict(table: &Value) -> HashMap<String, Val> {
+    if !table.is_table() {
+        panic!("Expected a TOML table but received: {table}");
+    }
+    if let Val::Dict(hm) = toml_value_to_val(table) {
+        hm
+    } else {
+        panic!("toml_value_to_val() on a Value::Table must return a Val::Dict");
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct Config {
     config: Value,
@@ -305,6 +335,57 @@ impl Config {
             .and_then(|table| table.get(Self::option_name(id)))
     }
 
+    fn get_list<T: FromValue>(
+        &self,
+        id: &OptionId,
+        parse_list: fn(&str) -> Result<Vec<ListEdit<T>>, ParseError>,
+    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
+        if let Some(table) = self.config.get(id.scope()) {
+            let option_name = Self::option_name(id);
+            let mut list_edits = vec![];
+            if let Some(value) = table.get(&option_name) {
+                match value {
+                    Value::Table(sub_table) => {
+                        if sub_table.is_empty()
+                            || !sub_table.keys().collect::<HashSet<_>>().is_subset(
+                                &["add".to_owned(), "remove".to_owned()]
+                                    .iter()
+                                    .collect::<HashSet<_>>(),
+                            )
+                        {
+                            return Err(format!(
+                                "Expected {option_name} to contain an 'add' element, a 'remove' element or both but found: {sub_table:?}"
+                            ));
+                        }
+                        if let Some(add) = sub_table.get("add") {
+                            list_edits.push(ListEdit {
+                                action: ListEditAction::Add,
+                                items: T::extract_list(&format!("{option_name}.add"), add)?,
+                            })
+                        }
+                        if let Some(remove) = sub_table.get("remove") {
+                            list_edits.push(ListEdit {
+                                action: ListEditAction::Remove,
+                                items: T::extract_list(&format!("{option_name}.remove"), remove)?,
+                            })
+                        }
+                    }
+                    Value::String(v) => {
+                        list_edits.extend(parse_list(v).map_err(|e| e.render(option_name))?);
+                    }
+                    value => list_edits.push(ListEdit {
+                        action: ListEditAction::Replace,
+                        items: T::extract_list(&option_name, value)?,
+                    }),
+                }
+            }
+            if !list_edits.is_empty() {
+                return Ok(Some(list_edits));
+            }
+        }
+        Ok(None)
+    }
+
     pub(crate) fn merge(mut self, mut other: Config) -> Config {
         let mut map = mem::take(self.config.as_table_mut().unwrap());
         let mut other = mem::take(other.config.as_table_mut().unwrap());
@@ -346,51 +427,50 @@ impl OptionsSource for Config {
         f64::from_config(self, id)
     }
 
+    fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {
+        self.get_list(id, parse_bool_list)
+    }
+
+    fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String> {
+        self.get_list(id, parse_int_list)
+    }
+
+    fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String> {
+        self.get_list(id, parse_float_list)
+    }
+
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
+        self.get_list(id, parse_string_list)
+    }
+
+    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
         if let Some(table) = self.config.get(id.scope()) {
             let option_name = Self::option_name(id);
-            let mut list_edits = vec![];
             if let Some(value) = table.get(&option_name) {
                 match value {
                     Value::Table(sub_table) => {
-                        if sub_table.is_empty()
-                            || !sub_table.keys().collect::<HashSet<_>>().is_subset(
-                                &["add".to_owned(), "remove".to_owned()]
-                                    .iter()
-                                    .collect::<HashSet<_>>(),
-                            )
-                        {
-                            return Err(format!(
-                "Expected {option_name} to contain an 'add' element, a 'remove' element or both but found: {sub_table:?}"
-              ));
-                        }
                         if let Some(add) = sub_table.get("add") {
-                            list_edits.push(ListEdit {
-                                action: ListEditAction::Add,
-                                items: String::extract_list(&format!("{option_name}.add"), add)?,
-                            })
+                            if sub_table.len() == 1 && add.is_table() {
+                                return Ok(Some(DictEdit {
+                                    action: DictEditAction::Add,
+                                    items: toml_table_to_dict(add),
+                                }));
+                            }
                         }
-                        if let Some(remove) = sub_table.get("remove") {
-                            list_edits.push(ListEdit {
-                                action: ListEditAction::Remove,
-                                items: String::extract_list(
-                                    &format!("{option_name}.remove"),
-                                    remove,
-                                )?,
-                            })
-                        }
+                        return Ok(Some(DictEdit {
+                            action: DictEditAction::Replace,
+                            items: toml_table_to_dict(value),
+                        }));
                     }
                     Value::String(v) => {
-                        list_edits.extend(parse_string_list(v).map_err(|e| e.render(option_name))?);
+                        return Ok(Some(parse_dict(v).map_err(|e| e.render(option_name))?));
                     }
-                    value => list_edits.push(ListEdit {
-                        action: ListEditAction::Replace,
-                        items: String::extract_list(&option_name, value)?,
-                    }),
+                    _ => {
+                        return Err(format!(
+                            "Expected {option_name} to be a toml table or Python dict, but given {value}."
+                        ));
+                    }
                 }
-            }
-            if !list_edits.is_empty() {
-                return Ok(Some(list_edits));
             }
         }
         Ok(None)
