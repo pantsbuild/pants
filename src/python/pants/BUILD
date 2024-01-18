@@ -6,7 +6,7 @@ python_sources(
     overrides={
         # Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
         "__main__.py": {"dependencies": ["src/python/pants/bin:pants_loader"]},
-        "version.py": {"dependencies": ["src/python/pants/_version:resources"]},
+        "version.py": {"dependencies": ["src/python/pants/_version:VERSION"]},
     },
 )
 

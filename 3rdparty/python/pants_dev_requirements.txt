@@ -1,0 +1,4 @@
+# These requirements exist solely for the venv Pants runs in in this repo.
+debugpy==1.6.0
+pydevd-pycharm==203.5419.8
+setuptools_scm==8.0.4

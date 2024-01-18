@@ -6,7 +6,6 @@ files(
     sources=[
         "Cargo.lock",
         "build.rs",
-        "VERSION",
         "**/Cargo.toml",
         "**/*.rs",
         "!**/*tests.rs",

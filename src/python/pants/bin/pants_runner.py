@@ -59,11 +59,11 @@ class PantsRunner:
     def scrub_pythonpath() -> None:
         # Do not propagate any PYTHONPATH that happens to have been set in our environment
         # to our subprocesses.
-        # Note that don't warn (but still scrub) if RUNNING_PANTS_FROM_SOURCES is set. This allows
-        # scripts that run pants directly from sources, and therefore must set PYTHONPATH, to mute
+        # Note that don't warn if RUNNING_PANTS_FROM_SOURCES is set. This allows scripts that
+        # run pants directly from sources, and therefore must set PYTHONPATH, to mute
         # this warning.
         pythonpath = os.environ.pop("PYTHONPATH", None)
-        if pythonpath and not os.environ.pop("RUNNING_PANTS_FROM_SOURCES", None):
+        if pythonpath and not os.environ.get("RUNNING_PANTS_FROM_SOURCES", "0") == "1":
             logger.debug(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
 
     def run(self, start_time: float) -> ExitCode:

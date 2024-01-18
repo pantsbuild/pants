@@ -9,6 +9,7 @@ source "${REPO_ROOT}/build-support/common.sh"
 
 REQUIREMENTS=(
   "${REPO_ROOT}/3rdparty/python/requirements.txt"
+  "${REPO_ROOT}/3rdparty/python/pants_dev_requirements.txt"
 )
 
 platform=$(uname -mps)

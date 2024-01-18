@@ -56,10 +56,31 @@ class Version(_Version):
 _PANTS_VERSION_OVERRIDE = "_PANTS_VERSION_OVERRIDE"
 
 
+# @TODO: Use https://github.com/pypa/setuptools_scm/pull/1005 when we can
+def _determine_version_from_pants_source():
+    from setuptools_scm import get_version  # pants: no-infer-dep
+
+    def version_scheme(version):
+        return version.format_with("{tag}")
+
+    val = get_version(
+        version_scheme=version_scheme,
+        tag_regex=r"^release_(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)$",
+    )
+    return val
+
+
 VERSION: str = (
     # Do not remove/change this env var without coordinating with `pantsbuild/scie-pants` as it is
     # being used when bootstrapping Pants with a released version.
     os.environ.get(_PANTS_VERSION_OVERRIDE)
+    or
+    # NB: This is only relevant for the Pants repo itself
+    (
+        _determine_version_from_pants_source()
+        if os.environ.get("RUNNING_PANTS_FROM_SOURCES", "0") == "1"
+        else None
+    )
     or
     # NB: We expect VERSION to always have an entry and want a runtime failure if this is false.
     # NB: Since "pants" is the namespace for multiple packages, we need to put VERSION underneath

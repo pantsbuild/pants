@@ -1674,11 +1674,33 @@ class VersionTemplateField(StringField):
     )
 
 
+class VersionVersionSchemeField(StringField):
+    alias = "version_scheme"
+    help = help_text(
+        """
+        The version scheme to configure `setuptools_scm` to use.
+        See https://setuptools-scm.readthedocs.io/en/latest/extending/#available-implementations
+        """
+    )
+
+
+class VersionLocalSchemeField(StringField):
+    alias = "local_scheme"
+    help = help_text(
+        """
+        The local scheme to configure `setuptools_scm` to use.
+        See https://setuptools-scm.readthedocs.io/en/latest/extending/#available-implementations_1
+        """
+    )
+
+
 class VCSVersion(Target):
     alias = "vcs_version"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         VersionTagRegexField,
+        VersionVersionSchemeField,
+        VersionLocalSchemeField,
         VCSVersionDummySourceField,
         VersionGenerateToField,
         VersionTemplateField,
