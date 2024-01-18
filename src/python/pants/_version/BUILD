@@ -11,7 +11,7 @@ vcs_version(
     #   tags, and produce a valid version. "release-branch-semver" increments minor version which is
     #   more misleading than "python-simplified-semver" which increments patch.
     #   Use https://github.com/pypa/setuptools_scm/pull/1005 when we can.
-    version_scheme="python-simplified-semver",
+    version_scheme=None if env("CI", "0") == "1" else "python-simplified-semver",
     local_scheme="no-local-version" if env("CI", "0") == "1" else None,
     tag_regex=r"^release_(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)$",
     template="{version}",
