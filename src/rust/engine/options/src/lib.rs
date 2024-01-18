@@ -131,16 +131,24 @@ pub(crate) trait OptionsSource {
 
     ///
     /// Get the float option identified by `id` from this source.
-    /// Errors when this source has an option value for `id` but that value is not a float.
+    /// Errors when this source has an option value for `id` but that value is not a float or an int
+    /// that we can coerce to a float.
     ///
     /// The default implementation looks for a string value for `id` and then attempts to parse it as
     /// a float value.
     ///
     fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
         if let Some(value) = self.get_string(id)? {
-            parse_float(&value)
+            let parsed_as_float = parse_float(&value)
                 .map(Some)
-                .map_err(|e| e.render(self.display(id)))
+                .map_err(|e| e.render(self.display(id)));
+            if parsed_as_float.is_err() {
+                // See if we can parse as an int and coerce it to a float.
+                if let Ok(i) = parse_int(&value) {
+                    return Ok(Some(i as f64));
+                }
+            }
+            parsed_as_float
         } else {
             Ok(None)
         }

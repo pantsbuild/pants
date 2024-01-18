@@ -77,7 +77,7 @@ fn test_bool() {
 #[test]
 fn test_float() {
     let args = args([
-        "-j=4.0",
+        "-j=4",
         "--foo=42",
         "--foo=3.14",
         "--baz-spam=1.137",
@@ -87,7 +87,7 @@ fn test_float() {
     let assert_float =
         |expected: f64, id: OptionId| assert_eq!(expected, args.get_float(&id).unwrap().unwrap());
 
-    assert_float(4.0, option_id!(-'j', "jobs"));
+    assert_float(4_f64, option_id!(-'j', "jobs"));
     assert_float(3.14, option_id!("foo"));
     assert_float(1.137, option_id!("baz", "spam"));
 

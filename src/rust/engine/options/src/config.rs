@@ -444,7 +444,6 @@ impl OptionsSource for Config {
     }
 
     fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
-        let mut dict_edit: Option<DictEdit> = None;
         if let Some(table) = self.config.get(id.scope()) {
             let option_name = Self::option_name(id);
             if let Some(value) = table.get(&option_name) {
@@ -452,20 +451,19 @@ impl OptionsSource for Config {
                     Value::Table(sub_table) => {
                         if let Some(add) = sub_table.get("add") {
                             if sub_table.len() == 1 && add.is_table() {
-                                dict_edit = Some(DictEdit {
+                                return Ok(Some(DictEdit {
                                     action: DictEditAction::Add,
                                     items: toml_table_to_dict(add),
-                                });
+                                }));
                             }
-                        } else {
-                            dict_edit = Some(DictEdit {
-                                action: DictEditAction::Replace,
-                                items: toml_table_to_dict(value),
-                            });
                         }
+                        return Ok(Some(DictEdit {
+                            action: DictEditAction::Replace,
+                            items: toml_table_to_dict(value),
+                        }));
                     }
                     Value::String(v) => {
-                        dict_edit = Some(parse_dict(v).map_err(|e| e.render(option_name))?);
+                        return Ok(Some(parse_dict(v).map_err(|e| e.render(option_name))?));
                     }
                     _ => {
                         return Err(format!(
@@ -475,6 +473,6 @@ impl OptionsSource for Config {
                 }
             }
         }
-        Ok(dict_edit)
+        Ok(None)
     }
 }
