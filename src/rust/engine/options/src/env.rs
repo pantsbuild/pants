@@ -6,8 +6,11 @@ use std::env;
 use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId, Scope};
-use super::OptionsSource;
-use crate::parse::{parse_bool, parse_string_list};
+use super::{DictEdit, OptionsSource};
+use crate::parse::{
+    parse_bool, parse_bool_list, parse_dict, parse_float_list, parse_int_list, parse_string_list,
+    ParseError,
+};
 use crate::ListEdit;
 
 #[derive(Debug)]
@@ -66,6 +69,20 @@ impl Env {
         }
         names
     }
+
+    fn get_list<T>(
+        &self,
+        id: &OptionId,
+        parse_list: fn(&str) -> Result<Vec<ListEdit<T>>, ParseError>,
+    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
+        if let Some(value) = self.get_string(id)? {
+            parse_list(&value)
+                .map(Some)
+                .map_err(|e| e.render(self.display(id)))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl From<&Env> for Vec<(String, String)> {
@@ -102,9 +119,25 @@ impl OptionsSource for Env {
         }
     }
 
+    fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {
+        self.get_list(id, parse_bool_list)
+    }
+
+    fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String> {
+        self.get_list(id, parse_int_list)
+    }
+
+    fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String> {
+        self.get_list(id, parse_float_list)
+    }
+
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
+        self.get_list(id, parse_string_list)
+    }
+
+    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
         if let Some(value) = self.get_string(id)? {
-            parse_string_list(&value)
+            parse_dict(&value)
                 .map(Some)
                 .map_err(|e| e.render(self.display(id)))
         } else {

@@ -24,7 +24,6 @@ _docs_globs = [
     "*.md",
     "**/*.md",
     "docs/*",
-    "build-support/bin/generate_user_list.py",
 ]
 _rust_globs = [
     "src/rust/engine/*",

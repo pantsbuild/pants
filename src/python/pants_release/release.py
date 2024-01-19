@@ -670,7 +670,6 @@ def tag_release() -> None:
     check_pgp()
 
     prompt_artifact_freshness()
-    prompt_to_generate_docs()
 
     run_tag_release()
     banner("Successfully tagged release")
@@ -768,47 +767,6 @@ def prompt_artifact_freshness() -> None:
         )
     else:
         print("No stale artifacts detected.")
-
-
-def prompt_to_generate_docs() -> None:
-    has_docs_access = input(
-        softwrap(
-            """
-            The docs now need to be regenerated. Do you already have editing access to
-            readme.com? [Y/n]:
-            """
-        )
-    )
-    # This URL will work regardless of the current version, so long as we don't delete 2.5 from
-    # the docs.
-    api_key_url = "https://dash.readme.com/project/pants/v2.5/api-key"
-    docs_cmd = "./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>"
-    if has_docs_access and has_docs_access.lower() != "y":
-        print(
-            softwrap(
-                f"""
-                Please ask in the #maintainers Slack channel to be added to Readme.com. Please
-                enable two-factor authentication!
-
-                Then go to {api_key_url} to find your API key. Run this command:
-
-                    {docs_cmd}
-
-                (If you are not comfortable getting permissions, you can ask another maintainer to
-                run this script in the #maintainers Slack.)
-                """
-            )
-        )
-    else:
-        print(
-            softwrap(
-                f"""
-                Please go to {api_key_url} to find your API key. Then, run this command:
-
-                    {docs_cmd}
-            """
-            )
-        )
 
 
 # -----------------------------------------------------------------------------------------------
