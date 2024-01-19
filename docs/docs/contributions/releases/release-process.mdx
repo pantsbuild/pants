@@ -53,6 +53,13 @@ If there is deprecated code that must be removed, you can either:
 2. Remove it yourself, in a precursor PR.
 3. Bump the deprecation removal target back by one dev release.
 
+### `dev0` - set up the new release series
+
+If this is the first dev release in a new series:
+
+1. Create a new file in ` src/python/pants/notes`, e.g. create `src/python/pants/notes/2.9.x.md`.
+   1. Copy the title and template over from the prior release, e.g. `2.8.x.md`.
+
 ### `rc` - Check for cherry-picks
 
 If this is a release candidate, ensure that pending cherry-picks have been applied in the release branch. Cherry-picks are usually applied automatically, but this may not always succeed, so [check for any pending cherry-picks](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick+is%3Aclosed), and find the relevant ones by looking at the milestone: for instance, if doing a release for 2.16, the relevant cherry-picks are those for milestone `2.16.x` or earlier.
@@ -62,50 +69,23 @@ The process may fail in one of two ways:
 - The cherry-picking process failed, and tagged the PR with `auto-cherry-picking-failed`: follow the instructions in the comment on the pull request. (This likely means there are merge conflicts that require manual resolution.)
 - the cherry-pick hasn't (yet) run: trigger the automation manually by going to [the GitHub Action](https://github.com/pantsbuild/pants/actions/workflows/auto-cherry-picker.yaml), clicking on the "Run workflow" button, and providing the PR number.
 
-## Step 1: Create the release commit
-
-The release commit is the commit that bumps the VERSION string. For `dev`/`a0` releases this happens in the `main` branch, in the same commit that updates the release notes and the `CONTRIBUTORS.md` file. For `rc` and stable releases, this happens in the relevant stable branch.
-
-### `dev0` - set up the new release series
-
-If this is the first dev release in a new series:
-
-1. Create a new file in ` src/python/pants/notes`, e.g. create `src/python/pants/notes/2.9.x.md`.
-   1. Copy the title and template over from the prior release, e.g. `2.8.x.md`.
-
-### Bump the VERSION
-
-From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
-
-This will create a pull request that:
-
-1. updates `CONTRIBUTORS.md`
-2. bumps the `VERSION` on the branch
-
-### Merge the pull request
-
-Post the PR to the `#development` channel in Slack. Merge once approved and green.
-
 ### `a0` - create a new Git branch
 
 If you're releasing an `a0` release, you must create the stable branch for that version.
 
-For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running the command below. Make sure you are on your release commit before doing this.
+For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running the command below.
+Make sure you are on the latest commit of `main` before doing this.
 
 ```bash
 $ git checkout -b 2.9.x
-$ git push upstream 2.9.x
+$ git push git@github.com:pantsbuild/pants.git 2.9.x
 ```
 
-## Step 2: Tag the release to trigger publishing
+## Step 1: Tag the release to trigger publishing
 
-Once you have merged the `VERSION` bump — which will be on `main` for `dev` and `a0` releases, and on the release branch for release candidates — tag the release commit to trigger wheel building and publishing.
+Once you are ready to release a new version, tag the a commit to trigger wheel building and publishing.
 
-First, ensure that you are on your release branch at your version bump commit.
-
-:::note Tip: if new commits have landed after your release commit
-You can reset to your release commit by running `git reset --hard <sha>`.
-:::
+First, ensure that you are on your release branch on the latest commit.
 
 Then, run:
 
@@ -115,7 +95,7 @@ Then, run:
 
 This will tag the release with your PGP key, and push the tag to origin, which will kick off a [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) to build the wheels and publish them to PyPI.
 
-## Step 3: Test the release
+## Step 2: Test the release
 
 Run this script as a basic smoke test:
 
@@ -125,7 +105,7 @@ Run this script as a basic smoke test:
 
 You should also check [GitHub Releases](https://github.com/pantsbuild/pants/releases) to ensure everything looks good. Find the version you released, then click it and confirm that the "Assets" list includes PEXes for macOS and Linux.
 
-## Step 4: Run release testing on public repositories
+## Step 3: Run release testing on public repositories
 
 Manually trigger a run of the [public repositories testing workflow](https://github.com/pantsbuild/pants/actions/workflows/public_repos.yaml), specifying the version just published as the "Pants version".
 
