@@ -338,7 +338,7 @@ pub fn fingerprinted_options(build_root: &BuildRoot) -> Result<Vec<Fingerprinted
         FingerprintedOption::new(option_id!("ignore", "warnings"), vec![]),
         FingerprintedOption::new(
             option_id!("pants", "version"),
-            "",  // @TODO: change
+            env!("GIT_TAG"),
         ),
         FingerprintedOption::new(
             option_id!("pants", "workdir"),
