@@ -3,9 +3,4 @@
 
 python_sources()
 
-python_tests(
-    name="test",
-    overrides={
-        "reversion_test.py": {"timeout": 90, "dependencies": ["3rdparty/python#pex"]},
-    },
-)
+python_tests(name="test")
