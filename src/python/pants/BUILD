@@ -6,7 +6,6 @@ python_sources(
     overrides={
         # Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
         "__main__.py": {"dependencies": ["src/python/pants/bin:pants_loader"]},
-        "version.py": {"dependencies": ["src/python/pants/_version:VERSION"]},
     },
 )
 
@@ -20,6 +19,8 @@ python_distribution(
         ":resources",
         # Include the native client binary in the distribution.
         "src/python/pants/bin:native_client",
+        # Embed the VERSION file so it can be read at runtime
+        "src/python/pants/_version:VERSION",
     ],
     # Because we have native code, this will cause the wheel to use whatever the ABI is for the
     # interpreter used to run setup.py, e.g. `cp39m-macosx_10_15_x86_64`.

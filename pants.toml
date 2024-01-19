@@ -189,6 +189,7 @@ extra_env_vars = [
   "PATH",
   # We'd always like complete backtraces in tests.
   "RUST_BACKTRACE=1",
+  "_PANTS_VERSION_OVERRIDE=3.0.0",
 ]
 timeout_default = 60
 
