@@ -7,6 +7,9 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
 
+GIT_TAG=$(git describe --tags)
+export GIT_TAG
+
 PY="$(determine_python)"
 export PY
 export PYO3_PYTHON="${PY}"
