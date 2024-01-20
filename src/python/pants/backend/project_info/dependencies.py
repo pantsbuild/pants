@@ -1,18 +1,19 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import dataclasses
 import itertools
 import json
+from dataclasses import dataclass
 from enum import Enum
 
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import AlwaysTraverseDeps, Target
+from pants.engine.target import AlwaysTraverseDeps
 from pants.engine.target import Dependencies as DependenciesField
 from pants.engine.target import (
     DependenciesRequest,
+    Target,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -54,10 +55,17 @@ class Dependencies(Goal):
     subsystem_cls = DependenciesSubsystem
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
-@dataclasses.dataclass
+
+@dataclass
 class TargetToDependencies:
     target: Target
     dependencies: Targets
+
+
+@dataclass
+class TargetsToDirectDependencies:
+    mapping: Addresses
+    dependencies: list[str]
 
 
 @goal_rule
@@ -71,24 +79,42 @@ async def dependencies(
     # generated targets.
 
     if dependencies_subsystem.format == DependenciesOutputFormat.json:
-        dependencies_per_target_root = await MultiGet(
-            Get(
-                Targets,
-                DependenciesRequest(
-                    tgt.get(DependenciesField),
-                    should_traverse_deps_predicate=AlwaysTraverseDeps(),
-                ),
+        if dependencies_subsystem.transitive:
+            transitive_targets_group = await MultiGet(
+                Get(
+                    TransitiveTargets,
+                    TransitiveTargetsRequest(
+                        (address,), should_traverse_deps_predicate=AlwaysTraverseDeps()
+                    ),
+                )
+                for address in addresses
             )
-            for tgt in target_roots
-        )
-        iterated_targets = []
-        for targets in dependencies_per_target_root:
-            iterated_targets.append([str(tgt.address) for tgt in targets])
 
-        mapping = dict(zip(
-            [str(tgt.address) for tgt in target_roots],
-            iterated_targets
-        ))
+            iterated_targets = []
+            for transitive_targets in transitive_targets_group:
+                iterated_targets.append(
+                    sorted([str(tgt.address) for tgt in transitive_targets.dependencies])
+                )
+
+        else:  # dependencies_subsystem.direct
+            dependencies_per_target_root = await MultiGet(
+                Get(
+                    Targets,
+                    DependenciesRequest(
+                        tgt.get(DependenciesField),
+                        should_traverse_deps_predicate=AlwaysTraverseDeps(),
+                    ),
+                )
+                for tgt in target_roots
+            )
+
+            iterated_targets = []
+            for targets in dependencies_per_target_root:
+                iterated_targets.append(sorted([str(tgt.address) for tgt in targets]))
+
+        # the assumption is that when iterating the targets and sending dependency requests
+        # for them, the lists of dependencies are returned in the very same order
+        mapping = dict(zip([str(tgt.address) for tgt in target_roots], iterated_targets))
         output = json.dumps(mapping, indent=4)
         console.print_stdout(output)
 
@@ -119,7 +145,9 @@ async def dependencies(
             )
             targets = Targets(itertools.chain.from_iterable(dependencies_per_target_root))
 
-        address_strings = {addr.spec for addr in addresses} if dependencies_subsystem.closed else set()
+        address_strings = (
+            {addr.spec for addr in addresses} if dependencies_subsystem.closed else set()
+        )
         for tgt in targets:
             address_strings.add(tgt.address.spec)
 

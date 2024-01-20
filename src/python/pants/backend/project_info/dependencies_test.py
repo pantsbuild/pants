@@ -217,7 +217,7 @@ def test_python_dependencies(rule_runner: PythonRuleRunner) -> None:
     )
 
 
-def test_python_dependencies_output_format_json(rule_runner: PythonRuleRunner) -> None:
+def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonRuleRunner) -> None:
     create_python_requirement_tgts(rule_runner, "req1", "req2")
     create_python_sources(rule_runner, "dep/target")
     create_python_sources(
@@ -236,7 +236,12 @@ def test_python_dependencies_output_format_json(rule_runner: PythonRuleRunner) -
         specs=["some/target/a.py"],
         transitive=False,
         output_format=DependenciesOutputFormat.json,
-        expected={"some/target/a.py": ["3rdparty/python:req1", "dep/target/a.py"]},
+        expected={
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+            ]
+        },
     )
 
     # input: multiple modules
@@ -245,8 +250,14 @@ def test_python_dependencies_output_format_json(rule_runner: PythonRuleRunner) -
         transitive=False,
         output_format=DependenciesOutputFormat.json,
         expected={
-            "some/target/a.py": ["3rdparty/python:req1", "dep/target/a.py"],
-            "some/other/target/a.py": ["3rdparty/python:req2", "some/target/a.py"],
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+            ],
+            "some/other/target/a.py": [
+                "3rdparty/python:req2",
+                "some/target/a.py",
+            ],
         },
     )
 
@@ -256,21 +267,113 @@ def test_python_dependencies_output_format_json(rule_runner: PythonRuleRunner) -
         transitive=False,
         output_format=DependenciesOutputFormat.json,
         expected={
-            "some/target:target": ["some/target/a.py"],
-            "some/target/a.py": ["3rdparty/python:req1", "dep/target/a.py"],
-            "some/other/target:target": ["some/other/target/a.py"],
-            "some/other/target/a.py": ["3rdparty/python:req2", "some/target/a.py"],
+            "some/target:target": [
+                "some/target/a.py",
+            ],
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+            ],
+            "some/other/target:target": [
+                "some/other/target/a.py",
+            ],
+            "some/other/target/a.py": [
+                "3rdparty/python:req2",
+                "some/target/a.py",
+            ],
         },
     )
-    # assert_deps(
-    #     specs=["some/other/target:target"],
-    #     transitive=True,
-    #     output_format=DependenciesOutputFormat.json,
-    #     expected=[
-    #         "3rdparty/python:req1",
-    #         "3rdparty/python:req2",
-    #         "dep/target/a.py",
-    #         "some/other/target/a.py",
-    #         "some/target/a.py",
-    #     ],
-    # )
+    assert_deps(
+        specs=["some/other/target:target"],
+        transitive=True,
+        output_format=DependenciesOutputFormat.json,
+        expected={
+            "some/other/target:target": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/other/target/a.py",
+                "some/target/a.py",
+            ]
+        },
+    )
+
+
+def test_python_dependencies_output_format_json_transitive_deps(
+    rule_runner: PythonRuleRunner,
+) -> None:
+    create_python_requirement_tgts(rule_runner, "req1", "req2")
+    create_python_sources(rule_runner, "dep/target")
+    create_python_sources(
+        rule_runner, "some/target", dependencies=["dep/target", "3rdparty/python:req1"]
+    )
+    create_python_sources(
+        rule_runner,
+        "some/other/target",
+        dependencies=["some/target", "3rdparty/python:req2"],
+    )
+
+    assert_deps = partial(assert_dependencies, rule_runner)
+
+    # input: single module
+    assert_deps(
+        specs=["some/target/a.py"],
+        transitive=True,
+        output_format=DependenciesOutputFormat.json,
+        expected={
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+            ]
+        },
+    )
+
+    # input: multiple modules
+    assert_deps(
+        specs=["some/target/a.py", "some/other/target/a.py"],
+        transitive=True,
+        output_format=DependenciesOutputFormat.json,
+        expected={
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+            ],
+            "some/other/target/a.py": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/target/a.py",
+            ],
+        },
+    )
+
+    # input: directory, recursively
+    assert_deps(
+        specs=["some::"],
+        transitive=True,
+        output_format=DependenciesOutputFormat.json,
+        expected={
+            "some/target:target": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+                "some/target/a.py",
+            ],
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+            ],
+            "some/other/target:target": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/other/target/a.py",
+                "some/target/a.py",
+            ],
+            "some/other/target/a.py": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/target/a.py",
+            ],
+        },
+    )
