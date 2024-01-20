@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::fs;
 use std::process::{Command, Stdio};
 use std::str::from_utf8;
 
