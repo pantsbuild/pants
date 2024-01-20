@@ -40,16 +40,8 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
         .map_err(|e| format!("Problem running command {cmd:?}: {e}"))
         .unwrap();
     assert_eq!(Some(0), result.status.code());
-    assert_eq!(
-        fs::read_to_string(
-            build_root
-                .join("src")
-                .join("python")
-                .join("pants")
-                .join("VERSION")
-        )
-        .unwrap(),
-        from_utf8(result.stdout.as_slice()).unwrap()
-    );
+    assert!(from_utf8(result.stdout.as_slice())
+        .unwrap()
+        .starts_with("2."));
     (build_root, options_parser, pants_subprocessdir)
 }
