@@ -32,6 +32,8 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
         .args(args)
         .env_clear()
         .envs(std::env::vars().filter(|(k, _v)| !k.starts_with("PANTS_")))
+        // NB: Set this to some unique sentinel value so its always consistent in tests
+        .env("_PANTS_VERSION_OVERRIDE", "3.0.0")
         .stderr(Stdio::inherit());
 
     let result = cmd
@@ -39,8 +41,6 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
         .map_err(|e| format!("Problem running command {cmd:?}: {e}"))
         .unwrap();
     assert_eq!(Some(0), result.status.code());
-    assert!(from_utf8(result.stdout.as_slice())
-        .unwrap()
-        .starts_with("2."));
+    assert_eq!(from_utf8(result.stdout.as_slice()).unwrap(), "3.0.0");
     (build_root, options_parser, pants_subprocessdir)
 }
