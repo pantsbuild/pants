@@ -256,6 +256,31 @@ junit_tests(
 )
 ```
 
+## Repl
+
+Pants supports the [Scala repl](https://docs.scala-lang.org/overviews/scala-book/scala-repl.html), but
+doesn't autodetect it based on the active backend, it always defaults to using "python"
+(see [#14133](https://github.com/pantsbuild/pants/issues/14133)), so you'll have to
+explicitly add `--repl-shell=scala` to the command line:
+
+```
+❯ pants repl --repl-shell=scala src/jvm/org/pantsbuild/example/app/ExampleApp.scala
+Welcome to Scala 2.13.8 (OpenJDK 64-Bit Server VM, Java 11.0.21).
+Type in expressions for evaluation. Or try :help.
+
+scala> import org.pantsbuild.example.app.ExampleApp
+scala> ExampleApp.main(Array())
+Hello World!
+scala>
+```
+
+Alternatively, you can set "scala" to be the default repl in `pants.toml`:
+
+```toml tab={"label":"pants.toml"}
+[repl]
+shell = "scala"
+```
+
 ## Protobuf
 
 There's support for [ScalaPB](https://scalapb.github.io/) and [protoc Java generated code](https://developers.google.com/protocol-buffers/docs/reference/java-generated), currently in beta stage. To enable them, activate the relevant backends in `pants.toml`:
