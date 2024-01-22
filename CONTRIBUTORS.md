@@ -124,6 +124,7 @@ Created as part of the release process.
 + Igor Morozov
 + Ikai Lan
 + In-Ho Yi
++ Israël Hallé
 + Itay Donanhirsh
 + Ity Kaul
 + JC (Jonathan Chen)
@@ -134,6 +135,7 @@ Created as part of the release process.
 + James Bench
 + James Koch
 + James Mouradian
++ Jan Berkel
 + Jan Paul Erkelens
 + Jason Jackson
 + Jason Song
@@ -234,6 +236,7 @@ Created as part of the release process.
 + Navneeth Jayendran
 + Neeraj Kashyap
 + Neil Sanchala
++ Nicholas Gustafson
 + Nicholas Santos
 + Nik Shkrob
 + Nimrod Shlagman
