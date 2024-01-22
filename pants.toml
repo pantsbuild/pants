@@ -190,7 +190,7 @@ extra_env_vars = [
   # We'd always like complete backtraces in tests.
   "RUST_BACKTRACE=1",
   # NB: Set this to some unique sentinel value so its always consistent in tests
-  "_PANTS_VERSION_OVERRIDE=3.0.0",
+  "_PANTS_VERSION_OVERRIDE=0.0.0.dev0",
 ]
 timeout_default = 60
 
