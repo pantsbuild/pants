@@ -23,11 +23,11 @@ from pants.option.option_types import BoolOption, EnumOption
 class DependenciesOutputFormat(Enum):
     """Output format for listing dependencies.
 
-    merged: List all dependencies as a single list of targets.
+    text: List all dependencies as a single list of targets in plain text.
     json: List all dependencies as a mapping `{target: [dependencies]}`.
     """
 
-    merged = "merged"
+    text = "text"
     json = "json"
 
 
@@ -41,10 +41,11 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     )
     closed = BoolOption(
         default=False,
-        help="Include the input targets in the output, along with the dependencies.",
+        help="Include the input targets in the output, along with the dependencies. This option "
+        "is ignored when listing dependencies in any format other than plain text.",
     )
     format = EnumOption(
-        default=DependenciesOutputFormat.merged,
+        default=DependenciesOutputFormat.text,
         help="Output format for listing dependencies.",
     )
 
@@ -107,7 +108,7 @@ async def list_dependencies_as_json(
     console.print_stdout(output)
 
 
-async def list_dependencies_as_merged(
+async def list_dependencies_as_plain_text(
     addresses: Addresses, dependencies_subsystem: DependenciesSubsystem, console: Console
 ) -> None:
     """Get dependencies for given addresses and list them in the console as a single list."""
@@ -150,14 +151,14 @@ async def list_dependencies_as_merged(
 async def dependencies(
     console: Console, addresses: Addresses, dependencies_subsystem: DependenciesSubsystem
 ) -> Dependencies:
-    if dependencies_subsystem.format == DependenciesOutputFormat.merged:
-        await list_dependencies_as_merged(
+    if DependenciesOutputFormat.text == dependencies_subsystem.format:
+        await list_dependencies_as_plain_text(
             addresses=addresses,
             dependencies_subsystem=dependencies_subsystem,
             console=console,
         )
 
-    elif dependencies_subsystem.format == DependenciesOutputFormat.json:
+    elif DependenciesOutputFormat.json == dependencies_subsystem.format:
         await list_dependencies_as_json(
             addresses=addresses,
             dependencies_subsystem=dependencies_subsystem,

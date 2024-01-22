@@ -72,7 +72,7 @@ def assert_dependencies(
     expected: List[str],
     transitive: bool = False,
     closed: bool = False,
-    output_format: DependenciesOutputFormat = DependenciesOutputFormat.merged,
+    output_format: DependenciesOutputFormat = DependenciesOutputFormat.text,
 ) -> None:
     args = []
     if transitive:
@@ -84,7 +84,7 @@ def assert_dependencies(
     result = rule_runner.run_goal_rule(
         Dependencies, args=[*args, *specs], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
     )
-    if output_format == DependenciesOutputFormat.merged:
+    if output_format == DependenciesOutputFormat.text:
         assert result.stdout.splitlines() == expected
     elif output_format == DependenciesOutputFormat.json:
         assert json.loads(result.stdout) == expected
