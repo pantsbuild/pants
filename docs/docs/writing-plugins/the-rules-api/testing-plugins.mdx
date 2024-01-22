@@ -82,6 +82,23 @@ For Approach #4, you should use `setup_tmpdir()` to set up BUILD files.
 
 To use `run_rule_with_mocks`, pass the `@rule` as its first arg, then `rule_args=[arg1, arg2, ...]` in the same order as the arguments to the `@rule`.
 
+For example:
+
+```python
+from pants.engine.rules import rule
+from pants.testutil.rule_runner import run_rule_with_mocks
+
+
+@rule
+async def int_to_str(i: int) -> str:
+    return str(i)
+
+
+def test_int_to_str() -> None:
+    result: str = run_rule_with_mocks(int_to_str, rule_args=[42], mock_gets=[])
+    assert result == "42"
+```
+
 If your `@rule` has any `await Get`s or `await Effect`s, set the argument `mock_gets=[]` with `MockGet`/`MockEffect` objects corresponding to each of them. A `MockGet` takes three arguments: `output_type: type`, `input_types: tuple[type, ...]`, and `mock: Callable[..., InputType]`, which is a function that takes an instance of each of the `input_types` and returns a single instance of the `output_type`.
 
 For example, given this contrived rule to find all targets with `sources` with a certain filename included (find a "needle in the haystack"):
