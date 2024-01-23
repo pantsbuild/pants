@@ -42,7 +42,7 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     closed = BoolOption(
         default=False,
         help="Include the input targets in the output, along with the dependencies. This option "
-        "is ignored when listing dependencies in any format other than plain text.",
+        "only applies when using the `text` format.",
     )
     format = EnumOption(
         default=DependenciesOutputFormat.text,
@@ -101,8 +101,8 @@ async def list_dependencies_as_json(
         for targets in dependencies_per_target_root:
             iterated_targets.append(sorted([str(tgt.address) for tgt in targets]))
 
-    # the assumption is that when iterating the targets and sending dependency requests
-    # for them, the lists of dependencies are returned in the very same order
+    # The assumption is that when iterating the targets and sending dependency requests
+    # for them, the lists of dependencies are returned in the very same order.
     mapping = dict(zip([str(tgt.address) for tgt in target_roots], iterated_targets))
     output = json.dumps(mapping, indent=4)
     console.print_stdout(output)
