@@ -552,6 +552,36 @@ def test_build_ignore_dependency() -> None:
 
 `run_pants()` is hermetic by default, meaning that it will not read your `pants.toml`. As a result, you often need to include the option `--backend-packages` in the arguments to `run_pants()`. You can alternatively set the argument `hermetic=False`, although we discourage this.
 
+For example:
+
+```python
+from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
+
+
+def test_getting_list_of_files_from_a_target() -> None:
+    sources = {
+        "dir/BUILD": "files(sources=['subdir/*.txt'])",
+        "dir/subdir/file1.txt": "",
+        "dir/subdir/file2.txt": "",
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants(
+            [
+                "--backend-packages=['pants.backend.python']",
+                "filedeps",
+                f"{tmpdir}/dir:",
+            ],
+        )
+    result.assert_success()
+    assert all(
+        filepath in result.stdout
+        for filepath in (
+            f"{tmpdir}/dir/subdir/file1.txt",
+            f"{tmpdir}/dir/subdir/file2.txt",
+        )
+    )
+```
+
 To read any files that were created, use `get_buildroot()` as the first part of the path to ensure that the correct directory is read.
 
 ```python
