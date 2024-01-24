@@ -17,6 +17,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
 )
+from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, EnumOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -179,6 +180,9 @@ async def list_dependents_as_json(
 async def dependents_goal(
     specified_addresses: Addresses, dependents_subsystem: DependentsSubsystem, console: Console
 ) -> DependentsGoal:
+    if dependents_subsystem.closed and dependents_subsystem.format != DependentsOutputFormat.text:
+        raise OptionsError("`--closed` option can only be used with the `text` format output.")
+
     if DependentsOutputFormat.text == dependents_subsystem.format:
         await list_dependents_as_plain_text(
             addresses=specified_addresses,

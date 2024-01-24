@@ -8,6 +8,7 @@ import pytest
 
 from pants.backend.project_info.dependents import DependentsGoal, DependentsOutputFormat
 from pants.backend.project_info.dependents import rules as dependent_rules
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Dependencies, SpecialCasedDependencies, Target
 from pants.testutil.rule_runner import RuleRunner
 
@@ -117,6 +118,16 @@ def test_dependents_as_json_direct_deps(rule_runner: RuleRunner) -> None:
         rule_runner,
         output_format=DependentsOutputFormat.json,
     )
+
+    # using `--closed` option on non-text format output
+    with pytest.raises(ExecutionError) as err:
+        assert_deps(
+            targets=["base"],
+            closed=True,
+            expected={},
+        )
+    assert "OptionsError" in str(err.value)
+
     # input: single target
     assert_deps(
         targets=["base"],

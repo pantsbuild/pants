@@ -10,6 +10,7 @@ import pytest
 from pants.backend.project_info.dependencies import Dependencies, DependenciesOutputFormat, rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import SpecialCasedDependencies, Target
 from pants.testutil.python_rule_runner import PythonRuleRunner
 
@@ -232,6 +233,15 @@ def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonR
         rule_runner,
         output_format=DependenciesOutputFormat.json,
     )
+
+    # using `--closed` option on non-text format output
+    with pytest.raises(ExecutionError) as err:
+        assert_deps(
+            specs=["base"],
+            closed=True,
+            expected={},
+        )
+    assert "OptionsError" in str(err.value)
 
     # input: single module
     assert_deps(

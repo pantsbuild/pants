@@ -17,6 +17,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
     UnexpandedTargets,
 )
+from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, EnumOption
 
 
@@ -151,6 +152,12 @@ async def list_dependencies_as_plain_text(
 async def dependencies(
     console: Console, addresses: Addresses, dependencies_subsystem: DependenciesSubsystem
 ) -> Dependencies:
+    if (
+        dependencies_subsystem.closed
+        and dependencies_subsystem.format != DependenciesOutputFormat.text
+    ):
+        raise OptionsError("`--closed` option can only be used with the `text` format output.")
+
     if DependenciesOutputFormat.text == dependencies_subsystem.format:
         await list_dependencies_as_plain_text(
             addresses=addresses,
