@@ -178,7 +178,11 @@ pub(crate) trait OptionsSource {
     ///
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String>;
 
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String>;
+    ///
+    /// Get the dict option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a dict.
+    ///
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String>;
 }
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
@@ -260,7 +264,7 @@ impl OptionParser {
             ("pants_distdir".to_string(), subdir("distdir", "dist")?),
         ]);
 
-        let mut config = Config::merged(&repo_config_files, &seed_values)?;
+        let mut config = Config::parse(&repo_config_files, &seed_values)?;
         sources.insert(Source::Config, Rc::new(config.clone()));
         parser = OptionParser {
             sources: sources.clone(),
@@ -277,7 +281,7 @@ impl OptionParser {
             )? {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
-                    let rc_config = Config::parse(rcfile_path, &seed_values)?;
+                    let rc_config = Config::parse(&[rcfile_path], &seed_values)?;
                     config = config.merge(rc_config);
                 }
             }

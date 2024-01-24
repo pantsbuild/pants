@@ -135,10 +135,10 @@ impl OptionsSource for Env {
         self.get_list(id, parse_string_list)
     }
 
-    fn get_dict(&self, id: &OptionId) -> Result<Option<DictEdit>, String> {
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
         if let Some(value) = self.get_string(id)? {
             parse_dict(&value)
-                .map(Some)
+                .map(|e| Some(vec![e]))
                 .map_err(|e| e.render(self.display(id)))
         } else {
             Ok(None)
