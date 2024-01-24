@@ -25,9 +25,13 @@ mod parse;
 #[cfg(test)]
 mod parse_tests;
 
+#[cfg(test)]
+mod tests;
+
 mod types;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
@@ -209,7 +213,14 @@ pub struct OptionParser {
 }
 
 impl OptionParser {
-    pub fn new(env: Env, args: Args, allow_pantsrc: bool) -> Result<OptionParser, String> {
+    // If config_paths is None, we'll do config file discovery. Otherwise we'll use the provided paths.
+    // The latter case is useful for tests.
+    pub fn new(
+        args: Args,
+        env: Env,
+        config_paths: Option<Vec<&str>>,
+        allow_pantsrc: bool,
+    ) -> Result<OptionParser, String> {
         let buildroot = BuildRoot::find()?;
         let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
             .map_err(|e| {
@@ -237,11 +248,16 @@ impl OptionParser {
             format!("{}{}{}", a, path::MAIN_SEPARATOR, b)
         }
 
-        let default_config_path = path_join(&buildroot_string, "pants.toml");
-        let repo_config_files = parser.parse_string_list(
-            &option_id!("pants", "config", "files"),
-            &[&default_config_path],
-        )?;
+        let repo_config_files = match config_paths {
+            Some(paths) => paths.iter().map(|s| s.to_string()).collect(),
+            None => {
+                let default_config_path = path_join(&buildroot_string, "pants.toml");
+                parser.parse_string_list(
+                    &option_id!("pants", "config", "files"),
+                    &[&default_config_path],
+                )?
+            }
+        };
 
         let subdir = |subdir_name: &str, default: &str| -> Result<String, String> {
             Ok(parser
@@ -334,20 +350,18 @@ impl OptionParser {
         id: &OptionId,
         default: Vec<T>,
         getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
-        remover: fn(Vec<T>, &Vec<T>) -> Vec<T>,
+        remover: fn(&mut Vec<T>, &Vec<T>),
     ) -> Result<Vec<T>, String> {
-        let mut list_edits: Vec<ListEdit<T>> = vec![];
-        for (_, source) in self.sources.iter() {
-            if let Some(edits) = getter(source, id)? {
-                list_edits.extend(edits);
-            }
-        }
         let mut list = default;
-        for list_edit in list_edits {
-            match list_edit.action {
-                ListEditAction::Replace => list = list_edit.items,
-                ListEditAction::Add => list.extend(list_edit.items),
-                ListEditAction::Remove => list = remover(list, &list_edit.items),
+        for (_source_type, source) in self.sources.iter().rev() {
+            if let Some(list_edits) = getter(source, id)? {
+                for list_edit in list_edits {
+                    match list_edit.action {
+                        ListEditAction::Replace => list = list_edit.items,
+                        ListEditAction::Add => list.extend(list_edit.items),
+                        ListEditAction::Remove => remover(&mut list, &list_edit.items),
+                    }
+                }
             }
         }
         Ok(list)
@@ -368,9 +382,7 @@ impl OptionParser {
     ) -> Result<Vec<T>, String> {
         self.parse_list(id, default, getter, |list, remove| {
             let to_remove = remove.iter().collect::<HashSet<_>>();
-            list.into_iter()
-                .filter(|item| !to_remove.contains(item))
-                .collect()
+            list.retain(|item| !to_remove.contains(item));
         })
     }
 
@@ -389,9 +401,7 @@ impl OptionParser {
             default.to_vec(),
             |source, id| source.get_float_list(id),
             |list, to_remove| {
-                list.into_iter()
-                    .filter(|item| !to_remove.contains(item))
-                    .collect()
+                list.retain(|item| !to_remove.contains(item));
             },
         )
     }
@@ -413,17 +423,13 @@ impl OptionParser {
         id: &OptionId,
         default: HashMap<String, Val>,
     ) -> Result<HashMap<String, Val>, String> {
-        let mut dict_edits: Vec<DictEdit> = vec![];
-        for (_, source) in self.sources.iter() {
-            if let Some(edit) = source.get_dict(id)? {
-                dict_edits.push(edit);
-            }
-        }
         let mut dict = default;
-        for dict_edit in dict_edits {
-            match dict_edit.action {
-                DictEditAction::Replace => dict = dict_edit.items,
-                DictEditAction::Add => dict.extend(dict_edit.items),
+        for (_, source) in self.sources.iter().rev() {
+            if let Some(dict_edit) = source.get_dict(id)? {
+                match dict_edit.action {
+                    DictEditAction::Replace => dict = dict_edit.items,
+                    DictEditAction::Add => dict.extend(dict_edit.items),
+                }
             }
         }
         Ok(dict)
