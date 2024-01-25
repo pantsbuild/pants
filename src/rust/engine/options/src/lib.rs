@@ -429,10 +429,12 @@ impl OptionParser {
     ) -> Result<HashMap<String, Val>, String> {
         let mut dict = default;
         for (_, source) in self.sources.iter().rev() {
-            if let Some(dict_edit) = source.get_dict(id)? {
-                match dict_edit.action {
-                    DictEditAction::Replace => dict = dict_edit.items,
-                    DictEditAction::Add => dict.extend(dict_edit.items),
+            if let Some(dict_edits) = source.get_dict(id)? {
+                for dict_edit in dict_edits {
+                    match dict_edit.action {
+                        DictEditAction::Replace => dict = dict_edit.items,
+                        DictEditAction::Add => dict.extend(dict_edit.items),
+                    }
                 }
             }
         }
