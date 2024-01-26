@@ -68,7 +68,7 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
@@ -587,6 +587,7 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
             output_directories=("gopath",),
             description="Download Go `protoc` plugin sources.",
             allow_downloads=True,
+            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
     )
 

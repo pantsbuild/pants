@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import textwrap
 from dataclasses import dataclass
 from typing import Iterable, Mapping
@@ -14,14 +15,20 @@ from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
+logger = logging.getLogger(__name__)
+
+SANDBOX_CACHE = "gopath"
+NAMED_CACHE = "gopath_cache"
+
 
 @dataclass(frozen=True)
 class GoSdkProcess:
+    cache_scope: ProcessCacheScope
     command: tuple[str, ...]
     description: str
     env: FrozenDict[str, str]
@@ -43,6 +50,7 @@ class GoSdkProcess:
         output_directories: Iterable[str] = (),
         allow_downloads: bool = False,
         replace_sandbox_root_in_args: bool = False,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         object.__setattr__(self, "command", tuple(command))
         object.__setattr__(self, "description", description)
@@ -60,6 +68,7 @@ class GoSdkProcess:
         object.__setattr__(self, "output_files", tuple(output_files))
         object.__setattr__(self, "output_directories", tuple(output_directories))
         object.__setattr__(self, "replace_sandbox_root_in_args", replace_sandbox_root_in_args)
+        object.__setattr__(self, "cache_scope", cache_scope)
 
 
 @dataclass(frozen=True)
@@ -72,7 +81,9 @@ class GoSdkRunSetup:
 
 
 @rule
-async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
+async def go_sdk_invoke_setup(
+    goroot: GoRoot,
+) -> GoSdkRunSetup:
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
@@ -82,9 +93,12 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
             f"""\
             export GOROOT={goroot.path}
             sandbox_root="$(/bin/pwd)"
-            export GOPATH="${{sandbox_root}}/gopath"
+            export GOPATH="${{sandbox_root}}/{SANDBOX_CACHE}"
             export GOCACHE="${{sandbox_root}}/cache"
-            /bin/mkdir -p "$GOPATH" "$GOCACHE"
+
+            /bin/mkdir -p "$GOCACHE"
+            # GOTPATH is created by append_only_caches in Process args.
+
             if [ -n "${GoSdkRunSetup.CHDIR_ENV}" ]; then
               cd "${GoSdkRunSetup.CHDIR_ENV}"
             fi
@@ -138,12 +152,52 @@ async def setup_go_sdk_process(
         env["GOEXPERIMENT"] = ",".join(exp_fields)
 
     return Process(
+        # cache gopath to capture all downloaded go modules
+        append_only_caches={NAMED_CACHE: SANDBOX_CACHE},
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env=env,
         input_digest=input_digest,
         description=request.description,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        level=LogLevel.DEBUG,
+        cache_scope=request.cache_scope,
+    )
+
+
+@dataclass(frozen=True)
+class GoSdkFindPackageRequest:
+    module_path: str
+
+    def __init__(
+        self,
+        module_path: str,
+    ) -> None:
+        object.__setattr__(self, "module_path", module_path)
+
+
+@rule
+async def process_find_go_packages(
+    request: GoSdkFindPackageRequest,
+    bash: BashBinary,
+) -> Process:
+    find_script = FileContent(
+        "__run_find.sh",
+        textwrap.dedent(
+            f"""\
+            /bin/find {request.module_path} -type f -name '*.go'
+            """
+        ).encode("utf-8"),
+    )
+
+    digest = await Get(Digest, CreateDigest([find_script]))
+
+    return Process(
+        # Add a named_cache symlink to capture all downloaded go modules
+        append_only_caches={NAMED_CACHE: SANDBOX_CACHE},
+        argv=[bash.path, find_script.path],
+        input_digest=digest,
+        description=f"find .go files for {request.module_path}",
         level=LogLevel.DEBUG,
     )
 

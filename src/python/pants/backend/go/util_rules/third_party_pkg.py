@@ -8,11 +8,13 @@ import difflib
 import json
 import logging
 import os
+import textwrap
 from dataclasses import dataclass
 from typing import Any
 
 import ijson.backends.python as ijson
 
+import pants.backend.go.util_rules.sdk as gosdk
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
 from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import pkg_analyzer
@@ -22,23 +24,18 @@ from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
+from pants.core.util_rules.system_binaries import BashBinary, FindBinary
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
     DigestContents,
-    DigestSubset,
     FileContent,
-    GlobExpansionConjunction,
-    GlobMatchErrorBehavior,
     MergeDigests,
-    PathGlobs,
-    Snapshot,
 )
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -59,8 +56,9 @@ class ThirdPartyPkgAnalysis:
 
     import_path: str
     name: str
-
+    # TODO: maybe not necessary with named_cache modules
     digest: Digest
+    # dir_path is still needed though to pass to analysis
     dir_path: str
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
@@ -152,6 +150,16 @@ class ModuleDescriptors:
 
 
 @dataclass(frozen=True)
+class ModulePackageListRequest:
+    path: str
+
+
+@dataclass(frozen=True)
+class ModulePackageList:
+    package_paths: FrozenOrderedSet[str]
+
+
+@dataclass(frozen=True)
 class AnalyzeThirdPartyModuleRequest:
     go_mod_address: Address
     go_mod_digest: Digest
@@ -190,7 +198,7 @@ class FallibleThirdPartyPkgAnalysis:
 
 @rule
 async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> ModuleDescriptors:
-    # List the modules used directly and indirectly by this module.
+    """List the modules used directly and indirectly by the requested module."""
     #
     # This rule can't modify `go.mod` and `go.sum` as it would require mutating the workspace.
     # Instead, we expect them to be well-formed already.
@@ -211,7 +219,6 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
         GoSdkProcess(
             command=["list", "-mod=readonly", "-e", "-m", "-json", "all"],
             input_digest=request.digest,
-            output_directories=("gopath",),
             working_dir=request.path if request.path else None,
             # Allow downloads of the module metadata (i.e., go.mod files).
             allow_downloads=True,
@@ -241,6 +248,7 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
             import_path=mod_json["Path"],
             name=name,
             version=version,
+            # transitive dependency (used by your dependencies, not your first-party root module)
             indirect=mod_json.get("Indirect", False),
             minimum_go_version=mod_json.get("GoVersion"),
         )
@@ -249,7 +257,7 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
     # Gazelle does this, mainly to store the sum on the go_repository rule. We could store it (or its
     # absence) to be able to download sums automatically.
 
-    return ModuleDescriptors(FrozenOrderedSet(descriptors.values()), mod_list_result.output_digest)
+    return ModuleDescriptors(FrozenOrderedSet(descriptors.values()), EMPTY_DIGEST)
 
 
 def strip_sandbox_prefix(path: str, marker: str) -> str:
@@ -328,10 +336,63 @@ async def _check_go_sum_has_not_changed(
 
 
 @rule
+async def process_find_go_packages(
+    request: ModulePackageListRequest,
+    bash: BashBinary,
+    find: FindBinary,
+) -> ModulePackageList:
+    """This connects the (cached) go mod download steps with the package analyzer steps by finding
+    likely package directories within a module."""
+
+    # As background, several other options did not work for this layer:
+    # - `go list` provides the same package paths, but fails on modules which do not use go.sum
+    # - `os.walk` could process the named cache folder directly, but running a Process allows caching
+
+    find_script = FileContent(
+        "__run_find.sh",
+        textwrap.dedent(
+            f"""\
+            {find.path} {request.path} -type f -name '*.go'
+            """
+        ).encode("utf-8"),
+    )
+
+    digest = await Get(Digest, CreateDigest([find_script]))
+
+    list_pkg_result = await Get(
+        FallibleProcessResult,
+        Process(
+            # Use a named_cache symlink to reference downloaded go modules
+            append_only_caches={gosdk.NAMED_CACHE: gosdk.SANDBOX_CACHE},
+            argv=[bash.path, find_script.path],
+            input_digest=digest,
+            description=f"find .go files for {request.path}",
+            level=LogLevel.DEBUG,
+        ),
+    )
+
+    all_dirs = set()
+    if list_pkg_result.exit_code != 0 or len(list_pkg_result.stdout) == 0:
+        logger.warning(f"failed to list {request.path}: {list_pkg_result.stderr.decode()}")
+    else:
+        output = list_pkg_result.stdout.decode("utf-8")
+        for line in output.split("\n"):
+            # get the parent directory, ignore the empty path
+            if dirname := os.path.dirname(line):
+                all_dirs.add(dirname)
+
+    to_remove = [d for d in all_dirs if "testdata" in d.split("/")]
+    all_dirs = all_dirs.difference(to_remove)
+
+    return ModulePackageList(FrozenOrderedSet(all_dirs))
+
+
+@rule
 async def analyze_go_third_party_module(
     request: AnalyzeThirdPartyModuleRequest,
     analyzer: PackageAnalyzerSetup,
 ) -> AnalyzedThirdPartyModule:
+    """Find packages and dependencies of a given go module."""
     # Download the module.
     download_result = await Get(
         ProcessResult,
@@ -341,9 +402,9 @@ async def analyze_go_third_party_module(
             working_dir=os.path.dirname(request.go_mod_path),
             # Allow downloads of the module sources.
             allow_downloads=True,
-            output_directories=("gopath",),
-            output_files=(os.path.join(os.path.dirname(request.go_mod_path), "go.sum"),),
+            output_files=("go.sum",),
             description=f"Download Go module {request.name}@{request.version}.",
+            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
     )
 
@@ -363,45 +424,23 @@ async def analyze_go_third_party_module(
 
     module_metadata = json.loads(download_result.stdout)
     module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
-    go_mod_relpath = strip_sandbox_prefix(module_metadata["GoMod"], "gopath/")
 
-    # Subset the output directory to just the module sources and go.mod (which may be generated).
-    module_sources_snapshot = await Get(
-        Snapshot,
-        DigestSubset(
-            download_result.output_digest,
-            PathGlobs(
-                [f"{module_sources_relpath}/**", go_mod_relpath],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                conjunction=GlobExpansionConjunction.all_match,
-                description_of_origin=f"the download of Go module {request.name}@{request.version}",
-            ),
-        ),
+    # Get the packages from the module
+    find_pkg_dirs = await Get(
+        ModulePackageList,
+        ModulePackageListRequest(path=module_sources_relpath),
     )
 
-    # Determine directories with potential Go packages in them.
-    candidate_package_dirs = []
-    files_by_dir = group_by_dir(
-        p for p in module_sources_snapshot.files if p.startswith(module_sources_relpath)
-    )
-    for maybe_pkg_dir, files in files_by_dir.items():
-        # Skip directories where "testdata" would end up in the import path.
-        # See https://github.com/golang/go/blob/f005df8b582658d54e63d59953201299d6fee880/src/go/build/build.go#L580-L585
-        if "testdata" in maybe_pkg_dir.split("/"):
-            continue
-
-        # Consider directories with at least one `.go` file as package candidates.
-        if any(f for f in files if f.endswith(".go")):
-            candidate_package_dirs.append(maybe_pkg_dir)
-    candidate_package_dirs.sort()
+    chosen_paths = find_pkg_dirs.package_paths
 
     # Analyze all of the packages in this module.
     analyzer_relpath = "__analyzer"
     analysis_result = await Get(
         ProcessResult,
         Process(
-            [os.path.join(analyzer_relpath, analyzer.path), *candidate_package_dirs],
-            input_digest=module_sources_snapshot.digest,
+            [os.path.join(analyzer_relpath, analyzer.path), *chosen_paths],
+            append_only_caches={"gopath_cache": "gopath"},
+            input_digest=EMPTY_DIGEST,
             immutable_input_digests={
                 analyzer_relpath: analyzer.digest,
             },
@@ -414,16 +453,17 @@ async def analyze_go_third_party_module(
     if len(analysis_result.stdout) == 0:
         return AnalyzedThirdPartyModule(FrozenOrderedSet())
 
+    # split the analysis results by package, and build an output object
     package_analysis_gets = []
     for pkg_path, pkg_json in zip(
-        candidate_package_dirs, ijson.items(analysis_result.stdout, "", multiple_values=True)
+        chosen_paths, ijson.items(analysis_result.stdout, "", multiple_values=True)
     ):
         package_analysis_gets.append(
             Get(
                 FallibleThirdPartyPkgAnalysis,
                 AnalyzeThirdPartyPackageRequest(
                     pkg_json=_freeze_json_dict(pkg_json),
-                    module_sources_digest=module_sources_snapshot.digest,
+                    module_sources_digest=EMPTY_DIGEST,
                     module_sources_path=module_sources_relpath,
                     module_import_path=request.name,
                     package_path=pkg_path,
@@ -442,6 +482,10 @@ async def analyze_go_third_party_module(
 async def analyze_go_third_party_package(
     request: AnalyzeThirdPartyPackageRequest,
 ) -> FallibleThirdPartyPkgAnalysis:
+    """Return an analysis for a given package. The analysis object corresponds to the output.
+
+    of `go list` - combining the location, imports and build details for a package.
+    """
     if not request.package_path.startswith(request.module_sources_path):
         raise AssertionError(
             "The path within GOPATH for a package in a module must always be prefixed by the path "
@@ -449,8 +493,9 @@ async def analyze_go_third_party_package(
             f"This was not the case however for module {request.module_import_path}.\n\n"
             "This may be a bug in Pants. Please report this issue at "
             "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
-            f"package_path: {request.package_path}; module_sources_path: {request.module_sources_path}; "
-            f"module_import_path: {request.module_import_path}"
+            f"\npackage_path: {request.package_path}; "
+            f"\nmodule_sources_path: {request.module_sources_path}; "
+            f"\nmodule_import_path: {request.module_import_path}"
         )
     import_path_tail = request.package_path[len(request.module_sources_path) :].strip(os.sep)
     if import_path_tail != "":
@@ -574,6 +619,7 @@ async def analyze_go_third_party_package(
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
+    """Entrypoint to analyze packages for all modules in the given input."""
     module_analysis = await Get(
         ModuleDescriptors,
         ModuleDescriptorsRequest(

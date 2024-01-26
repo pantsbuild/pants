@@ -385,6 +385,10 @@ class ReadlinkBinary(BinaryPath):
     pass
 
 
+class FindBinary(BinaryPath):
+    pass
+
+
 class GitBinaryException(Exception):
     pass
 
@@ -743,6 +747,14 @@ async def find_git(system_binaries: SystemBinariesSubsystem.EnvironmentAware) ->
         request, rationale="track changes to files in your build environment"
     )
     return GitBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `find` binary", level=LogLevel.DEBUG)
+async def find_find(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> FindBinary:
+    request = BinaryPathRequest(binary_name="find", search_path=system_binaries.system_binary_paths)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="find files")
+    return FindBinary(first_path.path, first_path.fingerprint)
 
 
 def rules():
