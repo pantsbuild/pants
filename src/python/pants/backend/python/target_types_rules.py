@@ -13,7 +13,7 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import DefaultDict, Dict, Generator, Optional, Tuple, cast
+from typing import Callable, DefaultDict, Dict, Generator, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
@@ -274,21 +274,37 @@ async def infer_pex_binary_entry_point_dependency(
         owners.ambiguous, owners_must_be_ancestors=entry_point.file_name_used
     )
 
-    if owners.unambiguous:
-        unambiguous_owners = owners.unambiguous
-    elif maybe_disambiguated:
-        unambiguous_owners = (maybe_disambiguated,)
-    elif owners.ambiguous and not maybe_disambiguated:
-        _handle_unresolved_pex_entrypoint(
+    unambiguous_owners = await _determine_entry_point_owner(
+        maybe_disambiguated,
+        owners,
+        unresolved_ambiguity_handler=lambda: _handle_unresolved_pex_entrypoint(
             address,
             entry_point_field.value,
             owners.ambiguous,
             python_infer_subsystem.unowned_dependency_behavior,
-        )
-        unambiguous_owners = ()
-    else:
-        unambiguous_owners = ()
+        ),
+    )
     return InferredDependencies(unambiguous_owners)
+
+
+async def _determine_entry_point_owner(
+    maybe_disambiguated: Optional[Address],
+    owners: PythonModuleOwners,
+    unresolved_ambiguity_handler: Callable[[], None],
+):
+    """Determine what should be the unambiguous owner for a PEX's entrypoint.
+
+    This might be empty.
+    """
+    if owners.unambiguous:
+        return owners.unambiguous
+    elif maybe_disambiguated:
+        return (maybe_disambiguated,)
+    elif owners.ambiguous and not maybe_disambiguated:
+        unresolved_ambiguity_handler()
+        return ()
+    else:
+        return ()
 
 
 def _handle_unresolved_pex_entrypoint(
@@ -296,7 +312,7 @@ def _handle_unresolved_pex_entrypoint(
     entry_point: str,
     ambiguous_owners,
     unowned_dependency_behavior: UnownedDependencyUsage,
-):
+) -> None:
     """Raise an error if we could not disambiguate an entrypoint for the PEX."""
     msg = softwrap(
         f"""
@@ -307,7 +323,7 @@ def _handle_unresolved_pex_entrypoint(
         """
     )
     if unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
-        return
+        pass
     elif unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
         logger.warning(msg)
     else:
