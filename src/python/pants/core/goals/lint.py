@@ -160,11 +160,6 @@ class AbstractLintRequest:
     is_formatter: ClassVar[bool] = False
     is_fixer: ClassVar[bool] = False
 
-    # Enables lint rules which run the formatter/fixer and check if it made changes.
-    # If it did make changes shows an error. This makes sure the user didn't forget
-    # to run the formatter/fixer. You most probably don't want to disable this flag.
-    enable_lint_rules: ClassVar[bool] = True
-
     @final
     @classproperty
     def _requires_snapshot(cls) -> bool:
@@ -191,9 +186,8 @@ class AbstractLintRequest:
 
     @classmethod
     def _get_rules(cls) -> Iterable:
-        if cls.enable_lint_rules:
-            yield UnionRule(AbstractLintRequest, cls)
-            yield UnionRule(AbstractLintRequest.Batch, cls.Batch)
+        yield UnionRule(AbstractLintRequest, cls)
+        yield UnionRule(AbstractLintRequest.Batch, cls.Batch)
 
 
 class LintTargetsRequest(AbstractLintRequest):
