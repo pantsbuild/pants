@@ -8,11 +8,9 @@ How to add lockfiles and the `generate-lockfiles` goal.
 ---
 Lockfiles are a way to pin to exact versions of dependencies, often including hashes to guarantee integrity between the version pinned and the version downloaded.
 
-This guide will walk you through implementing lockfiles, hooking them into the `generate-lockfiles` goal, and implementing the `export` goal which will allow you to export dependencies for use outside of Pants. It assumes that your language has a tool that supports generating and using lockfiles or that you have written code which does these. 
+This guide will walk you through implementing lockfiles and hooking them into the `generate-lockfiles` goal. It assumes that your language has a tool that supports generating and using lockfiles or that you have written code which does these.
 
-1. Expose your lockfiles to Pants
-
----
+## 1. Expose your lockfiles to Pants
 
 Create subclasses of `KnownUserResolveNamesRequest` to inform Pants about which resolves exist, and a subclass of `RequestedUserResolveNames` for Pants to request those resolves later. Implement the resolve-finding logic in a Rule from your subclass of `KnownUserResolveNamesRequest` to `KnownUserResolveNames`. Set `KnownResolveNames.requested_resolve_names_cls` to your subclass of `RequestedUserResolveNames`. 
 
@@ -42,9 +40,7 @@ async def identify_user_resolves_from_fortran_files(
     )
 ```
 
-2. Connect resolve names to requests to generate lockfiles
-
----
+## 2. Connect resolve names to requests to generate lockfiles
 
 Create a subclass of `GenerateLockfile`. Pants will use this to represent a lockfile to generate. Then create a rule from your subclass of `RequestedUserResolveNames` to `UserGenerateLockfiles`. Pants will use this rule to convert from a user's request to export a resolve by name into the information needed to export the resolve.
 
@@ -75,9 +71,7 @@ async def setup_user_lockfile_requests(
     )
 ```
 
-3. Generate lockfiles
-
----
+## 3. Generate lockfiles
 
 Create a rule from your subclass of `GenerateLockfile` to `GenerateLockfileResult`. This rule generates the lockfile. In the common case that you're running a process to generate this lockfile, you can use the `Process.output_files` to gather those files from the execution sandbox.
 
@@ -104,9 +98,7 @@ async def generate_lockfile_from_sources(
 
 ```
 
-4. Register rules
-
----
+## 4. Register rules
 
 At the bottom of the file, let Pants know what your rules and types do. Update your plugin's `register.py` to tell Pants about them/
 
@@ -137,9 +129,7 @@ def rules():
     ]
 ```
 
-5. Use lockfiles for fetching dependencies
-
----
+## 5. Use lockfiles for fetching dependencies
 
 If you have a tool that supports lockfiles, the easiest way to get the lockfile to it is to simply use a glob to pull the file into a digest.
 
