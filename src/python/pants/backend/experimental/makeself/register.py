@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """Make self-extractable archives on Unix.
 
-See https://github.com/megastep/subsystem.
+See https://github.com/megastep/makeself.
 """
 from pants.backend.makeself import subsystem
 from pants.backend.makeself.goals import package, run
