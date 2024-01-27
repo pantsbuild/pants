@@ -643,7 +643,7 @@ def tasks_task_begin(
     tasks: PyTasks,
     func: Any,
     return_type: type,
-    arg_types: Sequence[type],
+    arg_types: Sequence[tuple[str, type]],
     masked_types: Sequence[type],
     side_effecting: bool,
     engine_aware_return_type: bool,
@@ -653,9 +653,10 @@ def tasks_task_begin(
     level: int,
 ) -> None: ...
 def tasks_task_end(tasks: PyTasks) -> None: ...
-def tasks_add_get(
-    tasks: PyTasks, output: type, inputs: Sequence[type], rule_id: str | None
+def tasks_add_call(
+    tasks: PyTasks, output: type, inputs: Sequence[type], rule_id: str, explicit_args_arity: int
 ) -> None: ...
+def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
 def tasks_add_get_union(
     tasks: PyTasks, output_type: type, input_types: Sequence[type], in_scope_types: Sequence[type]
 ) -> None: ...
@@ -741,27 +742,30 @@ _Input = TypeVar("_Input")
 
 class PyGeneratorResponseCall:
     @overload
-    def __init__(self) -> None: ...
-    @overload
     def __init__(
         self,
+        output_type: type,
+        args: tuple[Any, ...],
         input_arg0: dict[Any, type],
     ) -> None: ...
     @overload
-    def __init__(self, input_arg0: _Input) -> None: ...
+    def __init__(self, output_type: type, args: tuple[Any, ...], input_arg0: _Input) -> None: ...
     @overload
     def __init__(
         self,
+        output_type: type,
+        args: tuple[Any, ...],
         input_arg0: type[_Input],
         input_arg1: _Input,
     ) -> None: ...
     @overload
     def __init__(
         self,
+        output_type: type,
+        args: tuple[Any, ...],
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
-    def set_output_type(self, output_type: type) -> None: ...
 
 class PyGeneratorResponseGet(Generic[_Output]):
     output_type: type[_Output]

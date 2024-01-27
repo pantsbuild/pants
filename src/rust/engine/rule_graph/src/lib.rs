@@ -79,6 +79,7 @@ pub struct Reentry<T: TypeId> {
 pub struct RuleEntry<R: Rule> {
     params: ParamTypes<R::TypeId>,
     rule: R,
+    explicit_args_arity: u16,
 }
 
 impl<R: Rule> RuleEntry<R> {
@@ -177,6 +178,7 @@ impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
             &EntryWithDeps::Rule(RuleEntry {
                 ref rule,
                 ref params,
+                ..
             }) => format!(
                 "{}{}for {}",
                 rule.fmt_for_graph(display_args),

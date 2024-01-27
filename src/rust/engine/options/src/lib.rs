@@ -37,9 +37,29 @@ use std::rc::Rc;
 pub use self::args::Args;
 use self::config::Config;
 pub use self::env::Env;
+use crate::parse::{parse_float, parse_int};
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
 pub use types::OptionType;
+
+// NB: The legacy Python options parser supported dicts with member_type "Any", which means
+// the values can be arbitrarily-nested lists, tuples and dicts, including heterogeneous
+// ones that are not supported as top-level option values. We have very few dict[Any] options,
+// but there are a handful, and user plugins may also define them. Therefore we must continue
+// to support this in the Rust options parser, hence this clunky enum.
+//
+// We only use this for parsing values in dicts, as in other cases we know that the type must
+// be some scalar or string, or a uniform list of one type of scalar or string, so we can
+// parse as such.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Val {
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    String(String),
+    List(Vec<Val>),
+    Dict(HashMap<String, Val>),
+}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ListEditAction {
@@ -52,6 +72,18 @@ pub(crate) enum ListEditAction {
 pub(crate) struct ListEdit<T> {
     pub action: ListEditAction,
     pub items: Vec<T>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DictEditAction {
+    Replace,
+    Add,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct DictEdit {
+    pub action: DictEditAction,
+    pub items: HashMap<String, Val>,
 }
 
 ///
@@ -85,18 +117,13 @@ pub(crate) trait OptionsSource {
     /// Errors when this source has an option value for `id` but that value is not an int.
     ///
     /// The default implementation looks for a string value for `id` and then attempts to parse it as
-    /// a int value.
+    /// an int value.
     ///
     fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
         if let Some(value) = self.get_string(id)? {
-            value.parse().map(Some).map_err(|e| {
-                format!(
-                    "Problem parsing {} value {} as an int value: {}",
-                    self.display(id),
-                    value,
-                    e
-                )
-            })
+            parse_int(&value)
+                .map(Some)
+                .map_err(|e| e.render(self.display(id)))
         } else {
             Ok(None)
         }
@@ -104,31 +131,58 @@ pub(crate) trait OptionsSource {
 
     ///
     /// Get the float option identified by `id` from this source.
-    /// Errors when this source has an option value for `id` but that value is not a float.
+    /// Errors when this source has an option value for `id` but that value is not a float or an int
+    /// that we can coerce to a float.
     ///
     /// The default implementation looks for a string value for `id` and then attempts to parse it as
     /// a float value.
     ///
     fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
         if let Some(value) = self.get_string(id)? {
-            value.parse().map(Some).map_err(|e| {
-                format!(
-                    "Problem parsing {} value {} as a float value: {}",
-                    self.display(id),
-                    value,
-                    e
-                )
-            })
+            let parsed_as_float = parse_float(&value)
+                .map(Some)
+                .map_err(|e| e.render(self.display(id)));
+            if parsed_as_float.is_err() {
+                // See if we can parse as an int and coerce it to a float.
+                if let Ok(i) = parse_int(&value) {
+                    return Ok(Some(i as f64));
+                }
+            }
+            parsed_as_float
         } else {
             Ok(None)
         }
     }
 
     ///
+    /// Get the bool list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a bool list.
+    ///
+    fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String>;
+
+    ///
+    /// Get the int list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not an int list.
+    ///
+    fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String>;
+
+    ///
+    /// Get the float list option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a float list.
+    ///
+    fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String>;
+
+    ///
     /// Get the string list option identified by `id` from this source.
     /// Errors when this source has an option value for `id` but that value is not a string list.
     ///
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String>;
+
+    ///
+    /// Get the dict option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a dict.
+    ///
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String>;
 }
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
@@ -210,7 +264,7 @@ impl OptionParser {
             ("pants_distdir".to_string(), subdir("distdir", "dist")?),
         ]);
 
-        let mut config = Config::merged(&repo_config_files, &seed_values)?;
+        let mut config = Config::parse(&repo_config_files, &seed_values)?;
         sources.insert(Source::Config, Rc::new(config.clone()));
         parser = OptionParser {
             sources: sources.clone(),
@@ -227,7 +281,7 @@ impl OptionParser {
             )? {
                 let rcfile_path = Path::new(&rcfile);
                 if rcfile_path.exists() {
-                    let rc_config = Config::parse(rcfile_path, &seed_values)?;
+                    let rc_config = Config::parse(&[rcfile_path], &seed_values)?;
                     config = config.merge(rc_config);
                 }
             }

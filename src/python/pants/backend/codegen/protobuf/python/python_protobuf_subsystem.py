@@ -39,6 +39,26 @@ class PythonProtobufSubsystem(Subsystem):
         """
     )
 
+    grpcio_plugin = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Use the official `grpcio` plugin (https://pypi.org/project/grpcio/) to generate grpc
+            service stubs.
+            """
+        ),
+    )
+
+    grpclib_plugin = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Use the alternative `grpclib` plugin (https://github.com/vmagamedov/grpclib) to
+            generate grpc service stubs.
+            """
+        ),
+    )
+
     mypy_plugin = BoolOption(
         default=False,
         help=softwrap(
@@ -82,6 +102,17 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "mypy_protobuf.lock")
 
 
+class PythonProtobufGrpclibPlugin(PythonToolRequirementsBase):
+    options_scope = "python-grpclib-protobuf"
+    help = "Configuration of the grpclib plugin."
+
+    default_requirements = ["grpclib[protobuf]>=0.4,<1"]
+
+    register_interpreter_constraints = True
+
+    default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "grpclib.lock")
+
+
 @dataclass(frozen=True)
 class PythonProtobufDependenciesInferenceFieldSet(FieldSet):
     required_fields = (
@@ -118,6 +149,7 @@ async def infer_dependencies(
         )
         locality = source_root.path
 
+    result = []
     addresses_for_protobuf = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
@@ -127,7 +159,7 @@ async def infer_dependencies(
         ),
     )
 
-    result = [
+    result.append(
         find_python_runtime_library_or_raise_error(
             addresses_for_protobuf,
             request.field_set.address,
@@ -138,31 +170,55 @@ async def infer_dependencies(
             recommended_requirement_url="https://pypi.org/project/protobuf/",
             disable_inference_option=f"[{python_protobuf.options_scope}].infer_runtime_dependency",
         )
-    ]
+    )
 
     if request.field_set.grpc_toggle.value:
-        addresses_for_grpc = await Get(
-            PythonModuleOwners,
-            PythonModuleOwnersRequest(
-                "grpc",
-                resolve=resolve,
-                locality=locality,
-            ),
-        )
-
-        result.append(
-            find_python_runtime_library_or_raise_error(
-                addresses_for_grpc,
-                request.field_set.address,
-                # Note that the library is called `grpcio`, but the module is `grpc`.
-                "grpc",
-                resolve=resolve,
-                resolves_enabled=python_setup.enable_resolves,
-                recommended_requirement_name="grpcio",
-                recommended_requirement_url="https://pypi.org/project/grpcio/",
-                disable_inference_option=f"[{python_protobuf.options_scope}].infer_runtime_dependency",
+        if python_protobuf.grpcio_plugin:
+            addresses_for_grpc = await Get(
+                PythonModuleOwners,
+                PythonModuleOwnersRequest(
+                    "grpc",
+                    resolve=resolve,
+                    locality=locality,
+                ),
             )
-        )
+
+            result.append(
+                find_python_runtime_library_or_raise_error(
+                    addresses_for_grpc,
+                    request.field_set.address,
+                    # Note that the library is called `grpcio`, but the module is `grpc`.
+                    "grpc",
+                    resolve=resolve,
+                    resolves_enabled=python_setup.enable_resolves,
+                    recommended_requirement_name="grpcio",
+                    recommended_requirement_url="https://pypi.org/project/grpcio/",
+                    disable_inference_option=f"[{python_protobuf.options_scope}].infer_runtime_dependency",
+                )
+            )
+
+        if python_protobuf.grpclib_plugin:
+            addresses_for_grpclib = await Get(
+                PythonModuleOwners,
+                PythonModuleOwnersRequest(
+                    "grpclib",
+                    resolve=resolve,
+                    locality=locality,
+                ),
+            )
+
+            result.append(
+                find_python_runtime_library_or_raise_error(
+                    addresses_for_grpclib,
+                    request.field_set.address,
+                    "grpclib",
+                    resolve=resolve,
+                    resolves_enabled=python_setup.enable_resolves,
+                    recommended_requirement_name="grpclib[protobuf]",
+                    recommended_requirement_url="https://pypi.org/project/grpclib/",
+                    disable_inference_option=f"[{python_protobuf.options_scope}].infer_runtime_dependency",
+                )
+            )
 
     return InferredDependencies(result)
 

@@ -90,7 +90,7 @@ def commit_and_pr(
     git("checkout", "-b", branch)
     git("add", str(VERSION_PATH), str(CONTRIBUTORS_PATH))
     git("commit", "-m", title)
-    git("push", "origin", "HEAD")
+    git("push", "git@github.com:pantsbuild/pants.git", "HEAD")
 
     pr = repo.create_pull(
         title=title,

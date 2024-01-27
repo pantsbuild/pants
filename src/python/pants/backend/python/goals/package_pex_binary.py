@@ -24,6 +24,7 @@ from pants.backend.python.target_types import (
     PexPlatformsField,
     PexResolveLocalPlatformsField,
     PexScriptField,
+    PexShBootField,
     PexShebangField,
     PexStripEnvField,
     PexVenvHermeticScripts,
@@ -64,6 +65,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     emit_warnings: PexEmitWarningsField
     ignore_errors: PexIgnoreErrorsField
     inherit_path: PexInheritPathField
+    sh_boot: PexShBootField
     shebang: PexShebangField
     strip_env: PexStripEnvField
     platforms: PexPlatformsField
@@ -92,6 +94,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--ignore-errors")
         if self.inherit_path.value is not None:
             args.append(f"--inherit-path={self.inherit_path.value}")
+        if self.sh_boot.value is True:
+            args.append("--sh-boot")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
         if self.strip_env.value is False:

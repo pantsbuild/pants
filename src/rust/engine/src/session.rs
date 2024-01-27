@@ -8,7 +8,7 @@ use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use crate::context::{Core, SessionCore};
-use crate::nodes::{NodeKey, Select};
+use crate::nodes::{NodeKey, Root};
 use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
@@ -27,9 +27,6 @@ use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 // threshold should be logged. The threshold might become configurable, but this might not need
 // to be.
 const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
-
-// Root requests are limited to Select nodes, which produce (python) Values.
-pub type Root = Select;
 
 pub type ObservedValueResult = (Result<Value, Failure>, Option<LastObserved>);
 

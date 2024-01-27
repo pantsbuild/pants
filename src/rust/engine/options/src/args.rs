@@ -4,8 +4,10 @@
 use std::env;
 
 use super::id::{NameTransform, OptionId, Scope};
-use super::parse::parse_bool;
-use super::OptionsSource;
+use super::parse::{
+    parse_bool, parse_bool_list, parse_dict, parse_float_list, parse_int_list, ParseError,
+};
+use super::{DictEdit, OptionsSource};
 use crate::parse::parse_string_list;
 use crate::ListEdit;
 use std::collections::HashMap;
@@ -77,6 +79,31 @@ impl Args {
         }
         Ok(None)
     }
+
+    fn get_list<T>(
+        &self,
+        id: &OptionId,
+        parse_list: fn(&str) -> Result<Vec<ListEdit<T>>, ParseError>,
+    ) -> Result<Option<Vec<ListEdit<T>>>, String> {
+        let arg_names = Self::arg_names(id, Negate::False);
+        let mut edits = vec![];
+        for arg in &self.args {
+            let mut components = arg.as_str().splitn(2, '=');
+            if let Some(name) = components.next() {
+                if arg_names.contains_key(name) {
+                    let value = components.next().ok_or_else(|| {
+                        format!("Expected string list option {name} to have a value.")
+                    })?;
+                    edits.extend(parse_list(value).map_err(|e| e.render(name))?)
+                }
+            }
+        }
+        if edits.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(edits))
+        }
+    }
 }
 
 impl OptionsSource for Args {
@@ -100,24 +127,28 @@ impl OptionsSource for Args {
         }
     }
 
+    fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {
+        self.get_list(id, parse_bool_list)
+    }
+
+    fn get_int_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<i64>>>, String> {
+        self.get_list(id, parse_int_list)
+    }
+
+    fn get_float_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<f64>>>, String> {
+        self.get_list(id, parse_float_list)
+    }
+
     fn get_string_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<String>>>, String> {
-        let arg_names = Self::arg_names(id, Negate::False);
-        let mut edits = vec![];
-        for arg in &self.args {
-            let mut components = arg.as_str().splitn(2, '=');
-            if let Some(name) = components.next() {
-                if arg_names.contains_key(name) {
-                    let value = components.next().ok_or_else(|| {
-                        format!("Expected string list option {name} to have a value.")
-                    })?;
-                    edits.extend(parse_string_list(value).map_err(|e| e.render(name))?)
-                }
-            }
-        }
-        if edits.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(edits))
+        self.get_list(id, parse_string_list)
+    }
+
+    fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String> {
+        match self.find_flag(Self::arg_names(id, Negate::False))? {
+            Some((name, ref value, _)) => parse_dict(value)
+                .map(|e| Some(vec![e]))
+                .map_err(|e| e.render(name)),
+            None => Ok(None),
         }
     }
 }

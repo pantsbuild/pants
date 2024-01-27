@@ -68,7 +68,7 @@ fn test_bool() {
 
     assert!(args.get_bool(&option_id!("dne")).unwrap().is_none());
     assert_eq!(
-        "Got 'swallow' for -c. Expected 'true' or 'false'.".to_owned(),
+        "Problem parsing -c bool value:\n1:swallow\n  ^\nExpected 'true' or 'false' at line 1 column 1".to_owned(),
         args.get_bool(&option_id!(-'c', "unladen", "capacity"))
             .unwrap_err()
     );
@@ -94,7 +94,9 @@ fn test_float() {
     assert!(args.get_float(&option_id!("dne")).unwrap().is_none());
 
     assert_eq!(
-        "Problem parsing --bad value swallow as a float value: invalid float literal".to_owned(),
+        "Problem parsing --bad float value:\n1:swallow\n  ^\n\
+        Expected \"+\", \"-\" or ['0' ..= '9'] at line 1 column 1"
+            .to_owned(),
         args.get_float(&option_id!("bad")).unwrap_err()
     );
 }

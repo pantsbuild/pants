@@ -1,0 +1,97 @@
+---
+    title: Remote caching
+    sidebar_position: 0
+---
+
+---
+
+## What is remote caching?
+
+Remote caching allows Pants to store and retrieve the results of process execution to and from a remote server, rather than only using your machine's local Pants cache. This allows Pants to efficiently share a cache across different runs and different machines, for example, all of your CI workers sharing the same fine-grained cache.
+
+Pants supports several remote caching providers:
+
+- [Remote Execution API](https://github.com/bazelbuild/remote-apis) ("REAPI"), which also supports [remote execution](./remote-execution.mdx)
+- GitHub Actions Cache
+- Local file system
+
+## Remote Execution API
+
+### Server
+
+See the [REAPI server compatibility guide](./index.mdx#server-compatibility) for more information about REAPI-compatible caches.
+
+### Pants Configuration
+
+After you have either set up a REAPI cache server or obtained access to one, the next step is to point Pants to it so that Pants will use it to read and write process results.
+
+For the following examples, assume that the REAPI server is running on `cache.corp.example.com` at port 8980 and that it is on an internal network. Also assume that the name of the REAPI instance is "main." At a minimum, you will need to configure `pants.toml` as follows:
+
+```toml
+[GLOBAL]
+remote_cache_read = true
+remote_cache_write = true
+remote_store_address = "grpc://build.corp.example.com:8980"
+remote_instance_name = "main"
+```
+
+If the endpoint is using TLS, then the `remote_store_address` option would be specified with the `grpcs://` scheme, i.e. `"grpcs://cache.corp.example.com:8980"`.
+
+## GitHub Actions Cache
+
+GitHub Actions provides a built-in caching service which Pants supports using for sharing caches across GitHub Actions runs (not with machines outside of GitHub Actions). It is typically used via the `actions/cache` action to cache whole directories and files, but Pants can use the same functionality for fine-grained caching.
+
+:::caution GitHub Actions Cache support is still experimental
+Support for this cache provider is still under development, with more refinement required. Please [let us know](/community/getting-help) if you use it and encounter errors or warnings.
+:::
+
+### Workflow
+
+The values of the `ACTIONS_CACHE_URL` and `ACTIONS_RUNTIME_TOKEN` environment variables need to be provided to Pants via the `[GLOBAL].remote_store_address` and `[GLOBAL].remote_oauth_bearer_token` options respectively. They are only provided to action calls (not shell steps that use `run: ...`). Include a step like the following in your jobs, which sets those options via environment variables, before executing any Pants commands:
+
+```yaml
+- name: Configure Pants caching to GitHub Actions Cache
+  uses: actions/github-script@v6
+  with:
+    script: |
+      core.exportVariable('PANTS_REMOTE_STORE_ADDRESS', process.env.ACTIONS_CACHE_URL);
+      core.exportVariable('PANTS_REMOTE_OAUTH_BEARER_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN);
+```
+
+### Pants Configuration
+
+Once the GitHub values are configured, Pants will read the environment variables. You will also need to configure pants to read and write to the cache only while in CI, such as [via a `pants.ci.toml` configuration file](../using-pants-in-ci.mdx#configuring-pants-for-ci-pantscitoml-optional):
+
+```toml
+[GLOBAL]
+# GitHub Actions cache URL and token are set via environment variables
+remote_provider = "experimental-github-actions-cache"
+remote_cache_read = true
+remote_cache_write = true
+```
+
+If desired, you can also set `remote_instance_name` to a string that's included as a prefix on each cache key, which will be then be displayed in the 'Actions' > 'Caches' UI.
+
+## Local file system
+
+Pants can cache "remotely" to a local file system path, which can be used for a networked mount cache, without having to pay the cost of storing Pants' local cache on the network mount too. This can also be used for testing/validation.
+
+:::caution Local file system caching support is still experimental
+Support for this cache provider is still under development, with more refinement required. Please [let us know](/community/getting-help) if you use it and encounter errors or warnings.
+:::
+
+### Pants Configuration
+
+To read and write the cache to `/path/to/cache`, you will need to configure `pants.toml` as follows:
+
+```toml
+[GLOBAL]
+remote_store_provider = "experimental-file"
+remote_store_address = "file:///path/to/cache"
+remote_cache_read = true
+remote_cache_write = true
+```
+
+## Reference
+
+Run `pants help-advanced global` or refer to [Global options](../../../reference/global-options.mdx). Most remote execution and caching options begin with the prefix `--remote`.

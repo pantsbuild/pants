@@ -1,0 +1,538 @@
+---
+    title: Helm Overview
+    sidebar_position: 0
+---
+
+---
+
+:::caution Helm support is in alpha stage
+Pants has good support for the most common operations for managing Helm charts sources. However there may be use cases not covered yet.
+
+Please share feedback for what you need to use Pants with your Helm charts by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](/community/getting-help)!
+:::
+
+## Initial setup
+
+First, activate the relevant backend in `pants.toml`:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+  ...
+  "pants.backend.experimental.helm",
+  ...
+]
+```
+
+If you have more than one Helm chart in the same repository, organise them such that each of them lives in a separate folder with the chart definition file (`Chart.yaml`) at their root. The Helm backend is capable of auto-detecting the root folder of your Helm charts taking the chart definition file `Chart.yaml` as the reference for that root.
+
+```yaml tab={"label":"src/helm/foo/Chart.yaml"}
+apiVersion: v2
+description: Foo Helm chart
+name: foo
+version: 0.1.0
+```
+
+```yaml tab={"label":"src/helm/bar/Chart.yaml"}
+apiVersion: v2
+description: Bar Helm chart
+name: bar
+version: 0.1.0
+```
+
+### Adding `helm_chart` targets
+
+Helm charts are identified by the presence of a `Chart.yaml` or `Chart.yml` file, which contains relevant metadata about the chart like its name, version, dependencies, etc. To get started quickly you can create a simple `Chart.yaml` file in your sources folder:
+
+```yaml title="Chart.yaml"
+apiVersion: v2
+description: Example Helm chart
+name: example
+version: 0.1.0
+```
+
+:::note Using `helm create`
+You can use the `helm create` command to create an initial skeleton for your chart but be sure you have properly configured your source root patterns (as shown in the previous section) since the `helm create` command will create a folder name with the name of your chart and place the sources inside.
+:::
+
+Then run [`pants tailor ::`](../getting-started/initial-configuration.mdx#5-generate-build-files) to generate `BUILD` files. This will scan your source repository in search of `Chart.yaml` or `Chart.yml` files and create a `helm_chart` target for each of them.
+
+```
+❯ pants tailor ::
+Created src/helm/example/BUILD:
+  - Add helm_chart target example
+```
+
+If your workspace contains any Helm unit tests (under a `tests` folder), Pants will also idenfity them and create `helm_unittest_tests` targets for them. Additionally, if your unit tests also have snapshots (under a `tests/__snapshot__` folder), `tailor` will identify those files as test snapshots and will create `resources` targets for them. See "Snapshot testing" below for more info.
+
+### Basic operations
+
+The given setup is enough to now do some common operations on our Helm chart source code.
+
+#### Linting
+
+The Helm backend has an implementation of the Pants' `lint` goal which hooks it with the `helm lint` command:
+
+```
+pants lint ::
+==> Linting example
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+
+
+✓ helm succeeded.
+```
+
+The linting command is non-strict by default. If you want to enforce strict linting it can be either done globally in the `pants.toml` file, or in a per-chart target basis, using one of the two following ways:
+
+```toml tab={"label":"pants.toml"}
+[helm]
+# Enables strict linting globally
+lint_strict = true
+```
+
+```python tab={"label":"BUILD"}
+helm_chart(lint_strict=True)
+```
+
+Likewise, in a similar way you could enable strict linting globally and then choose to disable it in a per-target basis. Run `pants help helm` or `pants help helm_chart` for more information.
+
+You can set the field `skip_lint=True` on each `helm_chart` target to avoid linting it.
+
+#### Package
+
+Packing helm charts is supported out of the box via the Pants' `package` goal. The final package will be saved as a `.tgz` file under the `dist` folder at your source root.
+
+```
+pants package ::
+10:23:15.24 [INFO] Completed: Packaging Helm chart: testprojects/src/helm/example
+10:23:15.24 [INFO] Wrote dist/testprojects.src.helm.example/example/example-0.2.0.tgz
+Built Helm chart artifact: testprojects.src.helm.example/example/example-0.2.0.tgz
+```
+
+The final output folder can customised using the `output_path` field in the `helm_chart` target. Run `pants help helm_chart` for more information.
+
+#### Helm chart version
+
+Helm charts are versioned artifacts with the value of the `version` field in `Chart.yaml` determining the actual version of the chart. Pants needs to know the version of a first party chart to be able to build packages and correctly establish the dependencies among them. By default, Pants will use the value in `Chart.yaml` as the given version of a chart but it also supports overriding that value via the `version` field in the `helm_chart` target.
+
+For example, a chart defined as such:
+
+```python tab={"label":"src/helm/example/BUILD"}
+helm_chart()
+```
+
+```yaml tab={"label":"src/helm/example/Chart.yaml"}
+apiVersion: v2
+description: Example Helm chart
+name: example
+version: 0.1.0
+```
+
+Will be understood to have version `0.1.0` (as read from the `Chart.yaml` file). However, if we specify a version in `helm_chart` as follows:
+
+```python tab={"label":"src/helm/example/BUILD"}
+helm_chart(version="2.0.0")
+```
+
+```yaml tab={"label":"src/helm/example/Chart.yaml"}
+apiVersion: v2
+description: Example Helm chart
+name: example
+version: 0.1.0
+```
+
+Now the value in `Chart.yaml` will be ignored and the chart will be understood to have version `2.0.0`.
+
+Because Pants has support for interpolating values in the target fields, we can also make this version value more dynamic as follows:
+
+```python title="src/helm/example/BUILD"
+helm_chart(version=env('HELM_CHART_VERSION'))
+```
+
+Now the version value for this chart will be what has been set as the value of the environment variable `HELM_CHART_VERSION`.
+
+## Helm Unit tests
+
+The Helm backend supports running Helm unit tests via the [Helm `unittest` plugin](https://github.com/quintush/helm-unittest). To run unit tests follow the instructions on how to use that plugin and then create a `BUILD` file in the same folder where your tests live with the following target:
+
+```python tab={"label":"src/helm/example/tests/BUILD"}
+helm_unittest_tests()
+```
+
+```yaml tab={"label":"src/helm/example/templates/env-configmap.yaml"}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-configmap
+data:
+{{- range $envKey, $envVal := .Values.env }}
+  {{ $envKey | upper }}: {{ $envVal | quote }}
+{{- end }}
+```
+
+```yaml tab={"label":"src/helm/example/tests/env-configmap_test.yaml"}
+suite: test env-configmap
+templates:
+  - env-configmap.yaml
+tests:
+  - it: should contain the env map variables
+    set:
+      env:
+        VAR1_NAME: var1Value
+        var2_name: var2Value
+    asserts:
+      - equal:
+          path: data.VAR1_NAME
+          value: "var1Value"
+      - equal:
+          path: data.VAR2_NAME
+          value: "var2Value"
+```
+
+With the test files in places, you can now run `pants test ::` and Pants will execute each of your tests individually:
+
+```
+pants test ::
+10:50:12.45 [INFO] Completed: Running Helm unittest on: testprojects/src/helm/example/tests/env-configmap_test.yaml
+10:50:12.46 [INFO] Completed: Run Helm Unittest - testprojects/src/helm/example/tests/env-configmap_test.yaml succeeded.
+
+✓ testprojects/src/helm/example/tests/env-configmap_test.yaml succeeded in 0.75s.
+```
+
+#### Feeding additional files to unit tests
+
+In some cases we may want our tests to have access to additional files which are not part of the chart. This can be achieved by setting a dependency between our unit test targets and a `resources` target as follows:
+
+```python tab={"label":"src/helm/example/tests/BUILD"}
+helm_unittest_tests(dependencies=[":extra-values"])
+
+resources(name="extra-values", sources=["extra-values.yml"])
+```
+
+```yaml tab={"label":"src/helm/example/templates/env-configmap.yaml"}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-configmap
+data:
+{{- range $key, $val := .Values.data }}
+  {{ $key | upper }}: {{ $val | quote }}
+{{- end }}
+```
+
+```yaml tab={"label":"src/helm/example/tests/extra-values.yml"}
+data:
+  VAR1_NAME: var1Value
+  var2_name: var2Value
+```
+
+```yaml tab={"label":"src/helm/example/tests/env-configmap_test.yaml"}
+suite: test env-configmap
+templates:
+  - env-configmap.yaml
+values:
+  - extra-values.yml
+tests:
+  - it: should contain the env map variables
+    asserts:
+      - equal:
+          path: data.VAR1_NAME
+          value: "var1Value"
+      - equal:
+          path: data.VAR2_NAME
+          value: "var2Value"
+```
+
+Additional files can be referenced from any location inside your workspace. Note that the actual path to the additional files will be relative to the source roots configured in Pants.
+
+In this example, since Helm charts define their source root at the location of the `Chart.yaml` file and the `extra-values.yml` file is inside the `tests` folder relative to the chart, the test suite can access it as being local to it.
+
+However, in the following case, we need to reference the extra file relative to the chart root. Note the `../data/extra-values.yml` path in the test suite.
+
+```toml tab={"label":"pants.toml"}
+[source]
+root_patterns=["src/extra"]
+```
+
+```python tab={"label":"src/extra/data/BUILD"}
+resources(name="extra-values", sources=["extra-values.yml"])
+```
+
+```yaml tab={"label":"src/extra/data/extra-values.yml"}
+data:
+  VAR1_NAME: var1Value
+  var2_name: var2Value
+```
+
+```python tab={"label":"src/helm/example/tests/BUILD"}
+helm_unittest_tests(dependencies=["src/extra/data:extra-values"])
+```
+
+```yaml tab={"label":"src/helm/example/templates/env-configmap.yaml"}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-configmap
+data:
+{{- range $key, $val := .Values.data }}
+  {{ $key | upper }}: {{ $val | quote }}
+{{- end }}
+```
+
+```yaml tab={"label":"src/helm/example/tests/env-configmap_test.yaml"}
+suite: test env-configmap
+templates:
+  - env-configmap.yaml
+values:
+  - ../data/extra-values.yml
+tests:
+  - it: should contain the env map variables
+    asserts:
+      - equal:
+          path: data.VAR1_NAME
+          value: "var1Value"
+      - equal:
+          path: data.VAR2_NAME
+          value: "var2Value"
+```
+
+:::caution Using `file`, `files` and `relocated_files` targets
+Other file-centric targets are also supported, just be aware that `file` and `files` targets are
+not affected by the source roots setting. When using `relocated_files`, the files will be relative
+to the value set in the `dest` field.
+:::
+
+#### Snapshot testing
+
+Unit test snapshots are supported by Pants by wrapping the snapshots in resources targets, as shown in the previous section. Snapshot resources will be automatically inferred as dependencies of the tests where they reside, so there is no need to add a explicit `dependencies` relationship in your `helm_unittest_tests` targets.
+
+Since managing snapshots by hand is quite tedious, Pants provides some utilities to manage them in a simpler way. To generate or update the snapshots, use Pants's `generate-snapshots` goal:
+
+```
+pants generate-snapshots ::
+```
+
+This will generate test snapshots for tests that require them, with out-of-date snapshots being overwritten by newer ones.
+
+If new `__snapshot__` folders are created after running the `generate-snapshots` target, we recommend running the `tailor` goal again so that Pants can detect these new folders and create `resources` targets as appropriate.
+
+#### Timeouts
+
+Pants can cancel tests that take too long, which is useful to prevent tests from hanging indefinitely.
+
+To add a timeout, set the `timeout` field to an integer value of seconds, like this:
+
+```python title="BUILD"
+helm_unittest_test(name="tests", source="env-configmap_test.yaml", timeout=120)
+```
+
+When you set `timeout` on the `helm_unittest_tests` target generator, the same timeout will apply to every generated `helm_unittest_test` target. Instead, you can use the `overrides` field:
+
+```python title="BUILD"
+helm_unittest_tests(
+    name="tests",
+    overrides={
+        "env-configmap_test.yaml": {"timeout": 20},
+        ("deployment_test.yaml", "pod_test.yaml"): {"timeout": 35},
+    },
+)
+```
+
+You can also set a default value and a maximum value in `pants.toml`:
+
+```toml title="pants.toml"
+[test]
+timeout_default = 60
+timeout_maximum = 600
+```
+
+If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
+
+Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
+
+## Publishing Helm charts
+
+Pants only supports publishing Helm charts to OCI registries, a feature that was made generally available in Helm 3.8.
+
+The publishing is done with Pants' `publish` goal but first you will need to tell Pants what are the possible destination registries where to upload your charts.
+
+### Configuring OCI registries
+
+In a similar way as the `docker_image` target, a `helm_chart` target takes an optional `registries` field whose value is a list of registry endpoints (prefixed by the `oci://` protocol):
+
+```python title="src/helm/example/BUILD"
+helm_chart(
+  name="example",
+  registries=[
+    "oci://reg.company.internal"
+  ]
+)
+```
+
+The chart published from that given target will be uploaded to the OCI registry specified.
+
+If you have several charts that have to be published into the same registries, you can add them to your `pants.toml` file and then reference them by using their alias prefixed by a `@` symbol.
+
+You can also designate one or more registries as default and then charts that have no explicit `registries` field will use those default registries.
+
+```toml tab={"label":"pants.toml"}
+[helm.registries.company-registry1]
+address = "oci://reg1.company.internal"
+default = true
+
+[helm.registries.company-registry2]
+address = "oci://reg2.company.internal"
+```
+
+```python tab={"label":"src/example/BUILD"}
+helm_chart(name="demo")
+
+# This is equivalent to the previous target,
+# since company-registry1 is the default registry:
+helm_chart(
+    name="demo",
+    registries=["@company-registry1"],
+)
+
+# You can mix named and direct registry references.
+helm_chart(
+    name="demo2",
+    registries=[
+        "@company-registry2",
+        "oci://ext-registry.company-b.net:8443",
+    ]
+)
+```
+
+### Setting a repository name
+
+When publishing charts into an OCI registry, you most likely will be interested on separating them from other kind of OCI assets (i.e. container images). For doing so you can set a `repository` field in the `helm_chart` target so the chart artifact will be uploaded to the given path:
+
+```python title="src/helm/example/BUILD"
+helm_chart(
+  name="example",
+  repository="charts"
+)
+```
+
+With the previous setting, your chart would be published to your default registry under the `charts` folder like in `oci://myregistry.internal/charts/example-0.1.0.tgz`.
+
+You can also set a default global repository in `pants.toml` as in the following example:
+
+```toml title="pants.toml"
+[helm]
+default_registry_repository = "charts"
+```
+
+## Managing Chart Dependencies
+
+Helm charts can depend on other charts, whether first-party charts defined in the same repo, or third-party charts published in a registry. Pants uses this dependency information to know when work needs to be re-run.
+
+:::note Chart.yaml API version
+To benefit from Pants dependency management and inference in your Helm charts, you will need to use `apiVersion: v2` in your `Chart.yaml` file.
+:::
+
+### `Chart.yaml` dependencies
+
+Pants will automatically infer dependencies from the `Chart.yaml` file.
+
+For example, given two charts `foo` and `bar` and a dependency between them:
+
+```yaml tab={"label":"src/helm/foo/Chart.yaml"}
+apiVersion: v2
+description: Foo Helm chart
+name: foo
+version: 0.1.0
+```
+
+```python tab={"label":"src/helm/foo/BUILD"}
+helm_chart()
+```
+
+```yaml tab={"label":"src/helm/bar/Chart.yaml"}
+apiVersion: v2
+description: Bar Helm chart
+name: bar
+version: 0.1.0
+dependencies:
+  - name: foo
+```
+
+```python tab={"label":"src/helm/bar/BUILD"}
+helm_chart()
+```
+
+Then, running `pants dependencies`on `bar` will list `foo` as a dependency:
+
+```
+pants dependencies src/helm/bar
+src/helm/foo
+```
+
+### Explicitly provided dependencies in `BUILD` files
+
+If you prefer, you can let your BUILD files be the "source of truth" for dependencies, instead of specifying them in `Chart.yaml`:
+
+```yaml tab={"label":"src/helm/foo/Chart.yaml"}
+apiVersion: v2
+description: Foo Helm chart
+name: foo
+version: 0.1.0
+```
+
+```python tab={"label":"src/helm/foo/BUILD"}
+helm_chart()
+```
+
+```yaml tab={"label":"src/helm/bar/Chart.yaml"}
+apiVersion: v2
+description: Bar Helm chart
+name: bar
+version: 0.1.0
+```
+
+```python tab={"label":"src/helm/bar/BUILD"}
+helm_chart(dependencies=["//src/helm/foo"])
+```
+
+In this case, the `pants dependencies` command will show the same result and, in addition, Pants will modify its copy of `bar`'s `Chart.yaml` before using it, so that it includes `foo` in its dependency list. Note that Pants will not modify the original copy in your source tree, only the copy it uses in the sandboxed execution environment.
+
+### Third party chart artifacts
+
+Third party charts are provided to Pants using the `helm_artifact` target:
+
+```yaml title="3rdparty/helm/BUILD"
+helm_artifact(
+  artifact="chart_name",
+  version="0.0.1",
+  registry="...",     # Optional
+  repository="...",   # Optional for OCI registries
+)
+```
+
+Third party artifacts are resolved using `helm pull`. Other charts can reference them in the same way as first-party charts (either in the `Chart.yaml` or in the `BUILD` file).
+
+When adding third party artifacts, the `artifact` and `version` fields are mandatory, in addition to one _origin_ from which to download the actual archive. There are two different origins supported: _classic Helm repositories_ and _OCI registries_.
+
+For **classic repositories**, provide with the full URL to the location of the chart archive, excluding the archive file itself:
+
+```python title="3rdparty/helm/jetstack/BUILD"
+helm_artifact(
+  artifact="cert-manager",
+  version="v0.7.0",
+  repository="https://charts.jetstack.io",
+)
+```
+
+For **OCI registries**, you must provide with the URL to the registry in the `registry` field and an optional `repository` field with the path inside that registry.
+
+```python title="3rdparty/helm/example/BUILD"
+helm_artifact(
+  artifact="foo",
+  version="1.0.0",
+  registry="oci://registry.example.com",
+  repository="charts",
+)
+```

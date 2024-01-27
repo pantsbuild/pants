@@ -496,6 +496,29 @@ class PexIgnoreErrorsField(BoolField):
     help = "Should PEX ignore errors when it cannot resolve dependencies?"
 
 
+class PexShBootField(BoolField):
+    alias = "sh_boot"
+    default = False
+    help = help_text(
+        """
+        Should PEX create a modified ZIPAPP that uses `/bin/sh` to boot?
+
+        If you know the machines that the PEX will be distributed to have
+        POSIX compliant `/bin/sh` (almost all do, see:
+        https://pubs.opengroup.org/onlinepubs/9699919799/utilities/sh.html);
+        then this is probably the way you want your PEX to boot. Instead of
+        launching via a Python shebang, the PEX will launch via a `#!/bin/sh`
+        shebang that executes a small script embedded in the head of the PEX
+        ZIPAPP that performs initial interpreter selection and re-execution of
+        the underlying PEX in a way that is often more robust than a Python
+        shebang and always faster on 2nd and subsequent runs since the sh
+        script has a constant overhead of O(1ms) whereas the Python overhead
+        to perform the same interpreter selection and re-execution is
+        O(100ms).
+        """
+    )
+
+
 class PexShebangField(StringField):
     alias = "shebang"
     help = help_text(
@@ -680,6 +703,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexInheritPathField,
     PexStripEnvField,
     PexIgnoreErrorsField,
+    PexShBootField,
     PexShebangField,
     PexEmitWarningsField,
     PexLayoutField,
@@ -1650,11 +1674,33 @@ class VersionTemplateField(StringField):
     )
 
 
+class VersionVersionSchemeField(StringField):
+    alias = "version_scheme"
+    help = help_text(
+        """
+        The version scheme to configure `setuptools_scm` to use.
+        See https://setuptools-scm.readthedocs.io/en/latest/extending/#available-implementations
+        """
+    )
+
+
+class VersionLocalSchemeField(StringField):
+    alias = "local_scheme"
+    help = help_text(
+        """
+        The local scheme to configure `setuptools_scm` to use.
+        See https://setuptools-scm.readthedocs.io/en/latest/extending/#available-implementations_1
+        """
+    )
+
+
 class VCSVersion(Target):
     alias = "vcs_version"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         VersionTagRegexField,
+        VersionVersionSchemeField,
+        VersionLocalSchemeField,
         VCSVersionDummySourceField,
         VersionGenerateToField,
         VersionTemplateField,

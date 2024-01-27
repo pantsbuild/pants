@@ -24,7 +24,6 @@ _docs_globs = [
     "*.md",
     "**/*.md",
     "docs/*",
-    "build-support/bin/generate_user_list.py",
 ]
 _rust_globs = [
     "src/rust/engine/*",
@@ -38,7 +37,6 @@ _release_globs = [
     "src/python/pants/init/BUILD",
     "src/python/pants/notes/*",
     "src/python/pants_release/release.py",
-    "src/python/pants_release/reversion.py",
 ]
 _ci_config_globs = [
     "build-support/bin/classify_changed_files.py",
