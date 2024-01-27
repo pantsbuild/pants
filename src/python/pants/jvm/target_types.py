@@ -550,7 +550,7 @@ def parse_pom_xml(content: bytes) -> Iterator[Coordinate]:
 def get_child_text(parent: ET.Element, child: str) -> str:
     tag = parent.find(child)
     if tag is None:
-        raise ValueError(f"missing tag: {child}")
+        raise ValueError(f"missing element: {child}")
     text = tag.text
     if text is None:
         raise ValueError(f"empty tag: {child}")
