@@ -14,7 +14,9 @@ from pants.backend.go.util_rules.testutil import (
     EXPECTED_VERSION_NEXT_RELEASE,
     mock_go_binary,
 )
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.core.util_rules.system_binaries import BinaryNotFoundError
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -23,7 +25,7 @@ from pants.util.contextutil import temporary_dir
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[*goroot_rules(), QueryRule(GoRoot, [])])
+    return RuleRunner(rules=[*goroot_rules(), *fs_rules(), *archive_rules(), QueryRule(GoRoot, [])])
 
 
 def get_goroot(rule_runner: RuleRunner, binary_names_to_scripts: list[tuple[str, str]]) -> GoRoot:
