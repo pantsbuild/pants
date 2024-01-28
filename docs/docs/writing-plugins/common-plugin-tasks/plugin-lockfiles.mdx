@@ -14,7 +14,7 @@ This guide will walk you through implementing lockfiles and hooking them into th
 
 Create subclasses of `KnownUserResolveNamesRequest` to inform Pants about which resolves exist, and a subclass of `RequestedUserResolveNames` for Pants to request those resolves later. Implement the resolve-finding logic in a Rule from your subclass of `KnownUserResolveNamesRequest` to `KnownUserResolveNames`. Set `KnownResolveNames.requested_resolve_names_cls` to your subclass of `RequestedUserResolveNames`. 
 
-```python
+```python tab={"label": "pants-plugins/fortran/lockfiles.py"}
 from pants.core.goals.generate_lockfiles import KnownUserResolveNamesRequest, RequestedUserResolveNames, KnownUserResolveNames
 from pants.engine.rules import rule
 from pants.engine.target import AllTargets
@@ -44,7 +44,7 @@ async def identify_user_resolves_from_fortran_files(
 
 Create a subclass of `GenerateLockfile`. Pants will use this to represent a lockfile to generate. Then create a rule from your subclass of `RequestedUserResolveNames` to `UserGenerateLockfiles`. Pants will use this rule to convert from a user's request to export a resolve by name into the information needed to export the resolve.
 
-```python
+```python tab={"label": "pants-plugins/fortran/lockfiles.py"}
 from dataclasses import dataclass
 
 from pants.backend.fortran.target_types import FortranDeploymentTarget
@@ -75,7 +75,7 @@ async def setup_user_lockfile_requests(
 
 Create a rule from your subclass of `GenerateLockfile` to `GenerateLockfileResult`. This rule generates the lockfile. In the common case that you're running a process to generate this lockfile, you can use the `Process.output_files` to gather those files from the execution sandbox.
 
-```python
+```python tab={"label": "pants-plugins/fortran/lockfiles.py"}
 from pants.backend.fortran.tool import FortranProcess
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.engine.internals.selectors import Get
@@ -102,7 +102,7 @@ async def generate_lockfile_from_sources(
 
 At the bottom of the file, let Pants know what your rules and types do. Update your plugin's `register.py` to tell Pants about them/
 
-```python pants-plugins/fortran/lockfiles.py
+```python tab={"label": "pants-plugins/fortran/lockfiles.py"}
 
 
 from pants.core.goals.generate_lockfiles import GenerateLockfile, KnownUserResolveNamesRequest, RequestedUserResolveNames
@@ -119,7 +119,7 @@ def rules():
     )
 ```
 
-```python pants-plugins/fortran/register.py
+```python tab={"label": "pants-plugins/fortran/register.py"}
 from fortran import lockfiles
 
 def rules():
