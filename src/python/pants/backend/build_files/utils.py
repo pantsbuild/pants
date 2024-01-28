@@ -6,8 +6,9 @@ from __future__ import annotations
 import os
 from typing import Iterable
 
-from pants.core.goals.fix import FixFilesRequest, Partitions
+from pants.core.goals.fix import FixFilesRequest
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
+from pants.core.util_rules.partitions import Partitions
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.native_engine import FilespecMatcher
 from pants.engine.rules import collect_rules, rule

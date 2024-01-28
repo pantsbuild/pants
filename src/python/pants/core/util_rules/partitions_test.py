@@ -7,8 +7,11 @@ from typing import Any
 import pytest
 
 from pants.build_graph.address import Address
-from pants.core.goals.fix import Partitions
-from pants.core.util_rules.partitions import PartitionerType, _PartitionFieldSetsRequestBase
+from pants.core.util_rules.partitions import (
+    PartitionerType,
+    Partitions,
+    _PartitionFieldSetsRequestBase,
+)
 from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, MultipleSourcesField, SingleSourceField
 from pants.option.option_types import SkipOption
