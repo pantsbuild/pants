@@ -25,9 +25,14 @@ mod parse;
 #[cfg(test)]
 mod parse_tests;
 
+#[cfg(test)]
+mod tests;
+
 mod types;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
+use std::hash::Hash;
 use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
 use std::path;
@@ -52,7 +57,7 @@ pub use types::OptionType;
 // be some scalar or string, or a uniform list of one type of scalar or string, so we can
 // parse as such.
 #[derive(Debug, PartialEq)]
-pub(crate) enum Val {
+pub enum Val {
     Bool(bool),
     Int(i64),
     Float(f64),
@@ -212,7 +217,14 @@ pub struct OptionParser {
 }
 
 impl OptionParser {
-    pub fn new(env: Env, args: Args, allow_pantsrc: bool) -> Result<OptionParser, String> {
+    // If config_paths is None, we'll do config file discovery. Otherwise we'll use the provided paths.
+    // The latter case is useful for tests.
+    pub fn new(
+        args: Args,
+        env: Env,
+        config_paths: Option<Vec<&str>>,
+        allow_pantsrc: bool,
+    ) -> Result<OptionParser, String> {
         let buildroot = BuildRoot::find()?;
         let buildroot_string = String::from_utf8(buildroot.as_os_str().as_bytes().to_vec())
             .map_err(|e| {
@@ -240,11 +252,16 @@ impl OptionParser {
             format!("{}{}{}", a, path::MAIN_SEPARATOR, b)
         }
 
-        let default_config_path = path_join(&buildroot_string, "pants.toml");
-        let repo_config_files = parser.parse_string_list(
-            &option_id!("pants", "config", "files"),
-            &[&default_config_path],
-        )?;
+        let repo_config_files = match config_paths {
+            Some(paths) => paths.iter().map(|s| s.to_string()).collect(),
+            None => {
+                let default_config_path = path_join(&buildroot_string, "pants.toml");
+                parser.parse_string_list(
+                    &option_id!("pants", "config", "files"),
+                    &[&default_config_path],
+                )?
+            }
+        };
 
         let subdir = |subdir_name: &str, default: &str| -> Result<String, String> {
             Ok(parser
@@ -290,9 +307,15 @@ impl OptionParser {
         Ok(OptionParser { sources })
     }
 
-    pub fn parse_bool(&self, id: &OptionId, default: bool) -> Result<OptionValue<bool>, String> {
+    #[allow(clippy::type_complexity)]
+    fn parse_scalar<T: ToOwned + ?Sized>(
+        &self,
+        id: &OptionId,
+        default: &T,
+        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<T::Owned>, String>,
+    ) -> Result<OptionValue<T::Owned>, String> {
         for (source_type, source) in self.sources.iter() {
-            if let Some(value) = source.get_bool(id)? {
+            if let Some(value) = getter(source, id)? {
                 return Ok(OptionValue {
                     source: *source_type,
                     value,
@@ -301,38 +324,20 @@ impl OptionParser {
         }
         Ok(OptionValue {
             source: Source::Default,
-            value: default,
+            value: default.to_owned(),
         })
+    }
+
+    pub fn parse_bool(&self, id: &OptionId, default: bool) -> Result<OptionValue<bool>, String> {
+        self.parse_scalar(id, &default, |source, id| source.get_bool(id))
     }
 
     pub fn parse_int(&self, id: &OptionId, default: i64) -> Result<OptionValue<i64>, String> {
-        for (source_type, source) in self.sources.iter() {
-            if let Some(value) = source.get_int(id)? {
-                return Ok(OptionValue {
-                    source: *source_type,
-                    value,
-                });
-            }
-        }
-        Ok(OptionValue {
-            source: Source::Default,
-            value: default,
-        })
+        self.parse_scalar(id, &default, |source, id| source.get_int(id))
     }
 
     pub fn parse_float(&self, id: &OptionId, default: f64) -> Result<OptionValue<f64>, String> {
-        for (source_type, source) in self.sources.iter() {
-            if let Some(value) = source.get_float(id)? {
-                return Ok(OptionValue {
-                    source: *source_type,
-                    value,
-                });
-            }
-        }
-        Ok(OptionValue {
-            source: Source::Default,
-            value: default,
-        })
+        self.parse_scalar(id, &default, |source, id| source.get_float(id))
     }
 
     pub fn parse_string(
@@ -340,18 +345,69 @@ impl OptionParser {
         id: &OptionId,
         default: &str,
     ) -> Result<OptionValue<String>, String> {
-        for (source_type, source) in self.sources.iter() {
-            if let Some(value) = source.get_string(id)? {
-                return Ok(OptionValue {
-                    source: *source_type,
-                    value,
-                });
+        self.parse_scalar(id, default, |source, id| source.get_string(id))
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn parse_list<T>(
+        &self,
+        id: &OptionId,
+        default: Vec<T>,
+        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
+        remover: fn(&mut Vec<T>, &Vec<T>),
+    ) -> Result<Vec<T>, String> {
+        let mut list = default;
+        for (_source_type, source) in self.sources.iter().rev() {
+            if let Some(list_edits) = getter(source, id)? {
+                for list_edit in list_edits {
+                    match list_edit.action {
+                        ListEditAction::Replace => list = list_edit.items,
+                        ListEditAction::Add => list.extend(list_edit.items),
+                        ListEditAction::Remove => remover(&mut list, &list_edit.items),
+                    }
+                }
             }
         }
-        Ok(OptionValue {
-            source: Source::Default,
-            value: default.to_string(),
+        Ok(list)
+    }
+
+    // For Eq+Hash types we can use a HashSet when computing removals, which will be avg O(N+M).
+    // In practice it's likely that constructing the hash set for a tiny number of is actually
+    // slower than doing this with O(N*M) brute-force lookups, since we expect the size of the
+    // removal set to be tiny in almost any case.
+    // However this is still more than fast enough, and inoculates us against a very unlikely
+    // pathological case of a very large removal set.
+    #[allow(clippy::type_complexity)]
+    fn parse_list_hashable<T: Eq + Hash>(
+        &self,
+        id: &OptionId,
+        default: Vec<T>,
+        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
+    ) -> Result<Vec<T>, String> {
+        self.parse_list(id, default, getter, |list, remove| {
+            let to_remove = remove.iter().collect::<HashSet<_>>();
+            list.retain(|item| !to_remove.contains(item));
         })
+    }
+
+    pub fn parse_bool_list(&self, id: &OptionId, default: &[bool]) -> Result<Vec<bool>, String> {
+        self.parse_list_hashable(id, default.to_vec(), |source, id| source.get_bool_list(id))
+    }
+
+    pub fn parse_int_list(&self, id: &OptionId, default: &[i64]) -> Result<Vec<i64>, String> {
+        self.parse_list_hashable(id, default.to_vec(), |source, id| source.get_int_list(id))
+    }
+
+    // Floats are not Eq or Hash, so we fall back to the brute-force O(N*M) lookups.
+    pub fn parse_float_list(&self, id: &OptionId, default: &[f64]) -> Result<Vec<f64>, String> {
+        self.parse_list(
+            id,
+            default.to_vec(),
+            |source, id| source.get_float_list(id),
+            |list, to_remove| {
+                list.retain(|item| !to_remove.contains(item));
+            },
+        )
     }
 
     pub fn parse_string_list(
@@ -359,28 +415,30 @@ impl OptionParser {
         id: &OptionId,
         default: &[&str],
     ) -> Result<Vec<String>, String> {
-        let mut list_edits = vec![];
-        for (_, source) in self.sources.iter() {
-            if let Some(edits) = source.get_string_list(id)? {
-                list_edits.extend(edits);
-            }
-        }
-        let mut string_list = default.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        for list_edit in list_edits {
-            match list_edit.action {
-                ListEditAction::Replace => string_list = list_edit.items,
-                ListEditAction::Add => string_list.extend(list_edit.items),
-                ListEditAction::Remove => {
-                    let to_remove = list_edit.items.iter().collect::<HashSet<_>>();
-                    string_list = string_list
-                        .iter()
-                        .filter(|item| !to_remove.contains(item))
-                        .map(|s| s.to_owned())
-                        .collect::<Vec<String>>();
+        self.parse_list_hashable::<String>(
+            id,
+            default.iter().map(|s| s.to_string()).collect(),
+            |source, id| source.get_string_list(id),
+        )
+    }
+
+    pub fn parse_dict(
+        &self,
+        id: &OptionId,
+        default: HashMap<String, Val>,
+    ) -> Result<HashMap<String, Val>, String> {
+        let mut dict = default;
+        for (_, source) in self.sources.iter().rev() {
+            if let Some(dict_edits) = source.get_dict(id)? {
+                for dict_edit in dict_edits {
+                    match dict_edit.action {
+                        DictEditAction::Replace => dict = dict_edit.items,
+                        DictEditAction::Add => dict.extend(dict_edit.items),
+                    }
                 }
             }
         }
-        Ok(string_list)
+        Ok(dict)
     }
 }
 
