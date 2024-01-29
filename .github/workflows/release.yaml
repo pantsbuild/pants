@@ -438,6 +438,18 @@ jobs:
         event_type=github-pages
 
         '
+    - env:
+        GH_TOKEN: ${{ secrets.WORKER_PANTS_PANTSBUILD_ORG_TRIGGER_PAT }}
+      if: needs.release_info.outputs.is-release == 'true'
+      name: Trigger docs sync
+      run: 'RELEASE_TAG=${{ steps.get_info.outputs.build-ref }}
+
+        RELEASE_VERSION="${RELEASE_TAG#release_}"
+
+        gh workflow run sync_docs.yml -F "version=$RELEASE_VERSION" -F "reviewer=${{
+        github.actor }}" -R pantsbuild/pantsbuild.org
+
+        '
   release_info:
     if: github.repository_owner == 'pantsbuild'
     name: Create draft release and output info
