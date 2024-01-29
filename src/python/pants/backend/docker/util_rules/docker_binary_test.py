@@ -16,7 +16,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, EMPTY_DIGEST
 from pants.engine.process import Process, ProcessCacheScope
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
@@ -122,7 +122,9 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled, podman_found) -> No
             return BinaryPaths(request.binary_name, ())
 
     def mock_get_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
-        return BinaryShims()
+        return BinaryShims(
+            EMPTY_DIGEST, "cache_name"
+        )
 
     result = run_rule_with_mocks(
         get_docker,
