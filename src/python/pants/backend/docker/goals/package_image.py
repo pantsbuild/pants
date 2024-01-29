@@ -515,8 +515,8 @@ def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
                 # Podman output
                 r"^(?P<podman_long_id>\S{64})$",
             ),
-        )
-        , re.MULTILINE
+        ),
+        re.MULTILINE,
     )
     for output in outputs:
         image_id_match = next(
@@ -531,7 +531,11 @@ def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
             None,
         )
         if image_id_match:
-            image_id = image_id_match.group("digest") or image_id_match.group("short_id") or image_id_match.group("podman_long_id")
+            image_id = (
+                image_id_match.group("digest")
+                or image_id_match.group("short_id")
+                or image_id_match.group("podman_long_id")
+            )
             return image_id
 
     return "<unknown>"

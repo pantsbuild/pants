@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
-import logging
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Mapping

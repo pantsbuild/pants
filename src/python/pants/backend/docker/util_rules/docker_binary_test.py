@@ -6,13 +6,13 @@ from unittest import mock
 
 import pytest
 
-from pants.backend.docker.util_rules.docker_binary import DockerBinary, rules, get_docker
-from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.subsystems.docker_options import DockerOptions
+from pants.backend.docker.util_rules.docker_binary import DockerBinary, get_docker, rules
+from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.testutil.option_util import create_subsystem
+from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -97,13 +97,15 @@ def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None
     )
     assert run_request.description == f"Running docker image {image_ref}"
 
+
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
-    BinaryPaths,
     BinaryPathRequest,
+    BinaryPaths,
     BinaryShims,
     BinaryShimsRequest,
 )
+
 
 @pytest.mark.parametrize("podman_enabled", [True, False])
 @pytest.mark.parametrize("podman_found", [True, False])
@@ -126,14 +128,17 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled, podman_found) -> No
 
     result = run_rule_with_mocks(
         get_docker,
-        rule_args=[
-            docker_options,
-            docker_options_env_aware
-        ],
+        rule_args=[docker_options, docker_options_env_aware],
         mock_gets=[
-            MockGet(output_type=BinaryPaths, input_types=(BinaryPathRequest,), mock=mock_get_binary_path),
-            MockGet(output_type=BinaryShims, input_types=(BinaryShimsRequest,), mock=mock_get_binary_shims)
-        ]
+            MockGet(
+                output_type=BinaryPaths, input_types=(BinaryPathRequest,), mock=mock_get_binary_path
+            ),
+            MockGet(
+                output_type=BinaryShims,
+                input_types=(BinaryShimsRequest,),
+                mock=mock_get_binary_shims,
+            ),
+        ],
     )
 
     if podman_enabled and podman_found:

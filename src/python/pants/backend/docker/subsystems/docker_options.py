@@ -158,7 +158,7 @@ class DockerOptions(Subsystem):
             """
             EXPERIMENTAL. Allow support for podman where available instead of docker.
             """
-        )
+        ),
     )
 
     _build_args = ShellStrListOption(
