@@ -512,8 +512,8 @@ def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
                 r"(writing image (?P<digest>sha256:\S+) done)",
                 # Docker output.
                 r"(Successfully built (?P<short_id>\S+))",
-                # Podman output (Use the last short-hash to verify the long-hash on the final line)
-                r"(--> (\S+)\nSuccessfully tagged .*\n(?P<podman_id>\2\S+))",
+                # Podman output
+                r"^(?P<podman_long_id>\S{64})$",
             ),
         )
         , re.MULTILINE
@@ -531,7 +531,7 @@ def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
             None,
         )
         if image_id_match:
-            image_id = image_id_match.group("digest") or image_id_match.group("short_id") or image_id_match.group("podman_id")
+            image_id = image_id_match.group("digest") or image_id_match.group("short_id") or image_id_match.group("podman_long_id")
             return image_id
 
     return "<unknown>"
