@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+import logging
 
 import os
 from dataclasses import dataclass
@@ -22,6 +23,8 @@ from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -139,6 +142,8 @@ async def get_docker(
         )
         paths = await Get(BinaryPaths, BinaryPathRequest, request)
         first_path = paths.first_path
+        if first_path:
+            logger.warning("podman found. Podman support is experimental.")
 
     if not first_path:
         request = BinaryPathRequest(
