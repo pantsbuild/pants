@@ -537,7 +537,9 @@ async def generate_from_pom_xml(
 def parse_pom_xml(content: bytes) -> Iterator[Coordinate]:
     root = ET.fromstring(content.decode("utf-8"))
     match = re.match(r"^(\{.*\})project$", root.tag)
-    assert match, root.tag
+    if not match:
+        raise ValueError(f"Unexpected root tag `{root.tag}`, expected project")
+
     namespace = match.group(1)
     for dependency in root.iter(f"{namespace}dependency"):
         yield Coordinate(
