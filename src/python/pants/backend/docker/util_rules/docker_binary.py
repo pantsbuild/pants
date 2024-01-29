@@ -128,13 +128,26 @@ async def get_docker(
     docker_options: DockerOptions, docker_options_env_aware: DockerOptions.EnvironmentAware
 ) -> DockerBinary:
     search_path = docker_options_env_aware.executable_search_path
-    request = BinaryPathRequest(
-        binary_name="docker",
-        search_path=search_path,
-        test=BinaryPathTest(args=["-v"]),
-    )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
+
+    first_path: BinaryPath | None = None
+
+    if docker_options.enable_podman:
+        request = BinaryPathRequest(
+            binary_name="podman",
+            search_path=search_path,
+            test=BinaryPathTest(args=["-v"]),
+        )
+        paths = await Get(BinaryPaths, BinaryPathRequest, request)
+        first_path = paths.first_path
+
+    if not first_path:
+        request = BinaryPathRequest(
+            binary_name="docker",
+            search_path=search_path,
+            test=BinaryPathTest(args=["-v"]),
+        )
+        paths = await Get(BinaryPaths, BinaryPathRequest, request)
+        first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
 
     if not docker_options.tools:
         return DockerBinary(first_path.path, first_path.fingerprint)

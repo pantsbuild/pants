@@ -1596,6 +1596,7 @@ def test_get_context_root(
             "",
             "",
         ),
+        # Docker
         (
             "0e09b442b572",
             "",
@@ -1610,6 +1611,7 @@ def test_get_context_root(
                 """
             ),
         ),
+        # Buildkit
         (
             "sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7",
             dedent(
@@ -1631,6 +1633,20 @@ def test_get_context_root(
             ),
             "",
         ),
+        # Podman
+        (
+            "a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee",
+            dedent(
+                """\
+                STEP 5/5: COPY ./ .
+                COMMIT example
+                --> a85499e9039a
+                Successfully tagged localhost/example:latest
+                a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee
+                """
+            ),
+            ""
+        )
     ],
 )
 def test_parse_image_id_from_docker_build_output(expected: str, stdout: str, stderr: str) -> None:
