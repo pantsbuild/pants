@@ -38,10 +38,10 @@ class RuffFieldSet(FieldSet):
 
 
 class RuffMode(str, Enum):
-    CHECK_LINT = "check"
+    LINT = "check"
     FIX = "check --fix"
-    FMT_LINT = "format --check"
     FMT = "format"
+    # "format --check" is automatically covered by builtin linter for RuffFmtRequest.
 
 
 # --------------------------------------------------------------------------------------

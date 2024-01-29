@@ -10,12 +10,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.ruff import skip_field
-from pants.backend.python.lint.ruff.rules import (
-    RuffCheckLintRequest,
-    RuffFixRequest,
-    RuffFmtRequest,
-    RuffFormatLintRequest,
-)
+from pants.backend.python.lint.ruff.rules import RuffFixRequest, RuffFmtRequest, RuffLintRequest
 from pants.backend.python.lint.ruff.rules import rules as ruff_rules
 from pants.backend.python.lint.ruff.subsystem import RuffFieldSet
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
@@ -46,8 +41,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(FixResult, [RuffFixRequest.Batch]),
-            QueryRule(LintResult, [RuffCheckLintRequest.Batch]),
-            QueryRule(LintResult, [RuffFormatLintRequest.Batch]),
+            QueryRule(LintResult, [RuffLintRequest.Batch]),
             QueryRule(FmtResult, [RuffFmtRequest.Batch]),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
@@ -58,8 +52,7 @@ def rule_runner() -> RuleRunner:
 @dataclass
 class RuffResult:
     fix: FixResult
-    check_lint: LintResult
-    format_lint: LintResult
+    lint: LintResult
     fmt: FmtResult
 
 
@@ -87,20 +80,10 @@ def run_ruff(
             ),
         ],
     )
-    check_lint = rule_runner.request(
+    lint = rule_runner.request(
         LintResult,
         [
-            RuffCheckLintRequest.Batch(
-                "",
-                tuple(field_sets),
-                partition_metadata=_EmptyMetadata(),
-            ),
-        ],
-    )
-    format_lint = rule_runner.request(
-        LintResult,
-        [
-            RuffFormatLintRequest.Batch(
+            RuffLintRequest.Batch(
                 "",
                 tuple(field_sets),
                 partition_metadata=_EmptyMetadata(),
@@ -118,7 +101,7 @@ def run_ruff(
             )
         ],
     )
-    return RuffResult(fix=fix, check_lint=check_lint, format_lint=format_lint, fmt=fmt)
+    return RuffResult(fix=fix, lint=lint, fmt=fmt)
 
 
 @pytest.mark.platform_specific_behavior
@@ -134,8 +117,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
         [tgt],
         extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
-    assert result.check_lint.exit_code == 0
-    assert result.format_lint.exit_code == 0
+    assert result.lint.exit_code == 0
     assert result.fix.stderr == ""
     assert result.fix.stdout == ""
     assert not result.fix.did_change
@@ -148,8 +130,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_ruff(rule_runner, [tgt])
-    assert result.check_lint.exit_code == 1
-    assert result.format_lint.exit_code == 0
+    assert result.lint.exit_code == 1
     assert result.fix.stdout == "Found 1 error (1 fixed, 0 remaining).\n"
     assert result.fix.stderr == ""
     assert result.fix.did_change
@@ -174,13 +155,9 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     result = run_ruff(rule_runner, tgts)
 
-    assert result.check_lint.exit_code == 1
-    assert "Found 1 error" in result.check_lint.stdout
-    assert "bad.py:1:5" in result.check_lint.stdout
-
-    assert result.format_lint.exit_code == 1
-    assert "1 file would be reformatted, 2 files left unchanged" in result.format_lint.stdout
-    assert "Would reformat: unformatted.py" in result.format_lint.stdout
+    assert result.lint.exit_code == 1
+    assert "Found 1 error" in result.lint.stdout
+    assert "bad.py:1:5" in result.lint.stdout
 
     assert result.fix.output == rule_runner.make_snapshot(
         {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
@@ -224,6 +201,5 @@ def test_config_file(
     addr = Address(spec_path, relative_file_path=str(rel_file_path))
     tgt = rule_runner.get_target(addr)
     result = run_ruff(rule_runner, [tgt], extra_args=extra_args)
-    assert result.check_lint.exit_code == bool(should_change)
-    assert not result.format_lint.exit_code
+    assert result.lint.exit_code == bool(should_change)
     assert result.fix.did_change is should_change

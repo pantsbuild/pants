@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Tuple
+from typing import Any, Tuple
 
 from typing_extensions import assert_never
 
@@ -13,15 +13,14 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fix import FixResult, FixTargetsRequest
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.goals.lint import AbstractLintRequest, LintResult, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
@@ -31,6 +30,7 @@ class RuffFixRequest(FixTargetsRequest):
     field_set_type = RuffFieldSet
     tool_subsystem = Ruff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
+    enable_lint_rules = False
 
     @classproperty
     def tool_name(cls) -> str:
@@ -41,7 +41,7 @@ class RuffFixRequest(FixTargetsRequest):
         return "ruff-check"
 
 
-class RuffCheckLintRequest(LintTargetsRequest):
+class RuffLintRequest(LintTargetsRequest):
     field_set_type = RuffFieldSet
     tool_subsystem = Ruff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
@@ -63,20 +63,6 @@ class RuffFmtRequest(FmtTargetsRequest):
     @classproperty
     def tool_name(cls) -> str:
         return "ruff format"
-
-    @classproperty
-    def tool_id(self) -> str:
-        return "ruff-format"
-
-
-class RuffFormatLintRequest(LintTargetsRequest):
-    field_set_type = RuffFieldSet
-    tool_subsystem = Ruff
-    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
-
-    @classproperty
-    def tool_name(cls) -> str:
-        return "ruff format --check"
 
     @classproperty
     def tool_id(self) -> str:
@@ -112,11 +98,9 @@ async def run_ruff(
     extra_initial_args: Tuple[str, ...] = ()
     if request.mode is RuffMode.FMT:
         extra_initial_args = ("format",)
-    elif request.mode is RuffMode.FMT_LINT:
-        extra_initial_args = ("format", "--check")
     elif request.mode is RuffMode.FIX:
         extra_initial_args = ("check", "--fix")
-    elif request.mode is RuffMode.CHECK_LINT:
+    elif request.mode is RuffMode.LINT:
         extra_initial_args = ("check",)
     else:
         assert_never(request.mode)
@@ -149,25 +133,13 @@ async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
 
 
 @rule(desc="Lint with ruff check", level=LogLevel.DEBUG)
-async def ruff_check_lint(request: RuffCheckLintRequest.Batch[RuffFieldSet, Any]) -> LintResult:
+async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintResult:
     source_files = await Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
     result = await Get(
         FallibleProcessResult,
-        _RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.CHECK_LINT),
-    )
-    return LintResult.create(request, result)
-
-
-@rule(desc="Lint with ruff format --check", level=LogLevel.DEBUG)
-async def ruff_format_lint(request: RuffFormatLintRequest.Batch[RuffFieldSet, Any]) -> LintResult:
-    source_files = await Get(
-        SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
-    )
-    result = await Get(
-        FallibleProcessResult,
-        _RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.FMT_LINT),
+        _RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.LINT),
     )
     return LintResult.create(request, result)
 
@@ -181,24 +153,11 @@ async def ruff_fmt(request: RuffFmtRequest.Batch, ruff: Ruff) -> FmtResult:
     return await FmtResult.create(request, result)
 
 
-def without_lint(rules: Iterable[Rule]) -> Iterable[Rule]:
-    return (
-        rule
-        for rule in rules
-        if not isinstance(rule, UnionRule)
-        or (
-            rule.union_base is not AbstractLintRequest
-            and rule.union_base is not AbstractLintRequest.Batch
-        )
-    )
-
-
 def rules():
     return [
         *collect_rules(),
-        *without_lint(RuffFixRequest.rules()),
-        *RuffCheckLintRequest.rules(),
-        *RuffFormatLintRequest.rules(),
-        *without_lint(RuffFmtRequest.rules()),
+        *RuffFixRequest.rules(),
+        *RuffLintRequest.rules(),
+        *RuffFmtRequest.rules(),
         *pex.rules(),
     ]
