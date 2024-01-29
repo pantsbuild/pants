@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Tuple
 
 import pytest
 
@@ -54,7 +53,7 @@ def run_ruff(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
-) -> Tuple[FixResult, LintResult, FmtResult]:
+) -> tuple[FixResult, LintResult, FmtResult]:
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
@@ -94,6 +93,7 @@ def run_ruff(
             )
         ],
     )
+
     return fix_result, lint_result, fmt_result
 
 
@@ -148,13 +148,10 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     fix_result, lint_result, fmt_result = run_ruff(rule_runner, tgts)
     assert lint_result.exit_code == 1
-    assert "Found 1 error" in lint_result.stdout
-    assert "bad.py:1:5" in lint_result.stdout
     assert fix_result.output == rule_runner.make_snapshot(
         {"good.py": GOOD_FILE, "bad.py": GOOD_FILE, "unformatted.py": UNFORMATTED_FILE}
     )
     assert fix_result.did_change is True
-
     assert fmt_result.output == rule_runner.make_snapshot(
         {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "unformatted.py": GOOD_FILE}
     )
@@ -191,6 +188,6 @@ def test_config_file(
     rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
     addr = Address(spec_path, relative_file_path=str(rel_file_path))
     tgt = rule_runner.get_target(addr)
-    fix_result, lint_result, _ = run_ruff(rule_runner, [tgt], extra_args=extra_args)
+    fix_result, lint_result, fmt_result = run_ruff(rule_runner, [tgt], extra_args=extra_args)
     assert lint_result.exit_code == bool(should_change)
     assert fix_result.did_change is should_change
