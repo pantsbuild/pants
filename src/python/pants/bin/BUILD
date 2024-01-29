@@ -9,7 +9,6 @@ python_sources(
     dependencies=[":plugins"],
 )
 
-# NOTE: When adding a new backend, add it to `generate_docs.py` too! (If stable enough for docs)
 target(
     name="plugins",
     dependencies=[
