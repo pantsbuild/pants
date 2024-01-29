@@ -108,7 +108,7 @@ def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None
 @pytest.mark.parametrize("podman_enabled", [True, False])
 @pytest.mark.parametrize("podman_found", [True, False])
 def test_get_docker(rule_runner: RuleRunner, podman_enabled, podman_found) -> None:
-    docker_options = create_subsystem(DockerOptions, enable_podman=podman_enabled, tools=[])
+    docker_options = create_subsystem(DockerOptions, experimental_enable_podman=podman_enabled, tools=[])
     docker_options_env_aware = mock.MagicMock(spec=DockerOptions.EnvironmentAware)
 
     def mock_get_binary_path(request: BinaryPathRequest) -> BinaryPaths:

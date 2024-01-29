@@ -134,7 +134,8 @@ async def get_docker(
 
     first_path: BinaryPath | None = None
 
-    if docker_options.enable_podman:
+    if getattr(docker_options, "experimental_enable_podman", False):
+        # Enable podman support with `pants.backend.experimental.docker.podman`
         request = BinaryPathRequest(
             binary_name="podman",
             search_path=search_path,

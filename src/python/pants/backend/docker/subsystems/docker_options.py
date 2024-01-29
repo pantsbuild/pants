@@ -152,15 +152,6 @@ class DockerOptions(Subsystem):
         ),
     )
 
-    enable_podman = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            EXPERIMENTAL. Allow support for podman where available instead of docker.
-            """
-        ),
-    )
-
     _build_args = ShellStrListOption(
         help=softwrap(
             f"""
