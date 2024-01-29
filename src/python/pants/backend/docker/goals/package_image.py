@@ -523,7 +523,6 @@ def parse_image_id_from_docker_build_output(docker: DockerBinary, *outputs: byte
                     r"(writing image (?P<digest>sha256:\S+) done)",
                     # Docker output.
                     r"(Successfully built (?P<short_id>\S+))",
-                    # Podman output
                 ),
             )
         )
