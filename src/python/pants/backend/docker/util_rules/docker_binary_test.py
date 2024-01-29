@@ -9,6 +9,7 @@ import pytest
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_binary import DockerBinary, get_docker, rules
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
+from pants.backend.experimental.docker.podman.register import rules as podman_rules
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
@@ -16,7 +17,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.fs import Digest, EMPTY_DIGEST
+from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
@@ -34,7 +35,12 @@ def docker(docker_path: str) -> DockerBinary:
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=rules())
+    return RuleRunner(
+        rules=[
+            *rules(),
+            *podman_rules(),
+        ]
+    )
 
 
 def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> None:
@@ -108,7 +114,9 @@ def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None
 @pytest.mark.parametrize("podman_enabled", [True, False])
 @pytest.mark.parametrize("podman_found", [True, False])
 def test_get_docker(rule_runner: RuleRunner, podman_enabled, podman_found) -> None:
-    docker_options = create_subsystem(DockerOptions, experimental_enable_podman=podman_enabled, tools=[])
+    docker_options = create_subsystem(
+        DockerOptions, experimental_enable_podman=podman_enabled, tools=[]
+    )
     docker_options_env_aware = mock.MagicMock(spec=DockerOptions.EnvironmentAware)
 
     def mock_get_binary_path(request: BinaryPathRequest) -> BinaryPaths:
@@ -122,9 +130,7 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled, podman_found) -> No
             return BinaryPaths(request.binary_name, ())
 
     def mock_get_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
-        return BinaryShims(
-            EMPTY_DIGEST, "cache_name"
-        )
+        return BinaryShims(EMPTY_DIGEST, "cache_name")
 
     result = run_rule_with_mocks(
         get_docker,
@@ -143,5 +149,7 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled, podman_found) -> No
 
     if podman_enabled and podman_found:
         assert result.path == "/bin/podman"
+        assert result.is_podman
     else:
         assert result.path == "/bin/docker"
+        assert not result.is_podman
