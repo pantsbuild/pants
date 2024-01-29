@@ -515,8 +515,7 @@ def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
                 # Podman output
                 r"^(?P<podman_long_id>\S{64})$",
             ),
-        ),
-        re.MULTILINE,
+        )
     )
     for output in outputs:
         image_id_match = next(
