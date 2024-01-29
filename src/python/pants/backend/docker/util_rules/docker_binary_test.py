@@ -9,6 +9,13 @@ import pytest
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_binary import DockerBinary, get_docker, rules
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
+from pants.core.util_rules.system_binaries import (
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryShims,
+    BinaryShimsRequest,
+)
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.testutil.option_util import create_subsystem
@@ -96,15 +103,6 @@ def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None
         description="",  # The description field is marked `compare=False`
     )
     assert run_request.description == f"Running docker image {image_ref}"
-
-
-from pants.core.util_rules.system_binaries import (
-    BinaryPath,
-    BinaryPathRequest,
-    BinaryPaths,
-    BinaryShims,
-    BinaryShimsRequest,
-)
 
 
 @pytest.mark.parametrize("podman_enabled", [True, False])
