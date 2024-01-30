@@ -139,7 +139,19 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     """
     if isinstance(v, bytes):
         v = v.decode()
-    return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
+
+    found_sandbox_paths = re.findall(r"(/.*/pants-sandbox-[a-zA-Z0-9]+)/", v)
+    sandbox_path_to_replacement = {}
+    for sandbox_path in found_sandbox_paths:
+        if sandbox_path not in sandbox_path_to_replacement:
+            sandbox_path_to_replacement[
+                sandbox_path
+            ] = f"/<sandbox-{len(sandbox_path_to_replacement)+1}>"
+
+    for sandbox, replacement in sandbox_path_to_replacement.items():
+        v = v.replace(sandbox, replacement)
+
+    return v
 
 
 @dataclasses.dataclass(frozen=True)
