@@ -26,6 +26,8 @@ from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.util_rules import source_files
+from pants.core.util_rules.archive import rules as archive_rules
+from pants.engine.fs import rules as fs_rules
 from pants.engine.process import ProcessResult
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -48,13 +50,15 @@ def rule_runner() -> RuleRunner:
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
             *source_files.rules(),
+            *fs_rules(),
+            *archive_rules(),
             get_filtered_environment,
             QueryRule(TestResult, (GoTestRequest.Batch,)),
             QueryRule(ProcessResult, (GoSdkProcess,)),
         ],
         target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget],
     )
-    rule_runner.set_options(["--go-test-args=-v"], env_inherit={"PATH"})
+    rule_runner.set_options(["--go-test-args=-v", "--keep-sandboxes=always"], env_inherit={"PATH"})
     return rule_runner
 
 

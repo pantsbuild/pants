@@ -76,12 +76,14 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
-    go_run_script = FileContent(
-        "__run_go.sh",
-        textwrap.dedent(
-            f"""\
-            export GOROOT={goroot.path}
-            sandbox_root="$(/bin/pwd)"
+
+    script = textwrap.dedent(
+        f"""\
+            set -x
+
+            export sandbox_root="$(/bin/pwd)"
+            export sandbox_root=$(realpath $sandbox_root)
+            export GOROOT="$(realpath `pwd`)/{goroot.path}"
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/cache"
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
@@ -93,9 +95,20 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
               args=("${{@//__PANTS_SANDBOX_ROOT__/$sandbox_root}}")
               set -- "${{args[@]}}"
             fi
-            exec "{goroot.path}/bin/go" "$@"
+            which go >&2
+            echo "GOROOT: ${{GOROOT}}" >&2
+            echo "GOPATH: ${{GOPATH}}" >&2
+            echo "GOCACHE: ${{GOCACHE}}" >&2
+            cat __sources__.txt >&2
+            go env --json >&2
+            ls -al ${{GOROOT}}/src/internal/goarch/ >&2
+            exec "${{GOROOT}}/bin/go" "$@"
             """
-        ).encode("utf-8"),
+    )
+
+    go_run_script = FileContent(
+        "__run_go.sh",
+        script.encode("utf-8"),
     )
 
     digest = await Get(Digest, CreateDigest([go_run_script]))
@@ -111,7 +124,7 @@ async def setup_go_sdk_process(
     goroot: GoRoot,
 ) -> Process:
     input_digest, env_vars = await MultiGet(
-        Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
+        Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest, goroot.digest])),
         Get(
             EnvironmentVars,
             EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
@@ -125,6 +138,9 @@ async def setup_go_sdk_process(
         "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.full_version}/{goroot.goos}/{goroot.goarch}",
     }
 
+    if "PATH" in env:
+        env["PATH"] = f"{goroot.path}/bin:{env['PATH']}"
+
     if request.replace_sandbox_root_in_args:
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
 
@@ -137,6 +153,7 @@ async def setup_go_sdk_process(
             exp_fields.append("nocoverageredesign")
         env["GOEXPERIMENT"] = ",".join(exp_fields)
 
+    print(request.command)
     return Process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env=env,

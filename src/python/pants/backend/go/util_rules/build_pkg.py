@@ -812,6 +812,7 @@ async def build_go_package(
     # may end up to exceed those limits when compiling standard library packages where we append a very long GOROOT
     # path to each file name or in packages with large numbers of files.
     go_source_file_paths_config = "\n".join([*go_file_paths, *generated_cgo_file_paths])
+
     go_sources_file_paths_digest = await Get(
         Digest, CreateDigest([FileContent("__sources__.txt", go_source_file_paths_config.encode())])
     )

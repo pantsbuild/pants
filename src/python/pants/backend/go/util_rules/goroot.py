@@ -96,21 +96,27 @@ async def install_go_toolchain(
     unrooted = await Get(Digest, RemovePrefix(extracted_archive.digest, "go"))
     with_prefix = await Get(Digest, AddPrefix(unrooted, f".go-{version}"))
 
+    print(package, extracted_archive.digest, unrooted, with_prefix)
     binary_path = f".go-{version}/bin/go"
     env_result = await Get(  # noqa: PNT30: requires triage
         ProcessResult,
         Process(
-            (binary_path, "env", "-json"),
+            (f"{binary_path}", "env", "-json"),
             description=f"Determine Go SDK metadata for {binary_path}",
             level=LogLevel.DEBUG,
-            env={"GOPATH": "/does/not/matter"},
+            env={"GOPATH": "/doess/not/matter"},
             input_digest=with_prefix,
         ),
     )
+
     sdk_metadata = json.loads(env_result.stdout.decode())
 
+    print(sdk_metadata["GOROOT"])
+    print(len(sdk_metadata["GOROOT"]))
+    print(list(sdk_metadata["GOROOT"]))
+
     return GoRoot(
-        path=sdk_metadata["GOROOT"],
+        path=sdk_metadata["GOROOT"][26:],
         version=version,
         _raw_metadata=FrozenDict(sdk_metadata),
         digest=with_prefix,

@@ -17,6 +17,7 @@ from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -59,6 +60,16 @@ async def gofmt_fmt(
     request: GofmtRequest.Batch, gofmt: GofmtSubsystem, goroot: GoRoot
 ) -> FmtResult:
     await _validate_gofmt_args(gofmt.args)
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            (
+                request.snapshot.digest,
+                goroot.digest,
+            ),
+        ),
+    )
+
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
@@ -70,7 +81,7 @@ async def gofmt_fmt(
         ProcessResult,
         Process(
             argv=argv,
-            input_digest=request.snapshot.digest,
+            input_digest=input_digest,
             output_files=request.files,
             description=f"Run gofmt on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,

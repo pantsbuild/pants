@@ -615,7 +615,7 @@ async def run_go_tests(
         ),
     )
     test_input_digest = await Get(
-        Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
+        Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest, goroot.digest))
     )
 
     extra_env = {

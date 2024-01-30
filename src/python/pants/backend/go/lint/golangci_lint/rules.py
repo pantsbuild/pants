@@ -150,6 +150,7 @@ async def run_golangci_lint(
         Digest,
         MergeDigests(
             [
+                goroot.digest,
                 golangci_lint_run_script_digest,
                 downloaded_golangci_lint.digest,
                 config_files.snapshot.digest,
