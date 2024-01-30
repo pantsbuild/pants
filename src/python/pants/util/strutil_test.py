@@ -84,9 +84,9 @@ def test_strip_chroot_path() -> None:
         )
         == dedent(
             """\
-        Would reformat src/python/example.py
-        Would reformat test.py
-        Would reformat custom_tmpdir.py
+        Would reformat /<sandbox-1>/src/python/example.py
+        Would reformat /<sandbox-2>/test.py
+        Would reformat /<sandbox-3>/custom_tmpdir.py
 
         Some other output.
         """
@@ -120,8 +120,8 @@ def test_strip_chroot_path() -> None:
     [
         (False, False, "\033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m"),
         (False, True, "/var/pants-sandbox-123/red/path.py bold"),
-        (True, False, "\033[0;31mred/path.py\033[0m \033[1mbold\033[0m"),
-        (True, True, "red/path.py bold"),
+        (True, False, "\033[0;31m/<sandbox-1>/red/path.py\033[0m \033[1mbold\033[0m"),
+        (True, True, "/<sandbox-1>/red/path.py bold"),
     ],
 )
 def test_simplifier(strip_chroot_path: bool, strip_formatting: bool, expected: str) -> None:
