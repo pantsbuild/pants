@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Mapping, Sequence
 
 from pants.backend.adhoc.target_types import (
     SystemBinaryExtraEnvVarsField,
@@ -67,7 +67,7 @@ async def _find_binary(
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
-    extra_env_vars: Iterable[str] = (),
+    extra_env_vars: Sequence[str] = (),
 ) -> BinaryPath:
     binaries = await Get(
         BinaryPaths,

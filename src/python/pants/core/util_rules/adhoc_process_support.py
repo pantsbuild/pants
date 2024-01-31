@@ -8,10 +8,14 @@ import os
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Mapping, TypeVar, Union
+from typing import Dict, Iterable, Mapping, TypeVar, Union
 
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    EnvironmentAwarePackageRequest,
+    PackageFieldSet,
+)
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentNameRequest
@@ -30,7 +34,12 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.native_engine import AddressInput, RemovePrefix
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
+from pants.engine.process import (
+    FallibleProcessResult,
+    Process,
+    ProcessResult,
+    ProductDescription,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -239,7 +248,7 @@ async def _resolve_runnable_dependencies(
                 )
             )
 
-    runnable_extra_env_vars = {}
+    runnable_extra_env_vars: Dict[str, str] = {}
     if runnable_extra_env_vars_unresolved:
         runnable_extra_env_vars_resolved = await Get(EnvironmentVars, EnvironmentVarsRequest(runnable_extra_env_vars_unresolved))
         runnable_extra_env_vars = dict(runnable_extra_env_vars_resolved)
