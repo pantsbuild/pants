@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from typing import Iterable, Mapping
 
 from pants.backend.adhoc.target_types import (
+    SystemBinaryExtraEnvVarsField,
     SystemBinaryExtraSearchPathsField,
     SystemBinaryFingerprintArgsField,
     SystemBinaryFingerprintDependenciesField,
     SystemBinaryFingerprintPattern,
-    SystemBinaryExtraEnvVarsField,
     SystemBinaryNameField,
 )
 from pants.build_graph.address import Address
@@ -29,11 +29,11 @@ from pants.core.util_rules.system_binaries import (
     SearchPath,
     SystemBinariesSubsystem,
 )
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)

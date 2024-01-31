@@ -345,6 +345,7 @@ class SystemBinaryFingerprintDependenciesField(AdhocToolRunnableDependenciesFiel
         """
     )
 
+
 class SystemBinaryExtraEnvVarsField(StringSequenceField):
     alias: ClassVar[str] = "extra_env_vars"
     help = help_text(
@@ -358,6 +359,7 @@ class SystemBinaryExtraEnvVarsField(StringSequenceField):
         """
     )
 
+
 class SystemBinaryTarget(Target):
     alias: ClassVar[str] = "system_binary"
     core_fields = (
@@ -367,7 +369,7 @@ class SystemBinaryTarget(Target):
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
         SystemBinaryFingerprintDependenciesField,
-        SystemBinaryExtraEnvVarsField
+        SystemBinaryExtraEnvVarsField,
     )
     help = help_text(
         lambda: f"""
