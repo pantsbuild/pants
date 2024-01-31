@@ -329,6 +329,14 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
             'a.b.c.d.2Bar',
             'a.2b.c.D',
 
+            # Explicitly ignored strings
+            'w.x',  # pants: no-infer-dep
+            'w.x.Foo',  # pants: no-infer-dep
+            'w.x.y.z',  # pants: no-infer-dep
+            'w.x.y.z.Foo',  # pants: no-infer-dep
+            'w.x.y.z.FooBar',  # pants: no-infer-dep
+            'u.v.w.x.y.z.Baz',  # pants: no-infer-dep
+
             # Definitely invalid strings
             'I/have/a/slash',
             'I\\\\have\\\\backslashes',

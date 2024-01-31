@@ -322,7 +322,9 @@ impl Visitor for ImportCollector<'_> {
     fn visit_string(&mut self, node: tree_sitter::Node) -> ChildBehavior {
         let range = node.range();
         let text: &str = self.string_at(range);
-        if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\') {
+        if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\')
+            && !self.is_pragma_ignored(node)
+        {
             self.string_candidates
                 .insert(text.to_string(), (range.start_point.row + 1) as u64);
         }

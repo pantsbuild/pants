@@ -681,6 +681,13 @@ fn string_candidates() {
     // Technically the value of the string doesn't contain whitespace, but the parser isn't that
     // sophisticated yet.
     assert_strings("'''\\\na'''", &[]);
+
+    // pragma ignored strings
+    assert_strings("'a' # pants: no-infer-dep", &[]);
+    assert_strings("'''a''' # pants: no-infer-dep", &[]);
+    assert_strings("'a.b' # pants: no-infer-dep", &[]);
+    assert_strings("'a.b.c_狗' # pants: no-infer-dep", &[]);
+    assert_strings("'..a.b.c.d' # pants: no-infer-dep", &[]);
 }
 
 #[test]
