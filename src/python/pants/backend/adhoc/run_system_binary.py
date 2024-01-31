@@ -67,7 +67,7 @@ async def _find_binary(
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
-    extra_env_vars: Sequence[str] = (),
+    extra_env_vars: Sequence[str] | None,
 ) -> BinaryPath:
     binaries = await Get(
         BinaryPaths,
