@@ -30,7 +30,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
+from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
@@ -400,10 +400,7 @@ async def find_interpreter(
     )
     path, fingerprint = result.stdout.decode().strip().splitlines()
 
-    if pex_subsystem.verbosity > 0:
-        log_output = result.stderr.decode()
-        if log_output:
-            logger.info("%s", log_output)
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     return PythonExecutable(path=path, fingerprint=fingerprint)
 
@@ -675,7 +672,6 @@ async def build_pex(
     argv = [
         "--output-file",
         request.output_filename,
-        "--no-emit-warnings",
         *request.additional_args,
     ]
 
@@ -746,10 +742,7 @@ async def build_pex(
         ),
     )
 
-    if pex_subsystem.verbosity > 0:
-        log_output = result.stderr.decode()
-        if log_output:
-            logger.info("%s", log_output)
+    maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     digest = (
         await Get(

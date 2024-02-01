@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os.path
 from dataclasses import dataclass
 from typing import Iterable, List, Mapping, Optional, Tuple
@@ -28,6 +29,8 @@ from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_con
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
+
+logger = logging.getLogger(__name__)
 
 
 class PexCli(TemplatedExternalTool):
@@ -156,6 +159,8 @@ async def setup_pex_cli_process(
 
     verbosity_args = [f"-{'v' * pex_subsystem.verbosity}"] if pex_subsystem.verbosity > 0 else []
 
+    warnings_args = [] if pex_subsystem.emit_warnings else ["--no-emit-warnings"]
+
     # NB: We should always pass `--python-path`, as that tells Pex where to look for interpreters
     # when `--python` isn't an absolute path.
     resolve_args = [
@@ -171,6 +176,7 @@ async def setup_pex_cli_process(
         *request.subcommand,
         *global_args,
         *verbosity_args,
+        *warnings_args,
         *pip_version_args,
         *resolve_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
@@ -200,6 +206,15 @@ async def setup_pex_cli_process(
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
     )
+
+
+def maybe_log_pex_stderr(stderr: bytes, pex_verbosity: int) -> None:
+    """Forward Pex's stderr to a Pants logger if conditions are met."""
+    log_output = stderr.decode()
+    if log_output and pex_verbosity > 0:
+        logger.info("%s", log_output)
+    elif log_output and "PEXWarning:" in log_output:
+        logger.warning("%s", log_output)
 
 
 def rules():
