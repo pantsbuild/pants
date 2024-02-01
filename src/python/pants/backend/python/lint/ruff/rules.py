@@ -124,7 +124,7 @@ async def run_ruff(
     return result
 
 
-@rule(desc="Fix with ruff check --fix", level=LogLevel.DEBUG)
+@rule(desc="Fix with `ruff check --fix`", level=LogLevel.DEBUG)
 async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
     result = await Get(
         FallibleProcessResult, _RunRuffRequest(snapshot=request.snapshot, mode=RuffMode.FIX)
