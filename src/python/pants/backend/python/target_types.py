@@ -381,6 +381,24 @@ class PexArgsField(StringSequenceField):
     )
 
 
+class PexCheckField(StringField):
+    alias = "check"
+    valid_choices = ("none", "warn", "error")
+    expected_type = str
+    default = "error"
+    help = help_text(
+        """
+        Check that the built PEX is valid. Currently this only
+        applies to `--layout zipapp` where the PEX zip is
+        tested for importability of its `__main__` module by
+        the Python zipimport module. This check will fail for
+        PEX zips that use ZIP64 extensions since the Python
+        zipimport zipimporter only works with 32 bit zips. The
+        check no-ops for all other layouts.
+        """
+    )
+
+
 class PexEnvField(DictStringToStringField):
     alias = "env"
     help = help_text(
@@ -697,6 +715,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
     PexBinaryDependenciesField,
+    PexCheckField,
     PexPlatformsField,
     PexCompletePlatformsField,
     PexResolveLocalPlatformsField,
