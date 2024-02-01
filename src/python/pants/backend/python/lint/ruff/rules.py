@@ -132,7 +132,7 @@ async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
     return await FixResult.create(request, result)
 
 
-@rule(desc="Lint with ruff check", level=LogLevel.DEBUG)
+@rule(desc="Lint with `ruff check`", level=LogLevel.DEBUG)
 async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintResult:
     source_files = await Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
