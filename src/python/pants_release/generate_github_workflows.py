@@ -145,29 +145,6 @@ def classify_changes() -> Jobs:
     }
 
 
-def ensure_category_label() -> Sequence[Step]:
-    """Check that exactly one category label is present on a pull request."""
-    return [
-        {
-            "if": "github.event_name == 'pull_request'",
-            "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v4.0.0",
-            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
-            "with": {
-                "mode": "exactly",
-                "count": 1,
-                "labels": softwrap(
-                    """
-                    category:new feature, category:user api change,
-                    category:plugin api change, category:performance, category:bugfix,
-                    category:documentation, category:internal
-                    """
-                ),
-            },
-        }
-    ]
-
-
 def checkout(
     *,
     fetch_depth: int = 10,
@@ -950,14 +927,7 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
 
 def test_workflow_jobs() -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
-    jobs: dict[str, Any] = {
-        "check_labels": {
-            "name": "Ensure PR has a category label",
-            "runs-on": linux_x86_64_helper.runs_on(),
-            "if": IS_PANTS_OWNER,
-            "steps": ensure_category_label(),
-        },
-    }
+    jobs: dict[str, Any] = {}
     jobs.update(**linux_x86_64_test_jobs())
     jobs.update(**linux_arm64_test_jobs())
     jobs.update(**macos11_x86_64_test_jobs())
@@ -1570,6 +1540,40 @@ def public_repos() -> PublicReposOutput:
     return PublicReposOutput(jobs=jobs, inputs=inputs, run_name=run_name)
 
 
+@dataclass
+class CheckLabelsOutput:
+    jobs: Jobs
+
+
+def check_labels() -> CheckLabelsOutput:
+    steps = [
+        {
+            "name": "Ensure category label",
+            "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
+            "uses": "mheap/github-action-required-labels@v4.0.0",
+            "with": {
+                "count": 1,
+                "labels": softwrap(
+                    """
+                    category:new feature, category:user api change, category:plugin api change,
+                    category:performance, category:bugfix, category:documentation, category:internal
+                    """
+                ),
+                "mode": "exactly",
+            },
+        }
+    ]
+
+    job = {
+        "name": "Ensure PR has a category label",
+        "if": IS_PANTS_OWNER,
+        "runs-on": ["ubuntu-latest"],
+        "steps": steps,
+    }
+
+    return CheckLabelsOutput({"check_labels": job})
+
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -1607,7 +1611,7 @@ def merge_ok(pr_jobs: list[str]) -> Jobs:
             # NB: This always() condition is critical, as it ensures that this job is run even if
             #   jobs it depends on are skipped.
             "if": "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
-            "needs": ["classify_changes", "check_labels"] + sorted(pr_jobs),
+            "needs": ["classify_changes"] + sorted(pr_jobs),
             "outputs": {"merge_ok": f"{gha_expr('steps.set_merge_ok.outputs.merge_ok')}"},
             "steps": [
                 {
@@ -1649,7 +1653,7 @@ def generate() -> dict[Path, str]:
     pr_jobs = test_workflow_jobs()
     pr_jobs.update(**classify_changes())
     for key, val in pr_jobs.items():
-        if key in {"check_labels", "classify_changes"}:
+        if key in {"classify_changes"}:
             continue
         needs = val.get("needs", [])
         if isinstance(needs, str):
@@ -1740,12 +1744,32 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
+    check_labels_output = check_labels()
+    check_labels_yaml = yaml.dump(
+        {
+            "name": "PR Validation",
+            "on": {
+                "pull_request": {
+                    "types": [
+                        "opened",
+                        "reopened",
+                        "labeled",
+                        "unlabeled",
+                    ]
+                }
+            },
+            "jobs": check_labels_output.jobs,
+        },
+        Dumper=NoAliasDumper,
+    )
+
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",
         Path(".github/workflows/public_repos.yaml"): f"{HEADER}\n\n{public_repos_yaml}",
+        Path(".github/workflows/check_labels.yaml"): f"{HEADER}\n\n{check_labels_yaml}",
     }
 
 
