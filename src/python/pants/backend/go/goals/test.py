@@ -615,7 +615,7 @@ async def run_go_tests(
         ),
     )
     test_input_digest = await Get(
-        Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest, goroot.digest))
+        Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
     )
 
     extra_env = {
@@ -689,6 +689,7 @@ async def run_go_tests(
         working_directory=working_dir,
         output_files=output_files,
         level=LogLevel.DEBUG,
+        immutable_input_digests={".goroot": goroot.digest},
     )
     results = await Get(
         ProcessResultWithRetries,

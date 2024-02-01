@@ -155,7 +155,7 @@ async def generate_go_assembly_symabisfile(
                 ),
                 "-gensymabis",
                 "-o",
-                symabis_path,
+                "symabis",
                 "--",
                 *(str(PurePath(request.dir_path, s_file)) for s_file in request.s_files),
             ),
@@ -163,7 +163,7 @@ async def generate_go_assembly_symabisfile(
                 "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
             },
             description=f"Generate symabis metadata for assembly files for {request.dir_path}",
-            output_files=(symabis_path,),
+            output_files=("symabis",),
             replace_sandbox_root_in_args=True,
         ),
     )
@@ -175,7 +175,7 @@ async def generate_go_assembly_symabisfile(
     return FallibleGenerateAssemblySymabisResult(
         result=GenerateAssemblySymabisResult(
             symabis_digest=symabis_result.output_digest,
-            symabis_path=symabis_path,
+            symabis_path="symabis",
         ),
     )
 
@@ -188,10 +188,7 @@ async def assemble_go_assembly_files(
     asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
 
     def obj_output_path(s_file: str) -> str:
-        if os.path.isabs(request.dir_path):
-            return str(PurePath(s_file).with_suffix(".o"))
-        else:
-            return str(request.dir_path / PurePath(s_file).with_suffix(".o"))
+        return str(PurePath(s_file).with_suffix(".o"))
 
     assembly_results = await MultiGet(
         Get(

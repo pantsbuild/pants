@@ -80,9 +80,11 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
     script = textwrap.dedent(
         f"""\
             export sandbox_root="$(/bin/pwd)"
-            export GOROOT="{goroot.path}"
+            ls -al "$sandbox_root" >&2
+
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/cache"
+            export GOROOT="${{sandbox_root}}/{goroot.path}"
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
             if [ -n "${GoSdkRunSetup.CHDIR_ENV}" ]; then
               cd "${GoSdkRunSetup.CHDIR_ENV}"
@@ -115,7 +117,7 @@ async def setup_go_sdk_process(
     goroot: GoRoot,
 ) -> Process:
     input_digest, env_vars = await MultiGet(
-        Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest, goroot.digest])),
+        Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
         Get(
             EnvironmentVars,
             EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
@@ -136,7 +138,7 @@ async def setup_go_sdk_process(
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
 
     # Disable the "coverage redesign" experiment on Go v1.20+ for now since Pants does not yet support it.
-    if goroot.is_compatible_version("1.20"):
+    if goroot.is_compatible_version("1.20") and not goroot.is_compatible_version("1.21"):
         exp_str = env.get("GOEXPERIMENT", "")
         exp_fields = exp_str.split(",") if exp_str != "" else []
         exp_fields = [exp for exp in exp_fields if exp != "coverageredesign"]
@@ -144,6 +146,9 @@ async def setup_go_sdk_process(
             exp_fields.append("nocoverageredesign")
         env["GOEXPERIMENT"] = ",".join(exp_fields)
 
+    print(
+        f"Spawning process with env: {env}, {request.command=}, {input_digest=}, {request.output_directories=}, {request.output_files=}"
+    )
     return Process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env=env,
@@ -151,6 +156,7 @@ async def setup_go_sdk_process(
         description=request.description,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        immutable_input_digests={".goroot": goroot.digest},
         level=LogLevel.DEBUG,
     )
 

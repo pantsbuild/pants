@@ -93,10 +93,9 @@ async def install_go_toolchain(
     )
 
     extracted_archive = await Get(ExtractedArchive, Digest, package)
-    unrooted = await Get(Digest, RemovePrefix(extracted_archive.digest, "go"))
-    with_prefix = await Get(Digest, AddPrefix(unrooted, f".go-{version}"))
+    with_prefix = await Get(Digest, AddPrefix(extracted_archive.digest, ".goroot"))
 
-    binary_path = f".go-{version}/bin/go"
+    binary_path = ".goroot/go/bin/go"
     env_result = await Get(  # noqa: PNT30: requires triage
         ProcessResult,
         Process(
@@ -111,12 +110,13 @@ async def install_go_toolchain(
     sdk_metadata = json.loads(strip_v2_chroot_path_bytes(env_result.stdout).decode())
     major, minor = version.split(".")[:2]
     version = f"{major}.{minor}"
-
+    print(sdk_metadata)
+    print(sdk_metadata["GOROOT"])
     return GoRoot(
         path=sdk_metadata["GOROOT"],
-        version="1.18",
+        version=version,
         _raw_metadata=FrozenDict(sdk_metadata),
-        digest=with_prefix,
+        digest=extracted_archive.digest,
     )
 
 
@@ -128,6 +128,7 @@ async def setup_goroot(
     env_target: EnvironmentTarget,
 ) -> GoRoot:
     if toolchain_subsystem.enabled:
+        print("FOOBAR")
         return await Get(GoRoot, InstallGoToolchainRequest())
 
     search_paths = go_bootstrap.go_search_paths

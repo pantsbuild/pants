@@ -60,18 +60,9 @@ async def gofmt_fmt(
     request: GofmtRequest.Batch, gofmt: GofmtSubsystem, goroot: GoRoot
 ) -> FmtResult:
     await _validate_gofmt_args(gofmt.args)
-    input_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                request.snapshot.digest,
-                goroot.digest,
-            ),
-        ),
-    )
 
     argv = (
-        os.path.join(goroot.path, "bin/gofmt"),
+        os.path.join(goroot.path, "go/bin/gofmt"),
         "-w",
         *gofmt.args,
         # Filter out non-.go files, e.g. assembly sources, from the file list.
@@ -81,10 +72,11 @@ async def gofmt_fmt(
         ProcessResult,
         Process(
             argv=argv,
-            input_digest=input_digest,
+            input_digest=request.snapshot.digest,
             output_files=request.files,
             description=f"Run gofmt on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
+            immutable_input_digests={".goroot": goroot.digest},
         ),
     )
     return await FmtResult.create(request, result)
