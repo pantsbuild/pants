@@ -322,12 +322,16 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
             'a.b2.c.D',
             'a.b.c_狗',
 
-            # Invalid module names, but we don't check that hard
+            # Invalid module names are no longer permitted
+            '.',
+            '..',
+            'a.b.',
             '..a.b.c.d',
             'a.2b.d',
             'a..b..c',
             'a.b.c.d.2Bar',
             'a.2b.c.D',
+            'a.b.c_狗.',
 
             # Explicitly ignored strings
             'w.x',  # pants: no-infer-dep
@@ -362,11 +366,6 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
         "a.b_c.d._bar": ImpInfo(lineno=11, weak=True),
         "a.b2.c.D": ImpInfo(lineno=12, weak=True),
         "a.b.c_狗": ImpInfo(lineno=13, weak=True),
-        "..a.b.c.d": ImpInfo(lineno=16, weak=True),
-        "a.2b.d": ImpInfo(lineno=17, weak=True),
-        "a..b..c": ImpInfo(lineno=18, weak=True),
-        "a.b.c.d.2Bar": ImpInfo(lineno=19, weak=True),
-        "a.2b.c.D": ImpInfo(lineno=20, weak=True),
     }
     expected = {sym: info for sym, info in potentially_valid.items() if sym.count(".") >= min_dots}
 
