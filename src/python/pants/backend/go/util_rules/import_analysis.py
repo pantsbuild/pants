@@ -16,6 +16,7 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import strip_v2_chroot_path_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,9 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
         ),
     )
     stdlib_packages = {}
-    for pkg_json in ijson.items(list_result.stdout, "", multiple_values=True):
+    for pkg_json in ijson.items(
+        strip_v2_chroot_path_bytes(list_result.stdout), "", multiple_values=True
+    ):
         import_path = pkg_json.get("ImportPath")
         pkg_source_path = pkg_json.get("Dir")
 

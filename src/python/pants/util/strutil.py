@@ -129,7 +129,20 @@ def strip_prefix(string: str, prefix: str) -> str:
 
 
 # NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
-def strip_v2_chroot_path(v: bytes | str) -> str:
+def strip_v2_chroot_path_bytes(v: bytes) -> str:
+    """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
+    paths.
+
+    This is useful when a tool that is run with the V2 engine outputs absolute paths. It is
+    confusing for the user to see the absolute path in the final output because it is an
+    implementation detail that Pants copies their source code into a chroot.
+    """
+
+    return re.sub(rb"/.*/pants-sandbox-[a-zA-Z0-9]+/", b"", v)
+
+
+# NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
+def anonymize_v2_chroot_path(v: bytes | str) -> str:
     """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
     paths.
 
@@ -166,7 +179,7 @@ class Simplifier:
 
     def simplify(self, v: bytes | str) -> str:
         chroot = (
-            strip_v2_chroot_path(v)
+            anonymize_v2_chroot_path(v)
             if self.strip_chroot_path
             else v.decode()
             if isinstance(v, bytes)

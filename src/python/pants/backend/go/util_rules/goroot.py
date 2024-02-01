@@ -26,7 +26,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list, softwrap, strip_v2_chroot_path_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,6 @@ async def install_go_toolchain(
     unrooted = await Get(Digest, RemovePrefix(extracted_archive.digest, "go"))
     with_prefix = await Get(Digest, AddPrefix(unrooted, f".go-{version}"))
 
-    print(package, extracted_archive.digest, unrooted, with_prefix)
     binary_path = f".go-{version}/bin/go"
     env_result = await Get(  # noqa: PNT30: requires triage
         ProcessResult,
@@ -104,20 +103,18 @@ async def install_go_toolchain(
             (f"{binary_path}", "env", "-json"),
             description=f"Determine Go SDK metadata for {binary_path}",
             level=LogLevel.DEBUG,
-            env={"GOPATH": "/doess/not/matter"},
+            env={"GOPATH": "/does/not/matter"},
             input_digest=with_prefix,
         ),
     )
 
-    sdk_metadata = json.loads(env_result.stdout.decode())
-
-    print(sdk_metadata["GOROOT"])
-    print(len(sdk_metadata["GOROOT"]))
-    print(list(sdk_metadata["GOROOT"]))
+    sdk_metadata = json.loads(strip_v2_chroot_path_bytes(env_result.stdout).decode())
+    major, minor = version.split(".")[:2]
+    version = f"{major}.{minor}"
 
     return GoRoot(
-        path=sdk_metadata["GOROOT"][26:],
-        version=version,
+        path=sdk_metadata["GOROOT"],
+        version="1.18",
         _raw_metadata=FrozenDict(sdk_metadata),
         digest=with_prefix,
     )
