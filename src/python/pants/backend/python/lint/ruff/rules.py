@@ -144,7 +144,7 @@ async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintRe
     return LintResult.create(request, result)
 
 
-@rule(desc="Format with ruff format", level=LogLevel.DEBUG)
+@rule(desc="Format with `ruff format`", level=LogLevel.DEBUG)
 async def ruff_fmt(request: RuffFormatRequest.Batch, ruff: Ruff) -> FmtResult:
     result = await Get(
         FallibleProcessResult,
