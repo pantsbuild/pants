@@ -30,8 +30,10 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgImportPathRequest,
 )
 from pants.core.target_types import ResourcesGeneratorTarget
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
 
@@ -48,6 +50,8 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest]),
             QueryRule(FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),

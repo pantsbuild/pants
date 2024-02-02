@@ -25,7 +25,9 @@ from pants.backend.go.util_rules import (
 )
 from pants.core.goals.test import get_filtered_environment
 from pants.core.util_rules import source_files
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.fs import DigestContents, FileContent
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -47,6 +49,8 @@ def rule_runner() -> RuleRunner:
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
             *source_files.rules(),
+            *fs_rules(),
+            *archive_rules(),
             get_filtered_environment,
             QueryRule(DigestContents, (OverwriteMergeDigests,)),
         ],

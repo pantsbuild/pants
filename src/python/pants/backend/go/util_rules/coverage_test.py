@@ -35,7 +35,9 @@ from pants.core.goals.test import (
 )
 from pants.core.target_types import FileTarget
 from pants.core.util_rules import source_files
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.fs import DigestContents
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.native_engine import Digest
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -60,6 +62,8 @@ def rule_runner() -> RuleRunner:
             *tests_analysis.rules(),
             *third_party_pkg.rules(),
             *source_files.rules(),
+            *fs_rules(),
+            *archive_rules(),
             get_filtered_environment,
             QueryRule(TestResult, (GoTestRequest.Batch,)),
             QueryRule(CoverageReports, (GoCoverageDataCollection,)),
@@ -103,6 +107,8 @@ def test_basic_coverage(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
+    print(result.stdout_bytes)
+    print(result.stderr_bytes)
     assert result.exit_code == 0
     assert b"PASS: TestAdd" in result.stdout_bytes
     coverage_data = result.coverage_data

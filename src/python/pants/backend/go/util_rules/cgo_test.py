@@ -39,6 +39,8 @@ from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
+from pants.core.util_rules.archive import rules as archive_rules
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -62,6 +64,8 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             *package_binary.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(BuiltPackage, [GoBinaryFieldSet]),
             QueryRule(FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest]),
             QueryRule(FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest]),

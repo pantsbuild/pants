@@ -30,7 +30,9 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysisRequest,
 )
 from pants.build_graph.address import Address
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
@@ -51,6 +53,8 @@ def rule_runner() -> RuleRunner:
             *assembly.rules(),
             *target_type_rules.rules(),
             *go_mod.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(AllThirdPartyPackages, [AllThirdPartyPackagesRequest]),
             QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
         ],

@@ -25,6 +25,8 @@ from pants.backend.go.util_rules import (
 )
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.core.goals.tailor import rules as core_tailor_rules
+from pants.core.util_rules.archive import rules as archive_rules
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -44,6 +46,8 @@ def rule_runner() -> RuleRunner:
             *build_pkg_target.rules(),
             *assembly.rules(),
             *link.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(PutativeTargets, [PutativeGoTargetsRequest, AllOwnedSources]),
         ],
         target_types=[

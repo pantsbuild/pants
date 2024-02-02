@@ -26,7 +26,9 @@ from pants.backend.go.util_rules import (
 )
 from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, external_tool, source_files, system_binaries
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address
+from pants.engine.fs import rules as fs_rules
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -51,6 +53,8 @@ def rule_runner() -> RuleRunner:
             *system_binaries.rules(),
             *target_type_rules.rules(),
             *third_party_pkg.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(Partitions, [GolangciLintRequest.PartitionRequest]),
             QueryRule(LintResult, [GolangciLintRequest.Batch]),
             *GolangciLint.rules(),
@@ -140,6 +144,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_golangci_lint(rule_runner, [tgt])
+    print(lint_results[0].stderr)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert "f.go:3:6: func `good` is unused (unused)\n" in lint_results[0].stdout

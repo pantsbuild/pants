@@ -666,7 +666,7 @@ async def cgo_compile_request(
     dir_path = request.dir_path if request.dir_path else "."
 
     obj_dir_path = (
-        f"__go_stdlib_obj__/{request.import_path}" if os.path.isabs(dir_path) else dir_path
+        f"__go_stdlib_obj__/{request.import_path}" if dir_path.startswith(".goroot") else dir_path
     )
     cgo_input_digest = request.digest
     if os.path.isabs(dir_path):

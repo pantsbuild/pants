@@ -44,6 +44,7 @@ def get_goroot(rule_runner: RuleRunner, binary_names_to_scripts: list[tuple[str,
             [
                 f"--golang-go-search-paths={repr(binary_dirs)}",
                 f"--golang-minimum-expected-version={EXPECTED_VERSION}",
+                "--go-toolchain-enabled=false",
             ],
             env_inherit={"PATH"},
         )

@@ -123,7 +123,10 @@ async def run_golangci_lint(
     # associated tools in its environment. This is injected in $PATH in the
     # wrapper script.
     tool_search_path = ":".join(
-        ["${GOROOT}/bin", *(golang_env_aware.cgo_tool_search_paths if cgo_enabled else ())]
+        [
+            "${GOROOT}/bin",
+            *(golang_env_aware.cgo_tool_search_paths if cgo_enabled else ()),
+        ]
     )
 
     # golangci-lint requires a absolute path to a cache
@@ -131,8 +134,8 @@ async def run_golangci_lint(
         "__run_golangci_lint.sh",
         textwrap.dedent(
             f"""\
-            export GOROOT={goroot.path}
             sandbox_root="$(/bin/pwd)"
+            export GOROOT=${{sandbox_root}}/{goroot.path}
             export PATH="{tool_search_path}"
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/gocache"

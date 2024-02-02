@@ -80,8 +80,6 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
     script = textwrap.dedent(
         f"""\
             export sandbox_root="$(/bin/pwd)"
-            ls -al "$sandbox_root" >&2
-
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/cache"
             export GOROOT="${{sandbox_root}}/{goroot.path}"
@@ -146,9 +144,6 @@ async def setup_go_sdk_process(
             exp_fields.append("nocoverageredesign")
         env["GOEXPERIMENT"] = ",".join(exp_fields)
 
-    print(
-        f"Spawning process with env: {env}, {request.command=}, {input_digest=}, {request.output_directories=}, {request.output_files=}"
-    )
     return Process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env=env,

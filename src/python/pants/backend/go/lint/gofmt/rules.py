@@ -62,7 +62,7 @@ async def gofmt_fmt(
     await _validate_gofmt_args(gofmt.args)
 
     argv = (
-        os.path.join(goroot.path, "go/bin/gofmt"),
+        os.path.join(goroot.path, "bin/gofmt"),
         "-w",
         *gofmt.args,
         # Filter out non-.go files, e.g. assembly sources, from the file list.

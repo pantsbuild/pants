@@ -110,8 +110,7 @@ async def install_go_toolchain(
     sdk_metadata = json.loads(strip_v2_chroot_path_bytes(env_result.stdout).decode())
     major, minor = version.split(".")[:2]
     version = f"{major}.{minor}"
-    print(sdk_metadata)
-    print(sdk_metadata["GOROOT"])
+
     return GoRoot(
         path=sdk_metadata["GOROOT"],
         version=version,
@@ -128,7 +127,6 @@ async def setup_goroot(
     env_target: EnvironmentTarget,
 ) -> GoRoot:
     if toolchain_subsystem.enabled:
-        print("FOOBAR")
         return await Get(GoRoot, InstallGoToolchainRequest())
 
     search_paths = go_bootstrap.go_search_paths

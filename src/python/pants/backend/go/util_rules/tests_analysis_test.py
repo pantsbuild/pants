@@ -18,8 +18,10 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -38,6 +40,8 @@ def rule_runner() -> RuleRunner:
             *tests_analysis.rules(),
             *link.rules(),
             *sdk.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(GeneratedTestMain, [GenerateTestMainRequest]),
         ],
     )

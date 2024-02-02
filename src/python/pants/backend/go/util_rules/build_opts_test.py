@@ -40,6 +40,8 @@ from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetReq
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
+from pants.core.util_rules.archive import rules as archive_rules
+from pants.engine.fs import rules as fs_rules
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
@@ -64,6 +66,8 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             *third_party_pkg.rules(),
             *sdk.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(GoBuildOptions, (GoBuildOptionsFromTargetRequest,)),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
             QueryRule(GoRoot, ()),

@@ -43,8 +43,10 @@ from pants.backend.go.util_rules.build_pkg_target import (
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
 from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.core.target_types import FilesGeneratorTarget, FileSourceField, FileTarget
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.rules import Get, QueryRule, rule
 from pants.engine.target import AllTargets, Dependencies, DependenciesRequest
@@ -166,6 +168,8 @@ def rule_runner() -> RuleRunner:
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
+            *fs_rules(),
+            *archive_rules(),
             generate_from_file,
             map_import_paths,
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),

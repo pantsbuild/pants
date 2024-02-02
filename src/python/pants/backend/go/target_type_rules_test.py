@@ -39,7 +39,9 @@ from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
 )
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Addresses
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
@@ -68,6 +70,8 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
+            *fs_rules(),
+            *archive_rules(),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
