@@ -688,6 +688,25 @@ fn string_candidates() {
     assert_strings("'a.b' # pants: no-infer-dep", &[]);
     assert_strings("'a.b.c_狗' # pants: no-infer-dep", &[]);
     assert_strings("'..a.b.c.d' # pants: no-infer-dep", &[]);
+    assert_strings("['a.b'] # pants: no-infer-dep", &[]);
+    assert_strings("[{'a.b': 1}] # pants: no-infer-dep", &[]);
+    assert_strings("[{('a.b',): 1}] # pants: no-infer-dep", &[]);
+    assert_strings("[{2: 'a.b'}] # pants: no-infer-dep", &[]);
+    assert_strings("[{2: ('a.b',)}] # pants: no-infer-dep", &[]);
+    assert_strings("print('a.b') # pants: no-infer-dep", &[]);
+    assert_strings("print('a.b' if x else 3) # pants: no-infer-dep", &[]);
+    assert_strings("print(3 if x else 'a.b') # pants: no-infer-dep", &[]);
+    assert_strings(
+        "print([a for a in b if a not in ['a.b', 'c.d']]) # pants: no-infer-dep",
+        &[],
+    );
+    assert_strings(
+        r"
+    for a, b in foo['a.b'].items(): # pants: no-infer-dep
+        pass
+    ",
+        &[],
+    );
 }
 
 #[test]
