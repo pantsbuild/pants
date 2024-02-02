@@ -30,8 +30,14 @@ class RuffLintRequest(LintTargetsRequest):
     field_set_type = RuffFieldSet
     tool_subsystem = Ruff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
-    tool_name = "ruff check"
-    tool_id = "ruff-check"
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "ruff check"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "ruff-check"
 
 
 class RuffFixRequest(FixTargetsRequest):
@@ -42,8 +48,14 @@ class RuffFixRequest(FixTargetsRequest):
     # We don't need to include automatically added lint rules for this RuffFixRequest,
     # because these lint rules are already checked by RuffLintRequest.
     enable_lint_rules = False
-    tool_name = "ruff check --fix"
-    tool_id = RuffLintRequest.tool_id
+
+    @classproperty
+    def tool_name(cls) -> str:
+        return "ruff check --fix"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return RuffLintRequest.tool_id
 
 
 class RuffFormatRequest(FmtTargetsRequest):
