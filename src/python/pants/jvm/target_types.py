@@ -555,7 +555,7 @@ def get_child_text(parent: ET.Element, child: str) -> str:
         raise ValueError(f"missing element: {child}")
     text = tag.text
     if text is None:
-        raise ValueError(f"empty tag: {child}")
+        raise ValueError(f"empty element: {child}")
     return text
 
 
