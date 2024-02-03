@@ -41,6 +41,6 @@ pub fn launch_pantsd() -> (BuildRoot, OptionParser, TempDir) {
         .map_err(|e| format!("Problem running command {cmd:?}: {e}"))
         .unwrap();
     assert_eq!(Some(0), result.status.code());
-    assert_eq!(from_utf8(result.stdout.as_slice()).unwrap(), "0.0.0.dev0");
+    assert_eq!(from_utf8(result.stdout.as_slice()).unwrap(), "0.0.0.dev0\n");
     (build_root, options_parser, pants_subprocessdir)
 }
