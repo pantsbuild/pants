@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import os
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Iterator, Mapping, Sequence
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.generate_lockfiles import (
@@ -17,6 +17,7 @@ from pants.core.goals.generate_lockfiles import (
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
     UserGenerateLockfiles,
+    WrappedGenerateLockfile,
     determine_resolves_to_generate,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -24,7 +25,7 @@ from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.environment import EnvironmentName
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Effect, Get, MultiGet
@@ -147,6 +148,7 @@ async def export(
     build_root: BuildRoot,
     dist_dir: DistDir,
     export_subsys: ExportSubsystem,
+    local_environment: ChosenLocalEnvironmentName,
 ) -> Export:
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
@@ -159,10 +161,24 @@ async def export(
     )
 
     all_specified_user_requests = await MultiGet(
-        Get(UserGenerateLockfiles, RequestedUserResolveNames, resolve_names)
+        Get(
+            UserGenerateLockfiles,
+            {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName},
+        )
         for resolve_names in requested_user_resolve_names
     )
-    all_requests = list(itertools.chain(*all_specified_user_requests))
+    specified_tool_requests = await MultiGet(
+        Get(
+            WrappedGenerateLockfile,
+            {sentinel(): GenerateToolLockfileSentinel, local_environment.val: EnvironmentName},
+        )
+        for sentinel in requested_tool_sentinels
+    )
+    applicable_tool_requests = [req.request for req in specified_tool_requests]
+
+    all_requests: Iterator[GenerateLockfile] = itertools.chain(
+        *all_specified_user_requests, applicable_tool_requests
+    )
     all_results = await MultiGet(Get(ExportResults, GenerateLockfile, e) for e in all_requests)
 
     flattened_results = [res for results in all_results for res in results]
