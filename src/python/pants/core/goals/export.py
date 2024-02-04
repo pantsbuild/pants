@@ -13,7 +13,9 @@ from pants.core.goals.generate_lockfiles import (
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
+    RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
+    determine_resolves_to_generate,
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import _warn_on_non_local_environments
@@ -148,9 +150,23 @@ async def export(
     dist_dir: DistDir,
     export_subsys: ExportSubsystem,
 ) -> Export:
-    request_types = cast("Iterable[type[ExportRequest]]", union_membership.get(ExportRequest))
-    requests = tuple(request_type(targets) for request_type in request_types)
-    all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
+    known_user_resolve_names = await MultiGet(
+        Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
+        for request in union_membership.get(KnownUserResolveNamesRequest)
+    )
+    requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
+        known_user_resolve_names,
+        union_membership.get(GenerateToolLockfileSentinel),
+        set(export_subsys.resolve),
+    )
+
+    all_specified_user_requests = await MultiGet(
+        Get(UserExport, RequestedUserResolveNames, resolve_names)
+        for resolve_names in requested_user_resolve_names
+    )
+    all_requests = list(itertools.chain(*all_specified_user_requests))
+    all_results = await MultiGet(Get(ExportResults, ExportRequest, e) for e in all_requests)
+
     flattened_results = [res for results in all_results for res in results]
 
     await _warn_on_non_local_environments(targets, "the `export` goal")

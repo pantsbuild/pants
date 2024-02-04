@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Mapping
 
+from pants.core.goals.export import ExportError, ExportSubsystem, UserExport
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -163,6 +164,16 @@ async def setup_user_lockfile_requests(
     )
 
     return UserGenerateLockfiles(jvm_lockfile_requests)
+
+
+@rule
+async def resolve2export(
+    request: RequestedJVMUserResolveNames, export_subsys: ExportSubsystem
+) -> UserExport:
+    if request:
+        raise ExportError(f"JVM backend does not support exporting. Received request {request}.")
+    else:
+        return UserExport(())
 
 
 def rules():

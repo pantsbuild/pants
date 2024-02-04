@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from pants.backend.python.goals.lockfile import RequestedPythonUserResolveNames
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -30,6 +31,7 @@ from pants.core.goals.export import (
     ExportResults,
     ExportSubsystem,
     PostProcessingCommand,
+    UserExport,
 )
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
@@ -373,6 +375,14 @@ async def export_virtualenvs(
         for resolve in export_subsys.options.resolve
     )
     return ExportResults(mv.result for mv in maybe_venvs if mv.result is not None)
+
+
+@rule
+async def resolve2export(
+    request: RequestedPythonUserResolveNames, export_subsys: ExportSubsystem
+) -> UserExport:
+    """Convert requested resolve names into export requests."""
+    return UserExport(ExportVenvsRequest(targets=tuple(), resolve=r) for r in request)
 
 
 def rules():
