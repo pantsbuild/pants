@@ -11,11 +11,9 @@ from typing import Callable, Iterable, Iterator, Mapping, Protocol, Sequence, Tu
 from pants.core.goals.resolve_helpers import (
     GenerateLockfile,
     GenerateToolLockfileSentinel,
-    KnownUserResolveNames,
     KnownUserResolveNamesRequest,
-    RequestedUserResolveNames,
-    UserGenerateLockfiles,
-    determine_resolves_to_generate,
+    WrappedGenerateLockfile,
+    determine_requested_resolves,
 )
 from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
@@ -50,11 +48,6 @@ class GenerateLockfileWithEnvironments(GenerateLockfile):
     with, if the relevant backend supports environments."""
 
     environments: tuple[EnvironmentName, ...]
-
-
-@dataclass(frozen=True)
-class WrappedGenerateLockfile:
-    request: GenerateLockfile
 
 
 class PackageVersion(Protocol):
@@ -313,31 +306,8 @@ async def generate_lockfiles_goal(
     console: Console,
     global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
-    known_user_resolve_names = await MultiGet(
-        Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
-        for request in union_membership.get(KnownUserResolveNamesRequest)
-    )
-    requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
-        known_user_resolve_names,
-        union_membership.get(GenerateToolLockfileSentinel),
-        set(generate_lockfiles_subsystem.resolve),
-    )
-
-    # This is the "planning" phase of lockfile generation. Currently this is all done in the local
-    # environment, since there's not currently a clear mechanism to prescribe an environment.
-    all_specified_user_requests = await MultiGet(
-        Get(
-            UserGenerateLockfiles,
-            {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName},
-        )
-        for resolve_names in requested_user_resolve_names
-    )
-    specified_tool_requests = await MultiGet(
-        Get(
-            WrappedGenerateLockfile,
-            {sentinel(): GenerateToolLockfileSentinel, local_environment.val: EnvironmentName},
-        )
-        for sentinel in requested_tool_sentinels
+    all_specified_user_requests, specified_tool_requests = await determine_requested_resolves(
+        generate_lockfiles_subsystem.resolve, local_environment, union_membership
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
         specified_tool_requests,

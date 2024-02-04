@@ -10,6 +10,7 @@ from typing import Callable, ClassVar, Iterable, Sequence
 
 from pants.engine.collection import Collection
 from pants.engine.environment import EnvironmentName
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.target import Target
 from pants.engine.unions import union
 from pants.util.docutil import doc_url
@@ -317,3 +318,37 @@ class NoCompatibleResolveException(Exception):
                 """
             )
         )
+
+
+@dataclass(frozen=True)
+class WrappedGenerateLockfile:
+    request: GenerateLockfile
+
+
+async def determine_requested_resolves(requested_resolves, local_environment, union_membership):
+    known_user_resolve_names = await MultiGet(
+        Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
+        for request in union_membership.get(KnownUserResolveNamesRequest)
+    )
+    requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
+        known_user_resolve_names,
+        union_membership.get(GenerateToolLockfileSentinel),
+        set(requested_resolves),
+    )
+    # This is the "planning" phase of lockfile generation. Currently this is all done in the local
+    # environment, since there's not currently a clear mechanism to prescribe an environment.
+    all_specified_user_requests = await MultiGet(
+        Get(
+            UserGenerateLockfiles,
+            {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName},
+        )
+        for resolve_names in requested_user_resolve_names
+    )
+    specified_tool_requests = await MultiGet(
+        Get(
+            WrappedGenerateLockfile,
+            {sentinel(): GenerateToolLockfileSentinel, local_environment.val: EnvironmentName},
+        )
+        for sentinel in requested_tool_sentinels
+    )
+    return all_specified_user_requests, specified_tool_requests

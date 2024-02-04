@@ -9,16 +9,13 @@ from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, Sequence
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.generate_lockfiles import WrappedGenerateLockfile
 from pants.core.goals.resolve_helpers import (
     GenerateLockfile,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
-    RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
-    UserGenerateLockfiles,
-    determine_resolves_to_generate,
+    determine_requested_resolves,
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import _warn_on_non_local_environments
@@ -150,30 +147,10 @@ async def export(
     export_subsys: ExportSubsystem,
     local_environment: ChosenLocalEnvironmentName,
 ) -> Export:
-    known_user_resolve_names = await MultiGet(
-        Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
-        for request in union_membership.get(KnownUserResolveNamesRequest)
-    )
-    requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
-        known_user_resolve_names,
-        union_membership.get(GenerateToolLockfileSentinel),
-        set(export_subsys.resolve),
+    all_specified_user_requests, specified_tool_requests = await determine_requested_resolves(
+        export_subsys.resolve, local_environment, union_membership
     )
 
-    all_specified_user_requests = await MultiGet(
-        Get(
-            UserGenerateLockfiles,
-            {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName},
-        )
-        for resolve_names in requested_user_resolve_names
-    )
-    specified_tool_requests = await MultiGet(
-        Get(
-            WrappedGenerateLockfile,
-            {sentinel(): GenerateToolLockfileSentinel, local_environment.val: EnvironmentName},
-        )
-        for sentinel in requested_tool_sentinels
-    )
     applicable_tool_requests = [req.request for req in specified_tool_requests]
 
     all_requests: Iterator[GenerateLockfile] = itertools.chain(

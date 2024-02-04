@@ -26,7 +26,6 @@ from pants.core.goals.generate_lockfiles import (
     LockfileDiff,
     LockfileDiffPrinter,
     LockfilePackages,
-    WrappedGenerateLockfile,
     _preferred_environment,
     filter_tool_lockfile_requests,
 )
@@ -38,6 +37,7 @@ from pants.core.goals.resolve_helpers import (
     NoCompatibleResolveException,
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
+    WrappedGenerateLockfile,
     determine_resolves_to_generate,
 )
 from pants.engine.console import Console
