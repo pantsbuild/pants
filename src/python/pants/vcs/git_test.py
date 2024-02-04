@@ -16,7 +16,7 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
-from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
+from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, _Hunk, get_git_worktree
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
@@ -371,3 +371,62 @@ def test_worktree_invalidation(origin: Path) -> None:
         worktree_id_2 = rule_runner.request(str, [])
 
         assert worktree_id_1 != worktree_id_2
+
+
+@pytest.mark.parametrize(
+    "diff,expected",
+    [
+        [
+            dedent(
+                """
+                --- left        2024-02-04 00:00:00.000000000 +0100
+                +++ right       2024-02-04 00:00:00.000000000 +0100
+                @@ -1,0 +2 @@
+                +two
+                """
+            ),
+            [_Hunk(1, 0, 2, 1)],
+        ],
+        [
+            dedent(
+                """
+                --- left        2024-02-04 00:00:00.000000000 +0100
+                +++ right       2024-02-04 00:00:00.000000000 +0100
+                @@ -2 +1,0 @@
+                -two
+                """
+            ),
+            [_Hunk(2, 1, 1, 0)],
+        ],
+        [
+            dedent(
+                """
+                --- left        2024-02-04 00:00:00.000000000 +0100
+                +++ right       2024-02-04 00:00:00.000000000 +0100
+                @@ -2 +2 @@
+                -two
+                +four
+                """
+            ),
+            [_Hunk(2, 1, 2, 1)],
+        ],
+        [
+            dedent(
+                """
+                --- left        2024-02-04 00:00:00.000000000 +0100
+                +++ right       2024-02-04 00:00:00.000000000 +0100
+                @@ -2,2 +2,2 @@
+                -two
+                -three
+                +five
+                +six
+                """
+            ),
+            [_Hunk(2, 2, 2, 2)],
+        ],
+    ],
+)
+def test_parse_unified_diff(diff, expected):
+    wt = GitWorktree(None)  # type: ignore
+    actual = wt._parse_unified_diff(diff)
+    assert actual == expected

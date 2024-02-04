@@ -6,7 +6,10 @@ from __future__ import annotations
 import dataclasses
 import logging
 import os
+import re
 from dataclasses import dataclass
+from functools import cached_property
+from io import StringIO
 from os import PathLike
 from pathlib import Path, PurePath
 from typing import Any, Iterable
@@ -106,6 +109,56 @@ class GitWorktree(EngineAwareReturnType):
         # git will report changed files relative to the worktree: re-relativize to relative_to
         return {self._fix_git_relative_path(f, relative_to) for f in files}
 
+    def changed_file_lines(
+        self,
+        from_commit: str | None = None,
+        relative_to: PurePath | str | None = None,
+    ) -> set[str]:
+        relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
+        rel_suffix = ["--", str(relative_to)]
+        uncommitted_changes = self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(
+                ["diff", "--unified=0", "HEAD"] + rel_suffix,
+            )
+        )
+
+        files = set(uncommitted_changes.splitlines())
+        if from_commit:
+            # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
+            # the changes that have occurred on the current branch.
+            committed_cmd = ["diff", "--unified=0", from_commit + "...HEAD"] + rel_suffix
+            committed_changes = self._git_binary._invoke_unsandboxed(
+                self._create_git_cmdline(committed_cmd)
+            )
+            files.update(committed_changes.split())
+
+    def _parse_unified_diff(self, content: str) -> list[_Hunk]:
+        buf = StringIO(content)
+        hunks = []
+        for line in buf:
+            match = self._lines_changed_regex.match(line)
+            if not match:
+                continue
+
+            g = match.groups()
+            try:
+                hunk = _Hunk(
+                    left_start=int(g[0]),
+                    left_count=int(g[2]) if g[2] is not None else 1,
+                    right_start=int(g[3]),
+                    right_count=int(g[5]) if g[5] is not None else 1,
+                )
+            except ValueError as e:
+                raise ValueError(f"Failed to parse hunk: {line}") from e
+
+            hunks.append(hunk)
+
+        return hunks
+
+    @cached_property
+    def _lines_changed_regex(self) -> re.Pattern:
+        return re.compile(r"^@@ -([0-9]+)(,([0-9]+))? \+([0-9]+)(,([0-9]+))? @@.*")
+
     def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
@@ -118,6 +171,19 @@ class GitWorktree(EngineAwareReturnType):
     def __eq__(self, other: Any) -> bool:
         # NB: See the class doc regarding equality.
         return id(self) == id(other)
+
+
+@dataclass(frozen=True)
+class _Hunk:
+    """Hunk of difference in unified format.
+
+    https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+    """
+
+    left_start: int
+    left_count: int
+    right_start: int
+    right_count: int
 
 
 @dataclass(frozen=True)
