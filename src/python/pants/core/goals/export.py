@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import os
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Sequence, cast
+from typing import Iterable, Mapping, Sequence
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.generate_lockfiles import (
@@ -47,6 +47,11 @@ class ExportRequest:
     """
 
     targets: Sequence[Target]
+    resolve: str | None = None
+
+
+class UserExport(Collection[ExportRequest]):
+    """UserGenerateLockfiles."""
 
 
 @dataclass(frozen=True)
