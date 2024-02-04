@@ -31,6 +31,7 @@ mod interface;
 #[cfg(test)]
 mod interface_tests;
 pub mod nailgun;
+mod options;
 mod pantsd;
 pub mod process;
 pub mod scheduler;

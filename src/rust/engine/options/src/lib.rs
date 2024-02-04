@@ -37,7 +37,7 @@ use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt;
 use std::path;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub use self::args::Args;
 use self::config::Config;
@@ -97,7 +97,7 @@ pub(crate) struct DictEdit {
 /// This is currently a subset of the types of options the Pants python option system handles.
 /// Implementations should mimic the behavior of the equivalent python source.
 ///
-pub(crate) trait OptionsSource {
+pub(crate) trait OptionsSource: Send + Sync {
     ///
     /// Get a display version of the option `id` that most closely matches the syntax used to supply
     /// the id at runtime. For example, an global option of "bob" would display as "--bob" for use in
@@ -213,7 +213,7 @@ impl<T> Deref for OptionValue<T> {
 }
 
 pub struct OptionParser {
-    sources: BTreeMap<Source, Rc<dyn OptionsSource>>,
+    sources: BTreeMap<Source, Arc<dyn OptionsSource>>,
 }
 
 impl OptionParser {
@@ -241,9 +241,9 @@ impl OptionParser {
                 .map(|(k, v)| (format!("env.{k}", k = k), v.clone())),
         );
 
-        let mut sources: BTreeMap<Source, Rc<dyn OptionsSource>> = BTreeMap::new();
-        sources.insert(Source::Env, Rc::new(env));
-        sources.insert(Source::Flag, Rc::new(args));
+        let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
+        sources.insert(Source::Env, Arc::new(env));
+        sources.insert(Source::Flag, Arc::new(args));
         let mut parser = OptionParser {
             sources: sources.clone(),
         };
@@ -282,7 +282,7 @@ impl OptionParser {
         ]);
 
         let mut config = Config::parse(&repo_config_files, &seed_values)?;
-        sources.insert(Source::Config, Rc::new(config.clone()));
+        sources.insert(Source::Config, Arc::new(config.clone()));
         parser = OptionParser {
             sources: sources.clone(),
         };
@@ -303,7 +303,7 @@ impl OptionParser {
                 }
             }
         }
-        sources.insert(Source::Config, Rc::new(config));
+        sources.insert(Source::Config, Arc::new(config));
         Ok(OptionParser { sources })
     }
 
@@ -312,7 +312,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: &T,
-        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<T::Owned>, String>,
+        getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<T::Owned>, String>,
     ) -> Result<OptionValue<T::Owned>, String> {
         for (source_type, source) in self.sources.iter() {
             if let Some(value) = getter(source, id)? {
@@ -353,7 +353,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Vec<T>,
-        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
+        getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
         remover: fn(&mut Vec<T>, &Vec<T>),
     ) -> Result<Vec<T>, String> {
         let mut list = default;
@@ -382,7 +382,7 @@ impl OptionParser {
         &self,
         id: &OptionId,
         default: Vec<T>,
-        getter: fn(&Rc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
+        getter: fn(&Arc<dyn OptionsSource>, &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String>,
     ) -> Result<Vec<T>, String> {
         self.parse_list(id, default, getter, |list, remove| {
             let to_remove = remove.iter().collect::<HashSet<_>>();
