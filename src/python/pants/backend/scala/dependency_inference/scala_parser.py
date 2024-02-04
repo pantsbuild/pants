@@ -15,7 +15,8 @@ from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionResult,
     ScalaVersion,
 )
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
     AddPrefix,

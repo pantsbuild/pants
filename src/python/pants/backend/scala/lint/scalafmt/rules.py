@@ -11,7 +11,7 @@ from pants.backend.scala.lint.scalafmt.skip_field import SkipScalafmtField
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import (
     GatherConfigFilesByDirectoriesRequest,
     GatheredConfigFilesByDirectories,

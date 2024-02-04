@@ -20,7 +20,7 @@ from pants.core.goals.export import (
     PostProcessingCommand,
     export,
 )
-from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
+from pants.core.goals.resolve_helpers import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
     EnvironmentField,

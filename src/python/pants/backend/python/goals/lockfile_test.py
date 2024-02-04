@@ -18,7 +18,8 @@ from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__DEFAULT, P
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.goals.resolve_helpers import UserGenerateLockfiles
 from pants.engine.fs import DigestContents
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule

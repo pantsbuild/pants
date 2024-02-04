@@ -26,14 +26,16 @@ from pants.backend.python.util_rules.pex_requirements import (
     ResolvePexConfigRequest,
 )
 from pants.core.goals.generate_lockfiles import (
-    GenerateLockfile,
     GenerateLockfileResult,
     GenerateLockfilesSubsystem,
+    WrappedGenerateLockfile,
+)
+from pants.core.goals.resolve_helpers import (
+    GenerateLockfile,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
-    WrappedGenerateLockfile,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests

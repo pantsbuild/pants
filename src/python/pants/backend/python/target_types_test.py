@@ -38,7 +38,7 @@ from pants.backend.python.target_types_rules import (
     resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
-from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.core.goals.resolve_helpers import UnrecognizedResolveNamesError
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError

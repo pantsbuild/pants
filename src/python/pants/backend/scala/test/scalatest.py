@@ -12,7 +12,7 @@ from pants.backend.scala.target_types import (
     ScalatestTestSourceField,
     ScalatestTestTimeoutField,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,

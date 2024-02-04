@@ -11,9 +11,9 @@ from pants.backend.terraform.target_types import (
     TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformProcess
-from pants.core.goals.generate_lockfiles import (
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.goals.resolve_helpers import (
     GenerateLockfile,
-    GenerateLockfileResult,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,

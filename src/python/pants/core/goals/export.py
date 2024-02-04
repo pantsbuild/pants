@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, Sequence
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.generate_lockfiles import (
+from pants.core.goals.generate_lockfiles import WrappedGenerateLockfile
+from pants.core.goals.resolve_helpers import (
     GenerateLockfile,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
@@ -17,7 +18,6 @@ from pants.core.goals.generate_lockfiles import (
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
     UserGenerateLockfiles,
-    WrappedGenerateLockfile,
     determine_resolves_to_generate,
 )
 from pants.core.util_rules.distdir import DistDir

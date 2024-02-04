@@ -16,9 +16,9 @@ from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.resolve import NodeJSProjectResolves
 from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
 from pants.core.goals.export import ExportError, ExportResults, ExportSubsystem
-from pants.core.goals.generate_lockfiles import (
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.goals.resolve_helpers import (
     GenerateLockfile,
-    GenerateLockfileResult,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,

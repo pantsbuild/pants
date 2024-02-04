@@ -19,7 +19,7 @@ from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionResult,
     ScalaVersion,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.core.util_rules import distdir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest

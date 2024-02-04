@@ -8,7 +8,8 @@ from typing import cast
 
 import pytest
 
-from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.goals.resolve_helpers import UserGenerateLockfiles
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest

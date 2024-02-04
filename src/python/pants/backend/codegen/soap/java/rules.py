@@ -15,7 +15,7 @@ from pants.backend.codegen.soap.target_types import (
 )
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.resolve_helpers import GenerateToolLockfileSentinel
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,

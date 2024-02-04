@@ -9,14 +9,16 @@ from typing import Mapping
 
 from pants.core.goals.export import ExportError, ExportResults, ExportSubsystem
 from pants.core.goals.generate_lockfiles import (
-    GenerateLockfile,
     GenerateLockfileResult,
     GenerateLockfilesSubsystem,
+    WrappedGenerateLockfile,
+)
+from pants.core.goals.resolve_helpers import (
+    GenerateLockfile,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
-    WrappedGenerateLockfile,
 )
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent
