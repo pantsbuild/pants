@@ -9,6 +9,7 @@ import os
 import shlex
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import PurePath
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
@@ -40,6 +41,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, Target, Targets, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership
+from pants.source.source_root import SourceRootRequest, SourceRoot
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -113,6 +115,12 @@ async def run_pep660_build(
       https://packaging.python.org/en/latest/specifications/direct-url-data-structure/
       https://packaging.python.org/en/latest/specifications/binary-distribution-format/
     """
+    dist_abs_path = (
+        build_root.path
+        if request.dist_source_root == "."
+        else str(build_root.pathlib_path / request.dist_source_root)
+    )
+    direct_url = "file://" + dist_abs_path.replace(os.path.sep, "/")
 
     # Create the .pth files to add the relevant source root to sys.path.
     # We cannot use the build backend to do this because we do not want to tell
@@ -123,15 +131,12 @@ async def run_pep660_build(
     #       supports python3.7+ (what pip supports as of April 2023).
     #       Or maybe do something like setuptools strict editable wheel.
     pth_file_contents = ""
-    direct_url = ""
-    for source_root in request.build_time_source_roots:
-        # can we use just the first one to only have the dist's source root?
+    for source_root in request.build_time_source_roots:  # NB: the roots are sorted
+        # Can we use just the dist_abs_path instead of including all source roots?
         abs_path = (
             build_root.path if source_root == "." else str(build_root.pathlib_path / source_root)
         )
         pth_file_contents += f"{abs_path}\n"
-        if not direct_url:  # use just the first source_root
-            direct_url = "file://" + abs_path.replace(os.path.sep, "/")
     pth_file_name = "__pants__.pth"
     pth_file_path = os.path.join(request.working_directory, pth_file_name)
 

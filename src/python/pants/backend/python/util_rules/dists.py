@@ -117,6 +117,7 @@ class DistBuildRequest:
     build_sdist: bool
     input: Digest
     working_directory: str  # Relpath within the input digest.
+    dist_source_root: str  # Source root of the python_distribution target
     build_time_source_roots: tuple[str, ...]  # Source roots for 1st party build-time deps.
     output_path: str  # Location of the output directory within dist dir.
 
