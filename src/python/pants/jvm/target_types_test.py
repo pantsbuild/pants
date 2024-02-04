@@ -252,7 +252,7 @@ def test_invalid_root_tag(rule_runner: RuleRunner) -> None:
 
     with pytest.raises(
         ExecutionError, match=r".*ValueError.*`invalid_tag`.*dir/pom.xml.*`project`.*"
-    ) as e:
+    ):
         rule_runner.request(
             _TargetParametrizations,
             [
