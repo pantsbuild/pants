@@ -10,11 +10,13 @@ from typing import Iterable, Mapping, Sequence
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.generate_lockfiles import (
+    GenerateLockfile,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
+    UserGenerateLockfiles,
     determine_resolves_to_generate,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -50,10 +52,6 @@ class ExportRequest:
 
     targets: Sequence[Target]
     resolve: str | None = None
-
-
-class UserExport(Collection[ExportRequest]):
-    """UserGenerateLockfiles."""
 
 
 @dataclass(frozen=True)
@@ -161,11 +159,11 @@ async def export(
     )
 
     all_specified_user_requests = await MultiGet(
-        Get(UserExport, RequestedUserResolveNames, resolve_names)
+        Get(UserGenerateLockfiles, RequestedUserResolveNames, resolve_names)
         for resolve_names in requested_user_resolve_names
     )
     all_requests = list(itertools.chain(*all_specified_user_requests))
-    all_results = await MultiGet(Get(ExportResults, ExportRequest, e) for e in all_requests)
+    all_results = await MultiGet(Get(ExportResults, GenerateLockfile, e) for e in all_requests)
 
     flattened_results = [res for results in all_results for res in results]
 
