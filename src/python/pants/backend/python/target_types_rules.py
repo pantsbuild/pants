@@ -274,7 +274,7 @@ async def infer_pex_binary_entry_point_dependency(
         owners.ambiguous, owners_must_be_ancestors=entry_point.file_name_used
     )
 
-    unambiguous_owners = await _determine_entry_point_owner(
+    unambiguous_owners = _determine_entry_point_owner(
         maybe_disambiguated,
         owners,
         unresolved_ambiguity_handler=lambda: _handle_unresolved_pex_entrypoint(
@@ -287,11 +287,11 @@ async def infer_pex_binary_entry_point_dependency(
     return InferredDependencies(unambiguous_owners)
 
 
-async def _determine_entry_point_owner(
+def _determine_entry_point_owner(
     maybe_disambiguated: Optional[Address],
     owners: PythonModuleOwners,
     unresolved_ambiguity_handler: Callable[[], None],
-):
+) -> Tuple[Address, ...]:
     """Determine what should be the unambiguous owner for a PEX's entrypoint.
 
     This might be empty.
