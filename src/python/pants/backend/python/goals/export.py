@@ -35,7 +35,7 @@ from pants.core.goals.export import (
 )
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -366,15 +366,15 @@ async def export_virtualenvs(
     request: ExportVenvsRequest,
     export_subsys: ExportSubsystem,
 ) -> ExportResults:
-    if not export_subsys.options.resolve:
+    if not request.resolve:
         raise ExportError("Must specify at least one --resolve to export")
     if request.targets:
         raise ExportError("The `export` goal does not take target specs.")
-    maybe_venvs = await MultiGet(
-        Get(MaybeExportResult, _ExportVenvForResolveRequest(resolve))
-        for resolve in export_subsys.options.resolve
-    )
-    return ExportResults(mv.result for mv in maybe_venvs if mv.result is not None)
+    maybe_venvs = await Get(MaybeExportResult, _ExportVenvForResolveRequest(request.resolve))
+    if maybe_venvs.result:
+        return ExportResults((maybe_venvs.result,))
+    else:
+        return ExportResults(())
 
 
 @rule
