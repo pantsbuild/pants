@@ -517,7 +517,7 @@ async def generate_from_pom_xml(
     )
     files = await Get(DigestContents, Digest, pom_xml.snapshot.digest)
     mapping = request.generator[JvmArtifactsPackageMappingField].value
-    coordinates = parse_pom_xml(files[0].content)
+    coordinates = parse_pom_xml(files[0].content, pom_xml_path=pom_xml.snapshot.files[0])
     targets = (
         JvmArtifactTarget(
             unhydrated_values={
@@ -534,11 +534,13 @@ async def generate_from_pom_xml(
     return GeneratedTargets(request.generator, targets)
 
 
-def parse_pom_xml(content: bytes) -> Iterator[Coordinate]:
+def parse_pom_xml(content: bytes, pom_xml_path: str) -> Iterator[Coordinate]:
     root = ET.fromstring(content.decode("utf-8"))
     match = re.match(r"^(\{.*\})project$", root.tag)
     if not match:
-        raise ValueError(f"Unexpected root tag `{root.tag}`, expected project")
+        raise ValueError(
+            f"Unexpected root tag `{root.tag}` in {pom_xml_path}, expected tag `project`"
+        )
 
     namespace = match.group(1)
     for dependency in root.iter(f"{namespace}dependency"):

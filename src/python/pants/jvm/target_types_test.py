@@ -11,6 +11,7 @@ from pants.backend.scala.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.parametrize import Parametrize
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import jvm_common
@@ -232,3 +233,32 @@ def test_generate_jvm_artifacts_with_package_mapping(rule_runner: RuleRunner) ->
             ),
         },
     )
+
+
+def test_invalid_root_tag(rule_runner: RuleRunner) -> None:
+    build_content = dedent(
+        """\
+        jvm_artifacts(name="test")
+        """
+    )
+    pom_xml = "<invalid_tag></invalid_tag>"
+    rule_runner.write_files({"dir/BUILD": build_content, "dir/pom.xml": pom_xml})
+    rule_runner.set_options(
+        [
+            f"--jvm-resolves={repr(_JVM_RESOLVES)}",
+            "--jvm-default-resolve=jvm-default",
+        ]
+    )
+
+    with pytest.raises(
+        ExecutionError, match=r".*ValueError.*`invalid_tag`.*dir/pom.xml.*`project`.*"
+    ) as e:
+        rule_runner.request(
+            _TargetParametrizations,
+            [
+                _TargetParametrizationsRequest(
+                    Address("dir", target_name="test"),
+                    description_of_origin="tests",
+                ),
+            ],
+        )
