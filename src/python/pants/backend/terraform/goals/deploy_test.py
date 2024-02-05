@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from pants.backend.terraform.goals.deploy import DeployTerraformFieldSet
 from pants.backend.terraform.testutil import rule_runner_with_auto_approve, standard_deployment
 from pants.core.goals.deploy import Deploy, DeployProcess
@@ -47,10 +49,29 @@ def test_deploy_terraform_forwards_args(rule_runner: RuleRunner, standard_deploy
     assert "-chdir=src/tf" in argv, "Did not find expected -chdir"
     assert "-var-file=stg.tfvars" in argv, "Did not find expected -var-file"
     assert "-auto-approve" in argv, "Did not find expected passthrough args"
-    # assert standard_deployment.state_file.check()
 
 
-# TODO test plan / apply based on dry-run flag
+@pytest.mark.parametrize(
+    "options,action,not_action",
+    [
+        ([], "apply", "plan"),
+        (["--experimental-deploy-dry-run=False"], "apply", "plan"),
+        (["--experimental-deploy-dry-run"], "plan", "apply"),
+    ],
+)
+def test_deploy_terraform_adheres_to_dry_run_flag(
+    rule_runner: RuleRunner, standard_deployment, options: list[str], action: str, not_action: str
+) -> None:
+    rule_runner.write_files(standard_deployment.files)
+    rule_runner.set_options(options)
+
+    target = rule_runner.get_target(Address("src/tf", target_name="stg"))
+    field_set = DeployTerraformFieldSet.create(target)
+    deploy_process = rule_runner.request(DeployProcess, [field_set])
+    argv = deploy_process.process.process.argv
+
+    assert action in argv, f"Expected {action} in argv"
+    assert not_action not in argv, f"Did not expect {not_action} in argv"
 
 
 def test_deploy_terraform_with_module(rule_runner: RuleRunner) -> None:
