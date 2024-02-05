@@ -204,7 +204,11 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
     @classmethod
     def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
         obj = cls(file_content.path)
-        obj.visit(ast.parse(file_content.content, file_content.path))
+        try:
+            obj.visit(ast.parse(file_content.content, file_content.path))
+        except SyntaxError as e:
+            raise Exception(f"Error parsing BUILD file {file_content.path}:{e.lineno}: {e.msg}")
+
         return tuple(obj.env_vars)
 
     def visit_Call(self, node: ast.Call):
