@@ -117,6 +117,7 @@ class TerraformInitRequest:
 @dataclass(frozen=True)
 class TerraformInitResponse:
     sources_and_deps: Digest
+    third_party_deps: Digest
     terraform_files: SourceFiles
     chdir: str
 
@@ -220,7 +221,10 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
     )
 
     return TerraformInitResponse(
-        sources_and_deps=all_terraform_files, terraform_files=source_files, chdir=chdir
+        sources_and_deps=all_terraform_files,
+        third_party_deps=third_party_deps.digest,
+        terraform_files=source_files,
+        chdir=chdir,
     )
 
 

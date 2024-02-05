@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
@@ -15,6 +16,8 @@ from pants.engine.target import Target
 from pants.engine.unions import union
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -193,6 +196,9 @@ def determine_resolves_to_generate(
         ], list(all_tool_sentinels)
 
     requested_user_resolve_names = []
+    logger.debug(
+        f"searching for requested resolves {requested_resolve_names=} {all_known_user_resolve_names=}"
+    )
     for known_resolve_names in all_known_user_resolve_names:
         requested = requested_resolve_names.intersection(known_resolve_names.names)
         if requested:
@@ -330,6 +336,7 @@ async def determine_requested_resolves(requested_resolves, local_environment, un
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
         for request in union_membership.get(KnownUserResolveNamesRequest)
     )
+    logger.debug(f"Found known user resolves {known_user_resolve_names}")
     requested_user_resolve_names, requested_tool_sentinels = determine_resolves_to_generate(
         known_user_resolve_names,
         union_membership.get(GenerateToolLockfileSentinel),
@@ -344,6 +351,7 @@ async def determine_requested_resolves(requested_resolves, local_environment, un
         )
         for resolve_names in requested_user_resolve_names
     )
+    logger.debug(f"Identified specified user requests as {all_specified_user_requests}")
     specified_tool_requests = await MultiGet(
         Get(
             WrappedGenerateLockfile,

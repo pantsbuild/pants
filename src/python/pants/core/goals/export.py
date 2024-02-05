@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import itertools
+import logging
 import os
 from dataclasses import dataclass
-from typing import Iterable, Iterator, Mapping, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from pants.base.build_root import BuildRoot
 from pants.core.goals.resolve_helpers import (
@@ -34,6 +35,8 @@ from pants.option.option_types import StrListOption
 from pants.util.dirutil import safe_rmtree
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 class ExportError(Exception):
@@ -153,12 +156,14 @@ async def export(
 
     applicable_tool_requests = [req.request for req in specified_tool_requests]
 
-    all_requests: Iterator[GenerateLockfile] = itertools.chain(
-        *all_specified_user_requests, applicable_tool_requests
+    all_requests: list[GenerateLockfile] = list(
+        itertools.chain(*all_specified_user_requests, applicable_tool_requests)
     )
+    logger.debug(f"Found applicable lockfiles {all_requests}")
     all_results = await MultiGet(Get(ExportResults, GenerateLockfile, e) for e in all_requests)
 
     flattened_results = [res for results in all_results for res in results]
+    logger.debug(f"Generated digests for resolves {flattened_results}")
 
     await _warn_on_non_local_environments(targets, "the `export` goal")
 
@@ -192,6 +197,7 @@ async def export(
         console.print_stdout(f"Wrote {result.description} to {result_dir}")
 
     unexported_resolves = sorted(set(export_subsys.resolve) - resolves_exported)
+    logger.debug(f"Successfully exported resolves {resolves_exported}")
     if unexported_resolves:
         all_known_user_resolve_names = await MultiGet(
             Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
