@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import abc
 import dataclasses
 import functools
 import itertools
@@ -11,7 +12,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, ClassVar, FrozenSet, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -91,7 +92,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
     _generate_file_level_targets,
 )
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
@@ -99,6 +100,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.vcs.hunk import Hunk
 
 logger = logging.getLogger(__name__)
 
@@ -939,6 +941,14 @@ def _log_or_raise_unmatched_owners(
         raise ResolveError(msg)
 
 
+@union
+class HunkOwnersRequest(abc.ABC):
+    @classmethod
+    @abc.abstractmethod
+    def new(cls, hunks: FrozenDict[str, Hunk]) -> HunkOwnersRequest:
+        raise NotImplementedError
+
+
 @dataclass(frozen=True)
 class OwnersRequest:
     """A request for the owners of a set of file paths.
@@ -948,6 +958,8 @@ class OwnersRequest:
     """
 
     sources: tuple[str, ...]
+    changed_files_with_line_numbers: tuple[str, ...] = ()
+    diff_hunks: FrozenDict[str, Hunk] = FrozenDict()
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
@@ -957,16 +969,44 @@ class Owners(FrozenOrderedSet[Address]):
     pass
 
 
+@dataclass(frozen=True)
+class MyHunkOwnersRequest(HunkOwnersRequest):  # TODO remove
+    hunks: FrozenDict[str, tuple[Hunk, ...]]
+
+    @classmethod
+    def new(cls, hunks: FrozenDict[str, tuple[Hunk, ...]]) -> HunkOwnersRequest:
+        return MyHunkOwnersRequest(hunks)
+
+
+@rule
+def get_my_hunk_owners(request: MyHunkOwnersRequest) -> Owners:  # TODO remove
+    # raise RuntimeError(request)
+    return Owners()
+
+
 @rule(desc="Find which targets own certain files", _masked_types=[EnvironmentName])
 async def find_owners(
     owners_request: OwnersRequest,
     local_environment_name: ChosenLocalEnvironmentName,
+    union_membership: UnionMembership,
 ) -> Owners:
+    # If we need to process a file with line numbers, we delegate the logic to plugins.
+    sources = set(owners_request.sources).difference(owners_request.changed_files_with_line_numbers)
+
+    if len(owners_request.changed_files_with_line_numbers) > 0:
+        request_types = union_membership[HunkOwnersRequest]
+        hunk_owners = await MultiGet(
+            Get(Owners, HunkOwnersRequest, request_type.new(owners_request.diff_hunks))
+            for request_type in request_types
+        )
+    else:
+        hunk_owners = []
+
     # Determine which of the sources are live and which are deleted.
-    sources_paths = await Get(Paths, PathGlobs(owners_request.sources))
+    sources_paths = await Get(Paths, PathGlobs(sources))
 
     live_files = FrozenOrderedSet(sources_paths.files)
-    deleted_files = FrozenOrderedSet(s for s in owners_request.sources if s not in live_files)
+    deleted_files = FrozenOrderedSet(s for s in sources if s not in live_files)
     live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
@@ -1009,7 +1049,7 @@ async def find_owners(
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
     result = set()
-    unmatched_sources = set(owners_request.sources)
+    unmatched_sources = set(sources)
     for live in (True, False):
         candidate_tgts: Sequence[Target]
         if live:
@@ -1051,7 +1091,7 @@ async def find_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
         )
 
-    return Owners(result)
+    return Owners(functools.reduce(set.union, map(set, hunk_owners), result))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1645,4 +1685,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateFileTargets),
+        UnionRule(HunkOwnersRequest, MyHunkOwnersRequest),  # TODO remove
     ]

@@ -13,17 +13,19 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
-from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.graph import HunkOwnersRequest, Owners, OwnersRequest
 from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
-from pants.option.option_types import EnumOption, StrOption
+from pants.option.option_types import EnumOption, StrListOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
 from pants.vcs.git import GitWorktree
+from pants.vcs.hunk import Hunk
 
 
 class DependentsOption(Enum):
@@ -36,6 +38,8 @@ class DependentsOption(Enum):
 class ChangedRequest:
     sources: tuple[str, ...]
     dependents: DependentsOption
+    files_with_line_numbers: tuple[str, ...]
+    diff_hunks: FrozenDict[str, Hunk]
 
 
 class ChangedAddresses(Collection[Address]):
@@ -44,13 +48,16 @@ class ChangedAddresses(Collection[Address]):
 
 @rule
 async def find_changed_owners(
-    request: ChangedRequest, specs_filter: SpecsFilter
+    request: ChangedRequest,
+    specs_filter: SpecsFilter,
 ) -> ChangedAddresses:
     no_dependents = request.dependents == DependentsOption.NONE
     owners = await Get(
         Owners,
         OwnersRequest(
             request.sources,
+            request.files_with_line_numbers,
+            request.diff_hunks,
             # If `--changed-dependents` is used, we cannot eagerly filter out root targets. We
             # need to first find their dependents, and only then should we filter. See
             # https://github.com/pantsbuild/pants/issues/15544
@@ -59,6 +66,7 @@ async def find_changed_owners(
             match_if_owning_build_file_included_in_sources=True,
         ),
     )
+
     if no_dependents:
         return ChangedAddresses(owners)
 
@@ -105,6 +113,7 @@ class ChangedOptions:
 
     since: str | None
     diffspec: str | None
+    files_with_line_numbers: list[str] | None
     dependents: DependentsOption
 
     @classmethod
@@ -117,7 +126,7 @@ class ChangedOptions:
             old_container=options,
             new_container=options,
         )
-        return cls(options.since, options.diffspec, dependents)
+        return cls(options.since, options.diffspec, options.line_numbers, dependents)
 
     @property
     def provided(self) -> bool:
@@ -138,6 +147,21 @@ class ChangedOptions:
             ),
         )
 
+    def diff_hunks(self, git_worktree: GitWorktree) -> dict[str, tuple[Hunk, ...]]:
+        """Determines the universal diff hunks changed according to SCM/workspace and options.
+
+        More info on universal diff: https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+        """
+        if self.files_with_line_numbers is None:
+            return {}
+
+        changes_since = self.since or git_worktree.current_rev_identifier
+        return git_worktree.changed_files_lines(
+            paths=self.files_with_line_numbers,
+            from_commit=changes_since,
+            relative_to=get_buildroot(),
+        )
+
 
 class Changed(Subsystem):
     options_scope = "changed"
@@ -156,6 +180,10 @@ class Changed(Subsystem):
     diffspec = StrOption(
         default=None,
         help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
+    )
+    line_numbers = StrListOption(
+        default=None,
+        help="Calculate changes with line numbers for the specified list of files.",
     )
     dependents = EnumOption(
         default=DependentsOption.NONE,

@@ -16,7 +16,7 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.rules import Get, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
-from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, _Hunk, get_git_worktree
+from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, Hunk, get_git_worktree
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
@@ -385,7 +385,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +two
                 """
             ),
-            [_Hunk(1, 0, 2, 1)],
+            [Hunk(1, 0, 2, 1)],
         ],
         [
             dedent(
@@ -396,7 +396,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 -two
                 """
             ),
-            [_Hunk(2, 1, 1, 0)],
+            [Hunk(2, 1, 1, 0)],
         ],
         [
             dedent(
@@ -408,7 +408,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +four
                 """
             ),
-            [_Hunk(2, 1, 2, 1)],
+            [Hunk(2, 1, 2, 1)],
         ],
         [
             dedent(
@@ -422,7 +422,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            [_Hunk(2, 2, 2, 2)],
+            [Hunk(2, 2, 2, 2)],
         ],
     ],
 )

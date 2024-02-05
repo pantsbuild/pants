@@ -4,6 +4,7 @@
 import logging
 from typing import cast
 
+from pants.backend.project_info import dependents
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.environments import determine_bootstrap_environment
@@ -71,7 +72,17 @@ def calculate_specs(
     changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
-    changed_request = ChangedRequest(changed_files, changed_options.dependents)
+    if changed_options.files_with_line_numbers:
+        diff_hunks = changed_options.diff_hunks(maybe_git_worktree.git_worktree)
+    else:
+        diff_hunks = None
+
+    changed_request = ChangedRequest(
+        sources=changed_files,
+        dependents=changed_options.dependents,
+        files_with_line_numbers=tuple(changed_options.files_with_line_numbers),
+        diff_hunks=FrozenDict(diff_hunks),
+    )
     (changed_addresses,) = session.product_request(
         ChangedAddresses,
         [Params(changed_request, options_bootstrapper, bootstrap_environment)],

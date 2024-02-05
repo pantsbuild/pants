@@ -18,6 +18,7 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
+from pants.vcs.hunk import Hunk
 
 logger = logging.getLogger(__name__)
 
@@ -109,30 +110,28 @@ class GitWorktree(EngineAwareReturnType):
         # git will report changed files relative to the worktree: re-relativize to relative_to
         return {self._fix_git_relative_path(f, relative_to) for f in files}
 
-    def changed_file_lines(
+    def changed_files_lines(
         self,
-        from_commit: str | None = None,
+        paths: list[str],
+        from_commit: str,
         relative_to: PurePath | str | None = None,
-    ) -> set[str]:
+    ) -> dict[str, tuple[Hunk, ...]]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         rel_suffix = ["--", str(relative_to)]
-        uncommitted_changes = self._git_binary._invoke_unsandboxed(
-            self._create_git_cmdline(
-                ["diff", "--unified=0", "HEAD"] + rel_suffix,
-            )
-        )
 
-        files = set(uncommitted_changes.splitlines())
-        if from_commit:
-            # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
-            # the changes that have occurred on the current branch.
-            committed_cmd = ["diff", "--unified=0", from_commit + "...HEAD"] + rel_suffix
-            committed_changes = self._git_binary._invoke_unsandboxed(
-                self._create_git_cmdline(committed_cmd)
+        hunks = {}
+        for path in paths:
+            hunks[path] = self._parse_unified_diff(
+                self._git_binary._invoke_unsandboxed(
+                    self._create_git_cmdline(
+                        ["diff", "--unified=0", from_commit + "...HEAD"] + rel_suffix,
+                    )
+                )
             )
-            files.update(committed_changes.split())
 
-    def _parse_unified_diff(self, content: str) -> list[_Hunk]:
+        return hunks
+
+    def _parse_unified_diff(self, content: str) -> tuple[Hunk, ...]:
         buf = StringIO(content)
         hunks = []
         for line in buf:
@@ -142,7 +141,7 @@ class GitWorktree(EngineAwareReturnType):
 
             g = match.groups()
             try:
-                hunk = _Hunk(
+                hunk = Hunk(
                     left_start=int(g[0]),
                     left_count=int(g[2]) if g[2] is not None else 1,
                     right_start=int(g[3]),
@@ -153,7 +152,7 @@ class GitWorktree(EngineAwareReturnType):
 
             hunks.append(hunk)
 
-        return hunks
+        return tuple(hunks)
 
     @cached_property
     def _lines_changed_regex(self) -> re.Pattern:
@@ -171,19 +170,6 @@ class GitWorktree(EngineAwareReturnType):
     def __eq__(self, other: Any) -> bool:
         # NB: See the class doc regarding equality.
         return id(self) == id(other)
-
-
-@dataclass(frozen=True)
-class _Hunk:
-    """Hunk of difference in unified format.
-
-    https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
-    """
-
-    left_start: int
-    left_count: int
-    right_start: int
-    right_count: int
 
 
 @dataclass(frozen=True)
