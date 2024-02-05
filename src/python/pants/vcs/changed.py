@@ -55,14 +55,14 @@ async def find_changed_owners(
         Owners,
         OwnersRequest(
             request.sources,
-            request.files_with_line_numbers,
-            request.diff_hunks,
             # If `--changed-dependents` is used, we cannot eagerly filter out root targets. We
             # need to first find their dependents, and only then should we filter. See
             # https://github.com/pantsbuild/pants/issues/15544
             filter_by_global_options=no_dependents,
             # Changing a BUILD file might impact the targets it defines.
             match_if_owning_build_file_included_in_sources=True,
+            changed_files_with_line_numbers=request.files_with_line_numbers,
+            diff_hunks=request.diff_hunks,
         ),
     )
 

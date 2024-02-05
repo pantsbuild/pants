@@ -12,7 +12,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, ClassVar, FrozenSet, Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -963,11 +963,11 @@ class OwnersRequest:
     """
 
     sources: tuple[str, ...]
-    changed_files_with_line_numbers: tuple[str, ...] = ()
-    diff_hunks: FrozenDict[str, Hunk] = FrozenDict()
     owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
+    changed_files_with_line_numbers: tuple[str, ...] = ()
+    diff_hunks: FrozenDict[str, Hunk] = FrozenDict()
 
 
 class Owners(FrozenOrderedSet[Address]):

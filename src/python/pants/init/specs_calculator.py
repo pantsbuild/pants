@@ -4,7 +4,6 @@
 import logging
 from typing import cast
 
-from pants.backend.project_info import dependents
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.environments import determine_bootstrap_environment
