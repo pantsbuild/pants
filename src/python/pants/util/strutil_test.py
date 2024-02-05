@@ -123,12 +123,14 @@ def test_path_issue_strip_chroot_path() -> None:
             dedent(
                 """\
             /var/pants-sandbox-123/red:/var/pants-sandbox-123/blue
+            /var/pants-sandbox-345/red:/var/pants-sandbox-456/blue
             """
             )
         )
         == dedent(
             """\
         /<sandbox-1>/red:/<sandbox-1>/blue
+        /<sandbox-2>/red:/<sandbox-3>/blue
         """
         )
     )
