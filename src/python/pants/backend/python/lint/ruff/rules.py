@@ -92,11 +92,11 @@ async def _run_ruff_fmt(
         mode=RuffMode.FORMAT,
         interpreter_constraints=interpreter_constraints,
     )
-    result = await run_ruff(run_ruff_request, ruff)
+    result = await _run_ruff(run_ruff_request, ruff)
     return await FmtResult.create(request, result)
 
 
-async def run_ruff(
+async def _run_ruff(
     request: _RunRuffRequest,
     ruff: Ruff,
 ) -> FallibleProcessResult:
@@ -150,7 +150,7 @@ async def run_ruff(
 
 @rule(desc="Fix with `ruff check --fix`", level=LogLevel.DEBUG)
 async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
-    result = await run_ruff(
+    result = await _run_ruff(
         _RunRuffRequest(snapshot=request.snapshot, mode=RuffMode.FIX),
         ruff,
     )
@@ -162,7 +162,7 @@ async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any], ruff: Ruf
     source_files = await Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
-    result = await run_ruff(
+    result = await _run_ruff(
         _RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.LINT),
         ruff,
     )

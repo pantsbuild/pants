@@ -485,5 +485,5 @@ def rules():
         # after all our deprecation fixers.
         UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
         UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
-        # UnionRule(RewrittenBuildFileRequest, FormatWithRuffRequest),
+        UnionRule(RewrittenBuildFileRequest, FormatWithRuffRequest),
     )
