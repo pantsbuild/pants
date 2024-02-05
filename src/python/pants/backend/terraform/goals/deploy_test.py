@@ -50,6 +50,9 @@ def test_deploy_terraform_forwards_args(rule_runner: RuleRunner, standard_deploy
     # assert standard_deployment.state_file.check()
 
 
+# TODO test plan / apply based on dry-run flag
+
+
 def test_deploy_terraform_with_module(rule_runner: RuleRunner) -> None:
     """Test that we can deploy a root module with a nearby shared module."""
     files = {
