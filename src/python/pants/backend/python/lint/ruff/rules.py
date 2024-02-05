@@ -87,18 +87,15 @@ async def _run_ruff_fmt(
     ruff: Ruff,
     interpreter_constraints: Optional[InterpreterConstraints] = None,
 ) -> FmtResult:
-    result = await Get(
-        FallibleProcessResult,
-        _RunRuffRequest(
-            snapshot=request.snapshot,
-            mode=RuffMode.FORMAT,
-            interpreter_constraints=interpreter_constraints,
-        ),
+    run_ruff_request = _RunRuffRequest(
+        snapshot=request.snapshot,
+        mode=RuffMode.FORMAT,
+        interpreter_constraints=interpreter_constraints,
     )
+    result = await run_ruff(run_ruff_request, ruff)
     return await FmtResult.create(request, result)
 
 
-@rule(level=LogLevel.DEBUG)
 async def run_ruff(
     request: _RunRuffRequest,
     ruff: Ruff,
@@ -153,20 +150,21 @@ async def run_ruff(
 
 @rule(desc="Fix with `ruff check --fix`", level=LogLevel.DEBUG)
 async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
-    result = await Get(
-        FallibleProcessResult, _RunRuffRequest(snapshot=request.snapshot, mode=RuffMode.FIX)
+    result = await run_ruff(
+        _RunRuffRequest(snapshot=request.snapshot, mode=RuffMode.FIX),
+        ruff,
     )
     return await FixResult.create(request, result)
 
 
 @rule(desc="Lint with `ruff check`", level=LogLevel.DEBUG)
-async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintResult:
+async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any], ruff: Ruff) -> LintResult:
     source_files = await Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
-    result = await Get(
-        FallibleProcessResult,
+    result = await run_ruff(
         _RunRuffRequest(snapshot=source_files.snapshot, mode=RuffMode.LINT),
+        ruff,
     )
     return LintResult.create(request, result)
 
