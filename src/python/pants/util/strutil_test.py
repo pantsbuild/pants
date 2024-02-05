@@ -115,6 +115,25 @@ def test_strip_chroot_path() -> None:
     assert anonymize_v2_chroot_path("hello world") == "hello world"
 
 
+def test_path_issue_strip_chroot_path() -> None:
+    # This was a specific bug observed where the PATH variable got anonymized incorrectly. In particular, the
+    # replacement crossed over into *another* PATH item, i.e, including `:`.
+    assert (
+        anonymize_v2_chroot_path(
+            dedent(
+                """\
+            /var/pants-sandbox-123/red:/var/pants-sandbox-123/blue
+            """
+            )
+        )
+        == dedent(
+            """\
+        /<sandbox-1>/red:/<sandbox-1>/blue
+        """
+        )
+    )
+
+
 @pytest.mark.parametrize(
     ("strip_chroot_path", "strip_formatting", "expected"),
     [
