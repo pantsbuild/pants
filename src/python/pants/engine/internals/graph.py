@@ -943,6 +943,11 @@ def _log_or_raise_unmatched_owners(
 
 @union
 class HunkOwnersRequest(abc.ABC):
+    """Union for universal diff hunk owners requests.
+
+    Define a subclass if you want to use `--changed-files-with-line-numbers` flag.
+    """
+
     @classmethod
     @abc.abstractmethod
     def new(cls, hunks: FrozenDict[str, Hunk]) -> HunkOwnersRequest:
