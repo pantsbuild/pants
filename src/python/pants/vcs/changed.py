@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, cast
 
 from pants.backend.project_info import dependents
 from pants.backend.project_info.dependents import Dependents, DependentsRequest
@@ -13,7 +12,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
-from pants.engine.internals.graph import HunkOwnersRequest, Owners, OwnersRequest
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
@@ -132,19 +131,14 @@ class ChangedOptions:
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, git_worktree: GitWorktree) -> list[str]:
+    def changed_files(self, git_worktree: GitWorktree) -> set[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
-            return cast(
-                List[str], git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
-            )
+            return git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
 
         changes_since = self.since or git_worktree.current_rev_identifier
-        return cast(
-            List[str],
-            git_worktree.changed_files(
-                from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
-            ),
+        return git_worktree.changed_files(
+            from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
         )
 
     def diff_hunks(self, git_worktree: GitWorktree) -> dict[str, tuple[Hunk, ...]]:
