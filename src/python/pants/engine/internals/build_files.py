@@ -59,6 +59,16 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+class BuildFileSyntaxError(SyntaxError):
+    """An error parsing a BUILD file."""
+
+    def __str__(self) -> str:
+        first_line = f"Error parsing BUILD file '{self.filename}:{self.lineno}': {self.msg}"
+        second_line = f"  {self.text.rstrip()}"
+        third_line = f"  {' ' * (self.offset - 1)}^"
+        return f"{first_line}\n{second_line}\n{third_line}"
+
+
 @dataclass(frozen=True)
 class BuildFileOptions:
     patterns: tuple[str, ...]
@@ -207,7 +217,7 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
         try:
             obj.visit(ast.parse(file_content.content, file_content.path))
         except SyntaxError as e:
-            raise Exception(f"Error parsing BUILD file {file_content.path}:{e.lineno}: {e.msg}")
+            raise BuildFileSyntaxError(e.msg, (e.filename, e.lineno, e.offset, e.text)) from e
 
         return tuple(obj.env_vars)
 
