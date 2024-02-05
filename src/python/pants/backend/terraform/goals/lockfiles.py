@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Union
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import (
     TerraformDependenciesField,
+    TerraformDeploymentTarget,
     TerraformModuleSourcesField,
     TerraformModuleTarget,
     TerraformRootModuleField,
@@ -46,6 +48,8 @@ async def identify_user_resolves_from_terraform_files(
     for tgt in all_targets:
         if tgt.has_field(TerraformModuleSourcesField):
             known_terraform_module_dirs.add(tgt.address.spec)
+        if tgt.has_field(TerraformRootModuleField):
+            known_terraform_module_dirs.add(tgt.address.spec)
 
     return KnownUserResolveNames(
         names=tuple(known_terraform_module_dirs),
@@ -56,7 +60,7 @@ async def identify_user_resolves_from_terraform_files(
 
 @dataclass(frozen=True)
 class GenerateTerraformLockfile(GenerateLockfile):
-    target: TerraformModuleTarget
+    target: Union[TerraformModuleTarget, TerraformDeploymentTarget]
 
 
 @rule
@@ -73,17 +77,22 @@ async def setup_user_lockfile_requests(
     )
 
     targets = await Get(Targets, Addresses, Addresses(addrs))
-    deployment_targets = [t for t in targets if isinstance(t, TerraformModuleTarget)]
+    module_targets = [t for t in targets if isinstance(t, TerraformModuleTarget)]
+    deployment_targets = [t for t in targets if isinstance(t, TerraformDeploymentTarget)]
+    targets_with_resolves: list[Union[TerraformModuleTarget, TerraformDeploymentTarget]] = [
+        *module_targets,
+        *deployment_targets,
+    ]
 
     return UserGenerateLockfiles(
         [
             GenerateTerraformLockfile(
                 target=tgt,
-                resolve_name=tgt.residence_dir,
+                resolve_name=tgt.address.spec,
                 lockfile_dest=(Path(tgt.residence_dir) / ".terraform.lock.hcl").as_posix(),
                 diff=False,
             )
-            for tgt in deployment_targets
+            for tgt in targets_with_resolves
         ]
     )
 
