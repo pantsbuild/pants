@@ -214,11 +214,13 @@ class PythonToolBase(PythonToolRequirementsBase):
 
     # Subclasses must set.
     default_main: ClassVar[MainSpecification]
-    # TODO: default_main can be an Executable, which is very uncommon.
-    #       This does not add an --executable option because that complicates
-    #       the UX for most tools, even though Executable should be very uncommon.
-    #       If we need to allow users to set --executable, then add a mixin class:
-    #       PythonToolExecutableMixin
+
+    # Though possible, we do not recommend setting `default_main` to an Executable
+    # instead of a ConsoleScript or an EntryPoint. Executable is a niche pex feature
+    # designed to support poorly named executable python scripts that cannot be imported
+    # (eg when a file has a character like "-" that is not valid in python identifiers).
+    # As this should be rare or even non-existant, we do NOT add an `executable` option
+    # to mirror the other MainSpecification options.
 
     console_script = StrOption(
         advanced=True,
