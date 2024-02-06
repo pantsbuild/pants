@@ -75,9 +75,13 @@ class BuildFileSyntaxError(SyntaxError):
 
     def __str__(self) -> str:
         first_line = f"Error parsing BUILD file {self.filename}:{self.lineno}: {self.msg}"
-        second_line = f"  {self.text.rstrip()}"
-        third_line = f"  {' ' * (self.offset - 1)}^"
-        return f"{first_line}\n{second_line}\n{third_line}"
+        # These two fields are optional per the spec, so we can't rely on them being set.
+        if self.text is not None and self.offset is not None:
+            second_line = f"  {self.text.rstrip()}"
+            third_line = f"  {' ' * (self.offset - 1)}^"
+            return f"{first_line}\n{second_line}\n{third_line}"
+
+        return first_line
 
 
 @dataclass(frozen=True)
