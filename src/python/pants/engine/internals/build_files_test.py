@@ -18,7 +18,9 @@ from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, Envi
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BUILDFileEnvVarExtractor,
     BuildFileOptions,
+    BuildFileSyntaxError,
     OptionalAddressFamily,
     evaluate_preludes,
     parse_address_family,
@@ -944,3 +946,39 @@ def test_build_file_description_of_origin(target_adaptor_rule_runner: RuleRunner
         [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
     )
     assert "src/BUILD:2" == target_adaptor.description_of_origin
+
+
+@pytest.mark.parametrize(
+    "filename, contents, expect_failure, expected_message",
+    [
+        ("BUILD", "data()", False, None),
+        (
+            "BUILD.qq",
+            "data()qq",
+            True,
+            "Error parsing BUILD file BUILD.qq:1: invalid syntax\n  data()qq\n        ^",
+        ),
+        (
+            "foo/BUILD",
+            "data()\nqwe asd",
+            True,
+            "Error parsing BUILD file foo/BUILD:2: invalid syntax\n  qwe asd\n      ^",
+        ),
+    ],
+)
+def test_build_file_syntax_error(filename, contents, expect_failure, expected_message):
+    class MockFileContent:
+        def __init__(self, path, content):
+            self.path = path
+            self.content = content
+
+    if expect_failure:
+        with pytest.raises(BuildFileSyntaxError) as e:
+            BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+
+        formatted = str(e.value)
+
+        assert formatted == expected_message
+
+    else:
+        BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))

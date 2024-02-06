@@ -62,8 +62,19 @@ logger = logging.getLogger(__name__)
 class BuildFileSyntaxError(SyntaxError):
     """An error parsing a BUILD file."""
 
+    def from_syntax_error(error: SyntaxError) -> BuildFileSyntaxError:
+        return BuildFileSyntaxError(
+            error.msg,
+            (
+                error.filename,
+                error.lineno,
+                error.offset,
+                error.text,
+            ),
+        )
+
     def __str__(self) -> str:
-        first_line = f"Error parsing BUILD file '{self.filename}:{self.lineno}': {self.msg}"
+        first_line = f"Error parsing BUILD file {self.filename}:{self.lineno}: {self.msg}"
         second_line = f"  {self.text.rstrip()}"
         third_line = f"  {' ' * (self.offset - 1)}^"
         return f"{first_line}\n{second_line}\n{third_line}"
@@ -217,7 +228,7 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
         try:
             obj.visit(ast.parse(file_content.content, file_content.path))
         except SyntaxError as e:
-            raise BuildFileSyntaxError(e.msg, (e.filename, e.lineno, e.offset, e.text)) from e
+            raise BuildFileSyntaxError.from_syntax_error(e).with_traceback(e.__traceback__)
 
         return tuple(obj.env_vars)
 
