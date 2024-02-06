@@ -417,8 +417,9 @@ async def create_dist_build_request(
             },
         ),
     )
-    dist_source_root = next(iter(source_roots_result.path_to_root.values())).path
-    source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
+    path_to_root = source_roots_result.path_to_root
+    dist_source_root = next(iter(path_to_root.values())).path if path_to_root else "."
+    source_roots = tuple(sorted({sr.path for sr in path_to_root.values()}))
 
     # Get any extra build-time environment (e.g., native extension requirements).
     build_env_requests = []
