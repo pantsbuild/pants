@@ -417,7 +417,9 @@ async def create_dist_build_request(
             },
         ),
     )
-    source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
+    path_to_root = source_roots_result.path_to_root
+    dist_source_root = next(iter(path_to_root.values())).path if path_to_root else "."
+    source_roots = tuple(sorted({sr.path for sr in path_to_root.values()}))
 
     # Get any extra build-time environment (e.g., native extension requirements).
     build_env_requests = []
@@ -467,6 +469,7 @@ async def create_dist_build_request(
         build_sdist=sdist,
         input=prefixed_input,
         working_directory=working_directory,
+        dist_source_root=dist_source_root,
         build_time_source_roots=source_roots,
         target_address_spec=exported_target.target.address.spec,
         wheel_config_settings=wheel_config_settings,
