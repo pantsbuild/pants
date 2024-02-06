@@ -130,12 +130,15 @@ def strip_prefix(string: str, prefix: str) -> str:
 
 # NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
 def anonymize_v2_chroot_path(v: bytes | str) -> str:
-    """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
-    paths.
+    """Replace all instances of chroot tmpdir paths from the str to use cache-friendly
+    anonymous alternatives.
 
-    This is useful when a tool that is run with the V2 engine outputs absolute paths. It is
-    confusing for the user to see the absolute path in the final output because it is an
-    implementation detail that Pants copies their source code into a chroot.
+    This is useful when a tool that is run with the V2 engine outputs absolute
+    paths. These paths are bad for caching, because they'll be unique for each run. They
+    are also unstable. This replacement will expose the sandbox usage to users, but
+    using <pants-sandbox-1>, etc. makes them distinct from most other paths, and makes
+    it very clear if multiple sandboxes are being used.
+
     """
     if isinstance(v, bytes):
         v = v.decode()
@@ -146,7 +149,7 @@ def anonymize_v2_chroot_path(v: bytes | str) -> str:
         if sandbox_path not in sandbox_path_to_replacement:
             sandbox_path_to_replacement[
                 sandbox_path
-            ] = f"/<sandbox-{len(sandbox_path_to_replacement)+1}>"
+            ] = f"/<pants-sandbox-{len(sandbox_path_to_replacement)+1}>"
 
     for sandbox, replacement in sandbox_path_to_replacement.items():
         v = v.replace(sandbox, replacement)

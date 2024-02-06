@@ -77,6 +77,8 @@ def test_strip_chroot_path() -> None:
             Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-3zt5Ph/src/python/example.py
             Would reformat /var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-OCnquv/test.py
             Would reformat /custom-tmpdir/pants-sandbox-7zt4pH/custom_tmpdir.py
+            Would reformat /custom-tmpdir/pants-sandbox-7zt4pH/another_file.py
+            Would reformat /private/var/folders/sx/pdpbqz4x5cscn9hhfpbsbqvm0000gn/T/pants-sandbox-3zt5Ph/foobar.py
 
             Some other output.
             """
@@ -84,9 +86,11 @@ def test_strip_chroot_path() -> None:
         )
         == dedent(
             """\
-        Would reformat /<sandbox-1>/src/python/example.py
-        Would reformat /<sandbox-2>/test.py
-        Would reformat /<sandbox-3>/custom_tmpdir.py
+        Would reformat /<pants-sandbox-1>/src/python/example.py
+        Would reformat /<pants-sandbox-2>/test.py
+        Would reformat /<pants-sandbox-3>/custom_tmpdir.py
+        Would reformat /<pants-sandbox-3>/another_file.py
+        Would reformat /<pants-sandbox-1>/foobar.py
 
         Some other output.
         """
@@ -129,8 +133,8 @@ def test_path_issue_strip_chroot_path() -> None:
         )
         == dedent(
             """\
-        /<sandbox-1>/red:/<sandbox-1>/blue
-        /<sandbox-2>/red:/<sandbox-3>/blue
+        /<pants-sandbox-1>/red:/<pants-sandbox-1>/blue
+        /<pants-sandbox-2>/red:/<pants-sandbox-3>/blue
         """
         )
     )
@@ -141,8 +145,8 @@ def test_path_issue_strip_chroot_path() -> None:
     [
         (False, False, "\033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m"),
         (False, True, "/var/pants-sandbox-123/red/path.py bold"),
-        (True, False, "\033[0;31m/<sandbox-1>/red/path.py\033[0m \033[1mbold\033[0m"),
-        (True, True, "/<sandbox-1>/red/path.py bold"),
+        (True, False, "\033[0;31m/<pants-sandbox-1>/red/path.py\033[0m \033[1mbold\033[0m"),
+        (True, True, "/<pants-sandbox-1>/red/path.py bold"),
     ],
 )
 def test_simplifier(strip_chroot_path: bool, strip_formatting: bool, expected: str) -> None:
