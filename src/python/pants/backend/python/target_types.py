@@ -323,8 +323,8 @@ class EntryPointField(AsyncFieldMixin, Field):
           1) `'app.py'`, Pants will convert into the module `path.to.app`;
           2) `'app.py:func'`, Pants will convert into `path.to.app:func`.
 
-        You may either set this field or the `script` field, but not both. Leave off both fields
-        to have no entry point.
+        You may only set one of: this field, or the `script` field, or the `executable` field.
+        Leave off all three fields to have no entry point.
         """
     )
     value: EntryPoint | None
@@ -369,8 +369,8 @@ class PexScriptField(Field):
         Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a script or
         console_script as defined by any of the distributions in the PEX.
 
-        You may either set this field or the `entry_point` field, but not both. Leave off both
-        fields to have no entry point.
+        You may only set one of: this field, or the `entry_point` field, or the `executable` field.
+        Leave off all three fields to have no entry point.
         """
     )
     value: ConsoleScript | None
@@ -390,9 +390,9 @@ class PexExecutableField(Field):
     default = None
     help = help_text(
         """
-        Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a execuatble
+        Set the entry point, i.e. what gets run when executing `./my_app.pex`, to an execuatble
         local python script. This executable python script is typically something that cannot
-        be imported so it cannot be used via script or entry_point.
+        be imported so it cannot be used via `script` or `entry_point`.
 
         You may only set one of: this field, or the `entry_point` field, or the `script` field.
         Leave off all three fields to have no entry point.
@@ -784,13 +784,12 @@ class PexBinary(Target):
 
         if (got_entry_point + got_script + got_executable) > 1:
             raise InvalidTargetException(
-                # TODO: this is ugly. How to improve?
                 softwrap(
                     f"""
                     The `{self.alias}` target {self.address} cannot set more than one of the
                     `{self[PexEntryPointField].alias}`, `{self[PexScriptField].alias}`, and
-                    `{self[PexExecutableField].alias}` fields at
-                    the same time. To fix, please remove one.
+                    `{self[PexExecutableField].alias}` fields at the same time.
+                    To fix, please remove all but one.
                     """
                 )
             )
