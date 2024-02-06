@@ -9,7 +9,6 @@ import os
 import shlex
 from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import PurePath
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
@@ -41,7 +40,6 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, Target, Targets, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership
-from pants.source.source_root import SourceRootRequest, SourceRoot
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
