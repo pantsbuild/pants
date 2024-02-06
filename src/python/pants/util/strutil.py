@@ -130,15 +130,13 @@ def strip_prefix(string: str, prefix: str) -> str:
 
 # NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
 def anonymize_v2_chroot_path(v: bytes | str) -> str:
-    """Replace all instances of chroot tmpdir paths from the str to use cache-friendly
-    anonymous alternatives.
+    """Replace all instances of chroot tmpdir paths from the str to use cache-friendly anonymous
+    alternatives.
 
-    This is useful when a tool that is run with the V2 engine outputs absolute
-    paths. These paths are bad for caching, because they'll be unique for each run. They
-    are also unstable. This replacement will expose the sandbox usage to users, but
-    using <pants-sandbox-1>, etc. makes them distinct from most other paths, and makes
-    it very clear if multiple sandboxes are being used.
-
+    This is useful when a tool that is run with the V2 engine outputs absolute paths. These paths
+    are bad for caching, because they'll be unique for each run. They are also unstable. This
+    replacement will expose the sandbox usage to users, but using <pants-sandbox-1>, etc. makes them
+    distinct from most other paths, and makes it very clear if multiple sandboxes are being used.
     """
     if isinstance(v, bytes):
         v = v.decode()
