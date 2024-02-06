@@ -15,9 +15,11 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     ConsoleScript,
     EntryPoint,
+    Executable,
     PexBinariesGeneratorTarget,
     PexBinary,
     PexEntryPointField,
+    PexExecutableField,
     PexScriptField,
     PythonDistribution,
     PythonRequirementsField,
@@ -54,15 +56,28 @@ from pants.util.strutil import softwrap
 
 
 def test_pex_binary_validation() -> None:
-    def create_tgt(*, script: str | None = None, entry_point: str | None = None) -> PexBinary:
+    def create_tgt(
+        *, script: str | None = None, executable: str | None = None, entry_point: str | None = None
+    ) -> PexBinary:
         return PexBinary(
-            {PexScriptField.alias: script, PexEntryPointField.alias: entry_point},
+            {
+                PexScriptField.alias: script,
+                PexExecutableField.alias: executable,
+                PexEntryPointField.alias: entry_point,
+            },
             Address("", target_name="t"),
         )
 
     with pytest.raises(InvalidTargetException):
+        create_tgt(script="foo", executable="foo", entry_point="foo")
+    with pytest.raises(InvalidTargetException):
+        create_tgt(script="foo", executable="foo")
+    with pytest.raises(InvalidTargetException):
         create_tgt(script="foo", entry_point="foo")
+    with pytest.raises(InvalidTargetException):
+        create_tgt(executable="foo", entry_point="foo")
     assert create_tgt(script="foo")[PexScriptField].value == ConsoleScript("foo")
+    assert create_tgt(executable="foo")[PexExecutableField].value == Executable("foo")
     assert create_tgt(entry_point="foo")[PexEntryPointField].value == EntryPoint("foo")
 
 
