@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from pathlib import PurePath
+from typing import Optional
 
 from pants.backend.python.goals.run_helper import (
     _create_python_source_run_dap_request,
@@ -49,21 +51,27 @@ class PythonSourceFieldSet(RunFieldSet):
             return python_setup.default_run_goal_use_sandbox
         return self._run_goal_use_sandbox.value
 
+    def _executable_main(self) -> Optional[Executable]:
+        source = PurePath(self.source.value)
+        source_name = source.stem if source.suffix == ".py" else source.name
+        if not source_name.isidentifier():
+            # If the python source is not importable (python modules can't be named with '-'),
+            # then it must be an executable script.
+            executable = Executable(self.source.value)
+        else:
+            # The module is importable, so entry_point will do the heavy lifting instead.
+            executable = None
+        return executable
+
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_source_run_request(
     field_set: PythonSourceFieldSet, pex_env: PexEnvironment, python_setup: PythonSetup
 ) -> RunRequest:
-    # If the python source is not importable (python modules can't be named with '-'),
-    # then it must be an executable script.
-    if "-" in field_set.source.value:
-        executable = Executable(field_set.source.value)
-    else:
-        executable = None
     return await _create_python_source_run_request(
         field_set.address,
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
-        executable=executable,
+        executable=field_set._executable_main(),
         pex_env=pex_env,
         run_in_sandbox=field_set.should_use_sandbox(python_setup),
     )
@@ -78,6 +86,7 @@ async def create_python_source_run_in_sandbox_request(
     run_request = await _create_python_source_run_request(
         field_set.address,
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
+        executable=field_set._executable_main(),
         pex_env=pex_env,
         run_in_sandbox=True,
     )
@@ -109,6 +118,7 @@ async def create_python_source_debug_adapter_request(
     run_request = await _create_python_source_run_request(
         field_set.address,
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
+        executable=field_set._executable_main(),
         pex_env=pex_env,
         pex_path=[debugpy_pex],
         run_in_sandbox=run_in_sandbox,
