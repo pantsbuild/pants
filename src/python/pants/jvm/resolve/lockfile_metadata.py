@@ -66,8 +66,8 @@ class JVMLockfileMetadataV1(JVMLockfileMetadata):
     User validity is tested by the set of user requirements strings appearing as a subset of those
     in the metadata requirements.
 
-    Tool validity is tested by the set of user requirements strings being an exact match of those
-    in the metadata requirements.
+    Tool validity is tested by the set of user requirements strings being an exact match of those in
+    the metadata requirements.
     """
 
     requirements: FrozenOrderedSet[str]

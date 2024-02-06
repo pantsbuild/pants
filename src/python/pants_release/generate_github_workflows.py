@@ -1309,39 +1309,25 @@ class Repo:
     """
 
     python_version: str = "3.10"
-    """
-    The Python version to install system-wide for user code to use.
-    """
+    """The Python version to install system-wide for user code to use."""
 
     env: dict[str, str] = field(default_factory=dict)
-    """
-    Any extra environment variables to provide to all pants steps
-    """
+    """Any extra environment variables to provide to all pants steps."""
 
     install_go: bool = False
-    """
-    Whether to install Go system-wide
-    """
+    """Whether to install Go system-wide."""
 
     install_thrift: bool = False
-    """
-    Whether to install Thrift system-wide
-    """
+    """Whether to install Thrift system-wide."""
 
     node_version: None | str = None
-    """
-    Whether to install Node/NPM system-wide, and which version if so
-    """
+    """Whether to install Node/NPM system-wide, and which version if so."""
 
     checkout_options: dict[str, Any] = field(default_factory=dict)
-    """
-    Any additional options to provide to actions/checkout
-    """
+    """Any additional options to provide to actions/checkout."""
 
     setup_commands: str = ""
-    """
-    Any additional set-up commands to run before pants (e.g. `sudo apt install ...`)
-    """
+    """Any additional set-up commands to run before pants (e.g. `sudo apt install ...`)"""
 
     goals: Sequence[str] = tuple(DefaultGoals)
     """

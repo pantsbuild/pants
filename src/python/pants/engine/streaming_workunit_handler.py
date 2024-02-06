@@ -164,11 +164,11 @@ class WorkunitsCallback(ABC):
         finished: bool,
         context: StreamingWorkunitContext,
     ) -> None:
-        """
-        :started_workunits: Workunits that have started but not completed.
-        :completed_workunits: Workunits that have completed.
-        :finished: True when the last chunk of workunit data is reported to the callback.
-        :context: A context providing access to functionality relevant to the run.
+        """:started_workunits: Workunits that have started but not completed.
+
+        :completed_workunits: Workunits that have completed. :finished: True when the last chunk of
+        workunit data is reported to the callback. :context: A context providing access to
+        functionality relevant to the run.
         """
 
     @property

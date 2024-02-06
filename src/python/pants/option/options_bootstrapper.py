@@ -53,11 +53,11 @@ class OptionsBootstrapper:
         """Get the location of the config files.
 
         The locations are specified by the --pants-config-files option.  However we need to load the
-        config in order to process the options.  This method special-cases --pants-config-files
-        in order to solve this chicken-and-egg problem.
+        config in order to process the options.  This method special-cases --pants-config-files in
+        order to solve this chicken-and-egg problem.
 
-        Note that, obviously, it's not possible to set the location of config files in a config file.
-        Doing so will have no effect.
+        Note that, obviously, it's not possible to set the location of config files in a config
+        file. Doing so will have no effect.
         """
         # This exactly mirrors the logic applied in Option to all regular options.  Note that we'll
         # also parse --pants-config as a regular option later, but there's no harm in that.  In fact,
@@ -116,9 +116,9 @@ class OptionsBootstrapper:
         :param env: An environment dictionary.
         :param args: An args array.
         :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
-          consume pantsrc files, they should pass False in order to avoid reading files from
-          absolute paths. Production usecases should pass True to allow options values to make the
-          decision of whether to respect pantsrc files.
+            consume pantsrc files, they should pass False in order to avoid reading files from
+            absolute paths. Production usecases should pass True to allow options values to make the
+            decision of whether to respect pantsrc files.
         """
         with warnings.catch_warnings(record=True):
             # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
@@ -225,11 +225,11 @@ class OptionsBootstrapper:
     def bootstrap_options(self) -> Options:
         """The post-bootstrap options, computed from the env, args, and fully discovered Config.
 
-        Re-computing options after Config has been fully expanded allows us to pick up bootstrap values
-        (such as backends) from a config override file, for example.
+        Re-computing options after Config has been fully expanded allows us to pick up bootstrap
+        values (such as backends) from a config override file, for example.
 
-        Because this can be computed from the in-memory representation of these values, it is not part
-        of the object's identity.
+        Because this can be computed from the in-memory representation of these values, it is not
+        part of the object's identity.
         """
         return self.parse_bootstrap_options(self.env, self.bootstrap_args, self.config)
 
@@ -272,8 +272,8 @@ class OptionsBootstrapper:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
         :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
-        :returns: A bootstrapped Options instance that also carries options for all the supplied known
-                  scopes.
+        :returns: A bootstrapped Options instance that also carries options for all the supplied
+            known scopes.
         """
         return self._full_options(
             FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope)),

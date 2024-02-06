@@ -45,7 +45,8 @@ def target_option(s: str) -> str:
 
     :API: public
 
-    TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
+    TODO(stuhood): Eagerly convert these to Addresses: see
+    https://rbcommons.com/s/twitter/r/2937/
     """
     return s
 
@@ -82,8 +83,8 @@ def file_option(s: str) -> str:
 def dict_with_files_option(s):
     """Same as 'dict', but fingerprints the file contents of any values which are file paths.
 
-    For any value which matches the path of a file on disk, the file path is not fingerprinted -- only
-    its contents.
+    For any value which matches the path of a file on disk, the file path is not fingerprinted --
+    only its contents.
 
     :API: public
     """
@@ -207,8 +208,8 @@ class ListValueComponent:
     A component consists of values to append and values to filter while constructing the final list.
 
     Each component may either replace or modify the preceding component.  So that, e.g., a config
-    file can append to and/or filter the default value list, instead of having to repeat most
-    of the contents of the default value list.
+    file can append to and/or filter the default value list, instead of having to repeat most of the
+    contents of the default value list.
     """
 
     REPLACE = "REPLACE"
@@ -281,10 +282,10 @@ class ListValueComponent:
 
         Note that we accept tuple literals, but the internal value is always a list.
 
-        :param value: The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
-                      a string representation of a list or tuple (possibly prefixed by + or -
-                      indicating modification instead of replacement), or any allowed member_type.
-                      May also be a comma-separated sequence of modifications.
+        :param value: The value to convert. Can be an instance of ListValueComponent, a list, a
+            tuple, a string representation of a list or tuple (possibly prefixed by + or -
+            indicating modification instead of replacement), or any allowed member_type. May also be
+            a comma-separated sequence of modifications.
         """
         if isinstance(value, cls):  # Ensure idempotency.
             return value
@@ -368,8 +369,8 @@ class DictValueComponent:
     def create(cls, value) -> DictValueComponent:
         """Interpret value as either a dict or something to extend another dict with.
 
-        :param value: The value to convert.  Can be an instance of DictValueComponent, a dict,
-                      or a string representation (possibly prefixed by +) of a dict.
+        :param value: The value to convert. Can be an instance of DictValueComponent, a dict, or a
+            string representation (possibly prefixed by +) of a dict.
         """
         if isinstance(value, bytes):
             value = value.decode()

@@ -143,11 +143,11 @@ class BuildConfiguration:
         def registered_aliases(self) -> BuildFileAliases:
             """Return the registered aliases exposed in BUILD files.
 
-            These returned aliases aren't so useful for actually parsing BUILD files.
-            They are useful for generating online documentation.
+            These returned aliases aren't so useful for actually parsing BUILD files. They are
+            useful for generating online documentation.
 
             :returns: A new BuildFileAliases instance containing this BuildConfiguration's
-                      registered alias mappings.
+                  registered alias mappings.
             """
             return BuildFileAliases(
                 objects=self._exposed_object_by_alias.copy(),

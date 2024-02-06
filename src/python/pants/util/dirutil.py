@@ -179,11 +179,9 @@ def read_file(filename: str, binary_mode: bool = False) -> bytes | str:
 def safe_walk(path: bytes | str, **kwargs: Any) -> Iterator[tuple[str, list[str], list[str]]]:
     """Just like os.walk, but ensures that the returned values are unicode objects.
 
-    This isn't strictly safe, in that it is possible that some paths
-    will not be decodeable, but that case is rare, and the only
-    alternative is to somehow avoid all interaction between paths and
-    unicode objects, which seems especially tough in the presence of
-    unicode_literals. See e.g.
+    This isn't strictly safe, in that it is possible that some paths will not be decodeable, but
+    that case is rare, and the only alternative is to somehow avoid all interaction between paths
+    and unicode objects, which seems especially tough in the presence of unicode_literals. See e.g.
     https://mail.python.org/pipermail/python-dev/2008-December/083856.html
 
     :API: public
@@ -240,8 +238,7 @@ def register_rmtree(directory: str, cleaner: _MkdtempCleanerType = _mkdtemp_atex
 def safe_rmtree(directory: str | Path) -> None:
     """Delete a directory if it's present. If it's not present, no-op.
 
-    Note that if the directory argument is a symlink, only the symlink will
-    be deleted.
+    Note that if the directory argument is a symlink, only the symlink will be deleted.
 
     :API: public
     """
@@ -329,9 +326,9 @@ def absolute_symlink(source_path: str, target_path: str) -> None:
     """Create a symlink at target pointing to source using the absolute path.
 
     :param source_path: Absolute path to source file
-    :param target_path: Absolute path to intended symlink
-    :raises ValueError if source_path or link_path are not unique, absolute paths
-    :raises OSError on failure UNLESS file already exists or no such file/directory
+    :param target_path: Absolute path to intended symlink :raises ValueError if source_path or
+        link_path are not unique, absolute paths :raises OSError on failure UNLESS file already
+        exists or no such file/directory
     """
     if not os.path.isabs(source_path):
         raise ValueError(f"Path for source : {source_path} must be absolute")
@@ -357,9 +354,9 @@ def relative_symlink(source_path: str, link_path: str) -> None:
     """Create a symlink at link_path pointing to relative source.
 
     :param source_path: Absolute path to source file
-    :param link_path: Absolute path to intended symlink
-    :raises ValueError if source_path or link_path are not unique, absolute paths
-    :raises OSError on failure UNLESS file already exists or no such file/directory
+    :param link_path: Absolute path to intended symlink :raises ValueError if source_path or
+        link_path are not unique, absolute paths :raises OSError on failure UNLESS file already
+        exists or no such file/directory
     """
     if not os.path.isabs(source_path):
         raise ValueError(f"Path for source:{source_path} must be absolute")
@@ -388,9 +385,8 @@ def touch(path: str, times: int | tuple[int, int] | None = None):
 
     :API: public
 
-    :path: The file to touch.
-    :times Either a tuple of (atime, mtime) or else a single time to use for both.  If not
-           specified both atime and mtime are updated to the current time.
+    :path: The file to touch. :times Either a tuple of (atime, mtime) or else a single time to use
+    for both.  If not        specified both atime and mtime are updated to the current time.
     """
     if isinstance(times, tuple) and len(times) > 2:
         raise ValueError(

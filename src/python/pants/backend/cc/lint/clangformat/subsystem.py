@@ -37,7 +37,7 @@ class ClangFormat(PythonToolBase):
     default_lockfile_resource = ("pants.backend.cc.lint.clangformat", "clangformat.lock")
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
-        """clang-format will use the closest configuration file to the file currently being
+        """Clang-format will use the closest configuration file to the file currently being
         formatted, so add all of them."""
         config_files = (
             ".clang-format",

@@ -315,20 +315,12 @@ _TestFieldSetT = TypeVar("_TestFieldSetT", bound=TestFieldSet)
 class TestRequest:
     """Base class for plugin types wanting to be run as part of `test`.
 
-    Plugins should define a new type which subclasses this type, and set the
-    appropriate class variables.
-    E.g.
-        class DryCleaningRequest(TestRequest):
-            tool_subsystem = DryCleaningSubsystem
-            field_set_type = DryCleaningFieldSet
+    Plugins should define a new type which subclasses this type, and set the appropriate class
+    variables. E.g.     class DryCleaningRequest(TestRequest):         tool_subsystem =
+    DryCleaningSubsystem         field_set_type = DryCleaningFieldSet
 
-    Then register the rules which tell Pants about your plugin.
-    E.g.
-        def rules():
-            return [
-                *collect_rules(),
-                *DryCleaningRequest.rules(),
-            ]
+    Then register the rules which tell Pants about your plugin. E.g.     def rules():         return
+    [             *collect_rules(),             *DryCleaningRequest.rules(),         ]
     """
 
     tool_subsystem: ClassVar[type[SkippableSubsystem]]
@@ -434,7 +426,7 @@ class CoverageReport(ABC):
         :param console: A handle to the terminal.
         :param workspace: A handle to local disk.
         :return: If a report was materialized to disk, the path of the file in the report one might
-                 open first to start examining the report.
+            open first to start examining the report.
         """
         ...
 

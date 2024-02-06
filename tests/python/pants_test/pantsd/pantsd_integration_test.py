@@ -524,7 +524,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         :param signum: The signal to send.
         :param regexps: Assert that all of these regexps match somewhere in stderr.
         :param not_regexps: Assert that all of these regexps do not match somewhere in stderr.
-        :param cleanup_wait_time: passed throught to waiter, dictated how long simulated cleanup will take
+        :param cleanup_wait_time: passed throught to waiter, dictated how long simulated cleanup
+            will take
         """
         with self.pantsd_test_context() as (workdir, config, checker):
             client_handle, waiter_pid, child_pid, _ = launch_waiter(
@@ -680,9 +681,11 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         """Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't
         manifest as a PantsRunFinishedWithFailureException.
 
-        That is, that we unset the global Exiter override set by LocalPantsRunner before we try to log the exception.
+        That is, that we unset the global Exiter override set by LocalPantsRunner before we try to
+        log the exception.
 
-        This is a regression test for the most glaring case of https://github.com/pantsbuild/pants/issues/7597.
+        This is a regression test for the most glaring case of
+        https://github.com/pantsbuild/pants/issues/7597.
         """
         with self.pantsd_run_context(success=False) as ctx, temporary_dir(".") as directory:
             Path(directory, "BUILD").write_text(

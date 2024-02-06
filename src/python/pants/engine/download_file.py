@@ -50,7 +50,8 @@ class URLDownloadHandler:
     """
 
     match_authority: ClassVar[Optional[str]] = None
-    """The authority to match (e.g. 'pantsbuild.org' or 's3.amazonaws.com') or `None` to match all authorities.
+    """The authority to match (e.g. 'pantsbuild.org' or 's3.amazonaws.com') or `None` to match all
+    authorities.
 
     The authority is matched using `fnmatch`, see https://docs.python.org/3/library/fnmatch.html for more
     information.

@@ -26,9 +26,9 @@ class SignalHandler:
     """A specification for how to handle a fixed set of nonfatal signals.
 
     This is subclassed and registered with ExceptionSink.reset_signal_handler() whenever the signal
-    handling behavior is modified for different pants processes, for example in the remote client when
-    pantsd is enabled. The default behavior is to exit "gracefully" by leaving a detailed log of which
-    signal was received, then exiting with failure.
+    handling behavior is modified for different pants processes, for example in the remote client
+    when pantsd is enabled. The default behavior is to exit "gracefully" by leaving a detailed log
+    of which signal was received, then exiting with failure.
 
     Note that the terminal will convert a ctrl-c from the user into a SIGINT.
     """

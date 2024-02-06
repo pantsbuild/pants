@@ -544,11 +544,12 @@ def test_fetch_one_coord_with_bad_length(rule_runner: RuleRunner) -> None:
 def test_fetch_one_coord_with_mismatched_coord(rule_runner: RuleRunner) -> None:
     """This test demonstrates that fetch_one_coord is picky about inexact coordinates.
 
-    Even though the expected jar was downloaded, the coordinate in the lockfile entry was inexact, meaning
-    it wasn't an exact string match for the coordinate fetched and reported by Coursier, which is exact.
+    Even though the expected jar was downloaded, the coordinate in the lockfile entry was inexact,
+    meaning it wasn't an exact string match for the coordinate fetched and reported by Coursier,
+    which is exact.
 
-    This shouldn't happen in practice, because these lockfile entries are ultimately derived from Coursier
-    reports which always give exact coordinate strings.
+    This shouldn't happen in practice, because these lockfile entries are ultimately derived from
+    Coursier reports which always give exact coordinate strings.
     """
     expected_exception_msg = (
         r'Coursier resolved coord.*?"org.hamcrest:hamcrest-core:1.3".*?'

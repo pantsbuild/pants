@@ -75,9 +75,7 @@ class BuildFileAliases:
         objects: dict[str, Any] | None = None,
         context_aware_object_factories: dict[str, ContextAwareObjectFactory] | None = None,
     ) -> None:
-        """
-        :API: public
-        """
+        """:API: public."""
         object.__setattr__(self, "_objects", self._validate_objects(objects))
         object.__setattr__(
             self,
@@ -87,16 +85,12 @@ class BuildFileAliases:
 
     @property
     def objects(self) -> FrozenDict[str, Any]:
-        """
-        :API: public
-        """
+        """:API: public."""
         return self._objects
 
     @property
     def context_aware_object_factories(self) -> FrozenDict[str, ContextAwareObjectFactory]:
-        """
-        :API: public
-        """
+        """:API: public."""
         return self._context_aware_object_factories
 
     def merge(self, other: BuildFileAliases) -> BuildFileAliases:

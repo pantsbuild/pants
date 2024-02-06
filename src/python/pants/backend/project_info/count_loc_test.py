@@ -84,7 +84,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 def test_files_without_owners(rule_runner: RuleRunner) -> None:
-    """cloc works on any readable file in the build root, regardless of whether it's declared in a
+    """Cloc works on any readable file in the build root, regardless of whether it's declared in a
     BUILD file."""
     rule_runner.write_files(
         {

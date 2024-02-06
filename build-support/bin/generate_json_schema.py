@@ -66,8 +66,8 @@ def get_default(option: dict) -> Any:
     """Get default value for an option.
 
     Ensure options that depend on any machine specific environment are properly handled. E.g.
-    `"default": "<buildroot>/.pants.d"` will be expanded to the `"default": "/home/your-user.name/code/pants/.pants.d"`
-    which is not what we want to have in a public schema.
+    `"default": "<buildroot>/.pants.d"` will be expanded to the `"default": "/home/your-
+    user.name/code/pants/.pants.d"` which is not what we want to have in a public schema.
     """
     return ENV_SPECIFIC_OPTION_DEFAULTS.get(option["config_key"], option["default"])
 

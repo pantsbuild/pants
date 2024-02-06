@@ -790,12 +790,12 @@ class CoarsenedTarget(EngineAwareParameter):
     def __init__(self, members: Iterable[Target], dependencies: Iterable[CoarsenedTarget]) -> None:
         """A set of Targets which cyclicly reach one another, and are thus indivisible.
 
-        Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for the
-        recursive portion.
+        Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for
+        the recursive portion.
 
         :param members: The members of the cycle.
-        :param dependencies: The deduped direct (not transitive) dependencies of all Targets in
-            the cycle. Dependencies between members of the cycle are excluded.
+        :param dependencies: The deduped direct (not transitive) dependencies of all Targets in the
+            cycle. Dependencies between members of the cycle are excluded.
         """
         self.members = FrozenOrderedSet(members)
         self.dependencies = FrozenOrderedSet(dependencies)

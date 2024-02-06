@@ -55,9 +55,7 @@ class RunTracker:
     )
 
     def __init__(self, args: tuple[str, ...], options: Options):
-        """
-        :API: public
-        """
+        """:API: public."""
         self._has_started: bool = False
         self._has_ended: bool = False
 

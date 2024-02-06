@@ -25,7 +25,8 @@ from pants.util.logging import LogLevel
 class PythonBuildStandaloneBinary:
     """A Python interpreter for use by `@rule` code as an alternative to BashBinary scripts.
 
-    This interpreter is provided by Python Build Standalone https://gregoryszorc.com/docs/python-build-standalone/main/,
+    This interpreter is provided by Python Build Standalone
+    https://gregoryszorc.com/docs/python-build-standalone/main/,
     which has a few caveats. Namely it doesn't play nicely with third-party sdists. Meaning Pants'
     scripts being run by Python Build Standalone should avoid third-party sdists.
     """

@@ -143,7 +143,6 @@ class FirstPartyPythonModuleMapping:
     resolves_to_modules_to_providers: FrozenDict[
         ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
     ]
-
     """A merged mapping of each resolve name to the first-party module names contained and their
     owning addresses.
 

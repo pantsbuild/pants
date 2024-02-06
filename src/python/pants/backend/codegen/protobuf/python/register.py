@@ -1,6 +1,5 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """Generate Python sources from Protocol Buffers (Protobufs).
 
 See https://www.pantsbuild.org/docs/protobuf.
