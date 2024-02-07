@@ -385,7 +385,7 @@ class PexCheckField(StringField):
     alias = "check"
     valid_choices = ("none", "warn", "error")
     expected_type = str
-    default = "error"
+    default = "warn"
     help = help_text(
         """
         Check that the built PEX is valid. Currently this only
