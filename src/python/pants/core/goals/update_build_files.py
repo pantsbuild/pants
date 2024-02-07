@@ -227,22 +227,16 @@ async def update_build_files(
         Formatter.YAPF: FormatWithYapfRequest,
         Formatter.RUFF: FormatWithRuffRequest,
     }
-    for request in union_membership[RewrittenBuildFileRequest]:
-        if issubclass(
-            request, (FormatWithBlackRequest, FormatWithRuffRequest, FormatWithYapfRequest)
-        ):
-            chosen_formatter_request_class = formatter_to_request_class.get(
-                update_build_files_subsystem.formatter
-            )
-            is_chosen_formatter = (
-                chosen_formatter_request_class is not None
-                and request == chosen_formatter_request_class
-            )
+    chosen_formatter_request_class = formatter_to_request_class.get(
+        update_build_files_subsystem.formatter
+    )
+    if not chosen_formatter_request_class:
+        raise ValueError(f"Unrecognized formatter: {update_build_files_subsystem.formatter}")
 
-            if update_build_files_subsystem.fmt and is_chosen_formatter:
-                rewrite_request_classes.append(request)
-            else:
-                continue
+    for request in union_membership[RewrittenBuildFileRequest]:
+        if update_build_files_subsystem.fmt and issubclass(request, chosen_formatter_request_class):
+            rewrite_request_classes.append(request)
+
         if update_build_files_subsystem.fix_safe_deprecations or not issubclass(
             request, DeprecationFixerRequest
         ):
