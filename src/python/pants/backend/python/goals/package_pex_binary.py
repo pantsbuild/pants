@@ -88,6 +88,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         args = []
         if self.emit_warnings.value_or_global_default(pex_binary_defaults) is False:
             args.append("--no-emit-warnings")
+        elif self.emit_warnings.value_or_global_default(pex_binary_defaults) is True:
+            args.append("--emit-warnings")
         if self.resolve_local_platforms.value_or_global_default(pex_binary_defaults) is True:
             args.append("--resolve-local-platforms")
         if self.ignore_errors.value is True:
