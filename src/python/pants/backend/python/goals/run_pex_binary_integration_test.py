@@ -218,7 +218,7 @@ def test_local_dist_with_executable_main() -> None:
         "foo/bar.py": "BAR = 'LOCAL DIST'",
         "foo/setup.py": dedent(
             """\
-            from setuptools import setup
+            from setuptools import setup  # pants: no-infer-dep
 
             # Double-brace the package_dir to avoid setup_tmpdir treating it as a format.
             setup(name="foo", version="9.8.7", packages=["foo"], package_dir={{"foo": "."}},)
@@ -255,6 +255,7 @@ def test_local_dist_with_executable_main() -> None:
             f"{tmpdir}/foo:bin",
         ]
         result = run_pants(args)
+        result.assert_success()
         assert result.stdout == "LOCAL DIST\n"
 
 
