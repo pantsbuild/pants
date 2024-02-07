@@ -26,7 +26,6 @@ from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -546,18 +545,6 @@ class PexEmitWarningsField(TriBoolField):
     def value_or_global_default(self, pex_binary_defaults: PexBinaryDefaults) -> bool:
         if self.value is None:
             return pex_binary_defaults.emit_warnings
-        warn_or_error(
-            "2.21.0.dev0",
-            softwrap(
-                """
-                          `emit_warnings` no longer set per target.
-                          Use `emit_warnings` on the [pex] subsytem to control warnings for
-                          all pex invocations
-                          """
-            ),
-            "use [pex] subsystem instead",
-            start_version="2.20.0.dev0",
-        )
 
         return self.value
 
@@ -851,8 +838,6 @@ class PexBinaryDefaults(Subsystem):
             `pex_binary` targets
             """
         ),
-        removal_version="2.21.0.dev0",
-        removal_hint="Use the [pex] subsystem to control warnings for all Pex invocations",
         advanced=True,
     )
     resolve_local_platforms = BoolOption(
