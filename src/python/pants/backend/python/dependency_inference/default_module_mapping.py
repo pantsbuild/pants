@@ -86,6 +86,7 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "django-filter": ("django_filters",),
     "django-postgres-extra": ("psqlextra",),
     "django-cors-headers": ("corsheaders",),
+    "django-redis": ("django_redis",),
     "djangorestframework": ("rest_framework",),
     "djangorestframework-dataclasses": ("rest_framework_dataclasses",),
     "djangorestframework-simplejwt": ("rest_framework_simplejwt",),
