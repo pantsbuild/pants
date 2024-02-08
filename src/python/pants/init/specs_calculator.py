@@ -97,6 +97,10 @@ def calculate_specs(
             # target-aware vs. target-less goals, e.g. `list` vs `count-loc`.
             address_literals=tuple(address_literal_specs),
             file_literals=file_literal_specs,
+            # The globs here are synthesized from VCS data by the `changed` mechanism.
+            # As such it does not make sense to apply user-facing matching errors to them.
+            # In particular, they can legitimately not match anything, if entire git
+            # subtrees were deleted for example.
             unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
             filter_by_global_options=True,
             from_change_detection=True,
