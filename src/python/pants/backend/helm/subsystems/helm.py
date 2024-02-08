@@ -179,6 +179,8 @@ class HelmSubsystem(TemplatedExternalTool):
 
             Before attempting to use passthrough arguments, check the reference of each of the available target types
             to see what fields are accepted in each of them.
+            
+            To pass `--dry-run`, use the `--experimental-deploy-dry-run` flag.
             """
         ),
     )
