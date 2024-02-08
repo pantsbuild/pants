@@ -46,7 +46,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
 from pants.source.filespec import FilespecMatcher
 from pants.util.docutil import bin_name, doc_url
-from pants.util.frozendict import FrozenDict
+from pants.util.frozendict import OrderedFrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.strutil import help_text, softwrap
@@ -123,7 +123,7 @@ class PutativeTarget:
 
     # Note that we generate the BUILD file target entry from these kwargs, the
     # `name`, and `type_alias`.
-    kwargs: FrozenDict[str, str | int | bool | tuple[str, ...]]
+    kwargs: OrderedFrozenDict[str, str | int | bool | tuple[str, ...]]
 
     # Any comment lines to add above the BUILD file stanza we generate for this putative target.
     # Should include the `#` prefix, which will not be added.
@@ -198,7 +198,7 @@ class PutativeTarget:
         object.__setattr__(self, "type_alias", type_alias)
         object.__setattr__(self, "triggering_sources", tuple(triggering_sources))
         object.__setattr__(self, "owned_sources", tuple(owned_sources))
-        object.__setattr__(self, "kwargs", FrozenDict(kwargs or {}))
+        object.__setattr__(self, "kwargs", OrderedFrozenDict(kwargs or {}))
         object.__setattr__(self, "comments", tuple(comments))
 
     @property
