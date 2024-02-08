@@ -13,16 +13,17 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import DefaultDict, Dict, Generator, Optional, Tuple, cast
+from typing import Callable, DefaultDict, Dict, Generator, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.rules import UnownedDependencyError, import_rules
 from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
     PythonInferSubsystem,
+    UnownedDependencyUsage,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -272,10 +273,61 @@ async def infer_pex_binary_entry_point_dependency(
     maybe_disambiguated = explicitly_provided_deps.disambiguated(
         owners.ambiguous, owners_must_be_ancestors=entry_point.file_name_used
     )
-    unambiguous_owners = owners.unambiguous or (
-        (maybe_disambiguated,) if maybe_disambiguated else ()
+
+    unambiguous_owners = _determine_entry_point_owner(
+        maybe_disambiguated,
+        owners,
+        unresolved_ambiguity_handler=lambda: _handle_unresolved_pex_entrypoint(
+            address,
+            entry_point_field.value,
+            owners.ambiguous,
+            python_infer_subsystem.unowned_dependency_behavior,
+        ),
     )
     return InferredDependencies(unambiguous_owners)
+
+
+def _determine_entry_point_owner(
+    maybe_disambiguated: Optional[Address],
+    owners: PythonModuleOwners,
+    unresolved_ambiguity_handler: Callable[[], None],
+) -> Tuple[Address, ...]:
+    """Determine what should be the unambiguous owner for a PEX's entrypoint.
+
+    This might be empty.
+    """
+    if owners.unambiguous:
+        return owners.unambiguous
+    elif maybe_disambiguated:
+        return (maybe_disambiguated,)
+    elif owners.ambiguous and not maybe_disambiguated:
+        unresolved_ambiguity_handler()
+        return ()
+    else:
+        return ()
+
+
+def _handle_unresolved_pex_entrypoint(
+    address: Address,
+    entry_point: str,
+    ambiguous_owners,
+    unowned_dependency_behavior: UnownedDependencyUsage,
+) -> None:
+    """Raise an error if we could not disambiguate an entrypoint for the PEX."""
+    msg = softwrap(
+        f"""
+        Pants cannot resolve the entrypoint for the target {address}.
+        The entrypoint {entry_point} might refer to the following:
+
+        {bullet_list(o.spec for o in ambiguous_owners)}
+        """
+    )
+    if unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
+        pass
+    elif unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
+        logger.warning(msg)
+    else:
+        raise UnownedDependencyError(msg)
 
 
 # -----------------------------------------------------------------------------------------------

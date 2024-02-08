@@ -10,7 +10,7 @@ from typing import Iterable
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.rules import UnownedDependencyError, import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -137,7 +137,12 @@ def test_resolve_pex_binary_entry_point() -> None:
         assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"), is_file=True)
 
 
-def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
+@pytest.mark.parametrize(
+    ["python_infer_unowned_dependency_behavior"], [("ignore",), ("warning",), ("error",)]
+)
+def test_infer_pex_binary_entry_point_dependency(
+    python_infer_unowned_dependency_behavior, caplog
+) -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types_rules.rules(),
@@ -145,6 +150,9 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
             QueryRule(InferredDependencies, [InferPexBinaryEntryPointDependency]),
         ],
         target_types=[PexBinary, PythonRequirementTarget, PythonSourcesGeneratorTarget],
+    )
+    rule_runner.set_options(
+        [f"--python-infer-unowned-dependency-behavior={python_infer_unowned_dependency_behavior}"]
     )
     rule_runner.write_files(
         {
@@ -237,8 +245,12 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
 
     # Warn if there's ambiguity, meaning we cannot infer.
     caplog.clear()
-    assert_inferred(Address("project", target_name="ambiguous"), expected=None)
-    assert len(caplog.records) == 1
+    if python_infer_unowned_dependency_behavior == "error":
+        with pytest.raises(ExecutionError) as ambiguous_error:
+            assert_inferred(Address("project", target_name="ambiguous"), expected=None)
+        assert isinstance(ambiguous_error.value.wrapped_exceptions[0], UnownedDependencyError)
+    else:
+        assert_inferred(Address("project", target_name="ambiguous"), expected=None)
     assert (
         softwrap(
             """
@@ -249,6 +261,17 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
         in caplog.text
     )
     assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
+
+    # assert that the message for the PEX entrypoint was respected
+    if python_infer_unowned_dependency_behavior == "warning":
+        assert len(caplog.records) == 2
+        assert (
+            "The entrypoint EntryPoint(module='ambiguous.py', function=None) might refer to the following"
+            in caplog.text
+        )
+    else:
+        # the "error" case raises it as an error, so it doesn't appear in caplog
+        assert len(caplog.records) == 1
 
     # Test that ignores can disambiguate an otherwise ambiguous entry point. Ensure we don't log a
     # warning about ambiguity.
@@ -270,9 +293,16 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
             relative_file_path="ambiguous_in_another_root.py",
         ),
     )
+
     caplog.clear()
-    assert_inferred(Address("project", target_name="another_root__module_used"), expected=None)
-    assert len(caplog.records) == 1
+    if python_infer_unowned_dependency_behavior == "error":
+        with pytest.raises(ExecutionError) as ambiguous_error_2:
+            assert_inferred(
+                Address("project", target_name="another_root__module_used"), expected=None
+            )
+        assert isinstance(ambiguous_error_2.value.wrapped_exceptions[0], UnownedDependencyError)
+    else:
+        assert_inferred(Address("project", target_name="another_root__module_used"), expected=None)
     assert (
         softwrap(
             """
@@ -282,6 +312,15 @@ def test_infer_pex_binary_entry_point_dependency(caplog) -> None:
         )
         in caplog.text
     )
+    if python_infer_unowned_dependency_behavior == "warning":
+        assert len(caplog.records) == 2
+        assert (
+            "The entrypoint EntryPoint(module='project.ambiguous_in_another_root', function=None) might refer to the following"
+            in caplog.text
+        )
+    else:
+        # the "error" case raises it as an error, so it doesn't appear in caplog
+        assert len(caplog.records) == 1
 
     # Test that we can turn off the inference.
     rule_runner.set_options(["--no-python-infer-entry-points"])
