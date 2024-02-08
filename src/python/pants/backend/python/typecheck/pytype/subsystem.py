@@ -21,7 +21,7 @@ class Pytype(PythonToolBase):
     )
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<3.10"]
+    default_interpreter_constraints = ["CPython>=3.7,<3.11"]
 
     default_main = ConsoleScript("pytype")
     default_requirements = ["pytype==2023.6.16"]
