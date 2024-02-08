@@ -4,6 +4,7 @@
 import logging
 from typing import cast
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.environments import determine_bootstrap_environment
@@ -96,7 +97,7 @@ def calculate_specs(
             # target-aware vs. target-less goals, e.g. `list` vs `count-loc`.
             address_literals=tuple(address_literal_specs),
             file_literals=file_literal_specs,
-            unmatched_glob_behavior=unmatched_cli_globs,
+            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
             filter_by_global_options=True,
             from_change_detection=True,
             description_of_origin="`--changed-since`",
