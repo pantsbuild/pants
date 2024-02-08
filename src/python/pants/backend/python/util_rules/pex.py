@@ -57,6 +57,7 @@ from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
+from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -1371,4 +1372,4 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
 
 
 def rules():
-    return [*collect_rules(), *pex_cli.rules(), *pex_requirements.rules()]
+    return [*collect_rules(), *pex_cli.rules(), *pex_requirements.rules(), *stripped_source_rules()]
