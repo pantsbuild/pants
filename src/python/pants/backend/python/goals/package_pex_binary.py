@@ -8,6 +8,7 @@ from typing import Tuple
 from pants.backend.python.target_types import (
     PexArgsField,
     PexBinaryDefaults,
+    PexCheckField,
     PexCompletePlatformsField,
     PexEmitWarningsField,
     PexEntryPointField,
@@ -79,6 +80,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     venv_site_packages_copies: PexVenvSitePackagesCopies
     venv_hermetic_scripts: PexVenvHermeticScripts
     environment: EnvironmentField
+    check: PexCheckField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
@@ -96,6 +98,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.sh_boot.value is True:
             args.append("--sh-boot")
+        if self.check.value is not None:
+            args.append(f"--check={self.check.value}")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
         if self.strip_env.value is False:
