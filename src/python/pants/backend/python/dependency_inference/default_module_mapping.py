@@ -5,35 +5,51 @@
 #  https://www.python.org/dev/peps/pep-0503/#normalized-names.
 
 import re
+from enum import Enum
 from functools import partial
-from typing import Dict, Iterable, Match, Tuple
+from typing import Callable, Dict, List, Match, Tuple
 
 
-def all_hyphen_to_dot(m: Match[str]) -> str:
-    """Convert all hyphens to dots e.g. azure-foo-bar -> azure.foo.bar.
+class PackageSeparator(Enum):
+    DOT = "."
+    UNDERSCORE = "_"
+    NONE = ""
 
-    >>> all_hyphen_to_dot(re.match(r"^azure-.+", "azure-foo-bar"))
+
+def all_hyphen_to_separator(m: Match[str], separator: PackageSeparator) -> str:
+    """Convert all hyphens to a package separator e.g. azure-foo-bar -> azure.foo.bar or
+    azure_foo_bar.
+
+    >>> all_hyphen_to_separator(re.match(r"^azure-.+", "azure-foo-bar"), PackageSeparator.DOT)
     'azure.foo.bar'
+    >>> all_hyphen_to_separator(re.match(r"^azure-.+", "azure-foo-bar"), PackageSeparator.UNDERSCORE)
+    'azure_foo_bar'
+    >>> all_hyphen_to_separator(re.match(r"^azure-.+", "azure-foo-bar"), PackageSeparator.NONE)
+    'azurefoobar'
     """
-    return m.string.replace("-", ".")
+    return m.string.replace("-", separator.value)
 
 
-def first_group_hyphen_to_underscore(m: Match[str]) -> str:
+def first_group_hyphen_to_separator(m: Match[str], separator: PackageSeparator) -> str:
     """Convert the first group(regex match group) of hyphens to underscores. Only returns the first
     group and must contain at least one group.
 
-    >>> first_group_hyphen_to_underscore(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"))
+    >>> first_group_hyphen_to_separator(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"), separator=PackageSeparator.UNDERSCORE)
     'admin_cursor_paginator'
+    >>> first_group_hyphen_to_separator(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"), separator=PackageSeparator.DOT)
+    'admin.cursor.paginator'
+    >>> first_group_hyphen_to_separator(re.match(r"^django-((.+(-.+)?))", "django-admin-cursor-paginator"), separator=PackageSeparator.NONE)
+    'admincursorpaginator'
     """
     if m.re.groups == 0 or not m.groups():
         raise ValueError(f"expected at least one group in the pattern{m.re.pattern} but got none.")
-    return str(m.groups()[0]).replace("-", "_")
+    return str(m.groups()[0]).replace("-", separator.value)
 
 
 def two_groups_hyphens_two_replacements_with_suffix(
     m: Match[str],
-    first_group_replacement: str = ".",
-    second_group_replacement: str = "",
+    first_group_replacement: PackageSeparator = PackageSeparator.DOT,
+    second_group_replacement: PackageSeparator = PackageSeparator.NONE,
     custom_suffix: str = "",
 ) -> str:
     """take two groups, and by default, the first will have '-' replaced with '.', the second will
@@ -41,13 +57,23 @@ def two_groups_hyphens_two_replacements_with_suffix(
 
     >>> two_groups_hyphens_two_replacements_with_suffix(re.match(r"^(google-cloud-)([^.]+)", "google-cloud-foo-bar"))
     'google.cloud.foobar'
+    >>> two_groups_hyphens_two_replacements_with_suffix(re.match(r"^(google-cloud-)([^.]+)", "google-cloud-foo-bar"), first_group_replacement=PackageSeparator.UNDERSCORE, second_group_replacement=PackageSeparator.DOT)
+    'google_cloud_foo.bar'
     """
     if m.re.groups < 2 or not m.groups():
         raise ValueError(f"expected at least two groups in the pattern{m.re.pattern}.")
-    prefix = m.string[m.start(1) : m.end(1)].replace("-", first_group_replacement)
-    suffix = m.string[m.start(2) : m.end(2)].replace("-", second_group_replacement)
+    prefix = m.string[m.start(1) : m.end(1)].replace("-", first_group_replacement.value)
+    suffix = m.string[m.start(2) : m.end(2)].replace("-", second_group_replacement.value)
     return f"{prefix}{suffix}{custom_suffix}"
 
+
+# common replacement methods
+all_hyphen_to_dot = partial(all_hyphen_to_separator, separator=PackageSeparator.DOT)
+all_hyphen_to_underscore = partial(all_hyphen_to_separator, separator=PackageSeparator.UNDERSCORE)
+first_group_hyphen_to_dot = partial(first_group_hyphen_to_separator, separator=PackageSeparator.DOT)
+first_group_hyphen_to_underscore = partial(
+    first_group_hyphen_to_separator, separator=PackageSeparator.UNDERSCORE
+)
 
 """
 A mapping of Patterns and their replacements. will be used with `re.sub`.
@@ -57,7 +83,7 @@ the replacement. see re.sub for more information
 then if an import in the python code is google.cloud.foo, then the package of
 google-cloud-foo will be used.
 """
-DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, Iterable] = {
+DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str]]] = {
     re.compile(r"""^azure-.+"""): [all_hyphen_to_dot],
     re.compile(r"""^django-((.+(-.+)?))"""): [first_group_hyphen_to_underscore],
     # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
@@ -67,13 +93,17 @@ DEFAULT_MODULE_PATTERN_MAPPING: Dict[re.Pattern, Iterable] = {
         for custom_suffix in ("", "_v1", "_v2", "_v3")
     ],
     re.compile(r"""^(opentelemetry-instrumentation-)([^.]+)"""): [
-        partial(two_groups_hyphens_two_replacements_with_suffix, second_group_replacement="_"),
+        partial(
+            two_groups_hyphens_two_replacements_with_suffix,
+            second_group_replacement=PackageSeparator.UNDERSCORE,
+        ),
     ],
-    re.compile(r"""^(oslo-.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^oslo-.+"""): [all_hyphen_to_underscore],
+    re.compile(r"""^python-(.+)"""): [first_group_hyphen_to_underscore],
     re.compile(r"""^python-(.+)"""): [first_group_hyphen_to_underscore],
 }
 
-DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
+DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "absl-py": ("absl",),
     "acryl-datahub": ("datahub",),
     "ansicolors": ("colors",),
@@ -159,7 +189,18 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple] = {
     "websocket-client": ("websocket",),
 }
 
-DEFAULT_TYPE_STUB_MODULE_MAPPING = {
+DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str]]] = {
+    re.compile(r"""^stubs_(.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^types_(.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^stubs-(.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^types-(.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(.+)_stubs"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(.+)_types"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(.+)-stubs"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(.+)-types"""): [first_group_hyphen_to_underscore],
+}
+
+DEFAULT_TYPE_STUB_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
     "djangorestframework-types": ("rest_framework",),
     "lark-stubs": ("lark",),
     "types-beautifulsoup4": ("bs4",),
