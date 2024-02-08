@@ -643,7 +643,7 @@ async def build_pex(
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
 
-    if not request.interpreter_constraints:
+    if not request.python and not request.interpreter_constraints:
         # Blank ICs in the request means that the caller wants us to use the ICs configured
         # for the resolve (falling back to the global ICs).
         resolve_name = ""
