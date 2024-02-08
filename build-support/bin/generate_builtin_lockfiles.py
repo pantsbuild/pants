@@ -126,7 +126,7 @@ all_python_tools = tuple(
             PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(Pytype, "pants.backend.experimental.python.typecheck.pytype"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
-            PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff"),
+            PythonTool(Ruff, "pants.backend.python.lint.ruff"),
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
