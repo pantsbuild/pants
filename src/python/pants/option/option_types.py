@@ -352,6 +352,55 @@ class WorkspacePathOption(_OptionBase[str, _StrDefault]):
     option_type: Any = custom_types.workspace_path
 
 
+class IntOrStrOption(_OptionBase[Union[str, int], _StrDefault]):
+    """An option which takes either an integer or an open or closed set of strings."""
+
+    def __new__(cls, *args, allowed_string_values: list[str] | None = None, **kwargs):
+        instance = super().__new__(
+            cls,  # type: ignore[arg-type]
+            *args,
+            **kwargs,
+        )
+
+        instance.allowed_string_values = allowed_string_values
+
+        class _OptionType:
+            def __init__(self, value: str | int) -> None:
+                self._allowed_string_values = allowed_string_values
+                if not isinstance(value, str) and not isinstance(value, int):
+                    raise ValueError(
+                        f"Expected an int or a string, got {type(value)} with value {value}"
+                    )
+                if isinstance(value, str):
+                    try:
+                        value = int(value)
+                    except ValueError:
+                        if allowed_string_values is not None and value not in allowed_string_values:
+                            raise ValueError(
+                                f"Expected an integer or a string from {{{', '.join(allowed_string_values)}}}, got '{value}'"
+                            )
+
+                self.value = value
+
+            def __repr__(self):
+                return f"IntOrStrOption<{{{', '.join(allowed_string_values)}}}>(value={self.value})"
+
+            def __eq__(self, other):
+                return (
+                    self.value == other.value
+                    and self._allowed_string_values == other._allowed_string_values
+                )
+
+        instance.option_type = _OptionType
+
+        return instance
+
+    def get_option_type(self, subsystem_cls):
+        return self.option_type
+
+    allowed_string_values: list[str] | None = None
+
+
 # -----------------------------------------------------------------------------------------------
 # Int Concrete Option Classes
 # -----------------------------------------------------------------------------------------------

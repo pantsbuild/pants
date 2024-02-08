@@ -502,6 +502,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
                         workdir.path().to_owned(),
                         (container_id, working_dir),
                         exclusive_spawn,
+                        workunit,
                     )
                     .map_err(|msg| {
                         // Processes that experience no infrastructure issues should result in an "Ok" return,
@@ -739,7 +740,8 @@ impl Command {
         let child_outputs = self.spawn(docker, container_id).await?;
         let mut stdout = BytesMut::with_capacity(8192);
         let mut stderr = BytesMut::with_capacity(8192);
-        let exit_code = collect_child_outputs(&mut stdout, &mut stderr, child_outputs).await?;
+        let exit_code =
+            collect_child_outputs(&mut stdout, &mut stderr, child_outputs, None).await?;
         Ok((exit_code, stdout.freeze(), stderr.freeze()))
     }
 }

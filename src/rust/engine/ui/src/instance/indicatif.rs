@@ -22,12 +22,20 @@ use workunit_store::SpanId;
 
 use super::TaskState;
 use crate::ConsoleUI;
+use crate::LogStreamingLines;
+use crate::LogStreamingTopn;
 
+const RESERVED_OUTPUT_LOG_LINES: usize = 10;
 pub struct IndicatifInstance {
     tasks_to_display: IndexSet<SpanId>,
     // NB: Kept for Drop.
     _multi_progress: MultiProgress,
     bars: Vec<ProgressBar>,
+
+    terminal_width: u16,
+    log_streaming: bool,
+    log_streaming_lines: usize,
+    log_streaming_topn: usize,
 }
 
 impl IndicatifInstance {
@@ -35,6 +43,10 @@ impl IndicatifInstance {
         local_parallelism: usize,
         terminal_width: u16,
         terminal_height: u16,
+
+        log_streaming: bool,
+        log_streaming_lines: LogStreamingLines,
+        log_streaming_topn: LogStreamingTopn,
     ) -> Result<IndicatifInstance, String> {
         // We take exclusive access to stdio by registering a callback that is used to render stderr
         // while we're holding access. See the method doc.
@@ -51,7 +63,7 @@ impl IndicatifInstance {
         let bars = (0..cmp::min(local_parallelism, terminal_height.into()))
             .map(|_n| {
                 let style = ProgressStyle::default_bar()
-                    .template("{spinner} {wide_msg}")
+                    .template("{spinner} {prefix}{msg}")
                     .expect("Valid template.");
 
                 multi_progress.add(ProgressBar::new(terminal_width.into()).with_style(style))
@@ -60,10 +72,23 @@ impl IndicatifInstance {
 
         *stderr_dest_bar_guard = Some(bars[0].downgrade());
 
+        let (log_lines, log_topn) = log_streaming_sizes(
+            terminal_height,
+            &bars,
+            log_streaming,
+            log_streaming_lines,
+            log_streaming_topn,
+        );
+
         Ok(IndicatifInstance {
             tasks_to_display: IndexSet::new(),
             _multi_progress: multi_progress,
             bars,
+            terminal_width,
+
+            log_streaming,
+            log_streaming_lines: log_lines,
+            log_streaming_topn: log_topn,
         })
     }
 
@@ -74,7 +99,11 @@ impl IndicatifInstance {
         future::ready(()).boxed()
     }
 
-    pub fn render(&mut self, heavy_hitters: &HashMap<SpanId, (String, SystemTime)>) {
+    pub fn render(
+        &mut self,
+        heavy_hitters: &HashMap<SpanId, (String, SystemTime)>,
+        log_retriever: &mut dyn FnMut(SpanId, usize) -> Option<Vec<u8>>,
+    ) {
         let tasks_to_display = &mut self.tasks_to_display;
         super::classify_tasks(
             heavy_hitters,
@@ -95,6 +124,10 @@ impl IndicatifInstance {
         let now = SystemTime::now();
         for (n, pbar) in self.bars.iter().enumerate() {
             let maybe_label = tasks_to_display.get_index(n).map(|span_id| {
+                let log_lines = (self.log_streaming && n < self.log_streaming_topn)
+                    .then(|| log_retriever(*span_id, self.log_streaming_lines))
+                    .flatten();
+
                 let (label, start_time) = heavy_hitters.get(span_id).unwrap();
                 let duration_label = match now.duration_since(*start_time).ok() {
                     None => "(Waiting)".to_string(),
@@ -102,17 +135,80 @@ impl IndicatifInstance {
                         format_workunit_duration_ms!((duration).as_millis()).to_string()
                     }
                 };
-                format!("{duration_label} {label}")
+
+                // we remove the duration spinner, space, duration label, space
+                let max_label_len =
+                    (self.terminal_width as usize).saturating_sub(duration_label.len() + 3);
+
+                let label = if log_lines.as_ref().map_or(false, |lines| !lines.is_empty()) {
+                    format!("{duration_label} {label:.*}\n", max_label_len)
+                } else {
+                    format!("{duration_label} {label:.*}", max_label_len)
+                };
+
+                (label, log_lines)
             });
 
             match maybe_label {
-                Some(label) => pbar.set_message(label),
-                None => pbar.set_message(""),
+                Some((label, maybe_message)) => {
+                    pbar.set_prefix(label);
+
+                    match maybe_message {
+                        Some(mut message) if !message.is_empty() => {
+                            message.push(b'\n');
+                            let message: String =
+                                String::from_utf8_lossy(message.as_slice()).into();
+                            pbar.set_message(message);
+                        }
+                        _ => pbar.set_message(""),
+                    }
+                }
+                None => {
+                    pbar.set_prefix("");
+                    pbar.set_message("");
+                }
             }
 
             pbar.tick();
         }
     }
+}
+
+fn log_streaming_sizes(
+    terminal_height: u16,
+    bars: &Vec<ProgressBar>,
+    log_streaming: bool,
+    log_streaming_lines: LogStreamingLines,
+    log_streaming_topn: LogStreamingTopn,
+) -> (usize, usize) {
+    let th = terminal_height as usize;
+    let remaining = th
+        .saturating_sub(RESERVED_OUTPUT_LOG_LINES)
+        .saturating_sub(bars.len());
+
+    let (log_streaming_lines, log_streaming_topn) = if log_streaming {
+        match (log_streaming_lines, log_streaming_topn) {
+            (LogStreamingLines::Exact(l), LogStreamingTopn::Exact(t)) => (l, t),
+            (LogStreamingLines::Exact(l), LogStreamingTopn::Auto) => {
+                // +1 for header
+                let topn = remaining / (l + 1);
+                (l, topn)
+            }
+            (LogStreamingLines::Auto, LogStreamingTopn::Exact(t)) => {
+                let lines = (remaining / t) - 1;
+                (lines, t)
+            }
+            (LogStreamingLines::Auto, LogStreamingTopn::Auto) => {
+                let target_topn = bars.len() / 2;
+                let target_lines = (remaining / target_topn) - 1;
+
+                (target_lines, target_topn)
+            }
+        }
+    } else {
+        (0, 0)
+    };
+    (log_streaming_lines, log_streaming_topn)
 }
 
 fn setup_bar_outputs(

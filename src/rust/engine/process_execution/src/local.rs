@@ -163,13 +163,24 @@ pub async fn collect_child_outputs<'a, 'b>(
     stdout: &'a mut BytesMut,
     stderr: &'a mut BytesMut,
     mut stream: BoxStream<'b, Result<ChildOutput, String>>,
+    mut workunit: Option<&mut RunningWorkunit>,
 ) -> Result<i32, String> {
     let mut exit_code = 1;
 
     while let Some(child_output_res) = stream.next().await {
         match child_output_res? {
-            ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
-            ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
+            ChildOutput::Stdout(bytes) => {
+                stdout.extend_from_slice(&bytes);
+                if let Some(ref mut workunit) = workunit {
+                    workunit.log(bytes.to_vec());
+                }
+            }
+            ChildOutput::Stderr(bytes) => {
+                stderr.extend_from_slice(&bytes);
+                if let Some(ref mut workunit) = workunit {
+                    workunit.log(bytes.to_vec());
+                }
+            }
             ChildOutput::Exit(code) => exit_code = code.0,
         };
     }
@@ -236,6 +247,7 @@ impl super::CommandRunner for CommandRunner {
                         workdir.path().to_owned(),
                         (),
                         exclusive_spawn,
+                        workunit,
                     )
                     .map_err(|msg| {
                         // Processes that experience no infrastructure issues should result in an "Ok" return,
@@ -414,6 +426,7 @@ pub trait CapturedWorkdir {
         workdir_path: PathBuf,
         workdir_token: Self::WorkdirToken,
         exclusive_spawn: bool,
+        workunit: &mut RunningWorkunit,
     ) -> Result<FallibleProcessResultWithPlatform, String> {
         let start_time = Instant::now();
         let mut stdout = BytesMut::with_capacity(8192);
@@ -436,6 +449,7 @@ pub trait CapturedWorkdir {
                     exclusive_spawn,
                 )
                 .await?,
+                Some(workunit),
             );
             if let Some(req_timeout) = req.timeout {
                 timeout(req_timeout, exit_code_future)

@@ -11,6 +11,7 @@ use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use bstr::ByteSlice;
 use bytes::{BufMut, Bytes, BytesMut};
 use concrete_time::TimeSpan;
 use deepsize::DeepSizeOf;
@@ -348,6 +349,7 @@ pub enum UserMetadataItem {
 enum StoreMsg {
     Started(Workunit),
     Completed(SpanId, Level, Option<WorkunitMetadata>, SystemTime),
+    LogData(SpanId, Vec<u8>),
     Canceled(SpanId, SystemTime),
 }
 
@@ -355,10 +357,12 @@ enum StoreMsg {
 pub struct WorkunitStore {
     log_starting_workunits: bool,
     max_level: Level,
-    senders: [UnboundedSender<StoreMsg>; 2],
+    senders: [UnboundedSender<StoreMsg>; 3],
     streaming_workunit_data: Arc<Mutex<StreamingWorkunitData>>,
     heavy_hitters_data: Arc<Mutex<HeavyHittersData>>,
+    workunit_log_data: Arc<Mutex<WorkunitLogData>>,
     metrics_data: Arc<MetricsData>,
+    enable_log_streaming: bool,
 }
 
 struct StreamingWorkunitData {
@@ -411,6 +415,7 @@ impl StreamingWorkunitData {
                         }
                     }
                 }
+                StoreMsg::LogData(..) => {}
                 StoreMsg::Canceled(..) => (),
             }
         }
@@ -442,6 +447,7 @@ impl HeavyHittersData {
                 StoreMsg::Canceled(span_id, time) => {
                     let _ = self.running_graph.complete(span_id, None, time);
                 }
+                StoreMsg::LogData(..) => {}
             }
         }
     }
@@ -539,22 +545,165 @@ impl HeavyHittersData {
     }
 }
 
+/// The linearized log lines for a single span. The buffer is used to accumulate partial lines until
+/// they are completed.
+#[derive(Default)]
+struct SpanLogLines {
+    /// The completed lines for this span.
+    lines: Vec<Vec<u8>>,
+
+    /// Any partial line that has not yet been terminated.
+    buffer: Vec<u8>,
+}
+
+impl SpanLogLines {
+    /// Add new data to the recorded lines.
+    fn add(&mut self, data: Vec<u8>) {
+        self.buffer.extend_from_slice(&data);
+        let new_lines = self.buffer.lines_with_terminator();
+
+        let mut last_line = None;
+
+        for line in new_lines {
+            if line.is_empty() {
+                continue;
+            }
+
+            if line.ends_with_str("\n") {
+                self.lines.push(line.to_vec());
+            } else {
+                // have to allocate here since we're already holding a reference to the
+                // buffer. Optimally bstr would have an API like `drain_lines` that would generate
+                // lines and then shift the remainder the front, but I can't find such an API.
+                last_line = Some(line.to_vec());
+            }
+        }
+
+        // If the last line is not terminated, then it is a partial line and we should keep it in
+        // the buffer.
+        self.buffer.clear();
+        if let Some(last_line) = last_line {
+            self.buffer.extend_from_slice(&last_line);
+        }
+    }
+
+    /// Return the last `count` lines for this span.
+    fn lines(&mut self, count: usize) -> Vec<u8> {
+        // We want to return the last `count` lines, but we also want to include any partial line
+        // that has not yet been terminated. So we return `count - 1?` lines, plus the partial line.
+        let total_lines = self.lines.len();
+        let relevant_lines = if self.buffer.is_empty() {
+            count
+        } else {
+            count.saturating_sub(1)
+        }
+        .min(total_lines);
+
+        let irrelevant_lines = total_lines.saturating_sub(relevant_lines);
+        // each line is prefixed with "  | ", so we need to account for that, as well as the buffer.
+        let byte_count = self.lines[irrelevant_lines..]
+            .iter()
+            .map(|l| l.len())
+            .sum::<usize>()
+            + self.buffer.len()
+            + 4 * count;
+
+        let mut output = Vec::with_capacity(byte_count);
+        const LINE_PREFIX: &[u8] = b"  | ";
+        for line in self.lines.iter().skip(irrelevant_lines) {
+            output.extend_from_slice(LINE_PREFIX);
+            output.extend_from_slice(line);
+        }
+
+        if !self.buffer.is_empty() {
+            output.extend_from_slice(LINE_PREFIX);
+            output.extend_from_slice(&self.buffer);
+        }
+        output
+    }
+}
+
+/// Stores the log lines for all running workunits.
+///
+/// The whole log is stored in memory and evicted when workunits complete. This isn't strictly
+/// needed for streaming to the terminal, but if one wants to implement another viewer (i.e. a web
+/// UI) then it's useful to have the whole log available.
+struct WorkunitLogData {
+    receiver: UnboundedReceiver<StoreMsg>,
+    running_graph: RunningWorkunitGraph,
+    log_lines: HashMap<SpanId, SpanLogLines>,
+}
+
+impl WorkunitLogData {
+    fn new(receiver: UnboundedReceiver<StoreMsg>) -> WorkunitLogData {
+        WorkunitLogData {
+            receiver,
+            running_graph: RunningWorkunitGraph::default(),
+            log_lines: HashMap::new(),
+        }
+    }
+
+    /// Refresh the store by processing any new messages.
+    fn refresh_store(&mut self) {
+        while let Ok(msg) = self.receiver.try_recv() {
+            match msg {
+                StoreMsg::Started(started) => {
+                    self.log_lines
+                        .insert(started.span_id, SpanLogLines::default());
+                    self.running_graph.add(started);
+                }
+
+                StoreMsg::Completed(span_id, _level, new_metadata, time) => {
+                    self.log_lines.remove(&span_id);
+                    let _ = self.running_graph.complete(span_id, new_metadata, time);
+                }
+                StoreMsg::Canceled(span_id, time) => {
+                    self.log_lines.remove(&span_id);
+                    let _ = self.running_graph.complete(span_id, None, time);
+                }
+                StoreMsg::LogData(span_id, data) => {
+                    if let Some(log_lines) = self.log_lines.get_mut(&span_id) {
+                        log_lines.add(data);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Return the last `count` lines for the given span.
+    pub fn read_log_lines(&mut self, span_id: SpanId, line_count: usize) -> Option<Vec<u8>> {
+        self.refresh_store();
+
+        self.log_lines
+            .get_mut(&span_id)
+            .map(|log_lines| log_lines.lines(line_count))
+    }
+}
+
 impl WorkunitStore {
-    pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
+    pub fn new(
+        log_starting_workunits: bool,
+        max_level: Level,
+        enable_log_streaming: bool,
+    ) -> WorkunitStore {
         // NB: Although it would be nice not to have seperate allocations per consumer, it is
         // difficult to use a channel like `tokio::sync::broadcast` due to that channel being bounded.
         // Subscribers receive messages at very different rates, and adjusting the workunit level
         // affects the total number of messages that might be queued at any given time.
         let (sender1, receiver1) = mpsc::unbounded_channel();
         let (sender2, receiver2) = mpsc::unbounded_channel();
+        let (sender3, receiver3) = mpsc::unbounded_channel();
         WorkunitStore {
             log_starting_workunits,
             max_level,
+            enable_log_streaming,
+
             // TODO: Create one `StreamingWorkunitData` per subscriber, and zero if no subscribers are
             // installed.
-            senders: [sender1, sender2],
+            senders: [sender1, sender2, sender3],
             streaming_workunit_data: Arc::new(Mutex::new(StreamingWorkunitData::new(receiver1))),
             heavy_hitters_data: Arc::new(Mutex::new(HeavyHittersData::new(receiver2))),
+            workunit_log_data: Arc::new(Mutex::new(WorkunitLogData::new(receiver3))),
             metrics_data: Arc::default(),
         }
     }
@@ -586,6 +735,15 @@ impl WorkunitStore {
     ///
     pub fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
         self.heavy_hitters_data.lock().heavy_hitters(k)
+    }
+
+    ///
+    /// Return the log lines for the given SpanId, if any.
+    ///
+    pub fn read_log_lines(&self, span_id: SpanId, line_count: usize) -> Option<Vec<u8>> {
+        self.workunit_log_data
+            .lock()
+            .read_log_lines(span_id, line_count)
     }
 
     fn send(&self, msg: StoreMsg) {
@@ -691,6 +849,14 @@ impl WorkunitStore {
         self.complete_workunit_impl(workunit, end_time);
     }
 
+    pub fn add_log_data(&self, span_id: SpanId, data: Vec<u8>) {
+        if !self.enable_log_streaming {
+            return;
+        }
+
+        self.send(StoreMsg::LogData(span_id, data));
+    }
+
     pub fn latest_workunits(&self, max_verbosity: log::Level) -> (Vec<Workunit>, Vec<Workunit>) {
         self.streaming_workunit_data
             .lock()
@@ -759,7 +925,7 @@ impl WorkunitStore {
     }
 
     pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
-        let store = WorkunitStore::new(false, Level::Trace);
+        let store = WorkunitStore::new(false, Level::Trace, false);
         store.init_thread_state(None);
         let workunit =
             store._start_workunit(SpanId(0), "testing", Level::Info, None, Option::default());
@@ -933,6 +1099,12 @@ impl RunningWorkunit {
     pub fn complete(&mut self) {
         if let Some(workunit) = self.workunit.take() {
             self.store.complete_workunit(workunit);
+        }
+    }
+
+    pub fn log(&mut self, data: Vec<u8>) {
+        if let Some(workunit) = self.workunit.as_ref() {
+            self.store.add_log_data(workunit.span_id, data);
         }
     }
 }

@@ -10,24 +10,47 @@ use task_executor::Executor;
 use workunit_store::WorkunitStore;
 mod instance;
 
+#[derive(Clone, Copy, Debug)]
+pub enum LogStreamingLines {
+    Exact(usize),
+    Auto,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum LogStreamingTopn {
+    Exact(usize),
+    Auto,
+}
+
 pub struct ConsoleUI {
     workunit_store: WorkunitStore,
     local_parallelism: usize,
     ui_use_prodash: bool,
     // While the UI is running, there will be an Instance present.
     instance: Option<Instance>,
+
+    log_streaming: bool,
+    log_streaming_lines: LogStreamingLines,
+    log_streaming_topn: LogStreamingTopn,
 }
 
 impl ConsoleUI {
     pub fn new(
         workunit_store: WorkunitStore,
         local_parallelism: usize,
+        log_streaming: bool,
+        log_streaming_lines: LogStreamingLines,
+        log_streaming_topn: LogStreamingTopn,
         ui_use_prodash: bool,
     ) -> ConsoleUI {
         ConsoleUI {
             workunit_store,
             local_parallelism,
             ui_use_prodash,
+            log_streaming,
+            log_streaming_lines,
+            log_streaming_topn,
+
             instance: None,
         }
     }
@@ -64,7 +87,9 @@ impl ConsoleUI {
         };
 
         let heavy_hitters = self.workunit_store.heavy_hitters(self.local_parallelism);
-        instance.render(&heavy_hitters)
+        let mut log_retriver =
+            |span_id, line_count| self.workunit_store.read_log_lines(span_id, line_count);
+        instance.render(&heavy_hitters, &mut log_retriver);
     }
 
     ///
@@ -80,6 +105,9 @@ impl ConsoleUI {
 
         self.instance = Some(Instance::new(
             self.ui_use_prodash,
+            self.log_streaming,
+            self.log_streaming_lines,
+            self.log_streaming_topn,
             self.local_parallelism,
             executor,
         )?);

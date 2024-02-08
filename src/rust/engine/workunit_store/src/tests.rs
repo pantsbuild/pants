@@ -87,7 +87,7 @@ async fn disabled_workunit_is_filtered() {
 #[tokio::test]
 async fn workunit_escalation_is_recorded() {
     // Create a store which will disable Debug level workunits.
-    let ws = WorkunitStore::new(true, Level::Info);
+    let ws = WorkunitStore::new(true, Level::Info, false);
     ws.init_thread_state(None);
 
     // Start a workunit at Debug (below the level of the store).
@@ -162,7 +162,7 @@ fn create_store(
         .iter()
         .map(|(_, span_id, _, _)| *span_id)
         .collect::<HashSet<_>>();
-    let ws = WorkunitStore::new(true, log::Level::Debug);
+    let ws = WorkunitStore::new(true, log::Level::Debug, false);
 
     // Collect and sort by SpanId.
     let mut all = started

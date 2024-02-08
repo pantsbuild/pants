@@ -419,11 +419,12 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "1.4.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d4260bcc2e8fc9df1eac4919a720effeb63a3f0952f5bf4944adfa18897f09"
+checksum = "542f33a8835a0884b006a0c3df3dadd99c0c3f296ed26c2fdc8028e01ad6230c"
 dependencies = [
  "memchr",
+ "regex-automata",
  "serde",
 ]
 
@@ -1760,7 +1761,7 @@ dependencies = [
 [[package]]
 name = "indicatif"
 version = "0.17.7"
-source = "git+https://github.com/tgolsson/indicatif.git?rev=31890f0ac55f9727d152ad314a78757ccc0142b6#31890f0ac55f9727d152ad314a78757ccc0142b6"
+source = "git+https://github.com/console-rs/indicatif.git?rev=2a8b2ea2cd56b5de11da7f79da41e6dd404b2a83#2a8b2ea2cd56b5de11da7f79da41e6dd404b2a83"
 dependencies = [
  "console",
  "instant",
@@ -4696,6 +4697,7 @@ dependencies = [
 name = "workunit_store"
 version = "0.0.1"
 dependencies = [
+ "bstr",
  "bytes",
  "concrete_time",
  "deepsize",

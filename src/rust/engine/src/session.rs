@@ -20,7 +20,7 @@ use pyo3::prelude::*;
 use task_executor::{Executor, TailTasks};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task::JoinHandle;
-use ui::ConsoleUI;
+use ui::{ConsoleUI, LogStreamingLines, LogStreamingTopn};
 use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
@@ -48,12 +48,18 @@ impl SessionDisplay {
         workunit_store: &WorkunitStore,
         parallelism: usize,
         dynamic_ui: bool,
+        dynamic_ui_log_streaming: bool,
+        dynamic_ui_log_streaming_lines: LogStreamingLines,
+        dynamic_ui_log_streaming_topn: LogStreamingTopn,
         ui_use_prodash: bool,
     ) -> SessionDisplay {
         if dynamic_ui {
             SessionDisplay::ConsoleUI(Box::new(ConsoleUI::new(
                 workunit_store.clone(),
                 parallelism,
+                dynamic_ui_log_streaming,
+                dynamic_ui_log_streaming_lines,
+                dynamic_ui_log_streaming_topn,
                 ui_use_prodash,
             )))
         } else {
@@ -143,6 +149,9 @@ impl Session {
     pub fn new(
         core: Arc<Core>,
         dynamic_ui: bool,
+        dynamic_ui_log_streaming: bool,
+        dynamic_ui_log_streaming_lines: LogStreamingLines,
+        dynamic_ui_log_streaming_topn: LogStreamingTopn,
         ui_use_prodash: bool,
         mut max_workunit_level: log::Level,
         build_id: String,
@@ -157,11 +166,18 @@ impl Session {
         if dynamic_ui {
             max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
         }
-        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level);
+        let workunit_store = WorkunitStore::new(
+            !dynamic_ui,
+            max_workunit_level,
+            dynamic_ui && dynamic_ui_log_streaming,
+        );
         let display = tokio::sync::Mutex::new(SessionDisplay::new(
             &workunit_store,
             core.local_parallelism,
             dynamic_ui,
+            dynamic_ui_log_streaming,
+            dynamic_ui_log_streaming_lines,
+            dynamic_ui_log_streaming_topn,
             ui_use_prodash,
         ));
 
@@ -209,6 +225,9 @@ impl Session {
             &self.state.workunit_store,
             self.state.core.local_parallelism,
             false,
+            false,
+            LogStreamingLines::Auto,
+            LogStreamingTopn::Auto,
             false,
         ));
         let handle = Arc::new(SessionHandle {

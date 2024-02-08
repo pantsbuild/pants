@@ -1342,7 +1342,7 @@ async fn sends_headers() {
     .await
     .unwrap();
     let context = Context {
-        workunit_store: WorkunitStore::new(false, log::Level::Debug),
+        workunit_store: WorkunitStore::new(false, log::Level::Debug, false),
         build_id: String::from("marmosets"),
         run_id: RunId(0),
         ..Context::default()
