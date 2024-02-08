@@ -19,6 +19,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    Executable,
     MainSpecification,
     PexCompletePlatformsField,
     PexLayout,
@@ -55,6 +56,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -682,8 +684,20 @@ async def build_pex(
     pex_python_setup = await _determine_pex_python_and_platforms(request)
     argv.extend(pex_python_setup.argv)
 
+    source_dir_name = "source_files"
+
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
+        if isinstance(request.main, Executable):
+            # Unlike other MainSpecifiecation types (that can pass spec as-is to pex),
+            # Executable must be an actual path relative to the sandbox.
+            # request.main.spec is a python source file including it's spec_path.
+            # To make it relative to the sandbox, we strip the source root
+            # and add the source_dir_name (sources get prefixed with that below).
+            stripped = await Get(
+                StrippedFileName, StrippedFileNameRequest(request.main.spec)
+            )
+            argv.append(f"{source_dir_name}/{stripped.value}")
 
     argv.extend(
         f"--inject-args={shlex.quote(injected_arg)}" for injected_arg in request.inject_args
@@ -696,7 +710,6 @@ async def build_pex(
     if request.pex_path:
         argv.extend(["--pex-path", ":".join(pex.name for pex in request.pex_path)])
 
-    source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
     sources_digest_as_subdir = await Get(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)

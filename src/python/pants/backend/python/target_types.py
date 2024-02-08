@@ -36,7 +36,6 @@ from pants.core.goals.test import (
     TestSubsystem,
 )
 from pants.core.util_rules.environments import EnvironmentField
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import Get
 from pants.engine.target import (
@@ -304,14 +303,10 @@ class Executable(MainSpecification):
 
     def iter_pex_args(self) -> Iterator[str]:
         yield "--executable"
+        # We do NOT yield self.executable or self.spec
+        # as the path needs additional processing in the rule graph.
+        # see: build_pex in util_rules/pex
 
-        # TODO: we can't use a rule in this context. How to do this?
-        # this needs to be the path relative to the sandbox root.
-        stripped = await Get(StrippedFileName, StrippedFileNameRequest(self.spec))
-        # "source_files" is hard-coded in util_rules.pex.build_pex
-        yield "source_files/" + stripped
-
-    # TODO: does spec make sense here?
     @property
     def spec(self) -> str:
         return self.executable
@@ -414,8 +409,8 @@ class PexExecutableField(Field):
             return None
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
-        # spec_path is relative to the repo workspace,
-        # but we need relative to source root.
+        # spec_path is relative to the workspace. The rule is responsible for
+        # stripping the source root as needed.
         return Executable(f"{address.spec_path}/{value}")
 
 
