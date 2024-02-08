@@ -38,7 +38,7 @@ Linter/formatter support is implemented in separate [backends](../../using-pants
 | `pants.backend.python.lint.yapf`              | [Yapf](https://github.com/google/yapf): code formatter                                                                     |
 | `pants.backend.python.lint.autoflake`         | [Autoflake](https://github.com/myint/autoflake): remove unused imports                                                     |
 | `pants.backend.python.lint.pyupgrade`         | [Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings` |
-| `pants.backend.experimental.python.lint.ruff` | [Ruff](https://beta.ruff.rs/docs/): an extremely fast Python linter, written in Rust.                                      |
+| `pants.backend.python.lint.ruff`              | [Ruff](https://docs.astral.sh/ruff/): an extremely fast Python linter, written in Rust.                                    |
 
 To enable, add the appropriate backends in `pants.toml`:
 
