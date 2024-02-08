@@ -54,7 +54,7 @@ class PythonSourceFieldSet(RunFieldSet):
     def _executable_main(self) -> Optional[Executable]:
         source = PurePath(self.source.value)
         source_name = source.stem if source.suffix == ".py" else source.name
-        if not source_name.isidentifier():
+        if not all(part.isidentifier() for part in source_name.split(".")):
             # If the python source is not importable (python modules can't be named with '-'),
             # then it must be an executable script.
             executable = Executable(self.source.value)
