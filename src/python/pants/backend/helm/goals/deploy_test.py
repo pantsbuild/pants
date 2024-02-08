@@ -273,4 +273,5 @@ def test_run_helm_deploy_adheres_to_dry_run_flag(
         env={"BUILD_NUMBER": expected_build_number, "NS_SUFFIX": expected_ns_suffix},
     )
 
+    assert deploy_process.process
     assert ("--dry-run" in deploy_process.process.process.argv) == expected

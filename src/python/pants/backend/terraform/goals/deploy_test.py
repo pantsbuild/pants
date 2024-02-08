@@ -68,6 +68,8 @@ def test_deploy_terraform_adheres_to_dry_run_flag(
     target = rule_runner.get_target(Address("src/tf", target_name="stg"))
     field_set = DeployTerraformFieldSet.create(target)
     deploy_process = rule_runner.request(DeployProcess, [field_set])
+    assert deploy_process.process
+
     argv = deploy_process.process.process.argv
 
     assert action in argv, f"Expected {action} in argv"
