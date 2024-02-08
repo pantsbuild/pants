@@ -37,7 +37,6 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address, Addresses
-from pants.engine.rules import Get
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,

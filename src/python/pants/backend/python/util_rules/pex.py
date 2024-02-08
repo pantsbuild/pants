@@ -694,9 +694,7 @@ async def build_pex(
             # request.main.spec is a python source file including it's spec_path.
             # To make it relative to the sandbox, we strip the source root
             # and add the source_dir_name (sources get prefixed with that below).
-            stripped = await Get(
-                StrippedFileName, StrippedFileNameRequest(request.main.spec)
-            )
+            stripped = await Get(StrippedFileName, StrippedFileNameRequest(request.main.spec))
             argv.append(f"{source_dir_name}/{stripped.value}")
 
     argv.extend(
