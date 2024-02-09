@@ -219,7 +219,7 @@ class PythonToolBase(PythonToolRequirementsBase):
     # instead of a ConsoleScript or an EntryPoint. Executable is a niche pex feature
     # designed to support poorly named executable python scripts that cannot be imported
     # (eg when a file has a character like "-" that is not valid in python identifiers).
-    # As this should be rare or even non-existant, we do NOT add an `executable` option
+    # As this should be rare or even non-existent, we do NOT add an `executable` option
     # to mirror the other MainSpecification options.
 
     console_script = StrOption(

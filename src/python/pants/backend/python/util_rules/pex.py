@@ -692,7 +692,7 @@ async def build_pex(
         if isinstance(request.main, Executable):
             # Unlike other MainSpecifiecation types (that can pass spec as-is to pex),
             # Executable must be an actual path relative to the sandbox.
-            # request.main.spec is a python source file including it's spec_path.
+            # request.main.spec is a python source file including its spec_path.
             # To make it relative to the sandbox, we strip the source root
             # and add the source_dir_name (sources get prefixed with that below).
             stripped = await Get(StrippedFileName, StrippedFileNameRequest(request.main.spec))
