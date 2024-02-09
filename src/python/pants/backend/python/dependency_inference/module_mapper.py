@@ -384,10 +384,11 @@ async def map_third_party_modules_to_addresses(
             elif proj_name in DEFAULT_TYPE_STUB_MODULE_MAPPING:
                 modules_to_add = DEFAULT_TYPE_STUB_MODULE_MAPPING[proj_name]
                 is_type_stub = True
-            elif modules_to_add := generate_mappings_from_pattern(proj_name, is_type_stub=False):
-                is_type_stub = False
+            # check for stubs first, since stub packages may also match impl package patterns
             elif modules_to_add := generate_mappings_from_pattern(proj_name, is_type_stub=True):
                 is_type_stub = True
+            elif modules_to_add := generate_mappings_from_pattern(proj_name, is_type_stub=False):
+                is_type_stub = False
             else:
                 modules_to_add = (fallback_value,)
                 is_type_stub = False
