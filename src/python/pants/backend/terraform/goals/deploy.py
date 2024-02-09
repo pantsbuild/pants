@@ -6,6 +6,10 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
+from pants.backend.terraform.dependency_inference import (
+    TerraformDeploymentInvocationFiles,
+    TerraformDeploymentInvocationFilesRequest,
+)
 from pants.backend.terraform.target_types import TerraformDeploymentFieldSet
 from pants.backend.terraform.tool import TerraformProcess, TerraformTool
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
@@ -16,6 +20,7 @@ from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import collect_rules, rule
+from pants.engine.target import SourcesField
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -40,7 +45,6 @@ async def prepare_terraform_deployment(
         TerraformInitResponse,
         TerraformInitRequest(
             request.field_set.root_module,
-            request.field_set.backend_config,
             request.field_set.dependencies,
             initialise_backend=True,
         ),
@@ -48,7 +52,15 @@ async def prepare_terraform_deployment(
 
     args = ["apply"]
 
-    var_files = await Get(SourceFiles, SourceFilesRequest([request.field_set.var_files]))
+    invocation_files = await Get(
+        TerraformDeploymentInvocationFiles,
+        TerraformDeploymentInvocationFilesRequest(
+            request.field_set.dependencies.address, request.field_set.dependencies
+        ),
+    )
+    var_files = await Get(
+        SourceFiles, SourceFilesRequest(e.get(SourcesField) for e in invocation_files.vars_files)
+    )
     for var_file in var_files.files:
         args.append(
             terraform_arg("-var-file", terraform_relpath(initialised_terraform.chdir, var_file))

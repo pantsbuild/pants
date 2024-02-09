@@ -429,6 +429,16 @@ def _parametrized_target_generators_with_templates(
         field_value = generator_fields.pop(field_type.alias, None)
         if field_value is not None:
             template_fields[field_type.alias] = field_value
+
+    # Move parametrize groups over to `template_fields` in order to expand them.
+    parametrize_group_field_names = [
+        name
+        for name, field in generator_fields.items()
+        if isinstance(field, Parametrize) and field.is_group
+    ]
+    for field_name in parametrize_group_field_names:
+        template_fields[field_name] = generator_fields.pop(field_name)
+
     field_type_aliases = target_type._get_field_aliases_to_field_types(
         target_type.class_field_types(union_membership)
     ).keys()

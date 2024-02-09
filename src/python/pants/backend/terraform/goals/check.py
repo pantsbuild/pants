@@ -5,7 +5,6 @@ from typing import Union
 
 from pants.backend.terraform.dependencies import TerraformInitRequest, TerraformInitResponse
 from pants.backend.terraform.target_types import (
-    TerraformBackendConfigField,
     TerraformDeploymentFieldSet,
     TerraformDeploymentTarget,
     TerraformFieldSet,
@@ -55,14 +54,11 @@ def terraform_fieldset_to_init_request(
 ) -> TerraformInitRequest:
     if isinstance(terraform_fieldset, TerraformDeploymentFieldSet):
         deployment = terraform_fieldset
-        return TerraformInitRequest(
-            deployment.root_module, deployment.backend_config, deployment.dependencies
-        )
+        return TerraformInitRequest(deployment.root_module, deployment.dependencies)
     if isinstance(terraform_fieldset, TerraformFieldSet):
         module = terraform_fieldset
         return TerraformInitRequest(
             TerraformRootModuleField(module.address.spec, module.address),
-            TerraformBackendConfigField(None, module.address),
             module.dependencies,
         )
 
@@ -89,8 +85,8 @@ async def terraform_check(
             TerraformProcess(
                 args=("validate",),
                 input_digest=deployment.sources_and_deps,
-                output_files=tuple(deployment.terraform_files),
-                description=f"Run `terraform fmt` on {pluralize(len(deployment.terraform_files), 'file')}.",
+                output_files=tuple(deployment.terraform_files.files),
+                description=f"Run `terraform validate` on module {deployment.chdir} with {pluralize(len(deployment.terraform_files.files), 'file')}.",
                 chdir=deployment.chdir,
             ),
         )

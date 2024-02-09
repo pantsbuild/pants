@@ -82,6 +82,23 @@ For Approach #4, you should use `setup_tmpdir()` to set up BUILD files.
 
 To use `run_rule_with_mocks`, pass the `@rule` as its first arg, then `rule_args=[arg1, arg2, ...]` in the same order as the arguments to the `@rule`.
 
+For example:
+
+```python
+from pants.engine.rules import rule
+from pants.testutil.rule_runner import run_rule_with_mocks
+
+
+@rule
+async def int_to_str(i: int) -> str:
+    return str(i)
+
+
+def test_int_to_str() -> None:
+    result: str = run_rule_with_mocks(int_to_str, rule_args=[42], mock_gets=[])
+    assert result == "42"
+```
+
 If your `@rule` has any `await Get`s or `await Effect`s, set the argument `mock_gets=[]` with `MockGet`/`MockEffect` objects corresponding to each of them. A `MockGet` takes three arguments: `output_type: type`, `input_types: tuple[type, ...]`, and `mock: Callable[..., InputType]`, which is a function that takes an instance of each of the `input_types` and returns a single instance of the `output_type`.
 
 For example, given this contrived rule to find all targets with `sources` with a certain filename included (find a "needle in the haystack"):
@@ -534,6 +551,36 @@ def test_build_ignore_dependency() -> None:
 ```
 
 `run_pants()` is hermetic by default, meaning that it will not read your `pants.toml`. As a result, you often need to include the option `--backend-packages` in the arguments to `run_pants()`. You can alternatively set the argument `hermetic=False`, although we discourage this.
+
+For example:
+
+```python
+from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
+
+
+def test_getting_list_of_files_from_a_target() -> None:
+    sources = {
+        "dir/BUILD": "files(sources=['subdir/*.txt'])",
+        "dir/subdir/file1.txt": "",
+        "dir/subdir/file2.txt": "",
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        result = run_pants(
+            [
+                "--backend-packages=['pants.backend.python']",
+                "filedeps",
+                f"{tmpdir}/dir:",
+            ],
+        )
+    result.assert_success()
+    assert all(
+        filepath in result.stdout
+        for filepath in (
+            f"{tmpdir}/dir/subdir/file1.txt",
+            f"{tmpdir}/dir/subdir/file2.txt",
+        )
+    )
+```
 
 To read any files that were created, use `get_buildroot()` as the first part of the path to ensure that the correct directory is read.
 

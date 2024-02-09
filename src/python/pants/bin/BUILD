@@ -9,7 +9,6 @@ python_sources(
     dependencies=[":plugins"],
 )
 
-# NOTE: When adding a new backend, add it to `generate_docs.py` too! (If stable enough for docs)
 target(
     name="plugins",
     dependencies=[
@@ -35,6 +34,7 @@ target(
         "src/python/pants/backend/experimental/codegen/thrift/scrooge/scala",
         "src/python/pants/backend/experimental/cue",
         "src/python/pants/backend/experimental/debian",
+        "src/python/pants/backend/experimental/docker/podman",
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/go/debug_goals",
         "src/python/pants/backend/experimental/go/lint/golangci_lint",

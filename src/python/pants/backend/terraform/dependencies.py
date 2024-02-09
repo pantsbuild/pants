@@ -3,26 +3,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from pathlib import Path
+from typing import Optional
 
-from pants.backend.terraform.partition import partition_files_by_directory
+from pants.backend.terraform.dependency_inference import (
+    TerraformDeploymentInvocationFiles,
+    TerraformDeploymentInvocationFilesRequest,
+)
 from pants.backend.terraform.target_types import (
-    TerraformBackendConfigField,
     TerraformDependenciesField,
     TerraformRootModuleField,
 )
 from pants.backend.terraform.tool import TerraformProcess
 from pants.backend.terraform.utils import terraform_arg, terraform_relpath
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import (
-    EMPTY_DIGEST,
     Address,
     AddressInput,
     Digest,
     MergeDigests,
+    Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     SourcesField,
@@ -31,99 +35,107 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
 )
+from pants.option.global_options import KeepSandboxes
 
 
 @dataclass(frozen=True)
 class TerraformDependenciesRequest:
-    source_files: SourceFiles
-    directories: Tuple[str, ...]
-    backend_config: SourceFiles
-    dependencies_files: SourceFiles
+    chdir: str
+    backend_config: Optional[str]
+    lockfile: bool
+    dependencies_files: Digest
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
+    upgrade: bool = False
 
 
 @dataclass(frozen=True)
 class TerraformDependenciesResponse:
-    fetched_deps: Tuple[Tuple[str, Digest], ...]
+    digest: Digest
 
 
 @rule
 async def get_terraform_providers(
     req: TerraformDependenciesRequest,
+    keep_sandboxes: KeepSandboxes,
 ) -> TerraformDependenciesResponse:
     args = ["init"]
-    if req.backend_config.files:
+    if req.backend_config:
         args.append(
             terraform_arg(
                 "-backend-config",
-                terraform_relpath(req.directories[0], req.backend_config.files[0]),
+                terraform_relpath(req.chdir, req.backend_config),
             )
         )
-        backend_digest = req.backend_config.snapshot.digest
-    else:
-        backend_digest = EMPTY_DIGEST
+
+    # If we have a lockfile and aren't regenerating it, don't modify it
+    if req.lockfile and not req.upgrade:
+        args.append("-lockfile=readonly")
+
+    if req.upgrade:
+        args.append("-upgrade")
 
     args.append(terraform_arg("-backend", str(req.initialise_backend)))
 
-    with_backend_config = await Get(
-        Digest,
-        MergeDigests(
-            [
-                req.source_files.snapshot.digest,
-                backend_digest,
-                req.dependencies_files.snapshot.digest,
-            ]
+    init_process_description = (
+        f"Running `init` on Terraform module at `{req.chdir}` to fetch dependencies"
+    )
+    fetched_deps = await Get(
+        FallibleProcessResult,
+        TerraformProcess(
+            args=tuple(args),
+            input_digest=(req.dependencies_files),
+            output_files=(".terraform.lock.hcl",),
+            output_directories=(".terraform",),
+            description=init_process_description,
+            chdir=req.chdir,
         ),
     )
-
-    # TODO: Does this need to be a MultiGet? I think we will now always get one directory
-    fetched_deps = await MultiGet(
-        Get(
-            FallibleProcessResult,
-            TerraformProcess(
-                args=tuple(args),
-                input_digest=with_backend_config,
-                output_files=(".terraform.lock.hcl",),
-                output_directories=(".terraform",),
-                description="Run `terraform init` to fetch dependencies",
-                chdir=directory,
-            ),
+    if fetched_deps.exit_code != 0:
+        raise ProcessExecutionFailure(
+            fetched_deps.exit_code,
+            fetched_deps.stdout,
+            fetched_deps.stderr,
+            init_process_description,
+            keep_sandboxes=keep_sandboxes,
         )
-        for directory in req.directories
-    )
 
-    return TerraformDependenciesResponse(
-        tuple(zip(req.directories, (x.output_digest for x in fetched_deps)))
-    )
+    return TerraformDependenciesResponse(fetched_deps.output_digest)
 
 
 @dataclass(frozen=True)
 class TerraformInitRequest:
     root_module: TerraformRootModuleField
-    backend_config: TerraformBackendConfigField
     dependencies: TerraformDependenciesField
 
     # Not initialising the backend means we won't access remote state. Useful for `validate`
     initialise_backend: bool = False
+    upgrade: bool = False
 
 
 @dataclass(frozen=True)
 class TerraformInitResponse:
     sources_and_deps: Digest
-    terraform_files: tuple[str, ...]
+    terraform_files: SourceFiles
     chdir: str
 
 
 @rule
 async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse:
-    module_dependencies = await Get(
+    this_targets_dependencies = await Get(
         TransitiveTargets, TransitiveTargetsRequest((request.dependencies.address,))
     )
 
     address_input = request.root_module.to_address_input()
     module_address = await Get(Address, AddressInput, address_input)
+
+    chdir = module_address.spec_path  # TODO: spec_path is wrong, that's to the build file
+    # if the Terraform module is in the root, chdir will be "". Terraform needs a valid dir to change to
+    if not chdir:
+        chdir = "."
+
+    # TODO: is this still necessary, or do we pull it in with (transitive) dependencies?
     module = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -131,39 +143,85 @@ async def init_terraform(request: TerraformInitRequest) -> TerraformInitResponse
         ),
     )
 
-    source_files, backend_config, dependencies_files = await MultiGet(
-        Get(SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])),
-        Get(SourceFiles, SourceFilesRequest([request.backend_config])),
+    source_files, dependencies_files, lockfile = await MultiGet(
+        Get(
+            SourceFiles, SourceFilesRequest([module.target.get(SourcesField)])
+        ),  # TODO: get through transitive deps???
         Get(
             SourceFiles,
-            SourceFilesRequest([tgt.get(SourcesField) for tgt in module_dependencies.dependencies]),
+            SourceFilesRequest(
+                [tgt.get(SourcesField) for tgt in this_targets_dependencies.dependencies]
+            ),
+        ),
+        Get(
+            Snapshot,
+            PathGlobs(
+                [(Path(request.root_module.address.spec_path) / ".terraform.lock.hcl").as_posix()]
+            ),
         ),
     )
-    files_by_directory = partition_files_by_directory(source_files.files)
-
-    fetched_deps = await Get(
-        TerraformDependenciesResponse,
-        TerraformDependenciesRequest(
-            source_files,
-            tuple(files_by_directory.keys()),
-            backend_config,
-            dependencies_files,
-            initialise_backend=request.initialise_backend,
+    invocation_files = await Get(
+        TerraformDeploymentInvocationFiles,
+        TerraformDeploymentInvocationFilesRequest(
+            request.dependencies.address, request.dependencies
         ),
     )
+    backend_config_tgts = invocation_files.backend_configs
+    if len(backend_config_tgts) == 0:
+        backend_config = None
+    elif len(backend_config_tgts) == 1:
+        backend_config_sources = await Get(
+            SourceFiles, SourceFilesRequest([backend_config_tgts[0].get(SourcesField)])
+        )
+        backend_config = backend_config_sources.snapshot.files[0]
+    else:
+        # We've found multiple backend files, but that's only a problem if we need to initialise the backend.
+        # For example, we might be `validate`ing a `terraform_module` that has multiple backend files in the same dir,
+        # so we don't need to init the backend.
+        # The `terraform_deployment`s will have the references to the correct backends
 
-    merged_fetched_deps = await Get(Digest, MergeDigests([x[1] for x in fetched_deps.fetched_deps]))
+        if request.initialise_backend:
+            backend_config_names = [e.address for e in backend_config_tgts]
+            raise ValueError(
+                f"Found more than 1 backend config for a Terraform deployment. identified {backend_config_names}"
+            )
+        else:
+            backend_config = None
 
-    sources_and_deps = await Get(
+    source_for_validate = await Get(
         Digest,
         MergeDigests(
-            [source_files.snapshot.digest, merged_fetched_deps, dependencies_files.snapshot.digest]
+            [source_files.snapshot.digest, dependencies_files.snapshot.digest, lockfile.digest]
         ),
     )
 
-    assert len(files_by_directory) == 1, "Multiple directories found, unable to identify a root"
-    chdir, files = next(iter(files_by_directory.items()))
-    return TerraformInitResponse(sources_and_deps, tuple(files), chdir)
+    has_lockfile = len(lockfile.files) > 0
+    third_party_deps = await Get(
+        TerraformDependenciesResponse,
+        TerraformDependenciesRequest(
+            chdir,
+            backend_config,
+            has_lockfile,
+            source_for_validate,
+            initialise_backend=request.initialise_backend,
+            upgrade=request.upgrade,
+        ),
+    )
+
+    all_terraform_files = await Get(
+        Digest,
+        MergeDigests(
+            [
+                source_files.snapshot.digest,
+                dependencies_files.snapshot.digest,
+                third_party_deps.digest,
+            ]
+        ),
+    )
+
+    return TerraformInitResponse(
+        sources_and_deps=all_terraform_files, terraform_files=source_files, chdir=chdir
+    )
 
 
 def rules():
