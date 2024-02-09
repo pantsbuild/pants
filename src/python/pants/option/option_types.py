@@ -352,6 +352,12 @@ class WorkspacePathOption(_OptionBase[str, _StrDefault]):
     option_type: Any = custom_types.workspace_path
 
 
+class DurationOption(_OptionBase[str, _StrDefault]):
+    """Time duration option to be used by concrete options that need to represent a time period."""
+
+    option_type: Any = custom_types.time_duration
+
+
 # -----------------------------------------------------------------------------------------------
 # Int Concrete Option Classes
 # -----------------------------------------------------------------------------------------------
