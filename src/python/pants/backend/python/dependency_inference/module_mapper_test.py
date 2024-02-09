@@ -985,6 +985,42 @@ def test_generate_mappings_from_pattern_matches_para(
     assert generate_mappings_from_pattern(proj_name, is_type_stub=False) == expected_modules
 
 
+@pytest.mark.parametrize(
+    ("proj_name", "expected_modules"),
+    [
+        (
+            "types-requests",
+            ("requests",),
+        ),
+        (
+            "botocore-stubs",
+            ("botocore",),
+        ),
+        (
+            "django-types",
+            ("django",),
+        ),
+        (
+            "types_requests",
+            ("requests",),
+        ),
+        (
+            "botocore_stubs",
+            ("botocore",),
+        ),
+        (
+            "django_types",
+            ("django",),
+        ),
+        ("", tuple()),
+    ],
+)
+def test_generate_type_stub_mappings_from_pattern_matches_para(
+    proj_name: str, expected_modules: Tuple[str]
+) -> None:
+    assert generate_mappings_from_pattern(proj_name, is_type_stub=True) == expected_modules
+
+
 def test_number_of_capture_groups_for_functions() -> None:
     with pytest.raises(ValueError):
         re.sub("foo", first_group_hyphen_to_underscore, "foo")
