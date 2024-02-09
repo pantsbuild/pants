@@ -69,7 +69,10 @@ def calculate_specs(
         )
 
     changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
-    file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
+    files_with_line_numbers = changed_options.files_with_line_numbers or []
+    file_literal_specs = tuple(
+        FileLiteralSpec(f) for f in changed_files if f not in files_with_line_numbers
+    )
 
     if changed_options.files_with_line_numbers:
         diff_hunks = changed_options.diff_hunks(maybe_git_worktree.git_worktree)
