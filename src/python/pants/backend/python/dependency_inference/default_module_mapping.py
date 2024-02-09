@@ -189,14 +189,10 @@ DEFAULT_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
 }
 
 DEFAULT_TYPE_STUB_MODULE_PATTERN_MAPPING: Dict[re.Pattern, List[Callable[[Match[str]], str]]] = {
-    re.compile(r"""^stubs_(.+)"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^types_(.+)"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^stubs-(.+)"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^types-(.+)"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^(.+)_stubs"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^(.+)_types"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^(.+)-stubs"""): [first_group_hyphen_to_underscore],
-    re.compile(r"""^(.+)-types"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^stubs[_-](.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^types[_-](.+)"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(.+)[_-]stubs"""): [first_group_hyphen_to_underscore],
+    re.compile(r"""^(.+)[_-]types"""): [first_group_hyphen_to_underscore],
 }
 
 DEFAULT_TYPE_STUB_MODULE_MAPPING: Dict[str, Tuple[str, ...]] = {
