@@ -696,7 +696,7 @@ async def build_pex(
             # To make it relative to the sandbox, we strip the source root
             # and add the source_dir_name (sources get prefixed with that below).
             stripped = await Get(StrippedFileName, StrippedFileNameRequest(request.main.spec))
-            argv.append(f"{source_dir_name}/{stripped.value}")
+            argv.append(os.path.join(source_dir_name, stripped.value))
 
     argv.extend(
         f"--inject-args={shlex.quote(injected_arg)}" for injected_arg in request.inject_args

@@ -410,7 +410,7 @@ class PexExecutableField(Field):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
         # spec_path is relative to the workspace. The rule is responsible for
         # stripping the source root as needed.
-        return Executable(f"{address.spec_path}/{value}".lstrip("/"))
+        return Executable(os.path.join(address.spec_path, value).lstrip(os.path.sep))
 
 
 class PexArgsField(StringSequenceField):
