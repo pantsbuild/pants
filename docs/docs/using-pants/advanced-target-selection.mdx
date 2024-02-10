@@ -185,3 +185,58 @@ For other goals, you can leverage shell piping to partition the input targets in
 ```bash
 pants list :: | awk 'NR % 5 == 0' | xargs pants package
 ```
+
+## Referring to a group of targets
+
+If setting tags on individual targets is not feasible, there are a few other options available to refer to multiple targets.
+
+If you have an operation that you perform often on a certain group of targets, you can use the
+[cli](https://www.pantsbuild.org/2.19/reference/subsystems/cli) subsystem options to create shortcuts. For instance,
+this alias
+
+```toml title="pants.toml"
+publish-libraries = "--filter-target-type=python_distribution --filter-address-regex=\"['^src/libA/,^src/libB/']\" publish src::"
+```
+
+would you let run `pants publish-libraries` to publish all Python distributions declared in the `src/libA` and `src/libB`
+directories.
+
+If you want to be able to run an arbitrary Pants goal on a group of targets, you can create a generic target with no
+specific type named [`target`](https://www.pantsbuild.org/2.19/reference/targets/target):
+
+```python title="BUILD"
+target(name="python-libs", dependencies=["src/python/libraries/libA", "src/python/libraries/libB"])
+```
+
+If declared in the root of your workspace, you can now address the Python libraries by `//:python-libs`:
+
+```bash
+$ pants publish //:python-libs
+````
+
+:::note Tip: create aliases for targets.
+If you have some targets declared in BUILD files that are stored deep within the directory structure of your workspace,
+you can make it easier to refer to that target such as when listing that target among dependencies of other targets.
+
+For example, you can simplify accessing a target by creating another target that will serve as an alias definition in
+a BUILD file stored in a more convenient location in the workspace, for instance, in the build root directory:
+
+```python title="BUILD"
+target(
+    name="deployment-bins",
+    dependencies=["src/golang/production/cloud/deployment/binaries:tools"]
+)
+```
+
+You can now refer to that target more concisely in BUILD files:
+
+```python title="BUILD"
+python_sources(dependencies=["//:deployment-bins"])
+```
+
+and when running Pants goals:
+
+```bash
+$ pants dependents --transitive //:deployment-bins
+```
+:::
