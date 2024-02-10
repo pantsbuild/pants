@@ -35,7 +35,7 @@ Bugfixes
 ~~~~~~~~
 
 * Set the pex_root cache only at build time (#9958)
-  `Issue #984 <https://github.com/pantsbuild/pex/issues/984>`_
+  `Issue #984 <https://github.com/pex-tool/pex/issues/984>`_
   `PR #9958 <https://github.com/pantsbuild/pants/pull/9958>`_
 
 * Fix lease extension, and make it recursive (#9956)

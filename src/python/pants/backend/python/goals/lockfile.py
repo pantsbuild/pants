@@ -126,7 +126,7 @@ async def generate_lockfile(
                 # limit on lock universality to avoid issues locking due to irrelevant
                 # Windows-only dependency issues. See this Pex issue that originated from a
                 # Pants user issue presented in Slack:
-                #   https://github.com/pantsbuild/pex/issues/1821
+                #   https://github.com/pex-tool/pex/issues/1821
                 #
                 # At some point it will probably make sense to expose `--target-system` for
                 # configuration.

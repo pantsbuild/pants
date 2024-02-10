@@ -170,7 +170,7 @@ New Features
 
 * Don't force inherit_path to be a bool (#5482)
   `PR #5482 <https://github.com/pantsbuild/pants/pull/5482>`_
-  `PR #444 <https://github.com/pantsbuild/pex/pull/444>`_
+  `PR #444 <https://github.com/pex-tool/pex/pull/444>`_
 
 Bugfixes
 ~~~~~~~~
