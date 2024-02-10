@@ -80,10 +80,11 @@ async def list_dependencies_as_json(
         )
 
         iterated_targets = []
-        for transitive_targets in transitive_targets_group:
-            iterated_targets.append(
-                sorted([str(tgt.address) for tgt in transitive_targets.dependencies])
-            )
+        for idx, transitive_targets in enumerate(transitive_targets_group):
+            targets_collection = {str(tgt.address) for tgt in transitive_targets.dependencies}
+            if dependencies_subsystem.closed:
+                targets_collection.add(addresses[idx].spec)
+            iterated_targets.append(sorted(targets_collection))
 
     else:
         dependencies_per_target_root = await MultiGet(
@@ -98,8 +99,11 @@ async def list_dependencies_as_json(
         )
 
         iterated_targets = []
-        for targets in dependencies_per_target_root:
-            iterated_targets.append(sorted([str(tgt.address) for tgt in targets]))
+        for idx, targets in enumerate(dependencies_per_target_root):
+            targets_collection = {str(tgt.address) for tgt in targets}
+            if dependencies_subsystem.closed:
+                targets_collection.add(str(target_roots[idx].address))
+            iterated_targets.append(sorted(targets_collection))
 
     # The assumption is that when iterating the targets and sending dependency requests
     # for them, the lists of dependencies are returned in the very same order.

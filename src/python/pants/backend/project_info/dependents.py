@@ -162,7 +162,7 @@ async def list_dependents_as_json(
             DependentsRequest(
                 (address,),
                 transitive=dependents_subsystem.transitive,
-                include_roots=False,
+                include_roots=dependents_subsystem.closed,
             ),
         )
         for address in addresses
