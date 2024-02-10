@@ -12,7 +12,6 @@ Active Maintainers
 * Daniel Wagner-Hall
 * Eric Arellano
 * Henry Fuller
-* John Sirois
 * Joshua Cannon
 * Kris Wilson
 * Patrick Lawson
@@ -37,6 +36,7 @@ Emeritus
 * Garrett Malmquist
 * Greg Shuflin
 * Ity Kaul
+* John Sirois
 * Larry Hosken
 * Mateo Rodriguez
 * Matt Olsen
