@@ -76,7 +76,7 @@ _T = TypeVar("_T")
 
 @dataclass(frozen=True)
 class per_platform(Generic[_T]):
-    """An object containing differing homogenous platform-dependent values.
+    """An object containing differing homogeneous platform-dependent values.
 
     The values should be evaluated for the execution environment, and not the host environment
     (I.e. it should be evaluated in a `rule` which requests `Platform`).
@@ -94,7 +94,7 @@ class per_platform(Generic[_T]):
             address: Address,
         ) -> Optional[Union[str, per_platform[str]]]:
             if isinstance(raw_value, per_platform):
-                # NOTE: Ensure the values are homogenous
+                # NOTE: Ensure the values are homogeneous
                 raw_value.check_types(str)
 
             return raw_value
