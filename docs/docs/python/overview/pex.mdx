@@ -7,7 +7,7 @@
 
 ## PEX files
 
-When working with Python code, Pants makes frequent use of the [PEX](https://github.com/pantsbuild/pex) (Python EXecutable) format. So, you'll see PEX referenced frequently in this documentation.
+When working with Python code, Pants makes frequent use of the [PEX](https://github.com/pex-tool/pex) (Python EXecutable) format. So, you'll see PEX referenced frequently in this documentation.
 
 A PEX is a self-contained Python environment, similar in spirit to a virtualenv. A Pex can contain combinations of Python source files, 3rd-party requirements (sdists or wheels), resource files, and metadata describing the contents.
 
@@ -67,7 +67,7 @@ pex_binary(
 )
 ```
 
-You can generate the JSON content for these files by installing the [Pex](https://github.com/pantsbuild/pex) command-line tool on the target platform and running `pex3 interpreter inspect --markers --tags` against the appropriate interpreter. You can run `pex3 interpreter inspect --help` for more options, and in particular for how to select the desired target interpreter.
+You can generate the JSON content for these files by installing the [Pex](https://github.com/pex-tool/pex) command-line tool on the target platform and running `pex3 interpreter inspect --markers --tags` against the appropriate interpreter. You can run `pex3 interpreter inspect --help` for more options, and in particular for how to select the desired target interpreter.
 
 :::caution Platform-specific dependencies must be available as wheels
 Some Python distributions include native code, and therefore require platform-specific artifacts. Often, such artifacts are pre-built and available on PyPI as platform-specific wheels. But in some cases they are only available as source distributions (sdists) and must be compiled into platform-specific wheels at build time. Pants can only build platform-specific sdists for the local machine or [environment](../../using-pants/environments.mdx), and cannot cross-compile for other target platforms. Therefore, to build for platforms other than the local one, all the platform-specific third-party packages that your PEX transitively depends on must be available as prebuilt wheels for each platform you care about. If those wheels aren't available on PyPI you can always build them manually once and host them on a private package repository.
@@ -85,7 +85,7 @@ In these cases you can override the default shebang using the [`shebang`](../../
 
 ## Setting Pex and Pip versions
 
-Pants makes use of the [Pex](https://github.com/pantsbuild/pex) command-line tool internally for building PEXes. The Pex version that Pants uses is specified by the `version` option under the `pex-cli` subsystem. The known Pex versions are specified by the `known_versions` option under the `pex-cli` subsystem. You can see all Pex tool options and their current values by running `pants help-advanced pex-cli`. To upgrade the Pex version, update these option values accordingly. For instance, in `pants.toml`, to upgrade to Pex 2.1.143:
+Pants makes use of the [Pex](https://github.com/pex-tool/pex) command-line tool internally for building PEXes. The Pex version that Pants uses is specified by the `version` option under the `pex-cli` subsystem. The known Pex versions are specified by the `known_versions` option under the `pex-cli` subsystem. You can see all Pex tool options and their current values by running `pants help-advanced pex-cli`. To upgrade the Pex version, update these option values accordingly. For instance, in `pants.toml`, to upgrade to Pex 2.1.143:
 
 ```[pex-cli]
 version = "v2.1.143"
@@ -97,7 +97,7 @@ known_versions = [
 ]
 ```
 
-The Pex version determines which Pip versions are supported. To see the lists of Pip versions a certain version of Pex supports you can either install that version of Pex as a standalone CLI and run `pex --help`, or examine [pex/pip/version.py](https://github.com/pantsbuild/pex/blob/main/pex/pip/version.py) in the sources of the relevant Pex version.
+The Pex version determines which Pip versions are supported. To see the lists of Pip versions a certain version of Pex supports you can either install that version of Pex as a standalone CLI and run `pex --help`, or examine [pex/pip/version.py](https://github.com/pex-tool/pex/blob/main/pex/pip/version.py) in the sources of the relevant Pex version.
 
 The Pip version that Pex uses is determined by the `pip_version` option in Pants. To upgrade the Pip version, update this option value accordingly. For instance, in `pants.toml`, to set the Pip version to be the latest supported by Pex:
 
