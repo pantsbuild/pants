@@ -76,15 +76,20 @@ def perform_copy(
 ) -> None:
     """Recursively copy the files at src_prefix/src_path to S3.
 
+    :param src_prefix: A relpath under the cwd. :param dst_prefix: An S3 URL prefix, of the form
+    s3://bucket/path_prefix.
+     :param src_prefix: A relpath under the cwd. :param dst_prefix: An S3 URL prefix, of the form
+    s3://bucket/path_prefix.
     :param src_prefix: A relpath under the cwd.
     :param dst_prefix: An S3 URL prefix, of the form s3://bucket/path_prefix.
-    :param path: The relpath under the src_prefix to copy.
-      src_prefix/path will be (recursively) copied to dst_prefix/path.
-      If empty, the entire src_prefix will be copied.
+    :param src_prefix: A relpath under the cwd.
+    :param dst_prefix: An S3 URL prefix, of the form s3://bucket/path_prefix.
+    :param path: The relpath under the src_prefix to copy. src_prefix/path will be (recursively)
+        copied to dst_prefix/path. If empty, the entire src_prefix will be copied.
     :param region: The AWS region to access (should be the one the bucket is in).
     :param acl: An optional ACL to set on the copied objects.
-    :param aws_cli_symlink_path: If specified, symlink the aws cli into this dir. Otherwise,
-      it will be synlinked into the system standard Path.
+    :param aws_cli_symlink_path: If specified, symlink the aws cli into this dir. Otherwise, it will
+        be synlinked into the system standard Path.
     """
     if shutil.which("aws") is None:
         _install_aws_cli(symlink_path=aws_cli_symlink_path)

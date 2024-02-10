@@ -1,6 +1,5 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """An OrderedSet is a set that remembers its insertion order, and a FrozenOrderedSet is one that is
 also immutable.
 
@@ -163,8 +162,8 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
     def discard(self, key: T) -> None:
         """Remove an element. Do not raise an exception if absent.
 
-        The MutableSet mixin uses this to implement the .remove() method, which
-        *does* raise an error when asked to remove a non-existent item.
+        The MutableSet mixin uses this to implement the .remove() method, which *does* raise an
+        error when asked to remove a non-existent item.
         """
         self._items.pop(key, None)
 

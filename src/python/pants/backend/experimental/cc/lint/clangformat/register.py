@@ -1,6 +1,5 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """A formatter for C/C++ (and several other languages).
 
 See https://clang.llvm.org/docs/ClangFormat.html for details.

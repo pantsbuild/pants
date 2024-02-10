@@ -204,8 +204,8 @@ class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
 
         If the downloaded artifact is the executable itself, you can leave this unimplemented.
 
-        If the downloaded artifact is an archive, this should be overridden to provide a
-        relative path in the downloaded archive, e.g. `./bin/protoc`.
+        If the downloaded artifact is an archive, this should be overridden to provide a relative
+        path in the downloaded archive, e.g. `./bin/protoc`.
         """
         return f"./{self.generate_url(plat).rsplit('/', 1)[-1]}"
 
@@ -354,11 +354,12 @@ class TemplatedExternalTool(ExternalTool, TemplatedExternalToolOptionsMixin):
 
     In addition to ExternalTool functionalities, it is needed to set, e.g.:
 
-    default_url_template = "https://tool.url/{version}/{platform}-mytool.zip"
+    default_url_template = "
+    https://tool.url/{version}/{platform}-mytool.zip"
     default_url_platform_mapping = {
-        "macos_x86_64": "osx_intel",
-        "macos_arm64": "osx_arm",
-        "linux_x86_64": "linux",
+    "macos_x86_64": "osx_intel",
+    "macos_arm64": "osx_arm",
+    "linux_x86_64": "linux",
     }
 
     The platform mapping dict is optional.

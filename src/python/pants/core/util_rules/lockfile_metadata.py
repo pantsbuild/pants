@@ -75,9 +75,9 @@ class NoLockfileMetadataBlock(InvalidLockfileError):
 class LockfileMetadata:
     """Base class for metadata that is attached to a given lockfile.
 
-    This class provides the external API for serializing, deserializing, and validating the
-    contents of individual lockfiles. New versions of metadata implement a concrete subclass and
-    provide deserialization and validation logic, along with specialist serialization logic.
+    This class provides the external API for serializing, deserializing, and validating the contents
+    of individual lockfiles. New versions of metadata implement a concrete subclass and provide
+    deserialization and validation logic, along with specialist serialization logic.
 
     To construct an instance of the most recent concrete subclass, call `LockfileMetadata.new()`.
     """

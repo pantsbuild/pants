@@ -415,12 +415,13 @@ class SchedulerSession:
         """Create and return an ExecutionRequest for the given (product, subject) pairs.
 
         :param requests: A sequence of product types to request for subjects.
-        :param poll: True to wait for _all_ of the given roots to
-          have changed since their last observed values in this SchedulerSession.
+        :param poll: True to wait for _all_ of the given roots to have changed since their last
+            observed values in this SchedulerSession.
         :param poll_delay: A delay (in seconds) to wait after observing a change, and before
-          beginning to compute a new value.
+            beginning to compute a new value.
         :param timeout: An optional timeout to wait for the request to complete (in seconds). If the
-          request has not completed before the timeout has elapsed, ExecutionTimeoutError is raised.
+            request has not completed before the timeout has elapsed, ExecutionTimeoutError is
+            raised.
         :returns: An ExecutionRequest for the given products and subjects.
         """
         native_execution_request = PyExecutionRequest(

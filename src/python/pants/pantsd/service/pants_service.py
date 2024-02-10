@@ -114,8 +114,8 @@ class _ServiceState:
     def await_paused(self, timeout=None):
         """Blocks until the service is in the Paused state, then returns True.
 
-        If a timeout is specified, the method may return False to indicate a timeout: with no timeout
-        it will always (eventually) return True.
+        If a timeout is specified, the method may return False to indicate a timeout: with no
+        timeout it will always (eventually) return True.
 
         Raises if the service is not currently in the Pausing state.
         """

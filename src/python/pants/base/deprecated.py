@@ -46,8 +46,8 @@ class CodeRemovedError(Exception):
 
     I.e., that the option/function/module with that removal_version has already been removed.
 
-    Note that the code in question may not actually have been excised from the codebase yet, but
-    it may be at any time.
+    Note that the code in question may not actually have been excised from the codebase yet, but it
+    may be at any time.
     """
 
 

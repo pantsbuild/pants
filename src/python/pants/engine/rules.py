@@ -92,9 +92,9 @@ def _make_rule(
     :param rule_type: The specific decorator used to declare the rule.
     :param return_type: The return/output type for the Rule. This must be a concrete Python type.
     :param parameter_types: A sequence of types that matches the number and order of arguments to
-                            the decorated function.
+        the decorated function.
     :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
-                      its inputs.
+        its inputs.
     """
 
     is_goal_cls = issubclass(return_type, Goal)

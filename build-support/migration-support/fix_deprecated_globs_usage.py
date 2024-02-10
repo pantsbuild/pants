@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """A script to replace deprecated uses of `globs`, `rglobs`, and `zglobs` in BUILD files with a
 direct list of files and globs.
 
@@ -77,10 +76,11 @@ class GlobFunction(NamedTuple):
     def normalize_rglob(rglob: str) -> str:
         """We must expand rglobs for them to work properly.
 
-        In rglobs, * at the beginning of a path component means "any number of directories, including 0".
-        So every time we see ^*, we need to output "**/*whatever".
+        In rglobs, * at the beginning of a path component means "any number of directories,
+        including 0". So every time we see ^*, we need to output "**/*whatever".
 
-        See https://github.com/pantsbuild/pants/blob/9832c8f6d8b60648cf906775506864aad0ffdb33/src/python/pants/source/wrapped_globs.py#L303
+        See
+        https://github.com/pantsbuild/pants/blob/9832c8f6d8b60648cf906775506864aad0ffdb33/src/python/pants/source/wrapped_globs.py#L303
         for the original implementation.
         """
         components = rglob.split(os.path.sep)

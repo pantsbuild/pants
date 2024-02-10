@@ -1,6 +1,5 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 """Contains the "base" code for plugin APIs which require partitioning."""
 
 from __future__ import annotations
@@ -29,7 +28,7 @@ class PartitionerType(Enum):
     """The plugin author has a rule to go from `RequestType.PartitionRequest` -> `Partitions`."""
 
     DEFAULT_SINGLE_PARTITION = "default_single_partition"
-    """Registers a partitioner which returns the inputs as a single partition
+    """Registers a partitioner which returns the inputs as a single partition.
 
     The returned partition will have no metadata.
     """

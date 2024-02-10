@@ -230,7 +230,7 @@ def test_bool_invalid_value(val: Any) -> None:
 
 @contextmanager
 def no_exception():
-    """use in tests as placeholder for a pytest.raises, when no exception is expected."""
+    """Use in tests as placeholder for a pytest.raises, when no exception is expected."""
     yield None
 
 

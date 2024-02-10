@@ -59,9 +59,9 @@ async def _find_all_unique_interpreter_constraints(
 
     This will find the constraints for each individual matching field set, and then OR across all
     unique constraints. Usually, Pants partitions when necessary so that conflicting interpreter
-    constraints can be handled gracefully. But in some cases, like the `generate-lockfiles` goal,
-    we need to combine those targets into a single value. This ORs, so that if you have a
-    ==2.7 partition and ==3.6 partition, for example, we return ==2.7 OR ==3.6.
+    constraints can be handled gracefully. But in some cases, like the `generate-lockfiles` goal, we
+    need to combine those targets into a single value. This ORs, so that if you have a ==2.7
+    partition and ==3.6 partition, for example, we return ==2.7 OR ==3.6.
 
     Returns the global interpreter constraints if no relevant targets were matched.
     """

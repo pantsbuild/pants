@@ -163,8 +163,8 @@ class OwnedDependency:
 
     Code in this target is published in the owner's distribution.
 
-    The owner of a target T is T's closest filesystem ancestor among the python_distribution
-    targets that directly or indirectly depend on it (including T itself).
+    The owner of a target T is T's closest filesystem ancestor among the python_distribution targets
+    that directly or indirectly depend on it (including T itself).
     """
 
     target: Target

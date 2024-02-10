@@ -90,7 +90,6 @@ class Goal:
         """
 
         LOCAL_ONLY = 2
-
         f""" Indicates that the goal chooses the environments to use to execute rules within the goal.
 
         This requires migration work to be done by the goal author. See
@@ -100,7 +99,6 @@ class Goal:
 
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]
-
     f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
 
     All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, but end
@@ -125,7 +123,8 @@ class Outputting:
 
     Allows output to go to a file or to stdout.
 
-    Useful for goals whose purpose is to emit output to the end user (as distinct from incidental logging to stderr).
+    Useful for goals whose purpose is to emit output to the end user (as distinct from incidental
+    logging to stderr).
     """
 
     output_file = StrOption(

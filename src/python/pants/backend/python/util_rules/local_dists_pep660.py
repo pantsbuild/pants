@@ -378,13 +378,12 @@ class EditableLocalDistsRequest:
 class EditableLocalDists:
     """A Digest populated by editable (PEP660) wheels of local dists.
 
-    According to PEP660, these wheels should not be exported to users and must be discarded
-    after install. Anything that uses this should ensure that these wheels get installed and
-    then deleted.
+    According to PEP660, these wheels should not be exported to users and must be discarded after
+    install. Anything that uses this should ensure that these wheels get installed and then deleted.
 
-    Installing PEP660 wheels creates an "editable" install such that the sys.path gets
-    adjusted to include source directories from the build root (not from the sandbox).
-    This is decidedly not hermetic or portable and should only be used locally.
+    Installing PEP660 wheels creates an "editable" install such that the sys.path gets adjusted to
+    include source directories from the build root (not from the sandbox). This is decidedly not
+    hermetic or portable and should only be used locally.
 
     PEP660 wheels have .dist-info metadata and the .pth files (or similar) that adjust sys.path.
     """

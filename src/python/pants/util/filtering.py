@@ -27,18 +27,15 @@ def _extract_modifier(modified_param: str) -> Tuple[Callable[[bool], bool], str]
 def create_filter(predicate_param: str, predicate_factory: Callable[[str], Filter]) -> Filter:
     """Create a filter function from a string parameter.
 
-    :param predicate_param: Create a filter for this param string. Each string is a
-                            comma-separated list of arguments to the predicate_factory.
-                            If the entire comma-separated list is prefixed by a '-' then the
-                            sense of the resulting filter is inverted.
+    :param predicate_param: Create a filter for this param string. Each string is a comma-separated
+        list of arguments to the predicate_factory. If the entire comma-separated list is prefixed
+        by a '-' then the sense of the resulting filter is inverted.
     :param predicate_factory: A function that takes a parameter and returns a predicate, i.e., a
-                              function that takes a single parameter (of whatever type the filter
-                              operates on) and returns a boolean.
+        function that takes a single parameter (of whatever type the filter operates on) and returns
+        a boolean.
     :return: A filter function of one argument that is the logical OR of the predicates for each of
-             the comma-separated arguments. If the comma-separated list was prefixed by a '-',
-             the sense of the filter is inverted.
-
-    :API: public
+        the comma-separated arguments. If the comma-separated list was prefixed by a '-', the sense
+        of the filter is inverted. :API: public
     """
     modifier, param = _extract_modifier(predicate_param)
     predicates = [predicate_factory(p) for p in param.split(",")]

@@ -27,9 +27,8 @@ class InvalidZipPath(ValueError):
 def environment_as(**kwargs: str | None) -> Iterator[None]:
     """Update the environment to the supplied values, for example:
 
-    with environment_as(PYTHONPATH='foo:bar:baz',
-                        PYTHON='/usr/bin/python2.7'):
-      subprocess.Popen(foo).wait()
+    with environment_as(PYTHONPATH='foo:bar:baz',                     PYTHON='/usr/bin/python2.7'):
+    subprocess.Popen(foo).wait()
     """
     new_environment = kwargs
     old_environment = {}
@@ -191,12 +190,12 @@ def overwrite_file_content(
 ) -> Iterator[None]:
     """A helper that resets a file after the method runs.
 
-     It will read a file, save the content, maybe write temporary_content to it, yield, then
-     write the original content to the file.
+    It will read a file, save the content, maybe write temporary_content to it, yield, then write
+    the original content to the file.
 
     :param file_path: Absolute path to the file to be reset after the method runs.
-    :param temporary_content: Content to write to the file, or a function from current content
-      to new temporary content.
+    :param temporary_content: Content to write to the file, or a function from current content to
+        new temporary content.
     """
     file_path = Path(file_path)
     original_content = file_path.read_bytes()

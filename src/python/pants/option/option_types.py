@@ -219,8 +219,8 @@ class _ListOptionBase(
 
     Don't use this class directly, instead use one of the concrete classes below.
 
-    The default value will always be set as an empty list, and the Python property always returns
-    a tuple (for immutability).
+    The default value will always be set as an empty list, and the Python property always returns a
+    tuple (for immutability).
     """
 
     option_type = list

@@ -489,8 +489,9 @@ class EnvironmentTarget:
         session (i.e. Pants run), but we instead settle for every Pantsd lifetime to have more
         acceptable performance.
 
-        Meanwhile, when running with Docker, we already invalidate whenever the image changes
-        thanks to https://github.com/pantsbuild/pants/pull/17101.
+        Meanwhile, when running with Docker, we already invalidate whenever the image changes thanks
+        to
+        https://github.com/pantsbuild/pants/pull/17101.
 
         Remote execution often is safe to cache, but depends on the remote execution server.
         So, we rely on the user telling us what is safe.

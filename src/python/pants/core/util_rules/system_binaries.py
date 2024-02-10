@@ -188,8 +188,8 @@ class BinaryNotFoundError(EnvironmentError):
     ) -> BinaryNotFoundError:
         """When no binary is found via `BinaryPaths`, and it is not recoverable.
 
-        :param rationale: A short description of why this binary is needed, e.g.
-            "download the tools Pants needs" or "run Python programs".
+        :param rationale: A short description of why this binary is needed, e.g. "download the tools
+            Pants needs" or "run Python programs".
         :param alternative_solution: A description of what else users can do to fix the issue,
             beyond installing the program. For example, "Alternatively, you can set the option
             `--python-bootstrap-search-path` to change the paths searched."

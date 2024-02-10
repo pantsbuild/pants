@@ -179,11 +179,11 @@ class LoaderTest(unittest.TestCase):
     ):
         """Make a fake Distribution (optionally with entry points)
 
-        Note the entry points do not actually point to code in the returned distribution --
-        the distribution does not even have a location and does not contain any code, just metadata.
+        Note the entry points do not actually point to code in the returned distribution -- the
+        distribution does not even have a location and does not contain any code, just metadata.
 
-        A module is synthesized on the fly and installed into sys.modules under a random name.
-        If optional entry point callables are provided, those are added as methods to the module and
+        A module is synthesized on the fly and installed into sys.modules under a random name. If
+        optional entry point callables are provided, those are added as methods to the module and
         their name (foo/bar/baz in fake module) is added as the requested entry point to the mocked
         metadata added to the returned dist.
 
