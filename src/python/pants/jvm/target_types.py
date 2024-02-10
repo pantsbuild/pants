@@ -516,6 +516,9 @@ async def generate_from_pom_xml(
         SourceFilesRequest([generator[PomXmlSourceField]]),
     )
     files = await Get(DigestContents, Digest, pom_xml.snapshot.digest)
+    if not files:
+        raise FileNotFoundError(f"pom.xml not found: {generator[PomXmlSourceField].value}")
+
     mapping = request.generator[JvmArtifactsPackageMappingField].value
     coordinates = parse_pom_xml(files[0].content, pom_xml_path=pom_xml.snapshot.files[0])
     targets = (
