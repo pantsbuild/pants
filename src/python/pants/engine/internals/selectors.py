@@ -128,7 +128,7 @@ class Awaitable(Generic[_Output], _BasePyGeneratorResponseGet[_Output]):
 class Effect(Generic[_Output], Awaitable[_Output]):
     """Asynchronous generator API for types which are SideEffecting.
 
-    Unlike `Get`s, `Effect`s can cause side-effects (writing files to the workspace, publishing
+    Unlike `Get`s, `Effect`s can cause side effects (writing files to the workspace, publishing
     things, printing to the console), and so they may only be used in `@goal_rule`s.
 
     See Get for more information on supported syntaxes.

@@ -43,7 +43,7 @@ def _initialize_build_configuration(
     """Initialize a BuildConfiguration for the given OptionsBootstrapper.
 
     NB: This method:
-      1. has the side-effect of (idempotently) adding PYTHONPATH entries for this process
+      1. has the side effect of (idempotently) adding PYTHONPATH entries for this process
       2. is expensive to call, because it might resolve plugins from the network
     """
 

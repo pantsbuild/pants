@@ -57,7 +57,7 @@ Additionally, these types now by-default register the implementations for the ru
 
 ### `RunFieldSet` can be used to run targets in the sandbox as part of a build rule
 
-With the new `experimental_run_in_sandbox` target type, targets that implement `RunFieldSet` can be run as a build rule for their side-effects.
+With the new `experimental_run_in_sandbox` target type, targets that implement `RunFieldSet` can be run as a build rule for their side effects.
 
 Many rules that create `RunRequest`s can be used verbatim, but others may make assumptions that they will not be run hermetically. You will need set `run_in_sandbox_behavior` to one of the following values to generate a rule that allows your targets to be run in the sandbox:
 

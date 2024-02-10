@@ -324,7 +324,7 @@ def validate_commands(commands: tuple[str, ...]):
             )
         )
     # We don't allow publishing via setup.py, as we don't want the setup.py running rule,
-    # which is not a @goal_rule, to side-effect (plus, we'd need to ensure that publishing
+    # which is not a @goal_rule, to side effect (plus, we'd need to ensure that publishing
     # happens in dependency order).  Note that `upload` and `register` were removed in
     # setuptools 42.0.0, in favor of Twine, but we still check for them in case the user modified
     # the default version used by our Setuptools subsystem.
