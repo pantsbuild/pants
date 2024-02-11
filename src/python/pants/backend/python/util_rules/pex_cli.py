@@ -33,10 +33,10 @@ from pants.util.meta import classproperty
 class PexCli(TemplatedExternalTool):
     options_scope = "pex-cli"
     name = "pex"
-    help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
+    help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
     default_version = "v2.1.163"
-    default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
+    default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.1.148,<3.0"
 
     @classproperty

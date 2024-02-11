@@ -431,7 +431,7 @@ class _BuildPexPythonSetup:
 async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexPythonSetup:
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
-    # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
+    # flags are mutually exclusive. See https://github.com/pex-tool/pex/issues/957.
     if request.platforms or request.complete_platforms:
         # Note that this means that this is not an internal-only pex.
         # TODO(#9560): consider validating that these platforms are valid with the interpreter

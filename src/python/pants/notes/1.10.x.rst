@@ -15,9 +15,9 @@ Bugfixes
 ~~~~~~~~
 
 * Pin jupyter transitive deps in integration tests (#6568)
-  `Pex Issue #561, <https://github.com/pantsbuild/pex/issues/561>`_
+  `Pex Issue #561, <https://github.com/pex-tool/pex/issues/561>`_
   `Pants PR #6568 <https://github.com/pantsbuild/pants/pull/6568>`_
-  `Pex PR #562 <https://github.com/pantsbuild/pex/pull/562>`_
+  `Pex PR #562 <https://github.com/pex-tool/pex/pull/562>`_
 
 * More pinning to fix jupyter floats. (#6600)
   `PR #6600 <https://github.com/pantsbuild/pants/pull/6600>`_
