@@ -250,7 +250,7 @@ class BinaryShimsRequest:
 
 @dataclass(frozen=True)
 class BinaryShims:
-    """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
+    """The shims created for a BinaryShimsRequest are placed in `bin_directory` of the `digest`.
 
     The purpose of these shims is so that a Process may be executed with `immutable_input_digests`
     provided to the `Process`, and `path_component` included in its `PATH` environment variable.
@@ -637,7 +637,7 @@ async def find_tar(
 async def find_cat(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> CatBinary:
     request = BinaryPathRequest(binary_name="cat", search_path=system_binaries.system_binary_paths)
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="outputing content from files")
+    first_path = paths.first_path_or_raise(request, rationale="outputting content from files")
     return CatBinary(first_path.path, first_path.fingerprint)
 
 
@@ -731,7 +731,7 @@ async def find_readlink(
         binary_name="readlink", search_path=system_binaries.system_binary_paths
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="defererence symlinks")
+    first_path = paths.first_path_or_raise(request, rationale="dereference symlinks")
     return ReadlinkBinary(first_path.path, first_path.fingerprint)
 
 

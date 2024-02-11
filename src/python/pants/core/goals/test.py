@@ -83,7 +83,7 @@ class TestResult(EngineAwareReturnType):
     addresses: tuple[Address, ...]
     output_setting: ShowOutput
     # A None result_metadata indicates a backend that performs its own test discovery/selection
-    # and either discovered no tests, or encounted an error, such as a compilation error, in
+    # and either discovered no tests, or encountered an error, such as a compilation error, in
     # the attempt.
     result_metadata: ProcessResultMetadata | None  # TODO: Merge elapsed MS of all subproceses
     partition_description: str | None = None

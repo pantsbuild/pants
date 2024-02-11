@@ -22,7 +22,7 @@ from pants.util.strutil import softwrap
 class PantsLoader:
     """Initial entrypoint for pants.
 
-    Executes a pants_runner by default, or executs a pantsd-specific entrypoint.
+    Executes a pants_runner by default, or executes a pantsd-specific entrypoint.
     """
 
     @staticmethod

@@ -94,7 +94,7 @@ You can use [`.pyi` files](https://mypy.readthedocs.io/en/stable/stubs.html) for
 
 Pants's dependency inference knows to infer a dependency both on the implementation and the type stub. You can verify this by running `pants dependencies path/to/file.py`.
 
-When writing stubs for third-party libraries, you may need the set up the `[source].root_patterns` option so that [source roots](../../using-pants/key-concepts/source-roots.mdx) are properly stripped. For example:
+When writing stubs for third-party libraries, you may need to set up the `[source].root_patterns` option so that [source roots](../../using-pants/key-concepts/source-roots.mdx) are properly stripped. For example:
 
 ```toml tab={"label":"pants.toml"}
 [source]

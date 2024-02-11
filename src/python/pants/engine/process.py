@@ -230,7 +230,7 @@ class ProcessResultMetadata:
     def source(self, current_run_id: RunId) -> Source:
         """Given the current run_id, return the calculated "source" of the ProcessResult.
 
-        If a ProcessResult is consumed in any run_id other than the one it was created in, the its
+        If a ProcessResult is consumed in any run_id other than the one it was created in, the
         source implicitly becomes memoization, since the result was re-used in a new run without
         being recreated.
         """

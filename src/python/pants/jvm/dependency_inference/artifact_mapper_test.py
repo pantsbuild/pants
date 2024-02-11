@@ -149,7 +149,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
             node = new_node
         return node
 
-    # Provided by `JVM_ARTFACT_MAPPINGS.`
+    # Provided by `JVM_ARTIFACT_MAPPINGS.`
     assert set(traverse("org", "junit").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
         Address("", target_name="junit_junit"),
     }

@@ -193,7 +193,7 @@ class RemotePantsRunner:
                     logger.warning(f"Pantsd was unresponsive on port {port}, retrying.")
                     time.sleep(1)
 
-                    # One possible cause of the daemon being non-responsive during an attempt might be if a
+                    # One possible cause of the daemon being non-responsive during an attempt might be if
                     # another lifecycle operation is happening concurrently (incl teardown). To account for
                     # this, we won't begin attempting restarts until at least 1 attempt has passed.
                     if attempt > 1:

@@ -487,7 +487,7 @@ class Specs:
     The `ignores` will filter out all relevant `includes`.
 
     If your rule does not need to consider includes vs. ignores, e.g. to find all targets in a
-    directory,  you can directly use `RawSpecs`.
+    directory, you can directly use `RawSpecs`.
     """
 
     includes: RawSpecs

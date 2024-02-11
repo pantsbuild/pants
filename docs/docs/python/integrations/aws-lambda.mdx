@@ -137,7 +137,7 @@ For example, one use of layers is splitting the deployment package for a Lambda 
 1. a function artifact with only the code in your repository (first-party sources)
 2. a layer artifact with the third-party requirements that the function imports
 
-This split means making a change to first-party sources only requires rebuilding and re-deploying the function artifact. Since this artifact doesn't need to include all of the third-party requirements, rebuilding is likely to much faster and the resulting package will be smaller. The layer will only need to be rebuilt and redeployed if the third-party dependencies change, like a version upgrade or an additional `import`.
+This split means making a change to first-party sources only requires rebuilding and re-deploying the function artifact. Since this artifact doesn't need to include all of the third-party requirements, rebuilding is likely to be much faster and the resulting package will be smaller. The layer will only need to be rebuilt and redeployed if the third-party dependencies change, like a version upgrade or an additional `import`.
 
 ```python tab={"label":"project/BUILD"}
 python_sources(name="lib")
