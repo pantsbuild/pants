@@ -672,9 +672,9 @@ def test_build_file_address() -> None:
 def test_build_files_share_globals() -> None:
     """Test that a macro in a prelude can reference another macro in another prelude.
 
-    At some point a change was made to separate the globals/locals dict (unintentional) which has the
-    unintended side effect of having the `__globals__` of a macro not contain references to every
-    other symbol in every other prelude.
+    At some point a change was made to separate the globals/locals dict (unintentional) which has
+    the unintended side effect of having the `__globals__` of a macro not contain references to
+    every other symbol in every other prelude.
     """
 
     symbols = run_rule_with_mocks(

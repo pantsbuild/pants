@@ -693,8 +693,8 @@ class Targets(Collection[Target]):
 # FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
 # use `FilteredTargets` still have filtering applied.
 class FilteredTargets(Collection[Target]):
-    """A heterogeneous collection of Target instances that have been filtered with the global options
-    `--tag` and `--exclude-target-regexp`.
+    """A heterogeneous collection of Target instances that have been filtered with the global
+    options `--tag` and `--exclude-target-regexp`.
 
     Outside of the extra filtering, this type is identical to `Targets`, including its handling of
     target generators.

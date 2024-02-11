@@ -148,7 +148,9 @@ class ResolvedHelmArtifact(HelmArtifact, EngineAwareReturnType):
 
 
 @rule
-def resolved_helm_artifact(artifact: HelmArtifact, subsystem: HelmSubsystem) -> ResolvedHelmArtifact:
+def resolved_helm_artifact(
+    artifact: HelmArtifact, subsystem: HelmSubsystem
+) -> ResolvedHelmArtifact:
     remotes = subsystem.remotes()
 
     candidate_remotes = list(remotes.get(artifact.requirement.location.spec))

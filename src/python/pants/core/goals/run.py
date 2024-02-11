@@ -44,8 +44,8 @@ _T = TypeVar("_T")
 
 
 class RunInSandboxBehavior(Enum):
-    """Defines the behavior of rules that act on a `RunFieldSet` subclass with regards to use in
-    the sandbox.
+    """Defines the behavior of rules that act on a `RunFieldSet` subclass with regards to use in the
+    sandbox.
 
     This is used to automatically generate rules used to fulfill `experimental_run_in_sandbox`
     targets.
