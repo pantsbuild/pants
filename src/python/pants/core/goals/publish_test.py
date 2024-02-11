@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -58,6 +60,7 @@ async def mock_publish(request: MockPublishRequest) -> PublishProcesses:
                 if artifact.relpath
             ),
             process=None if repo == "skip" else InteractiveProcess(["echo", repo]),
+            packages=request.packages,
             description="(requested)" if repo == "skip" else repo,
         )
         for repo in request.field_set.repositories.value
@@ -81,7 +84,20 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_noop(rule_runner: RuleRunner) -> None:
+@pytest.fixture
+def dist_path(rule_runner) -> Path:
+    return Path(rule_runner.build_root, "dist")
+
+
+def assert_written_artifacts(expected: list[str], dist: Path) -> None:
+    actual = os.listdir(dist)
+
+    assert len(actual) == len(expected)
+    for package in expected:
+        assert package in actual
+
+
+def test_noop(rule_runner: RuleRunner, dist_path: Path) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
@@ -108,8 +124,11 @@ def test_noop(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     assert "Nothing published." in result.stderr
 
+    # We should not have written anything to dist
+    assert_written_artifacts([], dist_path)
 
-def test_skipped_publish(rule_runner: RuleRunner) -> None:
+
+def test_skipped_publish(rule_runner: RuleRunner, dist_path: Path) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
@@ -134,9 +153,13 @@ def test_skipped_publish(rule_runner: RuleRunner) -> None:
         env_inherit={"HOME", "PATH", "PYENV_ROOT"},
     )
 
+    tarball = "my-package-0.1.0.tar.gz"
+    wheel = "my_package-0.1.0-py3-none-any.whl"
+
     assert result.exit_code == 0
-    assert "my-package-0.1.0.tar.gz skipped (requested)." in result.stderr
-    assert "my_package-0.1.0-py3-none-any.whl skipped (requested)." in result.stderr
+    assert f"{tarball} skipped (requested)." in result.stderr
+    assert f"{wheel} skipped (requested)." in result.stderr
+    assert_written_artifacts([tarball, wheel], dist_path)
 
 
 def test_structured_output(rule_runner: RuleRunner) -> None:
