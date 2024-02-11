@@ -385,7 +385,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +two
                 """
             ),
-            [Hunk(1, 0, 2, 1)],
+            (Hunk(1, 0, 2, 1),),
         ],
         [
             dedent(
@@ -396,7 +396,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 -two
                 """
             ),
-            [Hunk(2, 1, 1, 0)],
+            (Hunk(2, 1, 1, 0),),
         ],
         [
             dedent(
@@ -408,7 +408,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +four
                 """
             ),
-            [Hunk(2, 1, 2, 1)],
+            (Hunk(2, 1, 2, 1),),
         ],
         [
             dedent(
@@ -422,7 +422,7 @@ def test_worktree_invalidation(origin: Path) -> None:
                 +six
                 """
             ),
-            [Hunk(2, 2, 2, 2)],
+            (Hunk(2, 2, 2, 2),),
         ],
     ],
 )
