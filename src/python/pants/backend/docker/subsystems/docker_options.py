@@ -108,13 +108,14 @@ class DockerOptions(Subsystem):
             The value is formatted and may reference these variables (in addition to the normal
             placeholders derived from the Dockerfile and build args etc):
 
-            {bullet_list(["name", "directory", "parent_directory", "target_repository"])}
+            {bullet_list(["name", "directory", "parent_directory", "build_file_path", "target_repository"])}
 
             Example: `--default-repository="{{directory}}/{{name}}"`.
 
             The `name` variable is the `docker_image`'s target name, `directory` and
             `parent_directory` are the name of the directory in which the BUILD file is for the
-            target, and its parent directory respectively.
+            target, and its parent directory respectively; and `build_file_path` is the full repository path
+            to the BUILD file.
 
             Use the `repository` field to set this value directly on a `docker_image` target.
 

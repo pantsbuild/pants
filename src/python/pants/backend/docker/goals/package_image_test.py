@@ -273,6 +273,11 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                   image_tags=["latest", "alpha-1.0", "alpha-1"],
                 )
                 docker_image(
+                  name="test6",
+                  image_tags=["1.2.3"],
+                  repository="xyz/{build_file_path}/{name}",
+                )
+                docker_image(
                   name="err1",
                   repository="{bad_template}",
                 )
@@ -365,11 +370,16 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
             )
         ],
     )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="test6"),
+        "Built docker image: xyz/docker/test/test6:1.2.3",
+    )
 
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
         r"docker/test:err1: '{bad_template}'\.\n\nThe placeholder 'bad_template' is unknown\. "
-        r"Try with one of: build_args, default_repository, directory, name, pants, "
+        r"Try with one of: build_args, build_file_path, default_repository, directory, name, pants, "
         r"parent_directory, tags, target_repository\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
