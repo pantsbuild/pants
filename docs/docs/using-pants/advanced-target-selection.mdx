@@ -148,18 +148,6 @@ To pipe a Pants run, use your shell's `|` pipe operator and `xargs`:
 pants dependents helloworld/util | xargs pants list
 ```
 
-:::caution xargs may end up invoking Pants goal more than once.
-When piping output of a Pants goal to `xargs`, keep in mind that the specified command may be invoked by `xargs` as
-many times as necessary to use up the list of input items. This may break the structured data output, for instance,
-when you want to `peek` the targets as JSON:
-
-```bash
-$ pants list --filter-target-type=resource :: | xargs pants peek
-```
-
-For this reason, it may be safer to use spec files to ensure the structured data format is preserved.
-:::
-
 You can, of course, pipe multiple times:
 
 ```bash
@@ -177,6 +165,14 @@ For example:
 ```bash
 $ pants dependencies helloworld/util > util_dependencies.txt
 $ pants --spec-files=util_dependencies.txt lint
+```
+
+Using spec files is also more robust because when piping output of a Pants goal to `xargs`, the specified command
+may be invoked by `xargs` as many times as necessary to use up the list of input items.
+This may break the structured data output, for instance, when you want to `peek` the targets as JSON:
+
+```bash
+$ pants list --filter-target-type=resource :: | xargs pants peek
 ```
 
 If you don't want to save the output to an actual file—such as to not pollute version control—you can use a variable and a named pipe:
