@@ -148,6 +148,23 @@ def test_dependents_as_json_direct_deps(rule_runner: RuleRunner) -> None:
         },
     )
 
+    # input: all targets, closed
+    assert_deps(
+        targets=["::"],
+        transitive=False,
+        closed=True,
+        expected={
+            "base:base": ["base:base", "intermediate:intermediate"],
+            "intermediate:intermediate": [
+                "intermediate:intermediate",
+                "leaf:leaf",
+                "special:special",
+            ],
+            "leaf:leaf": ["leaf:leaf"],
+            "special:special": ["special:special"],
+        },
+    )
+
 
 def test_dependents_as_json_transitive_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"special/BUILD": "tgt(special_deps=['intermediate'])"})
@@ -179,11 +196,28 @@ def test_dependents_as_json_transitive_deps(rule_runner: RuleRunner) -> None:
     # input: all targets
     assert_deps(
         targets=["::"],
-        transitive=False,
+        transitive=True,
         expected={
-            "base:base": ["intermediate:intermediate"],
+            "base:base": ["intermediate:intermediate", "leaf:leaf", "special:special"],
             "intermediate:intermediate": ["leaf:leaf", "special:special"],
             "leaf:leaf": [],
             "special:special": [],
+        },
+    )
+
+    # input: all targets, closed
+    assert_deps(
+        targets=["::"],
+        transitive=True,
+        closed=True,
+        expected={
+            "base:base": ["base:base", "intermediate:intermediate", "leaf:leaf", "special:special"],
+            "intermediate:intermediate": [
+                "intermediate:intermediate",
+                "leaf:leaf",
+                "special:special",
+            ],
+            "leaf:leaf": ["leaf:leaf"],
+            "special:special": ["special:special"],
         },
     )

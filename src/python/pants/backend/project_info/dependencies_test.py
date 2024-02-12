@@ -282,6 +282,32 @@ def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonR
             ],
         },
     )
+    # input: directory, recursively, closed
+    assert_deps(
+        specs=["some::"],
+        transitive=False,
+        closed=True,
+        expected={
+            "some/target:target": [
+                "some/target/a.py",
+                "some/target:target",
+            ],
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+                "some/target/a.py",
+            ],
+            "some/other/target:target": [
+                "some/other/target/a.py",
+                "some/other/target:target",
+            ],
+            "some/other/target/a.py": [
+                "3rdparty/python:req2",
+                "some/other/target/a.py",
+                "some/target/a.py",
+            ],
+        },
+    )
     assert_deps(
         specs=["some/other/target:target"],
         transitive=True,
@@ -291,6 +317,21 @@ def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonR
                 "3rdparty/python:req2",
                 "dep/target/a.py",
                 "some/other/target/a.py",
+                "some/target/a.py",
+            ]
+        },
+    )
+    assert_deps(
+        specs=["some/other/target:target"],
+        transitive=True,
+        closed=True,
+        expected={
+            "some/other/target:target": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/other/target/a.py",
+                "some/other/target:target",
                 "some/target/a.py",
             ]
         },
@@ -362,6 +403,41 @@ def test_python_dependencies_output_format_json_transitive_deps(
                 "3rdparty/python:req1",
                 "3rdparty/python:req2",
                 "dep/target/a.py",
+                "some/target/a.py",
+            ],
+        },
+    )
+
+    # input: directory, recursively, closed
+    assert_deps(
+        specs=["some::"],
+        transitive=True,
+        closed=True,
+        expected={
+            "some/target:target": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+                "some/target/a.py",
+                "some/target:target",
+            ],
+            "some/target/a.py": [
+                "3rdparty/python:req1",
+                "dep/target/a.py",
+                "some/target/a.py",
+            ],
+            "some/other/target:target": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/other/target/a.py",
+                "some/other/target:target",
+                "some/target/a.py",
+            ],
+            "some/other/target/a.py": [
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target/a.py",
+                "some/other/target/a.py",
                 "some/target/a.py",
             ],
         },
