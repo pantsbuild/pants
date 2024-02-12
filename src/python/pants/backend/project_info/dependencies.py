@@ -41,8 +41,7 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     )
     closed = BoolOption(
         default=False,
-        help="Include the input targets in the output, along with the dependencies. This option "
-        "only applies when using the `text` format.",
+        help="Include the input targets in the output, along with the dependencies.",
     )
     format = EnumOption(
         default=DependenciesOutputFormat.text,
@@ -58,11 +57,7 @@ class Dependencies(Goal):
 async def list_dependencies_as_json(
     addresses: Addresses, dependencies_subsystem: DependenciesSubsystem, console: Console
 ) -> None:
-    """Get dependencies for given addresses and list them in the console in JSON.
-
-    Note that `--closed` option is ignored as it doesn't make sense to duplicate source address in
-    the list of its dependencies.
-    """
+    """Get dependencies for given addresses and list them in the console in JSON."""
     # NB: We must preserve target generators for the roots, i.e. not replace with their
     # generated targets.
     target_roots = await Get(UnexpandedTargets, Addresses, addresses)
@@ -81,9 +76,14 @@ async def list_dependencies_as_json(
 
         iterated_targets = []
         for idx, transitive_targets in enumerate(transitive_targets_group):
-            targets_collection = {str(tgt.address) for tgt in transitive_targets.dependencies}
-            if dependencies_subsystem.closed:
-                targets_collection.add(addresses[idx].spec)
+            targets_collection = {
+                str(tgt.address)
+                for tgt in (
+                    transitive_targets.closure
+                    if dependencies_subsystem.closed
+                    else transitive_targets.dependencies
+                )
+            }
             iterated_targets.append(sorted(targets_collection))
 
     else:

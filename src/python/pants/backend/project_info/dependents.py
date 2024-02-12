@@ -117,8 +117,7 @@ class DependentsSubsystem(LineOriented, GoalSubsystem):
     )
     closed = BoolOption(
         default=False,
-        help="Include the input targets in the output, along with the dependents. This option "
-        "only applies when using the `text` format.",
+        help="Include the input targets in the output, along with the dependents.",
     )
     format = EnumOption(
         default=DependentsOutputFormat.text,
@@ -151,11 +150,7 @@ async def list_dependents_as_plain_text(
 async def list_dependents_as_json(
     addresses: Addresses, dependents_subsystem: DependentsSubsystem, console: Console
 ) -> None:
-    """Get dependents for given addresses and list them in the console in JSON.
-
-    Note that `--closed` option is ignored as it doesn't make sense to duplicate source address in
-    the list of its dependents.
-    """
+    """Get dependents for given addresses and list them in the console in JSON."""
     dependents_group = await MultiGet(
         Get(
             Dependents,
