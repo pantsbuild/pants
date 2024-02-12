@@ -942,16 +942,14 @@ def _log_or_raise_unmatched_owners(
 
 
 @union
+@dataclass(frozen=True)
 class HunkOwnersRequest(abc.ABC):
     """Union for universal diff hunk owners requests.
 
     Define a subclass if you want to use `--changed-files-with-line-numbers` flag.
     """
 
-    @classmethod
-    @abc.abstractmethod
-    def new(cls, hunks: FrozenDict[str, Hunk]) -> HunkOwnersRequest:
-        raise NotImplementedError
+    hunks: FrozenDict[str, Hunk]
 
 
 @dataclass(frozen=True)
@@ -974,21 +972,6 @@ class Owners(FrozenOrderedSet[Address]):
     pass
 
 
-@dataclass(frozen=True)
-class MyHunkOwnersRequest(HunkOwnersRequest):  # TODO remove
-    hunks: FrozenDict[str, tuple[Hunk, ...]]
-
-    @classmethod
-    def new(cls, hunks: FrozenDict[str, tuple[Hunk, ...]]) -> HunkOwnersRequest:
-        return MyHunkOwnersRequest(hunks)
-
-
-@rule
-def get_my_hunk_owners(request: MyHunkOwnersRequest) -> Owners:  # TODO remove
-    # raise RuntimeError(request)
-    return Owners()
-
-
 @rule(desc="Find which targets own certain files", _masked_types=[EnvironmentName])
 async def find_owners(
     owners_request: OwnersRequest,
@@ -1001,7 +984,7 @@ async def find_owners(
     if len(owners_request.changed_files_with_line_numbers) > 0:
         request_types = union_membership[HunkOwnersRequest]
         hunk_owners = await MultiGet(
-            Get(Owners, HunkOwnersRequest, request_type.new(owners_request.diff_hunks))
+            Get(Owners, HunkOwnersRequest, request_type(owners_request.diff_hunks))
             for request_type in request_types
         )
     else:
@@ -1690,5 +1673,4 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateFileTargets),
-        UnionRule(HunkOwnersRequest, MyHunkOwnersRequest),  # TODO remove
     ]

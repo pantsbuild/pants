@@ -77,7 +77,7 @@ def calculate_specs(
     if changed_options.files_with_line_numbers:
         diff_hunks = changed_options.diff_hunks(maybe_git_worktree.git_worktree)
     else:
-        diff_hunks = None
+        diff_hunks = {}
 
     changed_request = ChangedRequest(
         sources=changed_files,

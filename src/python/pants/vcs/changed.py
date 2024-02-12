@@ -125,7 +125,7 @@ class ChangedOptions:
             old_container=options,
             new_container=options,
         )
-        return cls(options.since, options.diffspec, options.line_numbers, dependents)
+        return cls(options.since, options.diffspec, options.files_with_line_numbers, dependents)
 
     @property
     def provided(self) -> bool:
@@ -175,7 +175,7 @@ class Changed(Subsystem):
         default=None,
         help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
     )
-    line_numbers = StrListOption(
+    files_with_line_numbers = StrListOption(
         default=None,
         help="Calculate changes with line numbers for the specified list of files.",
     )
