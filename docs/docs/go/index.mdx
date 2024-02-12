@@ -175,7 +175,7 @@ You can pass through arguments with `--`, e.g. `pants test pkg/deploy: -- -v -ru
 
 ### Loose files in tests (`testdata`)
 
-To open files in your tests, use [`file` / `files` targets](../using-pants/assets-and-archives.mdx) targets and add them as `dependencies` to your `go_package`.
+To open files in your tests, use [`file` / `files`](../using-pants/assets-and-archives.mdx) targets and add them as `dependencies` to your `go_package`.
 
 ```python title="pkg/runner/BUILD"
 go_package(dependencies=[":testdata"])

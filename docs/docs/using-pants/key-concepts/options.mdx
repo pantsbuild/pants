@@ -11,7 +11,7 @@ A deep dive into how options may be configured.
 
 Options are partitioned into named _scopes_.
 
-Some systemwide options belong in the _global scope_. For example, the `--level` option, which controls the logging level, is in the global scope.
+Some system-wide options belong in the _global scope_. For example, the `--level` option, which controls the logging level, is in the global scope.
 
 Other options belong to a _subsystem scope_. A _subsystem_ is simply a collection of related options, in a scope. For example, the `pytest` subsystem contains options related to [Python's test framework pytest](../../../reference/subsystems/pytest.mdx).
 
@@ -304,7 +304,7 @@ dictopt = """{
 #### Add/replace semantics
 
 - A value can be preceded by `+`, which will _update_ the value obtained from lower-precedence sources with the entries.
-- Otherwise, the value _replaces_ the one obtained from lower-precendence sources.
+- Otherwise, the value _replaces_ the one obtained from lower-precedence sources.
 
 For example, if the value of `--dictopt` in `scope` is set to `{'foo', 1, 'bar': 2}` in a config file, then
 

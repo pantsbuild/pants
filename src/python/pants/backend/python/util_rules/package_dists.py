@@ -151,7 +151,7 @@ class DependencyOwner:
 
     We need this type to prevent rule ambiguities when computing the list of targets owned by an
     ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which is itself an
-    ExportedTarget) and checking if owner is the original ExportedTarget.
+    ExportedTarget) and checking if owner is the original ExportedTarget).
     """
 
     exported_target: ExportedTarget
@@ -324,7 +324,7 @@ def validate_commands(commands: tuple[str, ...]):
             )
         )
     # We don't allow publishing via setup.py, as we don't want the setup.py running rule,
-    # which is not a @goal_rule, to side-effect (plus, we'd need to ensure that publishing
+    # which is not a @goal_rule, to side effect (plus, we'd need to ensure that publishing
     # happens in dependency order).  Note that `upload` and `register` were removed in
     # setuptools 42.0.0, in favor of Twine, but we still check for them in case the user modified
     # the default version used by our Setuptools subsystem.
@@ -417,7 +417,9 @@ async def create_dist_build_request(
             },
         ),
     )
-    source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
+    path_to_root = source_roots_result.path_to_root
+    dist_source_root = next(iter(path_to_root.values())).path if path_to_root else "."
+    source_roots = tuple(sorted({sr.path for sr in path_to_root.values()}))
 
     # Get any extra build-time environment (e.g., native extension requirements).
     build_env_requests = []
@@ -467,6 +469,7 @@ async def create_dist_build_request(
         build_sdist=sdist,
         input=prefixed_input,
         working_directory=working_directory,
+        dist_source_root=dist_source_root,
         build_time_source_roots=source_roots,
         target_address_spec=exported_target.target.address.spec,
         wheel_config_settings=wheel_config_settings,
@@ -631,7 +634,7 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
         )
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
-    # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have
+    # set. The user must have gone out of their way to use a `SetupKwargs` plugin, and to have
     # specified `SetupKwargs(_allow_banned_keys=True)`.
     setup_kwargs.update(
         {
@@ -971,7 +974,7 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
         or tgt.get(SourcesField).can_generate(ResourceSourceField, union_membership)
         # We also check for generating sources so that dependencies on `python_sources(sources=[])`
         # is included. Those won't generate any `python_source` targets, but still can be
-        # dependended upon.
+        # depended upon.
         or tgt.has_field(PythonGeneratingSourcesBase)
     )
 

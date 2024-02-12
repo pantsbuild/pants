@@ -83,7 +83,7 @@ API Changes
 ~~~~~~~~~~~
 
 * Upgrade to Pex 1.6.10. (#8187)
-  `Issue #756 <https://github.com/pantsbuild/pex/issues/756>`_
+  `Issue #756 <https://github.com/pex-tool/pex/issues/756>`_
   `PR #8187 <https://github.com/pantsbuild/pants/pull/8187>`_
 
 * Upgrade to PyYAML 5.1.2 (#8161)

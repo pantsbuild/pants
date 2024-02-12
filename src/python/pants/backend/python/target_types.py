@@ -296,6 +296,21 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
+@dataclass(frozen=True)
+class Executable(MainSpecification):
+    executable: str
+
+    def iter_pex_args(self) -> Iterator[str]:
+        yield "--executable"
+        # We do NOT yield self.executable or self.spec
+        # as the path needs additional processing in the rule graph.
+        # see: build_pex in util_rules/pex
+
+    @property
+    def spec(self) -> str:
+        return self.executable
+
+
 class EntryPointField(AsyncFieldMixin, Field):
     alias = "entry_point"
     default = None
@@ -309,8 +324,8 @@ class EntryPointField(AsyncFieldMixin, Field):
           1) `'app.py'`, Pants will convert into the module `path.to.app`;
           2) `'app.py:func'`, Pants will convert into `path.to.app:func`.
 
-        You may either set this field or the `script` field, but not both. Leave off both fields
-        to have no entry point.
+        You may only set one of: this field, or the `script` field, or the `executable` field.
+        Leave off all three fields to have no entry point.
         """
     )
     value: EntryPoint | None
@@ -355,8 +370,8 @@ class PexScriptField(Field):
         Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a script or
         console_script as defined by any of the distributions in the PEX.
 
-        You may either set this field or the `entry_point` field, but not both. Leave off both
-        fields to have no entry point.
+        You may only set one of: this field, or the `entry_point` field, or the `executable` field.
+        Leave off all three fields to have no entry point.
         """
     )
     value: ConsoleScript | None
@@ -371,12 +386,57 @@ class PexScriptField(Field):
         return ConsoleScript(value)
 
 
+class PexExecutableField(Field):
+    alias = "executable"
+    default = None
+    help = help_text(
+        """
+        Set the entry point, i.e. what gets run when executing `./my_app.pex`, to an execuatble
+        local python script. This executable python script is typically something that cannot
+        be imported so it cannot be used via `script` or `entry_point`.
+
+        You may only set one of: this field, or the `entry_point` field, or the `script` field.
+        Leave off all three fields to have no entry point.
+        """
+    )
+    value: Executable | None
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[Executable]:
+        value = super().compute_value(raw_value, address)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
+        # spec_path is relative to the workspace. The rule is responsible for
+        # stripping the source root as needed.
+        return Executable(os.path.join(address.spec_path, value).lstrip(os.path.sep))
+
+
 class PexArgsField(StringSequenceField):
     alias = "args"
     help = help_text(
         """
         Freeze these command-line args into the PEX. Allows you to run generic entry points
         on specific arguments without creating a shim file.
+        """
+    )
+
+
+class PexCheckField(StringField):
+    alias = "check"
+    valid_choices = ("none", "warn", "error")
+    expected_type = str
+    default = "warn"
+    help = help_text(
+        """
+        Check that the built PEX is valid. Currently this only
+        applies to `--layout zipapp` where the PEX zip is
+        tested for importability of its `__main__` module by
+        the Python zipimport module. This check will fail for
+        PEX zips that use ZIP64 extensions since the Python
+        zipimport zipimporter only works with 32 bit zips. The
+        check no-ops for all other layouts.
         """
     )
 
@@ -395,7 +455,7 @@ class PexPlatformsField(StringSequenceField):
     alias = "platforms"
     removal_version = "2.22.0.dev0"
     removal_hint = softwrap(
-        """\
+        f"""\
     The platforms field is a hack. The abbreviated information it provides is sometimes insufficient,
     leading to hard-to-debug build issues. Use complete_platforms instead.
     See {doc_url('pex')} for details.
@@ -697,6 +757,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
     PexBinaryDependenciesField,
+    PexCheckField,
     PexPlatformsField,
     PexCompletePlatformsField,
     PexResolveLocalPlatformsField,
@@ -724,6 +785,7 @@ class PexBinary(Target):
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
+        PexExecutableField,
         PexArgsField,
         PexEnvField,
         OutputPathField,
@@ -738,13 +800,18 @@ class PexBinary(Target):
     )
 
     def validate(self) -> None:
-        if self[PexEntryPointField].value is not None and self[PexScriptField].value is not None:
+        got_entry_point = self[PexEntryPointField].value is not None
+        got_script = self[PexScriptField].value is not None
+        got_executable = self[PexExecutableField].value is not None
+
+        if (got_entry_point + got_script + got_executable) > 1:
             raise InvalidTargetException(
                 softwrap(
                     f"""
-                    The `{self.alias}` target {self.address} cannot set both the
-                    `{self[PexEntryPointField].alias}` and `{self[PexScriptField].alias}` fields at
-                    the same time. To fix, please remove one.
+                    The `{self.alias}` target {self.address} cannot set more than one of the
+                    `{self[PexEntryPointField].alias}`, `{self[PexScriptField].alias}`, and
+                    `{self[PexExecutableField].alias}` fields at the same time.
+                    To fix, please remove all but one.
                     """
                 )
             )

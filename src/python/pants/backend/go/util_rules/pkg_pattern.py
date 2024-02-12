@@ -47,8 +47,8 @@ def _match_pattern_internal(pattern: str, vendor_exclude: bool) -> Callable[[str
     # The strategy for the vendor exclusion is to change the unmatchable
     # vendor strings to a disallowed code point (vendorChar) and to use
     # "(anything but that codepoint)*" as the implementation of the ... wildcard.
-    # This is a bit complicated but the obvious alternative,
-    # namely a hand-written search like in most shell glob matchers,
+    # This is a bit complicated, but the obvious alternative,
+    # namely a handwritten search like in most shell glob matchers,
     # is too easy to make accidentally exponential.
     # Using package regexp guarantees linear-time matching.
 

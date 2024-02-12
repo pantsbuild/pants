@@ -87,7 +87,7 @@ New Features
 ~~~~~~~~~~~~
 
 * Release pants as both a Python 2.7 PEX and a Python 3.6 PEX (#7401)
-  `Issue #654 <https://github.com/pantsbuild/pex/issues/654>`_
+  `Issue #654 <https://github.com/pex-tool/pex/issues/654>`_
   `PR #7401 <https://github.com/pantsbuild/pants/pull/7401>`_
 
 Refactoring, Improvements, and Tooling
@@ -150,7 +150,7 @@ New Features
   `PR #7365 <https://github.com/pantsbuild/pants/pull/7365>`_
 
 * Add support for releasing Python 3 wheels (#7197)
-  `Issue #654 <https://github.com/pantsbuild/pex/issues/654>`_
+  `Issue #654 <https://github.com/pex-tool/pex/issues/654>`_
   `PR #7197 <https://github.com/pantsbuild/pants/pull/7197>`_
 
 * [pantsd] Implement auto-shutdown after runs (#7341)

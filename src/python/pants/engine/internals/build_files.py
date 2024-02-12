@@ -59,6 +59,31 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
+class BuildFileSyntaxError(SyntaxError):
+    """An error parsing a BUILD file."""
+
+    def from_syntax_error(error: SyntaxError) -> BuildFileSyntaxError:
+        return BuildFileSyntaxError(
+            error.msg,
+            (
+                error.filename,
+                error.lineno,
+                error.offset,
+                error.text,
+            ),
+        )
+
+    def __str__(self) -> str:
+        first_line = f"Error parsing BUILD file {self.filename}:{self.lineno}: {self.msg}"
+        # These two fields are optional per the spec, so we can't rely on them being set.
+        if self.text is not None and self.offset is not None:
+            second_line = f"  {self.text.rstrip()}"
+            third_line = f"  {' ' * (self.offset - 1)}^"
+            return f"{first_line}\n{second_line}\n{third_line}"
+
+        return first_line
+
+
 @dataclass(frozen=True)
 class BuildFileOptions:
     patterns: tuple[str, ...]
@@ -204,7 +229,11 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
     @classmethod
     def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
         obj = cls(file_content.path)
-        obj.visit(ast.parse(file_content.content, file_content.path))
+        try:
+            obj.visit(ast.parse(file_content.content, file_content.path))
+        except SyntaxError as e:
+            raise BuildFileSyntaxError.from_syntax_error(e).with_traceback(e.__traceback__)
+
         return tuple(obj.env_vars)
 
     def visit_Call(self, node: ast.Call):

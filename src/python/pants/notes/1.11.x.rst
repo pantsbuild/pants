@@ -279,8 +279,8 @@ Refactoring, Improvements, and Tooling
 
 * Pin jupyter transitive deps in integration tests (#6568)
   `PR #6568 <https://github.com/pantsbuild/pants/pull/6568>`_
-  `Pex Issue #561 <https://github.com/pantsbuild/pex/issues/561>`_
-  `Pex PR #562 <https://github.com/pantsbuild/pex/pull/562>`_
+  `Pex Issue #561 <https://github.com/pex-tool/pex/issues/561>`_
+  `Pex PR #562 <https://github.com/pex-tool/pex/pull/562>`_
 
 * Switch synchronization primitive usage to parking_lot (#6564)
   `PR #6564 <https://github.com/pantsbuild/pants/pull/6564>`_

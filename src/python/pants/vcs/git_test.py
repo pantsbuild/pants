@@ -140,6 +140,9 @@ def test_integration(worktree: Path, readme_file: Path, git: MutatingGitWorktree
     assert {"README"} == git.changed_files()
     assert {"README", "INSTALL"} == git.changed_files(include_untracked=True)
 
+    (worktree / "WITH SPACE").write_text("space in path")
+    assert {"README", "INSTALL", "WITH SPACE"} == git.changed_files(include_untracked=True)
+
     # Confirm that files outside of a given relative_to path are ignored
     assert set() == git.changed_files(relative_to="non-existent")
 
