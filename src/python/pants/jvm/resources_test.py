@@ -107,7 +107,7 @@ def test_resources(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_resources_jar_is_determinstic(rule_runner: RuleRunner) -> None:
+def test_resources_jar_is_deterministic(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "resources(name='root', sources=['**/*.txt'])",

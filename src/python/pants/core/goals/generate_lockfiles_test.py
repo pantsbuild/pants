@@ -116,7 +116,7 @@ def test_determine_tool_sentinels_to_generate() -> None:
         set(),
     ) == ([Lang1Requested(["ambiguous"])], [])
 
-    # Error if same resolve name used for multiple user lockfiles.
+    # Error if the same resolve name is used for multiple user lockfiles.
     with pytest.raises(AmbiguousResolveNamesError):
         determine_resolves_to_generate(
             [

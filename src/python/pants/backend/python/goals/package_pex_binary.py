@@ -13,6 +13,7 @@ from pants.backend.python.target_types import (
     PexEmitWarningsField,
     PexEntryPointField,
     PexEnvField,
+    PexExecutableField,
     PexExecutionMode,
     PexExecutionModeField,
     PexIgnoreErrorsField,
@@ -59,6 +60,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
     entry_point: PexEntryPointField
     script: PexScriptField
+    executable: PexExecutableField
     args: PexArgsField
     env: PexEnvField
 
@@ -145,7 +147,7 @@ async def package_pex_binary(
     request = PexFromTargetsRequest(
         addresses=[field_set.address],
         internal_only=False,
-        main=resolved_entry_point.val or field_set.script.value,
+        main=resolved_entry_point.val or field_set.script.value or field_set.executable.value,
         inject_args=field_set.args.value or [],
         inject_env=field_set.env.value or FrozenDict[str, str](),
         platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),

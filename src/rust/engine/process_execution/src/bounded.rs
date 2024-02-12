@@ -373,7 +373,7 @@ pub(crate) fn balance(now: Instant, state: &mut State) -> usize {
         state.total_concurrency as isize - concurrency_used as isize;
     let mut prempted = 0;
 
-    // To reduce the number of tasks that we preempty, we preempt them in order by the amount of
+    // To reduce the number of tasks that we preempt, we preempt them in order by the amount of
     // concurrency that they desire or can relinquish.
     match desired_change_in_commitment.cmp(&0) {
         Ordering::Equal => {

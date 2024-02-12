@@ -99,7 +99,7 @@ New Features
 API Changes
 ~~~~~~~~~~~
 * Invoke Pants via module in ITs. (#8265)
-  `Issue #707 <https://github.com/pantsbuild/pex/issues/707>`_
+  `Issue #707 <https://github.com/pex-tool/pex/issues/707>`_
   `PR #8265 <https://github.com/pantsbuild/pants/pull/8265>`_
 
 Bugfixes

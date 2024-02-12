@@ -45,7 +45,7 @@ class GoCoverageBoundary:
 class GoCoverageProfile:
     """Parsed representation of a raw Go coverage profile for a single file.
 
-    A coverage outpyt file may report on multiple files which will be split into different instances
+    A coverage output file may report on multiple files which will be split into different instances
     of this dataclass.
     """
 
