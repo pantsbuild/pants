@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import NoReturn
 
-VERSION_PATH = Path("src/python/pants/VERSION")
+VERSION_PATH = Path(__file__).parent.parent.parent.parent / "pants" / "_version" / "VERSION"
 CONTRIBUTORS_PATH = Path("CONTRIBUTORS.md")
 
 _SCRIPT_START_TIME = time.time()
