@@ -291,7 +291,7 @@ async def demo(...) -> Foo:
 
 `SourceFilesRequest` expects an iterable of `SourcesField` objects. `SourceFiles` has a field `snapshot: Snapshot` with the merged snapshot of all resolved input sources fields.
 
-To convert a list of targets to source files on disk, you can request `HydrateSourcesRequest` for every input target:
+To convert a list of target addresses to existing source file names, you can request `HydratedSources` for every input target:
 
 ```python
 from itertools import chain
