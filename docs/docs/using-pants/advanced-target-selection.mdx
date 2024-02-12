@@ -145,7 +145,7 @@ Whereas `tags` are useful for _decentralized_ allow/block lists, `--spec-files` 
 To pipe a Pants run, use your shell's `|` pipe operator and `xargs`:
 
 ```bash
-pants dependents helloworld/util | xargs pants  list
+pants dependents helloworld/util | xargs pants list
 ```
 
 :::caution xargs may end up invoking Pants goal more than once.
