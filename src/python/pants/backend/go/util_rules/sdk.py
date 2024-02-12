@@ -26,6 +26,14 @@ SANDBOX_CACHE = "gopath"
 NAMED_CACHE = "gopath_cache"
 
 
+def sdk_cache() -> dict[str, str]:
+    """Returns the append_only_caches config used to populate ./gopath in a sandbox.
+
+    Other processes that build go may need to use the same cache
+    """
+    return {NAMED_CACHE: SANDBOX_CACHE}
+
+
 @dataclass(frozen=True)
 class GoSdkProcess:
     cache_scope: ProcessCacheScope
@@ -95,6 +103,8 @@ async def go_sdk_invoke_setup(
             sandbox_root="$(/bin/pwd)"
             export GOPATH="${{sandbox_root}}/{SANDBOX_CACHE}"
             export GOCACHE="${{sandbox_root}}/cache"
+            # go install targets GOBIN, updated here to keep binaries outside of the cached GOPATH
+            export GOBIN="${{sandbox_root}}/gobin"
 
             /bin/mkdir -p "$GOCACHE"
             # GOTPATH is created by append_only_caches in Process args.
@@ -153,7 +163,7 @@ async def setup_go_sdk_process(
 
     return Process(
         # cache gopath to capture all downloaded go modules
-        append_only_caches={NAMED_CACHE: SANDBOX_CACHE},
+        append_only_caches=sdk_cache(),
         argv=[bash.path, go_sdk_run.script.path, *request.command],
         env=env,
         input_digest=input_digest,
@@ -162,43 +172,6 @@ async def setup_go_sdk_process(
         output_directories=request.output_directories,
         level=LogLevel.DEBUG,
         cache_scope=request.cache_scope,
-    )
-
-
-@dataclass(frozen=True)
-class GoSdkFindPackageRequest:
-    module_path: str
-
-    def __init__(
-        self,
-        module_path: str,
-    ) -> None:
-        object.__setattr__(self, "module_path", module_path)
-
-
-@rule
-async def process_find_go_packages(
-    request: GoSdkFindPackageRequest,
-    bash: BashBinary,
-) -> Process:
-    find_script = FileContent(
-        "__run_find.sh",
-        textwrap.dedent(
-            f"""\
-            /bin/find {request.module_path} -type f -name '*.go'
-            """
-        ).encode("utf-8"),
-    )
-
-    digest = await Get(Digest, CreateDigest([find_script]))
-
-    return Process(
-        # Add a named_cache symlink to capture all downloaded go modules
-        append_only_caches={NAMED_CACHE: SANDBOX_CACHE},
-        argv=[bash.path, find_script.path],
-        input_digest=digest,
-        description=f"find .go files for {request.module_path}",
-        level=LogLevel.DEBUG,
     )
 
 

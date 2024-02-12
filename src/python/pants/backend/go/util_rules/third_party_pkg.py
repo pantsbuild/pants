@@ -56,9 +56,6 @@ class ThirdPartyPkgAnalysis:
 
     import_path: str
     name: str
-    # TODO: maybe not necessary with named_cache modules
-    digest: Digest
-    # dir_path is still needed though to pass to analysis
     dir_path: str
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
@@ -109,14 +106,13 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
 
 @dataclass(frozen=True)
 class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
-    """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
+    """All the packages downloaded from a go.mod.
 
-    The digest has files in the format `gopath/pkg/mod`, which is what `GoSdkProcess` sets `GOPATH`
-    to. This means that you can include the digest in a process and Go will properly consume it as
-    the `GOPATH`.
+    There is no longer a digest included, as the packages are downloaded as to a named_cache. Later
+    processes may use the file contents via append_only_caches=sdk.sdk_cache(). The simlink will
+    create the gopath such that go will properly consume it.
     """
 
-    digest: Digest
     import_paths_to_pkg_info: FrozenDict[str, ThirdPartyPkgAnalysis]
 
 
@@ -179,7 +175,6 @@ class AnalyzedThirdPartyModule:
 @dataclass(frozen=True)
 class AnalyzeThirdPartyPackageRequest:
     pkg_json: FrozenDict[str, Any]
-    module_sources_digest: Digest
     module_sources_path: str
     module_import_path: str
     package_path: str
@@ -326,6 +321,7 @@ async def _check_go_sum_has_not_changed(
                 )
             )
             go_sum_diff_rendered = "\n".join(line.rstrip() for line in go_sum_diff)
+
             raise ValueError(
                 f"For `{GoModTarget.alias}` target `{go_mod_address}`, the go.sum file is incomplete "
                 f"because it was updated while processing third-party dependency `{import_path}`. "
@@ -363,7 +359,7 @@ async def process_find_go_packages(
         FallibleProcessResult,
         Process(
             # Use a named_cache symlink to reference downloaded go modules
-            append_only_caches={gosdk.NAMED_CACHE: gosdk.SANDBOX_CACHE},
+            append_only_caches=gosdk.sdk_cache(),
             argv=[bash.path, find_script.path],
             input_digest=digest,
             description=f"find .go files for {request.path}",
@@ -398,11 +394,12 @@ async def analyze_go_third_party_module(
         ProcessResult,
         GoSdkProcess(
             ("mod", "download", "-json", f"{request.name}@{request.version}"),
-            input_digest=request.go_mod_digest,  # for go.sum
+            input_digest=request.go_mod_digest,
             working_dir=os.path.dirname(request.go_mod_path),
             # Allow downloads of the module sources.
             allow_downloads=True,
-            output_files=("go.sum",),
+            # check that go.sum does not change after execution
+            output_files=(os.path.join(os.path.dirname(request.go_mod_path), "go.sum"),),
             description=f"Download Go module {request.name}@{request.version}.",
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
         ),
@@ -439,7 +436,7 @@ async def analyze_go_third_party_module(
         ProcessResult,
         Process(
             [os.path.join(analyzer_relpath, analyzer.path), *chosen_paths],
-            append_only_caches={"gopath_cache": "gopath"},
+            append_only_caches=gosdk.sdk_cache(),
             input_digest=EMPTY_DIGEST,
             immutable_input_digests={
                 analyzer_relpath: analyzer.digest,
@@ -463,7 +460,6 @@ async def analyze_go_third_party_module(
                 FallibleThirdPartyPkgAnalysis,
                 AnalyzeThirdPartyPackageRequest(
                     pkg_json=_freeze_json_dict(pkg_json),
-                    module_sources_digest=EMPTY_DIGEST,
                     module_sources_path=module_sources_relpath,
                     module_import_path=request.name,
                     package_path=pkg_path,
@@ -535,7 +531,6 @@ async def analyze_go_third_party_package(
             )
 
     analysis = ThirdPartyPkgAnalysis(
-        digest=request.module_sources_digest,
         import_path=import_path,
         name=request.pkg_json["Name"],
         dir_path=request.package_path,
@@ -578,12 +573,13 @@ async def analyze_go_third_party_package(
         )
         input_digest = await Get(
             Digest,
-            MergeDigests((request.module_sources_digest, patterns_json_digest, embedder.digest)),
+            MergeDigests((patterns_json_digest, embedder.digest)),
         )
         embed_result = await Get(
             FallibleProcessResult,
             Process(
                 ("./embedder", "patterns.json", request.package_path),
+                append_only_caches=gosdk.sdk_cache(),
                 input_digest=input_digest,
                 description=f"Create embed mapping for {import_path}",
                 level=LogLevel.DEBUG,
@@ -655,7 +651,7 @@ async def download_and_analyze_third_party_packages(
         for pkg in analyzed_module.packages
     }
 
-    return AllThirdPartyPackages(EMPTY_DIGEST, FrozenDict(import_path_to_info))
+    return AllThirdPartyPackages(FrozenDict(import_path_to_info))
 
 
 @rule
@@ -714,7 +710,6 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             import_path=import_path,
             name="",
             dir_path="",
-            digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),
             c_files=(),

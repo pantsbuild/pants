@@ -6,6 +6,7 @@ from __future__ import annotations
 import os.path
 import re
 from textwrap import dedent
+from typing import Generator
 
 import pytest
 
@@ -30,15 +31,22 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysisRequest,
 )
 from pants.build_graph.address import Address
-from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import EMPTY_DIGEST, Digest, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
+from pants.util.contextutil import temporary_dir
+
+
+@pytest.fixture(scope="module")
+def named_caches_dir() -> Generator[str]:
+    with temporary_dir(prefix="test_tpp_cache_") as tmpdir:
+        yield tmpdir
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
+def rule_runner(named_caches_dir: str) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *sdk.rules(),
@@ -55,6 +63,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
         ],
         target_types=[GoModTarget],
+        bootstrap_args=[f"--named-caches-dir={named_caches_dir}"],
     )
     rule_runner.set_options(["--golang-cgo-enabled"], env_inherit={"PATH"})
     return rule_runner
@@ -179,12 +188,24 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         assert pkg_info.imports == imports
         assert pkg_info.go_files == go_files
         assert not pkg_info.s_files
-        snapshot = rule_runner.request(Snapshot, [pkg_info.digest])
-        expected_files = {
-            os.path.join(dir_path, file_name) for file_name in (*go_files, *extra_files)
-        }
-        assert expected_files.issubset(snapshot.files)
         assert pkg_info.minimum_go_version == minimum_go_version
+
+        named_caches_dir = (
+            rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
+        )
+        expected_files = {
+            os.path.join(dir_path, file_name)
+            for file_name in (*go_files, *extra_files)
+        }
+        seen_files = set()
+
+        path_in_named_cache = dir_path.replace(sdk.SANDBOX_CACHE, sdk.NAMED_CACHE)
+        cache_path = os.path.join(named_caches_dir, path_in_named_cache)
+        for _root, _dirs, files in os.walk(cache_path):
+            for name in files:
+                seen_files.add(os.path.join(dir_path, name))
+
+        assert seen_files == expected_files
 
     assert_pkg_info(
         import_path="github.com/google/uuid",

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
 
+import pants.backend.go.util_rules.sdk as gosdk
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import cgo_binaries, cgo_pkgconfig
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
@@ -355,6 +356,7 @@ async def _cc(
         src_file,
     ]
     return Process(
+        append_only_caches=gosdk.sdk_cache(),
         argv=args,
         env={"TERM": "dumb", **env},
         input_digest=input_digest,
@@ -407,6 +409,7 @@ async def _gccld(
     result = await Get(
         FallibleProcessResult,
         Process(
+            append_only_caches=gosdk.sdk_cache(),
             argv=args,
             env={"TERM": "dumb", **env},
             input_digest=input_digest,
@@ -666,10 +669,15 @@ async def cgo_compile_request(
     dir_path = request.dir_path if request.dir_path else "."
 
     obj_dir_path = (
-        f"__go_stdlib_obj__/{request.import_path}" if os.path.isabs(dir_path) else dir_path
+        # avoid writing under gopath (digests overwrite the symlink)
+        # and avoid writing under stdlib (outside the sandbox)
+        # the root of the sandbox (".") is used for the primary package
+        f"_objdir/{request.import_path}"
+        if dir_path != "."
+        else dir_path
     )
     cgo_input_digest = request.digest
-    if os.path.isabs(dir_path):
+    if obj_dir_path != ".":
         mkdir_digest = await Get(Digest, CreateDigest([Directory(obj_dir_path)]))
         cgo_input_digest = await Get(Digest, MergeDigests([cgo_input_digest, mkdir_digest]))
 

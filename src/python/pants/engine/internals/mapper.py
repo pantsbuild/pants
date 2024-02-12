@@ -69,7 +69,7 @@ class AddressMap:
                 dependencies_rules,
             )
         except Exception as e:
-            raise MappingError(f"Failed to parse ./{filepath}:\n{type(e).__name__}: {e}")
+            raise MappingError(f"Failed to parse ./{filepath} in {os.path.abspath('.')}") from e
         return cls.create(filepath, target_adaptors)
 
     @classmethod

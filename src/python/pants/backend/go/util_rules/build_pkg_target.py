@@ -291,7 +291,7 @@ async def setup_build_go_package_target_request(
         imports = set(_third_party_pkg_info.imports)
         dir_path = _third_party_pkg_info.dir_path
         pkg_name = _third_party_pkg_info.name
-        digest = _third_party_pkg_info.digest
+        digest = EMPTY_DIGEST
         minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
         s_files = _third_party_pkg_info.s_files

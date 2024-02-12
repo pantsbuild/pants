@@ -268,7 +268,11 @@ class RuleRunner:
             root_dir = Path(mkdtemp(prefix="RuleRunner."))
             print(f"Preserving rule runner temporary directories at {root_dir}.", file=sys.stderr)
             bootstrap_args.extend(
-                ["--keep-sandboxes=always", f"--local-execution-root-dir={root_dir}"]
+                [
+                    "--keep-sandboxes=always",
+                    f"--local-execution-root-dir={root_dir}",
+                    f"--named-caches-dir={root_dir}/named_caches",
+                ]
             )
             build_root = (root_dir / "BUILD_ROOT").resolve()
             build_root.mkdir()

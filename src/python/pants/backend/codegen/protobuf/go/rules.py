@@ -584,7 +584,6 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
         GoSdkProcess(
             ["mod", "download", "all"],
             input_digest=go_mod_digest,
-            output_directories=("gopath",),
             description="Download Go `protoc` plugin sources.",
             allow_downloads=True,
             cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
@@ -595,9 +594,11 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
         Get(
             ProcessResult,
             GoSdkProcess(
-                ["install", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1"],
-                input_digest=download_sources_result.output_digest,
-                output_files=["gopath/bin/protoc-gen-go"],
+                [
+                    "install",
+                    "google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1",
+                ],
+                output_files=["gobin/protoc-gen-go"],
                 description="Build Go protobuf plugin for `protoc`.",
             ),
         ),
@@ -608,8 +609,7 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
                     "install",
                     "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0",
                 ],
-                input_digest=download_sources_result.output_digest,
-                output_files=["gopath/bin/protoc-gen-go-grpc"],
+                output_files=["gobin/protoc-gen-go-grpc"],
                 description="Build Go gRPC protobuf plugin for `protoc`.",
             ),
         ),
@@ -633,7 +633,8 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
             [go_plugin_build_result.output_digest, go_grpc_plugin_build_result.output_digest]
         ),
     )
-    plugin_digest = await Get(Digest, RemovePrefix(merged_output_digests, "gopath/bin"))
+    plugin_digest = await Get(Digest, RemovePrefix(merged_output_digests, "gobin"))
+
     return _SetupGoProtocPlugin(plugin_digest)
 
 
