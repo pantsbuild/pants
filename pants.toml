@@ -152,6 +152,7 @@ python-default = "3rdparty/python/user_reqs.lock"
 flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
+setuptools-scm = "3rdparty/python/setuptools-scm.lock"
 
 [python-infer]
 assets = true
@@ -211,6 +212,8 @@ diff = true
 [pyupgrade]
 args = ["--keep-runtime-typing", "--py38-plus"]
 
+[setuptools-scm]
+install_from_resolve = "setuptools-scm"
 
 [jvm]
 default_resolve = "jvm_testprojects"

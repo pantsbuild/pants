@@ -60,12 +60,11 @@ _PANTS_VERSION_OVERRIDE = "_PANTS_VERSION_OVERRIDE"
 def _determine_version_from_pants_source():
     from setuptools_scm import get_version  # pants: no-infer-dep
 
-    def version_scheme(version):
-        return version.format_with("{tag}")
-
     val = get_version(
-        version_scheme=version_scheme,
+        # NB: Keep in sync with `src/python/pants/_version/BUILD`
+        version_scheme="only-version",
         tag_regex=r"^release_(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)$",
+        local_scheme="no-local-version" if os.getenv("CI", "0") == "1" else None,
     )
     return val
 
