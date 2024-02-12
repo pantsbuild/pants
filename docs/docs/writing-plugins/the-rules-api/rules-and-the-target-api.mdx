@@ -235,7 +235,7 @@ class MyTarget(Target):
 Then, to resolve the addresses, you can use `UnparsedAddressInputs`:
 
 ```python
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.target import Targets
 from pants.engine.rules import Get, rule
 
@@ -290,6 +290,30 @@ async def demo(...) -> Foo:
 ```
 
 `SourceFilesRequest` expects an iterable of `SourcesField` objects. `SourceFiles` has a field `snapshot: Snapshot` with the merged snapshot of all resolved input sources fields.
+
+To convert a list of target addresses to existing source file names, you can request `HydratedSources` for every input target:
+
+```python
+from itertools import chain
+from pants.engine.addresses import Addresses
+from pants.engine.collection import DeduplicatedCollection
+from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.target import (HydratedSources, HydrateSourcesRequest, SourcesField, UnexpandedTargets)
+
+
+class ProjectSources(DeduplicatedCollection[str]):
+    pass
+
+
+@rule
+async def addresses_to_source_files(addresses: Addresses) -> ProjectSources:
+    targets = await Get(UnexpandedTargets, Addresses, addresses)
+    all_sources = await MultiGet(Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in targets)
+    return ProjectSources(chain.from_iterable(sources.snapshot.files for sources in all_sources))
+```
+
+This is often useful when you need to pass target addresses to commands that are not Pants goals and would not
+be able to interpret them properly.
 
 ### Enabling codegen
 
