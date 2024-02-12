@@ -166,6 +166,45 @@ You can use the prefix `!!` to transitively exclude a dependency, meaning that e
 Transitive excludes can only be used in target types that conventionally are not depended upon by other targets, such as `pex_binary`, `python_distribution`, and `python_test` / `python_tests`. This is meant to limit confusion, as using `!!` in something like a `python_source` / `python_sources` target could result in surprising behavior for everything that depends on it. (Pants will print a helpful error when using `!!` when it's not legal.)
 :::
 
+## Referring to a group of targets
+
+If you want to group multiple targets to refer to them as dependencies, you can create a generic target with no
+specific type named [`target`](../../reference/targets/target):
+
+```python title="BUILD"
+target(
+    name="python-libs",
+    dependencies=["src/python/libraries/libA", "src/python/libraries/libB"],
+)
+```
+
+If declared in the root of your workspace, you can now address the Python libraries by `//:python-libs`:
+
+```bash
+$ pants dependencies //:python-libs
+````
+
+## Creating aliases for targets
+
+If you have some targets declared in BUILD files that are stored deep within the directory structure of your workspace,
+you can make it easier to refer to that target when listing that target among dependencies of other targets.
+
+For example, you can simplify accessing a target by creating another target that will serve as an alias definition in
+a BUILD file stored in a more convenient location in the workspace, for instance, in the build root directory:
+
+```python title="BUILD"
+target(
+    name="deployment-bins",
+    dependencies=["src/golang/production/cloud/deployment/binaries:tools"]
+)
+```
+
+You can now refer to that target more concisely in BUILD files:
+
+```python title="BUILD"
+python_sources(dependencies=["//:deployment-bins"])
+```
+
 ## Field default values
 
 As mentioned above in [BUILD files](./targets-and-build-files.mdx#build-files), most target fields have sensible defaults. And it's easy to override those values on a specific target. But applying the same non-default value on many targets can get unwieldy, error-prone and hard to maintain. Enter `__defaults__`.
