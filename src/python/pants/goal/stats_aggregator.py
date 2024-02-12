@@ -63,13 +63,15 @@ class StatsAggregatorSubsystem(Subsystem):
     )
 
 
-def log_or_write_to_file(output_file: Optional[str], text: str, logger: logging.Logger) -> None:
+def _log_or_write_to_file(output_file: Optional[str], text: str) -> None:
     """Send text to the stdout or write to the output file."""
-    if output_file:
-        with open(output_file, "w") as fh:
-            fh.write(text)
-    else:
-        logger.info(text)
+    if text:
+        if output_file:
+            with open(output_file, "w") as fh:
+                fh.write(text)
+            logger.info(f"Wrote Pants stats to {output_file}")
+        else:
+            logger.info(text)
 
 
 class StatsAggregatorCallback(WorkunitsCallback):
@@ -140,7 +142,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
             )
 
         if not (self.log and self.has_histogram_module):
-            log_or_write_to_file(self.output_file, output_contents, logger)
+            _log_or_write_to_file(self.output_file, output_contents)
             return
 
         from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
@@ -148,7 +150,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:
             output_contents += "\nNo observation histogram were recorded."
-            log_or_write_to_file(self.output_file, output_contents, logger)
+            _log_or_write_to_file(self.output_file, output_contents)
             return
 
         output_contents += "\nObservation histogram summaries:"
@@ -173,7 +175,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
                 f"  sum: {int(histogram.get_mean_value() * histogram.total_count)}\n"
                 f"{percentile_to_vals}"
             )
-        log_or_write_to_file(self.output_file, output_contents, logger)
+        _log_or_write_to_file(self.output_file, output_contents)
 
 
 @dataclass(frozen=True)
