@@ -97,7 +97,7 @@ class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType)
     """Intermediate representation of a `HelmProcess` that will produce a fully rendered set of
     manifests from a given chart.
 
-    The encapsulated `process` will be side-effecting dependening on the `cmd` that was originally requested.
+    The encapsulated `process` will be side-effecting depending on the `cmd` that was originally requested.
 
     This is meant to only be used internally by this module.
     """
@@ -318,7 +318,7 @@ async def setup_render_helm_deployment_process(
 
     # If using a post-renderer we are only going to keep the process result cached in
     # memory to prevent storing in disk, either locally or remotely, secrets or other
-    # sensitive values that may been added in by the post-renderer.
+    # sensitive values that may have been added in by the post-renderer.
     process_cache = (
         ProcessCacheScope.PER_RESTART_SUCCESSFUL
         if request.post_renderer

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 import pytest
+from packaging.requirements import InvalidRequirement
 from pkg_resources import Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -14,6 +15,7 @@ from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import (
     _PATCH_VERSION_UPPER_BOUND,
     InterpreterConstraints,
+    parse_constraint,
 )
 from pants.build_graph.address import Address
 from pants.engine.target import FieldSet
@@ -531,3 +533,29 @@ def test_major_minor_version_when_single_and_entire(
         assert set(all_versions) == {
             (*expected, patch) for patch in range(_PATCH_VERSION_UPPER_BOUND + 1)
         }
+
+
+@pytest.mark.parametrize(
+    ("input_ic", "expected"),
+    [
+        ("CPython==3.9.*", "CPython==3.9.*"),
+        ("==3.9.*", "CPython==3.9.*"),
+        ("PyPy==3.9.*", "PyPy==3.9.*"),
+    ],
+)
+def test_parse_python_interpreter_constraint_when_valid(input_ic: str, expected: str) -> None:
+    assert parse_constraint(input_ic) == Requirement.parse(expected)
+
+
+@pytest.mark.parametrize(
+    ("input_ic", "expected_error"),
+    [
+        ("some-invalid-constraint-3.9.*", "Failed to parse Python interpreter constraint"),
+        ("3.9.*", "Failed to parse Python interpreter constraint"),
+    ],
+)
+def test_parse_python_interpreter_constraint_when_invalid(
+    input_ic: str, expected_error: str
+) -> None:
+    with pytest.raises(InvalidRequirement, match=expected_error):
+        parse_constraint(input_ic)

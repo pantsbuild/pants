@@ -6,7 +6,7 @@ from pathlib import PurePath
 from typing import Set
 
 #
-# Note: This file is used as an pex entry point in the execution sandbox.
+# Note: This file is used as a pex entry point in the execution sandbox.
 #
 
 

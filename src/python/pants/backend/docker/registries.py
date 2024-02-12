@@ -99,5 +99,5 @@ class DockerRegistries:
             elif alias_or_address == ALL_DEFAULT_REGISTRIES:
                 yield from self.default
             else:
-                # Assume a explicit address from the BUILD file.
+                # Assume an explicit address from the BUILD file.
                 yield DockerRegistryOptions(address=alias_or_address)

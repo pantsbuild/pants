@@ -264,7 +264,7 @@ class EntireLockfile:
     """A request to resolve the entire contents of a lockfile.
 
     This resolution mode is used in a few cases:
-    1. for poetry or hand-written lockfiles (which do not support being natively subsetted the
+    1. for poetry or handwritten lockfiles (which do not support being natively subsetted the
        way that a PEX lockfile can be), in order to build a repository-PEX to subset separately.
     2. for tool lockfiles, which (regardless of format), need to resolve the entire lockfile
        content anyway.

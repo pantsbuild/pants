@@ -5,7 +5,7 @@ This document describes releases leading up to the ``1.26.x`` ``stable`` series.
 
 Some significant changes in this series:
 
-* Pants now uses PEX ``2.1.x``, which uses PIP under the hood, and consequently significantly changes resolves (in order to better align with the wider Python ecosystem). Please see https://github.com/pantsbuild/pex/pull/788 for details.
+* Pants now uses PEX ``2.1.x``, which uses PIP under the hood, and consequently significantly changes resolves (in order to better align with the wider Python ecosystem). Please see https://github.com/pex-tool/pex/pull/788 for details.
 
 * Adds support for TOML config files, e.g. ``pants.toml``. INI config files will still be supported for some time, but INI is now legacy. Please see https://groups.google.com/forum/#!topic/pants-devel/N1H03oJONco for more information.
 

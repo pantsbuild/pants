@@ -25,7 +25,7 @@ fn maybe_config<I: IntoIterator<Item = &'static str>>(file_contents: I) -> Resul
             path
         })
         .collect::<Vec<_>>();
-    Config::merged(
+    Config::parse(
         &files,
         &HashMap::from([
             ("seed1".to_string(), "seed1val".to_string()),
@@ -56,24 +56,46 @@ fn test_display() {
 }
 
 #[test]
-fn test_section_overlap() {
-    // Two files with the same section should result in merged content for that section.
+fn test_multiple_sources() {
     let config = config([
         "[section]\n\
-     field1 = 'something'\n",
+     name = 'first'\n\
+     field1 = 'something'\n\
+     list='+[0,1]'",
         "[section]\n\
-     field2 = 'something else'\n",
+     name = 'second'\n\
+     field2 = 'something else'\n\
+     list='-[0],+[2, 3]'",
     ]);
 
-    let assert_string = |expected: &str, id: OptionId| {
-        assert_eq!(
-            expected.to_owned(),
-            config.get_string(&id).unwrap().unwrap()
-        )
+    let assert_string = |expected: &str, id: &OptionId| {
+        assert_eq!(expected.to_owned(), config.get_string(id).unwrap().unwrap())
     };
 
-    assert_string("something", option_id!(["section"], "field1"));
-    assert_string("something else", option_id!(["section"], "field2"));
+    assert_string("second", &option_id!(["section"], "name"));
+    assert_string("something", &option_id!(["section"], "field1"));
+    assert_string("something else", &option_id!(["section"], "field2"));
+
+    assert_eq!(
+        vec![
+            ListEdit {
+                action: ListEditAction::Add,
+                items: vec![0, 1]
+            },
+            ListEdit {
+                action: ListEditAction::Remove,
+                items: vec![0]
+            },
+            ListEdit {
+                action: ListEditAction::Add,
+                items: vec![2, 3]
+            },
+        ],
+        config
+            .get_int_list(&option_id!(["section"], "list"))
+            .unwrap()
+            .unwrap()
+    )
 }
 
 #[test]

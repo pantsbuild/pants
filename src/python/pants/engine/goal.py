@@ -79,7 +79,7 @@ class Goal:
     ```
 
     Since `@goal_rules` always run in order to produce side effects (generally: console output),
-    they are not cacheable, and the `Goal` product of a `@goal_rule` contains only a exit_code
+    they are not cacheable, and the `Goal` product of a `@goal_rule` contains only an exit_code
     value to indicate whether the rule exited cleanly.
     """
 

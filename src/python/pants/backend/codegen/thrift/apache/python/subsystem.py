@@ -18,7 +18,7 @@ class ThriftPythonSubsystem(Subsystem):
         help=softwrap(
             """
             Code generation options specific to the Python code generator to pass to the
-            Apache `thift` binary via the `-gen py` argument.
+            Apache `thrift` binary via the `-gen py` argument.
             See `thrift -help` for supported values.
             """
         ),

@@ -24,7 +24,7 @@ from pants.util.strutil import softwrap
 class DockerInferenceFieldSet(FieldSet):
     required_fields = (DockerImageDependenciesField,)
 
-    depenendencies: DockerImageDependenciesField
+    dependencies: DockerImageDependenciesField
 
 
 class InferDockerDependencies(InferDependenciesRequest):
@@ -35,7 +35,7 @@ class InferDockerDependencies(InferDependenciesRequest):
 async def infer_docker_dependencies(
     request: InferDockerDependencies, all_packageable_targets: AllPackageableTargets
 ) -> InferredDependencies:
-    """Inspects the Dockerfile for references to known packagable targets."""
+    """Inspects the Dockerfile for references to known packageable targets."""
     dockerfile_info = await Get(DockerfileInfo, DockerfileInfoRequest(request.field_set.address))
     targets = await Get(Targets, Addresses([request.field_set.address]))
     build_args = await Get(DockerBuildArgs, DockerBuildArgsRequest(targets.expect_single()))
@@ -66,7 +66,7 @@ async def infer_docker_dependencies(
     # NB: There's no easy way of knowing the output path's default file ending as there could
     # be none or it could be dynamic. Instead of forcing clients to tell us, we just use all the
     # possible ones from the Dockerfile. In rare cases we over-infer, but it is relatively harmless.
-    # NB: The suffix gets an `or None` `pathlib` includes the ".", but `OutputPathField` doesnt
+    # NB: The suffix gets an `or None` `pathlib` includes the ".", but `OutputPathField` doesn't
     # expect it (if you give it "", it'll leave a trailing ".").
     possible_file_endings = {PurePath(path).suffix[1:] or None for path in maybe_output_paths}
     inferred_addresses = []
