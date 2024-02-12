@@ -75,7 +75,12 @@ VERSION: str = (
     # being used when bootstrapping Pants with a released version.
     os.environ.get(_PANTS_VERSION_OVERRIDE)
     or
-    # NB: This is only relevant for the Pants repo itself
+    # NB: This is only relevant for the Pants repo itself, as the `VERSION` file:
+    #   1. Doesn't exist in the tree
+    #   2. Shouldn't exist in the Pants sandbox when running processes/tests
+    #       - This file SHOULD NOT depend on the generated `VERSION` resource
+    #       - Because, if it DID depend on the generated `VERSION`, every commit changes
+    #           the contents of that file, so every commit would be a new cache entry.
     (
         _determine_version_from_pants_source()
         if os.environ.get("RUNNING_PANTS_FROM_SOURCES", "0") == "1"
