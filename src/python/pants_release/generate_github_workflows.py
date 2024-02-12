@@ -170,7 +170,7 @@ def ensure_category_label() -> Sequence[Step]:
 
 def checkout(
     *,
-    fetch_depth: int = 10,
+    fetch_depth: int = 250,
     containerized: bool = False,
     ref: str | None = None,
     **extra_opts: object,

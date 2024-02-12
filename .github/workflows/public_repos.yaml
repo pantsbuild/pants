@@ -15,7 +15,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: AlexTereshenkov/cheeseshop-query
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
@@ -100,7 +100,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: Ars-Linguistica/mlconjug3
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -152,7 +152,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: OpenSaMD/OpenSaMD
     - name: Set up Python 3.9.15
       uses: actions/setup-python@v4
@@ -237,7 +237,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: StackStorm/st2
         submodules: recursive
     - name: Set up Python 3.8
@@ -335,7 +335,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: fucina/treb
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -407,7 +407,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: ghandic/jsf
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -469,7 +469,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: komprenilo/liga
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
@@ -521,7 +521,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: lablup/backend.ai
     - name: Set up Python 3.11.4
       uses: actions/setup-python@v4
@@ -611,7 +611,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: mitodl/ol-django
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -665,7 +665,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: mitodl/ol-infrastructure
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -717,7 +717,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: naccdata/flywheel-gear-extensions
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -780,7 +780,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-adhoc
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -846,7 +846,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-codegen
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -943,7 +943,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-django
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
@@ -1029,7 +1029,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-docker
     - name: Set up Python 3.8
       uses: actions/setup-python@v4
@@ -1114,7 +1114,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-golang
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -1203,7 +1203,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-jvm
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -1288,7 +1288,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-kotlin
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
@@ -1373,7 +1373,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-python
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
@@ -1458,7 +1458,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/example-visibility
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
@@ -1533,7 +1533,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 250
         repository: pantsbuild/scie-pants
     - name: Set up Python 3.9
       uses: actions/setup-python@v4
