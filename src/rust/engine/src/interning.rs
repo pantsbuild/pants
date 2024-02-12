@@ -54,7 +54,7 @@ impl Interns {
         let (id, type_id): (u64, TypeId) = {
             let v = v.as_ref(py);
             let keys = self.keys.as_ref(py);
-            let id: u64 = if let Some(key) = keys.get_item(v) {
+            let id: u64 = if let Some(key) = keys.get_item(v)? {
                 key.extract()?
             } else {
                 let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);

@@ -277,7 +277,7 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.11"
 prost-build = "0.11"
 prost-types = "0.11"
-pyo3 = "0.19"
+pyo3 = "0.20"
 rand = "0.8"
 regex = "1"
 rlimit = "0.8"
